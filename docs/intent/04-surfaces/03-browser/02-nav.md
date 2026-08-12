@@ -17,6 +17,10 @@ The topbar is not just a list of pages. It shows the active node, active app con
 
 Nav should keep the system grounded. If the user is attached to the wrong app, using the wrong reporter, or agents are active, the shell should make that context visible before the user takes action.
 
+When an attached app has no valid browser-local Reporter selection, the shell should gently ask who the user is after the shared Reporter list is available. The user chooses an existing Reporter or creates one through the shared Reporter capability; Refine does not infer identity from the first available Reporter. The orientation dialog yields to route and utility dialogs so the shell presents one accessible modal context at a time.
+
+Reporter selection remains local to the browser and can always be changed or created later under `Controls > Reporter`. Dismissing the first-load orientation leaves identity unselected for the rest of that page lifetime rather than repeatedly interrupting the user.
+
 The current browser shell uses Dashboard, Features, Goals, Changes, and Logs as the main nav items. Management actions live in context menus so the main nav stays focused on work. The bright primary create action is `+ New Goal`, with related creation flows available nearby.
 
 Dashboard and Goals navigation carries their shared current/all Node scope in the URL. The URL remains the filter source of truth so reload, sharing, and browser history preserve that scope; a specific named-Node Goals filter is not projected onto Dashboard.

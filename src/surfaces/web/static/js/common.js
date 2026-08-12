@@ -1169,7 +1169,7 @@ async function applyProjectAttachResult(result, options = {}) {
   if (options.toast !== false) showProjectAttachToast(result);
   resetChatForProjectSwitch();
   initSSE();
-  await refreshNodeScopedState({ selectReporterFallback: true });
+  await refreshNodeScopedState();
   await refreshTargetAppToggle();
   if (location.hash !== "#/node/application") {
     location.hash = "#/node/application";
@@ -1541,7 +1541,7 @@ function mdInline(text) {
 
 // ---- reporter dropdown ------------------------------------------------------
 
-async function refreshReporters({ selectFallback = false } = {}) {
+async function refreshReporters() {
   if (!hasAttachedProject()) {
     state.reporters = [];
     setLastReporter("");
@@ -1550,25 +1550,27 @@ async function refreshReporters({ selectFallback = false } = {}) {
   }
   const data = await api("GET", "/api/reporters");
   state.reporters = data.reporters || [];
-  reconcileLastReporter({ selectFallback });
+  reconcileLastReporter();
   populateAllReporterDropdowns();
+  if (typeof notifyReporterOnboardingHydrated === "function") {
+    notifyReporterOnboardingHydrated();
+  }
 }
 
-async function refreshNodeScopedState({ selectReporterFallback = false } = {}) {
+async function refreshNodeScopedState() {
   if (typeof resetChatForProjectSwitch === "function") resetChatForProjectSwitch();
   state.reporters = [];
   state.dashboard = null;
   state.currentGoal = null;
   setLastReporter("");
   populateAllReporterDropdowns();
-  await refreshReporters({ selectFallback: selectReporterFallback });
+  await refreshReporters();
 }
 
-function reconcileLastReporter({ selectFallback = false } = {}) {
+function reconcileLastReporter() {
   const names = state.reporters.map((r) => r.name).filter(Boolean);
   if (state.lastReporter && names.includes(state.lastReporter)) return;
-  const next = selectFallback ? (names[0] || "") : "";
-  setLastReporter(next);
+  setLastReporter("");
 }
 
 function populateAllReporterDropdowns() {
@@ -1610,15 +1612,36 @@ async function handleReporterAdd(sel) {
   }
   try {
     const { reporter } = await api("POST", "/api/reporters", { name });
-    await refreshReporters();
+    mergeReporterIntoProjection(reporter);
+    populateAllReporterDropdowns();
     sel.value = reporter.name;
     setLastReporter(reporter.name);
+    try {
+      await refreshReporters();
+    } catch (refreshError) {
+      toast(
+        `Reporter created and selected, but the Reporter list could not be refreshed: ${refreshError.message}`,
+        "warn",
+        { source: "reporter-controls" },
+      );
+    }
     return reporter.name;
   } catch (e) {
     toast(`Could not add reporter: ${e.message}`, "error");
     sel.value = state.lastReporter || "";
     return null;
   }
+}
+
+function mergeReporterIntoProjection(reporter) {
+  if (!reporter?.name) return;
+  const reporters = Array.isArray(state.reporters) ? state.reporters : [];
+  const index = reporters.findIndex((candidate) =>
+    (reporter.id != null && candidate.id === reporter.id)
+      || candidate.name === reporter.name);
+  if (index >= 0) reporters[index] = { ...reporters[index], ...reporter };
+  else reporters.push(reporter);
+  state.reporters = reporters;
 }
 
 function setLastReporter(name) {
@@ -1887,13 +1910,7 @@ function initSSE() {
     if (!sseEventChanged("Project", e)) return;
     invalidateScreenDataCache();
     await refreshProjectStatus();
-    if (
-      state.currentRoute === "features" ||
-      state.currentRoute === "goals" ||
-      state.currentRoute === "dashboard" ||
-      (state.currentRoute === "node"
-        && document.querySelector('[data-tab-pane="reporters"].active'))
-    ) {
+    if (hasAttachedProject()) {
       await refreshReporters();
     }
     if (typeof refreshAgentStatusIndicator === "function") refreshAgentStatusIndicator();

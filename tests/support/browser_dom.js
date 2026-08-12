@@ -9,14 +9,20 @@ class BrowserEvent {
     this.key = init.key || "";
     this.ctrlKey = !!init.ctrlKey;
     this.metaKey = !!init.metaKey;
+    this.shiftKey = !!init.shiftKey;
     this.defaultPrevented = false;
     this.propagationStopped = false;
+    this.immediatePropagationStopped = false;
     this.target = null;
     this.currentTarget = null;
   }
 
   preventDefault() { this.defaultPrevented = true; }
   stopPropagation() { this.propagationStopped = true; }
+  stopImmediatePropagation() {
+    this.immediatePropagationStopped = true;
+    this.propagationStopped = true;
+  }
 }
 
 class BrowserElement {
@@ -83,6 +89,8 @@ class BrowserElement {
 
   get innerHTML() { return this._innerHTML || ""; }
   set innerHTML(markup) {
+    const removedNodes = [...this.children];
+    removedNodes.forEach((child) => { child.parentElement = null; });
     this.children = [];
     this._ownText = "";
     this._innerHTML = String(markup);
@@ -92,6 +100,14 @@ class BrowserElement {
     if (this.tagName === "SELECT") {
       this._value = this.value;
       this._initialValue = this.value;
+    }
+    if (removedNodes.length) {
+      this.ownerDocument._notifyMutation({
+        type: "childList",
+        target: this,
+        addedNodes: [],
+        removedNodes,
+      });
     }
   }
 
@@ -105,18 +121,37 @@ class BrowserElement {
   appendChild(child) {
     child.parentElement = this;
     this.children.push(child);
+    this.ownerDocument._notifyMutation({
+      type: "childList",
+      target: this,
+      addedNodes: [child],
+      removedNodes: [],
+    });
     return child;
   }
 
   prepend(child) {
     child.parentElement = this;
     this.children.unshift(child);
+    this.ownerDocument._notifyMutation({
+      type: "childList",
+      target: this,
+      addedNodes: [child],
+      removedNodes: [],
+    });
   }
 
   remove() {
     if (!this.parentElement) return;
-    this.parentElement.children = this.parentElement.children.filter((child) => child !== this);
+    const parent = this.parentElement;
+    parent.children = parent.children.filter((child) => child !== this);
     this.parentElement = null;
+    this.ownerDocument._notifyMutation({
+      type: "childList",
+      target: parent,
+      addedNodes: [],
+      removedNodes: [this],
+    });
   }
 
   contains(element) {
@@ -148,7 +183,10 @@ class BrowserElement {
     let current = this;
     do {
       event.currentTarget = current;
-      for (const listener of current.listeners.get(event.type) || []) listener.call(current, event);
+      for (const listener of [...(current.listeners.get(event.type) || [])]) {
+        listener.call(current, event);
+        if (event.immediatePropagationStopped) break;
+      }
       current = event.bubbles && !event.propagationStopped ? current.parentElement : null;
     } while (current);
     return !event.defaultPrevented;
@@ -190,10 +228,12 @@ class BrowserDocument {
     this.activeElement = null;
     this.body = new BrowserElement("body", this);
     this.listeners = new Map();
+    this.mutationObservers = new Set();
   }
 
   createElement(tagName) { return new BrowserElement(tagName, this); }
   querySelector(selector) { return this.body.querySelector(selector); }
+  querySelectorAll(selector) { return this.body.querySelectorAll(selector); }
   addEventListener(type, listener) {
     if (!this.listeners.has(type)) this.listeners.set(type, []);
     this.listeners.get(type).push(listener);
@@ -206,17 +246,48 @@ class BrowserDocument {
     if (!(event instanceof BrowserEvent)) event = new BrowserEvent(event.type || event, event);
     if (!event.target) event.target = this;
     event.currentTarget = this;
-    for (const listener of [...(this.listeners.get(event.type) || [])]) listener.call(this, event);
+    for (const listener of [...(this.listeners.get(event.type) || [])]) {
+      listener.call(this, event);
+      if (event.immediatePropagationStopped) break;
+    }
     return !event.defaultPrevented;
+  }
+
+  _notifyMutation(record) {
+    for (const observer of [...this.mutationObservers]) {
+      if (!observer.target) continue;
+      const inScope = observer.target === record.target
+        || (observer.options?.subtree && observer.target.contains(record.target));
+      if (inScope && observer.options?.childList) observer.callback([record], observer.publicObserver);
+    }
   }
 }
 
 function createBrowserDom(markup) {
   const document = new BrowserDocument();
+  class BrowserMutationObserver {
+    constructor(callback) {
+      this.callback = callback;
+      this.target = null;
+      this.options = null;
+      this.publicObserver = this;
+    }
+
+    observe(target, options = {}) {
+      this.target = target;
+      this.options = options;
+      document.mutationObservers.add(this);
+    }
+
+    disconnect() {
+      document.mutationObservers.delete(this);
+      this.target = null;
+    }
+  }
   const root = document.createElement("div");
   document.body.appendChild(root);
   root.innerHTML = markup;
-  return { document, root, BrowserEvent };
+  return { document, root, BrowserEvent, MutationObserver: BrowserMutationObserver };
 }
 
 function parseInto(parent, markup, document) {

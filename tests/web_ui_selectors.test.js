@@ -82,3 +82,19 @@ test("dom-morph.js is loaded before the screens that use it", () => {
     assert.ok(i > domMorph, `${src} must load after dom-morph.js`);
   }
 });
+
+test("Reporter onboarding loads before router and init", () => {
+  const indexHtml = fs.readFileSync(
+    path.join(__dirname, "../src/surfaces/web/static/index.html"),
+    "utf8",
+  );
+  const order = [...indexHtml.matchAll(/<script src="([^"]+)"><\/script>/g)]
+    .map((match) => match[1]);
+  const onboarding = order.indexOf("/static/js/features/reporter-onboarding.js");
+  const router = order.indexOf("/static/js/router.js");
+  const init = order.indexOf("/static/js/init.js");
+
+  assert.ok(onboarding >= 0, "Reporter onboarding must be loaded");
+  assert.ok(onboarding < router, "Reporter onboarding must load before router.js");
+  assert.ok(onboarding < init, "Reporter onboarding must load before init.js");
+});
