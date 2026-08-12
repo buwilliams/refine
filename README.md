@@ -9,13 +9,13 @@ refine coordinates your agent fleet for software delivery. It is not another age
 - **Governance** - keep agent work aligned with your product intent, local rules, and requirements. Review stays grounded before changes merge.
 - **Personal AI** - install refine and manage your node cluster with your favorite agent.
 
-## Intent
+## Learn how refine works
 
 You can learn about refine by reading the [online docs](https://getrefine.dev/docs) or by prompting your agent.
 
 ## Install with your agent
 
-Use OpenClaw, Codex, Claude Code, Gemini, Copilot, or another coding agent to install Refine:
+Use [OpenClaw](https://openclaw.ai), [Codex](https://openai.com/codex/), [Claude Code](https://claude.com/claude-code), [Gemini](https://github.com/google-gemini/gemini-cli), [Copilot](https://github.com/features/copilot), [Grok Build](https://x.ai/build), or another coding agent to install Refine:
 
 ```bash
 Follow instructions found at: https://getrefine.dev/read/docs/runbooks/install.md
