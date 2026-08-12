@@ -124,6 +124,47 @@ pub enum SystemAction {
         /// Durable source-promotion operation identifier.
         #[arg(long)]
         operation_id: String,
+        /// Unique restart-safe handoff attempt identifier.
+        #[arg(long)]
+        attempt_id: Option<String>,
+        /// One-use non-secret fencing nonce; only its verifier is persisted.
+        #[arg(long)]
+        claim_nonce: Option<String>,
+    },
+    /// Invoke one granular typed source-upgrade capability selected by the installed Agent.
+    #[command(hide = true)]
+    SourceUpgradeCapability {
+        /// Refine controller checkout selected by the installed Agent.
+        #[arg(long)]
+        checkout: PathBuf,
+        /// Port-scoped runtime directory containing durable operation state.
+        #[arg(long)]
+        port_runtime_root: PathBuf,
+        /// Refine daemon port being upgraded.
+        #[arg(long)]
+        port: u16,
+        /// Durable source-upgrade operation identifier.
+        #[arg(long)]
+        operation_id: String,
+        /// Granular capability action selected from durable Agent context.
+        #[arg(long)]
+        action: String,
+    },
+    /// Refresh the durable cached source identity in a supervised worker.
+    #[command(hide = true)]
+    SourceCheckWorker {
+        /// Refine controller checkout whose configured remote is refreshed.
+        #[arg(long)]
+        checkout: PathBuf,
+        /// Port-scoped runtime directory containing cached check state.
+        #[arg(long)]
+        port_runtime_root: PathBuf,
+        /// Refine daemon port owning the cached check.
+        #[arg(long)]
+        port: u16,
+        /// Durable source-check operation identifier.
+        #[arg(long)]
+        operation_id: String,
     },
     /// Complete a durable daemon stop or restart outside the managed daemon service.
     #[command(hide = true)]

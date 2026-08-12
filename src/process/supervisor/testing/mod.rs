@@ -122,6 +122,7 @@ impl FakeProvider {
             output,
             provider_session_id: invocation.session_id,
             raw_output: self.outputs.join("\n"),
+            process_id: "fake-provider-process".to_string(),
         }
     }
 }

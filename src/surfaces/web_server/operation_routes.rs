@@ -7,7 +7,7 @@ use serde_json::{Value, json};
 use crate::process::subprocess::FileProcessSupervisor;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::lifecycle::BackgroundDaemonConfig;
-use crate::process::supervisor::operations::FileOperationRegistry;
+use crate::process::supervisor::operations::{FileOperationRegistry, OperationRegistry};
 use crate::process::supervisor::runtime::RuntimeRoot;
 use crate::process::supervisor::security::{NativeSecretStore, SecretStore};
 use crate::tools::host::agent_providers::{
@@ -21,7 +21,7 @@ use crate::tools::host::deployed_update::{discover_refine_checkout, is_refine_ch
 use crate::tools::host::installation::{FileInstallationService, InstallationService};
 use crate::tools::host::release::{FileReleaseService, ReleaseBump};
 use crate::tools::host::source_promotion::{
-    FileSourcePromotionService, SourcePromotionSnapshot, source_promotion_affordance,
+    FileSourcePromotionService, source_promotion_affordance,
 };
 use crate::tools::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
 use crate::tools::observability::processes::FileProcessStatusService;

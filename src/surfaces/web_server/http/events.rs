@@ -237,13 +237,48 @@ impl LocalHttpDaemon {
             }
         }
         if let Some(runtime_root) = &self.server.runtime_root {
-            if let Ok(encoded) = fs::read_to_string(runtime_root.join("source-promotion.json"))
-                && let Ok(operation) = serde_json::from_str::<Value>(&encoded)
-            {
-                events.push(SseEventFrame {
-                    event: "source_promotion",
-                    data: json!({"operation": operation}),
-                });
+            let mut source_update_published = false;
+            if let Ok(checkout) = crate::tools::host::deployed_update::discover_refine_checkout() {
+                let service = crate::tools::host::source_promotion::FileSourcePromotionService::new(
+                    checkout,
+                    runtime_root,
+                    self.server.status.port,
+                );
+                if let Ok(status) = service.inspect_cached() {
+                    let combined = self.server.source_status_body(status);
+                    events.push(SseEventFrame {
+                        event: "source_update",
+                        data: combined,
+                    });
+                    source_update_published = true;
+                }
+            }
+            if !source_update_published {
+                let check = fs::read_to_string(runtime_root.join("source-update-check.json"))
+                    .ok()
+                    .and_then(|encoded| serde_json::from_str::<Value>(&encoded).ok());
+                let operation = fs::read_to_string(runtime_root.join("source-promotion.json"))
+                    .ok()
+                    .and_then(|encoded| serde_json::from_str::<Value>(&encoded).ok());
+                if check.is_some() || operation.is_some() {
+                    events.push(SseEventFrame {
+                        event: "source_update",
+                        data: json!({
+                            "source": {"operation": operation},
+                            "source_check": check.unwrap_or_else(|| json!({
+                                "freshness": "unknown",
+                                "in_flight": false
+                            })),
+                            "source_update": {
+                                "visible": true,
+                                "enabled": false,
+                                "state": "reconnecting",
+                                "update_available": false,
+                                "title": "Reconnecting to authoritative Refine source state"
+                            }
+                        }),
+                    });
+                }
             }
             for payload in recent_process_sse_events(runtime_root, 10)? {
                 events.push(SseEventFrame {
@@ -308,6 +343,7 @@ pub(super) fn state_sse_event(event: &str) -> bool {
             | "runtime_change"
             | "activity_added"
             | "system_operation"
+            | "source_update"
     )
 }
 

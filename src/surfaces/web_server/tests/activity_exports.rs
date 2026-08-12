@@ -36,7 +36,7 @@ fn web_server_serves_mcp_surface_through_daemon() {
 #[test]
 fn source_update_status_integration_drives_browser_states_across_reconnect() {
     use crate::tools::host::source_promotion::{
-        SOURCE_PROMOTION_STATE_FILE, SourcePromotionOperation,
+        FileSourcePromotionService, SOURCE_PROMOTION_STATE_FILE, SourcePromotionOperation,
     };
 
     let temp_root = unique_temp_dir("source-update-status-integration");
@@ -75,12 +75,52 @@ fn source_update_status_integration_drives_browser_states_across_reconnect() {
     server.target_root = Some(target_root.clone());
     server.runtime_root = Some(runtime_root.clone());
 
-    let available = server.handle_source_status_for_checkout(true, target_root.clone());
+    let queued = server.handle_source_status_for_checkout(true, target_root.clone());
+    assert_eq!(queued.status, 200);
+    assert_eq!(queued.body["source_check"]["in_flight"], true);
+    assert_eq!(queued.body["source_update"]["state"], "checking");
+    let service = FileSourcePromotionService::new(&target_root, &runtime_root, 8080);
+    let first_check = queued.body["source_check"]["operation_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    service.run_update_check(&first_check).unwrap();
+    let available = server.handle_source_status_for_checkout(false, target_root.clone());
     assert_eq!(available.status, 200);
     assert_eq!(available.body["target_app_is_refine"], true);
     assert_eq!(available.body["source_update"]["visible"], true);
     assert_eq!(available.body["source_update"]["enabled"], true);
     assert_eq!(available.body["source_update"]["state"], "available");
+    assert_eq!(available.body["source_check"]["freshness"], "fresh");
+    assert!(available.body["source_check"]["last_successful_check_at"].is_string());
+    let first_generation = available.body["source_check"]["generation"]
+        .as_u64()
+        .unwrap();
+    let cached = server.handle_source_status_for_checkout(false, target_root.clone());
+    assert_eq!(cached.status, 200);
+    assert_eq!(
+        cached.body["source_check"]["generation"].as_u64(),
+        Some(first_generation),
+        "automatic navigation reads must reuse the fresh hourly cache"
+    );
+    let refreshed = server.handle_source_status_for_checkout(true, target_root.clone());
+    assert_eq!(refreshed.status, 200);
+    assert_eq!(refreshed.body["source_check"]["in_flight"], true);
+    assert_eq!(
+        refreshed.body["source_check"]["generation"].as_u64(),
+        Some(first_generation),
+        "manual refresh returns immediately before the supervised fetch completes"
+    );
+    let second_check = refreshed.body["source_check"]["operation_id"]
+        .as_str()
+        .unwrap();
+    service.run_update_check(second_check).unwrap();
+    let refreshed = server.handle_source_status_for_checkout(false, target_root.clone());
+    assert_eq!(
+        refreshed.body["source_check"]["generation"].as_u64(),
+        Some(first_generation + 1),
+        "an explicit check refreshes the shared remote cache"
+    );
     let current_commit = available.body["source"]["current_commit"]
         .as_str()
         .unwrap()
@@ -91,12 +131,22 @@ fn source_update_status_integration_drives_browser_states_across_reconnect() {
         .to_string();
 
     fs::write(target_root.join("dirty.txt"), "leave untouched\n").unwrap();
+    let dirty_check = server.handle_source_status_for_checkout(true, target_root.clone());
+    let dirty_operation = dirty_check.body["source_check"]["operation_id"]
+        .as_str()
+        .unwrap();
+    service.run_update_check(dirty_operation).unwrap();
     let blocked = server.handle_source_status_for_checkout(false, target_root.clone());
     assert_eq!(blocked.status, 200);
     assert_eq!(blocked.body["source_update"]["visible"], true);
     assert_eq!(blocked.body["source_update"]["enabled"], false);
     assert_eq!(blocked.body["source_update"]["state"], "blocked");
     fs::remove_file(target_root.join("dirty.txt")).unwrap();
+    let clean_check = server.handle_source_status_for_checkout(true, target_root.clone());
+    let clean_operation = clean_check.body["source_check"]["operation_id"]
+        .as_str()
+        .unwrap();
+    service.run_update_check(clean_operation).unwrap();
 
     let mut operation = SourcePromotionOperation {
         id: "source-test".to_string(),
@@ -118,6 +168,18 @@ fn source_update_status_integration_drives_browser_states_across_reconnect() {
         registration_rollback_succeeded: None,
         observed_executable: None,
         rollback_evidence: None,
+        agent_process_id: None,
+        agent_worker_process_id: None,
+        agent_provider: None,
+        agent_context_path: None,
+        agent_output: None,
+        pre_upgrade_workflow_paused: None,
+        workflow_pause_restored: None,
+        primary_outcome: None,
+        restoration_error: None,
+        reconciliation_evidence: None,
+        handoff_attempt: None,
+        agent_decisions: Vec::new(),
     };
     fs::write(
         runtime_root.join(SOURCE_PROMOTION_STATE_FILE),
@@ -147,15 +209,14 @@ fn source_update_status_integration_drives_browser_states_across_reconnect() {
     assert_eq!(failed.status, 200);
     assert_eq!(failed.body["source"]["operation"]["status"], "failed");
     assert_eq!(failed.body["source_update"]["enabled"], true);
-    assert_eq!(failed.body["source_update"]["state"], "available");
+    assert_eq!(failed.body["source_update"]["state"], "failed");
 
     server.target_root = Some(temp_root.join("not-refine"));
-    let hidden = server.handle_source_status_for_checkout(false, target_root.clone());
-    assert_eq!(hidden.status, 200);
-    assert_eq!(hidden.body["target_app_is_refine"], false);
-    assert_eq!(hidden.body["source_update"]["visible"], false);
-    assert_eq!(hidden.body["source_update"]["enabled"], false);
-    assert_eq!(hidden.body["source_update"]["state"], "hidden");
+    let independent = server.handle_source_status_for_checkout(false, target_root.clone());
+    assert_eq!(independent.status, 200);
+    assert_eq!(independent.body["target_app_is_refine"], false);
+    assert_eq!(independent.body["source_update"]["visible"], true);
+    assert_ne!(independent.body["source_update"]["state"], "hidden");
 
     remove_temp_dir(&temp_root);
 }

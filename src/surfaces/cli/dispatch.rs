@@ -611,6 +611,8 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
             | SystemAction::SourceStatus { .. }
             | SystemAction::SourcePromote { .. }
             | SystemAction::SourcePromoteHelper { .. }
+            | SystemAction::SourceUpgradeCapability { .. }
+            | SystemAction::SourceCheckWorker { .. }
             | SystemAction::DaemonLifecycleHelper { .. }
             | SystemAction::RunnerWorker { .. }
             | SystemAction::Rollback { .. }

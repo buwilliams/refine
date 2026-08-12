@@ -9,10 +9,47 @@ fn operation_cancel_route_is_a_thin_shared_capability_adapter() {
         .unwrap();
 
     assert!(handler.contains("registry.cancel_supervised"));
+    assert!(handler.contains("maintenance:source-upgrade"));
+    assert!(handler.contains("cancel_operation"));
     assert!(!handler.contains("current_projection_with_runtime"));
     assert!(!handler.contains("request_termination"));
     assert!(!handler.contains("fail_with_error"));
     assert!(!routes.contains("fn terminate_operation_processes"));
+}
+
+#[test]
+fn source_upgrade_operation_cancel_route_delegates_to_typed_owner() {
+    let temp_root = unique_temp_dir("http-source-upgrade-cancel");
+    let refine_dir = temp_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
+    fs::create_dir_all(&refine_dir).unwrap();
+    let registry = FileOperationRegistry::new(&runtime_root);
+    let operation = registry
+        .register_exclusive_with_request(
+            "maintenance:source-upgrade",
+            json!({
+                "checkout": std::env::current_dir().unwrap(),
+                "restart_recovery": "capability",
+                "defer_cancellation_terminal": true
+            }),
+        )
+        .unwrap();
+    let mut server = server_with_projection();
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
+    server.runtime_root = Some(runtime_root.clone());
+
+    let cancel = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: format!("/api/operations/{}/cancel", operation.id),
+        body: None,
+    });
+    assert_eq!(cancel.status, 200, "{:#}", cancel.body);
+    assert_eq!(cancel.body["operation"]["status"], "cancelled");
+    assert_eq!(
+        registry.status(&operation.id).unwrap().state,
+        OperationState::Cancelled
+    );
+    remove_temp_dir(&temp_root);
 }
 
 #[test]

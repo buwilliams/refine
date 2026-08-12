@@ -19,7 +19,7 @@ pub(super) fn daemon_json(
         ))
     })?;
     let request = format!(
-        "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\nX-Refine-API-Version: 1\r\nIdempotency-Key: cli-{}\r\n\r\n",
+        "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\nX-Refine-API-Version: {API_CONTRACT_VERSION}\r\nIdempotency-Key: cli-{}\r\n\r\n",
         body_bytes.len(),
         new_cli_idempotency_key()
     );

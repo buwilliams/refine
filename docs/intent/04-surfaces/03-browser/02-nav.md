@@ -23,6 +23,13 @@ Dashboard and Goals navigation carries their shared current/all Node scope in th
 
 Nav should not hide important operating state or shell preferences in deep settings pages. Active app, node, target-app status, agent status, and the browser-local light/dark appearance toggle are part of the user's working context.
 
+Whenever the running Refine checkout and update channel are discoverable, the
+Controls menu exposes one compact source-update control independently of the
+attached target app. It reads authoritative cached state and moves through
+current, stale, checking, available, Agent progress, reconnecting, success,
+failure, and retry states. Upgrade is one-click authorization with no second
+confirmation; concurrent clients converge on the same operation and attempt.
+
 ## Future Direction
 
 Future navigation may become more command-palette and agent-driven. As agents take over more work, nav should help people jump to exceptions, evidence, pending review, active processes, and high-risk changes.

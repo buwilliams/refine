@@ -1,4 +1,6 @@
 use std::fs;
+use std::io::{Read, Write};
+use std::net::{Ipv4Addr, SocketAddrV4, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::thread;
@@ -6,30 +8,47 @@ use std::time::Duration;
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::process::subprocess::{FileProcessSupervisor, ProcessOwner};
+use crate::process::subprocess::{FileProcessSupervisor, ProcessOwner, ProcessSupervisor};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::lifecycle::http_probe;
+use crate::process::supervisor::operations::{
+    ExternalAttemptState, ExternalOperationAttempt, FileOperationRegistry, OperationHandle,
+    OperationRegistry, OperationState,
+};
 use crate::process::supervisor::runtime::RuntimeRoot;
 use crate::tools::host::daemon_lifecycle::{
-    HostRestartSafeHandoffLauncher, RestartSafeHandoff, RestartSafeHandoffLauncher,
-    live_daemon_executable,
+    HandoffLaunchReceipt, HandoffObservation, HostRestartSafeHandoffLauncher, RestartSafeHandoff,
+    RestartSafeHandoffLauncher, handoff_argument_fingerprint, handoff_mechanism,
+    handoff_mechanism_identity, live_daemon_executable,
 };
 use crate::tools::host::installation::{
     FileInstallationService, InstalledServiceAction, ServiceRegistrationUpdate,
 };
 
 pub const SOURCE_PROMOTION_STATE_FILE: &str = "source-promotion.json";
+pub const SOURCE_UPDATE_CHECK_STATE_FILE: &str = "source-update-check.json";
+pub const SOURCE_UPDATE_CHECK_INTERVAL_SECONDS: i64 = 60 * 60;
 
+mod agent;
+mod agent_plan;
+mod cancellation;
 mod execution;
 mod git_support;
+mod handoff_protocol;
 mod host;
+mod recovery;
 mod service;
+mod update_check;
 mod validation;
 
+#[cfg(test)]
+pub(crate) use agent::AgentLaunchFailpoint;
 pub use execution::run_source_promotion;
 pub use service::FileSourcePromotionService;
+pub use update_check::{CachedSourcePromotionStatus, SourceUpdateCheckState};
 pub use validation::validate_promotion;
 
 use git_support::*;
@@ -92,6 +111,38 @@ pub struct SourcePromotionOperation {
     pub observed_executable: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rollback_evidence: Option<SourcePromotionRollbackEvidence>,
+    /// The one dedicated managed maintenance Agent launched for this operation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_process_id: Option<String>,
+    /// The restart-independent maintenance worker that launches and observes
+    /// the installed provider. It is not itself represented as an Agent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_worker_process_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_provider: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_context_path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_output: Option<String>,
+    /// Admission intent captured before the Agent pauses new workflow claims.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pre_upgrade_workflow_paused: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workflow_pause_restored: Option<bool>,
+    /// Independent primary and restoration outcomes prevent restoration
+    /// failures from being hidden behind a successful promotion.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub primary_outcome: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub restoration_error: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reconciliation_evidence: Option<Value>,
+    /// Ordered typed-capability decisions made by the installed Agent.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub agent_decisions: Vec<Value>,
+    /// Redacted projection of the authoritative operation-registry handoff attempt.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub handoff_attempt: Option<ExternalOperationAttempt>,
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
@@ -161,21 +212,33 @@ impl SourcePromotionOperation {
             registration_rollback_succeeded: None,
             observed_executable: None,
             rollback_evidence: None,
+            agent_process_id: None,
+            agent_worker_process_id: None,
+            agent_provider: None,
+            agent_context_path: None,
+            agent_output: None,
+            pre_upgrade_workflow_paused: None,
+            workflow_pause_restored: None,
+            primary_outcome: None,
+            restoration_error: None,
+            reconciliation_evidence: None,
+            agent_decisions: Vec::new(),
+            handoff_attempt: None,
         }
     }
 }
 
 pub fn source_promotion_affordance(
-    target_app_is_refine: bool,
+    checkout_discoverable: bool,
     source: &SourcePromotionSnapshot,
 ) -> SourcePromotionAffordance {
-    if !target_app_is_refine {
+    if !checkout_discoverable {
         return SourcePromotionAffordance {
             visible: false,
             enabled: false,
             state: "hidden".to_string(),
             update_available: source.update_available,
-            title: "Refine source update is unavailable for this target app".to_string(),
+            title: "Running Refine source checkout is not discoverable".to_string(),
         };
     }
 
@@ -200,7 +263,7 @@ pub fn source_promotion_affordance(
     if !source.update_available {
         return SourcePromotionAffordance {
             visible: true,
-            enabled: false,
+            enabled: true,
             state: "current".to_string(),
             update_available: false,
             title: format!(
@@ -217,7 +280,6 @@ pub fn source_promotion_affordance(
     if !source.fast_forward {
         blockers.push("upstream is not a fast-forward".to_string());
     }
-    blockers.extend(source.active_work.iter().cloned());
     if !blockers.is_empty() {
         return SourcePromotionAffordance {
             visible: true,

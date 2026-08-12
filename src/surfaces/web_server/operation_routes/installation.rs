@@ -217,8 +217,8 @@ impl InProcessWebServer {
             return runtime_root_unavailable("inspect source promotion status");
         };
         let service = FileSourcePromotionService::new(checkout, runtime_root, self.status.port);
-        match service.inspect(fetch) {
-            Ok(source) => ApiResponse::json(200, self.source_status_body(source)),
+        match service.request_update_check(fetch) {
+            Ok(status) => ApiResponse::json(200, self.source_status_body(status)),
             Err(error) => error_response(error),
         }
     }
@@ -232,7 +232,25 @@ impl InProcessWebServer {
             Err(error) => return error_response(error),
         };
         let service = FileSourcePromotionService::new(checkout, runtime_root, self.status.port);
-        match service.queue() {
+        let refine_dir = match self.current_refine_dir() {
+            Ok(Some(refine_dir)) => refine_dir,
+            Ok(None) => self
+                .app_registry_root
+                .clone()
+                .unwrap_or_else(|| runtime_root.clone()),
+            Err(error) => return error_response(error),
+        };
+        let active_root = match self.current_target_root() {
+            Ok(root) => root,
+            Err(error) => return error_response(error),
+        };
+        let provider =
+            crate::surfaces::web_server::project_routes::configured_provider_from_settings(
+                &refine_dir,
+                active_root.as_deref(),
+                &json!({}),
+            );
+        match service.queue_agent(&provider) {
             Ok(operation) => ApiResponse::json(202, json!({"operation": operation})),
             Err(error) => error_response(error),
         }
@@ -240,17 +258,56 @@ impl InProcessWebServer {
 
     pub(in crate::surfaces::web_server) fn source_status_body(
         &self,
-        source: SourcePromotionSnapshot,
+        status: crate::tools::host::source_promotion::CachedSourcePromotionStatus,
     ) -> serde_json::Value {
+        let source = status.source;
+        let check = status.check;
         let target_app_is_refine = self
             .current_target_root()
             .ok()
             .flatten()
             .as_deref()
             .is_some_and(is_refine_checkout);
-        let source_update = source_promotion_affordance(target_app_is_refine, &source);
+        let mut source_update = source_promotion_affordance(true, &source);
+        let active_operation = source
+            .operation
+            .as_ref()
+            .is_some_and(|operation| matches!(operation.status.as_str(), "queued" | "running"));
+        if !active_operation && check.in_flight {
+            source_update.enabled = false;
+            source_update.state = "checking".to_string();
+            source_update.title = "Checking the configured Refine upstream".to_string();
+        } else if !active_operation {
+            if let Some(operation) = source
+                .operation
+                .as_ref()
+                .filter(|operation| matches!(operation.status.as_str(), "failed" | "interrupted"))
+            {
+                source_update.enabled =
+                    source.clean && source.fast_forward && source.update_available;
+                source_update.state = operation.status.clone();
+                source_update.title = match operation.error.as_deref() {
+                    Some(error) => format!("{}: {error}", operation.message),
+                    None => operation.message.clone(),
+                };
+            } else if let Some(failure) = check.failure.as_ref() {
+                source_update.enabled = true;
+                source_update.state = "error".to_string();
+                source_update.title = failure.clone();
+            } else if check.freshness != "fresh" {
+                source_update.enabled = true;
+                source_update.state = "stale".to_string();
+                source_update.title = match check.last_successful_check_at.as_deref() {
+                    Some(checked) => {
+                        format!("Update information is stale; last successful check was {checked}")
+                    }
+                    None => "No remote update check has completed yet".to_string(),
+                };
+            }
+        }
         json!({
             "source": source,
+            "source_check": check,
             "source_update": source_update,
             "target_app_is_refine": target_app_is_refine
         })

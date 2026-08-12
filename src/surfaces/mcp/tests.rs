@@ -176,6 +176,31 @@ fn passthrough_tool_forwards_method_path_and_body() {
 }
 
 #[test]
+fn source_upgrade_routes_remain_available_through_refine_request() {
+    for (id, method, path) in [
+        (20, "get", "/system/source"),
+        (21, "post", "/system/source/check"),
+        (22, "post", "/system/source/promote"),
+        (23, "get", "/operations/source-op"),
+        (24, "post", "/operations/source-op/retry"),
+        (25, "post", "/operations/source-op/cancel"),
+    ] {
+        let response = call(json!({
+            "jsonrpc": "2.0",
+            "id": id,
+            "method": "tools/call",
+            "params": {
+                "name": "refine_request",
+                "arguments": {"method": method, "path": path}
+            }
+        }));
+        let echoed = &response["result"]["structuredContent"];
+        assert_eq!(echoed["method"], method.to_uppercase());
+        assert_eq!(echoed["path"], path);
+    }
+}
+
+#[test]
 fn missing_path_parameter_is_a_tool_error_not_a_protocol_error() {
     let response = call(json!({
         "jsonrpc": "2.0",

@@ -3,7 +3,8 @@
 let _releasePlan = null;
 let _sourceUpdateNavRequest = null;
 let _sourceUpdateNavSnapshot = null;
-let _sourceUpdateNavTargetIsRefine = false;
+let _sourceUpdateCheckSnapshot = null;
+let _sourceUpdateNavDiscoverable = false;
 
 function renderSettingsReleasesTab(releases = {}) {
   const operations = [...(releases.operations || [])].reverse();
@@ -38,7 +39,7 @@ function renderSourcePromotionSection() {
       <h3>Upgrade</h3>
       <p class="muted small" style="margin-top:0">
         Check and promote the configured upstream source separately from published release updates.
-        Promotion requires a clean checkout, fast-forward ancestry, paused automation with no active work, and a successful candidate build.
+        The upgrade Agent preserves workflow admission intent, drains managed work, builds before shutdown, and uses the shared restart-safe promotion and rollback authority.
       </p>
       <div id="source-promotion-status" aria-live="polite" aria-busy="true">
         <p class="muted">Loading source checkout…</p>
@@ -48,7 +49,7 @@ function renderSourcePromotionSection() {
           Check for source updates
         </button>
         <button type="button" id="source-promotion-promote" data-testid="source-promotion-promote" disabled>
-          Promote latest source
+          Upgrade Refine
         </button>
       </div>
     </section>`;
@@ -68,7 +69,6 @@ function sourcePromotionBlockers(source = {}) {
   if (!source.clean) blockers.push("checkout has uncommitted changes");
   if (!source.fast_forward) blockers.push("upstream is not a fast-forward");
   if (!source.update_available) blockers.push("already at the fetched source commit");
-  if ((source.active_work || []).length) blockers.push(...source.active_work);
   const operation = sourcePromotionActiveOperation(source);
   if (operation) blockers.push(`promotion ${operation.id} is ${operation.status}`);
   return blockers;
@@ -76,10 +76,10 @@ function sourcePromotionBlockers(source = {}) {
 
 function sourcePromotionIsReady(source = {}) {
   return !!source.clean && !!source.fast_forward && !!source.update_available
-    && !(source.active_work || []).length && !sourcePromotionActiveOperation(source);
+    && !sourcePromotionActiveOperation(source);
 }
 
-function renderSourcePromotionStatus(source = {}) {
+function renderSourcePromotionStatus(source = {}, check = _sourceUpdateCheckSnapshot || {}) {
   const operation = source.operation || null;
   const blockers = sourcePromotionBlockers(source);
   const operationClass = operation?.status === "failed" ? "error" : "muted";
@@ -89,6 +89,8 @@ function renderSourcePromotionStatus(source = {}) {
       <div><dt>Current commit</dt><dd><code title="${htmlEscape(source.current_commit || "")}">${htmlEscape(shortSourceCommit(source.current_commit))}</code></dd></div>
       <div><dt>Upstream</dt><dd><code>${htmlEscape(`${source.remote || "unknown"}/${source.branch || "unknown"}`)}</code></dd></div>
       <div><dt>Available commit</dt><dd><code title="${htmlEscape(source.available_commit || "")}">${htmlEscape(shortSourceCommit(source.available_commit))}</code></dd></div>
+      <div><dt>Check freshness</dt><dd>${htmlEscape(check.in_flight ? "checking" : (check.freshness || "unknown"))}</dd></div>
+      <div><dt>Last successful check</dt><dd>${htmlEscape(check.last_successful_check_at || "never")}</dd></div>
     </dl>
     ${operation ? `
       <p class="small ${operationClass}" data-testid="source-promotion-operation">
@@ -100,21 +102,26 @@ function renderSourcePromotionStatus(source = {}) {
     <p class="muted small" data-testid="source-promotion-readiness">
       ${blockers.length
         ? `Promotion unavailable: ${htmlEscape(blockers.join("; "))}`
-        : "Ready to build, promote, and restart from the fetched source commit."}
+        : (source.update_available
+          ? `Ready for the upgrade Agent. ${htmlEscape((source.active_work || []).length
+            ? "It will pause admission and wait for preserved managed work to settle."
+            : "The runtime is already settled.")}`
+          : "Refine is current at the last fetched source identity.")}
     </p>`;
 }
 
-function applySourcePromotionStatus(source) {
+function applySourcePromotionStatus(source, checkState = _sourceUpdateCheckSnapshot || {}) {
   const root = document.getElementById("source-promotion-status");
   if (!root) return;
   root.setAttribute("aria-busy", "false");
-  renderInto(root, renderSourcePromotionStatus(source));
+  _sourceUpdateCheckSnapshot = checkState;
+  renderInto(root, renderSourcePromotionStatus(source, checkState));
   const activeOperation = sourcePromotionActiveOperation(source);
   const promotable = sourcePromotionIsReady(source);
   const promote = document.getElementById("source-promotion-promote");
-  const check = document.getElementById("source-promotion-check");
+  const checkButton = document.getElementById("source-promotion-check");
   if (promote) promote.disabled = !promotable;
-  if (check) check.disabled = !!activeOperation;
+  if (checkButton) checkButton.disabled = !!activeOperation || !!checkState.in_flight;
 }
 
 async function refreshSourcePromotionStatus({ fetchRemote = false, quiet = false } = {}) {
@@ -127,7 +134,7 @@ async function refreshSourcePromotionStatus({ fetchRemote = false, quiet = false
       fetchRemote ? {} : undefined,
       { cache: false },
     );
-    applySourcePromotionStatus(result.source || {});
+    applySourcePromotionStatus(result.source || {}, result.source_check || {});
     applySourceUpdateNavStatus(result);
   } catch (error) {
     if (!document.getElementById("source-promotion-status")) return;
@@ -143,13 +150,19 @@ function updateSourceUpdateNavLabel(button, label) {
   if (status) status.textContent = label;
 }
 
+function updateSourceUpdateNavAction(button, label) {
+  const action = button?.querySelector(".nav-source-update-action");
+  if (action) action.textContent = label;
+}
+
 function applySourceUpdateNavStatus(result = {}) {
   const button = document.getElementById("btn-source-update");
   if (!button) return;
   const sourceUpdate = result.source_update || {};
-  _sourceUpdateNavTargetIsRefine = sourceUpdate.visible === true && hasAttachedProject();
+  _sourceUpdateNavDiscoverable = sourceUpdate.visible === true;
   _sourceUpdateNavSnapshot = result.source || null;
-  button.hidden = !_sourceUpdateNavTargetIsRefine;
+  _sourceUpdateCheckSnapshot = result.source_check || _sourceUpdateCheckSnapshot;
+  button.hidden = !_sourceUpdateNavDiscoverable;
   if (button.hidden) {
     button.disabled = true;
     button.dataset.state = "hidden";
@@ -160,6 +173,13 @@ function applySourceUpdateNavStatus(result = {}) {
   button.dataset.updateAvailable = sourceUpdate.update_available ? "true" : "false";
   button.dataset.state = sourceUpdate.state || "unavailable";
   button.title = sourceUpdate.title || "Refine source update status is unavailable";
+  const upgradeAction = sourceUpdate.state === "available"
+    || (["failed", "interrupted"].includes(sourceUpdate.state) && sourceUpdate.update_available);
+  updateSourceUpdateNavAction(button, upgradeAction
+    ? "Upgrade Refine"
+    : (["updating", "queued", "running"].includes(sourceUpdate.state)
+      ? "Upgrading Refine"
+      : "Check for updates"));
   updateSourceUpdateNavLabel(button, button.title);
   button.setAttribute("aria-label", button.title);
 }
@@ -176,20 +196,64 @@ function handleSourcePromotionSseEvent(payload = {}) {
   applySourceUpdateNavStatus({
     source,
     source_update: {
-      visible: _sourceUpdateNavTargetIsRefine,
-      enabled: !active && operation.status === "failed" && sourcePromotionIsReady(source),
-      state: active ? "updating" : operation.status,
+      visible: _sourceUpdateNavDiscoverable,
+      enabled: !active,
+      state: active ? "updating" : (operation.status === "failed" ? "error" : operation.status),
       update_available: !!source.update_available,
       title: operation.error
         ? `${operation.message}: ${operation.error}`
         : operation.message,
     },
   });
+  if (!active) refreshSourceUpdateNav({ quiet: true });
+}
+
+function handleSourceUpdateCheckSseEvent(payload = {}) {
+  _sourceUpdateCheckSnapshot = payload.source_check || _sourceUpdateCheckSnapshot;
+  if (!_sourceUpdateNavSnapshot) return;
+  if (document.getElementById("source-promotion-status")) {
+    applySourcePromotionStatus(_sourceUpdateNavSnapshot, _sourceUpdateCheckSnapshot || {});
+  }
+  const check = _sourceUpdateCheckSnapshot || {};
+  const active = sourcePromotionActiveOperation(_sourceUpdateNavSnapshot);
+  const sourceReady = sourcePromotionIsReady(_sourceUpdateNavSnapshot);
+  const sourceBlocked = !!_sourceUpdateNavSnapshot.update_available && !sourceReady;
+  const state = active ? "updating"
+    : (check.in_flight ? "checking"
+      : (check.failure ? "error"
+        : (check.freshness !== "fresh" ? "stale"
+          : (sourceReady ? "available" : (sourceBlocked ? "blocked" : "current")))));
+  const title = active?.message || check.failure || (check.in_flight
+    ? "Checking the configured Refine upstream"
+    : (sourceReady
+      ? `Upgrade running Refine to ${shortSourceCommit(_sourceUpdateNavSnapshot.available_commit)}`
+      : (sourceBlocked
+        ? `Refine source update unavailable: ${sourcePromotionBlockers(_sourceUpdateNavSnapshot).join("; ")}`
+        : `Refine is current; last successful check: ${check.last_successful_check_at || "never"}`)));
+  applySourceUpdateNavStatus({
+    source: _sourceUpdateNavSnapshot,
+    source_check: check,
+    source_update: {
+      visible: true,
+      enabled: !active && !check.in_flight && !sourceBlocked,
+      state: state || "stale",
+      update_available: !!_sourceUpdateNavSnapshot.update_available,
+      title,
+    },
+  });
+}
+
+function handleSourceUpdateSseEvent(payload = {}) {
+  if (!payload.source || !payload.source_update || !payload.source_check) return;
+  applySourceUpdateNavStatus(payload);
+  if (document.getElementById("source-promotion-status")) {
+    applySourcePromotionStatus(payload.source, payload.source_check);
+  }
 }
 
 function markSourceUpdateNavUnavailable(error) {
   const button = document.getElementById("btn-source-update");
-  if (!button || !_sourceUpdateNavTargetIsRefine) return;
+  if (!button || !_sourceUpdateNavDiscoverable) return;
   button.hidden = false;
   button.disabled = true;
   button.dataset.state = "unavailable";
@@ -200,12 +264,12 @@ function markSourceUpdateNavUnavailable(error) {
 
 async function refreshSourceUpdateNav({ fetchRemote = false, quiet = false } = {}) {
   const button = document.getElementById("btn-source-update");
-  if (!button || !hasAttachedProject()) {
+  if (!button) {
     resetSourceUpdateNav();
     return null;
   }
   if (_sourceUpdateNavRequest) return _sourceUpdateNavRequest;
-  if (!quiet && _sourceUpdateNavTargetIsRefine) {
+  if (!quiet && _sourceUpdateNavDiscoverable) {
     button.hidden = false;
     button.disabled = true;
     button.dataset.state = "checking";
@@ -234,8 +298,9 @@ async function refreshSourceUpdateNav({ fetchRemote = false, quiet = false } = {
 
 function resetSourceUpdateNav() {
   const button = document.getElementById("btn-source-update");
-  _sourceUpdateNavTargetIsRefine = false;
+  _sourceUpdateNavDiscoverable = false;
   _sourceUpdateNavSnapshot = null;
+  _sourceUpdateCheckSnapshot = null;
   if (!button) return;
   button.hidden = true;
   button.disabled = true;
@@ -244,17 +309,18 @@ function resetSourceUpdateNav() {
 }
 
 async function queueSourcePromotionFromUi() {
-  const confirmed = window.confirm(
-    "Build the fetched source, stop this idle Refine daemon, fast-forward the clean checkout, and restart?",
-  );
-  if (!confirmed) return null;
   return api("POST", "/api/system/source/promote", {});
 }
 
 async function promoteSourceFromNav() {
   const button = document.getElementById("btn-source-update");
-  const current = await refreshSourceUpdateNav({ fetchRemote: true });
-  if (!current || current.source_update?.enabled !== true) return;
+  if (!button || button.disabled) return;
+  const retryableFailure = ["failed", "interrupted"].includes(button.dataset.state)
+    && button.dataset.updateAvailable === "true";
+  if (button.dataset.state !== "available" && !retryableFailure) {
+    await refreshSourceUpdateNav({ fetchRemote: true });
+    return;
+  }
   try {
     const result = await queueSourcePromotionFromUi();
     if (!result) return;
@@ -263,7 +329,8 @@ async function promoteSourceFromNav() {
     button.title = result.operation?.message || "Source promotion queued";
     updateSourceUpdateNavLabel(button, button.title);
     button.setAttribute("aria-label", button.title);
-    toast("Source promotion queued; Refine will reconnect after restart", "info");
+    updateSourceUpdateNavAction(button, "Upgrading Refine");
+    toast("Refine upgrade Agent queued; this page will reconnect after restart", "info");
   } catch (error) {
     toast(error.message || "Source promotion could not start", "error");
     await refreshSourceUpdateNav();
@@ -279,7 +346,7 @@ function initSourceUpdateNav() {
     button.dataset.bound = "true";
     bindOnce(button, "click", promoteSourceFromNav);
   }
-  refreshSourceUpdateNav({ fetchRemote: true });
+  refreshSourceUpdateNav();
 }
 
 function bindSourcePromotionControls() {
@@ -296,7 +363,7 @@ function bindSourcePromotionControls() {
       current.source.operation = result.operation;
       applySourcePromotionStatus(current.source);
       applySourceUpdateNavStatus(current);
-      toast("Source promotion queued; Refine will reconnect after restart", "info");
+      toast("Refine upgrade Agent queued; this page will reconnect after restart", "info");
     } catch (error) {
       toast(error.message || "Source promotion could not start", "error");
       await refreshSourcePromotionStatus();

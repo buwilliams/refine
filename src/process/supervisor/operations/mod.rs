@@ -36,6 +36,63 @@ pub enum OperationState {
     Interrupted,
 }
 
+fn operation_schema_version() -> u32 {
+    1
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExternalAttemptState {
+    Reserved,
+    Submitted,
+    Received,
+    Claimed,
+    Active,
+    Cancelling,
+    Interrupted,
+    Failed,
+    Cancelled,
+    Completed,
+}
+
+impl ExternalAttemptState {
+    pub fn terminal(&self) -> bool {
+        matches!(
+            self,
+            Self::Interrupted | Self::Failed | Self::Cancelled | Self::Completed
+        )
+    }
+}
+
+/// Durable, non-secret evidence for one bounded processless handoff attempt.
+///
+/// The raw claim nonce is intentionally never persisted. `nonce_verifier` is a
+/// SHA-256 verifier used only to fence stale or duplicate helpers.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ExternalOperationAttempt {
+    pub attempt_id: String,
+    pub state: ExternalAttemptState,
+    pub nonce_verifier: String,
+    pub mechanism: String,
+    pub mechanism_identity: String,
+    pub executable: String,
+    pub argument_fingerprint: String,
+    pub reserved_at: String,
+    pub claim_deadline_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub submitted_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub receipt: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub claimed_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub claimant_pid: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub claimant_identity: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub terminal_evidence: Option<Value>,
+}
+
 impl OperationState {
     pub fn as_api_status(&self) -> &'static str {
         match self {
@@ -52,6 +109,10 @@ impl OperationState {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct OperationHandle {
+    #[serde(default = "operation_schema_version")]
+    pub schema_version: u32,
+    #[serde(default)]
+    pub revision: u64,
     pub id: String,
     pub owner: String,
     pub state: OperationState,
@@ -63,6 +124,8 @@ pub struct OperationHandle {
     pub result: Value,
     #[serde(default)]
     pub error: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub external_attempt: Option<ExternalOperationAttempt>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

@@ -38,7 +38,7 @@ use crate::workflow::WorkflowEngine;
 use super::support::*;
 use super::*;
 
-fn configured_provider_from_settings(
+pub(in crate::surfaces::web_server) fn configured_provider_from_settings(
     refine_dir: &std::path::Path,
     active_root: Option<&std::path::Path>,
     body: &Value,

@@ -91,7 +91,16 @@ impl InProcessWebServer {
             return operation_id_required();
         };
         let registry = FileOperationRegistry::new(runtime_root);
-        match registry.cancel_supervised(operation_id, self) {
+        let cancellation = registry.status(operation_id).and_then(|operation| {
+            if operation.owner == "maintenance:source-upgrade" {
+                let checkout = discover_refine_checkout()?;
+                FileSourcePromotionService::new(checkout, runtime_root, self.status.port)
+                    .cancel_operation(operation_id)
+            } else {
+                registry.cancel_supervised(operation_id, self)
+            }
+        });
+        match cancellation {
             Ok(operation) => {
                 ApiResponse::json(200, json!({"operation": operation_response(operation)}))
             }
