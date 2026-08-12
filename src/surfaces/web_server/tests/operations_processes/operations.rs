@@ -37,6 +37,8 @@ fn source_upgrade_operation_cancel_route_delegates_to_typed_owner() {
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
+    server.product_paths =
+        Some(RefineCheckoutPaths::from_source_checkout(env!("CARGO_MANIFEST_DIR")).unwrap());
 
     let cancel = server.handle(ApiRequest {
         method: "POST".to_string(),

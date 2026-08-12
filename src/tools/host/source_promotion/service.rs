@@ -197,11 +197,8 @@ impl FileSourcePromotionService {
         })?;
         let snapshot = self.check()?;
         validate_promotion(&snapshot)?;
-        let executable = std::env::current_exe().map_err(|error| {
-            RefineError::Io(format!(
-                "failed to locate source-promotion helper executable: {error}"
-            ))
-        })?;
+        let executable = self.checkout_path.join("bin/refine");
+        require_checkout_binary(&executable, "source-promotion helper")?;
         self.queue_validated(&snapshot, &executable, &HostRestartSafeHandoffLauncher)
     }
 

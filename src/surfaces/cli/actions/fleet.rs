@@ -20,6 +20,9 @@ pub enum FleetAction {
         /// Runtime directory where Refine keeps daemon state.
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
+        /// Refine daemon port whose runtime owns this Agent session.
+        #[arg(long, default_value_t = 8082)]
+        port: u16,
     },
     /// List the fleet: every fleet node with its enablement, connection, and health details.
     List {

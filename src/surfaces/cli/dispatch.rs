@@ -65,6 +65,7 @@ use crate::surfaces::web_server::{
 use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
+use crate::tools::host::checkout::RefineCheckoutPaths;
 use crate::tools::host::daemon_lifecycle::{
     DaemonLifecycleAction, FileHostDaemonLifecycleService, execute_daemon_lifecycle,
     uninstall_daemon_installation,
@@ -134,8 +135,9 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
                     request,
                     provider,
                     runtime_root,
+                    port,
                 },
-        } => return fleet::dispatch_manage(request, provider, runtime_root),
+        } => return fleet::dispatch_manage(request, provider, runtime_root, port),
         Commands::Fleet {
             action:
                 FleetAction::Distribute {
@@ -182,7 +184,14 @@ pub(super) fn run_system_start(
     once: bool,
     foreground: bool,
 ) -> RefineResult<()> {
-    let runtime_root = absolute_cli_path(runtime_root)?;
+    #[cfg(not(test))]
+    let product_paths = RefineCheckoutPaths::discover()?;
+    #[cfg(test)]
+    let product_paths: Option<RefineCheckoutPaths> = None;
+    #[cfg(not(test))]
+    let runtime_root = resolve_system_runtime_root_for_paths(runtime_root, &product_paths)?;
+    #[cfg(test)]
+    let runtime_root = resolve_system_runtime_root(runtime_root)?;
     let cache_dir = cache_dir.map(absolute_cli_path).transpose()?;
     let static_root = static_root.map(absolute_cli_path).transpose()?;
     if !foreground && !once {
@@ -307,6 +316,16 @@ pub(super) fn run_system_start(
             target_root: None,
             app_registry_root: Some(runtime_root.clone()),
             runtime_root: Some(port_runtime_root),
+            product_paths: {
+                #[cfg(not(test))]
+                {
+                    Some(product_paths)
+                }
+                #[cfg(test)]
+                {
+                    product_paths
+                }
+            },
         },
         static_root: static_root.or_else(default_static_root),
     };
@@ -345,6 +364,7 @@ pub(super) fn system_status_response(runtime_root: PathBuf) -> RefineResult<serd
         "current_version": env!("CARGO_PKG_VERSION"),
         "launch_mode": current_launch_mode(),
         "executable_path": current_launch_executable(),
+        "runtime_root": runtime_root,
         "api_contract_version": API_CONTRACT_VERSION,
         "running_ports": running_ports,
         "ports": ports,
@@ -407,6 +427,22 @@ pub(super) fn absolute_cli_path(path: PathBuf) -> RefineResult<PathBuf> {
         })?;
         Ok(cwd.join(path))
     }
+}
+
+pub(super) fn resolve_system_runtime_root(path: PathBuf) -> RefineResult<PathBuf> {
+    #[cfg(test)]
+    if path.is_absolute() {
+        return Ok(path);
+    }
+    let paths = RefineCheckoutPaths::discover()?;
+    resolve_system_runtime_root_for_paths(path, &paths)
+}
+
+pub(super) fn resolve_system_runtime_root_for_paths(
+    path: PathBuf,
+    paths: &RefineCheckoutPaths,
+) -> RefineResult<PathBuf> {
+    paths.resolve_runtime_compatibility(&path)
 }
 
 #[cfg(not(test))]

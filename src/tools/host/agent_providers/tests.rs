@@ -53,6 +53,35 @@ fn host_provider_service_detects_known_provider_binaries() {
 }
 
 #[test]
+fn stateful_provider_launch_without_port_runtime_fails_closed() {
+    let temp_root = unique_temp_dir("provider-runtime-required");
+    let bin_dir = temp_root.join("bin");
+    fs::create_dir_all(&bin_dir).unwrap();
+    let provider = bin_dir.join("smoke-ai");
+    fs::write(&provider, "#!/bin/sh\nexit 0\n").unwrap();
+    make_executable(&provider);
+    let service = HostAgentProviderService {
+        path_override: Some(bin_dir.display().to_string()),
+        runtime_root: None,
+    };
+
+    let error = service
+        .invoke(ProviderInvocation {
+            provider: "smoke-ai".to_string(),
+            prompt: "runtime ownership".to_string(),
+            session_id: None,
+            cwd: None,
+            process_metadata: Default::default(),
+        })
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("port-scoped runtime"), "{error}");
+    assert!(!temp_root.join("run").exists());
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn interactive_provider_commands_keep_the_native_cli_conversation_mode() {
     let temp_root = unique_temp_dir("interactive-provider-command");
     let bin_dir = temp_root.join("bin");

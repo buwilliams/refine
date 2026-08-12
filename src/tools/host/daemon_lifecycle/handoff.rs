@@ -87,7 +87,8 @@ impl RestartSafeHandoffLauncher for HostRestartSafeHandoffLauncher {
     ) -> RefineResult<HandoffLaunchReceipt> {
         match service_manager {
             Some("systemd_user") => launch_systemd_handoff(handoff),
-            Some("launchd_login_item") => launch_launchd_handoff(handoff),
+            Some("launchd_user_daemon") => launch_launchd_handoff(handoff, "launchd_user_daemon"),
+            Some("launchd_login_item") => launch_launchd_handoff(handoff, "launchd_login_item"),
             Some(other) => Err(RefineError::Conflict(format!(
                 "cannot create a restart-safe handoff for unsupported service manager {other}"
             ))),
@@ -124,7 +125,10 @@ fn launch_systemd_handoff(handoff: &RestartSafeHandoff) -> RefineResult<HandoffL
     Ok(receipt(handoff, "systemd_user", unit, pid))
 }
 
-fn launch_launchd_handoff(handoff: &RestartSafeHandoff) -> RefineResult<HandoffLaunchReceipt> {
+fn launch_launchd_handoff(
+    handoff: &RestartSafeHandoff,
+    mechanism: &'static str,
+) -> RefineResult<HandoffLaunchReceipt> {
     let label = format!("com.refine.{}", sanitize_label(&handoff.label));
     if Command::new("launchctl")
         .args([
@@ -136,7 +140,7 @@ fn launch_launchd_handoff(handoff: &RestartSafeHandoff) -> RefineResult<HandoffL
         .status()
         .is_ok_and(|status| status.success())
     {
-        return Ok(receipt(handoff, "launchd_login_item", label, None));
+        return Ok(receipt(handoff, mechanism, label, None));
     }
     let mut command = Command::new("launchctl");
     command
@@ -150,7 +154,7 @@ fn launch_launchd_handoff(handoff: &RestartSafeHandoff) -> RefineResult<HandoffL
         .stdout(Stdio::null())
         .stderr(Stdio::null());
     run_submission(command, "launchd submitted job", handoff)?;
-    Ok(receipt(handoff, "launchd_login_item", label, None))
+    Ok(receipt(handoff, mechanism, label, None))
 }
 
 fn run_submission(
@@ -216,6 +220,7 @@ fn receipt(
 pub(crate) fn handoff_mechanism(service_manager: Option<&str>) -> RefineResult<&'static str> {
     match service_manager {
         Some("systemd_user") => Ok("systemd_user"),
+        Some("launchd_user_daemon") => Ok("launchd_user_daemon"),
         Some("launchd_login_item") => Ok("launchd_login_item"),
         Some(other) => Err(RefineError::Conflict(format!(
             "cannot create a restart-safe handoff for unsupported service manager {other}"
@@ -230,7 +235,9 @@ pub(crate) fn handoff_mechanism_identity(
 ) -> RefineResult<String> {
     Ok(match handoff_mechanism(service_manager)? {
         "systemd_user" => sanitize_label(&handoff.label),
-        "launchd_login_item" => format!("com.refine.{}", sanitize_label(&handoff.label)),
+        "launchd_user_daemon" | "launchd_login_item" => {
+            format!("com.refine.{}", sanitize_label(&handoff.label))
+        }
         _ => format!("detached:{}", handoff_argument_fingerprint(handoff)),
     })
 }
@@ -265,7 +272,7 @@ fn observe_receipt(receipt: &HandoffLaunchReceipt) -> RefineResult<HandoffObserv
             ))),
             None => Ok(HandoffObservation::Exited),
         },
-        "launchd_login_item" => {
+        "launchd_user_daemon" | "launchd_login_item" => {
             let status = Command::new("launchctl")
                 .args([
                     "print",
@@ -336,7 +343,7 @@ fn terminate_receipt(receipt: &HandoffLaunchReceipt) -> RefineResult<()> {
                 )));
             }
         }
-        "launchd_login_item" => {
+        "launchd_user_daemon" | "launchd_login_item" => {
             let status = Command::new("launchctl")
                 .args(["remove", &receipt.mechanism_identity])
                 .status()

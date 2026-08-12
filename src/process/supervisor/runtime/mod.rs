@@ -29,12 +29,6 @@ impl RuntimeRoot {
     pub fn cache_dir(&self, port: u16) -> PathBuf {
         self.port_root(port).join("cache")
     }
-
-    pub fn installed_user(app_id: &str) -> Self {
-        Self {
-            root: RuntimePathLayout::current_user(app_id).runtime_root,
-        }
-    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -97,11 +91,27 @@ impl RuntimePathLayout {
         }
     }
 
-    pub fn current_user(app_id: &str) -> Self {
-        Self::for_os(current_runtime_os(), app_id, RuntimePathInputs::from_env())
+    /// Resolve an installed daemon without creating an OS-global product home.
+    /// Runtime, cache, and logs stay under the checkout; only the service
+    /// registration path follows platform requirements.
+    pub fn checkout_for_os(
+        checkout: impl AsRef<Path>,
+        os: RuntimeOs,
+        app_id: &str,
+        inputs: RuntimePathInputs,
+    ) -> Self {
+        let checkout = checkout.as_ref();
+        let mut layout = Self::checkout_local(checkout);
+        layout.app_support_dir = checkout.to_path_buf();
+        layout.os = os.clone();
+        layout.deployment = RuntimeDeployment::SystemService;
+        layout.service_metadata_path = platform_service_metadata_path(os, app_id, inputs);
+        layout
     }
 
-    pub fn for_os(os: RuntimeOs, app_id: &str, inputs: RuntimePathInputs) -> Self {
+    /// Calculate a retired external layout for read-only legacy detection.
+    /// This must never be used as a normal runtime/cache/log destination.
+    pub fn legacy_external_for_os(os: RuntimeOs, app_id: &str, inputs: RuntimePathInputs) -> Self {
         let app_id = app_id.trim();
         let app_id = if app_id.is_empty() {
             DEFAULT_APP_ID
@@ -188,6 +198,34 @@ impl RuntimePathLayout {
     }
 }
 
+fn platform_service_metadata_path(
+    os: RuntimeOs,
+    app_id: &str,
+    inputs: RuntimePathInputs,
+) -> Option<PathBuf> {
+    let app_id = if app_id.trim().is_empty() {
+        DEFAULT_APP_ID
+    } else {
+        app_id.trim()
+    };
+    match os {
+        RuntimeOs::Macos => inputs.home.map(|home| {
+            home.join("Library/LaunchAgents")
+                .join(format!("com.{app_id}.daemon.plist"))
+        }),
+        RuntimeOs::Windows => inputs
+            .local_app_data
+            .or(inputs.app_data)
+            .or(inputs.program_data)
+            .map(|root| root.join(app_id).join("service.json")),
+        RuntimeOs::Linux => inputs
+            .xdg_config_home
+            .or_else(|| inputs.home.map(|home| home.join(".config")))
+            .map(|root| root.join("systemd/user").join(format!("{app_id}.service"))),
+        RuntimeOs::Other(_) => None,
+    }
+}
+
 impl RuntimePathInputs {
     pub fn from_env() -> Self {
         Self {
@@ -202,7 +240,7 @@ impl RuntimePathInputs {
     }
 }
 
-fn current_runtime_os() -> RuntimeOs {
+pub fn current_runtime_os() -> RuntimeOs {
     match std::env::consts::OS {
         "macos" => RuntimeOs::Macos,
         "windows" => RuntimeOs::Windows,
@@ -234,7 +272,7 @@ mod tests {
 
     #[test]
     fn runtime_path_layout_models_os_specific_user_installs() {
-        let mac = RuntimePathLayout::for_os(
+        let mac = RuntimePathLayout::legacy_external_for_os(
             RuntimeOs::Macos,
             "refine",
             RuntimePathInputs {
@@ -251,7 +289,7 @@ mod tests {
             PathBuf::from("/Users/buddy/Library/LaunchAgents/com.refine.daemon.plist")
         );
 
-        let windows = RuntimePathLayout::for_os(
+        let windows = RuntimePathLayout::legacy_external_for_os(
             RuntimeOs::Windows,
             "refine",
             RuntimePathInputs {
@@ -264,7 +302,7 @@ mod tests {
             PathBuf::from(r"C:\Users\buddy\AppData\Local").join("refine/run")
         );
 
-        let linux = RuntimePathLayout::for_os(
+        let linux = RuntimePathLayout::legacy_external_for_os(
             RuntimeOs::Linux,
             "refine",
             RuntimePathInputs {
@@ -279,6 +317,31 @@ mod tests {
         assert_eq!(
             linux.service_metadata_path.unwrap(),
             PathBuf::from("/home/buddy/.config/systemd/user/refine.service")
+        );
+    }
+
+    #[test]
+    fn installed_daemon_keeps_product_state_checkout_local() {
+        let layout = RuntimePathLayout::checkout_for_os(
+            "/opt/refine",
+            RuntimeOs::Linux,
+            DEFAULT_APP_ID,
+            RuntimePathInputs {
+                home: Some(PathBuf::from("/home/buddy")),
+                xdg_state_home: Some(PathBuf::from("/external/state")),
+                xdg_cache_home: Some(PathBuf::from("/external/cache")),
+                ..Default::default()
+            },
+        );
+        assert_eq!(layout.runtime_root, PathBuf::from("/opt/refine/run"));
+        assert_eq!(layout.cache_dir, PathBuf::from("/opt/refine/run/cache"));
+        assert_eq!(layout.logs_dir, PathBuf::from("/opt/refine/run/logs"));
+        assert_eq!(layout.app_support_dir, PathBuf::from("/opt/refine"));
+        assert_eq!(
+            layout.service_metadata_path,
+            Some(PathBuf::from(
+                "/home/buddy/.config/systemd/user/refine.service"
+            ))
         );
     }
 }

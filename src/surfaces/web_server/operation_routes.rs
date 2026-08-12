@@ -17,7 +17,7 @@ use crate::tools::host::daemon_lifecycle::{
     DaemonLifecycleAction, FileDaemonLifecycleOperationService, FileHostDaemonLifecycleService,
     execute_daemon_lifecycle,
 };
-use crate::tools::host::deployed_update::{discover_refine_checkout, is_refine_checkout};
+use crate::tools::host::deployed_update::is_refine_checkout;
 use crate::tools::host::installation::{FileInstallationService, InstallationService};
 use crate::tools::host::release::{FileReleaseService, ReleaseBump};
 use crate::tools::host::source_promotion::{

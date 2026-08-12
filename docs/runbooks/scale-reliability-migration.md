@@ -55,19 +55,25 @@ LIVE_STATE="$GIT_COMMON_DIR/refine-live-state"
 ls "$LIVE_STATE/goals" >/dev/null || echo "STOP: live state not found"
 ```
 
-**Runtime root** — node-local host state, port-scoped. Its location depends on
-how Refine was installed:
+**Runtime root** — node-local host state owned by the invoked Refine product
+home and port-scoped:
 
 | Install | Runtime root |
 | --- | --- |
-| Checkout-local | `<refine checkout>/run` |
-| Linux user install | `${XDG_STATE_HOME:-$HOME/.local/state}/<app id>/run` |
-| macOS user install | `$HOME/Library/Application Support/<app id>/run` |
+| Source checkout or gitless deployed product | `<refine product home>/run` |
+
+Older installations may still have state or service registration in HOME,
+XDG, or platform support directories. Treat those locations as legacy
+external evidence: do not merge, move, overwrite, or delete them during this
+procedure. Inspect ordinary status first, then use explicit
+`./r system repair --port "$PORT"` if the daemon registration must be migrated;
+the repair journal is retained under the owning product's
+`run/$PORT/installation-migrations/`.
 
 Confirm by looking for port-numbered directories containing `daemon-status.json`:
 
 ```bash
-RUNTIME_ROOT=/path/from/the/table
+RUNTIME_ROOT=/path/to/refine-product/run
 PORT=8082
 PORT_RUNTIME="$RUNTIME_ROOT/$PORT"
 test -f "$PORT_RUNTIME/daemon-status.json" || echo "STOP: port runtime not found"

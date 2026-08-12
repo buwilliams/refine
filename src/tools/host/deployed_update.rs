@@ -13,6 +13,9 @@ use crate::process::supervisor::runtime::RuntimeRoot;
 use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
+pub use crate::tools::host::checkout::{
+    active_refine_paths, discover_refine_checkout, is_refine_checkout,
+};
 use crate::tools::host::daemon_lifecycle::{
     DaemonLifecycleAction, FileHostDaemonLifecycleService, execute_daemon_lifecycle,
 };
@@ -24,6 +27,7 @@ pub struct DeployedUpdateSummary {
     pub ok: bool,
     pub checkout_path: String,
     pub runtime_root: String,
+    pub controlling_port: u16,
     pub stopped_ports: Vec<u16>,
     pub target_version: Option<String>,
     pub binary_path: String,
@@ -82,6 +86,7 @@ pub struct DeployedUpdateOptions {
     pub runtime_root: PathBuf,
     pub assume_yes: bool,
     pub provider: String,
+    pub controlling_port: u16,
 }
 
 impl DeployedUpdateOptions {
@@ -91,6 +96,7 @@ impl DeployedUpdateOptions {
             runtime_root: runtime_root.into(),
             assume_yes: false,
             provider: default_update_provider(),
+            controlling_port: 8082,
         }
     }
 
@@ -101,6 +107,11 @@ impl DeployedUpdateOptions {
 
     pub fn with_provider(mut self, provider: impl Into<String>) -> Self {
         self.provider = provider.into();
+        self
+    }
+
+    pub fn with_controlling_port(mut self, port: u16) -> Self {
+        self.controlling_port = port;
         self
     }
 }
@@ -168,21 +179,36 @@ pub fn run_deployed_update<H: DeployedUpdateHost>(
     let runtime_root = options.runtime_root;
     let assume_yes = options.assume_yes;
     let provider = options.provider;
+    let controlling_port = options.controlling_port;
     let binary_path = checkout_path.join("bin/refine");
     let mut summary = DeployedUpdateSummary {
         ok: false,
         checkout_path: checkout_path.display().to_string(),
         runtime_root: runtime_root.display().to_string(),
+        controlling_port,
         binary_path: binary_path.display().to_string(),
         build_result: "not_started".to_string(),
         manual_recovery_command: Some(manual_update_recovery_command(
             &checkout_path,
             &provider,
             assume_yes,
+            controlling_port,
         )),
         rollback_possible: false,
         ..Default::default()
     };
+    let expected_runtime_root = checkout_path.join("run");
+    if runtime_root != expected_runtime_root {
+        summary.failures.push(DeployedUpdateFailure {
+            stage: "resolve_checkout_paths".to_string(),
+            message: format!(
+                "deployed update runtime {} does not match checkout-owned runtime {}; neither tree was changed",
+                runtime_root.display(),
+                expected_runtime_root.display()
+            ),
+        });
+        return summary;
+    }
 
     let running_ports = match host.running_ports() {
         Ok(ports) => ports,
@@ -306,9 +332,10 @@ fn manual_update_recovery_command(
     checkout_path: &Path,
     provider: &str,
     assume_yes: bool,
+    port: u16,
 ) -> String {
     format!(
-        "cd {} && ./r agent invoke {} --provider {}",
+        "cd {} && ./r agent invoke {} --provider {} # provider state is owned by run/{port}",
         shell_quote(&checkout_path.display().to_string()),
         shell_quote(&update_agent_prompt(checkout_path, assume_yes)),
         shell_quote(provider)
@@ -338,12 +365,21 @@ fn shell_quote(value: &str) -> String {
 #[derive(Clone, Debug)]
 pub struct FileDeployedUpdateHost {
     pub runtime_root: PathBuf,
+    pub controlling_port: u16,
 }
 
 impl FileDeployedUpdateHost {
     pub fn new(runtime_root: impl Into<PathBuf>) -> Self {
         Self {
             runtime_root: runtime_root.into(),
+            controlling_port: 8082,
+        }
+    }
+
+    pub fn with_controlling_port(runtime_root: impl Into<PathBuf>, port: u16) -> Self {
+        Self {
+            runtime_root: runtime_root.into(),
+            controlling_port: port,
         }
     }
 
@@ -400,7 +436,13 @@ impl DeployedUpdateHost for FileDeployedUpdateHost {
                 invocation.cwd.join(UPDATE_RUNBOOK_PATH).display()
             )));
         }
-        let output = HostAgentProviderService::new().invoke(ProviderInvocation {
+        let output = HostAgentProviderService::with_runtime_root(
+            RuntimeRoot {
+                root: self.runtime_root.clone(),
+            }
+            .port_root(self.controlling_port),
+        )
+        .invoke(ProviderInvocation {
             provider: invocation.provider.clone(),
             prompt: invocation.prompt.clone(),
             session_id: None,
@@ -452,59 +494,6 @@ impl DeployedUpdateHost for FileDeployedUpdateHost {
             },
         )
     }
-}
-
-pub fn discover_refine_checkout() -> RefineResult<PathBuf> {
-    let cwd = std::env::current_dir().map_err(|error| {
-        RefineError::Io(format!("failed to resolve current directory: {error}"))
-    })?;
-    if let Some(path) = find_checkout_from(&cwd) {
-        return Ok(path);
-    }
-    if let Ok(exe) = std::env::current_exe()
-        && let Some(path) = exe.parent().and_then(find_checkout_from)
-    {
-        return Ok(path);
-    }
-    Err(RefineError::NotFound(
-        "could not find a Refine checkout; run ./r system update from the Refine checkout"
-            .to_string(),
-    ))
-}
-
-pub fn active_refine_paths() -> RefineResult<(PathBuf, PathBuf)> {
-    let executable = std::env::current_exe().map_err(|error| {
-        RefineError::Io(format!(
-            "failed to resolve active Refine executable: {error}"
-        ))
-    })?;
-    let executable = executable.canonicalize().unwrap_or(executable);
-    let checkout = executable
-        .ancestors()
-        .find(|path| is_refine_checkout(path))
-        .map(Path::to_path_buf)
-        .map(Ok)
-        .unwrap_or_else(discover_refine_checkout)?;
-    Ok((executable, checkout))
-}
-
-pub fn is_refine_checkout(path: &Path) -> bool {
-    path.join(".git").exists()
-        && path.join("Cargo.toml").is_file()
-        && path.join("src/main.rs").is_file()
-        && path.join(UPDATE_RUNBOOK_PATH).is_file()
-        && path.join("r").is_file()
-}
-
-fn find_checkout_from(start: &Path) -> Option<PathBuf> {
-    let mut current = Some(start);
-    while let Some(path) = current {
-        if is_refine_checkout(path) {
-            return Some(path.to_path_buf());
-        }
-        current = path.parent();
-    }
-    None
 }
 
 fn cargo_package_version(checkout: &Path) -> Option<String> {

@@ -19,11 +19,8 @@ impl FileSourcePromotionService {
     /// upgrade Agent. Refine enforces legal transitions and host safety; the
     /// Agent owns the sequence, observation retries, and recovery choice.
     pub fn run_agent_capability(&self, operation_id: &str, action: &str) -> RefineResult<Value> {
-        let executable = std::env::current_exe().map_err(|error| {
-            RefineError::Io(format!(
-                "failed to locate Refine capability executable: {error}"
-            ))
-        })?;
+        let executable = self.checkout_path.join("bin/refine");
+        require_checkout_binary(&executable, "source-upgrade capability")?;
         self.run_agent_capability_with(
             operation_id,
             action,

@@ -46,11 +46,8 @@ impl FileSourcePromotionService {
     /// Queue the one-click maintenance path as one exclusive shared operation
     /// and launch the configured installed provider directly as its Agent.
     pub fn queue_agent(&self, provider: &str) -> RefineResult<SourcePromotionOperation> {
-        let executable = std::env::current_exe().map_err(|error| {
-            RefineError::Io(format!(
-                "failed to locate typed source-upgrade capabilities: {error}"
-            ))
-        })?;
+        let executable = self.checkout_path.join("bin/refine");
+        require_checkout_binary(&executable, "typed source-upgrade capabilities")?;
         self.queue_agent_with(provider, &executable)
     }
 

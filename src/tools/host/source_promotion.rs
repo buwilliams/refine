@@ -306,6 +306,17 @@ fn short_commit(commit: &str) -> &str {
     commit.get(..commit.len().min(12)).unwrap_or(commit)
 }
 
+fn require_checkout_binary(executable: &Path, purpose: &str) -> RefineResult<()> {
+    if executable.is_file() {
+        Ok(())
+    } else {
+        Err(RefineError::NotFound(format!(
+            "checkout-local binary {} is required for {purpose}; build and install bin/refine before continuing",
+            executable.display()
+        )))
+    }
+}
+
 pub trait SourcePromotionHost {
     fn build_candidate(&mut self, commit: &str) -> RefineResult<PathBuf>;
     fn verify_preconditions(&mut self, from_commit: &str, to_commit: &str) -> RefineResult<()>;
@@ -314,6 +325,7 @@ pub trait SourcePromotionHost {
         executable: &Path,
     ) -> RefineResult<Option<ServiceRegistrationUpdate>>;
     fn stop_daemon(&mut self) -> RefineResult<()>;
+    fn activate_candidate_binary(&mut self, candidate: &Path) -> RefineResult<PathBuf>;
     fn activate(&mut self, from_commit: &str, to_commit: &str) -> RefineResult<()>;
     fn restart_daemon(&mut self, executable: &Path) -> RefineResult<()>;
     fn verify_daemon(
@@ -323,6 +335,7 @@ pub trait SourcePromotionHost {
     ) -> RefineResult<PathBuf>;
     fn complete_restart_registration(&mut self) -> RefineResult<()>;
     fn restore_restart_registration(&mut self) -> RefineResult<bool>;
+    fn restore_previous_binary(&mut self) -> RefineResult<bool>;
     fn verify_previous_registration(&mut self) -> RefineResult<PathBuf>;
     fn verify_previous_source(&mut self, expected_commit: &str) -> RefineResult<()>;
     fn rollback(&mut self, from_commit: &str, to_commit: &str) -> RefineResult<()>;

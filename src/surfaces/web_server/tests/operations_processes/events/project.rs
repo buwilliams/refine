@@ -1,6 +1,42 @@
 use super::*;
 
 #[test]
+fn web_system_routes_enforce_bootstrap_checkout_and_non_default_port_authority() {
+    let product_home = unique_temp_dir("http-product-authority");
+    let paths = RefineCheckoutPaths::for_test(product_home.clone());
+    let mut server = server_with_projection();
+    server.status.port = 4557;
+    server.app_registry_root = Some(paths.runtime_root.clone());
+    server.runtime_root = Some(paths.port_runtime_root(4557));
+    server.product_paths = Some(paths.clone());
+
+    let status = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/system/install".to_string(),
+        body: None,
+    });
+    assert_eq!(status.status, 200, "{}", status.body);
+    assert_eq!(status.body["install"]["port"], 4557);
+    assert_eq!(status.body["install"]["backend"], serde_json::Value::Null);
+
+    server.runtime_root = Some(paths.port_runtime_root(4558));
+    let mismatch = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/system/install".to_string(),
+        body: None,
+    });
+    assert_eq!(mismatch.status, 409);
+    assert!(
+        mismatch.body["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("bootstrap does not match")
+    );
+
+    remove_temp_dir(&product_home);
+}
+
+#[test]
 fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
     let temp_root = unique_temp_dir("http-project-utils");
     let runtime_root = temp_root.join("run/8080");

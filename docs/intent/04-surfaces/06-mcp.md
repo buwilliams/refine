@@ -24,6 +24,11 @@ Its tools should map onto real system capabilities the same way the API route gr
 
 Because MCP delegates to the shared daemon API, it inherits the system's local-first security, idempotency, logging, and state-repair behavior rather than re-deriving them.
 
+It also inherits the daemon's immutable checkout and port authority. MCP tools
+cannot redirect a stateful request into a caller-relative or user-global
+runtime, and provider work launched through MCP uses the same exact
+`<product-home>/run/<port>` root as CLI, HTTP, and browser callers.
+
 Current agent-facing planning support includes `refine_draft_goal`, which sends a Plan transcript through the same one-Goal extraction capability used by the browser, CLI, and HTTP API and returns the draft for review without persisting it.
 
 Current audit support includes `refine_export_goal_jira`, which maps a Goal id onto the shared Jira evidence export route rather than formatting a separate agent-only report.

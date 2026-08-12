@@ -3,7 +3,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use refine::process::supervisor::runtime::{DEFAULT_APP_ID, RuntimePathLayout};
+use refine::process::supervisor::runtime::{
+    DEFAULT_APP_ID, RuntimePathInputs, RuntimePathLayout, current_runtime_os,
+};
 use refine::surfaces::web_server::{API_CONTRACT_VERSION, API_GROUPS};
 use refine::tools::host::release::{FileReleaseService, ReleaseBump};
 use serde_json::json;
@@ -305,7 +307,15 @@ fn print_api_contract() -> Result<(), String> {
 }
 
 fn print_runtime_layout() -> Result<(), String> {
-    let layout = RuntimePathLayout::current_user(DEFAULT_APP_ID);
+    let root = repo_root()?;
+    let port = 8082_u16;
+    let layout = RuntimePathLayout::checkout_for_os(
+        &root,
+        current_runtime_os(),
+        DEFAULT_APP_ID,
+        RuntimePathInputs::from_env(),
+    );
+    let port_runtime_root = layout.runtime_root.join(port.to_string());
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({
@@ -313,8 +323,10 @@ fn print_runtime_layout() -> Result<(), String> {
             "os": layout.os,
             "app_support_dir": layout.app_support_dir,
             "runtime_root": layout.runtime_root,
-            "cache_dir": layout.cache_dir,
-            "logs_dir": layout.logs_dir,
+            "port": port,
+            "port_runtime_root": port_runtime_root,
+            "cache_dir": port_runtime_root.join("cache"),
+            "logs_dir": port_runtime_root.join("logs"),
             "service_metadata_path": layout.service_metadata_path
         }))
         .map_err(|error| format!("failed to encode runtime layout: {error}"))?

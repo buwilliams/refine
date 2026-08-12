@@ -93,7 +93,9 @@ impl InProcessWebServer {
         let registry = FileOperationRegistry::new(runtime_root);
         let cancellation = registry.status(operation_id).and_then(|operation| {
             if operation.owner == "maintenance:source-upgrade" {
-                let checkout = discover_refine_checkout()?;
+                let paths = self.product_paths()?;
+                paths.validate_source_checkout()?;
+                let checkout = paths.checkout.clone();
                 FileSourcePromotionService::new(checkout, runtime_root, self.status.port)
                     .cancel_operation(operation_id)
             } else {

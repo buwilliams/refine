@@ -56,6 +56,11 @@ Current implementation details that matter to intent:
   worktree, with private ownership, exact UTF-8 byte and SHA-256 evidence, and
   explicit failure when the handoff is missing, changed, unreadable, or cannot
   fit the provider sandbox.
+- every stateful provider launch receives the owning checkout's exact
+  `run/<port>` root from daemon, workflow, CLI, or durable operation context.
+  Runtime-free detect, configure, authentication, and diagnostics remain
+  stateless; invoke, resume, interactive, and managed launches fail closed
+  instead of inventing HOME, XDG, platform support, or CWD state.
 - every internal agent prompt is a Markdown template under `src/prompts/<feature>/`, loaded through the shared prompt engine rather than embedded in consumer code;
 - agents should prefer installed local CLIs and host tools where possible;
 - chat and standalone sessions are agent behavior, not browser-only behavior;

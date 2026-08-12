@@ -227,8 +227,8 @@ fn os_backend_hint() -> &'static str {
 
 fn install_target_label(target: &InstallTarget) -> &'static str {
     match target {
-        InstallTarget::MacOsAppBundle => "macos_app_bundle",
-        InstallTarget::WindowsInstaller => "windows_installer",
+        InstallTarget::MacosDaemon => "macos_daemon",
+        InstallTarget::WindowsDaemon => "windows_daemon",
         InstallTarget::LinuxCliWeb => "linux_cli_web",
     }
 }

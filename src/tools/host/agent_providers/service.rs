@@ -38,7 +38,7 @@ impl HostAgentProviderService {
     }
 
     pub fn reap_orphan_prompt_artifacts(&self) -> RefineResult<usize> {
-        reap_orphan_prompt_artifacts(&self.prompt_runtime_root())
+        reap_orphan_prompt_artifacts(&self.prompt_runtime_root()?)
     }
 
     fn spec(provider: &str) -> Option<ProviderSpec> {
@@ -198,7 +198,7 @@ impl HostAgentProviderService {
             spec.noninteractive_prompt_capability()
         };
         let prepared = prepare_prompt_with_environment(
-            &self.prompt_runtime_root(),
+            &self.prompt_runtime_root()?,
             capability,
             request.prompt,
             &request.environment,
@@ -293,7 +293,7 @@ impl HostAgentProviderService {
                 ))
             })?,
         );
-        let supervisor = FileProcessSupervisor::new(self.prompt_runtime_root());
+        let supervisor = FileProcessSupervisor::new(self.prompt_runtime_root()?);
         let process = supervisor.launch(ManagedProcessSpec {
             owner: ProcessOwner::Agent,
             command: prepared.binary,
@@ -482,7 +482,7 @@ impl HostAgentProviderService {
                 "provider command cannot be empty".to_string(),
             ));
         };
-        let runtime_root = self.prompt_runtime_root();
+        let runtime_root = self.prompt_runtime_root()?;
         let mut formatter = ProviderActivityFormatter::new(launch.output_format);
         let output = FileProcessSupervisor::new(runtime_root)
             .run_to_completion_with_prepared_environment(
@@ -552,11 +552,12 @@ impl HostAgentProviderService {
         }
     }
 
-    fn prompt_runtime_root(&self) -> PathBuf {
-        self.runtime_root.clone().unwrap_or_else(|| {
-            crate::process::supervisor::runtime::RuntimePathLayout::current_user("refine")
-                .runtime_root
-                .join("agents")
+    fn prompt_runtime_root(&self) -> RefineResult<PathBuf> {
+        self.runtime_root.clone().ok_or_else(|| {
+            RefineError::Conflict(
+                "stateful provider launch requires the daemon or caller to supply the owning checkout's port-scoped runtime; Refine will not fall back to HOME, XDG, OS app-support state, caller CWD, or an unscoped base run directory"
+                    .to_string(),
+            )
         })
     }
 }

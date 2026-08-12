@@ -69,6 +69,10 @@ impl SourcePromotionHost for FakeHost {
     fn stop_daemon(&mut self) -> RefineResult<()> {
         self.call("stop")
     }
+    fn activate_candidate_binary(&mut self, candidate: &Path) -> RefineResult<PathBuf> {
+        self.call("activate_binary")?;
+        Ok(candidate.to_path_buf())
+    }
     fn activate(&mut self, _from: &str, _to: &str) -> RefineResult<()> {
         self.call("activate")
     }
@@ -88,6 +92,10 @@ impl SourcePromotionHost for FakeHost {
     }
     fn restore_restart_registration(&mut self) -> RefineResult<bool> {
         self.call("restore_registration")?;
+        Ok(true)
+    }
+    fn restore_previous_binary(&mut self) -> RefineResult<bool> {
+        self.call("restore_binary")?;
         Ok(true)
     }
     fn verify_previous_registration(&mut self) -> RefineResult<PathBuf> {

@@ -7,9 +7,7 @@ use serde::{Deserialize, Serialize};
 #[cfg(not(test))]
 use crate::process::subprocess::{FileProcessSupervisor, ManagedProcessSpec, ProcessOwner};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::process::supervisor::lifecycle::{
-    DaemonReachability, daemon_executable_string, http_reachability_probe,
-};
+use crate::process::supervisor::lifecycle::{DaemonReachability, http_reachability_probe};
 use crate::process::supervisor::runtime::{
     DEFAULT_APP_ID, RuntimeOs, RuntimePathInputs, RuntimePathLayout,
 };
@@ -20,8 +18,10 @@ pub const INSTALL_BACKEND_FILE: &str = "install-backend.json";
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum InstallTarget {
-    MacOsAppBundle,
-    WindowsInstaller,
+    #[serde(rename = "macos_daemon", alias = "mac_os_app_bundle")]
+    MacosDaemon,
+    #[serde(rename = "windows_daemon", alias = "windows_installer")]
+    WindowsDaemon,
     LinuxCliWeb,
 }
 
@@ -35,6 +35,8 @@ pub struct InstallStatus {
     pub stale: bool,
     pub partial: bool,
     pub conflicting: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub legacy_runtime_root: Option<String>,
     pub backend: Option<InstallBackendRegistration>,
 }
 
@@ -49,7 +51,6 @@ pub struct InstallBackendRegistration {
     pub cache_dir: Option<String>,
     pub logs_dir: Option<String>,
     pub credential_store: String,
-    pub desktop_bundle: Option<String>,
     pub registered: bool,
     #[serde(default)]
     pub activated: bool,
@@ -90,12 +91,14 @@ struct InstallStateDocument {
 #[derive(Clone, Debug)]
 pub struct FileInstallationService {
     pub runtime_root: PathBuf,
+    pub checkout_root: PathBuf,
     pub current_version: String,
     pub port: Option<u16>,
     pub path_inputs: RuntimePathInputs,
 }
 
 mod backend_spec;
+mod legacy;
 mod lifecycle;
 mod os_backend;
 mod service_control;
@@ -103,6 +106,7 @@ mod service_registration;
 mod state;
 
 use backend_spec::*;
+use legacy::LegacyRegistrationBackup;
 pub use service_control::{InstalledServiceAction, ServiceManagerControl};
 pub use service_registration::ServiceRegistrationUpdate;
 
