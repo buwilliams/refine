@@ -30,19 +30,7 @@ pub(super) fn run_development_request_worker(
                 {
                     let result = (|| {
                         let refine_dir = refine_dir_for_target_root(&target_root)?;
-                        let values =
-                            FileSettingsService::with_active_root(&refine_dir, runtime_root)
-                                .load()?;
-                        let fallback_provider = values
-                            .get("agent_cli")
-                            .and_then(Value::as_str)
-                            .map(str::trim)
-                            .filter(|value| !value.is_empty())
-                            .unwrap_or("claude");
-                        let settings = DevelopmentRequestSettings::from_local_config(
-                            &config,
-                            fallback_provider,
-                        );
+                        let settings = DevelopmentRequestSettings::from_local_config(&config);
                         FileDevelopmentRequestService::new(runtime_root, refine_dir, &target_root)
                             .process_once(&settings)
                     })();

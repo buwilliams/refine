@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 pub mod behavior;
 pub mod behaviors;
+mod candidate_handoff;
 pub mod context;
 pub mod promotion;
 
@@ -122,8 +123,8 @@ mod settings;
 mod tests;
 
 use execution_context::{
-    agent_worktree_cwd, ensure_workflow_round, hydrate_in_progress_context, hydrate_retry_context,
-    implementation_branch_name,
+    agent_worktree_cwd, authored_workflow_commitment, hydrate_in_progress_context,
+    hydrate_retry_context, implementation_branch_name,
 };
 use goal_agent_context::{round_agent_context, selected_agent_context};
 use goal_agent_spec::goal_agent_prompt;

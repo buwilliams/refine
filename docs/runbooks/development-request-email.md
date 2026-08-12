@@ -16,7 +16,6 @@ Fastmail, or create an email-request ledger.
   its authoritative DNS provider.
 - A test message reaches `goal@getrefine.dev` in Fastmail.
 - Refine is attached to the intended target repository.
-- The configured agent provider is installed and authenticated locally.
 
 Do not enable Cloudflare Email Routing for this domain after its MX records
 point to Fastmail. Keep the existing website records in Cloudflare unchanged.
@@ -74,8 +73,9 @@ leaves incoming mail queued at Fastmail.
 Sender matching is case-insensitive. A zero auto-approve delay means the next
 poll approves an email-linked Goal as soon as it reaches Review; approval still
 uses Refine's candidate-integration and publication checks before moving it to
-Done. An optional non-empty `agent_cli` overrides the target's ordinary
-`agent_cli`; when omitted, the target setting is inherited.
+Done. Older capability files may still contain `agent_cli`; unknown fields are
+tolerated for compatibility, but that field is inactive and omitted when the
+configuration is serialized.
 
 Edit `allowed_senders` in this file to change the list. The runner rereads and
 validates the complete file each polling cycle.
@@ -87,9 +87,12 @@ For each accepted Fastmail message, Refine:
 1. queries mail addressed to the configured recipient and checks the local
    sender allowlist;
 2. persists a retry record before marking the Fastmail message processed;
-3. supplies the plain body and `.txt` attachments to one review agent, ignoring
-   images and every other attachment type;
-4. creates at most one deterministic, low-priority Goal in Backlog;
+3. deterministically assembles the authoritative source as `From`, `Subject`,
+   decoded body, and each named text attachment in MIME order, preserving each
+   attachment filename and ignoring unnamed, image, binary, and non-text bodies;
+4. atomically creates at most one deterministic, low-priority Goal with that
+   source as its sole initial Round, the sender as Reporter, and the normal
+   default assignee semantics; no reviewer rewrites accepted trusted source;
 5. lets the normal backlog and workflow automation run;
 6. approves the Goal from Review only after verified Ready Merge evidence; and
 7. sends a threaded resolution reply from `goal@getrefine.dev` after Done.
@@ -99,6 +102,14 @@ Request records live only below the installation runtime at
 deterministic outbound Message-ID plus a Sent-mail lookup prevents a restart
 between send and local settlement from sending the same resolution twice.
 
+Records use schema 2. On restart, a schema-1 `received` record is upgraded only
+by re-fetching its original `provider_email_id` and durably reconstructing the
+complete source before Goal authoring. If raw mail is unavailable, the schema-1
+record remains retryable and no body-only Goal is created. Schema-1 records
+already linked or terminal continue without rewriting historical Goal Rounds or
+evidence. Unsupported, malformed, and invalid records are left byte-for-byte
+unchanged and isolated so later valid records can continue.
+
 The runner is owned by the local daemon. Stopping Refine stops polling, agent
 review, Goal creation, approval, and replies; Fastmail continues queuing mail.
 
@@ -106,8 +117,9 @@ review, Goal creation, approval, and replies; Fastmail continues queuing mail.
 
 1. Send a small request from one allowlisted address.
 2. Confirm a new `DR...` Goal appears in Backlog within the polling interval.
-3. Confirm generated image or non-text attachments do not appear in the Goal
-   prompt, while a `.txt` attachment does.
+3. Confirm the sole Round contains `From`, `Subject`, decoded body, and named
+   text-attachment filenames and contents; image, binary, non-text, and unnamed
+   attachment bodies must not appear.
 4. Let the Goal reach Review and confirm it advances to Done through approval.
 5. Confirm the sender receives one threaded resolution reply.
 6. Stop Refine, send another request, wait longer than one polling interval,
@@ -115,8 +127,9 @@ review, Goal creation, approval, and replies; Fastmail continues queuing mail.
 
 If intake fails, inspect the request record's `last_error` and the daemon's
 `refine development requests:` log line. Common causes are a missing token, a
-sender absent from the allowlist, or an API token without mail/submission
-access.
+sender absent from the allowlist, an unavailable raw message needed for schema-1
+migration, an unsupported/invalid record schema, or an API token without
+mail/submission access.
 
 ## Disable or rotate
 

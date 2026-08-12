@@ -340,3 +340,324 @@ fn quality_operation_restart_recovery_interrupts_and_terminates_its_provider() {
     restore_smoke_ai(previous);
     fs::remove_dir_all(fixture.temp_root).unwrap();
 }
+
+#[test]
+fn isolated_candidate_identity_faults_remain_unclassified_and_preserve_evidence() {
+    for mutation in ["round", "branch", "dirty", "commit"] {
+        let fixture = goal_quality_fixture(
+            &format!("quality-identity-{mutation}"),
+            "printf provider-must-not-launch > provider-launched",
+        );
+        let runner = fixture.runner();
+        let (operation, request) = runner
+            .register_goal_checks("GOAL1", "smoke-ai", Default::default())
+            .unwrap();
+        let expected_commit = request.candidate_commit.clone();
+        match mutation {
+            "round" => {
+                FileWorkItemService::new(&fixture.refine_dir)
+                    .append_goal_round_summary("GOAL1", "Reporter", "Changed authority")
+                    .unwrap();
+            }
+            "branch" => {
+                assert!(
+                    Command::new("git")
+                        .arg("-C")
+                        .arg(&fixture.candidate_root)
+                        .args(["branch", "-m", "wrong-branch"])
+                        .status()
+                        .unwrap()
+                        .success()
+                );
+            }
+            "dirty" => {
+                fs::write(fixture.candidate_root.join("untracked.txt"), "preserve\n").unwrap();
+            }
+            "commit" => {
+                fs::write(fixture.candidate_root.join("candidate.txt"), "advanced\n").unwrap();
+                assert!(
+                    Command::new("git")
+                        .arg("-C")
+                        .arg(&fixture.candidate_root)
+                        .args(["add", "candidate.txt"])
+                        .status()
+                        .unwrap()
+                        .success()
+                );
+                assert!(
+                    Command::new("git")
+                        .arg("-C")
+                        .arg(&fixture.candidate_root)
+                        .args(["commit", "-m", "advanced"])
+                        .status()
+                        .unwrap()
+                        .success()
+                );
+            }
+            _ => unreachable!(),
+        }
+
+        let error = runner.run_registered(&operation.id, request).unwrap_err();
+        assert!(
+            matches!(error, RefineError::QualityCandidateInfrastructure(_)),
+            "{mutation}: {error}"
+        );
+        let settled = FileOperationRegistry::new(&fixture.runtime_root)
+            .status(&operation.id)
+            .unwrap();
+        assert_eq!(settled.state, OperationState::Failed);
+        assert_eq!(
+            settled.error.as_ref().unwrap()["code"],
+            "quality_candidate_infrastructure_fault"
+        );
+        let detail = FileWorkItemService::new(&fixture.refine_dir)
+            .show_goal_detail("GOAL1")
+            .unwrap();
+        assert_eq!(detail["rounds"][0]["quality_state"], "unclassified");
+        assert_eq!(detail["rounds"][0]["quality_details"], "");
+        assert!(!fixture.candidate_root.join("provider-launched").exists());
+        assert!(!expected_commit.is_empty());
+        fs::remove_dir_all(fixture.temp_root).unwrap();
+    }
+}
+
+#[test]
+fn registered_candidate_deletion_is_infrastructure_failure_and_preserves_the_ref() {
+    let temp_root = unique_temp_dir("quality-linked-candidate-deletion");
+    let target_root = temp_root.join("target");
+    let runtime_root = temp_root.join("run/8080");
+    fs::create_dir_all(&target_root).unwrap();
+    for args in [
+        vec!["init", "-b", "main"],
+        vec!["config", "user.email", "quality@example.com"],
+        vec!["config", "user.name", "Quality Test"],
+    ] {
+        assert!(
+            Command::new("git")
+                .arg("-C")
+                .arg(&target_root)
+                .args(args)
+                .status()
+                .unwrap()
+                .success()
+        );
+    }
+    fs::write(target_root.join("app.txt"), "base\n").unwrap();
+    assert!(
+        Command::new("git")
+            .arg("-C")
+            .arg(&target_root)
+            .args(["add", "app.txt"])
+            .status()
+            .unwrap()
+            .success()
+    );
+    assert!(
+        Command::new("git")
+            .arg("-C")
+            .arg(&target_root)
+            .args(["commit", "-m", "base"])
+            .status()
+            .unwrap()
+            .success()
+    );
+    let branch = "refine/GOAL1/round-1";
+    let candidate_root = target_root
+        .join(".git/refine-worktrees")
+        .join(branch.replace('/', "-"));
+    fs::create_dir_all(candidate_root.parent().unwrap()).unwrap();
+    assert!(
+        Command::new("git")
+            .arg("-C")
+            .arg(&target_root)
+            .args([
+                "worktree",
+                "add",
+                "-b",
+                branch,
+                candidate_root.to_str().unwrap()
+            ])
+            .status()
+            .unwrap()
+            .success()
+    );
+    let candidate = git_output(&candidate_root, &["rev-parse", "HEAD"])
+        .trim()
+        .to_string();
+    let refine_dir =
+        crate::tools::host::project_layout::refine_dir_for_target_root(&target_root).unwrap();
+    let work_items = FileWorkItemService::new(&refine_dir);
+    work_items
+        .create_goal_summary("Quality candidate", Some("GOAL1"))
+        .unwrap();
+    work_items
+        .append_goal_round_summary("GOAL1", "Reporter", "Verify candidate")
+        .unwrap();
+    work_items
+        .update_goal_git_refs("GOAL1", branch, "main", &candidate, Some(&candidate))
+        .unwrap();
+    FileQualityService::new(&refine_dir)
+        .save_settings(QualitySettingsPatch {
+            tests: Some(vec!["Outcome works".to_string()]),
+            ..QualitySettingsPatch::default()
+        })
+        .unwrap();
+    let runner = QualityOperationRunner::new(&refine_dir, &runtime_root, &target_root);
+    let (operation, request) = runner
+        .register_goal_checks("GOAL1", "smoke-ai", Default::default())
+        .unwrap();
+    assert!(
+        Command::new("git")
+            .arg("-C")
+            .arg(&target_root)
+            .args([
+                "worktree",
+                "remove",
+                "--force",
+                candidate_root.to_str().unwrap()
+            ])
+            .status()
+            .unwrap()
+            .success()
+    );
+
+    let error = runner.run_registered(&operation.id, request).unwrap_err();
+    assert!(matches!(
+        error,
+        RefineError::QualityCandidateInfrastructure(_)
+    ));
+    let settled = FileOperationRegistry::new(&runtime_root)
+        .status(&operation.id)
+        .unwrap();
+    assert_eq!(
+        settled.error.as_ref().unwrap()["code"],
+        "quality_candidate_infrastructure_fault"
+    );
+    assert_eq!(
+        git_output(&target_root, &["rev-parse", branch]).trim(),
+        candidate
+    );
+    let detail = work_items.show_goal_detail("GOAL1").unwrap();
+    assert_eq!(detail["rounds"][0]["quality_state"], "unclassified");
+    assert_eq!(detail["rounds"][0]["quality_details"], "");
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn candidate_deletion_before_quality_registration_creates_no_quality_result() {
+    let fixture = linked_goal_quality_fixture("quality-preflight-candidate-deletion");
+    assert!(
+        Command::new("git")
+            .arg("-C")
+            .arg(&fixture.target_root)
+            .args([
+                "worktree",
+                "remove",
+                "--force",
+                fixture.candidate_root.to_str().unwrap()
+            ])
+            .status()
+            .unwrap()
+            .success()
+    );
+    let runner = QualityOperationRunner::new(
+        &fixture.refine_dir,
+        &fixture.runtime_root,
+        &fixture.target_root,
+    );
+    let error = runner
+        .run_goal_checks("GOAL1", "smoke-ai", Default::default())
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        RefineError::QualityCandidateInfrastructure(_)
+    ));
+    assert!(
+        FileOperationRegistry::new(&fixture.runtime_root)
+            .recover()
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(
+        git_output(&fixture.target_root, &["rev-parse", &fixture.branch]).trim(),
+        fixture.candidate
+    );
+    let detail = FileWorkItemService::new(&fixture.refine_dir)
+        .show_goal_detail("GOAL1")
+        .unwrap();
+    assert_eq!(detail["rounds"][0]["quality_state"], "unclassified");
+    assert_eq!(detail["rounds"][0]["quality_details"], "");
+    fs::remove_dir_all(fixture.temp_root).unwrap();
+}
+
+#[test]
+fn integrated_target_scopes_do_not_require_the_retired_candidate_worktree() {
+    for reconciliation in [false, true] {
+        let fixture = goal_quality_fixture(
+            if reconciliation {
+                "quality-integrated-reconciliation"
+            } else {
+                "quality-integrated-target"
+            },
+            "printf provider-must-not-launch > provider-launched",
+        );
+        FileQualityService::new(&fixture.refine_dir)
+            .save_settings(QualitySettingsPatch {
+                tests: Some(Vec::new()),
+                ..QualitySettingsPatch::default()
+            })
+            .unwrap();
+        let work_items = FileWorkItemService::new(&fixture.refine_dir);
+        let detail = work_items.show_goal_detail("GOAL1").unwrap();
+        let candidate = detail["candidate_commit"].as_str().unwrap().to_string();
+        let target_branch = git_output(&fixture.candidate_root, &["branch", "--show-current"])
+            .trim()
+            .to_string();
+        work_items
+            .set_goal_branch_name("GOAL1", "refine/retired/round-1")
+            .unwrap();
+        let mut evidence = json!({
+            "workflow_quality_timing": "post_build",
+            "workflow_integration": {
+                "candidate_commit": candidate,
+                "target_branch": target_branch,
+                "target_commit": candidate,
+                "remote": "origin",
+                "pushed": false,
+                "integrated_at": "2026-01-01T00:00:00Z",
+                "merge": {"ok": true, "conflicts": [], "message": "integrated"}
+            }
+        });
+        if reconciliation {
+            evidence["workflow_reconciliation"] = json!({
+                "state": "detected",
+                "candidate_commit": candidate
+            });
+        }
+        work_items
+            .update_goal_round_evaluation_summary("GOAL1", 0, &evidence)
+            .unwrap();
+        assert!(
+            FileGitWorktreeService::new(&fixture.candidate_root)
+                .existing_worktree_for_branch("refine/retired/round-1")
+                .unwrap()
+                .is_none()
+        );
+
+        let operation = fixture
+            .runner()
+            .run_goal_checks("GOAL1", "smoke-ai", Default::default())
+            .unwrap();
+        assert!(operation.result.ok);
+        assert_eq!(
+            operation.operation.request["evaluation_scope"],
+            if reconciliation {
+                "integrated_target_reconciliation"
+            } else {
+                "integrated_target"
+            }
+        );
+        assert!(!fixture.candidate_root.join("provider-launched").exists());
+        fs::remove_dir_all(fixture.temp_root).unwrap();
+    }
+}

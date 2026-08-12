@@ -4,6 +4,7 @@ use crate::model::workflow::GoalStatus;
 use crate::process::agent_sessions::{GoalAgentLaunch, run_goal_agent_with_settlement};
 use crate::process::supervisor::config::{FileGovernanceService, FileGuidanceService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::operations::FileOperationRegistry;
 use crate::prompts::{PromptEngine, PromptTemplate};
 use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
@@ -17,6 +18,10 @@ use crate::tools::host::quality::{
 use crate::tools::host::target_apps::FileTargetAppService;
 use crate::tools::product::merging::{FileMergerService, ReconciliationRequest};
 use crate::workflow::behavior::{WorkflowAdvanceOutcome, WorkflowBehavior};
+use crate::workflow::candidate_handoff::{
+    fail_candidate_handoff, find_candidate_handoff, record_candidate_handoff_commit,
+    register_candidate_handoff, settle_candidate_handoff,
+};
 use crate::workflow::context::WorkflowContext;
 use crate::workflow::{
     GovernanceEvaluation, agent_worktree_cwd, complete_implementation_planning,
@@ -92,10 +97,11 @@ impl WorkflowBehavior for WorkflowTodo {
         // selected this Goal using observed local capacity, and durable Goal state
         // must cross into in-progress before Git may materialize a repository copy.
         ctx.request_transition(GoalStatus::Todo, GoalStatus::InProgress)?;
-        let worktree_path = match materialize_in_progress_worktree(ctx, &app_git, &branch) {
-            Ok(path) => path,
-            Err(error) => return fail(ctx, "branch", error),
-        };
+        let (worktree_path, handoff) =
+            match materialize_in_progress_worktree(ctx, &app_git, &branch, &base_commit) {
+                Ok(materialized) => materialized,
+                Err(error) => return fail(ctx, "branch", error),
+            };
         ctx.log(
             "git",
             &format!("Created implementation worktree for {branch}"),
@@ -115,6 +121,7 @@ impl WorkflowBehavior for WorkflowTodo {
         }
         ctx.branch = Some(branch);
         ctx.worktree_path = Some(worktree_path);
+        ctx.candidate_handoff_operation_id = Some(handoff.id);
         Ok(WorkflowAdvanceOutcome::Transition {
             from: GoalStatus::Todo,
             to: GoalStatus::InProgress,
@@ -328,7 +335,11 @@ fn materialize_in_progress_worktree(
     ctx: &WorkflowContext<'_>,
     app_git: &FileGitWorktreeService,
     branch: &str,
-) -> RefineResult<String> {
+    base_commit: &str,
+) -> RefineResult<(
+    String,
+    crate::process::supervisor::operations::OperationHandle,
+)> {
     let status = ctx.work_items.show_goal_summary(&ctx.goal_id)?.goal.status;
     if status != GoalStatus::InProgress {
         return Err(RefineError::Conflict(format!(
@@ -341,7 +352,18 @@ fn materialize_in_progress_worktree(
         .git_path("refine-worktrees")?
         .join(branch.replace('/', "-"));
     with_repository_git_lock(ctx.target_root, || {
-        app_git.ensure_worktree(branch, &worktree_target)
+        let worktree_path = app_git.ensure_worktree(branch, &worktree_target)?;
+        let handoff = register_candidate_handoff(
+            ctx.runtime_root,
+            ctx.target_root,
+            &ctx.goal_id,
+            ctx.round_idx,
+            &ctx.node_id,
+            branch,
+            &worktree_path,
+            base_commit,
+        )?;
+        Ok((worktree_path, handoff))
     })
 }
 
@@ -468,6 +490,33 @@ impl WorkflowBehavior for WorkflowImplementation {
         {
             return fail(ctx, "commit", error);
         }
+        let handoff_id = ctx
+            .candidate_handoff_operation_id
+            .clone()
+            .or_else(|| {
+                find_candidate_handoff(
+                    ctx.runtime_root,
+                    ctx.target_root,
+                    &ctx.goal_id,
+                    ctx.round_idx,
+                )
+                .ok()
+                .flatten()
+                .map(|operation| operation.id)
+            })
+            .ok_or_else(|| {
+                RefineError::Conflict(format!(
+                    "Goal {} Round {} has no active candidate handoff after commit",
+                    ctx.goal_id,
+                    ctx.round_idx + 1
+                ))
+            })?;
+        if let Err(error) =
+            record_candidate_handoff_commit(ctx.runtime_root, &handoff_id, &commit.commit)
+        {
+            return fail(ctx, "candidate_handoff", error);
+        }
+        ctx.candidate_handoff_operation_id = Some(handoff_id.clone());
         let changed_paths = match worktree_git.changed_paths_since(&target_branch, &commit.commit) {
             Ok(paths) => paths,
             Err(error) => return fail(ctx, "guidance", error),
@@ -550,13 +599,91 @@ impl WorkflowBehavior for WorkflowImplementation {
         ctx.agent_cwd = Some(agent_cwd);
         ctx.provider_output = Some(provider_output);
         ctx.implementation_changed = commit.has_changes_since_base;
-        ctx.commit = Some(commit.commit);
+        ctx.commit = Some(commit.commit.clone());
         let next = match ctx.quality_timing(GoalStatus::InProgress) {
-            Ok(timing) if timing == POST_BUILD => GoalStatus::ReadyMerge,
-            Ok(_) => GoalStatus::Qa,
+            Ok(timing) if timing == POST_BUILD => {
+                if let Err(error) =
+                    ctx.request_transition(GoalStatus::InProgress, GoalStatus::ReadyMerge)
+                {
+                    fail_candidate_handoff(
+                        ctx.runtime_root,
+                        &handoff_id,
+                        "candidate_handoff_transition_failed",
+                        &error,
+                    );
+                    return fail(ctx, "candidate_handoff", error);
+                }
+                GoalStatus::ReadyMerge
+            }
+            Ok(_) => {
+                let quality_runner = QualityOperationRunner::new(
+                    ctx.refine_dir(),
+                    ctx.runtime_root,
+                    ctx.target_root,
+                );
+                let prepared = with_repository_git_lock(ctx.target_root, || {
+                    let (operation, request) = quality_runner.register_goal_checks(
+                        &ctx.goal_id,
+                        &ctx.provider,
+                        ctx.workflow_process_metadata("qa", "WorkflowQa"),
+                    )?;
+                    if let Err(error) =
+                        ctx.request_transition(GoalStatus::InProgress, GoalStatus::Qa)
+                    {
+                        let _ = FileOperationRegistry::new(ctx.runtime_root).fail_with_error(
+                            &operation.id,
+                            json!({
+                                "code": "quality_transition_failed",
+                                "message": error.to_string()
+                            }),
+                        );
+                        fail_candidate_handoff(
+                            ctx.runtime_root,
+                            &handoff_id,
+                            "candidate_handoff_transition_failed",
+                            &error,
+                        );
+                        return Err(error);
+                    }
+                    if let Err(error) = settle_candidate_handoff(
+                        ctx.runtime_root,
+                        &handoff_id,
+                        "transferred_to_quality",
+                        json!({
+                            "quality_operation_id": operation.id,
+                            "candidate_commit": commit.commit,
+                            "round_idx": ctx.round_idx
+                        }),
+                    ) {
+                        let _ = FileOperationRegistry::new(ctx.runtime_root).fail_with_error(
+                            &operation.id,
+                            json!({
+                                "code": "candidate_handoff_settlement_failed",
+                                "message": error.to_string()
+                            }),
+                        );
+                        return Err(error);
+                    }
+                    Ok((operation, request))
+                });
+                let (operation, request) = match prepared {
+                    Ok(prepared) => prepared,
+                    Err(error) => {
+                        let category =
+                            if matches!(error, RefineError::QualityCandidateInfrastructure(_)) {
+                                "quality_candidate_infrastructure"
+                            } else {
+                                "candidate_handoff"
+                            };
+                        return fail(ctx, category, error);
+                    }
+                };
+                ctx.quality_operation_id = Some(operation.id);
+                ctx.quality_request = Some(request);
+                GoalStatus::Qa
+            }
             Err(error) => return fail(ctx, "quality", error),
         };
-        ctx.request_transition(GoalStatus::InProgress, next.clone())?;
         Ok(WorkflowAdvanceOutcome::Transition {
             from: GoalStatus::InProgress,
             to: next,
@@ -582,11 +709,14 @@ impl WorkflowBehavior for WorkflowQa {
                 return Err(error);
             }
             Err(error) => {
-                let category = if is_quality_harness_fault(&error) {
-                    "quality_harness"
-                } else {
-                    "quality"
-                };
+                let category =
+                    if crate::tools::host::quality::is_quality_candidate_infrastructure(&error) {
+                        "quality_candidate_infrastructure"
+                    } else if is_quality_harness_fault(&error) {
+                        "quality_harness"
+                    } else {
+                        "quality"
+                    };
                 return fail(
                     ctx,
                     category,
@@ -843,6 +973,22 @@ impl WorkflowBehavior for WorkflowReadyMerge {
             Err(error) => return fail(ctx, "merge", error),
         };
         ctx.merge = Some(integration.merge);
+        if let Some(handoff) = find_candidate_handoff(
+            ctx.runtime_root,
+            ctx.target_root,
+            &ctx.goal_id,
+            ctx.round_idx,
+        )? {
+            settle_candidate_handoff(
+                ctx.runtime_root,
+                &handoff.id,
+                "candidate_integrated",
+                json!({
+                    "candidate_commit": commit,
+                    "round_idx": ctx.round_idx
+                }),
+            )?;
+        }
         if !transitioned {
             ctx.final_status = Some(GoalStatus::Cancelled);
             return Ok(WorkflowAdvanceOutcome::Completed {
@@ -1008,14 +1154,23 @@ impl WorkflowBehavior for WorkflowCancelled {
     }
 }
 
-fn run_workflow_quality(ctx: &WorkflowContext<'_>) -> RefineResult<QualityCheckResult> {
-    QualityOperationRunner::new(ctx.refine_dir(), ctx.runtime_root, ctx.target_root)
-        .run_goal_checks(
-            &ctx.goal_id,
-            &ctx.provider,
-            ctx.workflow_process_metadata("qa", "WorkflowQa"),
-        )
-        .map(|operation| operation.result)
+fn run_workflow_quality(ctx: &mut WorkflowContext<'_>) -> RefineResult<QualityCheckResult> {
+    let runner = QualityOperationRunner::new(ctx.refine_dir(), ctx.runtime_root, ctx.target_root);
+    if let (Some(operation_id), Some(request)) =
+        (ctx.quality_operation_id.take(), ctx.quality_request.take())
+    {
+        runner
+            .run_registered(&operation_id, request)
+            .map(|operation| operation.result)
+    } else {
+        runner
+            .run_goal_checks(
+                &ctx.goal_id,
+                &ctx.provider,
+                ctx.workflow_process_metadata("qa", "WorkflowQa"),
+            )
+            .map(|operation| operation.result)
+    }
 }
 
 fn ensure_goal_agent_context(ctx: &WorkflowContext<'_>, goal: &Value) -> RefineResult<Value> {
@@ -1325,6 +1480,19 @@ fn record_governance(
 }
 
 fn fail<T>(ctx: &WorkflowContext<'_>, category: &str, error: RefineError) -> RefineResult<T> {
+    if let Ok(Some(handoff)) = find_candidate_handoff(
+        ctx.runtime_root,
+        ctx.target_root,
+        &ctx.goal_id,
+        ctx.round_idx,
+    ) {
+        fail_candidate_handoff(
+            ctx.runtime_root,
+            &handoff.id,
+            "candidate_handoff_workflow_failed",
+            &error,
+        );
+    }
     let _ = ctx.fail(category, &error);
     Err(error)
 }

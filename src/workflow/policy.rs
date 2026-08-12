@@ -10,7 +10,6 @@ use crate::model::workflow::GoalStatus;
 use crate::process::subprocess::{FileProcessSupervisor, ProcessOwner, ProcessPauseState};
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::prompts::{PromptEngine, PromptTemplate};
 use crate::tools::host::host_resources::{HostResources, observed_agent_memory_bytes};
 use crate::tools::host::project_layout::prepare_refine_dir;
 use crate::tools::observability::logs::FileLogService;
@@ -206,18 +205,15 @@ impl WorkflowEngine {
         } else {
             detail.trim()
         };
+        let mut recovered = 0;
         for goal in &active_goals {
-            let round_idx = match goal.round_count.checked_sub(1) {
-                Some(round_idx) => round_idx,
-                None => work_items
-                    .append_workflow_recovery_round_summary(
-                        &goal.id,
-                        "Refine",
-                        PromptEngine::load(PromptTemplate::GoalWorkflowDefaultRound),
-                    )?
-                    .goal
-                    .round_count
-                    .saturating_sub(1),
+            let Some(round_idx) = goal.round_count.checked_sub(1) else {
+                eprintln!(
+                    "refine workflow recovery: Goal {} is {} with no authored Round; preserving the Goal and creating no worker or worktree",
+                    goal.id,
+                    goal.status.as_str()
+                );
+                continue;
             };
             super::implementation_planning::recover_interrupted_plan(
                 &work_items,
@@ -245,8 +241,9 @@ impl WorkflowEngine {
                     goal_id: Some(goal.id.clone()),
                 },
             )?;
+            recovered += 1;
         }
-        Ok(active_goals.len())
+        Ok(recovered)
     }
 
     fn terminate_stale_workflow_processes(&self) -> RefineResult<()> {
@@ -411,6 +408,9 @@ impl SchedulingEligibility {
         let mut lowest_holding_order: BTreeMap<(&str, &str), i64> = BTreeMap::new();
         let mut occupying_count: BTreeMap<(&str, &str), usize> = BTreeMap::new();
         for goal in goals.clone() {
+            if goal.round_count == 0 {
+                continue;
+            }
             let (Some(feature_id), Some(order)) = (goal.feature_id.as_deref(), goal.feature_order)
             else {
                 continue;
@@ -430,6 +430,9 @@ impl SchedulingEligibility {
             .clone()
             .into_iter()
             .filter(|goal| {
+                if goal.round_count == 0 {
+                    return false;
+                }
                 let (Some(feature_id), Some(order)) =
                     (goal.feature_id.as_deref(), goal.feature_order)
                 else {
@@ -445,6 +448,7 @@ impl SchedulingEligibility {
         let mut highest_todo_rank = BTreeMap::new();
         for goal in goals {
             if goal.status != GoalStatus::Todo
+                || goal.round_count == 0
                 || excluded_goal_ids.contains(&goal.id)
                 || !feature_eligible.contains(&goal.id)
             {

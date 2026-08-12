@@ -125,7 +125,9 @@ fn web_server_instantly_promotes_new_goal_when_configured() {
         path: "/api/goals".to_string(),
         body: Some(json!({
             "id": "GOAL1",
-            "name": "Instantly promoted Goal"
+            "name": "Instantly promoted Goal",
+            "reporter": "Reporter",
+            "prompt": "Implement the instantly promoted Goal"
         })),
     });
 
@@ -272,7 +274,12 @@ fn daemon_agent_automation_loop_executes_todo_goals_without_manual_request() {
     server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/goals".to_string(),
-        body: Some(json!({"id": "GOAL1", "name": "Loop schedulable"})),
+        body: Some(json!({
+            "id": "GOAL1",
+            "name": "Loop schedulable",
+            "reporter": "Reporter",
+            "prompt": "Implement the schedulable Goal"
+        })),
     });
     server.handle(ApiRequest {
         method: "POST".to_string(),

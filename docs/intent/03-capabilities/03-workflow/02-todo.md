@@ -16,6 +16,12 @@ The scheduler reads todo Goals assigned to its active node. When policy permits,
 
 If a Goal cannot proceed, it remains visible as actionable work. Live-process counts and runner-local reservations are soft efficiency controls and may be rebuilt after restart.
 
+Todo execution is admitted only for an existing non-empty latest Round. Before
+any branch, worktree, or process is created, Refine locks the Goal record and
+atomically rechecks Todo status, active-node ownership, exact Round count,
+request, and authored workflow revision while moving to in-progress. A changed
+authoring commitment remains Todo and produces no execution side effects.
+
 ## Future Direction
 
 Todo selection should gain better dependency, risk, capability, node-health, and expected-impact reasoning while remaining understandable as the point where work becomes actionable.

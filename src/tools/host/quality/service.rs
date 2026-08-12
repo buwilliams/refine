@@ -27,6 +27,10 @@ use crate::tools::product::work_items::FileWorkItemService;
 use crate::workflow::WorkflowEngine;
 
 use super::types::*;
+use super::{
+    ISOLATED_CANDIDATE, QualityIdentityCommitment, is_quality_candidate_infrastructure,
+    validate_quality_identity,
+};
 
 mod cancellation;
 mod execution;
@@ -73,6 +77,8 @@ pub struct QualityCheckRequest {
     #[serde(default = "default_evaluation_scope")]
     pub evaluation_scope: String,
     pub candidate_commit: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub identity_commitment: Option<QualityIdentityCommitment>,
     #[serde(default, skip_serializing_if = "Map::is_empty")]
     pub process_metadata: Map<String, Value>,
 }

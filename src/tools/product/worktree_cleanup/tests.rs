@@ -289,7 +289,13 @@ fn cleanup_preserves_dirty_missing_and_owned_worktrees_but_hibernates_inactive_s
     fs::write(dirty.join("untracked.txt"), "preserve me\n").unwrap();
     fixture.register_active_process(&active);
     FileOperationRegistry::new(&fixture.runtime_root)
-        .register_with_request("quality", json!({"nested": {"goal_id": "OPERATION"}}))
+        .register_with_request(
+            "candidate-handoff",
+            json!({
+                "kind": "workflow_candidate_handoff",
+                "nested": {"worktree_path": operation}
+            }),
+        )
         .unwrap();
 
     let report = FileWorktreeCleanupService::new(&fixture.repo, &fixture.runtime_root)
@@ -308,7 +314,7 @@ fn cleanup_preserves_dirty_missing_and_owned_worktrees_but_hibernates_inactive_s
     assert!(reasons.contains(&(Some("DIRTY"), "dirty_worktree")));
     assert!(reasons.contains(&(Some("ACTIVE"), "active_process")));
     assert!(reasons.contains(&(Some("REVIEW"), "eligible")));
-    assert!(reasons.contains(&(Some("OPERATION"), "active_owner")));
+    assert!(reasons.contains(&(Some("OPERATION"), "active_process")));
     assert!(reasons.contains(&(None, "goal_not_found")));
     assert!(!review.exists(), "hibernated {}", review.display());
     for path in [dirty, active, operation, missing] {

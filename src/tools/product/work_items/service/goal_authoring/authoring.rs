@@ -50,7 +50,8 @@ impl FileWorkItemService {
 
     pub fn author_goal(&self, request: GoalAuthoringRequest) -> RefineResult<GoalAuthoringResult> {
         let snapshot = self.projection_snapshot()?;
-        self.author_goal_with_context(request, false, Some(&snapshot), false)
+        // Non-surface integrations publish metadata and their initial Round together.
+        self.author_goal_with_context(request, false, Some(&snapshot), true)
     }
 
     /// Authors a new Goal from a caller-validated coherent projection. The web

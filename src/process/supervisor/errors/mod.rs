@@ -20,6 +20,8 @@ pub enum RefineError {
         target_commit: String,
     },
     #[error("{0}")]
+    QualityCandidateInfrastructure(Box<QualityCandidateInfrastructureError>),
+    #[error("{0}")]
     Degraded(String),
     #[error("{0}")]
     Io(String),
@@ -49,11 +51,33 @@ impl RefineError {
             Self::InvalidInput(_) => ErrorCategory::InvalidInput,
             Self::NotFound(_) => ErrorCategory::NotFound,
             Self::Unauthorized(_) => ErrorCategory::Unauthorized,
-            Self::Conflict(_) | Self::StaleCandidate { .. } => ErrorCategory::Conflict,
+            Self::Conflict(_)
+            | Self::StaleCandidate { .. }
+            | Self::QualityCandidateInfrastructure(_) => ErrorCategory::Conflict,
             Self::Degraded(_) => ErrorCategory::Degraded,
             Self::Io(_) => ErrorCategory::Io,
             Self::Serialization(_) => ErrorCategory::Serialization,
             Self::NotImplemented(_) => ErrorCategory::NotImplemented,
         }
     }
+}
+
+#[derive(Debug, Error)]
+#[error(
+    "Quality candidate infrastructure fault for Goal {goal_id} during {phase}: {reason}; expected round {expected_round_idx}, branch {expected_branch}, path {expected_path}, registered={expected_registered}, commit {expected_commit}; observed round {observed_round_idx:?}, branch {observed_branch:?}, path {observed_path:?}, registered={observed_registered}, commit {observed_commit:?}"
+)]
+pub struct QualityCandidateInfrastructureError {
+    pub goal_id: String,
+    pub phase: String,
+    pub reason: String,
+    pub expected_round_idx: usize,
+    pub observed_round_idx: Option<usize>,
+    pub expected_branch: String,
+    pub observed_branch: Option<String>,
+    pub expected_path: String,
+    pub observed_path: Option<String>,
+    pub expected_registered: bool,
+    pub observed_registered: bool,
+    pub expected_commit: String,
+    pub observed_commit: Option<String>,
 }

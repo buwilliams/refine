@@ -4,20 +4,15 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
-use mail_parser::{MessageParser, MimeHeaders};
-use reqwest::blocking::Client;
 use serde::{Deserialize, Serialize};
-use serde_json::{Map, Value, json};
+use serde_json::Value;
+#[cfg(test)]
+use serde_json::json;
 use sha2::{Digest, Sha256};
 
 use crate::model::workflow::GoalStatus;
-use crate::process::subprocess::write_json_atomically;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::security::{NativeSecretStore, SecretStore};
-use crate::prompts::{PromptTemplate, render};
-use crate::tools::host::agent_providers::{
-    AgentProviderService, HostAgentProviderService, ProviderInvocation,
-};
 use crate::tools::product::merging::FileMergerService;
 use crate::tools::product::work_items::{
     FeatureGoalPlacement, FileWorkItemService, GoalAuthoringRequest,
@@ -27,7 +22,17 @@ const JMAP_SESSION_URL: &str = "https://api.fastmail.com/jmap/session";
 const TOKEN_SCOPE: &str = "email";
 const TOKEN_NAME: &str = "fastmail_jmap_token";
 const PROCESSED_KEYWORD: &str = "refine-processed";
-const REQUEST_SCHEMA_VERSION: u64 = 1;
+mod email_source;
+mod fastmail;
+mod records;
+
+use email_source::{ParsedEmail, parse_email};
+use fastmail::FastmailClient;
+#[cfg(test)]
+use fastmail::pending_email_filter;
+use records::{read_record, write_record};
+
+const REQUEST_SCHEMA_VERSION: u64 = 2;
 const CONFIG_SCHEMA_VERSION: u64 = 1;
 const DEFAULT_POLL_SECONDS: u64 = 60;
 const DEVELOPMENT_REQUEST_GOAL_PRIORITY: &str = "low";
@@ -47,8 +52,6 @@ pub struct SelfDevelopmentEmailConfig {
     pub poll_seconds: u64,
     #[serde(default)]
     pub auto_approve_after_seconds: u64,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub agent_cli: Option<String>,
 }
 
 pub fn self_development_email_config_path(runtime_root: &Path) -> PathBuf {
@@ -107,10 +110,6 @@ pub fn load_self_development_email_config(
         )));
     }
     config.poll_seconds = config.poll_seconds.max(1);
-    config.agent_cli = config
-        .agent_cli
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty());
     Ok(Some(config))
 }
 
@@ -132,19 +131,14 @@ pub struct DevelopmentRequestSettings {
     pub address: String,
     pub allowed_senders: BTreeSet<String>,
     pub auto_approve_after: Duration,
-    pub provider: String,
 }
 
 impl DevelopmentRequestSettings {
-    pub fn from_local_config(config: &SelfDevelopmentEmailConfig, fallback_provider: &str) -> Self {
+    pub fn from_local_config(config: &SelfDevelopmentEmailConfig) -> Self {
         Self {
             address: config.address.clone(),
             allowed_senders: config.allowed_senders.clone(),
             auto_approve_after: Duration::from_secs(config.auto_approve_after_seconds),
-            provider: config
-                .agent_cli
-                .clone()
-                .unwrap_or_else(|| fallback_provider.to_string()),
         }
     }
 }
@@ -180,313 +174,15 @@ pub struct DevelopmentRequestRecord {
     pub attempts: u64,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
-#[serde(tag = "decision", rename_all = "snake_case")]
-enum ReviewDecision {
-    CreateGoal { name: String, prompt: String },
-    Ignore { reason: Option<String> },
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct ParsedEmail {
-    message_id: Option<String>,
-    sender: String,
-    subject: String,
-    source_text: String,
-}
-
-#[derive(Clone, Debug, Deserialize)]
-struct JmapSession {
-    #[serde(rename = "apiUrl")]
-    api_url: String,
-    #[serde(rename = "downloadUrl")]
-    download_url: String,
-    #[serde(rename = "primaryAccounts")]
-    primary_accounts: Map<String, Value>,
-}
-
-#[derive(Clone, Debug)]
-struct FastmailClient {
-    http: Client,
-    token: String,
-    api_url: String,
-    download_url: String,
-    account_id: String,
-}
-
-impl FastmailClient {
-    fn connect(token: String) -> RefineResult<Self> {
-        let http = Client::builder()
-            .timeout(Duration::from_secs(30))
-            .build()
-            .map_err(http_error)?;
-        let session = http
-            .get(JMAP_SESSION_URL)
-            .bearer_auth(&token)
-            .send()
-            .and_then(reqwest::blocking::Response::error_for_status)
-            .map_err(http_error)?
-            .json::<JmapSession>()
-            .map_err(http_error)?;
-        let account_id = session
-            .primary_accounts
-            .get("urn:ietf:params:jmap:mail")
-            .and_then(Value::as_str)
-            .ok_or_else(|| {
-                RefineError::Conflict(
-                    "Fastmail JMAP session has no primary mail account".to_string(),
-                )
-            })?
-            .to_string();
-        Ok(Self {
-            http,
-            token,
-            api_url: session.api_url,
-            download_url: session.download_url,
-            account_id,
-        })
-    }
-
-    fn call(&self, using: &[&str], method_calls: Vec<Value>) -> RefineResult<Value> {
-        let response = self
-            .http
-            .post(&self.api_url)
-            .bearer_auth(&self.token)
-            .json(&json!({"using": using, "methodCalls": method_calls}))
-            .send()
-            .and_then(reqwest::blocking::Response::error_for_status)
-            .map_err(http_error)?
-            .json::<Value>()
-            .map_err(http_error)?;
-        if let Some(error) = response
-            .get("methodResponses")
-            .and_then(Value::as_array)
-            .and_then(|responses| {
-                responses
-                    .iter()
-                    .find(|response| response.get(0).and_then(Value::as_str) == Some("error"))
-            })
-        {
-            return Err(RefineError::Conflict(format!(
-                "Fastmail JMAP method failed: {error}"
-            )));
-        }
-        Ok(response)
-    }
-
-    fn method_result<'a>(response: &'a Value, name: &str) -> RefineResult<&'a Value> {
-        response
-            .get("methodResponses")
-            .and_then(Value::as_array)
-            .and_then(|responses| {
-                responses
-                    .iter()
-                    .find(|response| response.get(0).and_then(Value::as_str) == Some(name))
-            })
-            .and_then(|response| response.get(1))
-            .ok_or_else(|| RefineError::Serialization(format!("Fastmail response omitted {name}")))
-    }
-
-    fn mailbox_id_by_role(&self, role: &str) -> RefineResult<String> {
-        let response = self.call(
-            &["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
-            vec![json!(["Mailbox/get", {"accountId": self.account_id}, "mailboxes"])],
-        )?;
-        Self::method_result(&response, "Mailbox/get")?
-            .get("list")
-            .and_then(Value::as_array)
-            .and_then(|mailboxes| {
-                mailboxes
-                    .iter()
-                    .find(|mailbox| mailbox.get("role").and_then(Value::as_str) == Some(role))
-            })
-            .and_then(|mailbox| mailbox.get("id"))
-            .and_then(Value::as_str)
-            .map(str::to_string)
-            .ok_or_else(|| RefineError::NotFound(format!("Fastmail {role} mailbox was not found")))
-    }
-
-    fn pending_email_ids(&self, address: &str) -> RefineResult<Vec<String>> {
-        let response = self.call(
-            &["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
-            vec![json!(["Email/query", {
-                "accountId": self.account_id,
-                "filter": pending_email_filter(address),
-                "sort": [{"property": "receivedAt", "isAscending": true}],
-                "limit": 25
-            }, "pending"])],
-        )?;
-        Ok(Self::method_result(&response, "Email/query")?
-            .get("ids")
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-            .filter_map(Value::as_str)
-            .map(str::to_string)
-            .collect())
-    }
-
-    fn raw_email(&self, email_id: &str) -> RefineResult<Vec<u8>> {
-        let response = self.call(
-            &["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
-            vec![json!(["Email/get", {
-                "accountId": self.account_id,
-                "ids": [email_id],
-                "properties": ["id", "blobId"]
-            }, "email"])],
-        )?;
-        let blob_id = Self::method_result(&response, "Email/get")?
-            .get("list")
-            .and_then(Value::as_array)
-            .and_then(|emails| emails.first())
-            .and_then(|email| email.get("blobId"))
-            .and_then(Value::as_str)
-            .ok_or_else(|| {
-                RefineError::Serialization(format!("Fastmail email {email_id} has no blobId"))
-            })?;
-        let url = self
-            .download_url
-            .replace("{accountId}", &self.account_id)
-            .replace("{blobId}", blob_id)
-            .replace("{name}", "message.eml")
-            .replace("{type}", "message%2Frfc822");
-        Ok(self
-            .http
-            .get(url)
-            .bearer_auth(&self.token)
-            .send()
-            .and_then(reqwest::blocking::Response::error_for_status)
-            .map_err(http_error)?
-            .bytes()
-            .map_err(http_error)?
-            .to_vec())
-    }
-
-    fn mark_processed(&self, email_id: &str) -> RefineResult<()> {
-        let response = self.call(
-            &["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
-            vec![json!(["Email/set", {
-                "accountId": self.account_id,
-                "update": {email_id: {format!("keywords/{PROCESSED_KEYWORD}"): true}}
-            }, "processed"])],
-        )?;
-        ensure_set_succeeded(
-            Self::method_result(&response, "Email/set")?,
-            "mark email processed",
-        )
-    }
-
-    fn identity_id(&self, address: &str) -> RefineResult<String> {
-        let response = self.call(
-            &[
-                "urn:ietf:params:jmap:core",
-                "urn:ietf:params:jmap:mail",
-                "urn:ietf:params:jmap:submission",
-            ],
-            vec![json!(["Identity/get", {"accountId": self.account_id}, "identities"])],
-        )?;
-        Self::method_result(&response, "Identity/get")?
-            .get("list")
-            .and_then(Value::as_array)
-            .and_then(|identities| {
-                identities.iter().find(|identity| {
-                    identity
-                        .get("email")
-                        .and_then(Value::as_str)
-                        .is_some_and(|email| email.eq_ignore_ascii_case(address))
-                })
-            })
-            .and_then(|identity| identity.get("id"))
-            .and_then(Value::as_str)
-            .map(str::to_string)
-            .ok_or_else(|| {
-                RefineError::NotFound(format!("Fastmail identity {address} was not found"))
-            })
-    }
-
-    fn sent_contains_message_id(&self, sent_id: &str, message_id: &str) -> RefineResult<bool> {
-        let response = self.call(
-            &["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
-            vec![json!(["Email/query", {
-                "accountId": self.account_id,
-                "filter": {"inMailbox": sent_id, "header": ["Message-ID", message_id]},
-                "limit": 1
-            }, "sent-query"])],
-        )?;
-        Ok(Self::method_result(&response, "Email/query")?
-            .get("ids")
-            .and_then(Value::as_array)
-            .is_some_and(|ids| !ids.is_empty()))
-    }
-
+trait MailSource {
+    fn pending_email_ids(&self, address: &str) -> RefineResult<Vec<String>>;
+    fn raw_email(&self, email_id: &str) -> RefineResult<Vec<u8>>;
+    fn mark_processed(&self, email_id: &str) -> RefineResult<()>;
     fn send_resolution(
         &self,
         settings: &DevelopmentRequestSettings,
         record: &DevelopmentRequestRecord,
-    ) -> RefineResult<()> {
-        let drafts_id = self.mailbox_id_by_role("drafts")?;
-        let sent_id = self.mailbox_id_by_role("sent")?;
-        if self
-            .sent_contains_message_id(&sent_id, &format!("<{}>", record.notification_message_id))?
-        {
-            return Ok(());
-        }
-        let identity_id = self.identity_id(&settings.address)?;
-        let subject = if record.subject.to_ascii_lowercase().starts_with("re:") {
-            record.subject.clone()
-        } else {
-            format!("Re: {}", record.subject)
-        };
-        let goal_id = record.goal_id.as_deref().unwrap_or("unknown");
-        let goal_name = record.goal_name.as_deref().unwrap_or("Development request");
-        let body = format!(
-            "Your development request has been resolved.\n\nGoal: {goal_name} ({goal_id})\n\nThis confirms the Refine Goal is done; it does not make a separate deployment claim.\n"
-        );
-        let mut draft = json!({
-            "mailboxIds": {drafts_id.clone(): true},
-            "keywords": {"$draft": true, "$seen": true},
-            "from": [{"email": settings.address}],
-            "to": [{"email": record.sender}],
-            "subject": subject,
-            "textBody": [{"partId": "body", "type": "text/plain"}],
-            "bodyValues": {"body": {"value": body, "isTruncated": false}},
-            "header:Message-ID:asMessageIds": [record.notification_message_id]
-        });
-        if let Some(message_id) = record.message_id.as_ref().filter(|value| !value.is_empty()) {
-            draft["header:In-Reply-To:asMessageIds"] = json!([message_id]);
-            draft["header:References:asMessageIds"] = json!([message_id]);
-        }
-        let response = self.call(
-            &[
-                "urn:ietf:params:jmap:core",
-                "urn:ietf:params:jmap:mail",
-                "urn:ietf:params:jmap:submission",
-            ],
-            vec![
-                json!(["Email/set", {
-                    "accountId": self.account_id,
-                    "create": {"draft": draft}
-                }, "draft"]),
-                json!(["EmailSubmission/set", {
-                    "accountId": self.account_id,
-                    "create": {"submission": {"emailId": "#draft", "identityId": identity_id}},
-                    "onSuccessUpdateEmail": {"#submission": {
-                        format!("mailboxIds/{drafts_id}"): null,
-                        format!("mailboxIds/{sent_id}"): true,
-                        "keywords/$draft": null
-                    }}
-                }, "submit"]),
-            ],
-        )?;
-        ensure_set_succeeded(
-            Self::method_result(&response, "Email/set")?,
-            "create resolution email",
-        )?;
-        ensure_set_succeeded(
-            Self::method_result(&response, "EmailSubmission/set")?,
-            "submit resolution email",
-        )
-    }
+    ) -> RefineResult<()>;
 }
 
 #[derive(Clone, Debug)]
@@ -494,6 +190,8 @@ pub struct FileDevelopmentRequestService {
     runtime_root: PathBuf,
     refine_dir: PathBuf,
     target_root: PathBuf,
+    #[cfg(test)]
+    fail_next_record_write: std::cell::Cell<bool>,
 }
 
 impl FileDevelopmentRequestService {
@@ -506,6 +204,8 @@ impl FileDevelopmentRequestService {
             runtime_root: runtime_root.into(),
             refine_dir: refine_dir.into(),
             target_root: target_root.into(),
+            #[cfg(test)]
+            fail_next_record_write: std::cell::Cell::new(false),
         }
     }
 
@@ -526,7 +226,7 @@ impl FileDevelopmentRequestService {
 
     fn ingest(
         &self,
-        fastmail: &FastmailClient,
+        fastmail: &dyn MailSource,
         settings: &DevelopmentRequestSettings,
     ) -> RefineResult<()> {
         for email_id in fastmail.pending_email_ids(&settings.address)? {
@@ -581,14 +281,23 @@ impl FileDevelopmentRequestService {
 
     fn process_local_records(
         &self,
-        fastmail: &FastmailClient,
+        fastmail: &dyn MailSource,
         settings: &DevelopmentRequestSettings,
     ) -> RefineResult<()> {
         for path in self.record_paths()? {
-            let mut record = self.read_record(&path)?;
+            let mut record = match self.read_record(&path) {
+                Ok(record) => record,
+                Err(error) => {
+                    eprintln!(
+                        "refine development request record {} was isolated: {error}",
+                        path.display()
+                    );
+                    continue;
+                }
+            };
             let result = match record.status {
                 DevelopmentRequestStatus::Received => {
-                    self.review_and_create_goal(&mut record, settings)
+                    self.recover_or_create_goal(&mut record, fastmail, settings)
                 }
                 DevelopmentRequestStatus::GoalCreated | DevelopmentRequestStatus::Resolved => {
                     self.advance_goal_and_notify(&mut record, fastmail, settings)
@@ -606,76 +315,102 @@ impl FileDevelopmentRequestService {
         Ok(())
     }
 
-    fn review_and_create_goal(
+    fn recover_or_create_goal(
         &self,
         record: &mut DevelopmentRequestRecord,
+        mail: &dyn MailSource,
         settings: &DevelopmentRequestSettings,
     ) -> RefineResult<()> {
-        let email = format!(
-            "From: {}\nSubject: {}\n\n{}",
-            record.sender, record.subject, record.source_text
+        let work_items = FileWorkItemService::with_projection_cache(
+            &self.refine_dir,
+            &self.runtime_root,
+            self.runtime_root.join("cache"),
         );
-        let output = HostAgentProviderService::with_runtime_root(&self.runtime_root).invoke(
-            ProviderInvocation {
-                provider: settings.provider.clone(),
-                prompt: render(
-                    PromptTemplate::DevelopmentRequestReview,
-                    &[("email", &email)],
-                ),
-                session_id: None,
-                cwd: Some(self.target_root.display().to_string()),
-                process_metadata: Map::from_iter([
-                    (
-                        "kind".to_string(),
-                        Value::String("development_request_review".to_string()),
-                    ),
-                    ("request_id".to_string(), Value::String(record.id.clone())),
-                ]),
-            },
-        )?;
-        match parse_review_decision(&output)? {
-            ReviewDecision::Ignore { reason } => {
-                record.status = DevelopmentRequestStatus::Ignored;
-                record.last_error = reason;
-            }
-            ReviewDecision::CreateGoal { name, prompt } => {
-                let work_items = FileWorkItemService::with_projection_cache(
-                    &self.refine_dir,
-                    &self.runtime_root,
-                    self.runtime_root.join("cache"),
-                );
-                // The request ID is also the Goal ID. If the process stopped after the Goal write
-                // but before the request-record write, recover that exact Goal on the next poll.
-                if let Ok(goal) = work_items.show_goal_summary(&record.id) {
-                    record.goal_id = Some(goal.goal.id);
-                    record.goal_name = Some(goal.goal.name);
-                    record.status = DevelopmentRequestStatus::GoalCreated;
-                    record.last_error = None;
-                    record.updated_at = Utc::now().to_rfc3339();
-                    return self.write_record(record);
+        let name = development_request_goal_name(&record.subject);
+        match work_items.show_goal_summary(&record.id) {
+            Ok(goal) => {
+                if record.schema_version == REQUEST_SCHEMA_VERSION {
+                    validate_recovered_goal(&work_items, record, &name)?;
+                } else {
+                    self.validate_legacy_goal_ownership(&goal.goal)?;
                 }
-                let result = work_items.author_goal(development_request_goal_authoring_request(
-                    record,
-                    name.clone(),
-                    prompt,
-                ))?;
-                let goal = result.goal.ok_or_else(|| {
-                    RefineError::Conflict("development request did not produce a Goal".to_string())
-                })?;
-                record.goal_id = Some(goal.id);
-                record.goal_name = Some(name);
+                record.goal_id = Some(goal.goal.id);
+                record.goal_name = Some(goal.goal.name);
                 record.status = DevelopmentRequestStatus::GoalCreated;
                 record.last_error = None;
+                record.updated_at = Utc::now().to_rfc3339();
+                return self.write_record(record);
             }
+            Err(RefineError::NotFound(_)) => {}
+            Err(error) => return Err(error),
         }
+
+        if record.schema_version == 1 {
+            self.migrate_received_record(record, mail, settings)?;
+        }
+        let goal = work_items
+            .author_goal(development_request_goal_authoring_request(record, name))?
+            .goal
+            .ok_or_else(|| {
+                RefineError::Conflict("development request did not produce a Goal".to_string())
+            })?;
+        record.goal_id = Some(goal.id);
+        record.goal_name = Some(goal.name);
+        record.status = DevelopmentRequestStatus::GoalCreated;
+        record.last_error = None;
         record.updated_at = Utc::now().to_rfc3339();
         self.write_record(record)
+    }
+
+    fn migrate_received_record(
+        &self,
+        record: &mut DevelopmentRequestRecord,
+        mail: &dyn MailSource,
+        settings: &DevelopmentRequestSettings,
+    ) -> RefineResult<()> {
+        let parsed = parse_email(&mail.raw_email(&record.provider_email_id)?)?;
+        if !sender_is_trusted(settings, &parsed.sender) {
+            return Err(RefineError::InvalidInput(format!(
+                "schema 1 request {} re-fetched an untrusted sender {}",
+                record.id, parsed.sender
+            )));
+        }
+        let mut upgraded = record.clone();
+        upgraded.schema_version = REQUEST_SCHEMA_VERSION;
+        upgraded.message_id = parsed.message_id;
+        upgraded.sender = parsed.sender;
+        upgraded.subject = parsed.subject;
+        upgraded.source_text = parsed.source_text;
+        upgraded.updated_at = Utc::now().to_rfc3339();
+        upgraded.last_error = None;
+        // The migration write must become durable before the authoring seam is entered.
+        self.write_record(&upgraded)?;
+        *record = upgraded;
+        Ok(())
+    }
+
+    fn validate_legacy_goal_ownership(
+        &self,
+        goal: &crate::model::goal::GoalIndexProjection,
+    ) -> RefineResult<()> {
+        let active_node = crate::tools::product::nodes::FileNodeRegistryService::with_active_root(
+            &self.refine_dir,
+            &self.runtime_root,
+        )
+        .active_node_id()?;
+        if goal.node_id.as_deref().unwrap_or("default") != active_node {
+            return Err(RefineError::Conflict(format!(
+                "legacy development-request Goal {} belongs to a different node",
+                goal.id
+            )));
+        }
+        Ok(())
     }
 
     fn advance_goal_and_notify(
         &self,
         record: &mut DevelopmentRequestRecord,
-        fastmail: &FastmailClient,
+        fastmail: &dyn MailSource,
         settings: &DevelopmentRequestSettings,
     ) -> RefineResult<()> {
         let goal_id = record.goal_id.as_deref().ok_or_else(|| {
@@ -753,94 +488,19 @@ impl FileDevelopmentRequestService {
     }
 
     fn read_record(&self, path: &Path) -> RefineResult<DevelopmentRequestRecord> {
-        let bytes = fs::read(path).map_err(|error| {
-            RefineError::Io(format!("failed to read {}: {error}", path.display()))
-        })?;
-        serde_json::from_slice(&bytes).map_err(|error| {
-            RefineError::Serialization(format!("failed to parse {}: {error}", path.display()))
-        })
+        read_record(path)
     }
 
     fn write_record(&self, record: &DevelopmentRequestRecord) -> RefineResult<()> {
+        #[cfg(test)]
+        if self.fail_next_record_write.replace(false) {
+            return Err(RefineError::Io(
+                "injected development-request record write interruption".to_string(),
+            ));
+        }
         let path = self.record_path(&record.id);
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).map_err(|error| {
-                RefineError::Io(format!("failed to create {}: {error}", parent.display()))
-            })?;
-        }
-        let encoded = serde_json::to_vec_pretty(record).map_err(|error| {
-            RefineError::Serialization(format!("failed to encode request {}: {error}", record.id))
-        })?;
-        write_json_atomically(&path, &encoded, "development request")
+        write_record(&path, record)
     }
-}
-
-fn http_error(error: reqwest::Error) -> RefineError {
-    RefineError::Io(format!("Fastmail request failed: {error}"))
-}
-
-fn ensure_set_succeeded(result: &Value, action: &str) -> RefineResult<()> {
-    if result
-        .get("notCreated")
-        .and_then(Value::as_object)
-        .is_some_and(|value| !value.is_empty())
-        || result
-            .get("notUpdated")
-            .and_then(Value::as_object)
-            .is_some_and(|value| !value.is_empty())
-    {
-        return Err(RefineError::Conflict(format!(
-            "Fastmail could not {action}: {result}"
-        )));
-    }
-    Ok(())
-}
-
-fn pending_email_filter(address: &str) -> Value {
-    json!({"to": address, "notKeyword": PROCESSED_KEYWORD})
-}
-
-fn parse_email(raw: &[u8]) -> RefineResult<ParsedEmail> {
-    let message = MessageParser::default()
-        .parse(raw)
-        .ok_or_else(|| RefineError::Serialization("failed to parse RFC 5322 email".to_string()))?;
-    let sender = message
-        .from()
-        .and_then(|address| address.first())
-        .and_then(|address| address.address.as_deref())
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(str::to_ascii_lowercase)
-        .ok_or_else(|| RefineError::InvalidInput("email has no From address".to_string()))?;
-    let mut sections = Vec::new();
-    if let Some(body) = message.body_text(0) {
-        let body = body.trim();
-        if !body.is_empty() {
-            sections.push(body.to_string());
-        }
-    }
-    for attachment in message.attachments() {
-        if attachment
-            .attachment_name()
-            .is_some_and(|name| name.to_ascii_lowercase().ends_with(".txt"))
-            && let Some(text) = attachment
-                .text_contents()
-                .map(str::trim)
-                .filter(|text| !text.is_empty())
-        {
-            sections.push(format!("Text attachment:\n{text}"));
-        }
-    }
-    Ok(ParsedEmail {
-        message_id: message.message_id().map(str::to_string),
-        sender,
-        subject: message
-            .subject()
-            .unwrap_or("Development request")
-            .trim()
-            .to_string(),
-        source_text: sections.join("\n\n"),
-    })
 }
 
 fn request_id(provider_email_id: &str) -> String {
@@ -851,12 +511,11 @@ fn request_id(provider_email_id: &str) -> String {
 fn development_request_goal_authoring_request(
     record: &DevelopmentRequestRecord,
     name: String,
-    prompt: String,
 ) -> GoalAuthoringRequest {
     GoalAuthoringRequest {
         id: Some(record.id.clone()),
         name: Some(name),
-        prompt,
+        prompt: record.source_text.clone(),
         reporter: record.sender.clone(),
         assignee: None,
         priority: DEVELOPMENT_REQUEST_GOAL_PRIORITY.to_string(),
@@ -867,248 +526,45 @@ fn development_request_goal_authoring_request(
     }
 }
 
-fn parse_review_decision(output: &str) -> RefineResult<ReviewDecision> {
-    let trimmed = output.trim();
-    let candidate = trimmed
-        .strip_prefix("```json")
-        .or_else(|| trimmed.strip_prefix("```"))
-        .and_then(|value| value.strip_suffix("```"))
-        .map(str::trim)
-        .unwrap_or(trimmed);
-    serde_json::from_str(candidate).map_err(|error| {
-        RefineError::Serialization(format!(
-            "development request reviewer returned invalid JSON: {error}"
-        ))
-    })
+fn development_request_goal_name(subject: &str) -> String {
+    let subject = subject.trim();
+    if subject.is_empty() {
+        "Development request".to_string()
+    } else {
+        subject.to_string()
+    }
+}
+
+fn sender_is_trusted(settings: &DevelopmentRequestSettings, sender: &str) -> bool {
+    settings.allowed_senders.contains(sender)
+}
+
+fn validate_recovered_goal(
+    work_items: &FileWorkItemService,
+    record: &DevelopmentRequestRecord,
+    expected_name: &str,
+) -> RefineResult<()> {
+    let detail = work_items.show_goal_detail(&record.id)?;
+    let rounds = detail
+        .get("rounds")
+        .and_then(Value::as_array)
+        .ok_or_else(|| RefineError::Conflict(format!("Goal {} has no Round array", record.id)))?;
+    let expected_assignee = record.sender.as_str();
+    let source_matches = rounds.len() == 1
+        && rounds[0].get("prompt").and_then(Value::as_str) == Some(record.source_text.as_str())
+        && rounds[0].get("assignee").and_then(Value::as_str) == Some(expected_assignee);
+    let metadata_matches = detail.get("name").and_then(Value::as_str) == Some(expected_name)
+        && detail.get("priority").and_then(Value::as_str)
+            == Some(DEVELOPMENT_REQUEST_GOAL_PRIORITY)
+        && detail.get("reporter").and_then(Value::as_str) == Some(record.sender.as_str());
+    if !source_matches || !metadata_matches {
+        return Err(RefineError::Conflict(format!(
+            "development request {} found a Goal that does not match its authoritative source revision",
+            record.id
+        )));
+    }
+    Ok(())
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn write_config(runtime_root: &Path, target_root: &Path, allowed_senders: &[&str]) {
-        fs::create_dir_all(runtime_root).unwrap();
-        fs::write(
-            self_development_email_config_path(runtime_root),
-            serde_json::to_vec_pretty(&json!({
-                "schema_version": 1,
-                "target_root": target_root,
-                "address": " Goal@GetRefine.dev ",
-                "allowed_senders": allowed_senders,
-                "poll_seconds": 0,
-                "auto_approve_after_seconds": 5
-            }))
-            .unwrap(),
-        )
-        .unwrap();
-    }
-
-    #[test]
-    fn absent_local_contract_disables_email_intake() {
-        let runtime_root = std::env::temp_dir().join(format!(
-            "refine-development-request-config-{}",
-            uuid::Uuid::new_v4()
-        ));
-        assert_eq!(
-            load_self_development_email_config(&runtime_root).unwrap(),
-            None
-        );
-    }
-
-    #[test]
-    fn local_contract_is_normalized_reread_and_bound_to_one_target() {
-        let root = std::env::temp_dir().join(format!(
-            "refine-development-request-config-{}",
-            uuid::Uuid::new_v4()
-        ));
-        let runtime_root = root.join("run/8082");
-        let target_root = root.join("refine-next");
-        let other_target = root.join("production-app");
-        fs::create_dir_all(&target_root).unwrap();
-        fs::create_dir_all(&other_target).unwrap();
-        write_config(
-            &runtime_root,
-            &target_root,
-            &[" Buddy@Example.com ", "BUDDY@example.com"],
-        );
-
-        let config = load_self_development_email_config(&runtime_root)
-            .unwrap()
-            .unwrap();
-        assert_eq!(config.target_root, target_root.canonicalize().unwrap());
-        assert_eq!(config.address, "goal@getrefine.dev");
-        assert_eq!(config.poll_seconds, 1);
-        assert_eq!(
-            config.allowed_senders,
-            BTreeSet::from(["buddy@example.com".to_string()])
-        );
-        assert!(self_development_email_target_is_active(&config, &target_root).unwrap());
-        assert!(!self_development_email_target_is_active(&config, &other_target).unwrap());
-
-        write_config(
-            &runtime_root,
-            &target_root,
-            &["second@example.com", "THIRD@example.com"],
-        );
-        let updated = load_self_development_email_config(&runtime_root)
-            .unwrap()
-            .unwrap();
-        assert_eq!(
-            updated.allowed_senders,
-            BTreeSet::from([
-                "second@example.com".to_string(),
-                "third@example.com".to_string()
-            ])
-        );
-        let settings = DevelopmentRequestSettings::from_local_config(&updated, "codex");
-        assert_eq!(settings.provider, "codex");
-        assert_eq!(settings.auto_approve_after, Duration::from_secs(5));
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn local_contract_rejects_a_relative_target() {
-        let root = std::env::temp_dir().join(format!(
-            "refine-development-request-config-{}",
-            uuid::Uuid::new_v4()
-        ));
-        let runtime_root = root.join("run/8082");
-        fs::create_dir_all(&runtime_root).unwrap();
-        fs::write(
-            self_development_email_config_path(&runtime_root),
-            serde_json::to_vec_pretty(&json!({
-                "schema_version": 1,
-                "target_root": "../refine-next",
-                "address": "goal@getrefine.dev",
-                "allowed_senders": ["buddy@example.com"]
-            }))
-            .unwrap(),
-        )
-        .unwrap();
-        assert!(load_self_development_email_config(&runtime_root).is_err());
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn mime_extraction_keeps_body_and_text_attachments_only() {
-        let raw = concat!(
-            "From: Buddy <Buddy@example.com>\r\n",
-            "To: goal@getrefine.dev\r\n",
-            "Subject: Add a useful feature\r\n",
-            "Message-ID: <source@example.com>\r\n",
-            "MIME-Version: 1.0\r\n",
-            "Content-Type: multipart/mixed; boundary=x\r\n\r\n",
-            "--x\r\nContent-Type: text/plain\r\n\r\nPlease add the feature.\r\n",
-            "--x\r\nContent-Type: text/plain\r\nContent-Disposition: attachment; filename=request.txt\r\n\r\nAcceptance details.\r\n",
-            "--x\r\nContent-Type: image/png\r\nContent-Disposition: attachment; filename=screen.png\r\n\r\nPNGDATA\r\n",
-            "--x\r\nContent-Type: application/json\r\nContent-Disposition: attachment; filename=generated.json\r\n\r\n{}\r\n",
-            "--x--\r\n"
-        );
-        let parsed = parse_email(raw.as_bytes()).unwrap();
-        assert_eq!(parsed.sender, "buddy@example.com");
-        assert!(parsed.source_text.contains("Please add the feature."));
-        assert!(parsed.source_text.contains("Acceptance details."));
-        assert!(!parsed.source_text.contains("PNGDATA"));
-        assert!(!parsed.source_text.contains("generated.json"));
-    }
-
-    #[test]
-    fn request_identity_is_stable_and_goal_compatible() {
-        let id = request_id("fastmail-email-id");
-        assert_eq!(id, request_id("fastmail-email-id"));
-        assert!(id.starts_with("DR"));
-        assert_eq!(id.len(), 26);
-    }
-
-    #[test]
-    fn local_request_record_round_trips_as_the_durable_retry_queue() {
-        let root = std::env::temp_dir().join(format!(
-            "refine-development-request-{}",
-            uuid::Uuid::new_v4()
-        ));
-        let service = FileDevelopmentRequestService::new(
-            root.join("run/8082"),
-            root.join("refine-live-state"),
-            root.join("target"),
-        );
-        let record = service.record_from_email(
-            "provider-id",
-            ParsedEmail {
-                message_id: Some("source@example.com".to_string()),
-                sender: "buddy@example.com".to_string(),
-                subject: "Request".to_string(),
-                source_text: "Please implement this.".to_string(),
-            },
-            "goal@getrefine.dev",
-        );
-        service.write_record(&record).unwrap();
-        assert_eq!(
-            service
-                .read_record(&service.record_path(&record.id))
-                .unwrap(),
-            record
-        );
-        assert!(
-            service
-                .record_path(&record.id)
-                .starts_with(root.join("run/8082/self-development-email/requests"))
-        );
-        assert!(!root.join("refine-live-state/development-requests").exists());
-        assert!(record.notification_message_id.ends_with("@getrefine.dev"));
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn jmap_patch_uses_the_provider_email_id_as_the_dynamic_object_key() {
-        let email_id = "fastmail-id";
-        let patch = json!({
-            "update": {email_id: {format!("keywords/{PROCESSED_KEYWORD}"): true}}
-        });
-        assert_eq!(
-            patch["update"][email_id][format!("keywords/{PROCESSED_KEYWORD}")],
-            true
-        );
-        assert!(patch["update"].get("email_id").is_none());
-    }
-
-    #[test]
-    fn pending_query_selects_the_recipient_address_without_a_mailbox() {
-        let filter = pending_email_filter("goal@getrefine.dev");
-        assert_eq!(filter["to"], "goal@getrefine.dev");
-        assert_eq!(filter["notKeyword"], PROCESSED_KEYWORD);
-        assert!(filter.get("inMailbox").is_none());
-    }
-
-    #[test]
-    fn reviewer_priority_cannot_raise_an_email_goal_priority() {
-        let plain = r#"{"decision":"create_goal","name":"N","prompt":"P","priority":"high"}"#;
-        let ReviewDecision::CreateGoal { name, prompt } = parse_review_decision(plain).unwrap()
-        else {
-            panic!("expected a Goal decision");
-        };
-        let service = FileDevelopmentRequestService::new("runtime", "state", "target");
-        let record = service.record_from_email(
-            "provider-id",
-            ParsedEmail {
-                message_id: None,
-                sender: "buddy@example.com".to_string(),
-                subject: "Request".to_string(),
-                source_text: "Please implement this.".to_string(),
-            },
-            "goal@getrefine.dev",
-        );
-        let request = development_request_goal_authoring_request(&record, name, prompt);
-        assert_eq!(request.priority, "low");
-    }
-
-    #[test]
-    fn reviewer_accepts_fenced_json() {
-        let fenced = "```json\n{\"decision\":\"ignore\",\"reason\":\"noise\"}\n```";
-        assert_eq!(
-            parse_review_decision(fenced).unwrap(),
-            ReviewDecision::Ignore {
-                reason: Some("noise".to_string())
-            }
-        );
-    }
-}
+mod tests;

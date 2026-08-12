@@ -1,8 +1,14 @@
+mod identity;
 mod service;
 #[cfg(test)]
 mod tests;
 mod types;
 
+pub(crate) use identity::validate_quality_identity;
+pub use identity::{
+    INTEGRATED_TARGET, INTEGRATED_TARGET_RECONCILIATION, ISOLATED_CANDIDATE,
+    QualityIdentityCommitment, is_quality_candidate_infrastructure,
+};
 pub use service::{
     FileQualityService, QualityCheckRequest, QualityCheckResult, QualityOperationResult,
     QualityOperationRunner, QualityService, QualityTestResult,

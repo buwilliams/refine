@@ -45,3 +45,18 @@ fn git(repo: &Path, args: &[&str]) -> RefineResult<()> {
         String::from_utf8_lossy(&output.stderr)
     )))
 }
+
+fn git_output(repo: &Path, args: &[&str]) -> String {
+    let output = Command::new("git")
+        .args(args)
+        .current_dir(repo)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "git {} failed: {}",
+        args.join(" "),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8(output.stdout).unwrap()
+}

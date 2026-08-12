@@ -9,7 +9,7 @@ use crate::model::workflow::GoalStatus;
 use crate::process::subprocess::workflow_subprocess_metadata;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::git_worktrees::MergeResult;
-use crate::tools::host::quality::{FileQualityService, POST_BUILD, PRE_MERGE};
+use crate::tools::host::quality::{FileQualityService, POST_BUILD, PRE_MERGE, QualityCheckRequest};
 use crate::tools::observability::logs::FileLogService;
 use crate::tools::product::work_items::FileWorkItemService;
 use crate::workflow::{json_object, now_timestamp};
@@ -21,10 +21,15 @@ pub struct WorkflowContext<'a> {
     pub node_id: String,
     pub provider: String,
     pub round_idx: usize,
+    pub authored_revision: u64,
+    pub authored_request: String,
     pub settings: JsonObject,
     pub work_items: FileWorkItemService,
     pub branch: Option<String>,
     pub worktree_path: Option<String>,
+    pub candidate_handoff_operation_id: Option<String>,
+    pub quality_operation_id: Option<String>,
+    pub quality_request: Option<QualityCheckRequest>,
     pub agent_cwd: Option<PathBuf>,
     pub provider_output: Option<String>,
     pub commit: Option<String>,
@@ -61,10 +66,15 @@ impl<'a> WorkflowContext<'a> {
             node_id,
             provider,
             round_idx,
+            authored_revision: 0,
+            authored_request: String::new(),
             settings,
             work_items,
             branch: None,
             worktree_path: None,
+            candidate_handoff_operation_id: None,
+            quality_operation_id: None,
+            quality_request: None,
             agent_cwd: None,
             provider_output: None,
             commit: None,
@@ -115,10 +125,19 @@ impl<'a> WorkflowContext<'a> {
                 to.as_str()
             )));
         }
-        if let Err(error) = self
-            .work_items
-            .advance_automated_goal_status(&self.goal_id, to.clone())
-        {
+        let transition = if from == GoalStatus::Todo && to == GoalStatus::InProgress {
+            self.work_items.advance_authored_goal_status(
+                &self.goal_id,
+                to.clone(),
+                self.round_idx,
+                self.authored_revision,
+                &self.authored_request,
+            )
+        } else {
+            self.work_items
+                .advance_automated_goal_status(&self.goal_id, to.clone())
+        };
+        if let Err(error) = transition {
             if self
                 .work_items
                 .show_goal_summary(&self.goal_id)?

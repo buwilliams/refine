@@ -455,7 +455,12 @@ fn web_server_applies_runtime_settings_updates_immediately() {
         let created = server.handle(ApiRequest {
             method: "POST".to_string(),
             path: "/api/goals".to_string(),
-            body: Some(json!({"id": id, "name": format!("Instant runtime settings {id}")})),
+            body: Some(json!({
+                "id": id,
+                "name": format!("Instant runtime settings {id}"),
+                "reporter": "Reporter",
+                "prompt": format!("Implement runtime settings Goal {id}")
+            })),
         });
         assert_eq!(created.status, 201);
     }

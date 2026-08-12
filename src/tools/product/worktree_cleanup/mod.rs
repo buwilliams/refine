@@ -272,6 +272,15 @@ impl FileWorktreeCleanupService {
                 collect_process_worktree_paths(&process, &mut paths);
             }
         }
+        for operation in FileOperationRegistry::new(&self.runtime_root).recover()? {
+            if matches!(
+                operation.state,
+                OperationState::Pending | OperationState::Running | OperationState::Cancelling
+            ) {
+                collect_named_paths(&operation.request, None, &mut paths);
+                collect_named_paths(&operation.progress, None, &mut paths);
+            }
+        }
         paths.sort();
         paths.dedup();
         Ok(paths)
