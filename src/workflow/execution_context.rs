@@ -5,6 +5,7 @@ use serde_json::{Value, json};
 use crate::model::goal::RoundIntegration;
 use crate::model::workflow::GoalStatus;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::prompts::{PromptEngine, PromptTemplate};
 use crate::tools::host::git_sync::with_repository_git_lock;
 use crate::tools::host::git_worktrees::FileGitWorktreeService;
 use crate::tools::product::work_items::FileWorkItemService;
@@ -23,7 +24,7 @@ pub(super) fn ensure_workflow_round(
     let goal = work_items.append_goal_round_summary(
         goal_id,
         "Refine",
-        "Implement and verify this Goal.",
+        PromptEngine::load(PromptTemplate::GoalWorkflowDefaultRound),
     )?;
     goal.goal
         .round_count

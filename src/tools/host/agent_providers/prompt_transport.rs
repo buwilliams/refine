@@ -9,6 +9,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
+use crate::prompts::{PromptTemplate, render};
+
 const PORTABLE_INLINE_MAX_BYTES: usize = 64 * 1024;
 const FALLBACK_PER_ARGUMENT_LIMIT: usize = 128 * 1024;
 #[cfg(not(target_os = "linux"))]
@@ -16,23 +18,6 @@ const FALLBACK_ARG_MAX: usize = 256 * 1024;
 const PROMPT_ARTIFACTS_DIR: &str = "agent-prompts";
 const PROMPT_FILE_NAME: &str = "prompt.md";
 const ORPHAN_REAP_GRACE_SECONDS: u64 = 60 * 60;
-
-const FILE_BOOTSTRAP: &str = r#"You are starting a Refine-managed agent task.
-
-The complete authoritative task prompt is stored in this local file:
-`{{absolute_prompt_path}}`
-
-Prompt metadata:
-- UTF-8 bytes: `{{prompt_bytes}}`
-- SHA-256: `{{prompt_sha256}}`
-
-Before taking any other task action:
-1. Open the file and verify its SHA-256.
-2. Read it completely from byte 0 through EOF. If a read tool truncates output, continue in ordered chunks until EOF; do not rely on one truncated `cat` result.
-3. Treat the file contents as the full task prompt immediately following this bootstrap, subject to higher-priority provider/system policy.
-4. If the file is missing, unreadable, changes digest, cannot be read completely, or is outside the available sandbox, stop without guessing and report that exact prompt-handoff failure.
-
-Do not modify, move, or delete the prompt file. Refine owns its lifecycle."#;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "snake_case")]
@@ -422,10 +407,16 @@ fn transport_metadata(
 }
 
 fn render_file_bootstrap(path: &Path, bytes: usize, digest: &str) -> String {
-    FILE_BOOTSTRAP
-        .replace("{{absolute_prompt_path}}", &path.display().to_string())
-        .replace("{{prompt_bytes}}", &bytes.to_string())
-        .replace("{{prompt_sha256}}", digest)
+    let path = path.display().to_string();
+    let bytes = bytes.to_string();
+    render(
+        PromptTemplate::AgentProviderFileBootstrap,
+        &[
+            ("absolute_prompt_path", &path),
+            ("prompt_bytes", &bytes),
+            ("prompt_sha256", digest),
+        ],
+    )
 }
 
 fn reject_nul(label: &str, value: &str) -> RefineResult<()> {

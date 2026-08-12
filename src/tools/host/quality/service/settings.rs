@@ -43,7 +43,7 @@ impl FileQualityService {
         if let Some(instructions) = patch.instructions {
             let trimmed = instructions.trim();
             stored.instructions = if trimmed.is_empty() {
-                DEFAULT_INSTRUCTIONS.to_string()
+                default_quality_instructions().to_string()
             } else {
                 trimmed.to_string()
             };
@@ -253,7 +253,7 @@ impl StoredQualitySettings {
         Self {
             business_requirements: self.business_requirements.trim().to_string(),
             instructions: if self.instructions.trim().is_empty() {
-                DEFAULT_INSTRUCTIONS.to_string()
+                default_quality_instructions().to_string()
             } else {
                 self.instructions.trim().to_string()
             },
@@ -269,7 +269,7 @@ impl Default for StoredQualitySettings {
     fn default() -> Self {
         Self {
             business_requirements: String::new(),
-            instructions: DEFAULT_INSTRUCTIONS.to_string(),
+            instructions: default_quality_instructions().to_string(),
             tests: Vec::new(),
             legacy_commands: Vec::new(),
             timing: PRE_MERGE.to_string(),

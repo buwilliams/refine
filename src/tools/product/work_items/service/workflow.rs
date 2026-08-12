@@ -1,6 +1,8 @@
 use super::*;
 use serde_json::json;
 
+use crate::prompts::{PromptTemplate, render};
+
 impl FileWorkItemService {
     pub fn retry_goal_quality_summary(&self, goal_id: &str) -> RefineResult<GoalSummaryProjection> {
         let current = self.show_goal_summary(goal_id)?;
@@ -102,9 +104,15 @@ impl FileWorkItemService {
         source_round.insert("workflow_recovery".to_string(), source_recovery);
         source_round.insert("updated".to_string(), Value::String(now.clone()));
 
-        let prompt = format!(
-            "Recover the completed implementation from stale candidate {candidate_commit} (round {}) onto the current {target_branch} target at {target_commit}. Preserve the prior round and candidate as audit evidence, reapply the intended changes on the current target, and rerun Governance and Quality before integration.",
-            round_idx + 1
+        let source_round = (round_idx + 1).to_string();
+        let prompt = render(
+            PromptTemplate::GoalWorkflowRecoverStaleCandidate,
+            &[
+                ("candidate_commit", candidate_commit),
+                ("source_round", &source_round),
+                ("target_branch", target_branch),
+                ("target_commit", target_commit),
+            ],
         );
         let mut successor = new_round_value("Refine", "Refine", &prompt);
         successor["workflow_recovery"] = json!({
@@ -226,9 +234,16 @@ impl FileWorkItemService {
         );
         source_round.insert("updated".to_string(), Value::String(now.clone()));
 
-        let prompt = format!(
-            "Recover candidate {candidate_commit} from round {} because its recorded reconciliation state ({recorded_reconciliation_state}) no longer matches {target_branch} at {target_commit}. Preserve the prior round as audit evidence, reapply the intended changes on the current target, and rerun Governance and Quality before integration.",
-            round_idx + 1
+        let source_round = (round_idx + 1).to_string();
+        let prompt = render(
+            PromptTemplate::GoalWorkflowRecoverReconciliation,
+            &[
+                ("candidate_commit", candidate_commit),
+                ("source_round", &source_round),
+                ("reconciliation_state", recorded_reconciliation_state),
+                ("target_branch", target_branch),
+                ("target_commit", target_commit),
+            ],
         );
         let mut successor = new_round_value("Refine", "Refine", &prompt);
         successor["workflow_recovery"] = json!({

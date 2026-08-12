@@ -12,6 +12,7 @@ use crate::process::subprocess::{FileProcessSupervisor, ProcessPauseState};
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::coordination::acquire_workflow_coordination;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::prompts::{PromptEngine, PromptTemplate};
 use crate::tools::host::git_sync::with_repository_git_lock;
 use crate::tools::host::host_resources::{HostResources, observed_agent_memory_bytes};
 use crate::tools::host::project_layout::prepare_refine_dir;
@@ -196,7 +197,7 @@ impl WorkflowEngine {
                     .append_workflow_recovery_round_summary(
                         &goal.id,
                         "Refine",
-                        "Implement and verify this Goal.",
+                        PromptEngine::load(PromptTemplate::GoalWorkflowDefaultRound),
                     )?
                     .goal
                     .round_count

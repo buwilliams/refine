@@ -56,7 +56,7 @@ Current implementation details that matter to intent:
   worktree, with private ownership, exact UTF-8 byte and SHA-256 evidence, and
   explicit failure when the handoff is missing, changed, unreadable, or cannot
   fit the provider sandbox.
-- every internal agent prompt is a Markdown template under `src/prompts`, loaded through the shared prompt engine rather than embedded in consumer code;
+- every internal agent prompt is a Markdown template under `src/prompts/<feature>/`, loaded through the shared prompt engine rather than embedded in consumer code;
 - agents should prefer installed local CLIs and host tools where possible;
 - chat and standalone sessions are agent behavior, not browser-only behavior;
 - import extraction and draft review should use shared work item persistence;

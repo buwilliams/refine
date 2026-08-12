@@ -4,6 +4,7 @@ use crate::model::workflow::GoalStatus;
 use crate::process::agent_sessions::{GoalAgentLaunch, run_goal_agent_with_settlement};
 use crate::process::supervisor::config::{FileGovernanceService, FileGuidanceService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::prompts::{PromptEngine, PromptTemplate};
 use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
@@ -1016,8 +1017,6 @@ fn run_workflow_quality(ctx: &WorkflowContext<'_>) -> RefineResult<QualityCheckR
         .map(|operation| operation.result)
 }
 
-const GOAL_AGENT_WORKFLOW_SUMMARY: &str = "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge.";
-
 fn ensure_goal_agent_context(ctx: &WorkflowContext<'_>, goal: &Value) -> RefineResult<Value> {
     let round = goal
         .get("rounds")
@@ -1100,7 +1099,7 @@ fn goal_agent_context(
             "rules": governance.get("rules").cloned().unwrap_or_else(|| json!([])),
             "configured": governance.get("configured").cloned().unwrap_or(Value::Bool(false)),
         },
-        "workflow_summary": GOAL_AGENT_WORKFLOW_SUMMARY,
+        "workflow_summary": PromptEngine::load(PromptTemplate::GoalAgentWorkflowSummary),
         "guidance_candidates": guidance_candidates,
         "goal": goal_context,
         "previous_rounds": previous_rounds,

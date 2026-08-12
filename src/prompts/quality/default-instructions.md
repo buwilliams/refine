@@ -1,0 +1,1 @@
+Evaluate every Quality test against the Goal candidate. Determine the least expensive reliable way to run each test, then report pass or fail with evidence. Do not change product code while evaluating the candidate.

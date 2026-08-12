@@ -1,94 +1,73 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum PromptTemplate {
-    Chat,
-    ChatPlan,
-    ChatGoal,
-    ChatFeature,
-    ChatAgent,
-    ChatStandalone,
-    ImportFeature,
-    ImportRound,
-    ImportPlanGoal,
-    ImportStandaloneGoal,
-    ImportNotes,
-    ReleaseGoal,
-    PostImplementationGovernance,
-    PostImplementationQuality,
-    GoalAgentSpec,
-    GoalAgent,
-    GoalAgentSession,
-    GovernanceGeneration,
-    TargetAppGeneration,
-    TargetAppLifecycle,
-    TargetAppCommandStart,
-    TargetAppCommandStop,
-    TargetAppCommandBuild,
-    DevelopmentRequestReview,
+macro_rules! prompt_templates {
+    ($($variant:ident => $path:literal),+ $(,)?) => {
+        #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+        pub enum PromptTemplate {
+            $($variant),+
+        }
+
+        impl PromptTemplate {
+            pub const ALL: &'static [Self] = &[$(Self::$variant),+];
+
+            pub const fn name(self) -> &'static str {
+                match self {
+                    $(Self::$variant => $path),+
+                }
+            }
+
+            const fn source(self) -> &'static str {
+                match self {
+                    $(Self::$variant => include_str!($path)),+
+                }
+            }
+        }
+    };
 }
 
-impl PromptTemplate {
-    pub const fn name(self) -> &'static str {
-        match self {
-            Self::Chat => "chat.md",
-            Self::ChatPlan => "chat-plan.md",
-            Self::ChatGoal => "chat-goal.md",
-            Self::ChatFeature => "chat-feature.md",
-            Self::ChatAgent => "chat-agent.md",
-            Self::ChatStandalone => "chat-standalone.md",
-            Self::ImportFeature => "import-feature.md",
-            Self::ImportRound => "import-round.md",
-            Self::ImportPlanGoal => "import-plan-goal.md",
-            Self::ImportStandaloneGoal => "import-standalone-goal.md",
-            Self::ImportNotes => "import-notes.md",
-            Self::ReleaseGoal => "release-goal.md",
-            Self::PostImplementationGovernance => "post-implementation-governance.md",
-            Self::PostImplementationQuality => "post-implementation-quality.md",
-            Self::GoalAgentSpec => "spec.md",
-            Self::GoalAgent => "goal-agent.md",
-            Self::GoalAgentSession => "goal-agent-session.md",
-            Self::GovernanceGeneration => "governance-generation.md",
-            Self::TargetAppGeneration => "target-app-generation.md",
-            Self::TargetAppLifecycle => "target-app-lifecycle.md",
-            Self::TargetAppCommandStart => "target-app-command-start.md",
-            Self::TargetAppCommandStop => "target-app-command-stop.md",
-            Self::TargetAppCommandBuild => "target-app-command-build.md",
-            Self::DevelopmentRequestReview => "development-request-review.md",
-        }
-    }
-
-    const fn source(self) -> &'static str {
-        match self {
-            Self::Chat => include_str!("chat.md"),
-            Self::ChatPlan => include_str!("chat-plan.md"),
-            Self::ChatGoal => include_str!("chat-goal.md"),
-            Self::ChatFeature => include_str!("chat-feature.md"),
-            Self::ChatAgent => include_str!("chat-agent.md"),
-            Self::ChatStandalone => include_str!("chat-standalone.md"),
-            Self::ImportFeature => include_str!("import-feature.md"),
-            Self::ImportRound => include_str!("import-round.md"),
-            Self::ImportPlanGoal => include_str!("import-plan-goal.md"),
-            Self::ImportStandaloneGoal => include_str!("import-standalone-goal.md"),
-            Self::ImportNotes => include_str!("import-notes.md"),
-            Self::ReleaseGoal => include_str!("release-goal.md"),
-            Self::PostImplementationGovernance => {
-                include_str!("post-implementation-governance.md")
-            }
-            Self::PostImplementationQuality => include_str!("post-implementation-quality.md"),
-            Self::GoalAgentSpec => include_str!("spec.md"),
-            Self::GoalAgent => include_str!("goal-agent.md"),
-            Self::GoalAgentSession => include_str!("goal-agent-session.md"),
-            Self::GovernanceGeneration => include_str!("governance-generation.md"),
-            Self::TargetAppGeneration => include_str!("target-app-generation.md"),
-            Self::TargetAppLifecycle => include_str!("target-app-lifecycle.md"),
-            Self::TargetAppCommandStart => include_str!("target-app-command-start.md"),
-            Self::TargetAppCommandStop => include_str!("target-app-command-stop.md"),
-            Self::TargetAppCommandBuild => include_str!("target-app-command-build.md"),
-            Self::DevelopmentRequestReview => include_str!("development-request-review.md"),
-        }
-    }
+prompt_templates! {
+    AgentProviderFileBootstrap => "agent_providers/file-bootstrap.md",
+    Chat => "chat/session.md",
+    ChatPlan => "chat/plan.md",
+    ChatGoal => "chat/goal.md",
+    ChatFeature => "chat/feature.md",
+    ChatAgent => "chat/agent.md",
+    ChatStandalone => "chat/standalone.md",
+    DevelopmentRequestReview => "development_requests/review.md",
+    GoalAgentSpec => "goal_agents/spec.md",
+    GoalAgent => "goal_agents/prompt.md",
+    GoalAgentSession => "goal_agents/session.md",
+    GoalAgentWorkflowSummary => "goal_agents/workflow-summary.md",
+    GoalWorkflowDefaultRound => "goal_workflow/default-round.md",
+    GoalWorkflowRecoverStaleCandidate => "goal_workflow/recover-stale-candidate.md",
+    GoalWorkflowRecoverReconciliation => "goal_workflow/recover-reconciliation.md",
+    GovernanceGeneration => "governance/generation.md",
+    PostImplementationGovernance => "governance/post-implementation.md",
+    ImplementationPlanningPlan => "implementation_planning/plan.md",
+    ImplementationPlanningCriticize => "implementation_planning/criticize.md",
+    ImplementationPlanningRevise => "implementation_planning/revise.md",
+    ImplementationPlanningImplement => "implementation_planning/implement.md",
+    ImportFeature => "imports/feature.md",
+    ImportRound => "imports/round.md",
+    ImportPlanGoal => "imports/plan-goal.md",
+    ImportStandaloneGoal => "imports/standalone-goal.md",
+    ImportNotes => "imports/notes.md",
+    PostImplementationQuality => "quality/post-implementation.md",
+    QualityDefaultInstructions => "quality/default-instructions.md",
+    ReleaseGoal => "release/goal.md",
+    TargetAppGeneration => "target_apps/generation.md",
+    TargetAppLifecycle => "target_apps/lifecycle.md",
+    TargetAppCommandStart => "target_apps/command-start.md",
+    TargetAppCommandStop => "target_apps/command-stop.md",
+    TargetAppCommandBuild => "target_apps/command-build.md",
+    TerminalProfileGeneralAgentWorkflow => "terminal_profiles/general-agent-workflow.md",
+    TerminalProfileActiveRefine => "terminal_profiles/active-refine.md",
+    TerminalProfileAttachedGoal => "terminal_profiles/attached-goal.md",
+    TerminalProfileAttachedFeature => "terminal_profiles/attached-feature.md",
+    TerminalProfilePlan => "terminal_profiles/plan.md",
+    TerminalProfileGoalDiagnostic => "terminal_profiles/goal-diagnostic.md",
+    TerminalProfileSupplementalContext => "terminal_profiles/supplemental-context.md",
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -178,6 +157,8 @@ pub fn render(template: PromptTemplate, variables: &[(&str, &str)]) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use std::path::{Path, PathBuf};
 
     #[test]
     fn renders_embedded_markdown_template_variables() {
@@ -231,38 +212,64 @@ mod tests {
     }
 
     #[test]
+    fn quality_defaults_are_template_owned() {
+        let loaded = PromptEngine::load(PromptTemplate::QualityDefaultInstructions);
+
+        assert!(loaded.contains("Evaluate every Quality test"));
+        assert!(loaded.contains("Do not change product code"));
+    }
+
+    #[test]
+    fn every_feature_template_is_registered_exactly_once() {
+        fn markdown_files(root: &Path, directory: &Path, files: &mut Vec<String>) {
+            for entry in fs::read_dir(directory).unwrap() {
+                let path = entry.unwrap().path();
+                if path.is_dir() {
+                    markdown_files(root, &path, files);
+                } else if path.extension().and_then(|extension| extension.to_str()) == Some("md") {
+                    files.push(
+                        path.strip_prefix(root)
+                            .unwrap()
+                            .to_string_lossy()
+                            .replace('\\', "/"),
+                    );
+                }
+            }
+        }
+
+        let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/prompts");
+        let mut actual = Vec::new();
+        markdown_files(&root, &root, &mut actual);
+        actual.sort();
+
+        let mut registered = PromptTemplate::ALL
+            .iter()
+            .map(|template| template.name().to_string())
+            .collect::<Vec<_>>();
+        registered.sort();
+        registered.dedup();
+
+        assert_eq!(registered.len(), PromptTemplate::ALL.len());
+        assert_eq!(registered, actual);
+        assert!(
+            registered
+                .iter()
+                .all(|name| name.contains('/') && name.ends_with(".md")),
+            "every prompt template must live under src/prompts/<feature>/"
+        );
+    }
+
+    #[test]
     fn agent_prompts_keep_only_task_specific_contracts() {
-        let templates = [
-            PromptTemplate::Chat,
-            PromptTemplate::ChatPlan,
-            PromptTemplate::ChatGoal,
-            PromptTemplate::ChatFeature,
-            PromptTemplate::ChatStandalone,
-            PromptTemplate::ImportFeature,
-            PromptTemplate::ImportRound,
-            PromptTemplate::ImportPlanGoal,
-            PromptTemplate::ImportStandaloneGoal,
-            PromptTemplate::ImportNotes,
-            PromptTemplate::ReleaseGoal,
-            PromptTemplate::PostImplementationGovernance,
-            PromptTemplate::PostImplementationQuality,
-            PromptTemplate::GoalAgentSpec,
-            PromptTemplate::GoalAgent,
-            PromptTemplate::GoalAgentSession,
-            PromptTemplate::GovernanceGeneration,
-            PromptTemplate::TargetAppGeneration,
-            PromptTemplate::TargetAppLifecycle,
-            PromptTemplate::TargetAppCommandStart,
-            PromptTemplate::TargetAppCommandStop,
-            PromptTemplate::TargetAppCommandBuild,
-            PromptTemplate::DevelopmentRequestReview,
-        ];
-        let mut total_words = 0;
-        for template in templates {
+        for &template in PromptTemplate::ALL {
             let word_count = PromptEngine::load(template).split_whitespace().count();
-            total_words += word_count;
+            let word_limit = match template {
+                PromptTemplate::AgentProviderFileBootstrap => 140,
+                PromptTemplate::TerminalProfileGeneralAgentWorkflow => 180,
+                _ => 90,
+            };
             assert!(
-                word_count <= 90,
+                word_count <= word_limit,
                 "{} is too prescriptive at {word_count} words",
                 template.name()
             );
@@ -281,9 +288,5 @@ mod tests {
                 );
             }
         }
-        assert!(
-            total_words <= 850,
-            "prompt set is too prescriptive at {total_words} words"
-        );
     }
 }

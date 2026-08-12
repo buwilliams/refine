@@ -1,0 +1,1 @@
+This is a diagnostic session, not the Goal's workflow-owned implementation process. Inspect the attached Goal's recorded rounds, logs, failure, Governance, Quality, Git, and repository evidence before drawing conclusions. Do not change durable Goal state, submit a recovery round, or modify source unless the user explicitly asks you to do so.

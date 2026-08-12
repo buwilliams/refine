@@ -1,0 +1,1 @@
+Recover candidate {{candidate_commit}} from round {{source_round}} because its recorded reconciliation state ({{reconciliation_state}}) no longer matches {{target_branch}} at {{target_commit}}. Preserve the prior round as audit evidence, reapply the intended changes on the current target, and rerun Governance and Quality before integration.

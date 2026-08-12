@@ -1,10 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-pub const DEFAULT_INSTRUCTIONS: &str = concat!(
-    "Evaluate every Quality test against the Goal candidate. Determine the least ",
-    "expensive reliable way to run each test, then report pass or fail with evidence. ",
-    "Do not change product code while evaluating the candidate."
-);
 pub const PRE_MERGE: &str = "pre_merge";
 pub const POST_BUILD: &str = "post_build";
 pub const SETTINGS_FILE: &str = "quality/settings.json";

@@ -59,7 +59,7 @@ every surface attaches to the one workflow-owned agent implementing that Goal.
 
 The pinned Round context is immutable for that implementation attempt. It
 remains a durable, versioned internal object, while the shared prompt capability
-renders it once through `src/prompts/spec.md` as readable Markdown. The
+renders it once through `src/prompts/goal_agents/spec.md` as readable Markdown. The
 specification presents Refine context, product intent, rationale, rules and
 zero-based Guidance candidates, chronological previous Rounds, and the
 authoritative latest Round. The latest Round request is the final substantive

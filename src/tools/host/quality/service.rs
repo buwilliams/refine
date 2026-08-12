@@ -16,7 +16,7 @@ use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationHandle, OperationRegistry, OperationState,
 };
 use crate::process::supervisor::security::{FileSecurityService, SecurityService};
-use crate::prompts::{PromptTemplate, render};
+use crate::prompts::{PromptEngine, PromptTemplate, render};
 use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
@@ -45,6 +45,10 @@ pub use runner::QualityOperationRunner;
 pub(crate) use summary::{quality_error_summary, quality_failure_summary};
 
 pub(super) const SETTINGS_MIGRATION_VERSION: u32 = 2;
+
+fn default_quality_instructions() -> &'static str {
+    PromptEngine::load(PromptTemplate::QualityDefaultInstructions)
+}
 
 fn default_evaluation_scope() -> String {
     "isolated_candidate".to_string()
