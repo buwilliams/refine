@@ -24,6 +24,116 @@ impl FileSourcePromotionService {
         self.port_runtime_root.join(SOURCE_PROMOTION_STATE_FILE)
     }
 
+    pub(crate) fn operation_registry(&self) -> FileOperationRegistry {
+        FileOperationRegistry::new(&self.port_runtime_root)
+    }
+
+    pub(crate) fn register_exclusive_operation(
+        &self,
+        owner: &str,
+        request: Value,
+    ) -> RefineResult<(OperationHandle, bool)> {
+        let registry = self.operation_registry();
+        match registry.register_exclusive_with_request(owner, request) {
+            Ok(operation) => Ok((operation, true)),
+            Err(RefineError::Conflict(_)) => registry
+                .recover()?
+                .into_iter()
+                .find(|operation| {
+                    operation.owner == owner
+                        && matches!(
+                            operation.state,
+                            OperationState::Pending
+                                | OperationState::Running
+                                | OperationState::Cancelling
+                        )
+                })
+                .map(|operation| (operation, false))
+                .ok_or_else(|| {
+                    RefineError::Conflict(format!(
+                        "an exclusive {owner} operation changed while it was being recovered"
+                    ))
+                }),
+            Err(error) => Err(error),
+        }
+    }
+
+    pub(crate) fn correlated_processes(
+        &self,
+        operation_id: &str,
+    ) -> RefineResult<Vec<crate::process::subprocess::ManagedProcess>> {
+        Ok(FileProcessSupervisor::new(&self.port_runtime_root)
+            .recover()?
+            .into_iter()
+            .filter(|process| {
+                process.details.as_deref().is_some_and(|details| {
+                    serde_json::from_str::<Value>(details)
+                        .ok()
+                        .and_then(|value| {
+                            value
+                                .get("operation_id")
+                                .and_then(Value::as_str)
+                                .map(str::to_string)
+                        })
+                        .as_deref()
+                        == Some(operation_id)
+                })
+            })
+            .collect())
+    }
+
+    pub(crate) fn settle_registry_from_source_operation(
+        &self,
+        operation: &SourcePromotionOperation,
+    ) -> RefineResult<()> {
+        let registry = self.operation_registry();
+        let Ok(handle) = registry.status(&operation.id) else {
+            return Ok(());
+        };
+        if matches!(
+            handle.state,
+            OperationState::Succeeded
+                | OperationState::Failed
+                | OperationState::Cancelled
+                | OperationState::Interrupted
+        ) {
+            return Ok(());
+        }
+        if matches!(handle.state, OperationState::Cancelling) {
+            return Ok(());
+        }
+        match operation.status.as_str() {
+            "succeeded" => {
+                registry.finish_with_result(
+                    &operation.id,
+                    OperationState::Succeeded,
+                    serde_json::to_value(operation).map_err(|error| {
+                        RefineError::Serialization(format!(
+                            "failed to encode source-upgrade result: {error}"
+                        ))
+                    })?,
+                )?;
+            }
+            "failed" | "interrupted" => {
+                registry.fail_with_partial_result(
+                    &operation.id,
+                    json!({
+                        "code": format!("source_upgrade_{}", operation.status),
+                        "message": operation.error.as_deref().unwrap_or(&operation.message),
+                        "retryable": true
+                    }),
+                    serde_json::to_value(operation).map_err(|error| {
+                        RefineError::Serialization(format!(
+                            "failed to encode source-upgrade failure: {error}"
+                        ))
+                    })?,
+                )?;
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+
     pub fn inspect(&self, fetch: bool) -> RefineResult<SourcePromotionSnapshot> {
         ensure_checkout(&self.checkout_path)?;
         let local_branch = git_text(&self.checkout_path, &["symbolic-ref", "--short", "HEAD"])?;
@@ -70,7 +180,7 @@ impl FileSourcePromotionService {
             clean,
             fast_forward,
             active_work,
-            operation: self.load_operation()?,
+            operation: self.reconcile_interrupted_agent()?,
         })
     }
 
@@ -101,42 +211,63 @@ impl FileSourcePromotionService {
         executable: &Path,
         launcher: &dyn RestartSafeHandoffLauncher,
     ) -> RefineResult<SourcePromotionOperation> {
-        let operation = SourcePromotionOperation::queued(snapshot);
+        let mut operation = SourcePromotionOperation::queued(snapshot);
+        self.operation_registry().register_with_id(
+            &operation.id,
+            "maintenance:source-upgrade",
+            json!({
+                "kind": "source_upgrade",
+                "restart_recovery": "capability",
+                "defer_cancellation_terminal": true
+            }),
+        )?;
         self.save_operation(&operation)?;
-        let runtime_root = self.port_runtime_root.parent().ok_or_else(|| {
-            RefineError::InvalidInput("port runtime root has no parent".to_string())
-        })?;
-        let service_manager =
-            FileInstallationService::for_port(runtime_root, env!("CARGO_PKG_VERSION"), self.port)
-                .installed_service_manager_for(InstalledServiceAction::Stop)?;
-        let handoff = RestartSafeHandoff {
-            executable: executable.to_path_buf(),
-            args: vec![
-                "system".to_string(),
-                "source-promote-helper".to_string(),
-                "--checkout".to_string(),
-                snapshot.checkout_path.clone(),
-                "--port-runtime-root".to_string(),
-                self.port_runtime_root.display().to_string(),
-                "--port".to_string(),
-                self.port.to_string(),
-                "--operation-id".to_string(),
-                operation.id.clone(),
-            ],
-            cwd: self.checkout_path.clone(),
-            label: operation.id.clone(),
-        };
-        if let Err(launch_error) = launcher.launch(&handoff, service_manager.as_deref()) {
+        self.launch_operation(&mut operation, snapshot, executable, launcher)?;
+        Ok(operation)
+    }
+
+    pub(super) fn launch_operation(
+        &self,
+        operation: &mut SourcePromotionOperation,
+        snapshot: &SourcePromotionSnapshot,
+        executable: &Path,
+        launcher: &dyn RestartSafeHandoffLauncher,
+    ) -> RefineResult<()> {
+        if let Err(launch_error) =
+            self.launch_operation_two_phase(operation, snapshot, executable, launcher)
+        {
             let mut failed = operation.clone();
-            failed.status = "failed".to_string();
-            failed.stage = "launch_helper".to_string();
-            failed.message = "Source promotion helper could not start".to_string();
-            failed.error = Some(launch_error.to_string());
-            failed.recovery = Some(
-                "No checkout or daemon changes were made; resolve the launch failure and retry"
-                    .to_string(),
-            );
-            failed.updated_at = now_timestamp();
+            let injected_crash = launch_error.to_string().contains("injected crash");
+            if !injected_crash {
+                failed.status = "failed".to_string();
+                failed.stage = "launch_helper".to_string();
+                failed.message = "Source promotion helper could not start".to_string();
+                failed.error = Some(launch_error.to_string());
+                failed.recovery = Some(
+                    "No checkout or daemon changes were made; resolve the launch failure and retry"
+                        .to_string(),
+                );
+                failed.updated_at = now_timestamp();
+                if let Ok(handle) = self.operation_registry().status(&failed.id) {
+                    let _ = self.operation_registry().compare_and_set(
+                        &failed.id,
+                        handle.revision,
+                        |candidate| {
+                            candidate.state = OperationState::Failed;
+                            candidate.error = Some(json!({
+                                "code": "source_upgrade_helper_launch_failed",
+                                "message": launch_error.to_string(),
+                                "retryable": true
+                            }));
+                            if let Some(attempt) = candidate.external_attempt.as_mut() {
+                                attempt.state = ExternalAttemptState::Failed;
+                                attempt.terminal_evidence = candidate.error.clone();
+                            }
+                            Ok(())
+                        },
+                    );
+                }
+            }
             if let Err(persist_error) = self.save_operation(&failed) {
                 return Err(append_error_context(
                     launch_error,
@@ -147,10 +278,26 @@ impl FileSourcePromotionService {
             }
             return Err(launch_error);
         }
-        Ok(operation)
+        Ok(())
     }
 
-    pub fn run_helper(&self, operation_id: &str) -> RefineResult<SourcePromotionOperation> {
+    pub fn run_helper(
+        &self,
+        operation_id: &str,
+        attempt_id: Option<&str>,
+        claim_nonce: Option<&str>,
+    ) -> RefineResult<SourcePromotionOperation> {
+        match (attempt_id, claim_nonce) {
+            (Some(attempt_id), Some(claim_nonce)) => {
+                self.claim_handoff(operation_id, attempt_id, claim_nonce)?;
+            }
+            (None, None) => {}
+            _ => {
+                return Err(RefineError::InvalidInput(
+                    "restart-safe helper requires both attempt id and claim nonce".to_string(),
+                ));
+            }
+        }
         let mut operation = self.load_operation()?.ok_or_else(|| {
             RefineError::NotFound("source-promotion operation state was not found".to_string())
         })?;
@@ -175,6 +322,7 @@ impl FileSourcePromotionService {
                         .to_string(),
                 );
                 operation.updated_at = now_timestamp();
+                let _ = self.restore_workflow_admission(&mut operation);
                 self.save_operation(&operation)?;
                 return Err(error);
             }
@@ -198,6 +346,7 @@ impl FileSourcePromotionService {
                     .to_string(),
             );
             operation.updated_at = now_timestamp();
+            let _ = self.restore_workflow_admission(&mut operation);
             self.save_operation(&operation)?;
             return Err(error);
         }
@@ -211,85 +360,47 @@ impl FileSourcePromotionService {
                     .to_string(),
             );
             operation.updated_at = now_timestamp();
+            let _ = self.restore_workflow_admission(&mut operation);
             self.save_operation(&operation)?;
             return Err(error);
         }
         let mut host = FileSourcePromotionHost::new(self.clone());
-        run_source_promotion(&mut host, &mut operation, |operation| {
-            self.save_operation(operation)
-        })?;
-        Ok(operation)
-    }
-
-    pub fn load_operation(&self) -> RefineResult<Option<SourcePromotionOperation>> {
-        match fs::read(self.state_path()) {
-            Ok(bytes) => serde_json::from_slice(&bytes).map(Some).map_err(|error| {
-                RefineError::Serialization(format!(
-                    "failed to parse source-promotion state {}: {error}",
-                    self.state_path().display()
-                ))
-            }),
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
-            Err(error) => Err(RefineError::Io(format!(
-                "failed to read source-promotion state {}: {error}",
-                self.state_path().display()
-            ))),
-        }
-    }
-
-    fn save_operation(&self, operation: &SourcePromotionOperation) -> RefineResult<()> {
-        fs::create_dir_all(&self.port_runtime_root).map_err(|error| {
-            RefineError::Io(format!(
-                "failed to create port runtime root {}: {error}",
-                self.port_runtime_root.display()
-            ))
-        })?;
-        let encoded = serde_json::to_vec_pretty(operation).map_err(|error| {
-            RefineError::Serialization(format!("failed to encode source-promotion state: {error}"))
-        })?;
-        let pending = self.state_path().with_extension("json.pending");
-        fs::write(&pending, encoded).map_err(|error| {
-            RefineError::Io(format!(
-                "failed to write source-promotion state {}: {error}",
-                pending.display()
-            ))
-        })?;
-        fs::rename(&pending, self.state_path()).map_err(|error| {
-            RefineError::Io(format!(
-                "failed to publish source-promotion state {}: {error}",
-                self.state_path().display()
-            ))
-        })
-    }
-
-    pub(crate) fn active_work(&self) -> RefineResult<Vec<String>> {
-        let mut active = Vec::new();
-        let supervisor = FileProcessSupervisor::new(&self.port_runtime_root);
-        let pause_state = supervisor.pause_state()?;
-        if !pause_state.workflow_paused {
-            active.push("workflow automation is not paused".to_string());
-        }
-        for process in supervisor.list()? {
-            if process.state == "running"
-                && !matches!(process.owner, ProcessOwner::Daemon | ProcessOwner::Runner)
-            {
-                active.push(format!(
-                    "running {} process {}",
-                    process.owner.as_kind(),
-                    process.id
-                ));
+        let result = run_source_promotion(&mut host, &mut operation, |candidate| {
+            if candidate.status == "succeeded" {
+                let mut reconciling = candidate.clone();
+                reconciling.status = "running".to_string();
+                reconciling.stage = "post_restart_reconciliation".to_string();
+                reconciling.message =
+                    "Candidate identity verified; reconciling runtime services".to_string();
+                self.save_operation(&reconciling)
+            } else {
+                self.save_operation(candidate)
             }
+        });
+        if result.is_ok() {
+            operation.status = "running".to_string();
+            operation.stage = "post_restart_reconciliation".to_string();
+            operation.message =
+                "Candidate identity verified; reconciling runtime services".to_string();
         }
-        if let Some(operation) = self.load_operation()?
-            && matches!(operation.status.as_str(), "queued" | "running")
-        {
-            active.push(format!(
-                "source promotion {} is {}",
-                operation.id, operation.status
-            ));
+        operation.primary_outcome = Some(if result.is_ok() {
+            "succeeded".to_string()
+        } else {
+            "failed".to_string()
+        });
+        let restore_result = self.restore_workflow_admission(&mut operation);
+        let reconciliation_result = if result.is_ok() && restore_result.is_ok() {
+            self.verify_post_restart_reconciliation(&mut operation)
+        } else {
+            Ok(())
+        };
+        if result.is_ok() && restore_result.is_ok() && reconciliation_result.is_ok() {
+            let _ = self.refresh_update_check_after_promotion();
         }
-        active.sort();
-        active.dedup();
-        Ok(active)
+        self.save_operation(&operation)?;
+        result?;
+        restore_result?;
+        reconciliation_result?;
+        Ok(operation)
     }
 }

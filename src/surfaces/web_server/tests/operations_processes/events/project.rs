@@ -185,6 +185,16 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
         .unwrap(),
     )
     .unwrap();
+    fs::write(
+        runtime_root.join("source-update-check.json"),
+        serde_json::to_vec_pretty(&json!({
+            "freshness": "fresh",
+            "in_flight": false,
+            "last_successful_check_at": "2026-08-06T12:00:00Z"
+        }))
+        .unwrap(),
+    )
+    .unwrap();
 
     let daemon = LocalHttpDaemon {
         server,
@@ -207,8 +217,9 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
     assert!(sse_body.contains("SSE process output"));
     assert!(sse_body.contains("event: operation_progress"));
     assert!(sse_body.contains("SSE operation progress"));
-    assert!(sse_body.contains("event: source_promotion"));
+    assert!(sse_body.contains("event: source_update"));
     assert!(sse_body.contains("Building source candidate"));
+    assert!(sse_body.contains("2026-08-06T12:00:00Z"));
     assert!(sse_body.contains("event: chat_event"));
     assert!(sse_body.contains("SSE chat event"));
 

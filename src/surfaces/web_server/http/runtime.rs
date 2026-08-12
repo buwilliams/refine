@@ -11,7 +11,27 @@ impl LocalHttpDaemon {
     ) -> RefineResult<()> {
         if let Some(runtime_root) = &self.server.runtime_root {
             report("recovering supervised operations");
-            FileOperationRegistry::new(runtime_root).recover_active_supervised()?;
+            let operation_registry = FileOperationRegistry::new(runtime_root);
+            operation_registry.recover_active_supervised()?;
+            let source_upgrade_present = runtime_root
+                .join(crate::tools::host::source_promotion::SOURCE_PROMOTION_STATE_FILE)
+                .exists()
+                || operation_registry
+                    .recover()?
+                    .into_iter()
+                    .any(|operation| operation.owner == "maintenance:source-upgrade");
+            if source_upgrade_present
+                && let Ok(checkout) =
+                    crate::tools::host::deployed_update::discover_refine_checkout()
+            {
+                report("reconciling restart-safe source-upgrade attempt");
+                crate::tools::host::source_promotion::FileSourcePromotionService::new(
+                    checkout,
+                    runtime_root,
+                    self.server.status.port,
+                )
+                .reconcile_interrupted_agent()?;
+            }
             report("recovering incomplete Quality cancellations");
             QualityOperationRunner::recover_cancelled_operations_for_runtime(runtime_root)?;
         }

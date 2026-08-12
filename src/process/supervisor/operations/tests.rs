@@ -26,6 +26,82 @@ fn exclusive_operation_registration_serializes_one_owner() {
     fs::remove_dir_all(temp_root).unwrap();
 }
 
+#[test]
+fn operation_schema_defaults_and_revision_compare_and_set_are_fenced() {
+    let runtime_root = unique_temp_dir("operations-revision-fence");
+    let registry = FileOperationRegistry::new(&runtime_root);
+    let operation = registry.register("maintenance:test").unwrap();
+    assert_eq!(operation.schema_version, 1);
+    assert_eq!(operation.revision, 0);
+    let advanced = registry
+        .compare_and_set(&operation.id, 0, |candidate| {
+            candidate.progress = json!({"stage": "reserved"});
+            Ok(())
+        })
+        .unwrap();
+    assert_eq!(advanced.revision, 1);
+    assert!(
+        registry
+            .compare_and_set(&operation.id, 0, |_| Ok(()))
+            .unwrap_err()
+            .to_string()
+            .contains("revision changed")
+    );
+
+    let legacy: OperationHandle = serde_json::from_value(json!({
+        "id": "legacy",
+        "owner": "maintenance:test",
+        "state": "Running",
+        "request": {},
+        "progress": {},
+        "result": {},
+        "error": null
+    }))
+    .unwrap();
+    assert_eq!(legacy.schema_version, 1);
+    assert_eq!(legacy.revision, 0);
+    assert!(legacy.external_attempt.is_none());
+    fs::remove_dir_all(runtime_root).unwrap();
+}
+
+#[test]
+fn capability_restart_recovery_adopts_one_correlated_process_or_interrupts_absence() {
+    let runtime_root = unique_temp_dir("operations-capability-adoption");
+    let registry = FileOperationRegistry::new(&runtime_root);
+    let operation = registry
+        .register_exclusive_with_request(
+            "maintenance:source-check",
+            json!({"restart_recovery": "capability"}),
+        )
+        .unwrap();
+    let supervisor = FileProcessSupervisor::new(&runtime_root);
+    let process = supervisor
+        .launch(operation_helper_process_spec(&operation.id))
+        .unwrap();
+
+    let recovered = registry.recover_active_supervised().unwrap();
+    assert!(recovered.iter().any(|item| item.id == operation.id));
+    assert_eq!(
+        registry.status(&operation.id).unwrap().state,
+        OperationState::Running
+    );
+    assert_eq!(supervisor.inspect(&process.id).unwrap().state, "running");
+    supervisor.signal(&process.id, "terminate").unwrap();
+
+    let absent = registry
+        .register_exclusive_with_request(
+            "maintenance:source-check-absent",
+            json!({"restart_recovery": "capability"}),
+        )
+        .unwrap();
+    registry.recover_active_supervised().unwrap();
+    assert_eq!(
+        registry.status(&absent.id).unwrap().state,
+        OperationState::Interrupted
+    );
+    fs::remove_dir_all(runtime_root).unwrap();
+}
+
 use crate::process::subprocess::{
     ManagedProcessSpec, ProcessOwner, ProcessResourceLimits, ProcessSupervisor,
     managed_pid_is_alive,

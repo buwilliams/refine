@@ -114,6 +114,50 @@ impl FileOperationRegistry {
             if !operation_active(&operation.state) {
                 continue;
             }
+            let capability_reconciles_restart = operation
+                .request
+                .get("restart_recovery")
+                .and_then(Value::as_str)
+                == Some("capability");
+            if capability_reconciles_restart {
+                let associated = processes
+                    .iter()
+                    .filter(|process| {
+                        process_operation_id(process).as_deref() == Some(operation.id.as_str())
+                    })
+                    .collect::<Vec<_>>();
+                let capability_attempt = operation
+                    .external_attempt
+                    .as_ref()
+                    .is_some_and(|attempt| !attempt.state.terminal());
+                if associated.len() == 1 || capability_attempt {
+                    self.append_log(
+                        &operation.id,
+                        operation_log_entry(
+                            &operation,
+                            "info",
+                            if associated.len() == 1 {
+                                "Operation adopted its supervised process after restart"
+                            } else {
+                                "Operation delegated external-attempt recovery to its owning capability"
+                            },
+                            Some(crate::model::JsonObject::from_iter([(
+                                "process_id".to_string(),
+                                associated
+                                    .first()
+                                    .map(|process| json!(process.id))
+                                    .unwrap_or(Value::Null),
+                            )])),
+                        ),
+                    )?;
+                    recovered.push(operation);
+                    continue;
+                }
+                // Zero matching processes is interruption evidence. More than
+                // one is an ownership violation and falls through to normal
+                // recovery, which terminates every correlated process before
+                // settling a single authoritative operation.
+            }
             let deferred_cancellation = matches!(operation.state, OperationState::Cancelling)
                 && cancellation_terminal_is_deferred(&operation);
             let Some(operation) = self.begin_recovery(&operation.id)? else {

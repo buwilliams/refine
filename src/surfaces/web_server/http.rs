@@ -46,7 +46,7 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::lifecycle::{
     DaemonRuntimeService, DaemonStatus, FileDaemonLifecycleService,
 };
-use crate::process::supervisor::operations::FileOperationRegistry;
+use crate::process::supervisor::operations::{FileOperationRegistry, OperationRegistry};
 use crate::tools::host::quality::QualityOperationRunner;
 use crate::tools::observability::activity::{ActivityService, FileActivityService};
 use crate::tools::observability::metrics::FileMetricsService;

@@ -195,7 +195,7 @@ fn local_http_daemon_keeps_sse_open_when_process_is_reaped_between_enumeration_a
     )
     .unwrap();
     let later_event_deadline = Instant::now() + Duration::from_secs(3);
-    while !response.contains("event: source_promotion") {
+    while !response.contains("\"id\":\"after-process-reap\"") {
         match stream.read(&mut chunk) {
             Ok(0) => panic!("SSE stream reached EOF before a later event arrived"),
             Ok(read) => response.push_str(&String::from_utf8_lossy(&chunk[..read])),
@@ -213,6 +213,7 @@ fn local_http_daemon_keeps_sse_open_when_process_is_reaped_between_enumeration_a
         !response.contains("event: error"),
         "reserved SSE error appeared before later delivery: {response}"
     );
+    assert!(response.contains("event: source_update"));
     assert!(response.contains("\"id\":\"after-process-reap\""));
 
     drop(stream);

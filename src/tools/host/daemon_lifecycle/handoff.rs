@@ -1,7 +1,10 @@
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::process::supervisor::errors::{RefineError, RefineResult};
+use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct RestartSafeHandoff {
@@ -11,12 +14,58 @@ pub(crate) struct RestartSafeHandoff {
     pub label: String,
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub(crate) struct HandoffLaunchReceipt {
+    pub mechanism: String,
+    pub mechanism_identity: String,
+    pub submitted_at: String,
+    pub executable: String,
+    pub argument_fingerprint: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pid: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub process_identity: Option<String>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum HandoffObservation {
+    Live,
+    Exited,
+    IdentityMismatch(String),
+    Ambiguous(String),
+}
+
 pub(crate) trait RestartSafeHandoffLauncher {
     fn launch(
         &self,
         handoff: &RestartSafeHandoff,
         service_manager: Option<&str>,
     ) -> RefineResult<()>;
+
+    fn submit(
+        &self,
+        handoff: &RestartSafeHandoff,
+        service_manager: Option<&str>,
+    ) -> RefineResult<HandoffLaunchReceipt> {
+        self.launch(handoff, service_manager)?;
+        Ok(HandoffLaunchReceipt {
+            mechanism: handoff_mechanism(service_manager)?.to_string(),
+            mechanism_identity: handoff_mechanism_identity(handoff, service_manager)?,
+            submitted_at: handoff_timestamp(),
+            executable: handoff.executable.display().to_string(),
+            argument_fingerprint: handoff_argument_fingerprint(handoff),
+            pid: None,
+            process_identity: None,
+        })
+    }
+
+    fn observe(&self, receipt: &HandoffLaunchReceipt) -> RefineResult<HandoffObservation> {
+        observe_receipt(receipt)
+    }
+
+    fn terminate(&self, receipt: &HandoffLaunchReceipt) -> RefineResult<()> {
+        terminate_receipt(receipt)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -28,6 +77,14 @@ impl RestartSafeHandoffLauncher for HostRestartSafeHandoffLauncher {
         handoff: &RestartSafeHandoff,
         service_manager: Option<&str>,
     ) -> RefineResult<()> {
+        self.submit(handoff, service_manager).map(|_| ())
+    }
+
+    fn submit(
+        &self,
+        handoff: &RestartSafeHandoff,
+        service_manager: Option<&str>,
+    ) -> RefineResult<HandoffLaunchReceipt> {
         match service_manager {
             Some("systemd_user") => launch_systemd_handoff(handoff),
             Some("launchd_login_item") => launch_launchd_handoff(handoff),
@@ -39,8 +96,11 @@ impl RestartSafeHandoffLauncher for HostRestartSafeHandoffLauncher {
     }
 }
 
-fn launch_systemd_handoff(handoff: &RestartSafeHandoff) -> RefineResult<()> {
+fn launch_systemd_handoff(handoff: &RestartSafeHandoff) -> RefineResult<HandoffLaunchReceipt> {
     let unit = sanitize_label(&handoff.label);
+    if let Some(pid) = systemd_main_pid(&unit)? {
+        return Ok(receipt(handoff, "systemd_user", unit, Some(pid)));
+    }
     let mut command = Command::new("systemd-run");
     command
         .args([
@@ -59,11 +119,25 @@ fn launch_systemd_handoff(handoff: &RestartSafeHandoff) -> RefineResult<()> {
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
-    run_submission(command, "systemd transient service", handoff)
+    run_submission(command, "systemd transient service", handoff)?;
+    let pid = systemd_main_pid(&unit).ok().flatten();
+    Ok(receipt(handoff, "systemd_user", unit, pid))
 }
 
-fn launch_launchd_handoff(handoff: &RestartSafeHandoff) -> RefineResult<()> {
+fn launch_launchd_handoff(handoff: &RestartSafeHandoff) -> RefineResult<HandoffLaunchReceipt> {
     let label = format!("com.refine.{}", sanitize_label(&handoff.label));
+    if Command::new("launchctl")
+        .args([
+            "print",
+            &format!("gui/{}/{}", unsafe { libc::geteuid() }, label),
+        ])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .is_ok_and(|status| status.success())
+    {
+        return Ok(receipt(handoff, "launchd_login_item", label, None));
+    }
     let mut command = Command::new("launchctl");
     command
         .args(["submit", "-l", &label, "--"])
@@ -75,7 +149,8 @@ fn launch_launchd_handoff(handoff: &RestartSafeHandoff) -> RefineResult<()> {
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
-    run_submission(command, "launchd submitted job", handoff)
+    run_submission(command, "launchd submitted job", handoff)?;
+    Ok(receipt(handoff, "launchd_login_item", label, None))
 }
 
 fn run_submission(
@@ -98,7 +173,7 @@ fn run_submission(
     }
 }
 
-fn launch_detached_handoff(handoff: &RestartSafeHandoff) -> RefineResult<()> {
+fn launch_detached_handoff(handoff: &RestartSafeHandoff) -> RefineResult<HandoffLaunchReceipt> {
     let mut command = Command::new(&handoff.executable);
     command
         .args(&handoff.args)
@@ -107,12 +182,220 @@ fn launch_detached_handoff(handoff: &RestartSafeHandoff) -> RefineResult<()> {
         .stdout(Stdio::null())
         .stderr(Stdio::null());
     configure_detached_session(&mut command);
-    command.spawn().map(|_| ()).map_err(|error| {
+    let child = command.spawn().map_err(|error| {
         RefineError::Io(format!(
             "failed to launch detached handoff {}: {error}",
             handoff.executable.display()
         ))
+    })?;
+    Ok(receipt(
+        handoff,
+        "detached",
+        format!("pid:{}", child.id()),
+        Some(child.id()),
+    ))
+}
+
+fn receipt(
+    handoff: &RestartSafeHandoff,
+    mechanism: &str,
+    mechanism_identity: String,
+    pid: Option<u32>,
+) -> HandoffLaunchReceipt {
+    HandoffLaunchReceipt {
+        mechanism: mechanism.to_string(),
+        mechanism_identity,
+        submitted_at: handoff_timestamp(),
+        executable: handoff.executable.display().to_string(),
+        argument_fingerprint: handoff_argument_fingerprint(handoff),
+        process_identity: pid.and_then(process_start_identity),
+        pid,
+    }
+}
+
+pub(crate) fn handoff_mechanism(service_manager: Option<&str>) -> RefineResult<&'static str> {
+    match service_manager {
+        Some("systemd_user") => Ok("systemd_user"),
+        Some("launchd_login_item") => Ok("launchd_login_item"),
+        Some(other) => Err(RefineError::Conflict(format!(
+            "cannot create a restart-safe handoff for unsupported service manager {other}"
+        ))),
+        None => Ok("detached"),
+    }
+}
+
+pub(crate) fn handoff_mechanism_identity(
+    handoff: &RestartSafeHandoff,
+    service_manager: Option<&str>,
+) -> RefineResult<String> {
+    Ok(match handoff_mechanism(service_manager)? {
+        "systemd_user" => sanitize_label(&handoff.label),
+        "launchd_login_item" => format!("com.refine.{}", sanitize_label(&handoff.label)),
+        _ => format!("detached:{}", handoff_argument_fingerprint(handoff)),
     })
+}
+
+pub(crate) fn handoff_argument_fingerprint(handoff: &RestartSafeHandoff) -> String {
+    let mut digest = Sha256::new();
+    digest.update(handoff.executable.as_os_str().to_string_lossy().as_bytes());
+    for arg in &handoff.args {
+        digest.update([0]);
+        digest.update(arg.as_bytes());
+    }
+    format!("{:x}", digest.finalize())
+}
+
+fn handoff_timestamp() -> String {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis()
+        .to_string()
+}
+
+fn observe_receipt(receipt: &HandoffLaunchReceipt) -> RefineResult<HandoffObservation> {
+    match receipt.mechanism.as_str() {
+        "systemd_user" => match systemd_main_pid(&receipt.mechanism_identity)? {
+            Some(pid) if receipt.pid.is_none_or(|expected| expected == pid) => {
+                Ok(HandoffObservation::Live)
+            }
+            Some(pid) => Ok(HandoffObservation::IdentityMismatch(format!(
+                "systemd job {} now owns pid {pid}, expected {:?}",
+                receipt.mechanism_identity, receipt.pid
+            ))),
+            None => Ok(HandoffObservation::Exited),
+        },
+        "launchd_login_item" => {
+            let status = Command::new("launchctl")
+                .args([
+                    "print",
+                    &format!(
+                        "gui/{}/{}",
+                        unsafe { libc::geteuid() },
+                        receipt.mechanism_identity
+                    ),
+                ])
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status();
+            Ok(if status.is_ok_and(|status| status.success()) {
+                HandoffObservation::Live
+            } else {
+                HandoffObservation::Exited
+            })
+        }
+        "detached" => observe_pid(receipt),
+        other => Ok(HandoffObservation::Ambiguous(format!(
+            "unsupported handoff receipt mechanism {other}"
+        ))),
+    }
+}
+
+fn observe_pid(receipt: &HandoffLaunchReceipt) -> RefineResult<HandoffObservation> {
+    let Some(pid) = receipt.pid else {
+        return Ok(HandoffObservation::Ambiguous(
+            "detached handoff receipt has no pid".to_string(),
+        ));
+    };
+    if unsafe { libc::kill(pid as i32, 0) } != 0 {
+        return Ok(HandoffObservation::Exited);
+    }
+    #[cfg(target_os = "linux")]
+    if std::fs::read_to_string(format!("/proc/{pid}/stat"))
+        .ok()
+        .and_then(|stat| {
+            stat.rsplit_once(") ")
+                .map(|(_, fields)| fields.starts_with('Z'))
+        })
+        == Some(true)
+    {
+        return Ok(HandoffObservation::Exited);
+    }
+    let actual = process_start_identity(pid);
+    if receipt.process_identity.is_some() && actual != receipt.process_identity {
+        return Ok(HandoffObservation::IdentityMismatch(format!(
+            "pid {pid} start identity changed"
+        )));
+    }
+    Ok(HandoffObservation::Live)
+}
+
+fn terminate_receipt(receipt: &HandoffLaunchReceipt) -> RefineResult<()> {
+    match receipt.mechanism.as_str() {
+        "systemd_user" => {
+            let status = Command::new("systemctl")
+                .args(["--user", "stop", &receipt.mechanism_identity])
+                .status()
+                .map_err(|error| {
+                    RefineError::Io(format!("failed to stop handoff unit: {error}"))
+                })?;
+            if !status.success() {
+                return Err(RefineError::Degraded(format!(
+                    "failed to stop handoff unit {}: {status}",
+                    receipt.mechanism_identity
+                )));
+            }
+        }
+        "launchd_login_item" => {
+            let status = Command::new("launchctl")
+                .args(["remove", &receipt.mechanism_identity])
+                .status()
+                .map_err(|error| {
+                    RefineError::Io(format!("failed to remove handoff job: {error}"))
+                })?;
+            if !status.success() {
+                return Err(RefineError::Degraded(format!(
+                    "failed to remove handoff job {}: {status}",
+                    receipt.mechanism_identity
+                )));
+            }
+        }
+        "detached" => {
+            if matches!(observe_pid(receipt)?, HandoffObservation::Live)
+                && let Some(pid) = receipt.pid
+                && unsafe { libc::kill(pid as i32, libc::SIGTERM) } != 0
+            {
+                return Err(RefineError::Io(format!(
+                    "failed to terminate exact detached handoff pid {pid}: {}",
+                    std::io::Error::last_os_error()
+                )));
+            }
+        }
+        other => {
+            return Err(RefineError::Conflict(format!(
+                "cannot terminate unsupported handoff mechanism {other}"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn systemd_main_pid(unit: &str) -> RefineResult<Option<u32>> {
+    let output = Command::new("systemctl")
+        .args(["--user", "show", unit, "--property=MainPID", "--value"])
+        .output()
+        .map_err(|error| RefineError::Io(format!("failed to observe systemd handoff: {error}")))?;
+    if !output.status.success() {
+        return Ok(None);
+    }
+    Ok(String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .parse::<u32>()
+        .ok()
+        .filter(|pid| *pid > 0))
+}
+
+#[cfg(target_os = "linux")]
+fn process_start_identity(pid: u32) -> Option<String> {
+    let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
+    let after_name = stat.rsplit_once(") ")?.1;
+    let start_time = after_name.split_whitespace().nth(19)?;
+    Some(format!("linux-proc-start:{start_time}"))
+}
+
+#[cfg(not(target_os = "linux"))]
+fn process_start_identity(_pid: u32) -> Option<String> {
+    None
 }
 
 #[cfg(unix)]
@@ -174,185 +457,5 @@ pub(crate) fn handoff_cwd(path: &Path) -> PathBuf {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs;
-    use std::time::{Duration, SystemTime, UNIX_EPOCH};
-
-    #[test]
-    fn handoff_labels_are_safe_for_systemd_and_launchd() {
-        assert_eq!(
-            sanitize_label("lifecycle:8082/source 1"),
-            "lifecycle-8082-source-1"
-        );
-    }
-
-    #[cfg(target_os = "linux")]
-    #[test]
-    #[ignore = "requires an available systemd user manager; platform-gated integration evidence"]
-    fn real_systemd_handoff_survives_stopping_the_origin_service_group() {
-        run_real_systemd_handoff_control("stop");
-    }
-
-    #[cfg(target_os = "linux")]
-    #[test]
-    #[ignore = "requires an available systemd user manager; platform-gated integration evidence"]
-    fn real_systemd_handoff_survives_restarting_the_origin_service_group() {
-        run_real_systemd_handoff_control("restart");
-    }
-
-    #[cfg(target_os = "linux")]
-    fn run_real_systemd_handoff_control(action: &str) {
-        if !Command::new("systemctl")
-            .args(["--user", "show-environment"])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status()
-            .is_ok_and(|status| status.success())
-        {
-            eprintln!("SKIP: systemd user manager is unavailable");
-            return;
-        }
-
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let root = std::env::temp_dir().join(format!(
-            "refine-systemd-handoff-{}-{nonce}",
-            std::process::id()
-        ));
-        fs::create_dir_all(&root).unwrap();
-        let marker = root.join("settled");
-        let submitted = root.join("submitted");
-        let controlled = root.join("controlled");
-        let unit = format!("refine-handoff-origin-{}-{nonce}", std::process::id());
-        let test_executable = std::env::current_exe().unwrap();
-        let child_test =
-            "tools::host::daemon_lifecycle::handoff::tests::real_systemd_handoff_child";
-        let status = Command::new("systemd-run")
-            .args([
-                "--user",
-                "--quiet",
-                "--property=Type=exec",
-                &format!("--unit={unit}"),
-                &format!(
-                    "--setenv=REFINE_SYSTEMD_HANDOFF_MARKER={}",
-                    marker.display()
-                ),
-                &format!(
-                    "--setenv=REFINE_SYSTEMD_HANDOFF_SUBMITTED={}",
-                    submitted.display()
-                ),
-                &format!(
-                    "--setenv=REFINE_SYSTEMD_HANDOFF_CONTROLLED={}",
-                    controlled.display()
-                ),
-                &format!("--setenv=REFINE_SYSTEMD_HANDOFF_ACTION={action}"),
-                &format!("--setenv=REFINE_SYSTEMD_HANDOFF_UNIT={unit}"),
-                "--",
-            ])
-            .arg(&test_executable)
-            .args([child_test, "--exact", "--ignored", "--nocapture"])
-            .status()
-            .unwrap();
-        assert!(status.success(), "failed to start origin service");
-        wait_for_path(&submitted, Duration::from_secs(10));
-        wait_for_path(&marker, Duration::from_secs(10));
-        assert_eq!(fs::read_to_string(&marker).unwrap(), "settled");
-        if action == "restart" {
-            wait_for_unit_state(&unit, true, Duration::from_secs(10));
-            let _ = Command::new("systemctl")
-                .args(["--user", "stop", &unit])
-                .status();
-        } else {
-            wait_for_unit_state(&unit, false, Duration::from_secs(10));
-        }
-
-        let _ = Command::new("systemctl")
-            .args(["--user", "reset-failed", &unit])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status();
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[cfg(target_os = "linux")]
-    #[test]
-    #[ignore = "helper invoked only by the real systemd handoff integration test"]
-    fn real_systemd_handoff_child() {
-        let Some(marker) = std::env::var_os("REFINE_SYSTEMD_HANDOFF_MARKER") else {
-            return;
-        };
-        let submitted = PathBuf::from(
-            std::env::var_os("REFINE_SYSTEMD_HANDOFF_SUBMITTED")
-                .expect("submitted marker is required"),
-        );
-        let controlled = PathBuf::from(
-            std::env::var_os("REFINE_SYSTEMD_HANDOFF_CONTROLLED")
-                .expect("controlled marker is required"),
-        );
-        if fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&controlled)
-            .is_err()
-        {
-            std::thread::sleep(Duration::from_secs(30));
-            return;
-        }
-        let marker = PathBuf::from(marker);
-        let script = format!("sleep 1; printf settled > {}", marker.display());
-        HostRestartSafeHandoffLauncher
-            .launch(
-                &RestartSafeHandoff {
-                    executable: PathBuf::from("/bin/sh"),
-                    args: vec!["-c".to_string(), script],
-                    cwd: marker.parent().unwrap().to_path_buf(),
-                    label: format!("refine-handoff-child-{}", uuid::Uuid::new_v4()),
-                },
-                Some("systemd_user"),
-            )
-            .unwrap();
-        fs::write(submitted, "submitted").unwrap();
-        let action =
-            std::env::var("REFINE_SYSTEMD_HANDOFF_ACTION").expect("handoff action is required");
-        let unit = std::env::var("REFINE_SYSTEMD_HANDOFF_UNIT").expect("handoff unit is required");
-        let _ = Command::new("systemctl")
-            .args(["--user", &action, &unit])
-            .status();
-        std::thread::sleep(Duration::from_secs(30));
-    }
-
-    #[cfg(target_os = "linux")]
-    fn wait_for_path(path: &Path, timeout: Duration) {
-        let deadline = std::time::Instant::now() + timeout;
-        while !path.exists() {
-            assert!(
-                std::time::Instant::now() < deadline,
-                "timed out waiting for {}",
-                path.display()
-            );
-            std::thread::sleep(Duration::from_millis(50));
-        }
-    }
-
-    #[cfg(target_os = "linux")]
-    fn wait_for_unit_state(unit: &str, active: bool, timeout: Duration) {
-        let deadline = std::time::Instant::now() + timeout;
-        loop {
-            let observed = Command::new("systemctl")
-                .args(["--user", "is-active", "--quiet", unit])
-                .status()
-                .is_ok_and(|status| status.success());
-            if observed == active {
-                return;
-            }
-            assert!(
-                std::time::Instant::now() < deadline,
-                "timed out waiting for {unit} active={active}"
-            );
-            std::thread::sleep(Duration::from_millis(50));
-        }
-    }
-}
+#[path = "handoff_tests.rs"]
+mod tests;

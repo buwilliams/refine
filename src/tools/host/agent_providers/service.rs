@@ -248,6 +248,89 @@ impl HostAgentProviderService {
         self.invoke_detailed_with_output(invocation, |_| {})
     }
 
+    /// Launch an installed provider as an independently supervised Agent.
+    ///
+    /// Maintenance capabilities use this form when the provider must survive a
+    /// daemon restart and drive several typed Refine commands from durable
+    /// context. The returned managed-process record is the durable launch
+    /// receipt; callers correlate it with an operation through standard
+    /// `operation_id` metadata.
+    pub(crate) fn launch_managed(
+        &self,
+        invocation: ProviderInvocation,
+    ) -> RefineResult<crate::process::subprocess::ManagedProcess> {
+        let _ = self.reap_orphan_prompt_artifacts()?;
+        let (spec, binary) = self.resolve_binary_for_provider(&invocation.provider)?;
+        if invocation
+            .cwd
+            .as_deref()
+            .is_some_and(|cwd| cwd.as_bytes().contains(&0))
+        {
+            return Err(RefineError::InvalidInput(
+                "provider cwd contains a NUL byte and cannot be launched".to_string(),
+            ));
+        }
+        let cwd = invocation.cwd.as_deref().map(Path::new);
+        let launch_environment = EffectiveLaunchEnvironment::assemble(&ProcessOwner::Agent, &[])?;
+        let prepared = self.prepare_provider_launch(
+            &spec,
+            binary,
+            ProviderLaunchRequest {
+                prompt: &invocation.prompt,
+                session_id: invocation.session_id.as_deref(),
+                cwd,
+                interactive: false,
+                environment: launch_environment,
+            },
+        )?;
+        prepared.validate_prompt_artifact()?;
+        let mut metadata = invocation.process_metadata;
+        metadata.insert(
+            "prompt_transport".to_string(),
+            serde_json::to_value(&prepared.prompt_transport).map_err(|error| {
+                RefineError::Serialization(format!(
+                    "failed to encode provider prompt transport metadata: {error}"
+                ))
+            })?,
+        );
+        let supervisor = FileProcessSupervisor::new(self.prompt_runtime_root());
+        let process = supervisor.launch(ManagedProcessSpec {
+            owner: ProcessOwner::Agent,
+            command: prepared.binary,
+            args: prepared.args,
+            cwd: cwd.map(|path| path.display().to_string()),
+            env: Vec::new(),
+            stdin: prepared.stdin,
+            limits: Some(ProcessResourceLimits {
+                kill_on_parent_exit: false,
+                ..Default::default()
+            }),
+            authorization_command: Some(prepared.authorization_command),
+            sensitive: false,
+            metadata,
+        })?;
+
+        // Keep a prompt-file lease alive until the provider exits. If the
+        // daemon terminates first, the process metadata keeps the artifact
+        // discoverable by the normal orphan reaper after the provider settles.
+        if let Some(artifact) = prepared.prompt_artifact {
+            let observer = supervisor.clone();
+            let process_id = process.id.clone();
+            std::thread::spawn(move || {
+                loop {
+                    match observer.wait(&process_id) {
+                        Ok(current) if current.state == "running" => {
+                            std::thread::sleep(std::time::Duration::from_millis(100));
+                        }
+                        _ => break,
+                    }
+                }
+                drop(artifact);
+            });
+        }
+        Ok(process)
+    }
+
     pub fn invoke_detailed_with_output<F>(
         &self,
         invocation: ProviderInvocation,
@@ -431,6 +514,7 @@ impl HostAgentProviderService {
             on_output(line);
         }
         let success = output.success();
+        let process_id = output.process.id.clone();
         let exit_code = output.process.exit_code;
         let stdout = output.stdout;
         let stderr = output.stderr;
@@ -456,12 +540,14 @@ impl HostAgentProviderService {
                 output: stdout.clone(),
                 provider_session_id,
                 raw_output: stdout,
+                process_id,
             })
         } else {
             Ok(ProviderInvocationResult {
                 output: final_text,
                 provider_session_id,
                 raw_output: stdout,
+                process_id,
             })
         }
     }

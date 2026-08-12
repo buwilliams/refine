@@ -34,6 +34,17 @@ read the durable lifecycle operation after shutdown or reconnection and obtain
 the same observed status, lifecycle evidence, failure, and recovery guidance as
 a synchronous CLI caller.
 
+Source-update reads are cached and responsive. Automatic stale refresh and
+manual refresh both return one durable, coalesced supervised-check receipt;
+they do not fetch in an HTTP handler. Source promotion returns one installed
+Agent operation outside Goal capacity. The operation projection includes the
+same redacted attempt identifier and receipt evidence used by SSE and browser
+reconnect, never the raw claim nonce. `POST /operations/{id}/cancel` dispatches
+by owner: ordinary work uses supervised cancellation, while
+`maintenance:source-upgrade` fences and reconciles its exact external helper,
+rollback, executable identity, and prior workflow-admission intent before any
+terminal cancellation result is exposed.
+
 Plan-to-Goal drafting uses the shared `/import/extract` route with purpose `plan_goal`; it returns exactly one unpersisted Goal draft so browser, CLI, and agent adapters can preserve their own explicit review boundary.
 
 The Goals screen sends its filter-scoped bulk selection to `POST /work/goals/export/jira`, which returns a durable operation immediately. The supervised runner records ownership, progress, logs, cancellation, failures, and the completed Jira CSV result; interrupted exports can be retried through `/work/goals/export/jira/{operation_id}/retry`. The result contains one row per selected Goal plus the filename, content type, selected Goal ids, and aggregate counts. Existing single-Goal CLI and agent adapters reuse the same row renderer and evidence rules rather than formatting separate reports. That renderer budgets every Description to Jira's Unicode-character limit, prioritizes audit identity and commit traceability before normalized round outcomes and narrative, and marks every shortened section or field explicitly. Raw provider payloads are not replayed, and verbose history in one Goal must not fail the rest of a valid bulk selection.

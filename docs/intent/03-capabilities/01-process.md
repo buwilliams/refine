@@ -24,6 +24,17 @@ Stopping a Goal worker confirms its exit, retains its branch and worktree, and c
 
 After daemon restart, live-process recovery terminates stale owned workers and removes retired execution-coordination files. Any nonterminal Goal remains eligible for a new idempotent worker. Planning artifacts, Git observations, and semantic outputs remain durable; a prior process identity is only provenance, not ownership that must be recovered.
 
+Restart-safe source activation is the bounded exception to ordinary supervisor
+ownership because the helper replaces the daemon and supervisor that launched
+it. The operation registry remains authoritative through a revision-fenced
+attempt: reservation is not liveness, submission records a mechanism-specific
+identity and receipt, and one helper must atomically claim with its attempt
+nonce before any side effect. Recovery observes that exact systemd, launchd,
+or detached-process identity; it adopts one live claimant or settles zero,
+stale, duplicate, or ambiguous evidence visibly and retryably. Cancellation
+fences claims first and cannot become terminal until the exact helper is gone
+or safely reconciled.
+
 Worktree cleanup is separate from Stop. It may hibernate a clean inactive worktree when no live local process or operation uses it, while dirty, ambiguous, standalone, and state worktrees remain protected. Candidate branches retain their own exact-SHA integration safeguards.
 
 `workflow_paused` is the canonical shared automation gate. Pausing blocks new Goal admission and lets automatic Git sync and inactive-worktree cleanup quiesce at safe repository-operation boundaries. Already active Goal executions continue unless their Agents are stopped separately. The daemon, API, and runner supervision remain available; quiesced repository workers settle normally instead of being treated as failed or permanently terminated. Resuming makes admission and those workers eligible to run again.

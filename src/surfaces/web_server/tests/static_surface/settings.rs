@@ -53,9 +53,14 @@ fn static_main_nav_exposes_refine_source_update_affordance() {
     assert!(releases.contains("const sourceUpdate = result.source_update || {}"));
     assert!(releases.contains("button.disabled = sourceUpdate.enabled !== true"));
     assert!(releases.contains(r#"fetchRemote ? "/api/system/source/check""#));
-    assert!(releases.contains("const confirmed = window.confirm("));
     assert!(releases.contains(r#"api("POST", "/api/system/source/promote", {})"#));
+    assert!(releases.contains("Upgrade Refine"));
+    assert!(releases.contains("source_check"));
+    assert!(!releases.contains("window.confirm("));
+    assert!(!releases.contains("hasAttachedProject()"));
     assert!(releases.contains("handleSourcePromotionSseEvent"));
+    assert!(releases.contains("handleSourceUpdateCheckSseEvent"));
+    assert!(releases.contains("handleSourceUpdateSseEvent"));
     assert!(!releases.contains("setInterval"));
     assert!(init.contains("initSourceUpdateNav()"));
 }

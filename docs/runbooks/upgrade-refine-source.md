@@ -9,18 +9,19 @@ healthy. Published-release updates remain unchanged.
 - The controller checkout is on a branch with a reachable configured remote.
 - The controller checkout has no staged, unstaged, or untracked changes.
 - The fetched commit is a fast-forward descendant of the current commit.
-- Refine automation and background processes are paused, with no running
-  non-daemon work on the selected port.
+- The installed upgrade Agent can pause new workflow admission and observe or
+  safely reconcile preserved active work on the selected port.
 
 Do not stash, reset, merge, or discard work to satisfy these checks. Resolve a
 dirty or divergent checkout explicitly before retrying.
 
 ## UI Workflow
 
-When the attached target app is a Refine Git checkout, the source-update control
-in the main navigation provides the same promotion action at a glance. It is
-disabled when the running source is current or any promotion precondition is
-blocked, and enabled when the fetched update is safe to promote.
+When the running Refine checkout is discoverable, the source-update control in
+the main navigation provides the same operation regardless of the attached
+target app. Cached reads never run Git fetch. Automatic refresh runs at most
+once per hour by default; duplicate manual clicks and clients share one
+supervised fetch.
 
 1. Use the enabled main-navigation refresh icon, or open **Node → Refine (dev)**
    and find **Upgrade** for the detailed status.
@@ -28,7 +29,8 @@ blocked, and enabled when the fetched update is safe to promote.
    upstream remote/branch, and available commit.
 3. If the panel reports a blocker, resolve it without overwriting work and
    check again.
-4. Select **Promote latest source** and confirm the restart handoff.
+4. Select **Upgrade Refine** once. This authorizes the installed maintenance
+   Agent; there is no confirmation dialog.
 5. Keep the page open or return to it later. The panel reconnects and polls the
    durable operation state through the daemon restart.
 6. Require the final message `Latest source promoted and Refine is healthy`.
@@ -53,9 +55,27 @@ Queue the same external handoff used by the UI:
 ./r system source-promote --port 8082 --runtime-root run
 ```
 
-The command returns the durable operation id before the daemon stops. State is
-stored at `<runtime-root>/<port>/source-promotion.json`; `run/<port>/...` is
-only the checkout-local default.
+The command returns the durable operation id before the daemon stops. The
+revisioned record under `<runtime-root>/<port>/operations/` is authoritative;
+`source-promotion.json` is a redacted projection repaired from it after a
+crash. `run/<port>/...` is only the checkout-local default.
+
+## Restart-Safe Handoff Evidence
+
+The operation reserves a unique attempt and nonce verifier before submission.
+Reservation or `restart_safe_handoff_preparing` is not proof that a helper is
+live. The helper receives the operation id, attempt id, and raw nonce, then
+atomically claims before delay or mutation. The registry records the expected
+systemd unit, launchd label, or detached process fingerprint and a bounded
+claim deadline, followed by a structured receipt. Only receipt or claim plus
+exact live identity can activate `restart_safe_handoff`.
+
+After a daemon restart, Refine adopts one exact live claimant. No claimant,
+identity mismatch, stale or late claim, or ambiguous evidence settles visibly
+as interrupted or failed and retryable; it never remains running because of a
+stage string. A retry receives a new attempt only after the old attempt is
+terminal. Public API, SSE, browser, CLI, and MCP output include only the nonce
+verifier and redacted receipt, never the raw nonce.
 
 ## Failure And Recovery
 
@@ -69,6 +89,13 @@ only the checkout-local default.
   inspect the reported Git precondition failure.
 - `restart_daemon`: the helper attempts to restore the prior commit and restart
   the previous daemon. Follow the persisted `recovery` text and verify with:
+- `restart_safe_handoff_preparing`: inspect the operation attempt. Before the
+  claim deadline, a manager job may still claim. After the deadline, zero or
+  ambiguous claimants must settle interrupted or failed before retry.
+- `cancelling`: cancellation has fenced late receipts and claims but is still
+  observing or terminating the exact helper, restoring registration/source as
+  required, and restoring the recorded workflow-admission intent. Do not call
+  it cancelled until the operation becomes terminal.
 
 ```sh
 ./r system status --port 8082 --runtime-root run

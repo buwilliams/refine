@@ -1893,6 +1893,22 @@ function initSSE() {
       }
     } catch {}
   });
+  sseSource.addEventListener("source_update_check", (e) => {
+    try {
+      const payload = JSON.parse(e.data || "{}");
+      if (typeof handleSourceUpdateCheckSseEvent === "function") {
+        handleSourceUpdateCheckSseEvent(payload);
+      }
+    } catch {}
+  });
+  sseSource.addEventListener("source_update", (e) => {
+    try {
+      const payload = JSON.parse(e.data);
+      if (typeof handleSourceUpdateSseEvent === "function") {
+        handleSourceUpdateSseEvent(payload);
+      }
+    } catch {}
+  });
   sseSource.addEventListener("target_app_state", () => {
     refreshTargetAppToggle();
   });

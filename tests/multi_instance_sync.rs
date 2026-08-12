@@ -292,8 +292,9 @@ fn http_json(port: u16, method: &str, path: &str, body: Option<Value>) -> Result
         .set_read_timeout(Some(Duration::from_secs(5)))
         .map_err(|error| error.to_string())?;
     let request = format!(
-        "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\nX-Refine-API-Version: 1\r\nIdempotency-Key: multi-instance-{}\r\n\r\n",
+        "{method} {path} HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\nX-Refine-API-Version: {}\r\nIdempotency-Key: multi-instance-{}\r\n\r\n",
         body.len(),
+        refine::surfaces::web_server::API_CONTRACT_VERSION,
         unique_idempotency_key()
     );
     stream

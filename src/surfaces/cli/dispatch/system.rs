@@ -167,9 +167,37 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     port_runtime_root,
                     port,
                     operation_id,
+                    attempt_id,
+                    claim_nonce,
                 },
         } => FileSourcePromotionService::new(checkout, port_runtime_root, port)
-            .run_helper(&operation_id)
+            .run_helper(&operation_id, attempt_id.as_deref(), claim_nonce.as_deref())
+            .map(|_| ()),
+        Commands::System {
+            action:
+                SystemAction::SourceUpgradeCapability {
+                    checkout,
+                    port_runtime_root,
+                    port,
+                    operation_id,
+                    action,
+                },
+        } => {
+            let result = FileSourcePromotionService::new(checkout, port_runtime_root, port)
+                .run_agent_capability(&operation_id, &action)?;
+            print_json(&result);
+            Ok(())
+        }
+        Commands::System {
+            action:
+                SystemAction::SourceCheckWorker {
+                    checkout,
+                    port_runtime_root,
+                    port,
+                    operation_id,
+                },
+        } => FileSourcePromotionService::new(checkout, port_runtime_root, port)
+            .run_update_check(&operation_id)
             .map(|_| ()),
         Commands::System {
             action:

@@ -196,12 +196,15 @@ pub(in crate::surfaces::web_server) fn operation_response(
 ) -> serde_json::Value {
     json!({
         "id": operation.id,
+        "schema_version": operation.schema_version,
+        "revision": operation.revision,
         "owner": operation.owner,
         "status": operation.state.as_api_status(),
         "state": operation.state,
         "progress": operation.progress,
         "result": operation.result,
-        "error": operation.error
+        "error": operation.error,
+        "external_attempt": operation.external_attempt
     })
 }
 

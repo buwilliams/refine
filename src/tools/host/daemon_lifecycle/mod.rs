@@ -23,7 +23,9 @@ mod operations_tests;
 
 use direct::stop_direct_daemon;
 pub(crate) use handoff::{
-    HostRestartSafeHandoffLauncher, RestartSafeHandoff, RestartSafeHandoffLauncher, handoff_cwd,
+    HandoffLaunchReceipt, HandoffObservation, HostRestartSafeHandoffLauncher, RestartSafeHandoff,
+    RestartSafeHandoffLauncher, handoff_argument_fingerprint, handoff_cwd, handoff_mechanism,
+    handoff_mechanism_identity,
 };
 pub(crate) use identity::live_daemon_executable;
 use managed::{run_service_managed_daemon, stop_service_managed_daemon};

@@ -107,3 +107,30 @@ impl OperationRegistry for FileOperationRegistry {
         Ok(operations)
     }
 }
+
+impl FileOperationRegistry {
+    /// Revision-fenced mutation used by capabilities that temporarily hand
+    /// ownership to a process outside the supervisor being replaced.
+    pub fn compare_and_set(
+        &self,
+        operation_id: &str,
+        expected_revision: u64,
+        transition: impl FnOnce(&mut OperationHandle) -> RefineResult<()>,
+    ) -> RefineResult<OperationHandle> {
+        let lock = self.mutation_lock()?;
+        let mut handle = self.status(operation_id)?;
+        if handle.revision != expected_revision {
+            FileExt::unlock(&lock).ok();
+            return Err(RefineError::Conflict(format!(
+                "Operation {operation_id} revision changed from {expected_revision} to {}",
+                handle.revision
+            )));
+        }
+        transition(&mut handle)?;
+        handle.schema_version = operation_schema_version();
+        handle.revision = handle.revision.saturating_add(1);
+        self.write(&handle)?;
+        FileExt::unlock(&lock).ok();
+        Ok(handle)
+    }
+}

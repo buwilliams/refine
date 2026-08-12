@@ -10,7 +10,7 @@ use serde_json::{Map, Value};
 use crate::process::launch_environment::EffectiveLaunchEnvironment;
 use crate::process::subprocess::{
     FileProcessSupervisor, ManagedProcessOutputStream, ManagedProcessSpec, ProcessOwner,
-    ProcessResourceLimits,
+    ProcessResourceLimits, ProcessSupervisor,
 };
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 
@@ -52,6 +52,8 @@ pub struct ProviderInvocationResult {
     pub output: String,
     pub provider_session_id: Option<String>,
     pub raw_output: String,
+    /// Durable supervised-process receipt for the installed provider CLI.
+    pub process_id: String,
 }
 
 #[derive(Clone, Debug)]

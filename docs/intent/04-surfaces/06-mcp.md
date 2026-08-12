@@ -28,6 +28,12 @@ Current agent-facing planning support includes `refine_draft_goal`, which sends 
 
 Current audit support includes `refine_export_goal_jira`, which maps a Goal id onto the shared Jira evidence export route rather than formatting a separate agent-only report.
 
+Source status, check, promotion, operation status, retry, and owner-aware
+cancellation intentionally use `refine_request`. The adapter forwards those
+routes through the real daemon dispatcher, so MCP observes the same operation
+and attempt identifiers, redaction, idempotency, and terminal evidence as HTTP,
+CLI, SSE, and browser callers.
+
 ## Future Direction
 
 As agent-native interaction grows, MCP may become a primary way external assistants drive Refine. The tool catalog should grow toward the most valuable capabilities — planning, import, workflow advancement, review — while keeping each tool aligned to a shared capability rather than a one-off behavior.
