@@ -106,16 +106,15 @@ function buildManagedProcessRows(processes, workflowPaused, backend, runnerReach
   if (!rows.some((proc) => proc.kind === "target_app")) {
     rows.push(syntheticTargetAppProcess());
   }
+  const workflowAction = workflowPauseActionModel({ workflow_paused: workflowPaused });
   const workflowAutomation = {
     id: "workflow-automation",
     kind: "workflow_automation",
     label: "Workflow automation",
-    status: workflowPaused ? "paused" : "active",
+    status: workflowAction.status,
     runner_reachable: runnerReachable,
     pid: null,
-    details: workflowPaused
-      ? "Workflow admission is paused; active executions continue and new work waits."
-      : "Workflow automation can run Goal agents, QA, and builds.",
+    details: workflowAction.description,
     paused: workflowPaused,
     actions: workflowAutomationActionIds(workflowPaused, supervisorOwnsWorkflowToggle),
     cpu_priority: { label: "-" },
@@ -467,9 +466,29 @@ function workflowAutomationActionIds(workflowPaused, supervisorOwnsWorkflowToggl
 }
 
 function workflowPausedFor(value = {}) {
-  if (typeof value.paused === "boolean") return value.paused;
   if (typeof value.workflow_paused === "boolean") return value.workflow_paused;
+  if (typeof value.paused === "boolean") return value.paused;
   return !!value.background_processes_stopped || !!value.agents_paused;
+}
+
+const WORKFLOW_PAUSE_CONFIRMATION = "Pause workflow automation? Refine will stop admitting new Goal work and quiesce automatic Git sync and inactive-worktree cleanup at safe boundaries. Already active Goal executions continue unless you Stop their Agents separately.";
+
+function workflowPauseActionModel(value = {}) {
+  const paused = workflowPausedFor(value);
+  const shouldPause = !paused;
+  return {
+    shouldPause,
+    actionId: shouldPause ? "pause_workflow" : "unpause_workflow",
+    direction: shouldPause ? "pause" : "resume",
+    status: paused ? "paused" : "active",
+    description: paused
+      ? "New Goal admission is paused; automatic Git sync and inactive-worktree cleanup quiesce at safe boundaries. Active Goal executions continue unless stopped separately."
+      : "New Goal admission, automatic Git sync, and inactive-worktree cleanup are eligible. Active Goal executions continue unless stopped separately.",
+    buttonLabel: shouldPause ? "Pause Workflow" : "Resume Workflow",
+    busyLabel: shouldPause ? "Pausing…" : "Resuming…",
+    confirmation: shouldPause ? WORKFLOW_PAUSE_CONFIRMATION : null,
+    payload: { paused: shouldPause },
+  };
 }
 
 function processActionIds(proc) {
@@ -542,9 +561,11 @@ function renderProcessActionButtons(proc, actionIds) {
 
 function renderProcessActionButton(proc, actionId) {
   if (actionId === "pause_workflow" || actionId === "unpause_workflow") {
-    const paused = actionId === "unpause_workflow";
+    const action = workflowPauseActionModel({
+      workflow_paused: actionId === "unpause_workflow",
+    });
     const disabled = workflowToggleDisabled(proc);
-    return `<button class="${paused ? "" : "secondary"}" data-testid="process-workflow-toggle" data-toggle-workflow="${paused ? "unpause" : "pause"}" ${disabled ? "disabled" : ""}>${paused ? "Unpause Workflow" : "Pause Workflow"}</button>`;
+    return `<button class="${action.shouldPause ? "secondary" : ""}" data-testid="process-workflow-toggle" data-toggle-workflow="${action.direction}" data-workflow-paused="${action.shouldPause ? "false" : "true"}" ${disabled ? "disabled" : ""}>${action.buttonLabel}</button>`;
   }
   if (actionId === "hard_reset_worktree") {
     const disabled = !proc.runner_reachable || hardResetWorktreeDisabled(proc);
@@ -900,20 +921,22 @@ function bindSettingsProcessesTab(s) {
   bindSupervisorProcessToggle();
   $$("[data-toggle-workflow]").forEach((b) => {
     bindOnce(b, "click", async () => {
-      const shouldPause = b.dataset.toggleWorkflow === "pause";
-      const ok = shouldPause
+      const action = workflowPauseActionModel({
+        workflow_paused: b.dataset.workflowPaused === "true",
+      });
+      const ok = action.shouldPause
         ? await modalConfirm(
-            "Pause workflow automation? Refine will stop admitting new Goal work until you unpause. Active executions continue; use Stop on an Agent to interrupt it.",
+            action.confirmation,
             { title: "Pause Workflow", okLabel: "Pause Workflow", danger: true },
           )
         : true;
       if (!ok) return;
-      await withButtonBusy(b, shouldPause ? "Pausing…" : "Unpausing…", async () => {
+      await withButtonBusy(b, action.busyLabel, async () => {
         try {
-          await api("POST", "/api/workflow/pause", { paused: shouldPause });
+          await api("POST", "/api/workflow/pause", action.payload);
           await refreshProcessesSettingsTab({ force: true });
           if (typeof refreshAgentStatusIndicator === "function") refreshAgentStatusIndicator();
-          if (!shouldPause) scheduleProcessesTabRefreshes();
+          if (!action.shouldPause) scheduleProcessesTabRefreshes();
         } catch (e) { await showActionError(e); }
       });
     });

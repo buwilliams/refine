@@ -95,7 +95,7 @@ pub fn process_summary_value_with_chat_sessions(
         "background_processes_stopped": pause_state.workflow_paused,
         "agents_paused": pause_state.workflow_paused,
         "processes": process_values,
-        "runner_work": runner_work_summary(runtime_root, pause_state.workflow_paused),
+        "runner_work": runner_work_summary(runtime_root),
         "backend": {
             "process_model": "supervisor"
         }
@@ -109,6 +109,7 @@ fn managed_process_roots(runtime_root: &Path) -> [PathBuf; 2] {
 pub fn runtime_process_summary_value(runtime: &RuntimeProjection) -> Value {
     let mut summary = runtime.supervisor.clone().unwrap_or_default();
     let pause_state = process_pause_state_from_summary(&summary);
+    apply_pause_state_aliases(&mut summary, &pause_state);
     summary.insert(
         "processes".to_string(),
         Value::Array(
@@ -285,8 +286,8 @@ fn process_pause_state_from_summary(summary: &JsonObject) -> ProcessPauseState {
     ProcessPauseState {
         workflow_paused: summary
             .get("workflow_paused")
-            .or_else(|| summary.get("paused"))
             .and_then(Value::as_bool)
+            .or_else(|| summary.get("paused").and_then(Value::as_bool))
             .unwrap_or_else(|| {
                 summary
                     .get("background_processes_stopped")
@@ -297,6 +298,17 @@ fn process_pause_state_from_summary(summary: &JsonObject) -> ProcessPauseState {
                         .and_then(Value::as_bool)
                         .unwrap_or(false)
             }),
+    }
+}
+
+fn apply_pause_state_aliases(summary: &mut JsonObject, pause_state: &ProcessPauseState) {
+    for key in [
+        "workflow_paused",
+        "paused",
+        "background_processes_stopped",
+        "agents_paused",
+    ] {
+        summary.insert(key.to_string(), json!(pause_state.workflow_paused));
     }
 }
 
@@ -324,8 +336,8 @@ fn required_runner_workers_reachable(processes: &[Value]) -> bool {
     })
 }
 
-fn runner_work_summary(runtime_root: &Path, background_stopped: bool) -> Value {
-    let status = if background_stopped { "paused" } else { "idle" };
+fn runner_work_summary(runtime_root: &Path) -> Value {
+    let status = "idle";
     let operations = FileOperationRegistry::new(runtime_root)
         .recover()
         .unwrap_or_default();
@@ -337,23 +349,15 @@ fn runner_work_summary(runtime_root: &Path, background_stopped: bool) -> Value {
         .iter()
         .rev()
         .find(|operation| operation.owner == "import:extract:plan");
-    let merger_status = if background_stopped {
-        "paused".to_string()
-    } else {
-        merger_operation
-            .map(|operation| operation.state.as_api_status().to_string())
-            .unwrap_or_else(|| "idle".to_string())
-    };
+    let merger_status = merger_operation
+        .map(|operation| operation.state.as_api_status().to_string())
+        .unwrap_or_else(|| "idle".to_string());
     let merger_goal_id = merger_operation
         .and_then(|operation| operation.owner.strip_prefix("merger:"))
         .map(ToString::to_string);
-    let plan_extract_status = if background_stopped {
-        "paused".to_string()
-    } else {
-        plan_extract_operation
-            .map(|operation| operation.state.as_api_status().to_string())
-            .unwrap_or_else(|| "idle".to_string())
-    };
+    let plan_extract_status = plan_extract_operation
+        .map(|operation| operation.state.as_api_status().to_string())
+        .unwrap_or_else(|| "idle".to_string());
     let plan_extract_details = plan_extract_operation
         .and_then(|operation| operation.progress.get("message").and_then(Value::as_str))
         .unwrap_or("Plan Draft extraction is ready for Draft Feature requests");
@@ -423,3 +427,6 @@ fn validate_process_id(process_id: &str) -> RefineResult<()> {
     }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests;

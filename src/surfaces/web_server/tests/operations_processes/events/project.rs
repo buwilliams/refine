@@ -789,6 +789,9 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     work_items
         .advance_automated_goal_status("GOAL-WORKFLOW", GoalStatus::InProgress)
         .unwrap();
+    let operations = FileOperationRegistry::new(&runtime_root);
+    operations.register("merger:GOAL-WORKFLOW").unwrap();
+    operations.register("import:extract:plan").unwrap();
     let paused = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/workflow/pause".to_string(),
@@ -821,12 +824,24 @@ fn web_server_lists_processes_and_updates_pause_controls() {
         supervisor.inspect(&launched_agent.id).unwrap().state,
         "running"
     );
+    let paused_work = paused.body["runner_work"].as_array().unwrap();
+    for kind in ["merger", "plan_draft_extractor"] {
+        assert_eq!(
+            paused_work
+                .iter()
+                .find(|work| work["kind"] == kind)
+                .unwrap()["status"],
+            "running"
+        );
+    }
     assert!(
-        paused.body["runner_work"]
-            .as_array()
-            .unwrap()
+        paused_work
             .iter()
-            .all(|work| work["status"] == "paused")
+            .filter(|work| !matches!(
+                work["kind"].as_str(),
+                Some("merger" | "plan_draft_extractor")
+            ))
+            .all(|work| work["status"] == "idle")
     );
 
     let resumed = server.handle(ApiRequest {

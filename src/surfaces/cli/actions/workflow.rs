@@ -2,13 +2,13 @@ use super::*;
 
 #[derive(Debug, Subcommand)]
 pub enum WorkflowAction {
-    /// Pause the agent automation engine: no new Goal work starts until resumed. Active local work continues to completion and can be stopped separately.
+    /// Pause workflow automation: block new Goal admission and quiesce automatic Git sync and inactive-worktree cleanup at safe boundaries. Active Goal executions continue unless stopped separately.
     Pause {
         /// Runtime directory where Refine keeps daemon state.
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
     },
-    /// Resume the agent automation engine after a pause so agents start eligible Goal work again.
+    /// Resume workflow automation: make new Goal admission, automatic Git sync, and inactive-worktree cleanup eligible again. Active Goal executions remain uninterrupted.
     Resume {
         /// Runtime directory where Refine keeps daemon state.
         #[arg(long, default_value = "run")]

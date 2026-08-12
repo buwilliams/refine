@@ -16,7 +16,7 @@ Processes makes daemons, target-app commands, agents, quality checks, imports, m
 
 Stop confirms process exit and conditionally returns an unchanged linked Goal to todo. It retains workflow worktrees and branches. If the Goal is already cancelled or changed, Stop preserves that newer state. Goal cancellation is a separate Goal action that commits terminal intent first.
 
-The Goal terminal and Processes view use the same shared process capability. Pause and resume controls affect supported background work without creating browser-specific state.
+The Goal terminal and Processes view use the same shared process capability. The Processes pause control reflects canonical `workflow_paused` state: pause blocks new Goal admission and quiesces automatic Git sync and inactive-worktree cleanup at safe boundaries, while already active Goal executions continue unless stopped separately. Resume makes admission and those repository workers eligible again. The browser does not relabel live Agents or unrelated active operations as paused, terminate Agents, or create browser-specific pause state.
 
 ## Future Direction
 

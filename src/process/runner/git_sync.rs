@@ -11,6 +11,9 @@ pub(super) fn run_git_sync_worker(
     let mut active_schedule = None;
     let mut next_attempt = Instant::now();
     loop {
+        if background_automation_is_paused(runtime_root)? {
+            return Ok(());
+        }
         let now = Instant::now();
         if now >= next_attempt {
             let Some(target_root) = current_target_root(runtime_root, project_registry_root)?
@@ -47,10 +50,19 @@ pub(super) fn run_git_sync_worker(
                 let demand_due = pending_sync.is_some_and(|deadline| now >= deadline);
                 let remote_fetch_due = next_remote_fetch.is_some_and(|deadline| now >= deadline);
                 if demand_due || remote_fetch_due {
-                    let result = if remote_fetch_due {
-                        service.try_sync()
-                    } else {
-                        service.try_sync_state()
+                    let result = match run_background_repository_operation(
+                        runtime_root,
+                        GIT_SYNC_RUNNER,
+                        || {
+                            if remote_fetch_due {
+                                service.try_sync()
+                            } else {
+                                service.try_sync_state()
+                            }
+                        },
+                    )? {
+                        BackgroundOperationOutcome::Completed(result) => result,
+                        BackgroundOperationOutcome::Paused => return Ok(()),
                     };
                     match result {
                         Ok(result) if !result.deferred => {
