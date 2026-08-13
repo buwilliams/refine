@@ -60,7 +60,7 @@ function renderSettingsQualityTab(quality, settings = {}) {
         For every Goal candidate, the configured agent evaluates each plain-text Quality test
         and proposes the appropriate command. Refine runs that command as a supervised process;
         its observed exit and output are the authoritative evidence for pass or fail.
-        Passing checks advance the Goal to Governance. A valid failed verdict preserves the candidate,
+        Passing checks advance the Goal to Governance. A valid failed verdict must preserve the candidate,
         drafts a fresh recovery Round, and returns the Goal to Todo within the shared automatic retry budget.
         Infrastructure and harness failures stop visibly without consuming that budget. Existing repository tests may be sufficient when they cover the change. Changes save automatically
         and do not start a run now.
