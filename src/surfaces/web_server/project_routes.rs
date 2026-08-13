@@ -78,6 +78,7 @@ pub(in crate::surfaces::web_server) fn configured_provider_from_settings(
 pub(super) fn dashboard_attention_items(
     indicators: &[String],
     runner_reachable: bool,
+    workflow_paused: bool,
 ) -> Vec<Value> {
     let mut items = indicators
         .iter()
@@ -92,7 +93,13 @@ pub(super) fn dashboard_attention_items(
             })
         })
         .collect::<Vec<_>>();
-    if !runner_reachable {
+    if workflow_paused {
+        items.push(json!({
+            "kind": "banner",
+            "severity": "info",
+            "message": "Workflow is paused."
+        }));
+    } else if !runner_reachable {
         items.push(json!({
             "kind": "banner",
             "severity": "error",
