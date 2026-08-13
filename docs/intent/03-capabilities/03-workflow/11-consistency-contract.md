@@ -6,6 +6,7 @@
 - **Execution Is Local**: workers and process identifiers are transient observations on one node.
 - **Evidence Before Transition**: semantic evidence is durable before the Goal state that depends on it.
 - **Conflicts Preserve Newer Decisions**: stale workers cannot overwrite reassignment, cancellation, a new Round, or another transition.
+- **Settlement Is Attempt-Fenced**: failure changes Goal status and originating Round metadata together only while that Round and claim remain authoritative.
 - **Cheap Restart**: nonterminal work may be run again; idempotence and readback replace durable execution ownership.
 
 ## Purpose
@@ -17,6 +18,8 @@ Multiple nodes and replaceable surfaces can act on the same synchronized Goals. 
 Workflow owns Goal status, node assignment, Round history, and workflow decisions. Process owns node-local operations and managed-process facts. Git owns repository, worktree, ref, commit, and integration facts. Activity and evidence record what happened. Projections and surfaces own no authoritative workflow state.
 
 Stable synchronized relationships use target-app, Goal, Round, Feature, and Git identities. Node-local operation, process, and session identifiers support control and may be cited as execution provenance, but they never authorize a workflow mutation or act as a resumable workflow checkpoint.
+
+A transient workflow attempt is fenced by its exact originating Round and the Goal record revision observed when that worker claims the Round. This authority contains no process or node-local identity and is not a resumable checkpoint. A replacement claim installs a newer authority, while cancellation, reopening, and a new Round clear or replace the prior authority without deleting its operational evidence.
 
 ## Required Invariants
 
@@ -38,6 +41,8 @@ Workflow-owned evidence may advance the record revision, but it may not silently
 switch to another Round. Restart recovery never synthesizes a generic Round:
 zero-Round Plan, Implement, Quality, or Governance Goals are preserved, diagnosed,
 and skipped while valid siblings continue.
+
+Preparation and behavior failures use one Goal-record mutation that verifies the originating Round and claim authority under the Goal lock, then writes both `failed` status and failure metadata onto that exact Round. If cancellation is undone or bulk-moved to todo, the reopened intent wins immediately; after either same-Round or new-Round replacement claim, an old worker may retain logs, process records, branches, and worktrees but cannot settle or contaminate the active Round's failure fields.
 
 Synchronization resolves one narrow ownership race: when a queued Goal is reassigned concurrently with automated work starting on its previously authoritative node, the start wins and the reassignment request is discarded. Other competing lifecycle changes remain conflicts.
 

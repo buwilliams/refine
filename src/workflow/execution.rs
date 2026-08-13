@@ -9,6 +9,7 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::project_layout::prepare_refine_dir;
 use crate::tools::product::project_projection::ActiveGoalIndex;
 use crate::tools::product::work_items::FileWorkItemService;
+use crate::tools::product::work_items::WorkflowAttemptAuthority;
 use crate::workflow::behavior::{WorkflowAdvanceOutcome, WorkflowBehavior};
 use crate::workflow::behaviors::{
     WorkflowDone, WorkflowGovernance, WorkflowImplementation, WorkflowPlan, WorkflowQuality,
@@ -35,6 +36,11 @@ struct RetryState {
 enum PreparedGoal<'a> {
     Execute(Box<WorkflowContext<'a>>),
     Completed(Box<WorkflowStepResult>),
+}
+
+struct PreparedGoalError {
+    error: RefineError,
+    authority: Option<WorkflowAttemptAuthority>,
 }
 
 impl WorkflowEngine {
@@ -92,6 +98,7 @@ impl WorkflowEngine {
                                         active.insert(goal_id.clone());
                                         launched = true;
                                         let outcome_tx = outcome_tx.clone();
+                                        let authority = ctx.attempt_authority;
                                         scope.spawn(move || {
                                             let outcome = std::panic::catch_unwind(
                                                 std::panic::AssertUnwindSafe(|| {
@@ -99,9 +106,16 @@ impl WorkflowEngine {
                                                 }),
                                             )
                                             .unwrap_or_else(|_| {
-                                                Err(RefineError::Conflict(format!(
+                                                let error = RefineError::Conflict(format!(
                                                     "workflow worker panicked for Goal {goal_id}"
-                                                )))
+                                                ));
+                                                let _ = self.settle_goal_failure(
+                                                    &goal_id,
+                                                    authority,
+                                                    "workflow_panic",
+                                                    &error,
+                                                );
+                                                Err(error)
                                             });
                                             let _ = outcome_tx.send((order, goal_id, outcome));
                                         });
@@ -111,15 +125,18 @@ impl WorkflowEngine {
                                         results.push((order, *result));
                                         launched = true;
                                     }
-                                    Err(error) if is_stale_authority(&error) => {}
-                                    Err(error) => {
-                                        let _ = self.settle_goal_failure(
-                                            &goal_id,
-                                            "preparation",
-                                            &error,
-                                        );
+                                    Err(failure) if is_stale_authority(&failure.error) => {}
+                                    Err(failure) => {
+                                        if let Some(authority) = failure.authority {
+                                            let _ = self.settle_goal_failure(
+                                                &goal_id,
+                                                authority,
+                                                "preparation",
+                                                &failure.error,
+                                            );
+                                        }
                                         self.record_retry(&goal_id);
-                                        errors.push((order, error));
+                                        errors.push((order, failure.error));
                                     }
                                 }
                             }
@@ -228,30 +245,38 @@ impl WorkflowEngine {
         Ok(result)
     }
 
-    fn prepare_goal<'a>(&'a self, goal_id: &str) -> RefineResult<PreparedGoal<'a>> {
-        let target_root = self.target_root.as_ref().ok_or_else(|| {
-            RefineError::InvalidInput(
-                "target root is required to execute workflow work".to_string(),
-            )
-        })?;
-        let refine_dir = prepare_refine_dir(target_root)?;
+    fn prepare_goal<'a>(&'a self, goal_id: &str) -> Result<PreparedGoal<'a>, PreparedGoalError> {
+        let unclaimed = |error| PreparedGoalError {
+            error,
+            authority: None,
+        };
+        let target_root = self
+            .target_root
+            .as_ref()
+            .ok_or_else(|| {
+                RefineError::InvalidInput(
+                    "target root is required to execute workflow work".to_string(),
+                )
+            })
+            .map_err(unclaimed)?;
+        let refine_dir = prepare_refine_dir(target_root).map_err(unclaimed)?;
         let work_items = FileWorkItemService::with_projection_cache(
             &refine_dir,
             &self.runtime_root,
             self.runtime_root.join("cache"),
         );
-        let policy = self.policy()?;
-        let summary = work_items.show_goal_summary(goal_id)?;
+        let policy = self.policy().map_err(unclaimed)?;
+        let summary = work_items.show_goal_summary(goal_id).map_err(unclaimed)?;
         let node_id = summary
             .goal
             .node_id
             .clone()
             .unwrap_or_else(|| "default".to_string());
         if node_id != policy.active_node_id {
-            return Err(RefineError::Conflict(format!(
+            return Err(unclaimed(RefineError::Conflict(format!(
                 "Goal {goal_id} is owned by node {node_id}, not active node {}",
                 policy.active_node_id
-            )));
+            ))));
         }
         if !matches!(
             summary.goal.status,
@@ -261,15 +286,29 @@ impl WorkflowEngine {
                 | GoalStatus::Governance
                 | GoalStatus::Quality
         ) {
-            return Err(RefineError::Conflict(format!(
+            return Err(unclaimed(RefineError::Conflict(format!(
                 "Goal {goal_id} is no longer eligible from {}",
                 summary.goal.status.as_str()
-            )));
+            ))));
         }
         let (round_idx, authored_revision, authored_request) =
-            authored_workflow_commitment(&work_items, goal_id)?;
-        let settings =
-            FileSettingsService::with_active_root(&refine_dir, &self.runtime_root).load()?;
+            authored_workflow_commitment(&work_items, goal_id).map_err(unclaimed)?;
+        let authority = work_items
+            .claim_workflow_attempt(
+                goal_id,
+                summary.goal.status.clone(),
+                round_idx,
+                authored_revision,
+                &authored_request,
+            )
+            .map_err(unclaimed)?;
+        let claimed = |error| PreparedGoalError {
+            error,
+            authority: Some(authority),
+        };
+        let settings = FileSettingsService::with_active_root(&refine_dir, &self.runtime_root)
+            .load()
+            .map_err(claimed)?;
         let mut ctx = WorkflowContext::new(
             &self.runtime_root,
             target_root,
@@ -277,13 +316,12 @@ impl WorkflowEngine {
             node_id,
             policy.provider,
             round_idx,
+            authority,
             settings,
             work_items,
         );
-        ctx.authored_revision = authored_revision;
-        ctx.authored_request = authored_request;
         match summary.goal.status {
-            GoalStatus::Todo => match WorkflowTodo.advance(&mut ctx)? {
+            GoalStatus::Todo => match WorkflowTodo.advance(&mut ctx).map_err(claimed)? {
                 WorkflowAdvanceOutcome::Transition {
                     to: GoalStatus::Plan,
                     ..
@@ -295,22 +333,22 @@ impl WorkflowEngine {
                 WorkflowAdvanceOutcome::Completed { final_status, .. } => {
                     ctx.final_status = Some(final_status);
                     Ok(PreparedGoal::Completed(Box::new(
-                        Self::workflow_step_result(ctx)?,
+                        Self::workflow_step_result(ctx).map_err(claimed)?,
                     )))
                 }
-                outcome => Err(RefineError::Conflict(outcome_reason(outcome))),
+                outcome => Err(claimed(RefineError::Conflict(outcome_reason(outcome)))),
             },
             GoalStatus::Plan | GoalStatus::Implement => {
                 let start_status = summary.goal.status.clone();
                 let pattern =
                     setting_string(&ctx.settings, "branch_name_pattern", "refine/{goal_id}");
                 let target = setting_string(&ctx.settings, "merge_target_branch", "main");
-                hydrate_plan_or_implement_context(&mut ctx, &pattern, &target)?;
+                hydrate_plan_or_implement_context(&mut ctx, &pattern, &target).map_err(claimed)?;
                 ctx.start_status = start_status;
                 Ok(PreparedGoal::Execute(Box::new(ctx)))
             }
             current => {
-                hydrate_retry_context(&mut ctx, current)?;
+                hydrate_retry_context(&mut ctx, current).map_err(claimed)?;
                 Ok(PreparedGoal::Execute(Box::new(ctx)))
             }
         }
@@ -321,7 +359,11 @@ impl WorkflowEngine {
         mut ctx: WorkflowContext<'_>,
     ) -> RefineResult<WorkflowStepResult> {
         let start_status = ctx.start_status.clone();
-        self.advance_behaviors(&mut ctx, start_status)?;
+        if let Err(error) = self.advance_behaviors(&mut ctx, start_status) {
+            let _ =
+                self.settle_goal_failure(&ctx.goal_id, ctx.attempt_authority, "workflow", &error);
+            return Err(error);
+        }
         Self::workflow_step_result(ctx)
     }
 
@@ -475,7 +517,11 @@ fn outcome_reason(outcome: WorkflowAdvanceOutcome) -> String {
 }
 
 fn is_stale_authority(error: &RefineError) -> bool {
-    matches!(error, RefineError::Conflict(message) if message.contains("owned by node") || message.contains("no longer eligible") || message.contains("changed from expected"))
+    matches!(error, RefineError::Conflict(message) if message.contains("owned by node")
+        || message.contains("no longer eligible")
+        || message.contains("changed from expected")
+        || message.contains("changed before workflow attempt claim")
+        || message.contains("workflow attempt") && message.contains("was superseded"))
 }
 
 fn workflow_status_uses_integrated_target(

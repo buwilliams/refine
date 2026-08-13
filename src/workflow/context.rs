@@ -11,7 +11,7 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::git_worktrees::MergeResult;
 use crate::tools::host::quality::QualityCheckRequest;
 use crate::tools::observability::logs::FileLogService;
-use crate::tools::product::work_items::FileWorkItemService;
+use crate::tools::product::work_items::{FileWorkItemService, WorkflowAttemptAuthority};
 use crate::workflow::{json_object, now_timestamp};
 
 pub struct WorkflowContext<'a> {
@@ -21,8 +21,7 @@ pub struct WorkflowContext<'a> {
     pub node_id: String,
     pub provider: String,
     pub round_idx: usize,
-    pub authored_revision: u64,
-    pub authored_request: String,
+    pub(crate) attempt_authority: WorkflowAttemptAuthority,
     pub settings: JsonObject,
     pub work_items: FileWorkItemService,
     pub branch: Option<String>,
@@ -48,13 +47,14 @@ impl<'a> WorkflowContext<'a> {
     // Context construction makes the runtime, target, Goal, node, provider, and Round axes
     // explicit so callers cannot derive execution authority from a local worker identity.
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
+    pub(crate) fn new(
         runtime_root: &'a Path,
         target_root: &'a Path,
         goal_id: String,
         node_id: String,
         provider: String,
         round_idx: usize,
+        attempt_authority: WorkflowAttemptAuthority,
         settings: JsonObject,
         work_items: FileWorkItemService,
     ) -> Self {
@@ -65,8 +65,7 @@ impl<'a> WorkflowContext<'a> {
             node_id,
             provider,
             round_idx,
-            authored_revision: 0,
-            authored_request: String::new(),
+            attempt_authority,
             settings,
             work_items,
             branch: None,
@@ -101,18 +100,6 @@ impl<'a> WorkflowContext<'a> {
 
     pub fn request_transition(&mut self, from: GoalStatus, to: GoalStatus) -> RefineResult<()> {
         let current = self.work_items.show_goal_summary(&self.goal_id)?;
-        if current.goal.status == to {
-            return Ok(());
-        }
-        if current.goal.status != from {
-            return Err(RefineError::Conflict(format!(
-                "Goal {} changed from expected {} to {} before workflow transition to {}",
-                self.goal_id,
-                from.as_str(),
-                current.goal.status.as_str(),
-                to.as_str()
-            )));
-        }
         let current_node = current.goal.node_id.as_deref().unwrap_or("default");
         if current_node != self.node_id {
             return Err(RefineError::Conflict(format!(
@@ -123,30 +110,12 @@ impl<'a> WorkflowContext<'a> {
                 to.as_str()
             )));
         }
-        let transition = if from == GoalStatus::Todo && to == GoalStatus::Plan {
-            self.work_items.advance_authored_goal_status(
-                &self.goal_id,
-                to.clone(),
-                self.round_idx,
-                self.authored_revision,
-                &self.authored_request,
-            )
-        } else {
-            self.work_items
-                .advance_automated_goal_status(&self.goal_id, to.clone())
-        };
-        if let Err(error) = transition {
-            if self
-                .work_items
-                .show_goal_summary(&self.goal_id)?
-                .goal
-                .status
-                == to
-            {
-                return Ok(());
-            }
-            return Err(error);
-        }
+        self.work_items.advance_claimed_goal_status(
+            &self.goal_id,
+            self.attempt_authority,
+            from.clone(),
+            to.clone(),
+        )?;
         self.log(
             "state",
             &format!(
@@ -186,18 +155,12 @@ impl<'a> WorkflowContext<'a> {
     }
 
     pub fn fail(&self, category: &str, error: &RefineError) -> RefineResult<()> {
-        let _ = self.work_items.fail_automated_goal_if_active(&self.goal_id);
-        // Record the reason on the Goal itself, not only in the log sidecar. A
-        // Goal can fail here with every gate it reached recorded as passed — an
-        // integration that found the branch tip moved, for one — and reading
-        // `failed` with nothing but passes above it explains nothing about why.
-        let _ = self.work_items.update_latest_goal_round_evaluation_summary(
+        let _ = self.work_items.settle_workflow_attempt_failure(
             &self.goal_id,
-            &json!({
-                "failure_category": category,
-                "failure_message": error.to_string(),
-                "failure_at": now_timestamp()
-            }),
+            self.attempt_authority,
+            category,
+            &error.to_string(),
+            &now_timestamp(),
         );
         self.log(
             category,

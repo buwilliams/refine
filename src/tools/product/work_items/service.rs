@@ -9,6 +9,7 @@ mod round_helpers;
 mod rounds_and_metadata;
 mod validation;
 mod workflow;
+mod workflow_attempts;
 use std::collections::BTreeSet;
 use std::fs::{self};
 use std::path::PathBuf;
@@ -46,6 +47,7 @@ use goal_filters::*;
 use record_persistence::*;
 use round_helpers::*;
 use validation::*;
+pub(crate) use workflow_attempts::WorkflowAttemptAuthority;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) struct GoalCancellationExpectation {
