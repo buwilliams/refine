@@ -21,6 +21,8 @@ When an attached app has no valid browser-local Reporter selection, the shell sh
 
 Reporter selection remains local to the browser and can always be changed or created later under `Controls > Reporter`. Dismissing the first-load orientation leaves identity unselected for the rest of that page lifetime rather than repeatedly interrupting the user.
 
+`Controls > Node`, immediately beside Reporter, displays and switches the runtime-local active Node for the attached app. The selector is reconciled from project status and the non-archived Node registry, shows display names for orientation, and keeps Node IDs authoritative for selection and activation. With no attached app it remains disabled and shows `No node` rather than implying an active context.
+
 The current browser shell uses Dashboard, Features, Goals, Changes, and Logs as the main nav items. Management actions live in context menus so the main nav stays focused on work. The bright primary create action is `+ New Goal`, with related creation flows available nearby.
 
 Dashboard and Goals navigation carries their shared current/all Node scope in the URL. The URL remains the filter source of truth so reload, sharing, and browser history preserve that scope; a specific named-Node Goals filter is not projected onto Dashboard.

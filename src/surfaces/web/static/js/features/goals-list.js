@@ -332,6 +332,7 @@ function drawGoalsWorkflowVisualization(filter, counts) {
 async function refreshGoalsTable() {
   if (state.currentRoute !== "goals") return;
   if (renderNoProjectIfDetached("Goals")) return;
+  const nodeGeneration = captureNodeContextGeneration();
   const f = goalsFilterFromHash();
   const params = new URLSearchParams();
   if (f.status) params.set("status", f.status);
@@ -352,6 +353,7 @@ async function refreshGoalsTable() {
   params.set("facets", "1");
   try {
     const data = await api("GET", "/api/goals?" + params);
+    if (!isNodeContextGenerationCurrent(nodeGeneration) || state.currentRoute !== "goals") return;
     if (renderNoProjectIfApiDetached(data, "Goals")) return;
     const goals = data.goals || [];
     const facets = data.facets || {};
@@ -389,6 +391,7 @@ async function refreshGoalsTable() {
     _lastGoalsRender = { goals, state: renderState };
     drawGoalsTable(goals, renderState);
   } catch (e) {
+    if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
     const tbl = $("#goals-table");
     if (tbl) tbl.innerHTML = `<p class="muted">${htmlEscape(e.message)}</p>`;
   }

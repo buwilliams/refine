@@ -160,6 +160,7 @@ function navigateLogsPage(page) {
 async function loadLogs() {
   if (state.currentRoute !== "logs") return;
   if (renderNoProjectIfDetached("Logs")) return;
+  const nodeGeneration = captureNodeContextGeneration();
   const f = logsFiltersFromHash();
   const params = new URLSearchParams();
   if (f.severity) params.set("severity", f.severity);
@@ -174,9 +175,11 @@ async function loadLogs() {
   params.set("facets", "1");
   try {
     const data = await api("GET", "/api/activity?" + params);
+    if (!isNodeContextGenerationCurrent(nodeGeneration) || state.currentRoute !== "logs") return;
     if (renderNoProjectIfApiDetached(data, "Logs")) return;
     drawLogsList(data, f);
   } catch (e) {
+    if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
     $("#logs-list").innerHTML = `<p class="muted">${htmlEscape(e.message)}</p>`;
   }
 }

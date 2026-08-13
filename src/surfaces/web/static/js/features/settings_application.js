@@ -421,6 +421,7 @@ function bindProjectApplicationsControls(currentProject, refreshTab = "runtime")
         state.project = result.attached === false
           ? { ...result, apps: result.apps || [] }
           : { ...(state.project || {}), ...result, apps: result.apps || [] };
+        await reconcileNodeContext();
         if (typeof resetGuideState === "function") resetGuideState({ redraw: false });
         updateActiveNodeLabel();
         toast("App removed", "info");

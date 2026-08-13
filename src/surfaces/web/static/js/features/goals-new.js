@@ -11,6 +11,7 @@ async function renderGoalNew() {
 let _newGoalModalOpen = false;
 let _newGoalModalDismiss = null;
 let _newGoalModalReturnHash = null;
+let _discardNewGoalForNodeSwitch = null;
 
 function guardNewGoalNavigation({ destinationHash, continueNavigation }) {
   if (!_newGoalModalOpen || !_newGoalModalDismiss) return false;
@@ -90,6 +91,7 @@ function openNewGoalModal(options = {}) {
     _newGoalModalOpen = false;
     _newGoalModalDismiss = null;
     _newGoalModalReturnHash = null;
+    _discardNewGoalForNodeSwitch = null;
     document.removeEventListener("keydown", onKey, true);
     window.removeEventListener("beforeunload", onBeforeUnload);
     root.remove();
@@ -100,6 +102,7 @@ function openNewGoalModal(options = {}) {
       location.hash = "#/goals";
     }
   }
+  _discardNewGoalForNodeSwitch = () => close(true);
   function isDirty() {
     return promptField.value.trim() !== initialFormState.prompt
       || priorityField.value !== initialFormState.priority;

@@ -92,6 +92,7 @@ async function refreshDashboard() {
     dashboardRetryTimer = null;
   }
   const refreshSeq = ++dashboardRefreshSeq;
+  const nodeGeneration = captureNodeContextGeneration();
   try {
     const reporter = state.lastReporter || "";
     const scope = dashboardScopeFromHash();
@@ -102,13 +103,15 @@ async function refreshDashboard() {
         ? dashboardApi("GET", "/api/goals?status=review&assignee=" + encodeURIComponent(reporter) + `&node=${nodeParam}&limit=200`)
         : Promise.resolve({ goals: [] }),
     ]);
-    if (refreshSeq !== dashboardRefreshSeq || state.currentRoute !== "dashboard") return;
+    if (refreshSeq !== dashboardRefreshSeq || state.currentRoute !== "dashboard"
+        || !isNodeContextGenerationCurrent(nodeGeneration)) return;
     if (renderNoProjectIfApiDetached(d, "Dashboard")) return;
     state.dashboard = d;
     state.dashboardReviewSnapshot = { reviewsForReporter: reviews.goals || [], reporter };
     drawDashboard(d, state.dashboardReviewSnapshot);
   } catch (e) {
-    if (refreshSeq !== dashboardRefreshSeq || state.currentRoute !== "dashboard") return;
+    if (refreshSeq !== dashboardRefreshSeq || state.currentRoute !== "dashboard"
+        || !isNodeContextGenerationCurrent(nodeGeneration)) return;
     const dash = document.getElementById("dash");
     const hasRenderedDashboard = !!dash?.querySelector(".dashboard-status-grid");
     if (dash && !hasRenderedDashboard) {

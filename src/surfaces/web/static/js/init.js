@@ -18,6 +18,10 @@ function tickRunningCells() {
 async function init() {
   const attached = await ensureProjectAttached();
   if (!attached && state.project?.attached !== false) return;
+  if (typeof reconcileNodeContext === "function") {
+    try { await reconcileNodeContext(); }
+    catch (e) { toast(`Could not load Node context: ${e.message || e}`, "error"); }
+  }
   initToolbar();
   if (typeof initGuide === "function") initGuide();
   if (typeof initCommandPalette === "function") initCommandPalette();

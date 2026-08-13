@@ -41,7 +41,9 @@ async function refreshSettings(options = {}) {
     return;
   }
   try {
+    const nodeGeneration = captureNodeContextGeneration();
     const data = await loadSettingsSurfaceData(surface, activeSlug);
+    if (!data || !isNodeContextGenerationCurrent(nodeGeneration)) return;
     drawSettingsSurface(surface, data, activeSlug);
   } catch (e) {
     const root = document.getElementById("settings-content");
@@ -71,7 +73,9 @@ async function refreshSettingsTab(slug, options = {}) {
     return;
   }
   try {
+    const nodeGeneration = captureNodeContextGeneration();
     const data = await loadSettingsSurfaceData(surface, activeSlug);
+    if (!data || !isNodeContextGenerationCurrent(nodeGeneration)) return;
     updateSettingsTabContent(
       activeSlug,
       renderSettingsTabBody(surface, activeSlug, data),
@@ -83,9 +87,11 @@ async function refreshSettingsTab(slug, options = {}) {
 }
 
 async function loadSettingsSurfaceData() {
+  const nodeGeneration = captureNodeContextGeneration();
   const surface = arguments[0] || settingsSurfaceForRoute();
   const activeSlug = arguments[1] || readSettingsTab(surface);
   const project = await api("GET", "/api/project/status");
+  if (!isNodeContextGenerationCurrent(nodeGeneration)) return null;
   state.project = project;
   updateActiveNodeLabel();
   if (project.attached === false) {
@@ -119,6 +125,7 @@ async function loadSettingsSurfaceData() {
         }))
       : Promise.resolve({}),
   ]);
+  if (!isNodeContextGenerationCurrent(nodeGeneration)) return null;
   state.project = project;
   state.reporters = reps.reporters || [];
   updateActiveNodeLabel();

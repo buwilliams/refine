@@ -91,6 +91,7 @@ function browserRuntime() {
         refreshDashboard = hooks.refreshDashboard || (() => {});
         refreshGoalsTable = hooks.refreshGoalsTable || (() => {});
         loadGoalDetail = hooks.loadGoalDetail || (() => {});
+        if (hooks.reconcileNodeContext) reconcileNodeContext = hooks.reconcileNodeContext;
       },
     };
   `, context);
@@ -166,8 +167,14 @@ test("main SSE transport reconnects in place and reconciles durable visible stat
   const runtime = browserRuntime();
   const notices = [];
   let detailRefreshes = 0;
+  let nodeReconciliations = 0;
   runtime.setLiveHooks({
     toast(message) { notices.push(message); },
+    reconcileNodeContext(options) {
+      assert.equal(JSON.stringify(options), JSON.stringify({ external: true }));
+      nodeReconciliations += 1;
+      return Promise.resolve();
+    },
     loadGoalDetail(goalId) {
       assert.equal(goalId, "GOAL1");
       detailRefreshes += 1;
@@ -183,6 +190,7 @@ test("main SSE transport reconnects in place and reconciles durable visible stat
 
   source.onopen?.();
   assert.equal(detailRefreshes, 1);
+  assert.equal(nodeReconciliations, 1);
   assert.match(notices[1], /reconnected/i);
 });
 
