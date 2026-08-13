@@ -64,6 +64,7 @@ function composerRuntime({ feature = featureFixture(), reporter = "Buddy", apiHa
   const opened = [];
   const toasts = [];
   const actionErrors = [];
+  let nodeGeneration = 0;
   let handler = apiHandler || (async (method, requestPath) => {
     if (method === "GET" && requestPath.startsWith("/api/features/")) return { feature };
     return { created: true, goal: { id: "GOAL3" } };
@@ -74,7 +75,9 @@ function composerRuntime({ feature = featureFixture(), reporter = "Buddy", apiHa
       return handler(method, requestPath, body, options);
     },
     encodeURIComponent,
+    captureNodeContextGeneration: () => nodeGeneration,
     htmlEscape,
+    isNodeContextGenerationCurrent: (generation) => generation === nodeGeneration,
     openFeatureModal: (nextFeature, options) => opened.push({ feature: nextFeature, options }),
     renderGoalDuplicatePrompt: duplicatePrompt,
     showActionError: async (error, title) => actionErrors.push({ error, title }),
@@ -99,6 +102,7 @@ function composerRuntime({ feature = featureFixture(), reporter = "Buddy", apiHa
   return {
     ...dom,
     actionErrors,
+    advanceNodeGeneration() { nodeGeneration += 1; },
     context,
     feature,
     opened,
@@ -299,6 +303,36 @@ test("Cmd+Enter submits and Escape resets the live composer without closing Feat
   assert.equal(fields.prompt.value, "");
   assert.equal(fields.name.value, "");
   assert.equal(browser.document.activeElement, fields.prompt);
+});
+
+test("a late Feature composer read cannot repaint a new Node context", async () => {
+  let resolveGoal;
+  const browser = composerRuntime({
+    apiHandler: async (method, requestPath) => {
+      if (method === "GET" && requestPath === "/api/goals/GOAL2") {
+        return new Promise((resolve) => { resolveGoal = resolve; });
+      }
+      return { feature: featureFixture() };
+    },
+  });
+  browser.root.querySelector('[data-feature-edit-goal="GOAL2"]').click();
+  while (!resolveGoal) await Promise.resolve();
+  browser.advanceNodeGeneration();
+  resolveGoal({
+    goal: {
+      id: "GOAL2",
+      name: "Old Node Goal",
+      priority: "high",
+      rounds: [{ prompt: "Old Node prompt" }],
+    },
+  });
+  await settle();
+
+  const fields = formFields(browser);
+  assert.equal(fields.goal_id.value, "");
+  assert.equal(fields.prompt.value, "");
+  assert.equal(fields.name.value, "");
+  assert.equal(browser.opened.length, 0);
 });
 
 test("wide and narrow viewports compute the intended layout on rendered composer elements", () => {

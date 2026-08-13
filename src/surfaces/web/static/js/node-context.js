@@ -8,6 +8,7 @@ let nodeContextTargetRoot = null;
 let nodeContextSwitchPromise = null;
 let nodeContextPendingId = "";
 let nodeContextReconcileTimer = null;
+let nodeContextReconcileSequence = 0;
 
 function captureNodeContextGeneration() {
   return nodeContextGeneration;
@@ -83,8 +84,13 @@ function nodeContextDirtySurfaces() {
       && captureRoundFormDraft(state.currentGoal)) {
     dirty.push({ label: "Goal Round", root: document.querySelector(".goal-detail-modal") });
   }
-  const feature = document.querySelector(".modal-backdrop[data-node-context-dirty='true']");
-  if (feature) dirty.push({ label: "Feature", root: feature.closest(".modal-backdrop") || feature });
+  const feature = typeof _featureModalRoot !== "undefined" ? _featureModalRoot : null;
+  const featureDirty = feature && (
+    feature.dataset.nodeContextDirty === "true"
+    || feature._featureComposerHasDraft?.()
+    || feature._featureCreateHasDraft?.()
+  );
+  if (featureDirty) dirty.push({ label: "Feature", root: feature });
   return dirty;
 }
 
@@ -140,7 +146,7 @@ function closeCleanNodeContextModals() {
     closeGoalDetailModal({ navigateAway: true });
   }
   if (typeof _featureModalRoot !== "undefined" && _featureModalRoot
-      && _featureModalRoot.dataset.nodeContextDirty !== "true") {
+      && !dirtyRoots.has(_featureModalRoot)) {
     closeFeatureModal({ navigateAway: true });
   }
 }
@@ -195,7 +201,11 @@ async function applyAuthoritativeNodeContext(project, registry, {
   return state.project;
 }
 
-async function reconcileNodeContext({ external = false } = {}) {
+async function reconcileNodeContext({ external = false, duringSwitch = false } = {}) {
+  // Activation performs its own authoritative reread. Do not let an unrelated
+  // reconciliation race that transition or add another generation change.
+  if (nodeContextSwitchPromise && !duringSwitch) return state.project;
+  const reconcileSequence = ++nodeContextReconcileSequence;
   const priorId = nodeContextActiveNodeId();
   const priorAttached = nodeContextAttached;
   const priorTargetRoot = nodeContextTargetRoot;
@@ -203,6 +213,7 @@ async function reconcileNodeContext({ external = false } = {}) {
     api("GET", "/api/project/status", undefined, { cache: false }),
     api("GET", "/api/nodes", undefined, { cache: false }),
   ]);
+  if (reconcileSequence !== nodeContextReconcileSequence) return state.project;
   const nextId = project?.attached === true ? (project.active_node_id || "") : "";
   const nextAttached = project?.attached === true;
   const nextTargetRoot = project?.target_root || "";
@@ -225,6 +236,8 @@ async function performNodeActivation(nodeId) {
     hydrateNodeSelector(state.project, { nodes: state.project?.nodes || [] });
     return false;
   }
+  // Fence any authority read that began before this user-confirmed transition.
+  nodeContextReconcileSequence += 1;
   await discardLocalNodeContextSurfaces();
   await api("POST", "/api/nodes/activate", { node_id: nodeId });
   invalidateScreenDataCache();
@@ -257,7 +270,7 @@ async function activateNodeContext(nodeId) {
   try {
     return await nodeContextSwitchPromise;
   } catch (error) {
-    try { await reconcileNodeContext(); } catch {}
+    try { await reconcileNodeContext({ duringSwitch: true }); } catch {}
     toast(`Could not switch Node: ${error.message || error}`, "error");
     return false;
   } finally {

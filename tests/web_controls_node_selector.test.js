@@ -37,6 +37,7 @@ function nodeContextRuntime(backend) {
   const context = vm.createContext({
     console,
     document,
+    _featureModalRoot: backend.featureRoot || null,
     state,
     setTimeout,
     clearTimeout,
@@ -218,6 +219,48 @@ test("activation failure rolls the selector back to authoritative identity", asy
   assert.match(runtime.toasts.at(-1).message, /activation refused/);
 });
 
+test("a reconciliation started before activation cannot repaint the confirmed Node", async () => {
+  const backend = {
+    activeId: "node-a",
+    nodes: [
+      { id: "node-a", display_name: "Alpha" },
+      { id: "node-b", display_name: "Beta" },
+    ],
+  };
+  const runtime = nodeContextRuntime(backend);
+  await runtime.api.reconcileNodeContext();
+
+  const staleResolvers = [];
+  let holdOldReads = true;
+  backend.handle = async (method, requestPath, body) => {
+    if (method === "POST") {
+      backend.activeId = body.node_id;
+      holdOldReads = false;
+      return { active_node_id: backend.activeId };
+    }
+    if (holdOldReads) {
+      const snapshot = requestPath === "/api/project/status"
+        ? { attached: true, target_root: "/tmp/app-a", active_node_id: "node-a", active_node: "Alpha" }
+        : { nodes: backend.nodes, active_node_id: "node-a" };
+      return new Promise((resolve) => staleResolvers.push(() => resolve(snapshot)));
+    }
+    if (requestPath === "/api/project/status") {
+      return { attached: true, target_root: "/tmp/app-a", active_node_id: backend.activeId, active_node: "Beta" };
+    }
+    return { nodes: backend.nodes, active_node_id: backend.activeId };
+  };
+
+  const staleReconciliation = runtime.api.reconcileNodeContext({ external: true });
+  while (staleResolvers.length < 2) await Promise.resolve();
+  assert.equal(await runtime.api.activateNodeContext("node-b"), true);
+  staleResolvers.forEach((resolve) => resolve());
+  await staleReconciliation;
+
+  assert.equal(runtime.selector.value, "node-b");
+  assert.equal(runtime.state.project.active_node_id, "node-b");
+  assert.equal(runtime.state.project.active_node, "Beta");
+});
+
 test("a local dirty draft can veto Node activation without losing its values", async () => {
   const prompt = { value: "keep this draft" };
   const priority = { value: "high" };
@@ -246,6 +289,31 @@ test("a local dirty draft can veto Node activation without losing its values", a
   assert.equal(await runtime.api.activateNodeContext("node-b"), false);
   assert.equal(prompt.value, "keep this draft");
   assert.equal(priority.value, "high");
+  assert.equal(runtime.calls.filter((call) => call.method === "POST").length, 0);
+  assert.equal(runtime.selector.value, "node-a");
+});
+
+test("a local Feature composer draft can veto Node activation", async () => {
+  const featureRoot = {
+    dataset: {},
+    _featureComposerHasDraft: () => true,
+  };
+  const backend = {
+    activeId: "node-a",
+    nodes: [
+      { id: "node-a", display_name: "Alpha" },
+      { id: "node-b", display_name: "Beta" },
+    ],
+    featureRoot,
+    confirm: async (message) => {
+      assert.match(message, /Feature/);
+      return false;
+    },
+  };
+  const runtime = nodeContextRuntime(backend);
+  await runtime.api.reconcileNodeContext();
+
+  assert.equal(await runtime.api.activateNodeContext("node-b"), false);
   assert.equal(runtime.calls.filter((call) => call.method === "POST").length, 0);
   assert.equal(runtime.selector.value, "node-a");
 });

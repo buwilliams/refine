@@ -887,6 +887,18 @@ function openFeatureModal(feature = null, options = {}) {
     if (reporterSelect) reporterSelect.value = featureReporter;
     const assigneeSelect = root.querySelector("#feature-assignee");
     if (assigneeSelect) assigneeSelect.value = featureAssignee;
+    const initialCreateState = {
+      name: root.querySelector("#feature-name")?.value || "",
+      description: root.querySelector("#feature-description")?.value || "",
+      reporter: reporterSelect?.value || "",
+      assignee: assigneeSelect?.value || "",
+    };
+    root._featureCreateHasDraft = () => (
+      (root.querySelector("#feature-name")?.value || "") !== initialCreateState.name
+      || (root.querySelector("#feature-description")?.value || "") !== initialCreateState.description
+      || (reporterSelect?.value || "") !== initialCreateState.reporter
+      || (assigneeSelect?.value || "") !== initialCreateState.assignee
+    );
     bindOnce(root.querySelector("[data-cancel]"), "click", close);
     bindOnce(root.querySelector("[data-ok]"), "click", async () => {
       const body = {
@@ -1002,6 +1014,7 @@ function bindFeatureAutosave(root, feature) {
     inFlight = true;
     try {
       const result = await api("PATCH", `/api/features/${encodeURIComponent(feature.id)}`, body);
+      if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
       const updated = result.feature || {};
       saved.name = updated.name || body.name;
       saved.description = updated.description || body.description;
@@ -1010,6 +1023,7 @@ function bindFeatureAutosave(root, feature) {
       root.dataset.nodeContextDirty = "false";
       if (state.currentRoute === "features") await refreshFeaturesTable();
     } catch (e) {
+      if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
       restoreSaved();
       showActionError(e, "Feature autosave failed");
     } finally {

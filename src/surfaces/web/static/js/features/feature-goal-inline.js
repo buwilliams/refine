@@ -119,6 +119,7 @@ function featureGoalPlacementRequest(placement) {
 }
 
 function bindFeatureGoalInlineComposer(root, feature, { goalPage = 1, navigateAway = false } = {}) {
+  const nodeGeneration = captureNodeContextGeneration();
   const composer = root.querySelector("[data-feature-goal-composer]");
   const form = composer?.querySelector("[data-feature-goal-form]");
   if (!composer || !form) return;
@@ -183,6 +184,7 @@ function bindFeatureGoalInlineComposer(root, feature, { goalPage = 1, navigateAw
   };
   const reload = async ({ focusComposer = false } = {}) => {
     const data = await api("GET", `/api/features/${encodeURIComponent(feature.id)}`, undefined, { cache: false });
+    if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
     openFeatureModal(data.feature, { goalPage, navigateAway, focusComposer });
   };
   const startEdit = async (goalId) => {
@@ -194,6 +196,7 @@ function bindFeatureGoalInlineComposer(root, feature, { goalPage = 1, navigateAw
         return;
       }
       const result = await api("GET", `/api/goals/${encodeURIComponent(goalId)}`, undefined, { cache: false });
+      if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
       const goal = result.goal;
       editingGoal = goal;
       composer.dataset.mode = "edit";
@@ -211,6 +214,7 @@ function bindFeatureGoalInlineComposer(root, feature, { goalPage = 1, navigateAw
       form.elements.prompt.focus();
       composer.scrollIntoView?.({ block: "nearest", behavior: "smooth" });
     } catch (error) {
+      if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
       setStatus(error.message || "Could not load Goal", "error");
       await showActionError(error, "Could not edit Goal");
     }
@@ -280,6 +284,7 @@ function bindFeatureGoalInlineComposer(root, feature, { goalPage = 1, navigateAw
         placement: featureGoalPlacementRequest(placement),
         ...(decision ? { duplicate_decision: decision } : {}),
       });
+      if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
       if (saved?.created === false && saved?.duplicate_action) {
           const moved = saved.duplicate_action === "move_original_to_backlog" && saved.move?.moved;
           toast(moved ? "Original Goal moved to backlog; duplicate not created" : "Duplicate not created", "info");
@@ -289,6 +294,7 @@ function bindFeatureGoalInlineComposer(root, feature, { goalPage = 1, navigateAw
       toast(editingGoal ? "Goal updated" : "Goal created", "success");
       await reload({ focusComposer: true });
     } catch (error) {
+      if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
       if (!editingGoal && error.code === "duplicate_goal" && error.error?.duplicate?.match) {
         duplicateDecision = "move_original_to_backlog";
         duplicateDecisionKey = prompt;
@@ -300,7 +306,9 @@ function bindFeatureGoalInlineComposer(root, feature, { goalPage = 1, navigateAw
         await showActionError(error, editingGoal ? "Goal update failed" : "Goal creation failed");
       }
     } finally {
-      if (root.isConnected) submitButton.disabled = false;
+      if (root.isConnected && isNodeContextGenerationCurrent(nodeGeneration)) {
+        submitButton.disabled = false;
+      }
     }
   });
 
