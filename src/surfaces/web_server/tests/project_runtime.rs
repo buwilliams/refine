@@ -1,4 +1,5 @@
 use super::*;
+use crate::surfaces::web_server::project_routes::dashboard_attention_items;
 
 #[test]
 fn web_server_structures_dashboard_attention_and_runtime_banner() {
@@ -10,7 +11,12 @@ fn web_server_structures_dashboard_attention_and_runtime_banner() {
         .unwrap()
         .goal
         .status = GoalStatus::Failed;
-    server.projection.runtime.supervisor = json!({"runner_reachable": false}).as_object().cloned();
+    server.projection.runtime.supervisor = json!({
+        "runner_reachable": false,
+        "workflow_paused": false
+    })
+    .as_object()
+    .cloned();
 
     let response = server.handle(ApiRequest {
         method: "GET".to_string(),
@@ -34,6 +40,71 @@ fn web_server_structures_dashboard_attention_and_runtime_banner() {
                 .unwrap()
                 .contains("Refine cannot reach the runtime worker")
     }));
+}
+
+#[test]
+fn dashboard_distinguishes_workflow_pause_from_runtime_reachability() {
+    let scenarios = [
+        (
+            false,
+            false,
+            Some((
+                "error",
+                "Refine cannot reach the runtime worker. Re-check auth after restoring provider access.",
+            )),
+        ),
+        (false, true, Some(("info", "Workflow is paused."))),
+        (true, false, None),
+        (true, true, Some(("info", "Workflow is paused."))),
+    ];
+
+    for (runner_reachable, workflow_paused, expected_banner) in scenarios {
+        let attention = dashboard_attention_items(&[], runner_reachable, workflow_paused);
+        let banners = attention
+            .iter()
+            .filter(|item| item["kind"] == "banner")
+            .collect::<Vec<_>>();
+        match expected_banner {
+            Some((severity, message)) => {
+                assert_eq!(banners.len(), 1, "{attention:#?}");
+                assert_eq!(banners[0]["severity"], severity, "{attention:#?}");
+                assert_eq!(banners[0]["message"], message, "{attention:#?}");
+            }
+            None => assert!(banners.is_empty(), "{attention:#?}"),
+        }
+    }
+}
+
+#[test]
+fn dashboard_uses_canonical_runtime_workflow_pause_state() {
+    let runtime_root = unique_temp_dir("dashboard-workflow-paused");
+    FileProcessSupervisor::new(&runtime_root)
+        .set_workflow_paused(true)
+        .unwrap();
+    let mut server = server_with_projection();
+    server.runtime_root = Some(runtime_root);
+
+    let response = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/dashboard".to_string(),
+        body: None,
+    });
+
+    assert_eq!(response.status, 200, "{:#}", response.body);
+    assert_eq!(response.body["runner_reachable"], false);
+    let banners = response.body["needs_attention"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|item| item["kind"] == "banner")
+        .collect::<Vec<_>>();
+    assert_eq!(banners.len(), 1, "{:#}", response.body);
+    assert_eq!(banners[0]["severity"], "info", "{:#}", response.body);
+    assert_eq!(
+        banners[0]["message"], "Workflow is paused.",
+        "{:#}",
+        response.body
+    );
 }
 
 #[test]

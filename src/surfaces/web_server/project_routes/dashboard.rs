@@ -56,6 +56,10 @@ impl InProcessWebServer {
             .get("runner_reachable")
             .and_then(|value| value.as_bool())
             .unwrap_or(false);
+        let workflow_paused = process
+            .get("workflow_paused")
+            .and_then(|value| value.as_bool())
+            .unwrap_or(false);
         ApiResponse::json(
             200,
             json!({
@@ -76,7 +80,8 @@ impl InProcessWebServer {
                 "active_node_diagnostics": active_node_identity.diagnostics,
                 "needs_attention": dashboard_attention_items(
                     &dashboard.attention_indicators,
-                    runner_reachable
+                    runner_reachable,
+                    workflow_paused
                 ),
                 "attached": attached
             }),

@@ -21,6 +21,7 @@ Current implementation details that matter to intent:
 
 - dashboard data comes from daemon-backed projection and diagnostic summaries;
 - workflow visualization is shared with the Goals screen;
+- an intentionally paused workflow is neutral operating context, not a runtime-worker failure needing attention;
 - target-app and agent status are part of the operating context;
 - detached/no-app mode should render a clear setup path rather than raw errors.
 
