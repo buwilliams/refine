@@ -6,6 +6,35 @@ MODE="${REFINE_RUN_MODE:-auto}"
 RELEASE_BIN="${REFINE_RELEASE_BIN:-$ROOT/bin/refine}"
 DEPLOYED_MARKER="${REFINE_DEPLOYED_MARKER:-$ROOT/.refine-deployed}"
 
+install_release_binary() {
+  local built_bin="$ROOT/target/release/refine"
+  local staged_bin="$RELEASE_BIN.installing.$$"
+  local staged_marker="$DEPLOYED_MARKER.installing.$$"
+
+  cargo build --release --locked --target-dir "$ROOT/target" --manifest-path "$ROOT/Cargo.toml"
+  if [ ! -f "$built_bin" ]; then
+    printf 'refine: release build succeeded but did not produce %s\n' "$built_bin" >&2
+    exit 1
+  fi
+  mkdir -p "$(dirname "$RELEASE_BIN")" "$(dirname "$DEPLOYED_MARKER")"
+  trap 'rm -f "$staged_bin" "$staged_marker"' EXIT
+  install -m 755 "$built_bin" "$staged_bin"
+  printf 'mode=deployed\nrelease_bin=bin/refine\n' > "$staged_marker"
+  mv -f "$staged_bin" "$RELEASE_BIN"
+  mv -f "$staged_marker" "$DEPLOYED_MARKER"
+  trap - EXIT
+}
+
+system_install_requested() {
+  [ "${1:-}" = "system" ] && [ "${2:-}" = "install" ] || return 1
+  for arg in "$@"; do
+    case "$arg" in
+      --help|-h) return 1 ;;
+    esac
+  done
+  return 0
+}
+
 select_mode() {
   case "$MODE" in
     ""|auto)
@@ -191,6 +220,11 @@ if [ "${1:-}" = "test" ]; then
     exit 0
   fi
   run_test_command "$@"
+fi
+
+if [ "${REFINE_R_DRY_RUN:-0}" != "1" ] \
+  && system_install_requested "$@"; then
+  install_release_binary
 fi
 
 SELECTED_MODE="$(select_mode)"

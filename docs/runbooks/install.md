@@ -52,14 +52,11 @@ tar -C "$tmp/refine" --exclude .git -cf - . | tar -C <refine-checkout> -xf -
 rm -rf "$tmp"
 ```
 
-5. Always compile the host-local release binary and mark the checkout as deployed. Do this after either `./r system update` or a fresh clone so `./r` uses `bin/refine` instead of running through Cargo:
+5. Install Refine for the selected port. This command assumes the prerequisites above are available, builds the locked release binary, atomically publishes it as `bin/refine`, marks the checkout as deployed, and only then registers and activates the service:
 
 ```bash
 cd <refine-checkout>
-cargo build --release --locked
-mkdir -p bin
-install -m 755 target/release/refine bin/refine
-printf 'mode=deployed\nrelease_bin=bin/refine\n' > .refine-deployed
+./r system install --port <port>
 ```
 
 6. Configure the selected provider:
@@ -98,7 +95,8 @@ A published installation is intentionally gitless and is identified by
 provider, and published-update operations. Source status and source promotion
 require an actual Git checkout and will fail closed for a gitless product home.
 
-Current service registrations launch the checkout-local binary with the exact
+`./r system install` is the complete fresh-install boundary; callers do not
+prebuild or copy the binary separately. Current service registrations launch the checkout-local binary with the exact
 port and checkout-local runtime and use the checkout as their working
 directory. The current targets are `macos_daemon`, `windows_daemon`, and
 `linux_cli_web`. The historical JSON values `mac_os_app_bundle` and

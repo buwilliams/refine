@@ -255,14 +255,16 @@ impl FileInstallationService {
         let executable = self.checkout_root.join("bin/refine");
         let metadata = fs::metadata(&executable).map_err(|error| {
             RefineError::NotFound(format!(
-                "installed Refine mode requires an executable at {}; build and install the release binary before registering or repairing a service: {error}",
-                executable.display()
+                "installed Refine mode requires an executable at {}; run `./r system install --port {}` from the owning checkout to build the release before registering or repairing a service: {error}",
+                executable.display(),
+                self.port.unwrap_or(8082),
             ))
         })?;
         if !metadata.is_file() {
             return Err(RefineError::NotFound(format!(
-                "installed Refine mode requires a file at {}; build and install the release binary before registering or repairing a service",
-                executable.display()
+                "installed Refine mode requires a file at {}; run `./r system install --port {}` from the owning checkout to rebuild it before registering or repairing a service",
+                executable.display(),
+                self.port.unwrap_or(8082),
             )));
         }
         #[cfg(unix)]

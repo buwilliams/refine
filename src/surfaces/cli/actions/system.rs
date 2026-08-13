@@ -2,7 +2,7 @@ use super::*;
 
 #[derive(Debug, Subcommand)]
 pub enum SystemAction {
-    /// Install the Refine daemon on this machine (launchd, Windows user service, or systemd).
+    /// Install Refine: build the release binary, then register and start its daemon service.
     Install {
         /// Daemon port to configure for the installation.
         #[arg(long)]
