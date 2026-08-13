@@ -190,12 +190,14 @@ function openNewGoalModal(options = {}) {
     const effectiveDuplicateDecision = (
       duplicateDecision && duplicateDecisionKey === duplicateKey
     ) ? duplicateDecision : "";
+    const nodeGeneration = captureNodeContextGeneration();
     try {
       const r = await api("POST", "/api/goals", {
         reporter: currentReporter, prompt, priority,
         ...(options.featureId ? { feature_id: options.featureId } : {}),
         duplicate_decision: effectiveDuplicateDecision,
       });
+      if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
       if (r?.created === false) {
         const move = r.move || {};
         if (r.duplicate_action === "move_original_to_backlog") {
@@ -230,6 +232,7 @@ function openNewGoalModal(options = {}) {
         }
       }
     } catch (err) {
+      if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
       if (err.code === "duplicate_goal" && err.error?.duplicate?.match) {
         duplicateDecision = "";
         duplicateDecisionKey = duplicateKey;

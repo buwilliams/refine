@@ -79,6 +79,7 @@ function newGoalRuntime({ apiHandler, hash = "#/goals/new" } = {}) {
   const requests = [];
   const toasts = [];
   let handler = apiHandler || (async () => ({ created: true, goal: { id: "GOAL2" } }));
+  const nodeContext = { generation: 0 };
 
   class TestFormData {
     constructor(form) { this.form = form; }
@@ -87,6 +88,8 @@ function newGoalRuntime({ apiHandler, hash = "#/goals/new" } = {}) {
 
   const context = vm.createContext({
     $$: (selector, root) => root.querySelectorAll(selector),
+    captureNodeContextGeneration: () => nodeContext.generation,
+    isNodeContextGenerationCurrent: (generation) => generation === nodeContext.generation,
     FormData: TestFormData,
     api: async (method, requestPath, body) => {
       requests.push({ method, path: requestPath, body });
@@ -120,6 +123,7 @@ function newGoalRuntime({ apiHandler, hash = "#/goals/new" } = {}) {
 
   return {
     ...dom,
+    advanceNodeGeneration() { nodeContext.generation += 1; },
     confirmations,
     context,
     location,
@@ -374,6 +378,23 @@ test("failed submit retains the complete draft and remains protected", async () 
   assert.deepEqual(browser.toasts.at(-1), { message: "Service unavailable", kind: "error" });
   fields(browser).cancel.click();
   assert.equal(browser.confirmations.length, 1);
+});
+
+test("a late New Goal response cannot close the preserved previous-Node draft", async () => {
+  const pendingCreate = deferred();
+  const browser = openBrowser({ apiHandler: () => pendingCreate.promise });
+  dirty(browser, "Goal submitted from the previous Node");
+  fields(browser).submit.click();
+  assert.equal(browser.requests.length, 1);
+
+  browser.advanceNodeGeneration();
+  pendingCreate.resolve({ created: true, goal: { id: "OLD-NODE-GOAL" } });
+  await settle();
+
+  assert.equal(browser.runtime.isOpen(), true);
+  assert.equal(fields(browser).prompt.value, "Goal submitted from the previous Node");
+  assert.equal(fields(browser).priority.value, "high");
+  assert.deepEqual(browser.toasts, []);
 });
 
 test("duplicate handling and a declined dismissal retain the draft and decision", async () => {
