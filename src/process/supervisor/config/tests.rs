@@ -387,6 +387,43 @@ fn guidance_migrates_stable_ids_and_rejects_stale_item_mutations() {
 }
 
 #[test]
+fn guidance_migrates_unaddressable_ids_and_rejects_invalid_revisions() {
+    let temp_root = unique_temp_dir("guidance-addressable-ids");
+    let refine_dir = temp_root.join(".refine");
+    fs::create_dir_all(&refine_dir).unwrap();
+    fs::write(
+        refine_dir.join(GUIDANCE_FILE),
+        serde_json::to_vec_pretty(&json!([{
+            "id": "not/addressable",
+            "name": "Existing",
+            "rule": "Always",
+            "instructions": "Keep this entry",
+            "enabled": true
+        }]))
+        .unwrap(),
+    )
+    .unwrap();
+    let service = FileGuidanceService::new(&refine_dir);
+
+    let migrated = service.list().unwrap();
+    assert_eq!(migrated["guidance"][0]["id"], "guidance-1");
+    assert!(matches!(
+        service.edit("guidance-1", &json!({"revision": "0", "enabled": false})),
+        Err(RefineError::InvalidInput(_))
+    ));
+    assert!(matches!(
+        service.update(&json!({
+            "revision": 0,
+            "guidance": migrated["guidance"],
+            "unknown": true
+        })),
+        Err(RefineError::InvalidInput(_))
+    ));
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn governance_rule_revisions_preserve_unrelated_fields_and_fence_stale_writers() {
     let temp_root = unique_temp_dir("governance-revisions");
     let refine_dir = temp_root.join(".refine");
@@ -418,6 +455,24 @@ fn governance_rule_revisions_preserve_unrelated_fields_and_fence_stale_writers()
     assert_eq!(replaced["rules_revision"], 2);
     assert_eq!(replaced["rules"][0]["text"], "Two");
     assert_eq!(replaced["constitution"], "Local first");
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn governance_rejects_invalid_revision_shapes() {
+    let temp_root = unique_temp_dir("governance-invalid-revision");
+    fs::create_dir_all(&temp_root).unwrap();
+    let service = FileGovernanceService::new(temp_root.join(".refine"));
+
+    assert!(matches!(
+        service.save(&json!({"rules": [], "rules_revision": "0"})),
+        Err(RefineError::InvalidInput(_))
+    ));
+    assert!(matches!(
+        service.save(&json!({"rules_revision": 0})),
+        Err(RefineError::InvalidInput(_))
+    ));
 
     fs::remove_dir_all(temp_root).unwrap();
 }

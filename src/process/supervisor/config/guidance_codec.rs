@@ -70,7 +70,51 @@ pub(super) fn validate_guidance_fields(value: &Value, require_all: bool) -> Refi
             "Guidance enabled must be a boolean".to_string(),
         ));
     }
+    guidance_revision(value)?;
     Ok(())
+}
+
+pub(super) fn validate_guidance_document_patch(value: &Value) -> RefineResult<()> {
+    let object = value.as_object().ok_or_else(|| {
+        RefineError::InvalidInput("Guidance update must be a JSON object".to_string())
+    })?;
+    for key in object.keys() {
+        if !matches!(key.as_str(), "guidance" | "revision") {
+            return Err(RefineError::InvalidInput(format!(
+                "unknown Guidance field: {key}"
+            )));
+        }
+    }
+    let items = object
+        .get("guidance")
+        .ok_or_else(|| RefineError::InvalidInput("guidance must be a list".to_string()))?;
+    normalize_guidance_input(items)?;
+    guidance_revision(value)?;
+    Ok(())
+}
+
+pub(super) fn validate_guidance_remove(value: &Value) -> RefineResult<()> {
+    let object = value.as_object().ok_or_else(|| {
+        RefineError::InvalidInput("Guidance removal must be a JSON object".to_string())
+    })?;
+    for key in object.keys() {
+        if key != "revision" {
+            return Err(RefineError::InvalidInput(format!(
+                "unknown Guidance removal field: {key}"
+            )));
+        }
+    }
+    guidance_revision(value)?;
+    Ok(())
+}
+
+pub(super) fn guidance_revision(value: &Value) -> RefineResult<Option<u64>> {
+    match value.get("revision") {
+        Some(revision) => revision.as_u64().map(Some).ok_or_else(|| {
+            RefineError::InvalidInput("Guidance revision must be a nonnegative integer".to_string())
+        }),
+        None => Ok(None),
+    }
 }
 
 fn normalize_guidance_item(
@@ -90,7 +134,7 @@ fn normalize_guidance_item(
         .unwrap_or("")
         .trim()
         .to_string();
-    if id.is_empty() || seen.contains(&id) {
+    if !valid_guidance_id(&id) || seen.contains(&id) {
         id = format!("guidance-{}", index + 1);
         while seen.contains(&id) {
             id.push('x');
@@ -104,6 +148,16 @@ fn normalize_guidance_item(
         "instructions": instructions,
         "enabled": item.get("enabled").and_then(Value::as_bool).unwrap_or(true)
     }))
+}
+
+fn valid_guidance_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.bytes().all(|byte| {
+            matches!(
+                byte,
+                b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~'
+            )
+        })
 }
 
 pub(super) fn new_guidance_id(items: &[Value]) -> String {

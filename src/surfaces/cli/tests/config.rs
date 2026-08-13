@@ -2,6 +2,8 @@ use super::*;
 use crate::process::supervisor::errors::RefineError;
 use std::sync::{Mutex, OnceLock};
 
+static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
 #[test]
 fn config_complete_command_tree_and_payload_forms_parse() {
     for args in [
@@ -304,7 +306,6 @@ fn config_rejects_unknown_malformed_and_overlapping_input_before_state_changes()
 
 #[test]
 fn config_daemon_routing_uses_contract_and_idempotency_headers_and_saved_readback() {
-    static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
     let _guard = ENV_LOCK
         .get_or_init(|| Mutex::new(()))
         .lock()
@@ -398,4 +399,64 @@ fn config_daemon_routing_uses_contract_and_idempotency_headers_and_saved_readbac
         assert!(request.contains("Idempotency-Key: cli-"));
     }
     assert!(requests[1].ends_with(r#"{"agent_cli":"codex"}"#));
+}
+
+#[test]
+fn config_rejects_invalid_domain_input_before_daemon_transport() {
+    let _guard = ENV_LOCK
+        .get_or_init(|| Mutex::new(()))
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0)).unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let (stop_tx, stop_rx) = std::sync::mpsc::channel();
+    let server = thread::spawn(move || {
+        loop {
+            match listener.accept() {
+                Ok((mut stream, _)) => {
+                    let body = br#"{}"#;
+                    write!(
+                    stream,
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    body.len()
+                )
+                .unwrap();
+                    stream.write_all(body).unwrap();
+                    return true;
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                    if stop_rx.try_recv().is_ok() {
+                        return false;
+                    }
+                    thread::yield_now();
+                }
+                Err(error) => panic!("unexpected listener error: {error}"),
+            }
+        }
+    });
+    let previous = std::env::var_os("REFINE_DAEMON_PORT");
+    unsafe { std::env::set_var("REFINE_DAEMON_PORT", port.to_string()) };
+
+    let result = dispatch_config(
+        Cli::try_parse_from([
+            "refine",
+            "config",
+            "settings",
+            "set",
+            "--json",
+            r#"{"unknown_setting":true}"#,
+        ])
+        .unwrap()
+        .command
+        .into_config(),
+    );
+
+    match previous {
+        Some(value) => unsafe { std::env::set_var("REFINE_DAEMON_PORT", value) },
+        None => unsafe { std::env::remove_var("REFINE_DAEMON_PORT") },
+    }
+    assert!(matches!(result, Err(RefineError::InvalidInput(_))));
+    stop_tx.send(()).unwrap();
+    assert!(!server.join().unwrap(), "invalid input reached the daemon");
 }

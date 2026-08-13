@@ -17,28 +17,7 @@ impl FileGovernanceService {
     }
 
     pub fn save(&self, body: &Value) -> RefineResult<Value> {
-        let updates = body.as_object().ok_or_else(|| {
-            RefineError::InvalidInput("Governance patch must be a JSON object".to_string())
-        })?;
-        if updates.is_empty() {
-            return Err(RefineError::InvalidInput(
-                "Governance patch requires at least one value".to_string(),
-            ));
-        }
-        for key in updates.keys() {
-            if !matches!(
-                key.as_str(),
-                "product"
-                    | "constitution"
-                    | "rules"
-                    | "rules_revision"
-                    | "max_automatic_round_retries"
-            ) {
-                return Err(RefineError::InvalidInput(format!(
-                    "unknown Governance field: {key}"
-                )));
-            }
-        }
+        Self::validate_patch(body)?;
         self.with_locked_governance(|current| {
             if let Some(product) = body.get("product") {
                 let product = product.as_str().ok_or_else(|| {
@@ -91,6 +70,66 @@ impl FileGovernanceService {
             self.write_governance(current)?;
             Ok(current.clone())
         })
+    }
+
+    pub fn validate_patch(body: &Value) -> RefineResult<()> {
+        let updates = body.as_object().ok_or_else(|| {
+            RefineError::InvalidInput("Governance patch must be a JSON object".to_string())
+        })?;
+        if updates.is_empty() {
+            return Err(RefineError::InvalidInput(
+                "Governance patch requires at least one value".to_string(),
+            ));
+        }
+        for key in updates.keys() {
+            if !matches!(
+                key.as_str(),
+                "product"
+                    | "constitution"
+                    | "rules"
+                    | "rules_revision"
+                    | "max_automatic_round_retries"
+            ) {
+                return Err(RefineError::InvalidInput(format!(
+                    "unknown Governance field: {key}"
+                )));
+            }
+        }
+        for key in ["product", "constitution"] {
+            if body.get(key).is_some_and(|value| !value.is_string()) {
+                return Err(RefineError::InvalidInput(format!("{key} must be a string")));
+            }
+        }
+        if body.get("rules").is_some_and(|value| !value.is_array()) {
+            return Err(RefineError::InvalidInput(
+                "rules must be a list".to_string(),
+            ));
+        }
+        if let Some(revision) = body.get("rules_revision") {
+            if !revision.is_u64() {
+                return Err(RefineError::InvalidInput(
+                    "rules_revision must be a nonnegative integer".to_string(),
+                ));
+            }
+            if body.get("rules").is_none() {
+                return Err(RefineError::InvalidInput(
+                    "rules_revision requires a rules replacement".to_string(),
+                ));
+            }
+        }
+        if let Some(max_retries) = body.get("max_automatic_round_retries") {
+            let max_retries = max_retries.as_u64().ok_or_else(|| {
+                RefineError::InvalidInput(
+                    "max_automatic_round_retries must be a nonnegative integer".to_string(),
+                )
+            })?;
+            u32::try_from(max_retries).map_err(|_| {
+                RefineError::InvalidInput(
+                    "max_automatic_round_retries must fit in a 32-bit integer".to_string(),
+                )
+            })?;
+        }
+        Ok(())
     }
 
     pub fn generate_rules(&self, body: &Value) -> RefineResult<Value> {

@@ -2,6 +2,7 @@ mod support;
 
 mod cli_surface {
     pub(super) mod agents;
+    pub(super) mod config;
     pub(super) mod daemon_status;
     pub(super) mod features;
     pub(super) mod fleet;
@@ -22,6 +23,7 @@ use serde_json::json;
 use support::integration::IntegrationFixture;
 
 use cli_surface::agents::*;
+use cli_surface::config::*;
 use cli_surface::daemon_status::*;
 use cli_surface::features::*;
 use cli_surface::fleet::*;
@@ -39,6 +41,7 @@ fn cli_surface_suite() {
 
     system_status_reports_healthy_daemon(&fixture);
     project_status_is_attached_to_test_app(&fixture);
+    config_commands_route_through_the_active_daemon(&fixture);
     daemon_backed_project_status_suppresses_ambiguous_default_label(&fixture);
     project_doctor_runs(&fixture);
     project_registry_lifecycle_commands(&fixture);

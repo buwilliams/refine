@@ -1,3 +1,4 @@
+use super::config_input::*;
 use super::*;
 
 use crate::process::supervisor::config::{
@@ -63,6 +64,7 @@ fn dispatch_settings(action: ConfigSettingsAction) -> RefineResult<Value> {
                 flags.insert(key.to_string(), value);
             }
             let body = decode_config_input(payload, flags, "settings patch")?;
+            FileSettingsService::validate_update(&body)?;
             with_target_or_daemon(
                 target_root,
                 "PATCH",
@@ -93,6 +95,9 @@ fn dispatch_quality(action: ConfigQualityAction) -> RefineResult<Value> {
                 flags.insert("tests".to_string(), json!(tests));
             }
             let body = decode_config_input(payload, flags, "Quality patch")?;
+            serde_json::from_value::<QualitySettingsPatch>(body.clone()).map_err(|error| {
+                RefineError::InvalidInput(format!("invalid Quality settings body: {error}"))
+            })?;
             with_target_or_daemon(
                 target_root,
                 "PATCH",
@@ -145,10 +150,12 @@ fn dispatch_governance(action: ConfigGovernanceAction) -> RefineResult<Value> {
                 );
             }
             let mut body = decode_config_input(payload, flags, "Governance patch")?;
+            FileGovernanceService::validate_patch(&body)?;
             if body.get("rules").is_some() && body.get("rules_revision").is_none() {
                 let current = read_domain(ConfigDomain::Governance, target_root.clone())?;
                 body["rules_revision"] = json!(current["rules_revision"].as_u64().unwrap_or(0));
             }
+            FileGovernanceService::validate_patch(&body)?;
             with_target_or_daemon(
                 target_root,
                 "PATCH",
@@ -167,6 +174,7 @@ fn dispatch_governance(action: ConfigGovernanceAction) -> RefineResult<Value> {
             insert_optional(&mut flags, "product", product);
             insert_optional(&mut flags, "constitution", constitution);
             let supplied = decode_optional_config_input(payload, flags, "Governance generation")?;
+            validate_governance_generation(&supplied)?;
             let current = read_domain(ConfigDomain::Governance, target_root.clone())?;
             let product = supplied
                 .get("product")
@@ -266,6 +274,12 @@ fn guidance_item_mutation(
     id: Option<String>,
     mut body: Value,
 ) -> RefineResult<Value> {
+    match (method, id.as_deref()) {
+        ("POST", None) => FileGuidanceService::validate_add(&body)?,
+        ("PATCH", Some(_)) => FileGuidanceService::validate_edit(&body)?,
+        ("DELETE", Some(_)) => FileGuidanceService::validate_remove(&body)?,
+        _ => unreachable!("unsupported Guidance mutation"),
+    }
     let current = read_domain(ConfigDomain::Guidance, target_root.clone())?;
     body["revision"] = json!(current["revision"].as_u64().unwrap_or(0));
     let path = id
@@ -335,136 +349,43 @@ fn with_target_or_daemon(
     }
 }
 
-fn decode_optional_config_input(
-    payload: ConfigPayload,
-    flags: serde_json::Map<String, Value>,
-    label: &str,
-) -> RefineResult<Value> {
-    if !flags.is_empty() || payload.json.is_some() || payload.file.is_some() || payload.stdin {
-        decode_config_input(payload, flags, label)
-    } else {
-        Ok(json!({}))
-    }
-}
-
-fn decode_config_input(
-    payload: ConfigPayload,
-    flags: serde_json::Map<String, Value>,
-    label: &str,
-) -> RefineResult<Value> {
-    decode_config_input_with_reader(payload, flags, label, &mut std::io::stdin().lock())
-}
-
-fn decode_config_input_with_reader(
-    payload: ConfigPayload,
-    flags: serde_json::Map<String, Value>,
-    label: &str,
-    stdin: &mut impl Read,
-) -> RefineResult<Value> {
-    let source_count = usize::from(payload.json.is_some())
-        + usize::from(payload.file.is_some())
-        + usize::from(payload.stdin);
-    if source_count > 1 {
-        return Err(RefineError::InvalidInput(
-            "use exactly one of --json, --file, or --stdin".to_string(),
-        ));
-    }
-    if source_count > 0 && !flags.is_empty() {
-        return Err(RefineError::InvalidInput(format!(
-            "{label} flags cannot be combined with --json, --file, or --stdin"
-        )));
-    }
-    let value = if let Some(text) = payload.json {
-        parse_object(&text, "inline JSON")?
-    } else if let Some(path) = payload.file {
-        let text = fs::read_to_string(&path).map_err(|error| {
-            RefineError::InvalidInput(format!(
-                "failed to read configuration file {}: {error}",
-                path.display()
-            ))
-        })?;
-        parse_object(&text, &format!("configuration file {}", path.display()))?
-    } else if payload.stdin {
-        let mut text = String::new();
-        stdin.read_to_string(&mut text).map_err(|error| {
-            RefineError::InvalidInput(format!("failed to read configuration stdin: {error}"))
-        })?;
-        parse_object(&text, "configuration stdin")?
-    } else {
-        Value::Object(flags)
-    };
-    if value.as_object().is_none_or(serde_json::Map::is_empty) {
-        return Err(RefineError::InvalidInput(format!(
-            "{label} requires at least one value"
-        )));
-    }
-    Ok(value)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Cursor;
 
     #[test]
-    fn input_decoder_handles_file_and_stdin_and_reports_malformed_sources() {
-        let path =
-            std::env::temp_dir().join(format!("refine-config-input-{}.json", std::process::id()));
-        fs::write(&path, "{not-json").unwrap();
-        let malformed_file = decode_config_input_with_reader(
-            ConfigPayload {
-                json: None,
-                file: Some(path.clone()),
-                stdin: false,
-            },
-            serde_json::Map::new(),
-            "Quality patch",
-            &mut Cursor::new(Vec::<u8>::new()),
-        );
-        assert!(matches!(malformed_file, Err(RefineError::InvalidInput(_))));
-        fs::remove_file(path).unwrap();
-
-        let malformed_stdin = decode_config_input_with_reader(
-            ConfigPayload {
-                json: None,
-                file: None,
-                stdin: true,
-            },
-            serde_json::Map::new(),
-            "Quality patch",
-            &mut Cursor::new(b"[not-an-object]"),
-        );
-        assert!(matches!(malformed_stdin, Err(RefineError::InvalidInput(_))));
-
-        let decoded = decode_config_input_with_reader(
-            ConfigPayload {
-                json: None,
-                file: None,
-                stdin: true,
-            },
-            serde_json::Map::new(),
-            "Quality patch",
-            &mut Cursor::new(br#"{"instructions":"line one\nline two"}"#),
-        )
+    fn config_errors_distinguish_detached_unreachable_and_conflict_failures() {
+        let detached_body = serde_json::to_vec(&json!({
+            "error": {
+                "code": "target_root_unavailable",
+                "message": "No active app is attached"
+            }
+        }))
         .unwrap();
-        assert_eq!(decoded["instructions"], "line one\nline two");
-    }
-}
+        let detached_response = format!(
+            "HTTP/1.1 503 Service Unavailable\r\nContent-Length: {}\r\n\r\n",
+            detached_body.len()
+        );
+        let mut detached_response = detached_response.into_bytes();
+        detached_response.extend(detached_body);
+        let detached = parse_daemon_response(&detached_response).unwrap_err();
 
-fn parse_object(text: &str, source: &str) -> RefineResult<Value> {
-    let value = serde_json::from_str::<Value>(text)
-        .map_err(|error| RefineError::InvalidInput(format!("malformed {source}: {error}")))?;
-    if !value.is_object() {
-        return Err(RefineError::InvalidInput(format!(
-            "{source} must contain a JSON object"
-        )));
-    }
-    Ok(value)
-}
-
-fn insert_optional(values: &mut serde_json::Map<String, Value>, key: &str, value: Option<String>) {
-    if let Some(value) = value {
-        values.insert(key.to_string(), Value::String(value));
+        for (error, code) in [
+            (detached, "missing_active_app"),
+            (
+                RefineError::Degraded("daemon connection refused".to_string()),
+                "daemon_unavailable",
+            ),
+            (
+                RefineError::Conflict("stale configuration revision".to_string()),
+                "conflict",
+            ),
+        ] {
+            let structured = structured_config_error(error);
+            let value: Value = serde_json::from_str(&structured.to_string()).unwrap();
+            assert_eq!(value["error"]["code"], code);
+            assert!(value["error"]["message"].is_string());
+        }
     }
 }
 

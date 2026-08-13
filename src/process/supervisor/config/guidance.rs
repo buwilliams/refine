@@ -17,6 +17,7 @@ impl FileGuidanceService {
     }
 
     pub fn update(&self, body: &Value) -> RefineResult<Value> {
+        validate_guidance_document_patch(body)?;
         let items = body
             .get("guidance")
             .ok_or_else(|| RefineError::InvalidInput("guidance must be a list".to_string()))?;
@@ -67,6 +68,7 @@ impl FileGuidanceService {
     }
 
     pub fn remove(&self, id: &str, body: &Value) -> RefineResult<Value> {
+        validate_guidance_remove(body)?;
         self.mutate(body, |document| {
             let items = document["guidance"]
                 .as_array_mut()
@@ -87,7 +89,7 @@ impl FileGuidanceService {
         body: &Value,
         mutation: impl FnOnce(&mut Value) -> RefineResult<()>,
     ) -> RefineResult<Value> {
-        let expected = body.get("revision").and_then(Value::as_u64);
+        let expected = guidance_revision(body)?;
         self.with_locked_document(|document| {
             let current = document["revision"].as_u64().unwrap_or(0);
             let expected = expected.or((current == 0).then_some(0)).ok_or_else(|| {
@@ -105,6 +107,22 @@ impl FileGuidanceService {
             self.write_document(document)?;
             Ok(document.clone())
         })
+    }
+
+    pub fn validate_update(body: &Value) -> RefineResult<()> {
+        validate_guidance_document_patch(body)
+    }
+
+    pub fn validate_add(body: &Value) -> RefineResult<()> {
+        validate_guidance_fields(body, true)
+    }
+
+    pub fn validate_edit(body: &Value) -> RefineResult<()> {
+        validate_guidance_fields(body, false)
+    }
+
+    pub fn validate_remove(body: &Value) -> RefineResult<()> {
+        validate_guidance_remove(body)
     }
 
     fn with_locked_document<T>(
