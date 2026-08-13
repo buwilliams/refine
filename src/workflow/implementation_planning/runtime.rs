@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::time::Duration;
 
 use serde_json::{Value, json};
 use uuid::Uuid;
@@ -12,7 +13,7 @@ use crate::process::agent_sessions::{GoalAgentLaunch, run_goal_agent_with_settle
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::git_worktrees::FileGitWorktreeService;
 use crate::tools::product::work_items::FileWorkItemService;
-use crate::workflow::now_timestamp;
+use crate::workflow::{now_timestamp, setting_usize};
 
 use super::WorkflowContext;
 
@@ -82,6 +83,11 @@ pub(super) fn run_observational_phase(
             provider: ctx.provider.clone(),
             prompt,
             metadata,
+            completion_timeout: Some(Duration::from_secs(setting_usize(
+                &ctx.settings,
+                "agent_hard_cap_seconds",
+                7200,
+            ) as u64)),
         },
         |attention| {
             let _ = ctx.log(

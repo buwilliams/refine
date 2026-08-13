@@ -142,6 +142,7 @@ where
         let _ = fs::remove_file(&stdout_path);
         return Err(error);
     }
+    let completion_timeout = launch.completion_timeout;
     let mut metadata = launch.metadata;
     metadata.insert("kind".to_string(), json!("interactive_session"));
     metadata.insert("profile".to_string(), json!("goal"));
@@ -337,6 +338,8 @@ where
     let mut guidance_applied = None;
     let mut implementation_evidence = None;
     let mut planning_result = None;
+    let completion_started_at = std::time::Instant::now();
+    let mut signal_reader = SignalReader::default();
     let status_result = (|| -> RefineResult<_> {
         loop {
             for command in read_commands_since(&command_path, &mut command_offset)? {
@@ -368,7 +371,7 @@ where
                 }
             }
 
-            if let Some(signal) = take_signal(&signal_path)? {
+            if let Some(signal) = signal_reader.take(&signal_path)? {
                 match signal.state.trim() {
                     "completed" | "complete" => {
                         completed_by_signal = true;
@@ -408,6 +411,14 @@ where
                 RefineError::Io(format!("failed to inspect Goal Agent process: {error}"))
             })? {
                 break Ok(status);
+            }
+            if let Some(timeout) =
+                completion_timeout.filter(|timeout| completion_started_at.elapsed() >= *timeout)
+            {
+                return Err(RefineError::Degraded(format!(
+                    "Goal Agent did not produce a valid completion signal within {} seconds",
+                    timeout.as_secs()
+                )));
             }
             thread::sleep(COMMAND_POLL_INTERVAL);
         }

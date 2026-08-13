@@ -170,28 +170,96 @@ pub(super) fn read_commands_since(
         .collect()
 }
 
-pub(super) fn take_signal(path: &Path) -> RefineResult<Option<AgentSessionSignal>> {
-    let bytes = match fs::read(path) {
-        Ok(bytes) => bytes,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(error) => {
-            return Err(RefineError::Io(format!(
-                "failed to read Goal Agent signal {}: {error}",
-                path.display()
-            )));
+#[derive(Debug)]
+struct IncompleteSignal {
+    fingerprint: u64,
+    first_seen: std::time::Instant,
+}
+
+#[derive(Debug)]
+pub(super) struct SignalReader {
+    incomplete: Option<IncompleteSignal>,
+    write_grace_period: Duration,
+}
+
+impl Default for SignalReader {
+    fn default() -> Self {
+        Self::new(SIGNAL_WRITE_GRACE_PERIOD)
+    }
+}
+
+impl SignalReader {
+    pub(super) fn new(write_grace_period: Duration) -> Self {
+        Self {
+            incomplete: None,
+            write_grace_period,
         }
-    };
-    let signal = match serde_json::from_slice(&bytes) {
-        Ok(signal) => signal,
-        Err(_) => return Ok(None),
-    };
-    fs::remove_file(path).map_err(|error| {
-        RefineError::Io(format!(
-            "failed to consume Goal Agent signal {}: {error}",
-            path.display()
-        ))
-    })?;
-    Ok(Some(signal))
+    }
+
+    pub(super) fn take(&mut self, path: &Path) -> RefineResult<Option<AgentSessionSignal>> {
+        let bytes = match fs::read(path) {
+            Ok(bytes) => bytes,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                self.incomplete = None;
+                return Ok(None);
+            }
+            Err(error) => {
+                return Err(RefineError::Io(format!(
+                    "failed to read Goal Agent signal {}: {error}",
+                    path.display()
+                )));
+            }
+        };
+        let value = match serde_json::from_slice::<Value>(&bytes) {
+            Ok(value) => {
+                self.incomplete = None;
+                value
+            }
+            Err(error) => {
+                let fingerprint = signal_fingerprint(&bytes);
+                let now = std::time::Instant::now();
+                match &mut self.incomplete {
+                    Some(incomplete) if incomplete.fingerprint == fingerprint => {
+                        if now.duration_since(incomplete.first_seen) >= self.write_grace_period {
+                            return Err(RefineError::InvalidInput(format!(
+                                "Goal Agent completion signal {} remained invalid JSON after {} ms: {error}",
+                                path.display(),
+                                self.write_grace_period.as_millis()
+                            )));
+                        }
+                    }
+                    observation => {
+                        *observation = Some(IncompleteSignal {
+                            fingerprint,
+                            first_seen: now,
+                        });
+                    }
+                }
+                return Ok(None);
+            }
+        };
+        let signal = serde_path_to_error::deserialize(value).map_err(|error| {
+            RefineError::InvalidInput(format!(
+                "Goal Agent completion signal {} does not match the required schema: {error}",
+                path.display()
+            ))
+        })?;
+        fs::remove_file(path).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to consume Goal Agent signal {}: {error}",
+                path.display()
+            ))
+        })?;
+        Ok(Some(signal))
+    }
+}
+
+fn signal_fingerprint(bytes: &[u8]) -> u64 {
+    use std::hash::{Hash, Hasher};
+
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    bytes.hash(&mut hasher);
+    hasher.finish()
 }
 
 pub(super) fn cleanup_session_artifacts(command_path: &Path, signal_path: &Path) {
@@ -223,13 +291,13 @@ fn completion_contract(signal_path: &Path, implementation_phase: Option<&str>) -
     let destination = signal_path.display();
     match implementation_phase {
         Some("plan") => format!(
-            "Choose applicable Guidance. On completion, write one JSON object to `{destination}` with `state`, a brief `message`, `guidance_applied`, and the required `planning_result`. `planning_result` must be a JSON object, never omitted or quoted as a string. Use this complete signal shape: `{{\"state\":\"completed\",\"message\":\"brief planning summary\",\"guidance_applied\":[],\"planning_result\":{{\"summary\":\"one plain-language paragraph explaining what will change and why\",\"checklist\":[{{\"id\":\"P1\",\"description\":\"one implementation step that clearly advances the plan\"}}]}}}}`."
+            "Choose applicable Guidance. On completion, write one JSON object to `{destination}` with `state`, a brief `message`, `guidance_applied`, and the required `planning_result`. `guidance_applied` must contain zero-based integer indexes, such as `[0]`, for applicable Guidance candidates; use `[]` when none apply, and never use names. `planning_result` must be a JSON object, never omitted or quoted as a string. Use this complete signal shape: `{{\"state\":\"completed\",\"message\":\"brief planning summary\",\"guidance_applied\":[0],\"planning_result\":{{\"summary\":\"one plain-language paragraph explaining what will change and why\",\"checklist\":[{{\"id\":\"P1\",\"description\":\"one implementation step that clearly advances the plan\"}}]}}}}`."
         ),
         Some("criticize") => format!(
-            "Choose applicable Guidance. On completion, write one JSON object to `{destination}` with `state`, a brief `message`, `guidance_applied`, and the required `planning_result`. `planning_result` must be a JSON object, never omitted or quoted as a string. Use this complete signal shape: `{{\"state\":\"completed\",\"message\":\"brief criticism summary\",\"guidance_applied\":[],\"planning_result\":{{\"summary\":\"one short sentence\",\"findings\":[]}}}}`."
+            "Choose applicable Guidance. On completion, write one JSON object to `{destination}` with `state`, a brief `message`, `guidance_applied`, and the required `planning_result`. `guidance_applied` must contain zero-based integer indexes, such as `[0]`, for applicable Guidance candidates; use `[]` when none apply, and never use names. `planning_result` must be a JSON object, never omitted or quoted as a string. Use this complete signal shape: `{{\"state\":\"completed\",\"message\":\"brief criticism summary\",\"guidance_applied\":[0],\"planning_result\":{{\"summary\":\"one short sentence\",\"findings\":[]}}}}`."
         ),
         Some("revise") => format!(
-            "Choose applicable Guidance. On completion, write one JSON object to `{destination}` with `state`, a brief `message`, `guidance_applied`, and the required `planning_result`. `planning_result` must be a JSON object, never omitted or quoted as a string. Use this complete signal shape: `{{\"state\":\"completed\",\"message\":\"brief revision summary\",\"guidance_applied\":[],\"planning_result\":{{\"summary\":\"one plain-language paragraph explaining what will change and why\",\"checklist\":[{{\"id\":\"P1\",\"description\":\"one implementation step that clearly advances the plan\"}}],\"criticism_resolutions\":[]}}}}`."
+            "Choose applicable Guidance. On completion, write one JSON object to `{destination}` with `state`, a brief `message`, `guidance_applied`, and the required `planning_result`. `guidance_applied` must contain zero-based integer indexes, such as `[0]`, for applicable Guidance candidates; use `[]` when none apply, and never use names. `planning_result` must be a JSON object, never omitted or quoted as a string. Use this complete signal shape: `{{\"state\":\"completed\",\"message\":\"brief revision summary\",\"guidance_applied\":[0],\"planning_result\":{{\"summary\":\"one plain-language paragraph explaining what will change and why\",\"checklist\":[{{\"id\":\"P1\",\"description\":\"one implementation step that clearly advances the plan\"}}],\"criticism_resolutions\":[]}}}}`."
         ),
         _ => format!(
             "Report changes and exact verification. Choose applicable Guidance. On completion, write `{{\"state\":\"completed\",\"message\":\"changes and exact verification\",\"guidance_applied\":[0],\"implementation_evidence\":{{\"checklist\":[{{\"id\":\"stable checklist ID\",\"outcome\":\"completed|deviated|rejected|blocked\",\"evidence\":\"what happened\"}}],\"verification\":[\"exact command and result\"]}}}}` to `{destination}`, replacing `[0]` with applicable indexes. Guidance makes the field required, though it may be empty. A governed implementation checklist requires evidence for every stable ID without altering the accepted plan."

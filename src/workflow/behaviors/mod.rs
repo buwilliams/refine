@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use serde_json::{Value, json};
 
 use crate::model::workflow::GoalStatus;
@@ -28,7 +30,7 @@ use crate::workflow::{
     fail_implementation_phase, governed_implementation_prompt, implementation_branch_name,
     json_object, now_timestamp, parse_governance_provider_output,
     post_implementation_governance_prompt, round_agent_context,
-    run_governed_implementation_planning, selected_agent_context, setting_string,
+    run_governed_implementation_planning, selected_agent_context, setting_string, setting_usize,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -456,6 +458,11 @@ impl WorkflowBehavior for WorkflowImplementation {
                 provider: ctx.provider.clone(),
                 prompt,
                 metadata: process_metadata,
+                completion_timeout: Some(Duration::from_secs(setting_usize(
+                    &ctx.settings,
+                    "agent_hard_cap_seconds",
+                    7200,
+                ) as u64)),
             },
             |attention| {
                 let _ = ctx.log(
@@ -1048,6 +1055,11 @@ fn run_quality_correction_agent(ctx: &mut WorkflowContext<'_>) -> RefineResult<(
                 provider: ctx.provider.clone(),
                 prompt,
                 metadata: ctx.workflow_process_metadata("quality", "WorkflowQualityAgent"),
+                completion_timeout: Some(Duration::from_secs(setting_usize(
+                    &ctx.settings,
+                    "agent_hard_cap_seconds",
+                    7200,
+                ) as u64)),
             },
             |attention| {
                 let _ = ctx.log(

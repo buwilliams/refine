@@ -21,6 +21,7 @@ use crate::prompts::{PromptTemplate, render};
 use crate::tools::host::agent_providers::HostAgentProviderService;
 
 const COMMAND_POLL_INTERVAL: Duration = Duration::from_millis(40);
+const SIGNAL_WRITE_GRACE_PERIOD: Duration = Duration::from_secs(2);
 const DEFAULT_COLS: u16 = 120;
 const DEFAULT_ROWS: u16 = 36;
 const MAX_INPUT_BYTES: usize = 16_000;
@@ -33,6 +34,7 @@ pub struct GoalAgentLaunch {
     pub provider: String,
     pub prompt: String,
     pub metadata: Map<String, Value>,
+    pub completion_timeout: Option<Duration>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
