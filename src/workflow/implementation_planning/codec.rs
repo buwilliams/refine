@@ -8,7 +8,7 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 
 const MAX_CRITICISM_FINDINGS: usize = 3;
 const MAX_SUMMARY_CHARS: usize = 600;
-const MAX_ITEM_CHARS: usize = 280;
+const MAX_ITEM_CHARS: usize = 28_000;
 
 pub(super) fn decode_plan(output: &str) -> RefineResult<ProposedImplementationPlan> {
     let plan: ProposedImplementationPlan = decode_json(output, "implementation plan")?;
@@ -262,6 +262,31 @@ mod tests {
 
         let verbose_shape = r#"{"summary":"Do it","checklist":[{"id":"P1","description":"One","verification":["cargo test"]}]}"#;
         assert!(decode_plan(verbose_shape).is_err());
+    }
+
+    #[test]
+    fn criticism_details_are_guided_toward_conciseness_without_a_tiny_limit() {
+        let formerly_oversized = serde_json::json!({
+            "summary": "Material gap",
+            "findings": [{
+                "id": "C1",
+                "material": true,
+                "description": "x".repeat(307),
+                "recommendation": "Correct the material gap."
+            }]
+        });
+        assert!(decode_criticism(&formerly_oversized.to_string()).is_ok());
+
+        let oversized = serde_json::json!({
+            "summary": "Material gap",
+            "findings": [{
+                "id": "C1",
+                "material": true,
+                "description": "x".repeat(MAX_ITEM_CHARS + 1),
+                "recommendation": "Correct the material gap."
+            }]
+        });
+        assert!(decode_criticism(&oversized.to_string()).is_err());
     }
 
     #[test]
