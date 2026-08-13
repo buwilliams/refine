@@ -77,12 +77,12 @@ fn authored_todo_start_rejects_round_revision_change_before_execution() {
         .unwrap();
 
     let error = service
-        .advance_authored_goal_status("GOAL1", GoalStatus::Plan, round_idx, revision, &request)
+        .claim_workflow_attempt("GOAL1", GoalStatus::Todo, round_idx, revision, &request)
         .unwrap_err();
     assert!(
         error
             .to_string()
-            .contains("authoring changed before execution")
+            .contains("changed before workflow attempt claim")
     );
     assert_eq!(
         service.show_goal_summary("GOAL1").unwrap().goal.status,
@@ -111,8 +111,11 @@ fn authored_todo_start_atomically_pins_nonempty_round() {
         .transition_goal_status("GOAL1", GoalStatus::Todo)
         .unwrap();
     let (round_idx, revision, request) = service.authored_goal_commitment("GOAL1").unwrap();
+    let authority = service
+        .claim_workflow_attempt("GOAL1", GoalStatus::Todo, round_idx, revision, &request)
+        .unwrap();
     let started = service
-        .advance_authored_goal_status("GOAL1", GoalStatus::Plan, round_idx, revision, &request)
+        .advance_claimed_goal_status("GOAL1", authority, GoalStatus::Todo, GoalStatus::Plan)
         .unwrap();
     assert_eq!(started.goal.status, GoalStatus::Plan);
     assert_eq!(round_idx, 0);

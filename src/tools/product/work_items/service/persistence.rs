@@ -238,6 +238,9 @@ impl FileWorkItemService {
         if !matches!(status, GoalStatus::Failed) {
             clear_latest_round_failure(object);
         }
+        if !is_automated_status(status) {
+            clear_latest_round_workflow_attempt(object);
+        }
         object.insert("updated".to_string(), Value::String(now_timestamp()));
         write_json_atomically(goal_path, value)
     }

@@ -322,76 +322,6 @@ impl FileWorkItemService {
         Ok((round_idx, workflow_revision(&value), request))
     }
 
-    pub(crate) fn advance_authored_goal_status(
-        &self,
-        goal_id: &str,
-        target: GoalStatus,
-        expected_round_idx: usize,
-        expected_revision: u64,
-        expected_request: &str,
-    ) -> RefineResult<GoalSummaryProjection> {
-        let _goal_lock = self.acquire_goal_mutation_lock(goal_id)?;
-        let current = self.show_goal_summary(goal_id)?;
-        self.ensure_goal_owned(&current)?;
-        let (goal_path, mut value) = self.read_goal_value_unchecked_locked(&current)?;
-        let observed_revision = workflow_revision(&value);
-        let object = value.as_object_mut().ok_or_else(|| {
-            RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
-        })?;
-        let observed_status = object
-            .get("status")
-            .and_then(Value::as_str)
-            .and_then(GoalStatus::parse_wire)
-            .unwrap_or(GoalStatus::Backlog);
-        let rounds = object
-            .get("rounds")
-            .and_then(Value::as_array)
-            .ok_or_else(|| RefineError::Conflict(format!("Goal {goal_id} has no Round array")))?;
-        let observed_request = rounds
-            .get(expected_round_idx)
-            .and_then(|round| round.get("prompt"))
-            .and_then(Value::as_str);
-        if observed_status != GoalStatus::Todo
-            || rounds.len() != expected_round_idx + 1
-            || observed_revision != expected_revision
-            || observed_request != Some(expected_request)
-        {
-            return Err(RefineError::Conflict(format!(
-                "Goal {goal_id} authoring changed before execution (expected Todo, Round {} revision {}; observed {}, {} Rounds revision {})",
-                expected_round_idx + 1,
-                expected_revision,
-                observed_status.as_str(),
-                rounds.len(),
-                observed_revision
-            )));
-        }
-        validate_automated_goal_transition(&observed_status, &target)?;
-        object.insert(
-            "status".to_string(),
-            Value::String(target.as_str().to_string()),
-        );
-        object.insert("updated".to_string(), Value::String(now_timestamp()));
-        write_json_atomically(&goal_path, &value)?;
-        self.show_goal_summary(goal_id)
-    }
-
-    pub(crate) fn fail_automated_goal_if_active(
-        &self,
-        goal_id: &str,
-    ) -> RefineResult<GoalSummaryProjection> {
-        let _goal_lock = self.acquire_goal_mutation_lock(goal_id)?;
-        let current = self.show_goal_summary(goal_id)?;
-        if matches!(
-            current.goal.status,
-            GoalStatus::Cancelled | GoalStatus::Done
-        ) {
-            return Ok(current);
-        }
-        validate_automated_goal_transition(&current.goal.status, &GoalStatus::Failed)?;
-        self.set_goal_status_unchecked_locked(goal_id, &GoalStatus::Failed)?;
-        self.show_goal_summary(goal_id)
-    }
-
     pub fn set_goal_branch_name(
         &self,
         goal_id: &str,
@@ -511,6 +441,12 @@ impl FileWorkItemService {
             "status".to_string(),
             Value::String(target.as_str().to_string()),
         );
+        if target != GoalStatus::Failed {
+            clear_latest_round_failure(object);
+        }
+        if !is_automated_status(&target) {
+            clear_latest_round_workflow_attempt(object);
+        }
         object.insert("updated".to_string(), Value::String(now_timestamp()));
 
         write_json_atomically(&goal_path, &value)?;

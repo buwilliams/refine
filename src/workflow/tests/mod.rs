@@ -1,4 +1,5 @@
 mod execution_ownership;
+mod failure_settlement;
 mod governance;
 mod quality_recovery;
 

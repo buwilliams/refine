@@ -49,6 +49,18 @@ pub(super) fn clear_latest_round_failure(object: &mut Map<String, Value>) {
     }
 }
 
+pub(super) fn clear_latest_round_workflow_attempt(object: &mut Map<String, Value>) {
+    let Some(round) = object
+        .get_mut("rounds")
+        .and_then(Value::as_array_mut)
+        .and_then(|rounds| rounds.last_mut())
+        .and_then(Value::as_object_mut)
+    else {
+        return;
+    };
+    round.insert("workflow_attempt_authority".to_string(), Value::Null);
+}
+
 pub(super) fn new_round_value(reporter: &str, assignee: &str, prompt: &str) -> Value {
     let now = now_timestamp();
     let mut round = Map::new();
@@ -65,6 +77,7 @@ pub(super) fn new_round_value(reporter: &str, assignee: &str, prompt: &str) -> V
     round.insert("guidance_decision".to_string(), Value::Null);
     round.insert("workflow_reconciliation".to_string(), Value::Null);
     round.insert("workflow_recovery".to_string(), Value::Null);
+    round.insert("workflow_attempt_authority".to_string(), Value::Null);
     round.insert(
         "rule_state".to_string(),
         Value::String("unclassified".to_string()),
