@@ -31,8 +31,14 @@ html[data-theme="dark"] {
 html[data-theme="dark"] .topbar {
   background: rgba(17, 24, 39, 0.94);
 }
-html[data-theme="dark"] .brand-logo {
-  filter: brightness(1.55) saturate(1.05);
+.brand-logo-dark {
+  display: none;
+}
+html[data-theme="dark"] .brand-logo-light {
+  display: none;
+}
+html[data-theme="dark"] .brand-logo-dark {
+  display: block;
 }
 html[data-theme="dark"] .banner-actions button,
 html[data-theme="dark"] input[type="text"],

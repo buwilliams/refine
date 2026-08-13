@@ -146,6 +146,26 @@ fn static_main_nav_consolidates_context_and_controls() {
     assert!(theme.contains(r#"new CustomEvent("refine-theme-change""#));
     assert!(theme_css.contains(r#"html[data-theme="dark"]"#));
     assert!(theme_css.contains("color-scheme: dark"));
+    assert!(index.contains(
+        r#"<img class="brand-logo brand-logo-light" src="/static/images/refine_logo_transparent.png" alt="refine">"#
+    ));
+    assert!(index.contains(
+        r#"<img class="brand-logo brand-logo-dark" src="/static/images/refine_logo_transparent_darkmode.png" alt="refine">"#
+    ));
+    assert!(theme_css.contains(
+        r#".brand-logo-dark {
+  display: none;
+}"#
+    ));
+    assert!(theme_css.contains(
+        r#"html[data-theme="dark"] .brand-logo-light {
+  display: none;
+}
+html[data-theme="dark"] .brand-logo-dark {
+  display: block;
+}"#
+    ));
+    assert!(!theme_css.contains("filter: brightness(1.55) saturate(1.05)"));
     let theme_script = index
         .find(r#"<script src="/static/js/theme.js"></script>"#)
         .expect("theme bootstrap should be loaded");
