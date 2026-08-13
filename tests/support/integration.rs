@@ -14,6 +14,7 @@ pub struct IntegrationFixture {
     pub runtime_root: PathBuf,
     pub app_root: PathBuf,
     pub artifact_root: PathBuf,
+    app_registry_backup: Option<Vec<u8>>,
     binary: PathBuf,
     daemon: Option<Child>,
     agent_automation_enabled: bool,
@@ -33,13 +34,13 @@ impl IntegrationFixture {
     fn start_with_automation(suite: &str, agent_automation_enabled: bool) -> Self {
         let repo_root = repo_root();
         let port = test_port();
-        let runtime_root = env_path("REFINE_TEST_RUNTIME_ROOT")
-            .unwrap_or_else(|| repo_root.join("target/refine-integration/run"));
+        let runtime_root = repo_root.join("run");
         let app_root = env_path("REFINE_TEST_APP_ROOT")
             .unwrap_or_else(|| default_app_root(&repo_root, suite, port));
         let artifact_root = repo_root
             .join("target/refine-integration/artifacts")
             .join(format!("{suite}-{port}"));
+        let app_registry_backup = fs::read(runtime_root.join("apps.json")).ok();
         let binary = PathBuf::from(env!("CARGO_BIN_EXE_refine"));
         let static_root = repo_root.join("src/surfaces/web/static");
 
@@ -49,6 +50,7 @@ impl IntegrationFixture {
             runtime_root,
             app_root,
             artifact_root,
+            app_registry_backup,
             binary,
             daemon: None,
             agent_automation_enabled,
@@ -140,7 +142,8 @@ impl IntegrationFixture {
         let _ = fs::remove_dir_all(&self.artifact_root);
         fs::create_dir_all(&self.artifact_root).expect("failed to create artifact root");
         self.copy_runtime_diagnostics("before-reset");
-        let _ = fs::remove_dir_all(&self.runtime_root);
+        let _ = fs::remove_dir_all(self.runtime_root.join(self.port.to_string()));
+        let _ = fs::remove_file(self.runtime_root.join("apps.json"));
         self.cleanup_test_app_worktrees();
         let _ = fs::remove_dir_all(&self.app_root);
     }
@@ -347,7 +350,13 @@ impl Drop for IntegrationFixture {
         self.copy_runtime_diagnostics("teardown");
         self.stop_daemon();
         self.copy_runtime_diagnostics("after-stop");
-        let _ = fs::remove_dir_all(&self.runtime_root);
+        let _ = fs::remove_dir_all(self.runtime_root.join(self.port.to_string()));
+        let app_registry = self.runtime_root.join("apps.json");
+        if let Some(backup) = &self.app_registry_backup {
+            let _ = fs::write(app_registry, backup);
+        } else {
+            let _ = fs::remove_file(app_registry);
+        }
         self.cleanup_test_app_worktrees();
         let _ = fs::remove_dir_all(&self.app_root);
     }

@@ -14,7 +14,7 @@ use crate::tools::product::work_items::FileWorkItemService;
 
 use super::{
     ChatAttachment, ChatService, ChatSessionRecord, ChatSessionWorktree, FileChatService,
-    StandaloneReadyMergeRequest, StandaloneReadyMergeResult, derive_standalone_goal_name,
+    StandaloneQualityRequest, StandaloneQualityResult, derive_standalone_goal_name,
 };
 
 impl FileChatService {
@@ -58,15 +58,15 @@ impl FileChatService {
         self.stop(session_id)
     }
 
-    pub fn submit_standalone_ready_merge(
+    pub fn submit_standalone_quality(
         &self,
         session_id: &str,
-        request: StandaloneReadyMergeRequest,
-    ) -> RefineResult<StandaloneReadyMergeResult> {
+        request: StandaloneQualityRequest,
+    ) -> RefineResult<StandaloneQualityResult> {
         let session = self.load_record(session_id)?;
         if !matches!(session.attachment, ChatAttachment::Standalone) {
             return Err(RefineError::InvalidInput(
-                "only standalone chat sessions can be submitted for merge".to_string(),
+                "only standalone chat sessions can be submitted to Quality".to_string(),
             ));
         }
         if session.closed {
@@ -82,7 +82,7 @@ impl FileChatService {
             || !read_state.queued_messages.is_empty()
         {
             return Err(RefineError::Conflict(
-                "wait for the standalone chat to finish before submitting for merge".to_string(),
+                "wait for the standalone chat to finish before submitting to Quality".to_string(),
             ));
         }
         let Some(worktree) = session.worktree.clone() else {
@@ -149,28 +149,47 @@ impl FileChatService {
                     None,
                 )?;
             }
-            with_repository_git_lock(&target_root, || {
+            let candidate_commit = with_repository_git_lock(&target_root, || {
                 match worktree_git.commit(&format!("Submit {goal_id} from standalone chat"), &[]) {
-                    Ok(_) => {}
+                    Ok(commit) => Ok(commit),
                     Err(error) => {
                         if !worktree_git.has_commits_since(target_branch)? {
                             return Err(error);
                         }
+                        worktree_git.resolve_commit("HEAD")
                     }
                 }
-                Ok(())
             })?;
-            work_items.set_goal_branch_name(&goal_id, &worktree.branch)?;
+            let target_git =
+                FileGitWorktreeService::with_runtime_root(&target_root, &self.runtime_root);
+            let base_commit = target_git.resolve_commit(target_branch)?;
+            work_items.update_goal_git_refs(
+                &goal_id,
+                &worktree.branch,
+                target_branch,
+                &base_commit,
+                Some(&candidate_commit),
+            )?;
+            work_items.update_latest_goal_round_evaluation_summary(
+                &goal_id,
+                &serde_json::json!({
+                    "imported_candidate": {
+                        "source": "standalone",
+                        "session_id": session_id,
+                        "branch": worktree.branch,
+                        "candidate_commit": candidate_commit
+                    },
+                    "implementation_report": "Imported from a completed Standalone worktree for independent Quality and Governance."
+                }),
+            )?;
             work_items.transition_goal_status(&goal_id, GoalStatus::Todo)?;
-            work_items.advance_automated_goal_status(&goal_id, GoalStatus::InProgress)?;
-            let goal =
-                work_items.advance_automated_goal_status(&goal_id, GoalStatus::ReadyMerge)?;
+            let goal = work_items.advance_automated_goal_status(&goal_id, GoalStatus::Quality)?;
             self.mark_worktree_submitted(session_id, &goal_id)?;
-            self.interrupt(session_id, "submitted for ready-merge")?;
+            self.interrupt(session_id, "submitted to quality")?;
             Ok(goal)
         })();
         match submit_result {
-            Ok(goal) => Ok(StandaloneReadyMergeResult { goal, worktree }),
+            Ok(goal) => Ok(StandaloneQualityResult { goal, worktree }),
             Err(error) => {
                 let _ = work_items.delete_goal_record(&goal_id);
                 Err(error)

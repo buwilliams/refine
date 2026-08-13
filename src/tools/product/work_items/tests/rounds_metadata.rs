@@ -156,7 +156,7 @@ fn implementation_plan_round_trips_and_rejects_stale_or_rebound_updates() {
         .transition_goal_status("GOAL1", GoalStatus::Todo)
         .unwrap();
     service
-        .advance_automated_goal_status("GOAL1", GoalStatus::InProgress)
+        .advance_automated_goal_status("GOAL1", GoalStatus::Plan)
         .unwrap();
     service
         .update_goal_git_refs("GOAL1", "refine/GOAL1/round-1", "main", "base123", None)

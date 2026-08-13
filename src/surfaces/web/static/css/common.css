@@ -128,10 +128,10 @@
 }
 .status-pill.backlog     { background: var(--color-neutral-soft); color: var(--color-text-muted); }
 .status-pill.todo        { background: var(--color-neutral-soft); color: var(--color-text-muted); }
-.status-pill.in-progress { background: var(--color-warning-soft); color: var(--color-warning); }
-.status-pill.qa          { background: var(--color-success-soft); color: #0f766e; }
-.status-pill.ready-merge { background: #fff0d7; color: #9a5b00; }
-.status-pill.build { background: var(--color-warning-soft); color: var(--color-warning); }
+.status-pill.plan { background: var(--color-warning-soft); color: var(--color-warning); }
+.status-pill.implement { background: #fff0d7; color: #9a5b00; }
+.status-pill.quality { background: var(--color-success-soft); color: #0f766e; }
+.status-pill.governance { background: #ede9fe; color: #6d28d9; }
 
 .source-promotion-facts {
   display: grid;

@@ -140,14 +140,14 @@ pub enum GoalAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Retry a failed stage for a Goal: --stage quality returns it to QA, --stage merge to ready-merge.
+    /// Retry a failed stage for a Goal: --stage quality or --stage governance.
     Retry {
         /// Goal id.
         id: String,
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
-        /// Stage to retry: "quality" (back to QA) or "merge" (back to ready-merge).
+        /// Stage to retry: "quality" or "governance". The legacy "merge" alias is accepted.
         #[arg(long, default_value = "quality")]
         stage: String,
     },
@@ -159,7 +159,7 @@ pub enum GoalAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Internal verification alias retained for QA and compatibility.
+    /// Internal verification alias retained for compatibility.
     #[command(hide = true)]
     Verify {
         /// Goal id.

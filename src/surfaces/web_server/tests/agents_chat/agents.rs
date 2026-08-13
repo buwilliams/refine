@@ -62,7 +62,7 @@ fn web_api_stops_managed_and_synthetic_agents_through_shared_control() {
         .transition_goal_status("GOAL-STOP-AGENT", GoalStatus::Todo)
         .unwrap();
     work_items
-        .advance_automated_goal_status("GOAL-STOP-AGENT", GoalStatus::InProgress)
+        .advance_automated_goal_status("GOAL-STOP-AGENT", GoalStatus::Plan)
         .unwrap();
 
     let agent_supervisor = FileProcessSupervisor::new(runtime_root.join("agents"));
@@ -134,7 +134,7 @@ fn web_api_stops_managed_and_synthetic_agents_through_shared_control() {
         .transition_goal_status("GOAL-STOP-CHAT", GoalStatus::Todo)
         .unwrap();
     work_items
-        .advance_automated_goal_status("GOAL-STOP-CHAT", GoalStatus::InProgress)
+        .advance_automated_goal_status("GOAL-STOP-CHAT", GoalStatus::Plan)
         .unwrap();
     let chat = FileChatService::with_runtime_root(&refine_dir, &runtime_root);
     let session = chat
@@ -174,7 +174,7 @@ fn web_api_stops_managed_and_synthetic_agents_through_shared_control() {
         .transition_goal_status("GOAL-STOP-MCP", GoalStatus::Todo)
         .unwrap();
     work_items
-        .advance_automated_goal_status("GOAL-STOP-MCP", GoalStatus::InProgress)
+        .advance_automated_goal_status("GOAL-STOP-MCP", GoalStatus::Plan)
         .unwrap();
     let mcp_process = agent_supervisor
         .launch(ManagedProcessSpec {

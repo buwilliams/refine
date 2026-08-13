@@ -77,13 +77,7 @@ fn authored_todo_start_rejects_round_revision_change_before_execution() {
         .unwrap();
 
     let error = service
-        .advance_authored_goal_status(
-            "GOAL1",
-            GoalStatus::InProgress,
-            round_idx,
-            revision,
-            &request,
-        )
+        .advance_authored_goal_status("GOAL1", GoalStatus::Plan, round_idx, revision, &request)
         .unwrap_err();
     assert!(
         error
@@ -118,15 +112,9 @@ fn authored_todo_start_atomically_pins_nonempty_round() {
         .unwrap();
     let (round_idx, revision, request) = service.authored_goal_commitment("GOAL1").unwrap();
     let started = service
-        .advance_authored_goal_status(
-            "GOAL1",
-            GoalStatus::InProgress,
-            round_idx,
-            revision,
-            &request,
-        )
+        .advance_authored_goal_status("GOAL1", GoalStatus::Plan, round_idx, revision, &request)
         .unwrap();
-    assert_eq!(started.goal.status, GoalStatus::InProgress);
+    assert_eq!(started.goal.status, GoalStatus::Plan);
     assert_eq!(round_idx, 0);
     assert_eq!(request, "Authoritative source");
     fs::remove_dir_all(temp_root).unwrap();
@@ -211,7 +199,7 @@ fn file_work_item_service_rejects_invalid_manual_transition() {
     .unwrap();
 
     let err = FileWorkItemService::new(&refine_dir)
-        .transition_goal_status("GOAL1", GoalStatus::InProgress)
+        .transition_goal_status("GOAL1", GoalStatus::Implement)
         .unwrap_err();
     assert_eq!(
         err.category(),

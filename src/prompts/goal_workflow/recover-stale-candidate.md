@@ -1,1 +1,0 @@
-Recover the completed implementation from stale candidate {{candidate_commit}} (round {{source_round}}) onto the current {{target_branch}} target at {{target_commit}}. Preserve the prior round and candidate as audit evidence, reapply the intended changes on the current target, and rerun Governance and Quality before integration.

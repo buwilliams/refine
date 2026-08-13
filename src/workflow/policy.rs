@@ -189,10 +189,10 @@ impl WorkflowEngine {
             .filter(|goal| {
                 matches!(
                     goal.status,
-                    GoalStatus::InProgress
-                        | GoalStatus::ReadyMerge
-                        | GoalStatus::Build
-                        | GoalStatus::Qa
+                    GoalStatus::Plan
+                        | GoalStatus::Implement
+                        | GoalStatus::Quality
+                        | GoalStatus::Governance
                 )
             })
             .filter(|goal| goal.node_id.as_deref().unwrap_or("default") == active_node_id)
@@ -391,7 +391,7 @@ fn releases_feature_order(status: &GoalStatus) -> bool {
 fn occupies_feature_slot(status: &GoalStatus) -> bool {
     matches!(
         status,
-        GoalStatus::InProgress | GoalStatus::ReadyMerge | GoalStatus::Build | GoalStatus::Qa
+        GoalStatus::Plan | GoalStatus::Implement | GoalStatus::Quality | GoalStatus::Governance
     )
 }
 

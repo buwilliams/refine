@@ -25,7 +25,7 @@ Each worker receives the Goal, Round, selected context, and semantic instruction
 
 Two nodes may briefly believe work is available because synchronization is delayed. Durable state convergence decides the outcome. In the clear reassignment-versus-start race, an automated start by the previously authoritative node wins over a concurrent queued reassignment. Ambiguous lifecycle conflicts remain visible for resolution rather than being hidden by timestamps or local runtime records.
 
-Stop and Cancel have different meanings. Stop targets a local process and conditionally requeues an unchanged Goal. Cancel writes terminal synchronized Goal intent and then attempts to stop matching local processes. Ready Merge has an explicit point of no return: cancellation before Git integration blocks it; cancellation after integration begins does not trigger rollback, and exact integration evidence is still recorded.
+Stop and Cancel have different meanings. Stop targets a local process and conditionally requeues an unchanged Goal. Cancel writes terminal synchronized Goal intent and then attempts to stop matching local processes. Governance has an explicit point of no return: cancellation before Git integration blocks it; cancellation after integration begins does not trigger rollback, and exact integration evidence is still recorded.
 
 Retired execution-coordination and cancellation-journal files are one-way cleanup inputs. They are removed during recovery and never imported into the new authority model.
 

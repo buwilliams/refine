@@ -24,7 +24,7 @@ fn web_server_goal_detail_exposes_failed_feature_blocking_notice() {
         .transition_goal_status("GOAL1", GoalStatus::Todo)
         .unwrap();
     service
-        .advance_automated_goal_status("GOAL1", GoalStatus::InProgress)
+        .advance_automated_goal_status("GOAL1", GoalStatus::Plan)
         .unwrap();
     service
         .advance_automated_goal_status("GOAL1", GoalStatus::Failed)
@@ -103,10 +103,10 @@ fn web_server_updates_feature_metadata_and_runs_goal_actions() {
         .transition_goal_status("GOAL1", GoalStatus::Todo)
         .unwrap();
     for status in [
-        GoalStatus::InProgress,
-        GoalStatus::ReadyMerge,
-        GoalStatus::Build,
-        GoalStatus::Qa,
+        GoalStatus::Plan,
+        GoalStatus::Implement,
+        GoalStatus::Quality,
+        GoalStatus::Governance,
     ] {
         goal_actions
             .advance_automated_goal_status("GOAL1", status)
@@ -120,7 +120,7 @@ fn web_server_updates_feature_metadata_and_runs_goal_actions() {
     assert_eq!(verified.status, 400);
     assert_eq!(
         goal_actions.show_goal_summary("GOAL1").unwrap().goal.status,
-        GoalStatus::Qa
+        GoalStatus::Governance
     );
 
     server.handle(ApiRequest {
@@ -137,7 +137,7 @@ fn web_server_updates_feature_metadata_and_runs_goal_actions() {
         body: Some(json!({})),
     });
     assert_eq!(retry_quality.status, 200);
-    assert_eq!(retry_quality.body["goal"]["status"], "qa");
+    assert_eq!(retry_quality.body["goal"]["status"], "quality");
 
     let started = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -147,7 +147,7 @@ fn web_server_updates_feature_metadata_and_runs_goal_actions() {
     assert_eq!(started.status, 200);
     assert_eq!(started.body["goal"]["status"], "todo");
     FileWorkItemService::new(&refine_dir)
-        .advance_automated_goal_status("GOAL4", GoalStatus::InProgress)
+        .advance_automated_goal_status("GOAL4", GoalStatus::Plan)
         .unwrap();
     let submitted = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -162,7 +162,13 @@ fn web_server_updates_feature_metadata_and_runs_goal_actions() {
             .contains("workflow-owned")
     );
     FileWorkItemService::new(&refine_dir)
-        .advance_automated_goal_status("GOAL4", GoalStatus::ReadyMerge)
+        .advance_automated_goal_status("GOAL4", GoalStatus::Implement)
+        .unwrap();
+    FileWorkItemService::new(&refine_dir)
+        .advance_automated_goal_status("GOAL4", GoalStatus::Quality)
+        .unwrap();
+    FileWorkItemService::new(&refine_dir)
+        .advance_automated_goal_status("GOAL4", GoalStatus::Governance)
         .unwrap();
     let submitted_again = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -170,7 +176,7 @@ fn web_server_updates_feature_metadata_and_runs_goal_actions() {
         body: Some(json!({})),
     });
     assert_eq!(submitted_again.status, 200);
-    assert_eq!(submitted_again.body["goal"]["status"], "ready-merge");
+    assert_eq!(submitted_again.body["goal"]["status"], "governance");
 
     let retry_merge = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -178,7 +184,7 @@ fn web_server_updates_feature_metadata_and_runs_goal_actions() {
         body: Some(json!({})),
     });
     assert_eq!(retry_merge.status, 200);
-    assert_eq!(retry_merge.body["goal"]["status"], "ready-merge");
+    assert_eq!(retry_merge.body["goal"]["status"], "governance");
 
     let merge = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -192,7 +198,7 @@ fn web_server_updates_feature_metadata_and_runs_goal_actions() {
             .unwrap()
             .goal
             .status,
-        GoalStatus::ReadyMerge
+        GoalStatus::Governance
     );
 
     remove_temp_dir(&temp_root);

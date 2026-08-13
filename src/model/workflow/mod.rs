@@ -5,10 +5,13 @@ use serde::{Deserialize, Serialize};
 pub enum GoalStatus {
     Backlog,
     Todo,
-    InProgress,
-    Qa,
-    ReadyMerge,
-    Build,
+    #[serde(alias = "in-progress")]
+    Plan,
+    Implement,
+    #[serde(alias = "qa")]
+    Quality,
+    #[serde(alias = "ready-merge", alias = "build")]
+    Governance,
     Review,
     Done,
     Failed,
@@ -20,10 +23,10 @@ impl GoalStatus {
         match self {
             Self::Backlog => "backlog",
             Self::Todo => "todo",
-            Self::InProgress => "in-progress",
-            Self::Qa => "qa",
-            Self::ReadyMerge => "ready-merge",
-            Self::Build => "build",
+            Self::Plan => "plan",
+            Self::Implement => "implement",
+            Self::Quality => "quality",
+            Self::Governance => "governance",
             Self::Review => "review",
             Self::Done => "done",
             Self::Failed => "failed",
@@ -35,10 +38,10 @@ impl GoalStatus {
         match value {
             "backlog" => Some(Self::Backlog),
             "todo" => Some(Self::Todo),
-            "in-progress" => Some(Self::InProgress),
-            "qa" => Some(Self::Qa),
-            "ready-merge" => Some(Self::ReadyMerge),
-            "build" => Some(Self::Build),
+            "plan" | "in-progress" => Some(Self::Plan),
+            "implement" => Some(Self::Implement),
+            "quality" | "qa" => Some(Self::Quality),
+            "governance" | "ready-merge" | "build" => Some(Self::Governance),
             "review" => Some(Self::Review),
             "done" => Some(Self::Done),
             "failed" => Some(Self::Failed),
@@ -58,10 +61,10 @@ pub enum TerminalGoalStatus {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum AutomatedGoalStatus {
-    InProgress,
-    Qa,
-    ReadyMerge,
-    Build,
+    Plan,
+    Implement,
+    Quality,
+    Governance,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -69,7 +72,6 @@ pub enum AutomatedGoalStatus {
 pub enum BulkStatusTarget {
     Backlog,
     Todo,
-    Build,
     Review,
     Done,
     Failed,
@@ -90,8 +92,7 @@ pub enum FeatureWorkflowTarget {
 pub enum FeatureProtectedStatus {
     Review,
     Done,
-    ReadyMerge,
-    Build,
+    Governance,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -99,10 +100,10 @@ pub enum FeatureProtectedStatus {
 pub enum FeatureCancelStatus {
     Backlog,
     Todo,
-    InProgress,
-    Qa,
-    ReadyMerge,
-    Build,
+    Plan,
+    Implement,
+    Quality,
+    Governance,
     Review,
     Failed,
 }
@@ -118,9 +119,8 @@ pub enum GoalOperation {
     StartImplementation,
     CancelAutomation,
     RetryAgent,
-    RetryQa,
-    RetryMerge,
-    SubmitMerge,
+    RetryQuality,
+    RetryGovernance,
     VerifyReview,
     Undo,
     Delete,
@@ -204,7 +204,7 @@ pub fn is_bulk_target_allowed(status: &GoalStatus) -> bool {
 pub fn is_automated_status(status: &GoalStatus) -> bool {
     matches!(
         status,
-        GoalStatus::InProgress | GoalStatus::Qa | GoalStatus::ReadyMerge | GoalStatus::Build
+        GoalStatus::Plan | GoalStatus::Implement | GoalStatus::Quality | GoalStatus::Governance
     )
 }
 
@@ -215,7 +215,7 @@ pub fn is_terminal_status(status: &GoalStatus) -> bool {
 pub fn is_feature_protected_status(status: &GoalStatus) -> bool {
     matches!(
         status,
-        GoalStatus::Review | GoalStatus::Done | GoalStatus::ReadyMerge | GoalStatus::Build
+        GoalStatus::Review | GoalStatus::Done | GoalStatus::Governance
     )
 }
 
@@ -224,10 +224,10 @@ pub fn is_feature_cancel_status(status: &GoalStatus) -> bool {
         status,
         GoalStatus::Backlog
             | GoalStatus::Todo
-            | GoalStatus::InProgress
-            | GoalStatus::Qa
-            | GoalStatus::ReadyMerge
-            | GoalStatus::Build
+            | GoalStatus::Plan
+            | GoalStatus::Implement
+            | GoalStatus::Quality
+            | GoalStatus::Governance
             | GoalStatus::Review
             | GoalStatus::Failed
     )
@@ -242,19 +242,20 @@ pub fn goal_operation_allowed(
 
     let allowed = match operation {
         CreateGoal => true,
-        EditMetadata | EditNotes | Delete => !matches!(status, InProgress | Qa | ReadyMerge),
+        EditMetadata | EditNotes | Delete => {
+            !matches!(status, Plan | Implement | Quality | Governance)
+        }
         SubmitNewRound => matches!(status, Todo | Failed | Review | Backlog),
         EditLatestRound => matches!(status, Backlog | Todo | Review),
         StartImplementation => matches!(status, Todo),
         CancelAutomation => is_automated_status(status),
-        RetryAgent => matches!(status, Failed | InProgress),
-        RetryQa => matches!(status, Qa | Failed),
-        RetryMerge => matches!(status, ReadyMerge | Failed),
-        SubmitMerge => matches!(status, ReadyMerge),
+        RetryAgent => matches!(status, Failed | Plan | Implement),
+        RetryQuality => matches!(status, Quality | Failed),
+        RetryGovernance => matches!(status, Governance | Failed),
         VerifyReview => matches!(status, Review),
         Undo => matches!(status, Done | Cancelled),
         AssignToFeature | RemoveFromFeature | ReorderInFeature => {
-            !matches!(status, InProgress | Qa | ReadyMerge)
+            !matches!(status, Plan | Implement | Quality | Governance)
         }
     };
 
@@ -303,17 +304,17 @@ mod tests {
         assert!(user_status_transition(&GoalStatus::Done, &GoalStatus::Review).allowed);
         assert!(user_status_transition(&GoalStatus::Failed, &GoalStatus::Todo).allowed);
         assert!(user_status_transition(&GoalStatus::Cancelled, &GoalStatus::Todo).allowed);
-        assert!(user_status_transition(&GoalStatus::Qa, &GoalStatus::Qa).no_op);
-        assert!(!user_status_transition(&GoalStatus::Todo, &GoalStatus::ReadyMerge).allowed);
-        assert!(!user_status_transition(&GoalStatus::Backlog, &GoalStatus::InProgress).allowed);
+        assert!(user_status_transition(&GoalStatus::Quality, &GoalStatus::Quality).no_op);
+        assert!(!user_status_transition(&GoalStatus::Todo, &GoalStatus::Governance).allowed);
+        assert!(!user_status_transition(&GoalStatus::Backlog, &GoalStatus::Plan).allowed);
     }
 
     #[test]
     fn bulk_targets_exclude_automated_states() {
-        assert!(!is_bulk_target_allowed(&GoalStatus::InProgress));
-        assert!(!is_bulk_target_allowed(&GoalStatus::Qa));
-        assert!(!is_bulk_target_allowed(&GoalStatus::ReadyMerge));
-        assert!(!is_bulk_target_allowed(&GoalStatus::Build));
+        assert!(!is_bulk_target_allowed(&GoalStatus::Plan));
+        assert!(!is_bulk_target_allowed(&GoalStatus::Implement));
+        assert!(!is_bulk_target_allowed(&GoalStatus::Quality));
+        assert!(!is_bulk_target_allowed(&GoalStatus::Governance));
         assert!(is_bulk_target_allowed(&GoalStatus::Review));
         assert!(is_bulk_target_allowed(&GoalStatus::Done));
         assert!(is_bulk_target_allowed(&GoalStatus::Todo));
@@ -323,8 +324,35 @@ mod tests {
     fn feature_rules_protect_specified_goal_statuses() {
         assert!(is_feature_protected_status(&GoalStatus::Review));
         assert!(is_feature_protected_status(&GoalStatus::Done));
-        assert!(is_feature_protected_status(&GoalStatus::ReadyMerge));
-        assert!(is_feature_protected_status(&GoalStatus::Build));
+        assert!(is_feature_protected_status(&GoalStatus::Governance));
         assert!(!is_feature_protected_status(&GoalStatus::Failed));
+    }
+
+    #[test]
+    fn legacy_statuses_are_read_as_current_states_but_never_emitted() {
+        for (legacy, current) in [
+            ("in-progress", GoalStatus::Plan),
+            ("qa", GoalStatus::Quality),
+            ("ready-merge", GoalStatus::Governance),
+            ("build", GoalStatus::Governance),
+        ] {
+            assert_eq!(GoalStatus::parse_wire(legacy), Some(current.clone()));
+            assert_eq!(
+                serde_json::from_str::<GoalStatus>(&format!("\"{legacy}\"")).unwrap(),
+                current
+            );
+        }
+        assert_eq!(
+            serde_json::to_string(&GoalStatus::Plan).unwrap(),
+            "\"plan\""
+        );
+        assert_eq!(
+            serde_json::to_string(&GoalStatus::Quality).unwrap(),
+            "\"quality\""
+        );
+        assert_eq!(
+            serde_json::to_string(&GoalStatus::Governance).unwrap(),
+            "\"governance\""
+        );
     }
 }

@@ -10,11 +10,11 @@ const FEATURES_DEFAULT_DIR = {
   name: "asc", status: "asc", reporter: "asc", assignee: "asc", node: "asc", updated: "desc",
 };
 const FEATURES_STATUS_OPTIONS = [
-  "", "backlog", "todo", "in-progress", "qa", "ready-merge",
-  "build", "review", "done", "failed", "cancelled",
+  "", "backlog", "todo", "plan", "implement", "quality", "governance",
+  "review", "done", "failed", "cancelled",
 ];
 const FEATURE_WORKFLOW_PROTECTED_STATUSES = new Set([
-  "review", "done", "ready-merge", "build",
+  "review", "done", "governance",
 ]);
 
 let _featureModalRoot = null;

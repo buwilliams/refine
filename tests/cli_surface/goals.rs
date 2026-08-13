@@ -205,12 +205,12 @@ pub(crate) fn goal_workflow_actions_start_retry_verify_merge_undo(fixture: &Inte
     fixture.assert_success("goal retry quality", &retried_quality);
     assert_eq!(
         fixture.json_stdout(&retried_quality)["goal"]["status"],
-        "qa"
+        "quality"
     );
     let verified_quality = fixture.run_refine(&["goal", "verify", &quality_id]);
     assert!(
         !verified_quality.status.success(),
-        "goal verify unexpectedly bypassed Ready Merge and Review"
+        "goal verify unexpectedly bypassed Governance and Review"
     );
     assert!(
         String::from_utf8_lossy(&verified_quality.stderr)
@@ -239,7 +239,7 @@ pub(crate) fn goal_workflow_actions_start_retry_verify_merge_undo(fixture: &Inte
     fixture.assert_success("goal retry merge", &retried_merge);
     assert_eq!(
         fixture.json_stdout(&retried_merge)["goal"]["status"],
-        "ready-merge"
+        "governance"
     );
     let merged = fixture.run_refine(&["goal", "merge", &merge_id]);
     assert!(

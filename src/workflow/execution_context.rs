@@ -66,7 +66,7 @@ pub(super) fn hydrate_retry_context(
         .map(|value| {
             serde_json::from_value::<RoundIntegration>(value.clone()).map_err(|error| {
                 RefineError::Serialization(format!(
-                    "Goal {} has invalid Ready Merge evidence: {error}",
+                    "Goal {} has invalid Governance evidence: {error}",
                     ctx.goal_id
                 ))
             })
@@ -172,7 +172,7 @@ pub(super) fn hydrate_retry_context(
     )
 }
 
-/// Restores the implementation workspace for an interrupted in-progress Goal.
+/// Restores the implementation workspace for an interrupted Plan or Implement Goal.
 ///
 /// In-progress may have stopped anywhere between the durable status transition and the first
 /// candidate commit. The branch name is deterministic, completed planning artifacts live on the
@@ -231,12 +231,12 @@ pub(super) fn hydrate_in_progress_context(
     ctx.worktree_path = Some(worktree.clone());
     ctx.candidate_handoff_operation_id = Some(handoff.id);
     ctx.agent_cwd = Some(PathBuf::from(&worktree));
-    ctx.start_status = GoalStatus::InProgress;
+    ctx.start_status = GoalStatus::Implement;
     ctx.log(
         "workflow",
         "Restarted interrupted implementation from its retained worktree",
         Some(json_object(json!({
-            "status": GoalStatus::InProgress.as_str(),
+            "status": GoalStatus::Implement.as_str(),
             "branch": branch,
             "worktree": worktree,
             "round": ctx.round_idx + 1

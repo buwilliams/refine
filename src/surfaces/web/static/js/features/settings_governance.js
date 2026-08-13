@@ -78,10 +78,10 @@ function renderSettingsGovernanceTab(gov) {
     <section class="settings-section" data-testid="governance-explanation">
       <h3>How Governance works</h3>
       <p class="muted small" style="margin-bottom:0">
-        After implementation, Governance inspects the Goal candidate against these Rules,
-        using Product and Constitution as context. A rule violation stops the Goal before
-        build and review; with no rules, the Goal continues. Changes save automatically
-        for subsequent checks and do not start a check now.
+        After Quality, Governance inspects the final Goal candidate against Product,
+        Constitution, Rules, and Guidance. A passing candidate is integrated before Review.
+        A rule finding can draft a fresh recovery Round up to the configured limit.
+        Changes save automatically and do not start a check now.
       </p>
     </section>
 
@@ -105,6 +105,15 @@ function renderSettingsGovernanceTab(gov) {
     })}
 
     <section class="settings-section">
+      <h3>Automatic Governance recovery</h3>
+      <label for="s-governance-max-retries">Maximum automatic recovery Rounds</label>
+      <input id="s-governance-max-retries" type="number" min="0" step="1"
+             value="${htmlEscape(String(gov.max_automatic_round_retries ?? 5))}"
+             data-testid="governance-max-automatic-round-retries">
+      <p class="muted small">Default: 5. Set to 0 to move the first Governance finding to Failed.</p>
+    </section>
+
+    <section class="settings-section">
       <h3>${renderSettingsGuideLabel("Rules", "governance-rules")}</h3>
       <p class="muted small" style="margin-top:0">
         One-line rules the Governance agent applies before and after implementation.
@@ -126,6 +135,7 @@ async function autosaveSettingsGovernance() {
     product: $("#s-governance-product").value,
     constitution: $("#s-governance-constitution").value,
     rules: collectGovernanceRules(),
+    max_automatic_round_retries: Math.max(0, Number.parseInt($("#s-governance-max-retries").value || "5", 10)),
   });
 }
 
@@ -135,7 +145,7 @@ function bindSettingsGovernanceTab(tabSlug = "governance") {
   bindSettingsMarkdownFields(root);
   bindSettingsAutosave(
     root,
-    "#s-governance-product, #s-governance-constitution, .governance-rule-input",
+    "#s-governance-product, #s-governance-constitution, #s-governance-max-retries, .governance-rule-input",
     autosaveSettingsGovernance,
   );
   bindOnce($("#s-governance-add-rule"), "click", () => addGovernanceRuleRow());

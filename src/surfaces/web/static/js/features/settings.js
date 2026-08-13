@@ -377,7 +377,7 @@ function setSettingsControlValue(el, value) {
     el.setAttribute("aria-pressed", enabled ? "true" : "false");
     el.classList.toggle("warn", !enabled);
     if (el.id === "s-quality-enabled") {
-      el.textContent = enabled ? "QA enabled" : "QA disabled";
+      el.textContent = enabled ? "Quality enabled" : "Quality disabled";
     }
   } else if (el instanceof HTMLInputElement && (el.type === "checkbox" || el.type === "radio")) {
     el.checked = value === "1";

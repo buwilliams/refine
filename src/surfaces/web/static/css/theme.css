@@ -63,13 +63,13 @@ html[data-theme="dark"] .workflow-status-grid > .workflow-status-card-agent,
 html[data-theme="dark"] .workflow-status-grid .workflow-agent-indicator {
   border-color: #31517f;
 }
-html[data-theme="dark"] .status-pill.qa,
+html[data-theme="dark"] .status-pill.quality,
 html[data-theme="dark"] .system-log-filter-complete,
 html[data-theme="dark"] .system-log-complete .system-log-message,
 html[data-theme="dark"] .system-log-complete .system-log-status {
   color: #5eead4;
 }
-html[data-theme="dark"] .status-pill.ready-merge {
+html[data-theme="dark"] .status-pill.governance {
   background: #422006;
   color: #fbbf24;
 }

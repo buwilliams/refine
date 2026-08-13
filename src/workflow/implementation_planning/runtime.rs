@@ -37,8 +37,7 @@ pub(super) fn run_observational_phase(
     let git_before = git.implementation_planning_observation()?;
     let started_at = now_timestamp();
     let operation_id = Uuid::new_v4().to_string();
-    let mut metadata =
-        ctx.workflow_process_metadata("in-progress", "WorkflowImplementationPlanning");
+    let mut metadata = ctx.workflow_process_metadata("plan", "WorkflowPlan");
     metadata.insert("implementation_phase".to_string(), json!(phase));
     metadata.insert("operation_id".to_string(), json!(&operation_id));
     metadata.insert("cwd".to_string(), json!(agent_cwd.display().to_string()));
@@ -251,8 +250,10 @@ pub(in crate::workflow) fn persist_plan(
 ) -> RefineResult<()> {
     let summary = ctx.work_items.show_goal_summary(&ctx.goal_id)?;
     let node = summary.goal.node_id.as_deref().unwrap_or("default");
-    if summary.goal.status != GoalStatus::InProgress
-        || node != ctx.node_id
+    if !matches!(
+        summary.goal.status,
+        GoalStatus::Plan | GoalStatus::Implement
+    ) || node != ctx.node_id
         || summary.goal.round_count != ctx.round_idx + 1
     {
         return Err(RefineError::Conflict(format!(

@@ -164,8 +164,26 @@ pub(super) fn run_governed_implementation_planning(
         persist_plan(ctx, Some(&previous), &plan)?;
     }
 
-    begin_phase(ctx, &mut plan, ImplementationPlanPhase::Implement)?;
     Ok(plan.final_plan.expect("revision phase persisted").result)
+}
+
+pub(super) fn begin_implementation_phase(
+    ctx: &WorkflowContext<'_>,
+) -> RefineResult<ProposedImplementationPlan> {
+    let mut plan = current_plan(ctx)?;
+    let final_plan = plan
+        .final_plan
+        .as_ref()
+        .map(|artifact| artifact.result.clone())
+        .ok_or_else(|| {
+            RefineError::Conflict(format!(
+                "Goal {} round {} has no finalized plan",
+                ctx.goal_id,
+                ctx.round_idx + 1
+            ))
+        })?;
+    begin_phase(ctx, &mut plan, ImplementationPlanPhase::Implement)?;
+    Ok(final_plan)
 }
 
 pub(super) fn governed_implementation_prompt(

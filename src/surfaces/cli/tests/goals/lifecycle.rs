@@ -123,7 +123,7 @@ fn goal_approve_and_undo_use_shared_file_work_item_service() {
         .transition_goal_status("GOAL1", GoalStatus::Todo)
         .unwrap();
     service
-        .advance_automated_goal_status("GOAL1", GoalStatus::InProgress)
+        .advance_automated_goal_status("GOAL1", GoalStatus::Plan)
         .unwrap();
     service
         .update_goal_git_refs(
@@ -154,10 +154,13 @@ fn goal_approve_and_undo_use_shared_file_work_item_service() {
         )
         .unwrap();
     service
-        .advance_automated_goal_status("GOAL1", GoalStatus::ReadyMerge)
+        .advance_automated_goal_status("GOAL1", GoalStatus::Implement)
         .unwrap();
     service
-        .advance_automated_goal_status("GOAL1", GoalStatus::Build)
+        .advance_automated_goal_status("GOAL1", GoalStatus::Quality)
+        .unwrap();
+    service
+        .advance_automated_goal_status("GOAL1", GoalStatus::Governance)
         .unwrap();
     service
         .advance_automated_goal_status("GOAL1", GoalStatus::Review)

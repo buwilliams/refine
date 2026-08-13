@@ -40,7 +40,7 @@ pub struct ReconciliationRequest<'a> {
 }
 
 #[derive(Clone, Debug)]
-struct ReadyMergeAuthority {
+struct GovernanceAuthority {
     goal_id: String,
     node_id: String,
     round_idx: usize,
@@ -70,7 +70,7 @@ impl FileMergerService {
         }
     }
 
-    /// Integrate the recorded automated workflow candidate during Ready Merge.
+    /// Integrate the recorded automated workflow candidate during Governance.
     ///
     /// The repository lock serializes fetch/merge/push across processes. Successful evidence is
     /// written before the caller advances the Goal, so a crash after push is recovered by proving
@@ -96,7 +96,7 @@ impl FileMergerService {
         .map(|(integration, ())| integration)
     }
 
-    /// Integrates a Ready Merge candidate and orders its operation settlement with the caller's
+    /// Integrates a Governance candidate and orders its operation settlement with the caller's
     /// next workflow transition.
     ///
     /// Goal authority is checked once more under the repository lock immediately before the first
@@ -119,7 +119,7 @@ impl FileMergerService {
             Some(target_root) => target_root.clone(),
             None => target_root(&self.refine_dir)?,
         };
-        let authority = ReadyMergeAuthority {
+        let authority = GovernanceAuthority {
             goal_id: goal_id.to_string(),
             node_id: node_id.to_string(),
             round_idx,
@@ -148,7 +148,7 @@ impl FileMergerService {
                 self.verify_existing_integration(&git, &existing)?;
                 let transitioned = settlement
                     .take()
-                    .expect("Ready Merge settlement is called once")(
+                    .expect("Governance settlement is called once")(
                     &existing
                 )?;
                 return Ok((existing, transitioned));
@@ -174,7 +174,7 @@ impl FileMergerService {
                 || {
                     settlement
                         .take()
-                        .expect("Ready Merge settlement is called once")(
+                        .expect("Governance settlement is called once")(
                         &integration
                     )
                 },
@@ -197,13 +197,13 @@ impl FileMergerService {
                     // Cancellation is already durable and authoritative. Preserve its causal
                     // operation error instead of replacing it with a late Git/settlement failure.
                     return Err(RefineError::Conflict(format!(
-                        "Ready Merge for Goal {goal_id} was cancelled: {error}"
+                        "Governance for Goal {goal_id} was cancelled: {error}"
                     )));
                 } else {
                     let code = if matches!(&error, RefineError::StaleCandidate { .. }) {
-                        "ready_merge_candidate_stale"
+                        "governance_candidate_stale"
                     } else {
-                        "ready_merge_integration_failed"
+                        "governance_integration_failed"
                     };
                     if let Some(operation_id) = operation_id.as_deref() {
                         let _ = operations.fail_with_error(
@@ -252,7 +252,7 @@ impl FileMergerService {
             .ok_or_else(|| RefineError::Conflict(format!("Goal {goal_id} has no review round")))?;
         let integration = round_integration(round)?.ok_or_else(|| {
             RefineError::Conflict(format!(
-                "Goal {goal_id} reached review without successful Ready Merge evidence"
+                "Goal {goal_id} reached review without successful Governance evidence"
             ))
         })?;
         if integration.candidate_commit != candidate_commit {
@@ -318,9 +318,9 @@ impl FileMergerService {
         };
         let work_items = FileWorkItemService::for_node(&self.refine_dir, node_id);
         let summary = work_items.show_goal_summary(goal_id)?;
-        if summary.goal.status != GoalStatus::Qa {
+        if summary.goal.status != GoalStatus::Quality {
             return Err(RefineError::Conflict(format!(
-                "Goal {goal_id} changed from qa to {} before its reconciliation revert",
+                "Goal {goal_id} changed from quality to {} before its reconciliation revert",
                 summary.goal.status.as_str()
             )));
         }
@@ -345,7 +345,7 @@ impl FileMergerService {
             })?;
         let recorded_integration = round_integration(round)?.ok_or_else(|| {
             RefineError::Conflict(format!(
-                "Goal {goal_id} has no Ready Merge evidence for reconciliation"
+                "Goal {goal_id} has no Governance evidence for reconciliation"
             ))
         })?;
         if &recorded_integration != integration {
@@ -442,7 +442,7 @@ impl FileMergerService {
     fn integrate_workflow_candidate_locked(
         &self,
         target_root: &Path,
-        authority: &ReadyMergeAuthority,
+        authority: &GovernanceAuthority,
         operation_id: &str,
     ) -> RefineResult<RoundIntegration> {
         let work_items = FileWorkItemService::for_node(&self.refine_dir, &authority.node_id);
@@ -465,11 +465,11 @@ impl FileMergerService {
         let remote = required_string(round, "workflow_git_remote", &authority.goal_id)?;
         let mut process_metadata = workflow_subprocess_metadata(
             &authority.goal_id,
-            "ready-merge",
-            "WorkflowReadyMerge",
+            "governance",
+            "WorkflowGovernance",
             Some(authority.round_idx),
         );
-        // Goal cancellation must not kill a Git child after the Ready Merge point of no return.
+        // Goal cancellation must not kill a Git child after the Governance point of no return.
         // This is node-local process metadata, not synchronized execution authority.
         process_metadata.insert("side_effect_committed".to_string(), json!(true));
         let git = FileGitWorktreeService::with_runtime_root(target_root, &self.runtime_root)
@@ -505,7 +505,7 @@ impl FileMergerService {
                         ok: true,
                         conflicts: Vec::new(),
                         message: Some(
-                            "Recovered successful Ready Merge integration from the published target branch"
+                            "Recovered successful Governance integration from the published target branch"
                                 .to_string(),
                         ),
                     },
@@ -602,20 +602,25 @@ impl FileMergerService {
     fn verify_integration_authority(
         &self,
         work_items: &FileWorkItemService,
-        authority: &ReadyMergeAuthority,
-        require_ready_merge: bool,
+        authority: &GovernanceAuthority,
+        require_governance: bool,
     ) -> RefineResult<()> {
         let detail = work_items.show_goal_detail(&authority.goal_id)?;
         let status = detail.get("status").and_then(Value::as_str);
-        if require_ready_merge && status != Some(GoalStatus::ReadyMerge.as_str()) {
+        if require_governance && status != Some(GoalStatus::Governance.as_str()) {
             return Err(RefineError::Conflict(format!(
-                "Goal {} is no longer ready-merge",
+                "Goal {} is no longer in governance",
                 authority.goal_id
             )));
         }
-        if !require_ready_merge && !matches!(status, Some("ready-merge" | "build" | "cancelled")) {
+        if !require_governance
+            && !matches!(
+                status,
+                Some("governance" | "review" | "cancelled" | "ready-merge" | "build")
+            )
+        {
             return Err(RefineError::Conflict(format!(
-                "Goal {} no longer authorizes Ready Merge recovery from status {}",
+                "Goal {} no longer authorizes Governance recovery from status {}",
                 authority.goal_id,
                 status.unwrap_or("unknown")
             )));
@@ -638,7 +643,7 @@ impl FileMergerService {
             })?;
         if rounds.len() != authority.round_idx + 1 {
             return Err(RefineError::Conflict(format!(
-                "Goal {} round changed before Ready Merge integration",
+                "Goal {} round changed before Governance integration",
                 authority.goal_id
             )));
         }
@@ -663,7 +668,7 @@ impl FileMergerService {
         ] {
             if recorded != Some(expected) {
                 return Err(RefineError::Conflict(format!(
-                    "Goal {} {label} changed before Ready Merge integration",
+                    "Goal {} {label} changed before Governance integration",
                     authority.goal_id
                 )));
             }
@@ -702,7 +707,7 @@ impl FileMergerService {
         };
         if !git.commit_is_ancestor(&integration.candidate_commit, &target)? {
             return Err(RefineError::Conflict(format!(
-                "Ready Merge evidence says candidate {} was integrated, but it is absent from {}",
+                "Governance evidence says candidate {} was integrated, but it is absent from {}",
                 integration.candidate_commit, integration.target_branch
             )));
         }
@@ -720,7 +725,7 @@ fn round_integration(round: &Value) -> RefineResult<Option<RoundIntegration>> {
     serde_json::from_value(value.clone())
         .map(Some)
         .map_err(|error| {
-            RefineError::Serialization(format!("invalid Ready Merge integration evidence: {error}"))
+            RefineError::Serialization(format!("invalid Governance integration evidence: {error}"))
         })
 }
 
@@ -733,7 +738,7 @@ fn required_string(value: &Value, key: &str, goal_id: &str) -> RefineResult<Stri
         .map(ToString::to_string)
         .ok_or_else(|| {
             RefineError::Conflict(format!(
-                "Goal {goal_id} has no recorded {key} for Ready Merge integration"
+                "Goal {goal_id} has no recorded {key} for Governance integration"
             ))
         })
 }

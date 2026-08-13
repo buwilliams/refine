@@ -43,19 +43,7 @@ function renderSettingsApplicationTab({
   });
 }
 
-function targetAppAutoBuildLabel(value) {
-  return ({
-    never: "Never",
-    on_worktree_merge: "On worktree merge",
-    hourly: "Hourly",
-    daily: "Daily (time)",
-  })[value] || value || "none";
-}
-
 function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
-  const rawAutoBuildMode = String(s.target_app_auto_build || "on_worktree_merge");
-  const autoBuildMode = rawAutoBuildMode === "nightly" ? "daily" : rawAutoBuildMode;
-  const autoBuildHour = String(s.target_app_auto_build_hour_utc || "0");
   return `
     <section class="settings-section">
       <h3>Application</h3>
@@ -165,37 +153,7 @@ function renderNodeApplicationConfigSections({ s, activeNodeLabel }) {
       })}
       ${renderTargetAppTestCommandsField(s, {
         guideItemId: "application-test",
-        description: "CLI commands Refine runs for workflow QA.",
-      })}
-      ${renderSettingsEditableField({
-        id: "s-target-auto-build",
-        label: "Automatic application build",
-        guideItemId: "application-auto-build",
-        description: "controls when Refine builds isolated candidate work before review.",
-        valueLabel: targetAppAutoBuildLabel(autoBuildMode),
-        control: `<select id="s-target-auto-build">
-          ${[
-            ["never", "Never"],
-            ["on_worktree_merge", "When candidate is ready"],
-            ["hourly", "Hourly"],
-            ["daily", "Daily (time)"],
-          ].map(([v, lbl]) => `<option value="${v}" ${autoBuildMode === v ? "selected" : ""}>${lbl}</option>`).join("")}
-        </select>`,
-      })}
-      ${renderSettingsEditableField({
-        id: "s-target-auto-build-hour-utc",
-        label: "Daily build time",
-        guideItemId: "application-auto-build-time",
-        description: "UTC whole-hour time used when automatic build is Daily.",
-        valueLabel: `${String(autoBuildHour).padStart(2, "0")}:00 UTC`,
-        control: `<select id="s-target-auto-build-hour-utc"
-                          ${autoBuildMode === "daily" ? "" : "disabled"}>
-          ${Array.from({ length: 24 }, (_, hour) => {
-            const value = String(hour);
-            const label = `${String(hour).padStart(2, "0")}:00 UTC`;
-            return `<option value="${value}" ${autoBuildHour === value ? "selected" : ""}>${label}</option>`;
-          }).join("")}
-        </select>`,
+        description: "CLI commands Refine runs for workflow Quality.",
       })}
       ${renderSettingsEditableField({
         id: "s-target-status-command",
@@ -327,8 +285,6 @@ function collectSettingsApplicationPayload() {
     target_app_stop_command: "",
     target_app_build_command: "",
     target_app_test_commands: $("#s-target-test-commands").value,
-    target_app_auto_build: $("#s-target-auto-build").value,
-    target_app_auto_build_hour_utc: $("#s-target-auto-build-hour-utc").value,
     target_app_status_command: $("#s-target-status-command").value,
     target_app_cwd: $("#s-target-cwd").value,
     target_app_env_json: $("#s-target-env").value,

@@ -1,4 +1,5 @@
 use super::*;
+use serde_json::json;
 
 impl FileWorkItemService {
     pub(super) fn with_goal_reporter_registered<T>(
@@ -148,12 +149,30 @@ impl FileWorkItemService {
                 goal_path.display()
             ))
         })?;
-        let value: Value = serde_json::from_slice(&bytes).map_err(|error| {
+        let mut value: Value = serde_json::from_slice(&bytes).map_err(|error| {
             RefineError::Serialization(format!(
                 "failed to parse Goal {}: {error}",
                 goal_path.display()
             ))
         })?;
+        if value
+            .get("status")
+            .and_then(Value::as_str)
+            .is_some_and(|status| matches!(status, "in-progress" | "qa" | "ready-merge" | "build"))
+        {
+            value["status"] = Value::String(current.goal.status.as_str().to_string());
+            if let Some(round) = value
+                .get_mut("rounds")
+                .and_then(Value::as_array_mut)
+                .and_then(|rounds| rounds.last_mut())
+            {
+                round["workflow_status_migration"] = json!({
+                    "target": current.goal.status.as_str(),
+                    "migrated_at": now_timestamp()
+                });
+            }
+            write_json_atomically(&goal_path, &value)?;
+        }
         Ok((goal_path, value))
     }
 

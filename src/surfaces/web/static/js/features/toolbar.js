@@ -1149,7 +1149,8 @@ function toolbarIcon(name) {
 function renderTerminalPanel(tab) {
   const terminal = terminalStateFor(chatState.activeTabId);
   const role = tab.mode === "terminal" ? "shell" : `${tab.label} agent`;
-  const diagnosticGoal = tab.mode === "goal" && tab.goalStatus && tab.goalStatus !== "in-progress";
+  const diagnosticGoal = tab.mode === "goal" && tab.goalStatus
+    && !["plan", "implement", "quality"].includes(tab.goalStatus);
   const status = terminal?.loading
     ? `Starting ${role}...`
     : terminal?.stopping

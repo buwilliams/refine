@@ -10,7 +10,7 @@
 
 ## Purpose
 
-Workflow moves software work forward without turning each Goal into an ad hoc chat session. It promotes, implements, quality-checks, integrates, optionally rebuilds, reviews, retries, pauses, resumes, and recovers work through explicit Goal states.
+Workflow moves software work forward without turning each Goal into an ad hoc chat session. It plans, implements, quality-checks, governs, integrates, reviews, retries, pauses, resumes, and recovers work through explicit Goal states.
 
 The point is durable semantic advancement. Refine should know what can happen next, why it can happen, and which node owns the Goal without persisting a second execution-ownership state machine.
 
@@ -20,10 +20,10 @@ The lifecycle is:
 
 - backlog: captured work waits until it is ready;
 - todo: actionable work is eligible on its assigned node;
-- in-progress: agents or processes implement the current Round;
-- qa: checks gather evidence before integration or after build according to pinned timing;
-- ready-merge: exact candidate integration is serialized by the repository lock;
-- build: the integrated target app is rebuilt or explicitly skipped;
+- plan: independent agents propose, critique, and finalize an implementation plan from pinned project and Goal context;
+- implement: a fresh agent changes the isolated candidate using the finalized plan;
+- quality: a fresh agent reviews the plan and implementation, writes or selects appropriate tests, corrects the candidate, and proves the checks pass;
+- governance: an independent review verifies product, constitution, rules, and guidance before exact candidate integration;
 - review: evidence and judgment accept or decline the integrated result;
 - done: the intended outcome is complete;
 - failed: the attempt stopped with inspectable evidence;
@@ -31,7 +31,7 @@ The lifecycle is:
 
 Workflow policy applies soft global, node, provider, and target-app limits based on observed live processes. Feature order and priority shape selection. An in-memory active set avoids duplicate launches in one runner, while synchronized Goal status, node assignment, and Round remain authoritative across nodes.
 
-Workers persist semantic artifacts and reread Goal authority at transitions and consequential boundaries. A restart may schedule the same nonterminal Goal again. Preserved planning, Git, quality, governance, integration, logs, branches, and worktrees make that repetition idempotent and explainable.
+Workers persist semantic artifacts and reread Goal authority at transitions and consequential boundaries. A restart may schedule the same nonterminal Goal again. Preserved planning, Git, quality, governance, integration, logs, branches, and worktrees make that repetition idempotent and explainable. A valid Governance finding may draft a fresh recovery Round and atomically return the Goal to todo; provider, parsing, Git, and infrastructure failures do not consume that automatic recovery budget.
 
 Preparation and non-retryable failures move an unchanged active Goal to failed. Retryable local failures use in-memory backoff and do not create durable delay records. Pause controls suppress new work and quiesce supported processes.
 

@@ -60,7 +60,9 @@ fn governance_review_without_a_verdict_fails_closed_as_a_parse_error() {
 fn governance_failing_verdict_records_the_parsed_violations() {
     let output = "Rule 1 is violated.\n\
              {\"status\":\"failed\",\"message\":\"app.py contains a smoke marker\",\
-             \"violations\":[{\"rule_id\":\"rule-1\",\"message\":\"smoke marker appended\"}]}";
+             \"violations\":[{\"rule_id\":\"rule-1\",\"message\":\"smoke marker appended\"}],\
+             \"recovery_analysis\":\"Remove the marker.\",\
+             \"recovery_round_prompt\":\"Remove the marker and rerun focused tests.\"}";
 
     let evaluation = parse_governance_provider_output(output, 1);
 
@@ -70,10 +72,18 @@ fn governance_failing_verdict_records_the_parsed_violations() {
         Some("app.py contains a smoke marker")
     );
     assert_eq!(evaluation.details["failed_actions"][0]["rule_id"], "rule-1");
+    assert_eq!(
+        evaluation.recovery_analysis.as_deref(),
+        Some("Remove the marker.")
+    );
+    assert_eq!(
+        evaluation.recovery_round_prompt.as_deref(),
+        Some("Remove the marker and rerun focused tests.")
+    );
 }
 
 #[test]
-fn file_automation_fails_in_progress_goal_on_post_implementation_governance_violation() {
+fn file_automation_fails_after_the_governance_recovery_budget_is_exhausted() {
     let temp_root = unique_temp_dir("automation-governance");
     let target_root = temp_root.clone();
     let refine_dir = test_refine_dir(&target_root);
@@ -95,7 +105,7 @@ fn file_automation_fails_in_progress_goal_on_post_implementation_governance_viol
             "#!/bin/sh\n\
              case \"$*\" in\n\
              *\"Post-implementation governance review\"*)\n\
-               printf '%s\\n' '{\"status\":\"failed\",\"message\":\"Do not append smoke markers.\",\"violations\":[{\"rule_id\":\"rule-1\",\"rule\":\"Do not append smoke markers.\",\"message\":\"app.py contains a smoke marker\"}]}'\n\
+               printf '%s\\n' '{\"status\":\"failed\",\"message\":\"Do not append smoke markers.\",\"violations\":[{\"rule_id\":\"rule-1\",\"rule\":\"Do not append smoke markers.\",\"message\":\"app.py contains a smoke marker\"}],\"recovery_analysis\":\"The implementation appended a forbidden marker.\",\"recovery_round_prompt\":\"Remove the smoke marker from app.py and preserve the health function without generated markers.\"}'\n\
                ;;\n\
              *)\n\
                printf '\\n# automated by smoke-ai governance violation\\n' >> app.py\n\
@@ -110,6 +120,12 @@ fn file_automation_fails_in_progress_goal_on_post_implementation_governance_viol
         permissions.set_mode(0o755);
         fs::set_permissions(&smoke_ai, permissions).unwrap();
     }
+    git(&temp_root, &["add", "smoke-ai"]).unwrap();
+    git(
+        &temp_root,
+        &["commit", "-q", "-m", "Add test provider fixture"],
+    )
+    .unwrap();
 
     let _smoke_ai_env_guard = smoke_ai_env_lock()
         .lock()
@@ -141,12 +157,18 @@ fn file_automation_fails_in_progress_goal_on_post_implementation_governance_viol
 
     let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
     let error = automation.evaluate_workflow().unwrap_err();
-    assert!(error.to_string().contains("Do not append smoke markers."));
+    assert!(
+        error
+            .to_string()
+            .contains("Governance findings remain after 5 automatic recovery Rounds"),
+        "{error}"
+    );
     let goal = work_items.show_goal_detail("GOAL1").unwrap();
     assert_eq!(goal["status"], "failed");
-    let latest = &goal["rounds"][0];
+    assert_eq!(goal["rounds"].as_array().unwrap().len(), 6);
+    let latest = &goal["rounds"][5];
     assert_eq!(latest["rule_state"], "failed");
-    assert_eq!(latest["quality_state"], "unclassified");
+    assert_eq!(latest["quality_state"], "passed");
     assert!(
         latest["governance_message"]
             .as_str()
@@ -155,6 +177,8 @@ fn file_automation_fails_in_progress_goal_on_post_implementation_governance_viol
     );
     assert_eq!(latest["governance_details"]["phase"], "post_implementation");
     assert_eq!(latest["governance_rule_actions"][0]["rule_id"], "rule-1");
+    assert_eq!(goal["rounds"][5]["automatic_retry"]["attempt"], 5);
+    assert_eq!(goal["rounds"][5]["automatic_retry"]["kind"], "governance");
     unsafe {
         if let Some(previous) = previous_smoke_ai {
             std::env::set_var("REFINE_SMOKE_AI_PATH", previous);

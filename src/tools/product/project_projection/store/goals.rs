@@ -38,7 +38,7 @@ impl FileProjectProjectionStore {
             goal: GoalIndexProjection {
                 id,
                 name: text(object.get("name")).unwrap_or_else(|| "Untitled Goal".to_string()),
-                status: goal_status(object.get("status")),
+                status: goal_status(object),
                 priority: goal_priority(object.get("priority")),
                 reporter,
                 assignee,

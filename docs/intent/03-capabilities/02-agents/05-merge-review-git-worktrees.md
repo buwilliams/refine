@@ -6,7 +6,7 @@
 - **Review As Boundary**: review is a meaningful workflow state, not a decorative approval label.
 - **Worktree Isolation**: agent and standalone work should be isolated when that makes changes safer and easier to inspect.
 - **Evidence-Based Merge**: merge decisions should be grounded in diffs, quality results, logs, and Goal intent.
-- **Recoverable Handoff**: work should move from isolated implementation through integration and rebuild to acceptance without losing context.
+- **Recoverable Handoff**: work should move from isolated implementation through Quality, Governance, integration, and acceptance without losing context.
 
 ## Purpose
 
@@ -21,13 +21,13 @@ This capability should connect workflow with the user's source repository:
 - implementation work can happen in an isolated branch or worktree;
 - todo Goals remain state-only regardless of queue size; an implementation
   worktree is created only after scheduler capacity is acquired and the Goal is
-  durably in-progress;
-- ready-merge should be a serialized merger-owned queue with a reviewable exact candidate and enough evidence;
-- ready-merge should merge and push the isolated candidate exactly once before optionally rebuilding the composed target app;
+  durably in Plan;
+- Governance should serialize exact candidate integration after Quality passes;
+- Governance should merge and push the isolated candidate exactly once before Review;
 - review should preserve human or agent judgment over the integrated result;
 - approval should mark the reviewed integration accepted without merging or pushing again;
 - failed or conflicted merges should create recoverable evidence;
-- standalone worktree output should be able to become structured ready-merge work.
+- standalone worktree output should be able to become structured Quality work.
 - clean managed Goal worktrees in any status should be hibernated by the shared
   maintenance capability after the configured retention delay when no live
   live operation or process owns them. Recoverable branches recreate the

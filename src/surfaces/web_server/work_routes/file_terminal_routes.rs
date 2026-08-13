@@ -130,16 +130,17 @@ impl InProcessWebServer {
                                 .ok()
                         })
                         .is_some_and(|goal| {
-                            goal.get("status").and_then(Value::as_str) == Some("in-progress")
-                                && goal
-                                    .get("rounds")
-                                    .and_then(Value::as_array)
-                                    .and_then(|rounds| rounds.last())
-                                    .and_then(|round| round.get("implementation_plan"))
-                                    .is_some_and(|plan| {
-                                        plan.get("state").and_then(Value::as_str)
-                                            == Some("in_progress")
-                                    })
+                            matches!(
+                                goal.get("status").and_then(Value::as_str),
+                                Some("plan" | "implement")
+                            ) && goal
+                                .get("rounds")
+                                .and_then(Value::as_array)
+                                .and_then(|rounds| rounds.last())
+                                .and_then(|round| round.get("implementation_plan"))
+                                .is_some_and(|plan| {
+                                    plan.get("state").and_then(Value::as_str) == Some("in_progress")
+                                })
                         });
                     if planning_between_processes {
                         return error_response(RefineError::Conflict(format!(

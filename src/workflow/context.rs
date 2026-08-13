@@ -3,13 +3,13 @@ use std::path::{Path, PathBuf};
 use serde_json::json;
 
 use crate::model::JsonObject;
-use crate::model::goal::{RoundIntegration, WorkflowQualityTiming};
+use crate::model::goal::RoundIntegration;
 use crate::model::log::LogEntry;
 use crate::model::workflow::GoalStatus;
 use crate::process::subprocess::workflow_subprocess_metadata;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::git_worktrees::MergeResult;
-use crate::tools::host::quality::{FileQualityService, POST_BUILD, PRE_MERGE, QualityCheckRequest};
+use crate::tools::host::quality::QualityCheckRequest;
 use crate::tools::observability::logs::FileLogService;
 use crate::tools::product::work_items::FileWorkItemService;
 use crate::workflow::{json_object, now_timestamp};
@@ -41,7 +41,6 @@ pub struct WorkflowContext<'a> {
     pub reconciliation_state: Option<String>,
     pub final_status: Option<GoalStatus>,
     pub start_status: GoalStatus,
-    quality_timing: Option<String>,
     git_remote: Option<String>,
 }
 
@@ -83,8 +82,7 @@ impl<'a> WorkflowContext<'a> {
             reconciliation: None,
             reconciliation_state: None,
             final_status: None,
-            start_status: GoalStatus::InProgress,
-            quality_timing: None,
+            start_status: GoalStatus::Plan,
             git_remote: None,
         }
     }
@@ -125,7 +123,7 @@ impl<'a> WorkflowContext<'a> {
                 to.as_str()
             )));
         }
-        let transition = if from == GoalStatus::Todo && to == GoalStatus::InProgress {
+        let transition = if from == GoalStatus::Todo && to == GoalStatus::Plan {
             self.work_items.advance_authored_goal_status(
                 &self.goal_id,
                 to.clone(),
@@ -248,127 +246,9 @@ impl<'a> WorkflowContext<'a> {
             .ok_or_else(|| missing_artifact("commit", &self.goal_id))
     }
 
-    /// Returns the Quality ordering committed to this candidate round.
-    ///
-    /// The first validation transition durably pins the current setting. Later Build, Quality,
-    /// and retry workers all reuse that value, so a settings edit cannot change which required
-    /// stages the already-created candidate traverses.
-    pub fn quality_timing(&mut self, current_status: GoalStatus) -> RefineResult<String> {
-        if let Some(timing) = &self.quality_timing {
-            return Ok(timing.clone());
-        }
-        let detail = self.work_items.show_goal_detail(&self.goal_id)?;
-        let round = detail
-            .get("rounds")
-            .and_then(serde_json::Value::as_array)
-            .and_then(|rounds| rounds.get(self.round_idx))
-            .ok_or_else(|| {
-                RefineError::NotFound(format!(
-                    "Goal {} has no round {}",
-                    self.goal_id,
-                    self.round_idx + 1
-                ))
-            })?;
-        if let Some(raw_timing) = round
-            .get("workflow_quality_timing")
-            .and_then(serde_json::Value::as_str)
-            .filter(|value| !value.trim().is_empty())
-        {
-            let timing = WorkflowQualityTiming::parse_wire(raw_timing).ok_or_else(|| {
-                RefineError::Serialization(format!(
-                    "Goal {} round {} has invalid workflow_quality_timing {raw_timing:?}",
-                    self.goal_id,
-                    self.round_idx + 1
-                ))
-            })?;
-            self.quality_timing = Some(timing.as_str().to_string());
-            return Ok(timing.as_str().to_string());
-        }
-
-        // Round 6 first wrote this commitment lazily. Existing candidates that already reached
-        // Build or QA therefore need a status/evidence based transition, not today's mutable
-        // setting. These states unambiguously reveal the ordering that got the candidate there.
-        let (timing, migrated) = match current_status {
-            GoalStatus::InProgress | GoalStatus::ReadyMerge => (
-                FileQualityService::new(self.refine_dir())
-                    .load_settings()?
-                    .timing,
-                false,
-            ),
-            GoalStatus::Build => {
-                let quality_completed = round
-                    .get("quality_state")
-                    .and_then(serde_json::Value::as_str)
-                    == Some("passed");
-                (
-                    if quality_completed {
-                        PRE_MERGE
-                    } else {
-                        POST_BUILD
-                    }
-                    .to_string(),
-                    true,
-                )
-            }
-            GoalStatus::Qa => {
-                let build_completed = round
-                    .get("logs")
-                    .and_then(serde_json::Value::as_array)
-                    .is_some_and(|logs| {
-                        logs.iter().any(|log| {
-                            log.get("category").and_then(serde_json::Value::as_str) == Some("build")
-                                && log.get("message").and_then(serde_json::Value::as_str)
-                                    == Some("Target app build passed")
-                        })
-                    });
-                (
-                    if build_completed {
-                        POST_BUILD
-                    } else {
-                        PRE_MERGE
-                    }
-                    .to_string(),
-                    true,
-                )
-            }
-            status => {
-                return Err(RefineError::Conflict(format!(
-                    "cannot commit Quality timing for Goal {} while it is {}",
-                    self.goal_id,
-                    status.as_str()
-                )));
-            }
-        };
-        let timing = WorkflowQualityTiming::parse_wire(&timing).ok_or_else(|| {
-            RefineError::Serialization(format!(
-                "Quality settings contain invalid timing {timing:?}"
-            ))
-        })?;
-        self.work_items.update_goal_round_evaluation_summary(
-            &self.goal_id,
-            self.round_idx,
-            &json!({"workflow_quality_timing": timing.as_str()}),
-        )?;
-        self.log(
-            "quality",
-            if migrated {
-                "Migrated Quality timing for in-flight candidate validation"
-            } else {
-                "Committed Quality timing for candidate validation"
-            },
-            Some(crate::workflow::json_object(json!({
-                "timing": timing.as_str(),
-                "current_status": current_status.as_str(),
-                "migration": migrated
-            }))),
-        )?;
-        self.quality_timing = Some(timing.as_str().to_string());
-        Ok(timing.as_str().to_string())
-    }
-
     /// Returns the Git remote committed to this candidate round.
     ///
-    /// Candidate publication and Ready Merge integration must use one identity even if project
+    /// Candidate publication and Governance integration must use one identity even if project
     /// settings change while the candidate is in flight.
     pub fn git_remote(&mut self) -> RefineResult<String> {
         if let Some(remote) = &self.git_remote {
@@ -415,180 +295,4 @@ fn missing_artifact(name: &str, goal_id: &str) -> RefineError {
     RefineError::Conflict(format!(
         "workflow artifact {name} is missing for Goal {goal_id}"
     ))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::tools::host::quality::{POST_BUILD, PRE_MERGE, QualitySettingsPatch};
-    use std::fs;
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    #[test]
-    fn candidate_quality_timing_is_durable_across_setting_changes_and_retry_contexts() {
-        let root = unique_temp_dir("workflow-quality-timing-commitment");
-        let refine_dir = root.join("state");
-        let runtime_root = root.join("run/8080");
-        let target_root = root.join("app");
-        fs::create_dir_all(&target_root).unwrap();
-        let work_items = FileWorkItemService::new(&refine_dir);
-        work_items
-            .create_goal_summary("Pinned Quality timing", Some("GOAL1"))
-            .unwrap();
-        work_items
-            .append_goal_round_summary("GOAL1", "Buddy", "Implement")
-            .unwrap();
-        FileQualityService::new(&refine_dir)
-            .save_settings(QualitySettingsPatch {
-                timing: Some(POST_BUILD.to_string()),
-                ..Default::default()
-            })
-            .unwrap();
-        let mut first = WorkflowContext::new(
-            &runtime_root,
-            &target_root,
-            "GOAL1".to_string(),
-            "default".to_string(),
-            "smoke-ai".to_string(),
-            0,
-            JsonObject::new(),
-            work_items.clone(),
-        );
-        let process_metadata =
-            first.workflow_process_metadata("in-progress", "WorkflowImplementation");
-        assert_eq!(process_metadata["goal_id"], "GOAL1");
-        assert_eq!(process_metadata["node_id"], "default");
-        assert_eq!(process_metadata["round_idx"], 0);
-        assert_eq!(
-            first.quality_timing(GoalStatus::ReadyMerge).unwrap(),
-            POST_BUILD
-        );
-
-        FileQualityService::new(&refine_dir)
-            .save_settings(QualitySettingsPatch {
-                timing: Some(PRE_MERGE.to_string()),
-                ..Default::default()
-            })
-            .unwrap();
-        let mut retry = WorkflowContext::new(
-            &runtime_root,
-            &target_root,
-            "GOAL1".to_string(),
-            "default".to_string(),
-            "smoke-ai".to_string(),
-            0,
-            JsonObject::new(),
-            work_items.clone(),
-        );
-        assert_eq!(retry.quality_timing(GoalStatus::Build).unwrap(), POST_BUILD);
-        let detail = work_items.show_goal_detail("GOAL1").unwrap();
-        assert_eq!(detail["rounds"][0]["workflow_quality_timing"], POST_BUILD);
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn in_flight_build_and_qa_rounds_migrate_both_timings_and_keep_them_on_retry() {
-        for (status, prior_quality, prior_build, expected) in [
-            (GoalStatus::Build, false, false, POST_BUILD),
-            (GoalStatus::Build, true, false, PRE_MERGE),
-            (GoalStatus::Qa, false, false, PRE_MERGE),
-            (GoalStatus::Qa, false, true, POST_BUILD),
-        ] {
-            let root = unique_temp_dir(&format!("workflow-quality-migrate-{expected}"));
-            let refine_dir = root.join("state");
-            let runtime_root = root.join("run/8080");
-            let target_root = root.join("app");
-            fs::create_dir_all(&target_root).unwrap();
-            let work_items = FileWorkItemService::new(&refine_dir);
-            work_items
-                .create_goal_summary("Migrate timing", Some("GOAL1"))
-                .unwrap();
-            work_items
-                .append_goal_round_summary("GOAL1", "Buddy", "Implement")
-                .unwrap();
-            if prior_quality {
-                work_items
-                    .update_goal_round_evaluation_summary(
-                        "GOAL1",
-                        0,
-                        &json!({"quality_state": "passed"}),
-                    )
-                    .unwrap();
-            }
-            if prior_build {
-                FileLogService::new(&refine_dir)
-                    .append_round_log(
-                        "GOAL1",
-                        0,
-                        LogEntry {
-                            datetime: now_timestamp(),
-                            severity: "info".to_string(),
-                            category: "build".to_string(),
-                            message: "Target app build passed".to_string(),
-                            details: None,
-                            actions: Vec::new(),
-                            actor: Some("refine".to_string()),
-                            goal_id: Some("GOAL1".to_string()),
-                        },
-                    )
-                    .unwrap();
-            }
-            FileQualityService::new(&refine_dir)
-                .save_settings(QualitySettingsPatch {
-                    timing: Some(if expected == PRE_MERGE {
-                        POST_BUILD.to_string()
-                    } else {
-                        PRE_MERGE.to_string()
-                    }),
-                    ..Default::default()
-                })
-                .unwrap();
-            let mut first = WorkflowContext::new(
-                &runtime_root,
-                &target_root,
-                "GOAL1".to_string(),
-                "default".to_string(),
-                "smoke-ai".to_string(),
-                0,
-                JsonObject::new(),
-                work_items.clone(),
-            );
-            assert_eq!(first.quality_timing(status.clone()).unwrap(), expected);
-
-            FileQualityService::new(&refine_dir)
-                .save_settings(QualitySettingsPatch {
-                    timing: Some(if expected == PRE_MERGE {
-                        POST_BUILD.to_string()
-                    } else {
-                        PRE_MERGE.to_string()
-                    }),
-                    ..Default::default()
-                })
-                .unwrap();
-            let mut retry = WorkflowContext::new(
-                &runtime_root,
-                &target_root,
-                "GOAL1".to_string(),
-                "default".to_string(),
-                "smoke-ai".to_string(),
-                0,
-                JsonObject::new(),
-                work_items.clone(),
-            );
-            assert_eq!(retry.quality_timing(status).unwrap(), expected);
-            assert_eq!(
-                work_items.show_goal_detail("GOAL1").unwrap()["rounds"][0]["workflow_quality_timing"],
-                expected
-            );
-            fs::remove_dir_all(root).unwrap();
-        }
-    }
-
-    fn unique_temp_dir(prefix: &str) -> PathBuf {
-        let nanos = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        std::env::temp_dir().join(format!("refine-{prefix}-{}-{nanos}", std::process::id()))
-    }
 }

@@ -24,7 +24,7 @@ Models should be the stable center of the system. Surfaces may rename controls, 
 Current implementation details that matter to intent:
 
 - `Goal` and `Feature` are explicit Rust model types.
-- Goal statuses are named workflow states: backlog, todo, in-progress, qa, ready-merge, build, review, done, failed, and cancelled.
+- Goal statuses are named workflow states: backlog, todo, plan, implement, quality, governance, review, done, failed, and cancelled. Legacy status names are accepted only while reading or migrating older records.
 - Goals can belong to Features with an order, letting Refine advance ordered work without forcing every Goal into a sequence.
 - Active work is owned by a node so distributed or multi-instance operation can be reasoned about explicitly.
 - Projections exist so the system can stay fast without replacing flat files as the source of truth.

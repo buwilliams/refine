@@ -89,10 +89,10 @@ impl FeatureRollup {
             .filter(|goal| {
                 matches!(
                     goal.status,
-                    GoalStatus::InProgress
-                        | GoalStatus::Qa
-                        | GoalStatus::ReadyMerge
-                        | GoalStatus::Build
+                    GoalStatus::Plan
+                        | GoalStatus::Implement
+                        | GoalStatus::Quality
+                        | GoalStatus::Governance
                         | GoalStatus::Review
                 )
             })
@@ -123,8 +123,17 @@ impl FeatureRollup {
 
         let status = if all_goals_final {
             GoalStatus::Done
-        } else if active_count > 0 {
-            GoalStatus::InProgress
+        } else if let Some(active) = goals.iter().find(|goal| {
+            matches!(
+                goal.status,
+                GoalStatus::Plan
+                    | GoalStatus::Implement
+                    | GoalStatus::Quality
+                    | GoalStatus::Governance
+                    | GoalStatus::Review
+            )
+        }) {
+            active.status.clone()
         } else if failed_count > 0 {
             GoalStatus::Failed
         } else if cancelled_count == goal_count && goal_count > 0 {

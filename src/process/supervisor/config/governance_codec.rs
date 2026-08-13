@@ -34,6 +34,13 @@ pub(super) fn normalize_governance(value: &mut Value) {
             .to_string(),
     );
     value["rules"] = rules;
+    value["max_automatic_round_retries"] = json!(
+        value
+            .get("max_automatic_round_retries")
+            .and_then(Value::as_u64)
+            .and_then(|value| u32::try_from(value).ok())
+            .unwrap_or(5)
+    );
     value["configured"] = Value::Bool(configured);
 }
 

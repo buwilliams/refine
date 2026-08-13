@@ -12,7 +12,7 @@ Review exists because not every decision can be reduced to command output. A cha
 
 ## Expected Role
 
-Review should preserve the Goal's intent, implementation evidence, Ready Merge target commit and push evidence, rebuild outcome, quality output, governance concerns, diffs, and conversation. It should support accepting the integrated result, requesting more work from the current target state, creating follow-up rounds, failing the Goal, or moving toward completion.
+Review should preserve the Goal's intent, finalized plan, implementation and Quality evidence, Governance verdict, exact integrated target commit and push evidence, diffs, and conversation. It should support accepting the integrated result, requesting more work from the current target state, creating follow-up rounds, failing the Goal, or moving toward completion.
 
 Review is a meaningful workflow boundary. For ordered Features, review can represent enough completion to let later work proceed without pretending the entire process is done.
 

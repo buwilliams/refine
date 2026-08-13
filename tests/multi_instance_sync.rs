@@ -370,7 +370,7 @@ fn ready_merge_fixture(prefix: &str) -> ReadyMergeFixture {
         .transition_goal_status("GOAL1", GoalStatus::Todo)
         .unwrap();
     work_items
-        .advance_automated_goal_status("GOAL1", GoalStatus::InProgress)
+        .advance_automated_goal_status("GOAL1", GoalStatus::Plan)
         .unwrap();
     work_items
         .update_goal_git_refs("GOAL1", &branch, "main", &base_commit, Some(&candidate))
@@ -379,7 +379,13 @@ fn ready_merge_fixture(prefix: &str) -> ReadyMergeFixture {
         .update_goal_round_evaluation_summary("GOAL1", 0, &json!({"workflow_git_remote": "origin"}))
         .unwrap();
     work_items
-        .advance_automated_goal_status("GOAL1", GoalStatus::ReadyMerge)
+        .advance_automated_goal_status("GOAL1", GoalStatus::Implement)
+        .unwrap();
+    work_items
+        .advance_automated_goal_status("GOAL1", GoalStatus::Quality)
+        .unwrap();
+    work_items
+        .advance_automated_goal_status("GOAL1", GoalStatus::Governance)
         .unwrap();
     let automation = WorkflowEngine::with_target_root(&runtime_root, &repo);
     let claim_id = automation.claim("GOAL1").unwrap();

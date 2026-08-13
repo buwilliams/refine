@@ -7,12 +7,11 @@ use crate::model::workflow::GoalStatus;
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::project_layout::prepare_refine_dir;
-use crate::tools::host::quality::POST_BUILD;
 use crate::tools::product::project_projection::ActiveGoalIndex;
 use crate::tools::product::work_items::FileWorkItemService;
 use crate::workflow::behavior::{WorkflowAdvanceOutcome, WorkflowBehavior};
 use crate::workflow::behaviors::{
-    WorkflowBuild, WorkflowDone, WorkflowImplementation, WorkflowQa, WorkflowReadyMerge,
+    WorkflowDone, WorkflowGovernance, WorkflowImplementation, WorkflowPlan, WorkflowQuality,
     WorkflowReview, WorkflowTodo,
 };
 use crate::workflow::context::WorkflowContext;
@@ -187,10 +186,10 @@ impl WorkflowEngine {
                 matches!(
                     goal.status,
                     GoalStatus::Todo
-                        | GoalStatus::InProgress
-                        | GoalStatus::ReadyMerge
-                        | GoalStatus::Build
-                        | GoalStatus::Qa
+                        | GoalStatus::Plan
+                        | GoalStatus::Implement
+                        | GoalStatus::Governance
+                        | GoalStatus::Quality
                 )
             })
             .filter(|goal| goal.node_id.as_deref().unwrap_or("default") == policy.active_node_id)
@@ -257,10 +256,10 @@ impl WorkflowEngine {
         if !matches!(
             summary.goal.status,
             GoalStatus::Todo
-                | GoalStatus::InProgress
-                | GoalStatus::ReadyMerge
-                | GoalStatus::Build
-                | GoalStatus::Qa
+                | GoalStatus::Plan
+                | GoalStatus::Implement
+                | GoalStatus::Governance
+                | GoalStatus::Quality
         ) {
             return Err(RefineError::Conflict(format!(
                 "Goal {goal_id} is no longer eligible from {}",
@@ -286,11 +285,12 @@ impl WorkflowEngine {
         match summary.goal.status {
             GoalStatus::Todo => match WorkflowTodo.advance(&mut ctx)? {
                 WorkflowAdvanceOutcome::Transition {
-                    to: GoalStatus::InProgress,
+                    to: GoalStatus::Plan,
                     ..
                 }
                 | WorkflowAdvanceOutcome::Transition {
-                    to: GoalStatus::Qa, ..
+                    to: GoalStatus::Quality,
+                    ..
                 } => Ok(PreparedGoal::Execute(Box::new(ctx))),
                 WorkflowAdvanceOutcome::Completed { final_status, .. } => {
                     ctx.final_status = Some(final_status);
@@ -300,11 +300,13 @@ impl WorkflowEngine {
                 }
                 outcome => Err(RefineError::Conflict(outcome_reason(outcome))),
             },
-            GoalStatus::InProgress => {
+            GoalStatus::Plan | GoalStatus::Implement => {
+                let start_status = summary.goal.status.clone();
                 let pattern =
                     setting_string(&ctx.settings, "branch_name_pattern", "refine/{goal_id}");
                 let target = setting_string(&ctx.settings, "merge_target_branch", "main");
                 hydrate_in_progress_context(&mut ctx, &pattern, &target)?;
+                ctx.start_status = start_status;
                 Ok(PreparedGoal::Execute(Box::new(ctx)))
             }
             current => {
@@ -358,14 +360,20 @@ impl WorkflowEngine {
         ctx: &mut WorkflowContext<'_>,
         mut current: GoalStatus,
     ) -> RefineResult<()> {
+        let plan = WorkflowPlan;
         let implementation = WorkflowImplementation;
-        let ready_merge = WorkflowReadyMerge;
-        let build = WorkflowBuild;
-        let qa = WorkflowQa;
+        let quality = WorkflowQuality;
+        let governance = WorkflowGovernance;
         let review = WorkflowReview;
         let done = WorkflowDone;
-        let behaviors: [&dyn WorkflowBehavior; 6] =
-            [&implementation, &ready_merge, &build, &qa, &review, &done];
+        let behaviors: [&dyn WorkflowBehavior; 6] = [
+            &plan,
+            &implementation,
+            &quality,
+            &governance,
+            &review,
+            &done,
+        ];
         let mut integrated_target_lane = None;
         loop {
             if integrated_target_lane.is_none()
@@ -475,9 +483,8 @@ fn workflow_status_uses_integrated_target(
     status: &GoalStatus,
 ) -> RefineResult<bool> {
     match status {
-        GoalStatus::ReadyMerge | GoalStatus::Build => Ok(true),
-        GoalStatus::Qa if ctx.reconciliation.is_some() => Ok(true),
-        GoalStatus::Qa => Ok(ctx.quality_timing(GoalStatus::Qa)? == POST_BUILD),
+        GoalStatus::Governance => Ok(true),
+        GoalStatus::Quality if ctx.reconciliation.is_some() => Ok(true),
         _ => Ok(false),
     }
 }

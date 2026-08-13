@@ -23,22 +23,10 @@ const state = {
 const WORKFLOW_STATUSES = [
   "backlog",
   "todo",
-  "in-progress",
-  "qa",
-  "ready-merge",
-  "build",
-  "review",
-  "done",
-  "failed",
-  "cancelled",
-];
-const POST_BUILD_WORKFLOW_STATUSES = [
-  "backlog",
-  "todo",
-  "in-progress",
-  "ready-merge",
-  "build",
-  "qa",
+  "plan",
+  "implement",
+  "quality",
+  "governance",
   "review",
   "done",
   "failed",
@@ -48,10 +36,10 @@ const STATUS_FILTER_OPTIONS = ["", ...WORKFLOW_STATUSES];
 const WORKFLOW_STATUS_LABELS = {
   "backlog": "Backlog",
   "todo": "To do",
-  "in-progress": "In progress",
-  "qa": "QA",
-  "ready-merge": "Ready Merge",
-  "build": "Rebuild",
+  "plan": "Plan",
+  "implement": "Implement",
+  "quality": "Quality",
+  "governance": "Governance",
   "review": "Review",
   "done": "Done",
   "failed": "Failed",
@@ -63,9 +51,7 @@ function workflowStatusLabel(status) {
 }
 
 function workflowStatuses() {
-  return state.dashboard?.quality_timing === "post_build"
-    ? POST_BUILD_WORKFLOW_STATUSES
-    : WORKFLOW_STATUSES;
+  return WORKFLOW_STATUSES;
 }
 
 const PASSED_REVIEW_STATES = new Set(["pass", "passed", "ok", "success", "succeeded"]);
@@ -1885,7 +1871,7 @@ function initSSE() {
     if (typeof scheduleAgentStatusRefresh === "function") scheduleAgentStatusRefresh();
     if (typeof refreshTargetAppToggle === "function") refreshTargetAppToggle();
     if (state.currentRoute === "dashboard") refreshDashboard();
-    // Refresh only the table on background updates so an in-progress
+    // Refresh only the table on background updates so an active workflow
     // keystroke in the search box isn't interrupted by a full re-render.
     if (state.currentRoute === "goals") refreshGoalsTable();
     if (state.currentRoute === "logs") loadLogs();

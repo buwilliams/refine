@@ -65,8 +65,8 @@ async function openBulkModal(field) {
         ${BULK_STATUS_OPTIONS.map((s) => `<option value="${s.value}">${htmlEscape(s.label)}</option>`).join("")}
       </select>
       <p class="muted small" style="margin-top:6px">
-        Last workflow state sends failed QA attempts back to qa, failed merge
-        attempts back to ready-merge, other failed Goals back to todo, and leaves active
+        Last workflow state sends failed Quality attempts back to quality, failed integration
+        attempts back to governance, other failed Goals back to todo, and leaves active
         automation and Review alone. Cancelled intentionally stops selected active,
         failed, or Review Goals; Done remains protected. Decline Review by submitting
         a new round when the work should continue.
@@ -239,7 +239,7 @@ function goalsJiraExportOperationHtml(operation, logs = []) {
       ? "failed"
       : status === "cancelled"
         ? "cancelled"
-        : "in-progress";
+        : "automated";
   const progressHtml = total > 0 ? `
     <progress value="${Math.min(completed, total)}" max="${total}"
               aria-label="Jira export progress"></progress>
@@ -546,7 +546,7 @@ async function openBulkTransferNodeModal() {
         ${opts}
       </select>
       <p class="muted small" style="margin-top:6px">
-        In-progress, qa, ready-merge, and build Goals are skipped.
+        Plan, Implement, Quality, and Governance Goals are skipped.
       </p>
     </div>
     <div class="modal-actions">

@@ -52,7 +52,7 @@ function renderTargetAppTestCommandsPreview(commands) {
     <div class="target-test-command-preview-list">
       ${commands.map((item) => `
         <div class="target-test-command-preview-row ${item.enabled === false ? "is-disabled" : ""}">
-          <span class="status-pill ${item.enabled === false ? "muted" : "qa"}">${item.enabled === false ? "disabled" : "enabled"}</span>
+          <span class="status-pill ${item.enabled === false ? "muted" : "quality"}">${item.enabled === false ? "disabled" : "enabled"}</span>
           <code>${htmlEscape(item.command)}</code>
         </div>`).join("")}
     </div>`;
@@ -89,7 +89,7 @@ function renderTargetAppTestCommandsField(settings = {}, options = {}) {
   const value = targetAppTestCommandsValue(commands);
   const id = options.id || "s-target-test-commands";
   const title = options.label || "Target-app tests";
-  const description = options.description || "CLI commands Refine runs for workflow QA.";
+  const description = options.description || "CLI commands Refine runs for workflow Quality.";
   const previewClass = commands.length === 1 ? " target-test-command-preview-single" : "";
   return `
     <div class="form-row settings-editable-field target-test-commands-field"

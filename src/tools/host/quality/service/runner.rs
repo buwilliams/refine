@@ -170,7 +170,7 @@ impl QualityOperationRunner {
                 .and_then(Value::as_object)
                 .ok_or_else(|| {
                     RefineError::Conflict(format!(
-                        "Goal {goal_id} cannot run post-build Quality without Ready Merge integration evidence"
+                        "Goal {goal_id} cannot reconcile legacy integrated Quality without Governance integration evidence"
                     ))
                 })?;
             let integrated_candidate = integration
@@ -183,7 +183,7 @@ impl QualityOperationRunner {
                 })?;
             if integrated_candidate != source_candidate_commit {
                 return Err(RefineError::Conflict(format!(
-                    "Goal {goal_id} post-build Quality candidate changed from {integrated_candidate} to {source_candidate_commit}"
+                    "Goal {goal_id} legacy integrated Quality candidate changed from {integrated_candidate} to {source_candidate_commit}"
                 )));
             }
             let (target_commit, evaluation_scope) = if reconciliation.is_some() {

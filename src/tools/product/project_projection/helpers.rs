@@ -151,13 +151,58 @@ pub(super) fn nullable_i64(value: Option<&Value>) -> Option<i64> {
     }
 }
 
-pub(super) fn goal_status(value: Option<&Value>) -> GoalStatus {
-    match nullable_text(value).as_deref() {
+pub(super) fn goal_status(goal: &serde_json::Map<String, Value>) -> GoalStatus {
+    let latest_round = goal
+        .get("rounds")
+        .and_then(Value::as_array)
+        .and_then(|rounds| rounds.last());
+    match nullable_text(goal.get("status")).as_deref() {
         Some("todo") => GoalStatus::Todo,
-        Some("in-progress") => GoalStatus::InProgress,
-        Some("qa") => GoalStatus::Qa,
-        Some("ready-merge") => GoalStatus::ReadyMerge,
-        Some("build") => GoalStatus::Build,
+        Some("plan") => GoalStatus::Plan,
+        Some("implement") => GoalStatus::Implement,
+        Some("quality") => GoalStatus::Quality,
+        Some("governance") => GoalStatus::Governance,
+        Some("in-progress") => {
+            let plan = latest_round.and_then(|round| round.get("implementation_plan"));
+            if plan
+                .and_then(|plan| plan.get("implementation"))
+                .is_some_and(|value| !value.is_null())
+                || goal
+                    .get("candidate_commit")
+                    .is_some_and(|value| !value.is_null())
+            {
+                GoalStatus::Quality
+            } else if plan
+                .and_then(|plan| plan.get("final_plan"))
+                .is_some_and(|value| !value.is_null())
+            {
+                GoalStatus::Implement
+            } else {
+                GoalStatus::Plan
+            }
+        }
+        Some("qa") => GoalStatus::Quality,
+        Some("ready-merge") => {
+            if latest_round
+                .and_then(|round| round.get("workflow_integration"))
+                .is_some_and(|value| !value.is_null())
+            {
+                GoalStatus::Review
+            } else {
+                GoalStatus::Governance
+            }
+        }
+        Some("build") => {
+            if latest_round
+                .and_then(|round| round.get("quality_state"))
+                .and_then(Value::as_str)
+                == Some("passed")
+            {
+                GoalStatus::Review
+            } else {
+                GoalStatus::Quality
+            }
+        }
         Some("review") => GoalStatus::Review,
         Some("done") => GoalStatus::Done,
         Some("failed") => GoalStatus::Failed,
@@ -182,4 +227,52 @@ pub(super) fn goal_status_counts<'a>(
         *counts.entry(status.clone()).or_default() += 1;
     }
     counts
+}
+
+#[cfg(test)]
+mod workflow_status_migration_tests {
+    use super::*;
+    use serde_json::json;
+
+    fn inferred(value: Value) -> GoalStatus {
+        goal_status(value.as_object().unwrap())
+    }
+
+    #[test]
+    fn legacy_active_statuses_infer_the_safest_current_stage() {
+        assert_eq!(
+            inferred(json!({"status": "in-progress", "rounds": [{}]})),
+            GoalStatus::Plan
+        );
+        assert_eq!(
+            inferred(json!({
+                "status": "in-progress",
+                "rounds": [{"implementation_plan": {"final_plan": {"result": {}}}}]
+            })),
+            GoalStatus::Implement
+        );
+        assert_eq!(
+            inferred(json!({
+                "status": "in-progress",
+                "candidate_commit": "abc",
+                "rounds": [{}]
+            })),
+            GoalStatus::Quality
+        );
+        assert_eq!(
+            inferred(json!({"status": "qa", "rounds": [{}]})),
+            GoalStatus::Quality
+        );
+        assert_eq!(
+            inferred(json!({"status": "ready-merge", "rounds": [{}]})),
+            GoalStatus::Governance
+        );
+        assert_eq!(
+            inferred(json!({
+                "status": "ready-merge",
+                "rounds": [{"workflow_integration": {"target_commit": "def"}}]
+            })),
+            GoalStatus::Review
+        );
+    }
 }

@@ -11,7 +11,7 @@
 
 The workflow UI exists to make Refine's automation legible. It shows where Goals are in the lifecycle and gives users fast navigation into filtered work states.
 
-It should answer: how much work is waiting, active, under QA, ready to merge, in review, done, failed, or cancelled?
+It should answer: how much work is waiting, planning, implementing, under Quality, under Governance, in review, done, failed, or cancelled?
 
 ## Expected Role
 

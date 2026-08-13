@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn ready_merge_integrates_once_and_review_approval_only_accepts() {
+fn governance_integrates_once_and_review_approval_only_accepts() {
     let temp_root = unique_temp_dir("ready-merge-integration");
     let repo = temp_root.join("repo");
     let refine_dir = repo.join(".refine");
@@ -52,7 +52,7 @@ fn ready_merge_integrates_once_and_review_approval_only_accepts() {
         .transition_goal_status("GOAL1", GoalStatus::Todo)
         .unwrap();
     work_items
-        .advance_automated_goal_status("GOAL1", GoalStatus::InProgress)
+        .advance_automated_goal_status("GOAL1", GoalStatus::Plan)
         .unwrap();
     work_items
         .update_goal_git_refs(
@@ -67,7 +67,13 @@ fn ready_merge_integrates_once_and_review_approval_only_accepts() {
         .update_goal_round_evaluation_summary("GOAL1", 0, &json!({"workflow_git_remote": "origin"}))
         .unwrap();
     work_items
-        .advance_automated_goal_status("GOAL1", GoalStatus::ReadyMerge)
+        .advance_automated_goal_status("GOAL1", GoalStatus::Implement)
+        .unwrap();
+    work_items
+        .advance_automated_goal_status("GOAL1", GoalStatus::Quality)
+        .unwrap();
+    work_items
+        .advance_automated_goal_status("GOAL1", GoalStatus::Governance)
         .unwrap();
 
     let merger = FileMergerService::new(&runtime_root, &refine_dir);
@@ -141,12 +147,6 @@ fn ready_merge_integrates_once_and_review_approval_only_accepts() {
     );
     let reviewed_head = git_stdout(&repo, &["rev-parse", "HEAD"]);
     work_items
-        .advance_automated_goal_status("GOAL1", GoalStatus::Build)
-        .unwrap();
-    work_items
-        .advance_automated_goal_status("GOAL1", GoalStatus::Qa)
-        .unwrap();
-    work_items
         .advance_automated_goal_status("GOAL1", GoalStatus::Review)
         .unwrap();
 
@@ -172,7 +172,7 @@ fn ready_merge_integrates_once_and_review_approval_only_accepts() {
             .filter(|line| line.contains("\"action\":\"push\""))
             .count(),
         1,
-        "Ready Merge must be the only target-branch push"
+        "Governance must be the only target-branch push"
     );
     work_items.undo_goal_summary("GOAL1").unwrap();
     let next_round = work_items

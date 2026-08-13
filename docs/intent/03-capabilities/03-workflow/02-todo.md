@@ -8,18 +8,18 @@
 
 ## Purpose
 
-Todo separates captured work from actionable work. It tells Refine that a Goal has enough context to be considered for implementation, recovery, or agent action.
+Todo separates captured work from actionable work. It tells Refine that a Goal has enough context to be picked up by automation for planning, recovery, or imported-candidate validation.
 
 ## Expected Role
 
-The scheduler reads todo Goals assigned to its active node. When policy permits, it rereads the Goal, advances it to in-progress, and starts a node-local worker. No durable reservation or repository copy is created merely because a Goal is queued. The implementation worktree is materialized only when implementation needs it.
+The scheduler reads todo Goals assigned to its active node. When policy permits, it rereads the Goal, advances it to plan, and starts a node-local worker. No durable reservation or repository copy is created merely because a Goal is queued. The implementation worktree is materialized only after the authored Round has crossed into Plan.
 
 If a Goal cannot proceed, it remains visible as actionable work. Live-process counts and runner-local reservations are soft efficiency controls and may be rebuilt after restart.
 
 Todo execution is admitted only for an existing non-empty latest Round. Before
 any branch, worktree, or process is created, Refine locks the Goal record and
 atomically rechecks Todo status, active-node ownership, exact Round count,
-request, and authored workflow revision while moving to in-progress. A changed
+request, and authored workflow revision while moving to plan. A changed
 authoring commitment remains Todo and produces no execution side effects.
 
 ## Future Direction

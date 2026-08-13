@@ -73,11 +73,11 @@ fn static_project_settings_explain_governance_and_quality_effects() {
     let quality = fs::read_to_string(static_root.join("js/features/settings_quality.js")).unwrap();
 
     assert!(governance.contains(r#"data-testid="governance-explanation""#));
-    assert!(governance.contains("A rule violation stops the Goal before"));
+    assert!(governance.contains("A rule finding can draft a fresh recovery Round"));
     assert!(governance.contains("do not start a check now"));
 
     assert!(quality.contains(r#"data-testid="quality-explanation""#));
-    assert!(quality.contains("Passing checks advance the Goal to review"));
+    assert!(quality.contains("Passing checks advance the Goal to Governance"));
     assert!(quality.contains("preserve the candidate"));
     assert!(quality.contains("do not start a run now"));
 }

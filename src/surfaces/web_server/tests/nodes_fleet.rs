@@ -109,7 +109,6 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_fleet() {
         body: Some(json!({
             "target_app_url": "http://127.0.0.1:3000",
             "target_app_start_command": "npm run dev",
-            "target_app_auto_build": "never"
         })),
     });
     server.handle(ApiRequest {

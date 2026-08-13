@@ -77,7 +77,7 @@ fn retrying_a_failed_goal_clears_the_recorded_failure_reason() {
         .transition_goal_status("GOAL1", GoalStatus::Todo)
         .unwrap();
     service
-        .advance_automated_goal_status("GOAL1", GoalStatus::InProgress)
+        .advance_automated_goal_status("GOAL1", GoalStatus::Plan)
         .unwrap();
     service
         .advance_automated_goal_status("GOAL1", GoalStatus::Failed)
@@ -107,7 +107,7 @@ fn retrying_a_failed_goal_clears_the_recorded_failure_reason() {
     service.retry_goal_merge_summary("GOAL1").unwrap();
 
     let retried = service.show_goal_detail("GOAL1").unwrap();
-    assert_eq!(retried["status"], "ready-merge");
+    assert_eq!(retried["status"], "governance");
     assert_eq!(retried["rounds"][0]["failure_category"], "");
     assert_eq!(retried["rounds"][0]["failure_message"], "");
     assert_eq!(retried["rounds"][0]["failure_at"], "");

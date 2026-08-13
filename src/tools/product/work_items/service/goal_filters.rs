@@ -118,7 +118,7 @@ pub(super) fn goal_transfer_skip_reason(goal: &GoalSummaryProjection) -> Option<
 pub(super) fn goal_status_transfer_skip_reason(goal: &GoalSummaryProjection) -> Option<String> {
     if matches!(
         goal.goal.status,
-        GoalStatus::InProgress | GoalStatus::Qa | GoalStatus::ReadyMerge | GoalStatus::Build
+        GoalStatus::Plan | GoalStatus::Implement | GoalStatus::Quality | GoalStatus::Governance
     ) {
         Some(format!("status:{}", goal.goal.status.as_str()))
     } else {

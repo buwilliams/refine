@@ -18,7 +18,7 @@ impl WorkflowEngine {
         let current = work_items.show_goal_summary(goal_id).ok()?;
         if matches!(
             current.goal.status,
-            GoalStatus::InProgress | GoalStatus::ReadyMerge | GoalStatus::Build | GoalStatus::Qa
+            GoalStatus::Plan | GoalStatus::Implement | GoalStatus::Quality | GoalStatus::Governance
         ) {
             work_items.fail_automated_goal_if_active(goal_id).ok()?;
         }

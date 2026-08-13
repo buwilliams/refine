@@ -24,14 +24,8 @@ fn daemon_automation_runs_full_goal_workflow_through_git_worktree() {
             "agent_cli": "smoke-ai",
             "quality_enabled": "1",
             "target_app_test_command": "printf target-tests-ok",
-            "target_app_build_command": "test \"$(git branch --show-current)\" = main && grep -q 'full workflow provider edit' app.py",
             "branch_name_pattern": "refine/{goal_id}"
         }),
-    );
-    fixture.api_json(
-        "PATCH",
-        "/api/quality",
-        serde_json::json!({"timing": "post_build"}),
     );
     fixture.api_json(
         "PATCH",
@@ -44,6 +38,16 @@ fn daemon_automation_runs_full_goal_workflow_through_git_worktree() {
     );
 
     let goal_id = fixture.create_goal("full workflow git-backed goal");
+    let round = fixture.run_refine(&[
+        "goal",
+        "round",
+        &goal_id,
+        "--reporter",
+        "refine-smoke",
+        "--prompt",
+        "Implement the deterministic full workflow provider change.",
+    ]);
+    fixture.assert_success("author workflow round", &round);
     let start = fixture.run_refine(&["goal", "start", &goal_id]);
     fixture.assert_success("start goal workflow", &start);
     wait_for_goal_status(&fixture, &goal_id, "review");
@@ -82,7 +86,7 @@ fn daemon_automation_runs_full_goal_workflow_through_git_worktree() {
     let reviewed_head = git(&fixture.app_root, &["rev-parse", "HEAD"])
         .trim()
         .to_string();
-    assert_eq!(latest["workflow_quality_timing"], "post_build", "{goal:#}");
+    assert!(latest.get("workflow_quality_timing").is_none(), "{goal:#}");
     assert_eq!(
         latest["workflow_integration"]["candidate_commit"], candidate_commit,
         "{goal:#}"
@@ -92,7 +96,7 @@ fn daemon_automation_runs_full_goal_workflow_through_git_worktree() {
         "{goal:#}"
     );
     assert_eq!(
-        latest["quality_details"]["evaluation_scope"], "integrated_target",
+        latest["quality_details"]["evaluation_scope"], "isolated_candidate",
         "{goal:#}"
     );
     assert_eq!(
@@ -100,12 +104,12 @@ fn daemon_automation_runs_full_goal_workflow_through_git_worktree() {
         "{goal:#}"
     );
     assert_eq!(
-        latest["quality_details"]["candidate_commit"], reviewed_head,
+        latest["quality_details"]["candidate_commit"], candidate_commit,
         "{goal:#}"
     );
     assert_eq!(
         latest["quality_details"]["cwd"],
-        fixture.app_root.display().to_string(),
+        worktree.display().to_string(),
         "{goal:#}"
     );
     let state_messages = latest["logs"]
@@ -118,19 +122,14 @@ fn daemon_automation_runs_full_goal_workflow_through_git_worktree() {
     assert_eq!(
         state_messages,
         vec![
-            "Workflow status changed: todo -> in-progress",
-            "Workflow status changed: in-progress -> ready-merge",
-            "Workflow status changed: ready-merge -> build",
-            "Workflow status changed: build -> qa",
-            "Workflow status changed: qa -> review",
+            "Workflow status changed: todo -> plan",
+            "Workflow status changed: plan -> implement",
+            "Workflow status changed: implement -> quality",
+            "Workflow status changed: quality -> governance",
+            "Workflow status changed: governance -> review",
         ],
         "{goal:#}"
     );
-    assert!(latest["logs"].as_array().unwrap().iter().any(|log| {
-        log["message"] == "Target app rebuild passed"
-            && log["details"]["skipped"] == false
-            && log["details"]["checkout"] == fixture.app_root.display().to_string()
-    }));
     assert_eq!(latest["quality_state"], "passed", "{goal:#}");
     assert_eq!(latest["rule_state"], "passed", "{goal:#}");
     assert_eq!(
@@ -209,15 +208,27 @@ fn deterministic_provider_script() -> std::path::PathBuf {
         &path,
         "#!/bin/sh\n\
          case \"$*\" in\n\
+         *\"# Current Workflow Phase: Plan\"*)\n\
+           printf '%s\\n' '{\"state\":\"completed\",\"message\":\"Plan proposed.\",\"guidance_applied\":[],\"planning_result\":{\"summary\":\"Implement and verify the deterministic provider change through the governed workflow.\",\"checklist\":[{\"id\":\"P1\",\"description\":\"Apply and verify the requested deterministic provider change.\"}]}}' > \"$REFINE_AGENT_SIGNAL_PATH\"\n\
+           ;;\n\
+         *\"# Current Workflow Phase: Criticize\"*)\n\
+           printf '%s\\n' '{\"state\":\"completed\",\"message\":\"Plan criticized.\",\"guidance_applied\":[],\"planning_result\":{\"summary\":\"No material omissions found.\",\"findings\":[]}}' > \"$REFINE_AGENT_SIGNAL_PATH\"\n\
+           ;;\n\
+         *\"# Current Workflow Phase: Revise\"*)\n\
+           printf '%s\\n' '{\"state\":\"completed\",\"message\":\"Plan finalized.\",\"guidance_applied\":[],\"planning_result\":{\"summary\":\"Implement and verify the deterministic provider change through the governed workflow.\",\"checklist\":[{\"id\":\"P1\",\"description\":\"Apply and verify the requested deterministic provider change.\"}],\"criticism_resolutions\":[]}}' > \"$REFINE_AGENT_SIGNAL_PATH\"\n\
+           ;;\n\
+         *\"# Goal Workflow Quality\"*)\n\
+           printf '%s\\n' '{\"state\":\"completed\",\"message\":\"Quality reviewed the candidate and retained the passing test.\",\"guidance_applied\":[]}' > \"$REFINE_AGENT_SIGNAL_PATH\"\n\
+           ;;\n\
          *\"Post-implementation Quality evaluation\"*)\n\
            printf '%s\\n' '{\"ok\":true,\"summary\":\"Quality planned.\",\"results\":[{\"test\":\"Migrated Quality command passes: printf target-tests-ok\",\"status\":\"passed\",\"evidence\":\"legacy command selected\",\"command\":\"printf target-tests-ok\"}]}'\n\
            ;;\n\
-         *\"governance\"*)\n\
+         *\"Post-implementation governance review\"*)\n\
            printf '%s\\n' '{\"status\":\"passed\",\"message\":\"Governance passed.\",\"violations\":[]}'\n\
            ;;\n\
          *)\n\
            printf '\\n# full workflow provider edit\\n' >> app.py\n\
-           printf '%s\\n' 'full workflow provider completed'\n\
+           printf '%s\\n' '{\"state\":\"completed\",\"message\":\"full workflow provider completed\",\"guidance_applied\":[],\"implementation_evidence\":{\"checklist\":[{\"id\":\"P1\",\"outcome\":\"completed\",\"evidence\":\"Applied the deterministic app.py change.\"}],\"verification\":[\"provider fixture completed\"]}}' > \"$REFINE_AGENT_SIGNAL_PATH\"\n\
            ;;\n\
          esac\n",
     )

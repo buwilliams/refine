@@ -397,7 +397,7 @@ fn web_server_creates_and_shows_goal() {
 }
 
 #[test]
-fn web_server_submit_standalone_chat_creates_ready_merge_goal_and_preserves_worktree() {
+fn web_server_submit_standalone_chat_creates_quality_goal_and_preserves_worktree() {
     let temp_root = unique_temp_dir("http-chat-standalone-submit");
     let runtime_root = temp_root.join("run/8080");
     init_git_app(&temp_root);
@@ -426,7 +426,7 @@ fn web_server_submit_standalone_chat_creates_ready_merge_goal_and_preserves_work
 
     let submitted = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: format!("/api/chat/{session_id}/submit-ready-merge"),
+        path: format!("/api/chat/{session_id}/submit-quality"),
         body: Some(json!({
             "reporter": "QA",
             "prompt": "Standalone experiment is ready for the merge workflow.",
@@ -435,7 +435,7 @@ fn web_server_submit_standalone_chat_creates_ready_merge_goal_and_preserves_work
     });
     assert_eq!(submitted.status, 201, "{submitted:#?}");
     let goal_id = submitted.body["goal"]["id"].as_str().unwrap().to_string();
-    assert_eq!(submitted.body["goal"]["status"], "ready-merge");
+    assert_eq!(submitted.body["goal"]["status"], "quality");
     assert_eq!(submitted.body["goal"]["branch_name"], branch);
     assert_eq!(submitted.body["goal"]["priority"], "medium");
     assert!(worktree_path.exists());

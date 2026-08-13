@@ -25,7 +25,7 @@ Current implementation details that matter to intent:
 - target-app lifecycle should run through shared host services and supervised processes;
 - detached state should render explicit setup and app-management options;
 - target-app test commands remain lifecycle controls; new Quality policy uses its own plain-text tests;
-- on upgrade, formerly enabled target-app QA commands are imported into Quality once and remain enforced until explicitly replaced by a non-empty plain-text Quality test set.
+- on upgrade, formerly enabled target-app test commands are imported into Quality once and remain enforced until explicitly replaced by a non-empty plain-text Quality test set.
 
 Target App should be practical. It should help Refine operate the real project with the least new infrastructure possible.
 

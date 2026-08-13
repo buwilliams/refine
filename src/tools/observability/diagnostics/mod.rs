@@ -153,7 +153,7 @@ impl DiagnosticsService for FileDiagnosticsService {
                 format!("installed_providers={}", installed_providers.join(",")),
             ],
             browser: vec![
-                "workflow QA uses the configured target-app test command; no browser CLI is required"
+                "workflow Quality uses configured target-app test commands; no browser CLI is required"
                     .to_string(),
             ],
             docker: vec![docker_status],

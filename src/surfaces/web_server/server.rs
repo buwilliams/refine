@@ -664,9 +664,10 @@ impl InProcessWebServer {
 
         if request.method == "POST"
             && request.path.starts_with("/chat/")
-            && request.path.ends_with("/submit-ready-merge")
+            && (request.path.ends_with("/submit-quality")
+                || request.path.ends_with("/submit-ready-merge"))
         {
-            return self.handle_chat_submit_ready_merge(request);
+            return self.handle_chat_submit_quality(request);
         }
 
         if request.method == "POST"
@@ -856,6 +857,7 @@ impl InProcessWebServer {
                 || request.path.ends_with("/verify")
                 || request.path.ends_with("/approve")
                 || request.path.ends_with("/retry-quality")
+                || request.path.ends_with("/retry-governance")
                 || request.path.ends_with("/retry-merge")
                 || request.path.ends_with("/submit-merge")
                 || request.path.ends_with("/merge")

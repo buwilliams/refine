@@ -59,9 +59,12 @@ impl FileWorkItemService {
         let object = value.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!("Goal {goal_id} is not a JSON object"))
         })?;
-        if object.get("status").and_then(Value::as_str) != Some("in-progress") {
+        if !matches!(
+            object.get("status").and_then(Value::as_str),
+            Some("plan" | "implement" | "in-progress")
+        ) {
             return Err(RefineError::Conflict(format!(
-                "Goal {goal_id} left in-progress before implementation planning evidence was written"
+                "Goal {goal_id} left plan/implement before planning evidence was written"
             )));
         }
         for (key, expected_value) in [

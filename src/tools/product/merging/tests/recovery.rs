@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn ready_merge_conflict_aborts_without_advancing_or_losing_candidate() {
+fn governance_conflict_aborts_without_advancing_or_losing_candidate() {
     let temp_root = unique_temp_dir("ready-merge-conflict");
     let repo = temp_root.join("repo");
     let refine_dir = repo.join(".refine");
@@ -54,7 +54,7 @@ fn ready_merge_conflict_aborts_without_advancing_or_losing_candidate() {
         .transition_goal_status("GOAL1", GoalStatus::Todo)
         .unwrap();
     work_items
-        .advance_automated_goal_status("GOAL1", GoalStatus::InProgress)
+        .advance_automated_goal_status("GOAL1", GoalStatus::Plan)
         .unwrap();
     work_items
         .update_goal_git_refs(
@@ -69,7 +69,13 @@ fn ready_merge_conflict_aborts_without_advancing_or_losing_candidate() {
         .update_goal_round_evaluation_summary("GOAL1", 0, &json!({"workflow_git_remote": "origin"}))
         .unwrap();
     work_items
-        .advance_automated_goal_status("GOAL1", GoalStatus::ReadyMerge)
+        .advance_automated_goal_status("GOAL1", GoalStatus::Implement)
+        .unwrap();
+    work_items
+        .advance_automated_goal_status("GOAL1", GoalStatus::Quality)
+        .unwrap();
+    work_items
+        .advance_automated_goal_status("GOAL1", GoalStatus::Governance)
         .unwrap();
 
     let error = FileMergerService::new(&runtime_root, &refine_dir)
@@ -81,7 +87,7 @@ fn ready_merge_conflict_aborts_without_advancing_or_losing_candidate() {
     );
     assert_eq!(
         work_items.show_goal_summary("GOAL1").unwrap().goal.status,
-        GoalStatus::ReadyMerge
+        GoalStatus::Governance
     );
     assert!(
         work_items.show_goal_detail("GOAL1").unwrap()["rounds"][0]["workflow_integration"]

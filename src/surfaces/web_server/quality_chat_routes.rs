@@ -7,21 +7,12 @@ use crate::tools::host::quality::{
     FileQualityService, QualityOperationRunner, QualityService, QualitySettingsPatch,
 };
 use crate::tools::host::target_apps::{FileTargetAppService, TargetAppSnapshot};
-use crate::tools::product::chat::{ChatAttachment, ChatService, StandaloneReadyMergeRequest};
+use crate::tools::product::chat::{ChatAttachment, ChatService, StandaloneQualityRequest};
 
 use super::support::*;
 use super::*;
 
 impl InProcessWebServer {
-    pub(super) fn quality_timing_setting(&self) -> String {
-        self.current_refine_dir()
-            .ok()
-            .flatten()
-            .and_then(|refine_dir| FileQualityService::new(refine_dir).load_settings().ok())
-            .map(|settings| settings.timing)
-            .unwrap_or_else(|| "pre_merge".to_string())
-    }
-
     pub(super) fn with_runtime_settings(&self, mut value: Value) -> Value {
         if let Some(runtime) = self.runtime_settings_value()
             && let Some(object) = value.as_object_mut()
@@ -115,12 +106,6 @@ impl InProcessWebServer {
             "last_operation": snapshot.last_operation,
             "process_id": snapshot.process_id,
             "pid": snapshot.pid,
-            "auto_build": get("target_app_auto_build"),
-            "auto_build_hour_utc": get("target_app_auto_build_hour_utc"),
-            "auto_build_last_started_at": "",
-            "auto_build_last_finished_at": "",
-            "auto_build_last_ok": false,
-            "auto_build_last_message": "",
             "legacy_config_present": !get("target_app_start_command").trim().is_empty()
                 || !get("target_app_stop_command").trim().is_empty()
                 || !get("target_app_build_command").trim().is_empty()
@@ -428,24 +413,27 @@ impl InProcessWebServer {
         }
     }
 
-    pub(super) fn handle_chat_submit_ready_merge(&self, request: ApiRequest) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "submit standalone chat for merge");
+    pub(super) fn handle_chat_submit_quality(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "submit standalone chat to Quality");
         if self.runtime_root.is_none() {
-            return runtime_root_unavailable("submit standalone chat for merge");
+            return runtime_root_unavailable("submit standalone chat to Quality");
         }
         let Some(session_id) = request
             .path
             .strip_prefix("/chat/")
-            .and_then(|path| path.strip_suffix("/submit-ready-merge"))
+            .and_then(|path| {
+                path.strip_suffix("/submit-quality")
+                    .or_else(|| path.strip_suffix("/submit-ready-merge"))
+            })
             .filter(|session_id| !session_id.is_empty() && !session_id.contains('/'))
         else {
             return chat_session_id_required();
         };
         let body = request.body.unwrap_or_else(|| json!({}));
         let service = self.chat_service(&refine_dir);
-        let submit = service.submit_standalone_ready_merge(
+        let submit = service.submit_standalone_quality(
             session_id,
-            StandaloneReadyMergeRequest {
+            StandaloneQualityRequest {
                 name: body.get("name").and_then(Value::as_str).map(str::to_string),
                 reporter: body
                     .get("reporter")

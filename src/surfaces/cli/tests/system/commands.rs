@@ -61,7 +61,7 @@ fn system_ps_lists_and_stops_nested_agent_processes() {
         .transition_goal_status("GOAL-NESTED", GoalStatus::Todo)
         .unwrap();
     work_items
-        .advance_automated_goal_status("GOAL-NESTED", GoalStatus::InProgress)
+        .advance_automated_goal_status("GOAL-NESTED", GoalStatus::Plan)
         .unwrap();
     let port = 19091;
     let port_root = RuntimeRoot {

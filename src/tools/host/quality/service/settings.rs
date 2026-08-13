@@ -60,7 +60,8 @@ impl FileQualityService {
         // `enabled` remains accepted on the compatibility wire shape, but every candidate is
         // evaluated. It cannot disable Quality.
         if let Some(timing) = patch.timing {
-            stored.timing = normalize_timing(&timing)?;
+            let _ = normalize_timing(&timing)?;
+            stored.timing = PRE_MERGE.to_string();
         }
         stored.migration_version = SETTINGS_MIGRATION_VERSION;
         self.write_stored_settings(&stored)?;
@@ -123,7 +124,7 @@ impl FileQualityService {
 
             // Stage imported state without advancing the migration marker. If Node cleanup or
             // the final write fails, retry sees both the staged commands and remaining legacy
-            // state, so enforced QA cannot disappear between attempts.
+            // state, so enforced Quality cannot disappear between attempts.
             self.write_stored_settings(&stored)?;
             #[cfg(test)]
             if self.migration_failure_after_stage {

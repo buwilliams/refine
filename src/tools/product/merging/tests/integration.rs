@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn ready_merge_push_failure_retries_without_duplicate_merge() {
+fn governance_push_failure_retries_without_duplicate_merge() {
     let temp_root = unique_temp_dir("ready-merge-push-retry");
     let repo = temp_root.join("repo");
     let refine_dir = repo.join(".refine");
@@ -64,7 +64,7 @@ fn ready_merge_push_failure_retries_without_duplicate_merge() {
         .transition_goal_status("GOAL1", GoalStatus::Todo)
         .unwrap();
     work_items
-        .advance_automated_goal_status("GOAL1", GoalStatus::InProgress)
+        .advance_automated_goal_status("GOAL1", GoalStatus::Plan)
         .unwrap();
     work_items
         .update_goal_git_refs(
@@ -79,7 +79,13 @@ fn ready_merge_push_failure_retries_without_duplicate_merge() {
         .update_goal_round_evaluation_summary("GOAL1", 0, &json!({"workflow_git_remote": "origin"}))
         .unwrap();
     work_items
-        .advance_automated_goal_status("GOAL1", GoalStatus::ReadyMerge)
+        .advance_automated_goal_status("GOAL1", GoalStatus::Implement)
+        .unwrap();
+    work_items
+        .advance_automated_goal_status("GOAL1", GoalStatus::Quality)
+        .unwrap();
+    work_items
+        .advance_automated_goal_status("GOAL1", GoalStatus::Governance)
         .unwrap();
     let merger = FileMergerService::new(&runtime_root, &refine_dir);
     let error = merger

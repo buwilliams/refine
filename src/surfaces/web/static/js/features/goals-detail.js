@@ -109,10 +109,8 @@ async function loadGoalDetail(goalId) {
 
 // User-driven workflow transitions for a Goal. Each state declares its
 // `back` and `forward` neighbors. System-owned states have no user buttons —
-// `in-progress` (Workflow Engine owns), `qa` (Quality owns), `ready-merge`
-// (merger queue owns), and `build` (target-app rebuild owns) have no user buttons
-// because they're system-driven phases the agent passes through
-// automatically in the order pinned by the current Goal round.
+// Plan, Implement, Quality, and Governance are system-owned and have no
+// user-driven status buttons.
 // Forward from `review` goes through the dedicated /approve endpoint for
 // approval. Declining review requires the new-round form so the next attempt
 // has a distinct identity and starts from the current integrated target.
@@ -124,10 +122,7 @@ async function loadGoalDetail(goalId) {
 const GOAL_WORKFLOW = {
   backlog:      { forward: { label: "Todo →",     next: "todo"   } },
   todo:         { back:    { label: "← Backlog",  next: "backlog" } },
-  // in-progress: no user buttons — Workflow Engine owns.
-  // qa: no user buttons — Quality owns.
-  // ready-merge: no user buttons — serialized integration owns.
-  // build: no user buttons — target-app build owns.
+  // plan / implement / quality / governance: automation owns these states.
   review:       { forward: { label: "Approve →",  next: "done", approve: true } },
   done:         { back:    { label: "← Review",   next: "review" } },
   failed:       { back:    { label: "← Todo",     next: "todo"   } },
@@ -136,10 +131,10 @@ const GOAL_WORKFLOW = {
 
 function workflowForGoal(goal, latest) {
   if (goal.status === "failed" && isQualityRetryGoal(latest)) {
-    return { back: { label: "← QA", next: "qa", retryQuality: true } };
+    return { back: { label: "← Quality", next: "quality", retryQuality: true } };
   }
   if (goal.status === "failed" && isMergeRetryGoal(latest)) {
-    return { back: { label: "← Candidate", next: "ready-merge", retryMerge: true } };
+    return { back: { label: "← Governance", next: "governance", retryGovernance: true } };
   }
   return GOAL_WORKFLOW[goal.status] || {};
 }
@@ -147,14 +142,14 @@ function workflowForGoal(goal, latest) {
 function isQualityRetryGoal(latest) {
   const message = latest?.latest_workflow_log?.message || "";
   return message.includes("Workflow status changed:") &&
-         message.includes("qa") &&
+         message.includes("quality") &&
          message.includes("failed");
 }
 
 function isMergeRetryGoal(latest) {
   const message = latest?.latest_workflow_log?.message || "";
   return message.includes("Workflow status changed:") &&
-         message.includes("ready-merge") &&
+         message.includes("governance") &&
          message.includes("failed");
 }
 
@@ -284,7 +279,7 @@ function drawGoalDetail(goal) {
   // Outside implementation it opens a separate diagnostic session whose stop
   // lifecycle cannot requeue, cancel, or otherwise mutate the Goal.
   const canOpenAgent = !!goal.id;
-  const openAgentTitle = goal.status === "in-progress"
+  const openAgentTitle = ["plan", "implement", "quality"].includes(goal.status)
     ? "Attach to the running Goal Agent"
     : "Open a diagnostic Agent with this Goal's recorded context";
 
@@ -441,7 +436,7 @@ function bindGoalDetailControls() {
       if (!target) return;
       const busyLabel = target.approve
         ? "Approving…"
-        : target.retryMerge
+        : target.retryGovernance
           ? "Queueing candidate…"
           : `Moving to ${target.next}…`;
       await withButtonBusy(btn, busyLabel, async () => {
@@ -452,12 +447,12 @@ function bindGoalDetailControls() {
             else toast(r.message || "Approval did not complete", "error");
           } else if (target.retryQuality) {
             const r = await api("POST", `/api/goals/${liveGoal().id}/retry-quality`);
-            if (r.ok) toast(r.message || "Queued for QA", "info");
-            else toast(r.message || "QA retry did not queue", "error");
-          } else if (target.retryMerge) {
-            const r = await api("POST", `/api/goals/${liveGoal().id}/retry-merge`);
-            if (r.ok) toast(r.message || "Queued candidate", "info");
-            else toast(r.message || "Candidate retry did not queue", "error");
+            if (r.ok) toast(r.message || "Queued for Quality", "info");
+            else toast(r.message || "Quality retry did not queue", "error");
+          } else if (target.retryGovernance) {
+            const r = await api("POST", `/api/goals/${liveGoal().id}/retry-governance`);
+            if (r.ok) toast(r.message || "Queued for Governance", "info");
+            else toast(r.message || "Governance retry did not queue", "error");
           } else {
             await api("PATCH", `/api/goals/${liveGoal().id}`, { status: target.next });
             toast(`Moved to ${target.next}`, "info");
@@ -802,7 +797,7 @@ function renderImplementationPlan(rnd, idx, prevPlanHistoryOpen = {}) {
   return `<section class="card implementation-plan" data-testid="goal-implementation-plan" aria-labelledby="implementation-plan-title-${idx}" style="margin-top:12px">
     <div class="row" style="align-items:center;gap:8px">
       <h4 id="implementation-plan-title-${idx}" style="margin:0">Implementation Plan</h4>
-      <span class="status-pill ${planState === "completed" ? "done" : planState === "failed" ? "failed" : "in-progress"}" data-testid="goal-implementation-plan-phase">${htmlEscape(phaseLabel)}</span>
+      <span class="status-pill ${planState === "completed" ? "done" : planState === "failed" ? "failed" : "plan"}" data-testid="goal-implementation-plan-phase">${htmlEscape(phaseLabel)}</span>
       <span class="muted small">phase ${htmlEscape(phase)}</span>
       <span class="spacer"></span>
       <span class="muted small">phase started ${fmtTime(plan.phase_started_at || plan.started_at)} · updated ${fmtTime(plan.updated_at)}</span>
@@ -831,7 +826,7 @@ function renderRound(rnd, idx, isLatest, prevRoundOpen = {}, prevPlanHistoryOpen
           ? `<span class="status-pill ${reviewStateClass(rnd.rule_state)}">governance: ${htmlEscape(rnd.rule_state)}</span>`
           : ""}
         ${isLatest && rnd.quality_state && rnd.quality_state !== "unclassified"
-          ? `<span class="status-pill ${reviewStateClass(rnd.quality_state, "qa")}">quality: ${htmlEscape(rnd.quality_state)}</span>`
+          ? `<span class="status-pill ${reviewStateClass(rnd.quality_state, "quality")}">quality: ${htmlEscape(rnd.quality_state)}</span>`
           : ""}
         <span class="spacer"></span>
         <span class="muted small">
@@ -953,7 +948,7 @@ function renderQualitySummary(round) {
     <div class="card" style="margin:0 0 14px" data-testid="goal-quality-summary">
       <h3>Quality</h3>
       <div class="row" style="gap:8px;flex-wrap:wrap">
-        <span class="status-pill ${reviewStateClass(round.quality_state, "qa")}" data-testid="goal-quality-state">quality: ${htmlEscape(normalizeReviewState(round.quality_state))}</span>
+        <span class="status-pill ${reviewStateClass(round.quality_state, "quality")}" data-testid="goal-quality-state">quality: ${htmlEscape(normalizeReviewState(round.quality_state))}</span>
         ${round.quality_checked_at ? `<span class="muted small" data-testid="goal-quality-checked-at">${fmtTime(round.quality_checked_at)}</span>` : ""}
       </div>
       ${round.quality_message ? `<p style="margin-bottom:6px" data-testid="goal-quality-message">${htmlEscape(round.quality_message)}</p>` : ""}

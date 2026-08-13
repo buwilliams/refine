@@ -832,7 +832,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
         .transition_goal_status("GOAL-WORKFLOW", GoalStatus::Todo)
         .unwrap();
     work_items
-        .advance_automated_goal_status("GOAL-WORKFLOW", GoalStatus::InProgress)
+        .advance_automated_goal_status("GOAL-WORKFLOW", GoalStatus::Plan)
         .unwrap();
     let operations = FileOperationRegistry::new(&runtime_root);
     operations.register("merger:GOAL-WORKFLOW").unwrap();
@@ -863,7 +863,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
             .unwrap()
             .goal
             .status,
-        GoalStatus::InProgress
+        GoalStatus::Plan
     );
     assert_eq!(
         supervisor.inspect(&launched_agent.id).unwrap().state,

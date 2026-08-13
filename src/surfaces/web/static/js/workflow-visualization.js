@@ -2,16 +2,13 @@
 
 const AGENT_MANAGED_WORKFLOW_STATUSES = new Set([
   "todo",
-  "in-progress",
-  "qa",
-  "ready-merge",
-  "build",
+  "plan",
+  "implement",
+  "quality",
+  "governance",
 ]);
 
-const WORKFLOW_VISUALIZATION_LABELS = {
-  "ready-merge": "Ready merge",
-  "build": "Rebuild",
-};
+const WORKFLOW_VISUALIZATION_LABELS = {};
 
 function workflowVisualizationLabel(status) {
   return WORKFLOW_VISUALIZATION_LABELS[status] || workflowStatusLabel(status);

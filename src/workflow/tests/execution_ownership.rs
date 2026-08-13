@@ -17,7 +17,7 @@ fn restart_recovery_preserves_goal_state_and_removes_retired_execution_files() {
         .transition_goal_status("GOAL1", GoalStatus::Todo)
         .unwrap();
     work_items
-        .advance_automated_goal_status("GOAL1", GoalStatus::InProgress)
+        .advance_automated_goal_status("GOAL1", GoalStatus::Plan)
         .unwrap();
 
     fs::create_dir_all(runtime_root.join("operations/.workflow-cancellations")).unwrap();
@@ -44,7 +44,7 @@ fn restart_recovery_preserves_goal_state_and_removes_retired_execution_files() {
     );
     assert_eq!(
         work_items.show_goal_summary("GOAL1").unwrap().goal.status,
-        GoalStatus::InProgress
+        GoalStatus::Plan
     );
     for name in [
         "workflow-automation-state.json",
@@ -134,10 +134,10 @@ fn restart_recovery_preserves_active_zero_round_goal_and_recovers_valid_sibling(
     let runtime_root = temp_root.join("run/8080");
     let work_items = FileWorkItemService::new(&refine_dir);
     let invalid = [
-        ("ZERO1", GoalStatus::InProgress),
-        ("ZERO2", GoalStatus::ReadyMerge),
-        ("ZERO3", GoalStatus::Build),
-        ("ZERO4", GoalStatus::Qa),
+        ("ZERO1", GoalStatus::Implement),
+        ("ZERO2", GoalStatus::Governance),
+        ("ZERO3", GoalStatus::Governance),
+        ("ZERO4", GoalStatus::Quality),
     ];
     for (id, status) in &invalid {
         work_items.create_goal_summary("Invalid", Some(id)).unwrap();
@@ -150,7 +150,7 @@ fn restart_recovery_preserves_active_zero_round_goal_and_recovers_valid_sibling(
         .append_goal_round_summary("VALID1", "Reporter", "Continue")
         .unwrap();
     work_items
-        .set_goal_status_unchecked("VALID1", &GoalStatus::InProgress)
+        .set_goal_status_unchecked("VALID1", &GoalStatus::Implement)
         .unwrap();
     let zero_records = invalid
         .iter()

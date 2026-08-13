@@ -63,7 +63,6 @@ pub(super) fn new_round_value(reporter: &str, assignee: &str, prompt: &str) -> V
     round.insert("agent_context".to_string(), Value::Null);
     round.insert("implementation_plan".to_string(), Value::Null);
     round.insert("guidance_decision".to_string(), Value::Null);
-    round.insert("workflow_quality_timing".to_string(), Value::Null);
     round.insert("workflow_reconciliation".to_string(), Value::Null);
     round.insert("workflow_recovery".to_string(), Value::Null);
     round.insert(

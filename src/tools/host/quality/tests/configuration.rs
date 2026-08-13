@@ -17,7 +17,7 @@ fn quality_settings_persist_and_report_configured_state() {
         .unwrap();
 
     assert_eq!(saved.enabled, "1");
-    assert_eq!(saved.timing, POST_BUILD);
+    assert_eq!(saved.timing, PRE_MERGE);
     assert!(saved.configured);
     assert_eq!(saved.tests, vec!["Dashboard loads"]);
     assert!(refine_dir.join(SETTINGS_FILE).exists());

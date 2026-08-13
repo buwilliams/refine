@@ -184,7 +184,7 @@ fn web_server_opens_an_in_progress_goal_diagnostic_when_no_goal_agent_is_running
         .transition_goal_status("GOAL-IN-PROGRESS", GoalStatus::Todo)
         .unwrap();
     work_items
-        .advance_automated_goal_status("GOAL-IN-PROGRESS", GoalStatus::InProgress)
+        .advance_automated_goal_status("GOAL-IN-PROGRESS", GoalStatus::Plan)
         .unwrap();
     FileSettingsService::new(&refine_dir)
         .update(&json!({"agent_cli": "smoke-ai"}))
@@ -214,7 +214,7 @@ fn web_server_opens_an_in_progress_goal_diagnostic_when_no_goal_agent_is_running
             .unwrap()
             .goal
             .status,
-        GoalStatus::InProgress
+        GoalStatus::Plan
     );
 
     let stopped = server.handle(ApiRequest {
@@ -252,7 +252,7 @@ fn web_server_reports_between_planning_phases_without_launching_a_diagnostic_age
         .transition_goal_status("GOAL-BETWEEN-PHASES", GoalStatus::Todo)
         .unwrap();
     work_items
-        .advance_automated_goal_status("GOAL-BETWEEN-PHASES", GoalStatus::InProgress)
+        .advance_automated_goal_status("GOAL-BETWEEN-PHASES", GoalStatus::Plan)
         .unwrap();
     work_items
         .update_goal_git_refs(
@@ -512,7 +512,7 @@ fn browser_terminal_stop_fails_the_goal_after_stopping_its_local_agent() {
         .transition_goal_status("GOAL-TERMINAL-STOP", GoalStatus::Todo)
         .unwrap();
     work_items
-        .advance_automated_goal_status("GOAL-TERMINAL-STOP", GoalStatus::InProgress)
+        .advance_automated_goal_status("GOAL-TERMINAL-STOP", GoalStatus::Plan)
         .unwrap();
     let runtime_for_thread = runtime_root.clone();
     let app_for_thread = app_root.clone();
@@ -633,7 +633,7 @@ fn public_goal_cancel_api_reports_goal_without_a_local_process_as_durably_cancel
         .transition_goal_status(goal_id, GoalStatus::Todo)
         .unwrap();
     work_items
-        .advance_automated_goal_status(goal_id, GoalStatus::InProgress)
+        .advance_automated_goal_status(goal_id, GoalStatus::Plan)
         .unwrap();
     let (command, args) = if cfg!(windows) {
         (

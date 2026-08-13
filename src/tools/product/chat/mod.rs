@@ -84,7 +84,7 @@ pub struct ChatReadResult {
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct StandaloneReadyMergeRequest {
+pub struct StandaloneQualityRequest {
     pub name: Option<String>,
     pub reporter: String,
     pub prompt: String,
@@ -92,7 +92,7 @@ pub struct StandaloneReadyMergeRequest {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct StandaloneReadyMergeResult {
+pub struct StandaloneQualityResult {
     pub goal: GoalSummaryProjection,
     pub worktree: ChatSessionWorktree,
 }

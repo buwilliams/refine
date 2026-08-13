@@ -28,7 +28,7 @@ The browser never orchestrates or polls implementation planning. Existing Goal
 SSE and reconnect reconciliation deliver the same Round object observed by CLI,
 API, MCP, and exports, and Open Agent attaches to the active workflow phase.
 Between phase-process registrations it reports that Workflow is between phases
-and never launches a diagnostic substitute for an in-progress planned Goal.
+and never launches a diagnostic substitute for a Goal active in Plan or Implement.
 
 The Goal UI should expose identity, status, priority, reporter, assignee, Feature membership, node ownership, notes, rounds, implementation reports, logs, governance, quality, chat, and workflow actions.
 

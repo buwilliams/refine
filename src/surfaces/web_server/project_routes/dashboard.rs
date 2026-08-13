@@ -71,7 +71,6 @@ impl InProcessWebServer {
                 "reporter_stats": assignee_stats_rows(&dashboard.reporter_stats),
                 "node_scope": dashboard.node_filter,
                 "node_filter": dashboard.node_filter,
-                "quality_timing": self.quality_timing_setting(),
                 "active_node_id": dashboard.current_node_id,
                 "active_node_display_name": active_node_identity.display_name,
                 "active_node_diagnostics": active_node_identity.diagnostics,

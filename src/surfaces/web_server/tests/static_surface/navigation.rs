@@ -431,7 +431,7 @@ fn web_server_accepts_static_ui_bulk_api_aliases() {
     assert_eq!(bulk_done.body["updated"], 2);
 
     FileWorkItemService::new(&refine_dir)
-        .set_goal_status_unchecked("GOAL3", &GoalStatus::InProgress)
+        .set_goal_status_unchecked("GOAL3", &GoalStatus::Implement)
         .unwrap();
     let bulk_cancel = server.handle(ApiRequest {
         method: "POST".to_string(),

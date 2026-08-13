@@ -12,12 +12,15 @@ use super::json_object;
 pub(super) struct GovernanceEvaluation {
     pub(super) failed: bool,
     pub(super) message: Option<String>,
+    pub(super) recovery_analysis: Option<String>,
+    pub(super) recovery_round_prompt: Option<String>,
     pub(super) details: JsonObject,
 }
 
 pub(super) fn post_implementation_governance_prompt(
     governance: &Value,
     rules: &[Value],
+    guidance: &[Value],
     worktree_path: &str,
     provider_cwd: &Path,
     goal_id: &str,
@@ -32,6 +35,7 @@ pub(super) fn post_implementation_governance_prompt(
         .and_then(Value::as_str)
         .unwrap_or("");
     let rules_json = serde_json::to_string_pretty(rules).unwrap_or_else(|_| "[]".to_string());
+    let guidance_json = serde_json::to_string_pretty(guidance).unwrap_or_else(|_| "[]".to_string());
     let round_number = (round_idx + 1).to_string();
     let provider_cwd = provider_cwd.display().to_string();
     render(
@@ -44,6 +48,7 @@ pub(super) fn post_implementation_governance_prompt(
             ("product", product),
             ("constitution", constitution),
             ("rules_json", &rules_json),
+            ("guidance_json", &guidance_json),
         ],
     )
 }
@@ -86,6 +91,8 @@ fn unparsable_governance_evaluation(
     GovernanceEvaluation {
         failed: true,
         message: Some(GOVERNANCE_VERDICT_UNPARSABLE.to_string()),
+        recovery_analysis: None,
+        recovery_round_prompt: None,
         details: json_object(json!({
             "phase": "post_implementation",
             "configured": true,
@@ -175,6 +182,18 @@ fn governance_evaluation_from_json(
     GovernanceEvaluation {
         failed,
         message,
+        recovery_analysis: value
+            .get("recovery_analysis")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(ToString::to_string),
+        recovery_round_prompt: value
+            .get("recovery_round_prompt")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(ToString::to_string),
         details: json_object(json!({
             "phase": "post_implementation",
             "configured": true,

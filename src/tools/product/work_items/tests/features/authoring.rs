@@ -22,7 +22,7 @@ fn file_work_item_service_exposes_failed_feature_blocking_notice_on_goal_detail(
         .transition_goal_status("GOAL1", GoalStatus::Todo)
         .unwrap();
     service
-        .advance_automated_goal_status("GOAL1", GoalStatus::InProgress)
+        .advance_automated_goal_status("GOAL1", GoalStatus::Plan)
         .unwrap();
     service
         .advance_automated_goal_status("GOAL1", GoalStatus::Failed)
@@ -156,13 +156,13 @@ fn file_work_item_service_rejects_feature_transfer_with_active_member_goal() {
         .transition_goal_status("GOAL1", GoalStatus::Todo)
         .unwrap();
     service
-        .advance_automated_goal_status("GOAL1", GoalStatus::InProgress)
+        .advance_automated_goal_status("GOAL1", GoalStatus::Plan)
         .unwrap();
 
     let err = service
         .transfer_feature_to_node("remote-node", "FEA1")
         .unwrap_err();
-    assert!(err.to_string().contains("status:in-progress"), "{err}");
+    assert!(err.to_string().contains("status:plan"), "{err}");
     assert_eq!(
         service
             .show_feature_summary("FEA1")
@@ -211,7 +211,7 @@ fn distribute_skips_feature_and_active_goals_and_honors_dry_run() {
         .transition_goal_status("GOAL2", GoalStatus::Todo)
         .unwrap();
     service
-        .advance_automated_goal_status("GOAL2", GoalStatus::InProgress)
+        .advance_automated_goal_status("GOAL2", GoalStatus::Plan)
         .unwrap();
     let targets = vec!["node-a".to_string()];
     let result = service

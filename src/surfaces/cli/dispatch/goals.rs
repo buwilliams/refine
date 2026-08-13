@@ -236,11 +236,11 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
             let service = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?);
             let goal = match stage.as_str() {
                 "quality" | "qa" => service.retry_goal_quality_summary(&id)?,
-                "merge" => service.retry_goal_merge_summary(&id)?,
+                "governance" | "merge" => service.retry_goal_merge_summary(&id)?,
                 _ => {
                     return Err(
                         crate::process::supervisor::errors::RefineError::InvalidInput(
-                            "retry stage must be quality or merge".to_string(),
+                            "retry stage must be quality or governance".to_string(),
                         ),
                     );
                 }
@@ -515,10 +515,16 @@ pub(super) fn dispatch_goal_daemon(action: GoalAction) -> RefineResult<()> {
             target_root: None,
             stage,
         } => {
-            let action = if stage.trim().eq_ignore_ascii_case("merge") {
-                "retry-merge"
-            } else {
-                "retry-quality"
+            let action = match stage.trim().to_ascii_lowercase().as_str() {
+                "quality" => "retry-quality",
+                "governance" | "merge" => "retry-governance",
+                _ => {
+                    return Err(
+                        crate::process::supervisor::errors::RefineError::InvalidInput(
+                            "retry stage must be quality or governance".to_string(),
+                        ),
+                    );
+                }
             };
             daemon_json(
                 "POST",

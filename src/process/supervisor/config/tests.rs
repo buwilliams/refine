@@ -183,14 +183,16 @@ fn file_settings_service_normalizes_node_stored_build_settings() {
         "Build and repair setup issues"
     );
     assert_eq!(settings["target_app_build_timeout_seconds"], "45");
-    assert_eq!(settings["target_app_auto_build"], "daily");
-    assert_eq!(settings["target_app_auto_build_hour_utc"], "4");
+    assert!(!settings.contains_key("target_app_auto_build"));
+    assert!(!settings.contains_key("target_app_auto_build_hour_utc"));
     assert_eq!(settings["quality_timing"], "post_build");
     let written = fs::read_to_string(service.path()).unwrap();
     assert!(written.contains("target_app_build_command"));
     assert!(written.contains("target_app_build_instructions"));
     assert!(!written.contains("target_app_rebuild_command"));
     assert!(!written.contains("target_app_rebuild_instructions"));
+    assert!(!written.contains("target_app_auto_rebuild"));
+    assert!(!written.contains("target_app_auto_build"));
     assert!(!refine_dir.join(SETTINGS_FILE).exists());
 
     fs::remove_dir_all(temp_root).unwrap();
@@ -237,15 +239,18 @@ fn file_project_config_services_persist_governance_guidance_and_reporters() {
     let refine_dir = temp_root.join(".refine");
 
     let governance = FileGovernanceService::new(&refine_dir);
+    assert_eq!(governance.load().unwrap()["max_automatic_round_retries"], 5);
     let saved = governance
         .save(&json!({
             "product": "Refine",
             "constitution": "Be useful",
-            "rules": [{"text": "No regressions"}]
+            "rules": [{"text": "No regressions"}],
+            "max_automatic_round_retries": 3
         }))
         .unwrap();
     assert_eq!(saved["configured"], true);
     assert_eq!(saved["rules"].as_array().unwrap().len(), 1);
+    assert_eq!(saved["max_automatic_round_retries"], 3);
     assert_eq!(
         governance
             .generate_rules(&json!({"product": "Refine", "constitution": "Be useful"}))

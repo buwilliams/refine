@@ -476,18 +476,6 @@ function drawTargetAppStatusBlock(snap) {
   const op = snap.last_operation
     ? `<p class="muted small" style="margin-top:6px">Last operation: ${htmlEscape(snap.last_operation.kind)} → ${htmlEscape(snap.last_operation.state)} · ${fmtTime(snap.last_operation.finished_at)}</p>`
     : "";
-  const autoBuildMode = snap.auto_build === "nightly" ? "daily" : snap.auto_build;
-  const autoBuildLabel = {
-    never: "Never",
-    on_worktree_merge: "On worktree merge",
-    hourly: "Hourly",
-    daily: `Daily (${String(snap.auto_build_hour_utc || "0").padStart(2, "0")}:00 UTC)`,
-  }[autoBuildMode || "never"] || "Never";
-  const autoBuild = `<p class="muted small" style="margin-top:6px">Automatic build: ${htmlEscape(autoBuildLabel)}${
-    snap.auto_build_last_finished_at
-      ? ` · last ${snap.auto_build_last_ok ? "OK" : "failed"} at ${fmtTime(snap.auto_build_last_finished_at)}`
-      : ""
-  }</p>`;
   const block = document.getElementById("target-app-status-block");
   if (block) {
     renderInto(block, `
@@ -499,7 +487,6 @@ function drawTargetAppStatusBlock(snap) {
       <p class="muted small" style="margin:8px 0 0">${htmlEscape(healthBits)}</p>
       ${healthDetail}
       ${op}
-      ${autoBuild}
       ${snap.last_error ? `<p class="muted small" style="margin-top:6px;color:var(--error)">Last error: ${htmlEscape(snap.last_error)}</p>` : ""}
       ${snap.legacy_config_present ? `<p class="muted small" style="margin-top:6px;color:var(--warn)">Legacy target-app settings detected.</p>` : ""}
     `);

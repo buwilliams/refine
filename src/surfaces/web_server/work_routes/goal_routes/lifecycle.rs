@@ -91,7 +91,7 @@ impl InProcessWebServer {
                     .approve_reviewed_goal(goal_id)
             }
             "retry-quality" => service.retry_goal_quality_summary(goal_id),
-            "retry-merge" => service.retry_goal_merge_summary(goal_id),
+            "retry-governance" | "retry-merge" => service.retry_goal_merge_summary(goal_id),
             "submit-merge" => service.submit_goal_for_merge_summary(goal_id),
             "undo" => service.undo_goal_summary(goal_id),
             _ => {

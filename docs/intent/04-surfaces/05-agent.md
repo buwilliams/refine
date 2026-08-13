@@ -25,7 +25,7 @@ Current implementation details that matter to intent:
 - provider configuration is treated as settings and diagnostics, not hardcoded behavior.
 - workflow invokes agents as part of shared state advancement.
 - chat sessions can attach to Goals or run standalone.
-- standalone sessions can work in Git worktrees and submit ready-merge Goals.
+- standalone sessions can work in Git worktrees and submit candidates directly to Quality.
 - Plan Mode and spec-like import can turn selected intent into reviewable Feature and Goal drafts.
 - guidance, governance, quality, and target-app settings provide context for agent work.
 
