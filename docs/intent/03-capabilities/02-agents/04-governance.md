@@ -32,6 +32,9 @@ Current implementation details that matter to intent:
 - governance concerns should be visible when they affect work;
 - governance should preserve human-editable project intent rather than hiding policy inside code;
 - governance verdicts should cite actual rule violations rather than preferences or hypothetical risks.
+- product, constitution, and automatic-Round-limit patches are independent of the rule collection and preserve omitted fields;
+- every rule has a stable id and the collection has a `rules_revision`; browser, CLI, and compatibility list writers submit the revision they observed, receive the authoritative normalized readback, and refresh rather than replay stale rules after a conflict;
+- generated rules are adopted through the same revision-fenced persistence path as manually edited rules, so generation cannot overwrite a concurrent rule change.
 
 ## Future Direction
 

@@ -1,4 +1,8 @@
 mod agents;
+mod config;
+mod config_input;
+#[cfg(test)]
+pub(crate) use config::dispatch_config;
 mod daemon_transport;
 mod discovery;
 mod features;
@@ -16,6 +20,8 @@ use system::{port_status_with_processes, selected_process_ports, stop_system_pro
 
 #[cfg(not(test))]
 use agents::dispatch_agent_daemon;
+#[cfg(not(test))]
+use config::dispatch_config as dispatch_config_daemon;
 #[cfg(not(test))]
 use features::dispatch_feature_daemon;
 #[cfg(not(test))]
@@ -121,6 +127,11 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
 
     #[cfg(not(test))]
     let cli = match cli.command {
+        Commands::Config { action } => {
+            let result = dispatch_config_daemon(action).map_err(config::structured_config_error)?;
+            print_json(&result);
+            return Ok(());
+        }
         Commands::Project { action } => return dispatch_project_daemon(action),
         Commands::Goal { action } => return dispatch_goal_daemon(action),
         Commands::Feature { action } => return dispatch_feature_daemon(action),
@@ -160,6 +171,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
     };
 
     match cli.command {
+        command @ Commands::Config { .. } => config::dispatch_command(command),
         command @ Commands::Website { .. } => website::dispatch_command(command),
         command @ Commands::System { .. } => system::dispatch_command(command),
         command @ Commands::Node { .. } => nodes::dispatch_command(command),
@@ -533,6 +545,30 @@ fn refine_dir_for_target_root(target_root: &Path) -> RefineResult<PathBuf> {
 
 pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> {
     match command {
+        Commands::Config { action } => match action {
+            ConfigAction::Show { target_root, .. } => target_root.as_ref(),
+            ConfigAction::Settings { action } => match action {
+                ConfigSettingsAction::Show { target_root }
+                | ConfigSettingsAction::Set { target_root, .. } => target_root.as_ref(),
+            },
+            ConfigAction::Quality { action } => match action {
+                ConfigQualityAction::Show { target_root }
+                | ConfigQualityAction::Set { target_root, .. } => target_root.as_ref(),
+            },
+            ConfigAction::Governance { action } => match action {
+                ConfigGovernanceAction::Show { target_root }
+                | ConfigGovernanceAction::Set { target_root, .. }
+                | ConfigGovernanceAction::GenerateRules { target_root, .. } => target_root.as_ref(),
+            },
+            ConfigAction::Guidance { action } => match action {
+                ConfigGuidanceAction::List { target_root }
+                | ConfigGuidanceAction::Add { target_root, .. }
+                | ConfigGuidanceAction::Edit { target_root, .. }
+                | ConfigGuidanceAction::Enable { target_root, .. }
+                | ConfigGuidanceAction::Disable { target_root, .. }
+                | ConfigGuidanceAction::Remove { target_root, .. } => target_root.as_ref(),
+            },
+        },
         Commands::Project { action } => match action {
             ProjectAction::Status { target_root, .. }
             | ProjectAction::Attach { target_root, .. }

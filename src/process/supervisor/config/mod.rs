@@ -3,6 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 #[cfg(test)]
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
@@ -94,6 +95,15 @@ fn normalize_reporter_name(name: &str) -> RefineResult<String> {
 
 fn now_timestamp() -> String {
     Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string()
+}
+
+fn new_config_item_id(prefix: &str) -> String {
+    static SEQUENCE: AtomicU64 = AtomicU64::new(0);
+    format!(
+        "{prefix}-{}-{}",
+        Utc::now().timestamp_micros(),
+        SEQUENCE.fetch_add(1, Ordering::Relaxed)
+    )
 }
 
 #[cfg(test)]

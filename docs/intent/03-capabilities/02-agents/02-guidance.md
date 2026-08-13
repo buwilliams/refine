@@ -26,6 +26,8 @@ Guidance should not become a wall of policy text that agents ignore or a reason 
 
 For Goal workflow phases, Refine snapshots every enabled guidance candidate into the current Round before launching the Goal Agent. The same agent decides which candidates apply and reports their zero-based integer indexes with its completion signal; display names are not signal identifiers. Refine validates and records the applied and skipped candidates without launching a separate guidance-classification turn.
 
+Guidance persistence assigns every entry a stable id and keeps a collection revision. Legacy array files are normalized and migrated in place under the existing record coordination boundary. Browser and CLI item mutations identify one entry and submit the revision they observed; compatibility whole-list replacement is revision-fenced too. A stale writer receives a conflict and must refresh, so adding, editing, enabling, disabling, or removing one entry cannot silently erase an unrelated concurrent change.
+
 ## Future Direction
 
 As agents improve, guidance should become more active. It should help agents select strategies, evaluate tradeoffs, choose tools, explain risks, and coordinate with other agents.

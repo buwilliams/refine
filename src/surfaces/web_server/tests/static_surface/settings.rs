@@ -75,6 +75,18 @@ fn static_project_settings_explain_governance_and_quality_effects() {
     assert!(governance.contains(r#"data-testid="governance-explanation""#));
     assert!(governance.contains("A rule finding can draft a fresh recovery Round"));
     assert!(governance.contains("do not start a check now"));
+    assert!(governance.contains("rules_revision:"));
+    assert!(governance.contains("saved.rules || []"));
+    assert!(governance.contains("e.status === 409"));
+    assert!(governance.contains("refreshSettingsTab(\"governance\""));
+
+    let guidance =
+        fs::read_to_string(static_root.join("js/features/settings_guidance.js")).unwrap();
+    assert!(guidance.contains("/api/guidance/${encodeURIComponent(current.id)}"));
+    assert!(guidance.contains("{ ...item, revision }"));
+    assert!(guidance.contains("e.status === 409"));
+    assert!(guidance.contains("refreshSettingsTab(refreshTab, { force: true })"));
+    assert!(!guidance.contains("api(\"PUT\", \"/api/guidance\""));
 
     assert!(quality.contains(r#"data-testid="quality-explanation""#));
     assert!(quality.contains("Passing checks advance the Goal to Governance"));

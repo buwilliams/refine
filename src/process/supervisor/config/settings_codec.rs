@@ -116,6 +116,27 @@ pub(super) fn allowed_settings() -> BTreeSet<&'static str> {
     .collect()
 }
 
+pub(super) fn normalize_settings_patch(value: &Value) -> RefineResult<JsonObject> {
+    let updates = value.as_object().ok_or_else(|| {
+        RefineError::InvalidInput("expected an object of {key: value}".to_string())
+    })?;
+    if updates.is_empty() {
+        return Err(RefineError::InvalidInput(
+            "expected an object of {key: value}".to_string(),
+        ));
+    }
+    let allowed = allowed_settings();
+    updates
+        .iter()
+        .map(|(key, value)| {
+            if !allowed.contains(key.as_str()) {
+                return Err(RefineError::InvalidInput(format!("unknown setting: {key}")));
+            }
+            Ok((key.clone(), Value::String(normalize_setting(key, value)?)))
+        })
+        .collect()
+}
+
 pub(super) fn legacy_setting_key(key: &str) -> Option<&'static str> {
     match key {
         "target_app_rebuild_command" => Some("target_app_build_command"),

@@ -1,4 +1,5 @@
 mod agents_processes;
+mod config;
 mod features;
 mod goals;
 mod imports_exports;
@@ -10,8 +11,8 @@ mod system;
 mod todos;
 
 use super::dispatch::{
-    absolute_cli_path, dispatch, explicit_target_root_path, plan_goal_draft_body, run_system_start,
-    system_ps_response, system_status_response,
+    absolute_cli_path, dispatch, dispatch_config, explicit_target_root_path, plan_goal_draft_body,
+    run_system_start, system_ps_response, system_status_response,
 };
 use super::*;
 

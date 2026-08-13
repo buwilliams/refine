@@ -15,6 +15,7 @@ pub struct QualitySettings {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(deny_unknown_fields)]
 pub struct QualitySettingsPatch {
     pub business_requirements: Option<String>,
     pub instructions: Option<String>,

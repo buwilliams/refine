@@ -312,6 +312,18 @@ fn todo_list_id_from_path(path: &str) -> Option<&str> {
         .filter(|id| !id.is_empty() && !id.contains('/'))
 }
 
+fn guidance_id_from_path(path: &str) -> Option<&str> {
+    path.strip_prefix("/guidance/")
+        .filter(|id| !id.is_empty() && !id.contains('/'))
+}
+
+fn guidance_id_required() -> ApiResponse {
+    ApiResponse::json(
+        404,
+        json!({"error": {"code": "not_found", "message": "Guidance route requires a valid entry id"}}),
+    )
+}
+
 fn todo_item_collection_list_id(path: &str) -> Option<&str> {
     path.strip_prefix("/todos/lists/")
         .and_then(|path| path.strip_suffix("/items"))

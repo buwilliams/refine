@@ -205,6 +205,40 @@ impl InProcessWebServer {
         }
     }
 
+    pub(crate) fn handle_guidance_add(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "add guidance");
+        match FileGuidanceService::new(refine_dir).add(&request.body.unwrap_or_else(|| json!({}))) {
+            Ok(value) => ApiResponse::json(200, value),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(crate) fn handle_guidance_edit(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "edit guidance");
+        let Some(id) = guidance_id_from_path(&request.path) else {
+            return guidance_id_required();
+        };
+        match FileGuidanceService::new(refine_dir)
+            .edit(id, &request.body.unwrap_or_else(|| json!({})))
+        {
+            Ok(value) => ApiResponse::json(200, value),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(crate) fn handle_guidance_remove(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "remove guidance");
+        let Some(id) = guidance_id_from_path(&request.path) else {
+            return guidance_id_required();
+        };
+        match FileGuidanceService::new(refine_dir)
+            .remove(id, &request.body.unwrap_or_else(|| json!({})))
+        {
+            Ok(value) => ApiResponse::json(200, value),
+            Err(error) => error_response(error),
+        }
+    }
+
     pub(crate) fn handle_reporters_list(&self) -> ApiResponse {
         let refine_dir = require_refine_dir!(self, "list reporters");
         match FileReporterService::new(refine_dir).list() {

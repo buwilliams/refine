@@ -20,7 +20,9 @@ The CLI should be the most stable surface for automation and system control. Bro
 
 Current implementation details that matter to intent:
 
-- command groups include project, goal, feature, Todo, workflow, node, fleet, log, agent, and system.
+- command groups include config, project, goal, feature, Todo, workflow, node, fleet, log, agent, and system.
+- `refine config` reads Settings, Quality, Governance, and Guidance together or by domain. Its domain subcommands accept concise scalar and multiline flags or one JSON object supplied inline, by file, or through stdin; successful writes print the daemon's authoritative pretty-JSON readback. Configuration does not absorb project attach/switch, workflow pause/resume, node or fleet management, Reporter/Todo lifecycle, or agent authentication, which remain in their named groups.
+- normal config calls use the active checkout-owned daemon, API contract version, and mutation idempotency key. Detached apps, unreachable daemons, invalid payloads, missing entries, and stale collection revisions remain structured errors suitable for automation. Explicit target roots exist only as hidden test adapters.
 - `fleet manage "<request>"` opens an agent session seeded with the manage-fleet runbook so fleet changes are conversational; `fleet "<request>"` and `fleet distribute "<instructions>"` reach the same session. The other fleet commands remain the deterministic primitives the agent acts through.
 - `refine commands` emits the current command tree as machine-readable JSON,
   while `refine next` recommends commands from current state. These live

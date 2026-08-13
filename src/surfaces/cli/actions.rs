@@ -7,6 +7,7 @@ use crate::model::workflow::GoalStatus;
 use crate::tools::host::installation::InstallTarget;
 
 mod agents;
+mod config;
 mod features;
 mod fleet;
 mod goals;
@@ -18,6 +19,10 @@ mod todos;
 mod workflow;
 
 pub use agents::{AgentAction, CliAgentProfile};
+pub use config::{
+    ConfigAction, ConfigDomain, ConfigGovernanceAction, ConfigGuidanceAction, ConfigPayload,
+    ConfigQualityAction, ConfigSettingsAction,
+};
 pub use features::FeatureAction;
 pub use fleet::FleetAction;
 pub use goals::GoalAction;
@@ -39,6 +44,12 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Commands {
+    /// Inspect and configure Settings, Quality, Governance, and Guidance for the active app.
+    /// Project selection, workflow control, nodes, fleet, Reporters, Todos, and agent authentication remain in their named command groups.
+    Config {
+        #[command(subcommand)]
+        action: ConfigAction,
+    },
     /// Manage which target application this Refine instance operates on.
     /// Attach, clone, switch, register, and diagnose target app repositories.
     Project {

@@ -122,7 +122,9 @@ function renderSettingsGovernanceTab(gov) {
         <p class="muted small" style="color:var(--warn)">
           Governance is incomplete. Goal execution continues until Product and Constitution are both filled in.
         </p>`}
-      ${renderGovernanceRules(gov.rules || [])}
+      <div data-governance-rules-revision="${htmlEscape(String(gov.rules_revision || 0))}">
+        ${renderGovernanceRules(gov.rules || [])}
+      </div>
       <div class="actions" style="margin-top:10px">
         <button class="secondary" id="s-governance-add-rule" data-testid="governance-add-rule">Add rule</button>
         <button class="secondary" id="s-governance-generate" data-testid="governance-generate">Generate rules</button>
@@ -131,12 +133,29 @@ function renderSettingsGovernanceTab(gov) {
 }
 
 async function autosaveSettingsGovernance() {
-  await api("PATCH", "/api/governance", {
-    product: $("#s-governance-product").value,
-    constitution: $("#s-governance-constitution").value,
-    rules: collectGovernanceRules(),
-    max_automatic_round_retries: Math.max(0, Number.parseInt($("#s-governance-max-retries").value || "5", 10)),
-  });
+  const revisionRoot = $("[data-governance-rules-revision]");
+  try {
+    const saved = await api("PATCH", "/api/governance", {
+      product: $("#s-governance-product").value,
+      constitution: $("#s-governance-constitution").value,
+      rules: collectGovernanceRules(),
+      rules_revision: Number.parseInt(revisionRoot?.dataset.governanceRulesRevision || "0", 10),
+      max_automatic_round_retries: Math.max(0, Number.parseInt($("#s-governance-max-retries").value || "5", 10)),
+    });
+    if (revisionRoot) revisionRoot.dataset.governanceRulesRevision = String(saved.rules_revision || 0);
+    $$(".governance-rule-input").forEach((input, index) => {
+      const rule = (saved.rules || [])[index];
+      if (!rule) return;
+      input.value = rule.text || "";
+      input.dataset.ruleId = rule.id || "";
+      input.dataset.created = rule.created || "";
+      input.dataset.source = rule.source || "manual";
+    });
+    return saved;
+  } catch (e) {
+    if (e.status === 409) await refreshSettingsTab("governance", { force: true });
+    throw e;
+  }
 }
 
 function bindSettingsGovernanceTab(tabSlug = "governance") {

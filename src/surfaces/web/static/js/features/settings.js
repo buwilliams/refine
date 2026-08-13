@@ -154,6 +154,7 @@ async function loadSettingsSurfaceData() {
     activeNodeId,
     activeNodeLabel,
     guidanceItems: guidance.guidance || [],
+    guidanceRevision: guidance.revision || 0,
     performance: performance || {},
     performanceBackend: (performance || {}).backend || (diag || {}).backend || {},
     processes: processes || {},
@@ -258,6 +259,7 @@ function detachedSettingsSurfaceData(project = {}) {
     activeNodeId,
     activeNodeLabel,
     guidanceItems: [],
+    guidanceRevision: 0,
     performance: {},
     performanceBackend: {},
     processes: {
@@ -1098,7 +1100,7 @@ function bindSettingsTabBody(surface, slug, data) {
   } else if (surface === SETTINGS_SURFACES.project) {
     if (slug === "quality") bindSettingsQualityTab();
     else if (slug === "governance") bindSettingsGovernanceTab();
-    else if (slug === "guidance") bindSettingsGuidanceTab(data.guidanceItems);
+    else if (slug === "guidance") bindSettingsGuidanceTab(data.guidanceItems, "guidance", data.guidanceRevision);
   }
 }
 

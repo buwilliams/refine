@@ -44,25 +44,12 @@ impl FileSettingsService {
     }
 
     pub fn update(&self, body: &serde_json::Value) -> RefineResult<serde_json::Value> {
-        let Some(updates) = body.as_object() else {
-            return Err(RefineError::InvalidInput(
-                "expected an object of {key: value}".to_string(),
-            ));
-        };
-        if updates.is_empty() {
-            return Err(RefineError::InvalidInput(
-                "expected an object of {key: value}".to_string(),
-            ));
-        }
+        let updates = normalize_settings_patch(body)?;
         let mut current = self.load()?;
-        let allowed = allowed_settings();
         let mut updated_test_command = false;
         let mut updated_test_commands = false;
         for (key, value) in updates {
-            if !allowed.contains(key.as_str()) {
-                return Err(RefineError::InvalidInput(format!("unknown setting: {key}")));
-            }
-            current.insert(key.clone(), Value::String(normalize_setting(key, value)?));
+            current.insert(key.clone(), value);
             if key == "target_app_test_command" {
                 updated_test_command = true;
             } else if key == "target_app_test_commands" {
@@ -75,6 +62,10 @@ impl FileSettingsService {
         self.validate(&current)?;
         self.write(&current)?;
         Ok(serde_json::json!({"ok": true, "settings": current}))
+    }
+
+    pub fn validate_update(body: &serde_json::Value) -> RefineResult<()> {
+        normalize_settings_patch(body).map(|_| ())
     }
 
     fn write(&self, settings: &JsonObject) -> RefineResult<()> {
