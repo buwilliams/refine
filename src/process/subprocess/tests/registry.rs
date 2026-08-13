@@ -34,6 +34,13 @@ fn file_process_supervisor_tracks_running_processes_and_pause_state() {
         serde_json::from_slice(&fs::read(supervisor.pause_state_path()).unwrap()).unwrap();
     assert_eq!(stored, json!({"workflow_paused": true}));
 
+    supervisor
+        .set_background_worker_enabled("git-sync", false)
+        .unwrap();
+    let resumed = supervisor.set_workflow_paused(false).unwrap();
+    assert!(!resumed.workflow_paused);
+    assert!(resumed.disabled_background_workers.contains("git-sync"));
+
     fs::write(
         supervisor.pause_state_path(),
         serde_json::to_vec_pretty(&json!({

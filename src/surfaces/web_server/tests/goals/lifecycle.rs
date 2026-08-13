@@ -470,7 +470,7 @@ fn web_server_opens_failed_goal_in_diagnostic_session_without_workflow_mutation(
 }
 
 #[test]
-fn browser_terminal_stop_requeues_the_goal_after_stopping_its_local_agent() {
+fn browser_terminal_stop_fails_the_goal_after_stopping_its_local_agent() {
     let _env_guard = smoke_ai_env_lock()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -574,7 +574,7 @@ fn browser_terminal_stop_requeues_the_goal_after_stopping_its_local_agent() {
     assert_eq!(stopped.body["process"]["id"], process_id);
     assert_eq!(stopped.body["termination"]["confirmed_exit"], true);
     assert_eq!(stopped.body["goal"]["id"], "GOAL-TERMINAL-STOP");
-    assert_eq!(stopped.body["goal"]["status"], "todo");
+    assert_eq!(stopped.body["goal"]["status"], "failed");
     assert_eq!(stopped.body["worktrees_retained"], true);
     assert!(
         FileProcessSupervisor::new(&runtime_root)
@@ -587,7 +587,7 @@ fn browser_terminal_stop_requeues_the_goal_after_stopping_its_local_agent() {
             .unwrap()
             .goal
             .status,
-        GoalStatus::Todo
+        GoalStatus::Failed
     );
     let receipt_path = fs::read_dir(runtime_root.join("process-stop-outcomes"))
         .unwrap()
@@ -603,7 +603,8 @@ fn browser_terminal_stop_requeues_the_goal_after_stopping_its_local_agent() {
     let receipt: serde_json::Value =
         serde_json::from_slice(&fs::read(receipt_path).unwrap()).unwrap();
     assert_eq!(receipt["termination"]["confirmed_exit"], true);
-    assert_eq!(receipt["goal_requeued"], true);
+    assert_eq!(receipt["goal_failed"], true);
+    assert_eq!(receipt["goal_requeued"], false);
     assert_eq!(receipt["worktrees_retained"], true);
     let _ = session_thread.join().unwrap();
 

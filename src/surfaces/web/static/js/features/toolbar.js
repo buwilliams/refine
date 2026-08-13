@@ -1322,7 +1322,7 @@ function retainedGoalStopMessage(stopped) {
     ? "Explicit Goal cancellation remains terminal."
     : stopped?.goal?.status === "failed"
       ? "The current planned attempt failed; start a fresh follow-up Round to retry."
-      : "Goal returned to todo.";
+      : "The Goal state was unchanged.";
   return `Agent stopped. ${goalOutcome} Its workflow worktree and branch were retained for inspection or explicit cleanup.`;
 }
 
@@ -3027,4 +3027,14 @@ function removeToolbarTab(tabId) {
   }
   saveChatStateToStorage();
   drawChat();
+}
+
+function removeToolbarTabsForStoppedProcess(processId, sessionId = "") {
+  const matches = Object.entries(chatState.tabs)
+    .filter(([, tab]) => (
+      (processId && tab.processId === processId)
+      || (sessionId && tab.sessionId === sessionId)
+    ))
+    .map(([tabId]) => tabId);
+  for (const tabId of matches) removeToolbarTab(tabId);
 }

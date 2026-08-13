@@ -14,6 +14,9 @@ fn runtime_fingerprint_summarizes_process_dir_and_skips_atomic_temp_files() {
         "{\"partial\":",
     )
     .unwrap();
+    let agent_processes = runtime_root.join("agents/processes");
+    fs::create_dir_all(&agent_processes).unwrap();
+    fs::write(agent_processes.join("agent-live.json"), "{}\n").unwrap();
     let metrics_log = runtime_root.join("metrics/performance.jsonl");
     fs::create_dir_all(metrics_log.parent().unwrap()).unwrap();
     fs::write(&metrics_log, "{\"duration_ms\":1}\n").unwrap();
@@ -25,12 +28,18 @@ fn runtime_fingerprint_summarizes_process_dir_and_skips_atomic_temp_files() {
 
     assert_eq!(fingerprint, fingerprint_before_metric_append);
     assert!(fingerprint.entries.contains_key("processes"));
+    assert!(fingerprint.entries.contains_key("agents/processes"));
     assert!(!fingerprint.entries.contains_key("metrics"));
     assert!(!fingerprint.entries.contains_key("processes/proc-live.json"));
     assert!(
         !fingerprint
             .entries
             .contains_key("processes/.proc-live.json.proc-temp.tmp")
+    );
+    assert!(
+        !fingerprint
+            .entries
+            .contains_key("agents/processes/agent-live.json")
     );
 
     fs::remove_dir_all(temp_root).unwrap();

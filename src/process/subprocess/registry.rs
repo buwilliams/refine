@@ -188,9 +188,25 @@ impl FileProcessSupervisor {
     }
 
     pub fn set_workflow_paused(&self, paused: bool) -> RefineResult<ProcessPauseState> {
-        let state = ProcessPauseState {
-            workflow_paused: paused,
-        };
+        let mut state = self.pause_state()?;
+        state.workflow_paused = paused;
+        self.write_pause_state(&state)?;
+        Ok(state)
+    }
+
+    pub fn set_background_worker_enabled(
+        &self,
+        worker_kind: &str,
+        enabled: bool,
+    ) -> RefineResult<ProcessPauseState> {
+        let mut state = self.pause_state()?;
+        if enabled {
+            state.disabled_background_workers.remove(worker_kind);
+        } else {
+            state
+                .disabled_background_workers
+                .insert(worker_kind.to_string());
+        }
         self.write_pause_state(&state)?;
         Ok(state)
     }

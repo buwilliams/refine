@@ -7,7 +7,31 @@ impl InProcessWebServer {
         }
         match self.current_runtime_projection() {
             Ok(runtime) => {
-                let summary = runtime_process_summary_value(&runtime);
+                let mut summary = runtime_process_summary_value(&runtime);
+                enrich_process_resource_usage(&mut summary);
+                if let Some(object) = summary.as_object_mut() {
+                    object.insert(
+                        "target_app".to_string(),
+                        runtime
+                            .target_app
+                            .clone()
+                            .map(Value::Object)
+                            .unwrap_or(Value::Null),
+                    );
+                    let daemon = self
+                        .product_paths
+                        .as_ref()
+                        .map(|paths| repository_disk_usage_value(&paths.checkout));
+                    let target_app = self
+                        .current_target_root()
+                        .ok()
+                        .flatten()
+                        .map(|root| repository_disk_usage_value(&root));
+                    object.insert(
+                        "repository_disk_usage".to_string(),
+                        json!({"daemon": daemon, "target_app": target_app}),
+                    );
+                }
                 ApiResponse::json(
                     200,
                     if query_param(raw_path, "summary").as_deref() == Some("1") {
@@ -81,6 +105,49 @@ impl InProcessWebServer {
         };
         match service.stop(process_id, signal) {
             Ok(value) => ApiResponse::json(200, value),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(in crate::surfaces::web_server) fn handle_background_worker_control(
+        &self,
+        request: ApiRequest,
+    ) -> ApiResponse {
+        let Some(runtime_root) = &self.runtime_root else {
+            return runtime_root_unavailable("control background worker");
+        };
+        let Some(remainder) = request.path.strip_prefix("/processes/background-workers/") else {
+            return process_id_required();
+        };
+        let mut parts = remainder.split('/');
+        let Some(worker_kind) = parts.next().filter(|value| !value.is_empty()) else {
+            return process_id_required();
+        };
+        let Some(action) = parts.next().filter(|value| !value.is_empty()) else {
+            return process_id_required();
+        };
+        if parts.next().is_some() || !matches!(action, "start" | "stop") {
+            return error_response(RefineError::InvalidInput(
+                "background worker action must be start or stop".to_string(),
+            ));
+        }
+
+        let mut workers = FileRunnerWorkerService::new(runtime_root);
+        if let Some(registry_root) = self.app_registry_runtime_root() {
+            workers = workers.with_project_registry_root(registry_root);
+        }
+        match workers.set_background_worker_enabled(worker_kind, action == "start") {
+            Ok(BackgroundWorkerEnsure::Running(process)) => ApiResponse::json(
+                200,
+                json!({"worker_kind": worker_kind, "status": "running", "process": process.api_json()}),
+            ),
+            Ok(BackgroundWorkerEnsure::Paused) => {
+                ApiResponse::json(200, json!({"worker_kind": worker_kind, "status": "paused"}))
+            }
+            Ok(BackgroundWorkerEnsure::Disabled) => ApiResponse::json(
+                200,
+                json!({"worker_kind": worker_kind, "status": "stopped"}),
+            ),
             Err(error) => error_response(error),
         }
     }

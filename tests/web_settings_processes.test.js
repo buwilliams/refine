@@ -9,6 +9,8 @@ function processSettingsRuntime() {
     htmlEscape(value) {
       return String(value);
     },
+    renderSettingsGuideLabel(value) { return value; },
+    fmtTime(value) { return String(value); },
   });
   const source = fs.readFileSync(
     path.join(
@@ -22,6 +24,8 @@ function processSettingsRuntime() {
     globalThis.processSettingsTest = {
       isAgent: isCurrentAgentProviderProcessRecord,
       renderActions: renderProcessActions,
+      renderTab: renderProcessesTab,
+      buildRows: buildProcessManagerRows,
       workflowPausedFor,
       workflowPauseActionModel,
     };
@@ -71,10 +75,10 @@ test("workflow pause action model locks descriptions, confirmation, actions, and
   const resume = processes.workflowPauseActionModel({ workflow_paused: true });
   assert.equal(resume.shouldPause, false);
   assert.equal(resume.actionId, "unpause_workflow");
-  assert.equal(resume.direction, "resume");
+  assert.equal(resume.direction, "unpause");
   assert.equal(resume.status, "paused");
-  assert.equal(resume.buttonLabel, "Resume Workflow");
-  assert.equal(resume.busyLabel, "Resuming…");
+  assert.equal(resume.buttonLabel, "Unpause Workflow");
+  assert.equal(resume.busyLabel, "Unpausing…");
   assert.equal(resume.confirmation, null);
   assert.deepEqual(JSON.parse(JSON.stringify(resume.payload)), { paused: false });
   assert.equal(
@@ -132,7 +136,7 @@ test("workflow pause handler delegates the action model to the shared API and re
       JSON.parse(JSON.stringify(calls)),
       [["POST", "/api/workflow/pause", { paused: !paused }]],
     );
-    assert.deepEqual(busyLabels, [paused ? "Resuming…" : "Pausing…"]);
+    assert.deepEqual(busyLabels, [paused ? "Unpausing…" : "Pausing…"]);
     assert.equal(refreshed, 1);
     assert.equal(scheduled, paused ? 1 : 0);
     assert.equal(
@@ -142,15 +146,15 @@ test("workflow pause handler delegates the action model to the shared API and re
   }
 });
 
-test("Guide states the complete workflow pause and resume contract", () => {
+test("Guide states the complete workflow pause and unpause contract", () => {
   const guide = fs.readFileSync(
     path.join(__dirname, "../src/surfaces/web/static/js/features/guide.js"),
     "utf8",
   );
-  assert.match(guide, /Pause or resume workflow/);
+  assert.match(guide, /Pause or unpause workflow/);
   assert.match(guide, /Pausing blocks new Goal admission and quiesces automatic Git sync and inactive-worktree cleanup at safe boundaries\./);
   assert.match(guide, /Already active Goal executions continue unless stopped separately\./);
-  assert.match(guide, /Resuming makes admission and those repository workers eligible again\./);
+  assert.match(guide, /Unpausing makes admission and those repository workers eligible again\./);
 });
 
 test("Agents includes background and foreground provider processes", () => {
@@ -209,6 +213,46 @@ test("every current agent provider process renders a process-specific Stop actio
   );
 });
 
+test("process manager is one six-column table with stable services and dynamic agents", () => {
+  const processes = processSettingsRuntime();
+  const data = {
+    target_app: { state: "running", has_stop_action: true, has_build_action: true, has_status_checks: true },
+    repository_disk_usage: {
+      target_app: { bytes: 1024 * 1024, includes_git_worktrees: true },
+      daemon: { bytes: 2 * 1024 * 1024, includes_git_worktrees: true },
+    },
+    background_workers: [
+      { id: "background-worker-git-sync", kind: "background_worker", worker_kind: "git-sync", status: "running", pid: 42, process_id: "git-sync-42", management_actions: ["stop_background_worker"] },
+      { id: "background-worker-workflow", kind: "background_worker", worker_kind: "workflow", status: "stopped", management_actions: ["start_background_worker", "pause_workflow"] },
+      { id: "background-worker-worktree-cleanup", kind: "background_worker", worker_kind: "worktree-cleanup", status: "running", management_actions: ["stop_background_worker"] },
+      { id: "background-worker-development-requests", kind: "background_worker", worker_kind: "development-requests", status: "stopped", management_actions: ["start_background_worker"] },
+    ],
+    processes: [
+      { id: "daemon-1", kind: "daemon", status: "running", pid: 10, memory_used_bytes: 4096, processor_used_percent: 1.5 },
+      { id: "git-sync-42", kind: "runner", worker_kind: "git-sync", status: "running", pid: 42 },
+      { id: "agent-1", kind: "agent", goal_id: "GOAL-1", status: "running", pid: 50, management_actions: ["stop_agent"] },
+    ],
+  };
+  const source = { source_update: { enabled: true, update_available: true, title: "Update Refine" } };
+  const rows = processes.buildRows(data, source);
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(rows.map((row) => row.kind))),
+    ["target_app", "daemon", "background_worker", "background_worker", "background_worker", "background_worker", "agent"],
+  );
+  const html = processes.renderTab(data, source);
+  assert.equal((html.match(/<table\b/g) || []).length, 1);
+  for (const heading of ["Process name", "PID", "Memory used", "Processor used", "Details", "Actions"]) {
+    assert.match(html, new RegExp(`<th>${heading}</th>`));
+  }
+  for (const name of ["Target app", "Refine daemon", "git-sync", "workflow", "worktree-cleanup", "development-requests", "Agent · GOAL-1"]) {
+    assert.match(html, new RegExp(name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  }
+  assert.match(html, /repository disk 1\.00 MiB \(includes \.git worktrees\)/);
+  assert.match(html, /data-testid="process-daemon-update"/);
+  assert.match(html, /data-testid="process-daemon-stop"/);
+  assert.doesNotMatch(html, /data-supervisor-toggle/);
+});
+
 test("agent Stop delegates to the shared process-control API route", () => {
   const source = fs.readFileSync(
     path.join(
@@ -225,11 +269,24 @@ test("agent Stop delegates to the shared process-control API route", () => {
     .split('$$("[data-stop-agent]")')[1]
     .split('$$("[data-cancel-agent]")')[0];
   assert.doesNotMatch(stopHandler, /\/api\/goals\//);
-  assert.match(stopHandler, /stopped\?\.worktree_retention\?\.retained/);
+  assert.match(stopHandler, /signal: "kill"/);
+  assert.doesNotMatch(stopHandler, /modalConfirm/);
+  assert.match(stopHandler, /stopped\?\.worktrees_retained/);
   assert.match(stopHandler, /fresh follow-up Round/);
   assert.match(stopHandler, /stopped\?\.goal\?\.status === "cancelled"/);
-  assert.match(stopHandler, /Explicit Goal cancellation remains terminal/);
+  assert.match(stopHandler, /The Goal is now failed/);
+  assert.match(stopHandler, /removeToolbarTabsForStoppedProcess/);
   assert.match(stopHandler, /toast\(/);
+});
+
+test("background and daemon controls call their process-manager lifecycle APIs", () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, "../src/surfaces/web/static/js/features/settings_processes.js"),
+    "utf8",
+  );
+  assert.match(source, /\/api\/processes\/background-workers\/\$\{encodeURIComponent\(workerKind\)\}\/\$\{action\}/);
+  assert.match(source, /api\("POST", "\/api\/system\/source\/promote", \{\}\)/);
+  assert.match(source, /api\("POST", "\/api\/system\/stop", \{\}\)/);
 });
 
 test("Agents excludes terminals and completed provider processes", () => {

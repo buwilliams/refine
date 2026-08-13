@@ -266,6 +266,49 @@ fn web_server_resolves_nested_agent_process_stream_stop_and_not_found() {
 }
 
 #[test]
+fn web_server_controls_background_worker_enablement_by_worker_kind() {
+    let temp_root = unique_temp_dir("http-background-worker-control");
+    let runtime_root = temp_root.join("run/8080");
+    let supervisor = FileProcessSupervisor::new(&runtime_root);
+    supervisor.set_workflow_paused(true).unwrap();
+    let mut server = server_with_projection();
+    server.runtime_root = Some(runtime_root.clone());
+
+    let stopped = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/processes/background-workers/git-sync/stop".to_string(),
+        body: None,
+    });
+    assert_eq!(stopped.status, 200, "{}", stopped.body);
+    assert_eq!(stopped.body["worker_kind"], "git-sync");
+    assert_eq!(stopped.body["status"], "stopped");
+    assert!(
+        supervisor
+            .pause_state()
+            .unwrap()
+            .disabled_background_workers
+            .contains("git-sync")
+    );
+
+    let started = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/processes/background-workers/git-sync/start".to_string(),
+        body: None,
+    });
+    assert_eq!(started.status, 200, "{}", started.body);
+    assert_eq!(started.body["status"], "paused");
+    assert!(
+        !supervisor
+            .pause_state()
+            .unwrap()
+            .disabled_background_workers
+            .contains("git-sync")
+    );
+
+    remove_temp_dir(&temp_root);
+}
+
+#[test]
 fn web_server_target_app_health_remains_available_while_workflow_is_paused() {
     let temp_root = unique_temp_dir("http-target-status-while-paused");
     let runtime_root = temp_root.join("run/8080");

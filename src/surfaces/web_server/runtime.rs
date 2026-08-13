@@ -466,6 +466,7 @@ fn runtime_projection_fingerprint(
     let mut fingerprint = RuntimeProjectionFingerprint::default();
     for path in [
         runtime_root.join("processes"),
+        runtime_root.join("agents/processes"),
         runtime_root.join("process-control.json"),
         runtime_root.join("operations"),
         runtime_root.join("target-app-state.json"),
@@ -556,7 +557,10 @@ fn should_scan_runtime_path_children(runtime_root: &Path, path: &Path) -> bool {
         .unwrap_or(path)
         .to_string_lossy()
         .replace('\\', "/");
-    !matches!(relative.as_str(), "processes" | "operations")
+    !matches!(
+        relative.as_str(),
+        "processes" | "agents/processes" | "operations"
+    )
 }
 
 #[cfg(test)]

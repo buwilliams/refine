@@ -143,6 +143,74 @@ fn paused_workflow_suppresses_background_repository_workers_until_resumed() {
 }
 
 #[test]
+fn user_stop_kills_and_disables_a_background_worker_until_start() {
+    let runtime_root = std::env::temp_dir().join(format!(
+        "refine-user-stopped-background-runner-{}",
+        uuid::Uuid::new_v4()
+    ));
+    let supervisor = FileProcessSupervisor::new(&runtime_root);
+    let (command, args) = if cfg!(windows) {
+        (
+            "cmd".to_string(),
+            vec!["/C".to_string(), "ping -n 300 127.0.0.1 >NUL".to_string()],
+        )
+    } else {
+        ("sleep".to_string(), vec!["300".to_string()])
+    };
+    let process = supervisor
+        .launch(ManagedProcessSpec {
+            owner: ProcessOwner::Runner,
+            command,
+            args,
+            cwd: None,
+            env: Vec::new(),
+            stdin: None,
+            limits: None,
+            authorization_command: None,
+            sensitive: false,
+            metadata: serde_json::from_value(json!({
+                "kind": "runner",
+                "worker_kind": GIT_SYNC_RUNNER
+            }))
+            .unwrap(),
+        })
+        .unwrap();
+    let service = FileRunnerWorkerService::new(&runtime_root);
+
+    assert!(matches!(
+        service
+            .set_background_worker_enabled(GIT_SYNC_RUNNER, false)
+            .unwrap(),
+        BackgroundWorkerEnsure::Disabled
+    ));
+    assert!(!FileProcessSupervisor::process_is_alive(&process).unwrap());
+    assert!(
+        supervisor
+            .pause_state()
+            .unwrap()
+            .disabled_background_workers
+            .contains(GIT_SYNC_RUNNER)
+    );
+
+    supervisor.set_workflow_paused(true).unwrap();
+    assert!(matches!(
+        service
+            .set_background_worker_enabled(GIT_SYNC_RUNNER, true)
+            .unwrap(),
+        BackgroundWorkerEnsure::Paused
+    ));
+    assert!(
+        !supervisor
+            .pause_state()
+            .unwrap()
+            .disabled_background_workers
+            .contains(GIT_SYNC_RUNNER)
+    );
+
+    std::fs::remove_dir_all(runtime_root).unwrap();
+}
+
+#[test]
 fn pause_at_ensure_is_quiet_and_invalid_pause_state_is_an_error() {
     let runtime_root = std::env::temp_dir().join(format!(
         "refine-pause-at-background-ensure-{}",

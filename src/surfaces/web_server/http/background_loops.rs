@@ -84,7 +84,9 @@ impl LocalHttpDaemon {
 
 fn ensure_worker_failure(workers: &FileRunnerWorkerService, worker_kind: &str) -> Option<String> {
     match workers.ensure_background_worker(worker_kind) {
-        Ok(BackgroundWorkerEnsure::Running(_)) | Ok(BackgroundWorkerEnsure::Paused) => None,
+        Ok(BackgroundWorkerEnsure::Running(_))
+        | Ok(BackgroundWorkerEnsure::Paused)
+        | Ok(BackgroundWorkerEnsure::Disabled) => None,
         Err(error) => Some(format!("{worker_kind} runner: {error}")),
     }
 }

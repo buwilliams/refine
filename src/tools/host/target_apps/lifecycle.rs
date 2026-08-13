@@ -138,6 +138,7 @@ impl FileTargetAppService {
     }
 
     pub fn stop(&self) -> RefineResult<TargetAppSnapshot> {
+        self.mark_target_processes_stopped()?;
         let settings = self.settings()?;
         let instructions = setting(&settings, "target_app_stop_instructions");
         let command = setting(&settings, "target_app_stop_command");
@@ -157,7 +158,6 @@ impl FileTargetAppService {
         } else {
             self.run_command("stop", &command, &settings, Default::default())?
         };
-        self.mark_target_processes_stopped()?;
         let ok = operation.exit_code == Some(0);
         let snapshot = TargetAppSnapshot {
             ok,
@@ -334,7 +334,7 @@ impl FileTargetAppService {
                 process.owner == ProcessOwner::TargetApp && process.state != "stopped"
             })
         {
-            let _ = supervisor.signal(&process.id, "stop");
+            let _ = supervisor.signal(&process.id, "kill");
         }
         Ok(())
     }

@@ -1,14 +1,24 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 
 use crate::model::JsonObject;
+use crate::process::runner::BACKGROUND_RUNNERS;
 use crate::process::subprocess::{FileProcessSupervisor, ProcessPauseState, ProcessSupervisor};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::operations::{FileOperationRegistry, OperationRegistry};
+use crate::tools::host::project_layout::git_common_dir;
 use crate::tools::product::chat::{ChatAttachment, ChatSessionRecord, FileChatService};
 use crate::tools::product::project_projection::RuntimeProjection;
+
+const REPOSITORY_DISK_USAGE_CACHE_TTL: Duration = Duration::from_secs(15);
+
+static REPOSITORY_DISK_USAGE_CACHE: OnceLock<Mutex<BTreeMap<PathBuf, (Instant, u64)>>> =
+    OnceLock::new();
 
 #[derive(Clone, Debug)]
 pub struct FileProcessStatusService {
@@ -35,7 +45,12 @@ impl FileProcessStatusService {
     }
 
     pub fn summary(&self) -> RefineResult<Value> {
-        process_summary_value_with_chat_sessions(&self.runtime_root, self.refine_dir.as_deref())
+        let mut summary = process_summary_value_with_chat_sessions(
+            &self.runtime_root,
+            self.refine_dir.as_deref(),
+        )?;
+        enrich_process_resource_usage(&mut summary);
+        Ok(summary)
     }
 
     pub fn stream(&self, process_id: &str) -> RefineResult<String> {
@@ -87,14 +102,17 @@ pub fn process_summary_value_with_chat_sessions(
     }
     append_chat_session_processes(&mut process_values, runtime_root, refine_dir)?;
     let runner_reachable = required_runner_workers_reachable(&process_values);
+    let background_workers = background_worker_values(&process_values, &pause_state);
     Ok(json!({
         "runner_reachable": runner_reachable,
         "paused": pause_state.workflow_paused,
         "workflow_paused": pause_state.workflow_paused,
+        "disabled_background_workers": pause_state.disabled_background_workers,
         // Wire-compatible aliases. Both are derived from the single workflow gate.
         "background_processes_stopped": pause_state.workflow_paused,
         "agents_paused": pause_state.workflow_paused,
         "processes": process_values,
+        "background_workers": background_workers,
         "runner_work": runner_work_summary(runtime_root),
         "backend": {
             "process_model": "supervisor"
@@ -168,6 +186,122 @@ pub fn process_status_value(summary: &Value) -> Value {
         .entry("runner_work".to_string())
         .or_insert_with(|| Value::Array(Vec::new()));
     Value::Object(summary)
+}
+
+pub fn enrich_process_resource_usage(summary: &mut Value) {
+    let Some(summary) = summary.as_object_mut() else {
+        return;
+    };
+    let mut pids = BTreeSet::new();
+    for key in ["processes", "background_workers"] {
+        for process in summary
+            .get(key)
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            if let Some(pid) = process.get("pid").and_then(Value::as_u64) {
+                pids.insert(pid as u32);
+            }
+        }
+    }
+    let observations = process_resource_observations(&pids);
+    for key in ["processes", "background_workers"] {
+        let Some(processes) = summary.get_mut(key).and_then(Value::as_array_mut) else {
+            continue;
+        };
+        for process in processes {
+            let Some(object) = process.as_object_mut() else {
+                continue;
+            };
+            let Some(pid) = object.get("pid").and_then(Value::as_u64) else {
+                continue;
+            };
+            let Some((memory_used_bytes, processor_used_percent)) = observations.get(&(pid as u32))
+            else {
+                continue;
+            };
+            object.insert("memory_used_bytes".to_string(), json!(memory_used_bytes));
+            object.insert(
+                "processor_used_percent".to_string(),
+                json!(processor_used_percent),
+            );
+        }
+    }
+}
+
+fn process_resource_observations(pids: &BTreeSet<u32>) -> BTreeMap<u32, (u64, f64)> {
+    if pids.is_empty() {
+        return BTreeMap::new();
+    }
+    let pid_list = pids
+        .iter()
+        .map(u32::to_string)
+        .collect::<Vec<_>>()
+        .join(",");
+    let Ok(output) = Command::new("ps")
+        .args(["-o", "pid=,rss=,pcpu=", "-p", &pid_list])
+        .output()
+    else {
+        return BTreeMap::new();
+    };
+    if !output.status.success() {
+        return BTreeMap::new();
+    }
+    String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter_map(|line| {
+            let mut fields = line.split_whitespace();
+            let pid = fields.next()?.parse::<u32>().ok()?;
+            let rss_kib = fields.next()?.parse::<u64>().ok()?;
+            let processor_percent = fields.next()?.replace(',', ".").parse::<f64>().ok()?;
+            Some((pid, (rss_kib.saturating_mul(1024), processor_percent)))
+        })
+        .collect()
+}
+
+pub fn repository_disk_usage_value(repository_root: &Path) -> Value {
+    let common_dir = git_common_dir(repository_root).ok();
+    let mut measured_roots = vec![repository_root.to_path_buf()];
+    if let Some(common_dir) = common_dir.as_ref()
+        && !common_dir.starts_with(repository_root)
+    {
+        measured_roots.push(common_dir.clone());
+    }
+    let bytes = measured_roots
+        .iter()
+        .filter_map(|path| cached_directory_disk_usage_bytes(path))
+        .fold(0_u64, u64::saturating_add);
+    json!({
+        "bytes": bytes,
+        "repository_root": repository_root,
+        "git_common_dir": common_dir,
+        "includes_git_worktrees": common_dir.is_some()
+    })
+}
+
+fn cached_directory_disk_usage_bytes(path: &Path) -> Option<u64> {
+    let cache = REPOSITORY_DISK_USAGE_CACHE.get_or_init(|| Mutex::new(BTreeMap::new()));
+    if let Ok(cache) = cache.lock()
+        && let Some((measured_at, bytes)) = cache.get(path)
+        && measured_at.elapsed() < REPOSITORY_DISK_USAGE_CACHE_TTL
+    {
+        return Some(*bytes);
+    }
+    let output = Command::new("du").args(["-sk"]).arg(path).output().ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let kib = String::from_utf8_lossy(&output.stdout)
+        .split_whitespace()
+        .next()?
+        .parse::<u64>()
+        .ok()?;
+    let bytes = kib.saturating_mul(1024);
+    if let Ok(mut cache) = cache.lock() {
+        cache.insert(path.to_path_buf(), (Instant::now(), bytes));
+    }
+    Some(bytes)
 }
 
 pub fn is_current_process_object(process: &JsonObject) -> bool {
@@ -298,6 +432,14 @@ fn process_pause_state_from_summary(summary: &JsonObject) -> ProcessPauseState {
                         .and_then(Value::as_bool)
                         .unwrap_or(false)
             }),
+        disabled_background_workers: summary
+            .get("disabled_background_workers")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(Value::as_str)
+            .map(str::to_string)
+            .collect(),
     }
 }
 
@@ -334,6 +476,84 @@ fn required_runner_workers_reachable(processes: &[Value]) -> bool {
                 && process.get("status").and_then(Value::as_str) == Some("running")
         })
     })
+}
+
+fn background_worker_values(processes: &[Value], pause_state: &ProcessPauseState) -> Vec<Value> {
+    let mut worker_kinds = BACKGROUND_RUNNERS
+        .into_iter()
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    let known_worker_kinds = worker_kinds.iter().cloned().collect::<BTreeSet<_>>();
+    let mut discovered_worker_kinds = pause_state.disabled_background_workers.clone();
+    discovered_worker_kinds.extend(processes.iter().filter_map(|process| {
+        (process.get("kind").and_then(Value::as_str) == Some("runner"))
+            .then(|| process.get("worker_kind").and_then(Value::as_str))
+            .flatten()
+            .map(str::to_string)
+    }));
+    worker_kinds.extend(
+        discovered_worker_kinds
+            .difference(&known_worker_kinds)
+            .cloned(),
+    );
+
+    worker_kinds
+        .into_iter()
+        .map(|worker_kind| {
+            let process = processes.iter().find(|process| {
+                process.get("kind").and_then(Value::as_str) == Some("runner")
+                    && process.get("worker_kind").and_then(Value::as_str)
+                        == Some(worker_kind.as_str())
+                    && process.get("status").and_then(Value::as_str) == Some("running")
+            });
+            let disabled = pause_state
+                .disabled_background_workers
+                .contains(worker_kind.as_str());
+            let globally_paused = pause_state.workflow_paused
+                && matches!(worker_kind.as_str(), "git-sync" | "worktree-cleanup");
+            let status = if process.is_some() {
+                "running"
+            } else if disabled {
+                "stopped"
+            } else if globally_paused {
+                "paused"
+            } else {
+                "stopped"
+            };
+            let mut management_actions = vec![if process.is_some() {
+                "stop_background_worker"
+            } else {
+                "start_background_worker"
+            }];
+            if worker_kind == "workflow" {
+                management_actions.push(if pause_state.workflow_paused {
+                    "unpause_workflow"
+                } else {
+                    "pause_workflow"
+                });
+            }
+            json!({
+                "id": format!("background-worker-{worker_kind}"),
+                "kind": "background_worker",
+                "worker_kind": &worker_kind,
+                "label": &worker_kind,
+                "status": status,
+                "pid": process.and_then(|process| process.get("pid")).cloned().unwrap_or(Value::Null),
+                "process_id": process.and_then(|process| process.get("id")).cloned().unwrap_or(Value::Null),
+                "details": if disabled {
+                    "stopped by user"
+                } else if globally_paused {
+                    "waiting for workflow automation to resume"
+                } else if process.is_some() {
+                    "supervised background worker"
+                } else {
+                    "not running"
+                },
+                "disabled": disabled,
+                "management_actions": management_actions
+            })
+        })
+        .collect()
 }
 
 fn runner_work_summary(runtime_root: &Path) -> Value {

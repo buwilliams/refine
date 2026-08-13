@@ -611,30 +611,27 @@ fn relay_daemon_startup_output(path: Option<&str>, offset: &mut usize) -> bool {
 
 impl DaemonRuntimeService for FileDaemonLifecycleService {
     fn stop_runtime(&self, port: u16) -> RefineResult<DaemonStatus> {
-        let supervisor = FileProcessSupervisor::new(self.runtime_root.port_root(port));
-        let processes = supervisor.list()?;
-        for process in processes
-            .iter()
-            .filter(|process| process.owner != ProcessOwner::Daemon)
-        {
-            let process = supervisor.wait(&process.id)?;
-            if process.state == "running" {
-                let _ = supervisor.signal(&process.id, "terminate");
+        let port_root = self.runtime_root.port_root(port);
+        for process_root in [port_root.join("agents"), port_root.clone()] {
+            let supervisor = FileProcessSupervisor::new(process_root);
+            for process in supervisor
+                .list()?
+                .into_iter()
+                .filter(|process| process.owner != ProcessOwner::Daemon)
+            {
+                let process = supervisor.wait(&process.id)?;
+                if process.state == "running" {
+                    let _ = supervisor.signal(&process.id, "kill");
+                }
             }
         }
+        let supervisor = FileProcessSupervisor::new(&port_root);
+        let processes = supervisor.list()?;
         for process in processes {
             if process.owner == ProcessOwner::Daemon {
                 let process = supervisor.wait(&process.id)?;
                 if process.state == "running" {
-                    let _ = supervisor.signal(&process.id, "terminate");
-                    thread::sleep(Duration::from_millis(100));
-                    if supervisor
-                        .wait(&process.id)
-                        .map(|process| process.state == "running")
-                        .unwrap_or(false)
-                    {
-                        let _ = supervisor.signal(&process.id, "kill");
-                    }
+                    let _ = supervisor.signal(&process.id, "kill");
                 }
             }
         }

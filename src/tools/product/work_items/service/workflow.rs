@@ -577,7 +577,7 @@ impl FileWorkItemService {
         self.show_goal_summary(goal_id)
     }
 
-    pub(crate) fn requeue_goal_after_process_stop_if_current(
+    pub(crate) fn fail_goal_after_process_stop_if_current(
         &self,
         goal_id: &str,
         expected: &GoalCancellationExpectation,
@@ -599,10 +599,10 @@ impl FileWorkItemService {
         }
         if current.goal.status == GoalStatus::Done {
             return Err(RefineError::InvalidInput(format!(
-                "done Goal {goal_id} cannot be requeued by process Stop"
+                "done Goal {goal_id} cannot be failed by process Stop"
             )));
         }
-        self.set_goal_status_unchecked_locked(goal_id, &GoalStatus::Todo)?;
+        self.set_goal_status_unchecked_locked(goal_id, &GoalStatus::Failed)?;
         self.show_goal_summary(goal_id)
     }
 }

@@ -273,6 +273,9 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
         return globalThis.__terminalAction.listeners.get("click")?.();
       },
       close(tabId) { return closeChatTab(tabId); },
+      removeStopped(processId, sessionId = "") {
+        return removeToolbarTabsForStoppedProcess(processId, sessionId);
+      },
       clickCloseDescendant(tabId) {
         return handleToolbarTabClick({
           target: {
@@ -986,7 +989,7 @@ test("Goal Stop surfaces successful retained-worktree evidence", async () => {
       return {
         stopped: true,
         worktree_retention: { retained: true },
-        goal: { id: "GOAL-PARTIAL", status: "todo" },
+        goal: { id: "GOAL-PARTIAL", status: "unchanged" },
         termination: { confirmed_exit: true },
       };
     }
@@ -998,12 +1001,12 @@ test("Goal Stop surfaces successful retained-worktree evidence", async () => {
 
   assert.equal(browser.runtime.terminal("GOAL-PARTIAL").exited, true);
   assert.deepEqual(Array.from(browser.runtime.toasts().at(-1)), [
-    "Agent stopped. Goal returned to todo. Its workflow worktree and branch were retained for inspection or explicit cleanup.",
+    "Agent stopped. The Goal state was unchanged. Its workflow worktree and branch were retained for inspection or explicit cleanup.",
     "info",
   ]);
 });
 
-test("Goal Stop reports when explicit cancellation supersedes requeue", async () => {
+test("Goal Stop reports when explicit cancellation remains terminal", async () => {
   const browser = browserRuntime();
   browser.runtime.setApi(async (_method, requestPath, body) => {
     if (requestPath === "/api/terminal/session") {
@@ -1622,4 +1625,34 @@ test("closing a Goal Agent tab stops it through the workflow-aware backend path"
     requests.filter((request) => request[1].endsWith("/stop")),
     [["POST", "/api/terminal/goal-session/stop", undefined]],
   );
+});
+
+test("process-manager Agent Stop removes any attached toolbar tab locally", async () => {
+  const browser = browserRuntime();
+  const requests = [];
+  let sequence = 0;
+  browser.runtime.setApi(async (method, requestPath, body) => {
+    requests.push([method, requestPath, body]);
+    sequence += 1;
+    return {
+      id: `session-${sequence}`,
+      process_id: `process-${sequence}`,
+      cwd: "/repo",
+      profile: body?.profile || "standalone",
+      provider: "codex",
+    };
+  });
+
+  const first = await browser.runtime.create("standalone");
+  const second = await browser.runtime.create("standalone");
+  await browser.runtime.start(first);
+  await browser.runtime.start(second);
+  browser.runtime.removeStopped("process-1");
+
+  assert.equal(browser.runtime.tab(first), undefined);
+  assert.notEqual(browser.runtime.tab(second), undefined);
+  assert.equal(requests.filter((request) => request[1].endsWith("/stop")).length, 0);
+
+  browser.runtime.removeStopped("", "session-2");
+  assert.equal(browser.runtime.tab(second), undefined);
 });

@@ -102,6 +102,10 @@ impl InProcessWebServer {
             return self.handle_process_stream(request);
         }
 
+        if request.method == "POST" && request.path.starts_with("/processes/background-workers/") {
+            return self.handle_background_worker_control(request);
+        }
+
         if request.method == "POST"
             && request.path.starts_with("/processes/")
             && request.path.ends_with("/stop")

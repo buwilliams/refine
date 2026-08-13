@@ -247,6 +247,8 @@ pub fn workflow_subprocess_metadata(
 #[derive(Clone, Debug, Default, Eq, PartialEq, Serialize)]
 pub struct ProcessPauseState {
     pub workflow_paused: bool,
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub disabled_background_workers: BTreeSet<String>,
 }
 
 impl<'de> Deserialize<'de> for ProcessPauseState {
@@ -264,6 +266,8 @@ impl<'de> Deserialize<'de> for ProcessPauseState {
             background_processes_stopped: bool,
             #[serde(default)]
             agents_paused: bool,
+            #[serde(default)]
+            disabled_background_workers: BTreeSet<String>,
         }
 
         let wire = WireState::deserialize(deserializer)?;
@@ -271,7 +275,10 @@ impl<'de> Deserialize<'de> for ProcessPauseState {
             .workflow_paused
             .or(wire.paused)
             .unwrap_or(wire.background_processes_stopped || wire.agents_paused);
-        Ok(Self { workflow_paused })
+        Ok(Self {
+            workflow_paused,
+            disabled_background_workers: wire.disabled_background_workers,
+        })
     }
 }
 

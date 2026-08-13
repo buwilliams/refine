@@ -84,13 +84,13 @@ impl FileProcessControlService {
             let goal = match (goal_id.as_deref(), expectation.as_ref()) {
                 (Some(goal_id), Some(expectation)) => Some(
                     FileWorkItemService::new(&refine_dir)
-                        .requeue_goal_after_process_stop_if_current(goal_id, expectation)?,
+                        .fail_goal_after_process_stop_if_current(goal_id, expectation)?,
                 ),
                 _ => None,
             };
-            let goal_requeued = goal
+            let goal_failed = goal
                 .as_ref()
-                .is_some_and(|goal| goal.goal.status == GoalStatus::Todo);
+                .is_some_and(|goal| goal.goal.status == GoalStatus::Failed);
             return Ok(json!({
                 "stopped": true,
                 "process": {
@@ -104,7 +104,8 @@ impl FileProcessControlService {
                     "already_idle": true
                 },
                 "goal": goal.map(|goal| goal.goal),
-                "goal_requeued": goal_requeued,
+                "goal_failed": goal_failed,
+                "goal_requeued": false,
                 "worktrees_retained": true
             }));
         }
@@ -148,7 +149,7 @@ impl FileProcessControlService {
         let goal = match (goal_id.as_deref(), expectation.as_ref()) {
             (Some(goal_id), Some(expectation)) => {
                 let work_items = FileWorkItemService::new(self.resolve_refine_dir()?);
-                Some(work_items.requeue_goal_after_process_stop_if_current(goal_id, expectation)?)
+                Some(work_items.fail_goal_after_process_stop_if_current(goal_id, expectation)?)
             }
             _ => None,
         };
@@ -158,7 +159,8 @@ impl FileProcessControlService {
             "goal_id": goal_id,
             "termination": termination,
             "goal_status": goal.as_ref().map(|goal| goal.goal.status.as_str()),
-            "goal_requeued": goal.as_ref().is_some_and(|goal| goal.goal.status == GoalStatus::Todo),
+            "goal_failed": goal.as_ref().is_some_and(|goal| goal.goal.status == GoalStatus::Failed),
+            "goal_requeued": false,
             "worktrees_retained": true,
             "recorded_at": Utc::now().to_rfc3339()
         });
@@ -173,6 +175,7 @@ impl FileProcessControlService {
             "process": process_json,
             "termination": receipt["termination"],
             "goal": goal.map(|goal| goal.goal),
+            "goal_failed": receipt["goal_failed"],
             "goal_requeued": receipt["goal_requeued"],
             "worktrees_retained": true
         }))
@@ -311,7 +314,7 @@ impl FileProcessControlService {
         let goal = work_items.show_goal_summary(goal_id)?;
         if goal.goal.status == GoalStatus::Done {
             return Err(RefineError::InvalidInput(format!(
-                "done Goal {goal_id} cannot be requeued by process Stop"
+                "done Goal {goal_id} cannot be failed by process Stop"
             )));
         }
         Ok(GoalCancellationExpectation {

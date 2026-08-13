@@ -1,182 +1,87 @@
 // ---- System / Processes -----------------------------------------------------
 
-let supervisorProcessExpanded = false;
-
-function renderProcessesTab(processData, settings, diag, dash) {
-  const workflowPaused = workflowPausedFor(processData);
-  const backend = processData.backend || diag.backend || dash.backend || {};
-  const processes = (processData.processes || []).map(normalizeManagedProcess);
-  const runnerWork = processData.runner_work || [];
-  const runnerReachable = typeof processData.runner_reachable === "boolean"
-    ? processData.runner_reachable
-    : !!diag.reachable;
-  const anchorMs = Date.now();
-  const rows = buildManagedProcessRows(
-    processes, workflowPaused, backend, runnerReachable, diag,
-  ).map((proc) => renderManagedProcessRow(proc)).join("");
-  const agentRows = (processes || [])
-    .filter(isCurrentAgentProviderProcessRecord)
-    .map((proc) => renderAgentProcessRow(proc, anchorMs)).join("");
-  const subprocessRows = (processes || [])
-    .filter(isCurrentSubprocessRecord)
-    .map((proc) => renderSubprocessProcessRow(proc, anchorMs)).join("");
-  const workRows = runnerWork.map((work) => renderRunnerWorkRow(work, anchorMs)).join("");
-  const subprocessBody = [subprocessRows, workRows].filter(Boolean).join("");
+function renderProcessesTab(processData = {}, sourceData = {}) {
+  const rows = buildProcessManagerRows(processData, sourceData)
+    .map(renderProcessManagerRow)
+    .join("");
   return `
     <section class="settings-section">
-      <h3>${renderSettingsGuideLabel("Process management", "process-management")}</h3>
-      ${rows ? `
-        <table class="table process-table managed-process-table mobile-card-table" data-testid="managed-process-table">
-          <colgroup>
-            <col class="process-col">
-            <col class="status-col">
-            <col class="pid-col">
-            <col class="cpu-col">
-            <col class="memory-col">
-            <col class="details-col">
-            <col class="actions-col">
-          </colgroup>
-          <thead><tr>
-            <th>Process</th><th>Status</th><th>PID</th>
-            <th>CPU priority</th><th>Max memory</th><th>Details</th><th></th>
-          </tr></thead>
-          <tbody>${rows}</tbody>
-        </table>` : `<p class="muted">No managed processes found.</p>`}
-    </section>
-
-    <section class="settings-section">
-      <h3>${renderSettingsGuideLabel("Agents", "process-agent-processes")}</h3>
-      ${agentRows ? `
-        <table class="table process-table agents-process-table mobile-card-table" data-testid="agent-process-table">
-          <colgroup>
-            <col class="agent-col">
-            <col class="status-col">
-            <col class="pid-col">
-            <col class="round-col">
-            <col class="cpu-col">
-            <col class="memory-col">
-            <col class="elapsed-col">
-            <col class="idle-col">
-            <col class="agent-actions-col">
-          </colgroup>
-          <thead><tr>
-            <th>Agent</th><th>Status</th><th>PID</th><th>Context</th>
-            <th>CPU priority</th><th>Max memory</th><th>Elapsed</th><th>Idle</th><th></th>
-          </tr></thead>
-          <tbody>${agentRows}</tbody>
-        </table>` : `<p class="muted">No agent provider calls running.</p>`}
-    </section>
-
-    <section class="settings-section">
-      <h3>${renderSettingsGuideLabel("Subprocesses", "process-runner-processes")}</h3>
-      ${subprocessBody ? `
-        <table class="table process-table runner-workers-table mobile-card-table" data-testid="subprocess-table">
-          <colgroup>
-            <col class="worker-col">
-            <col class="status-col">
-            <col class="pid-col">
-            <col class="cpu-col">
-            <col class="memory-col">
-            <col class="elapsed-col">
-            <col class="details-col">
-            <col class="worker-actions-col">
-          </colgroup>
-          <thead><tr>
-            <th>Subprocess</th><th>Status</th><th>PID</th>
-            <th>CPU priority</th><th>Max memory</th><th>Elapsed</th><th>Details</th><th></th>
-          </tr></thead>
-          <tbody>${subprocessBody}</tbody>
-        </table>` : `<p class="muted">No subprocesses recorded.</p>`}
-      <div id="sqlite-cache-progress" style="display:none;margin-top:12px"></div>
+      <h3>${renderSettingsGuideLabel("Refine process manager", "process-management")}</h3>
+      <table class="table process-table process-manager-table mobile-card-table" data-testid="process-manager-table">
+        <colgroup>
+          <col class="process-col">
+          <col class="pid-col">
+          <col class="memory-col">
+          <col class="cpu-col">
+          <col class="details-col">
+          <col class="actions-col">
+        </colgroup>
+        <thead><tr>
+          <th>Process name</th><th>PID</th><th>Memory used</th>
+          <th>Processor used</th><th>Details</th><th>Actions</th>
+        </tr></thead>
+        <tbody>${rows || `<tr><td colspan="6" class="muted">No Refine processes found.</td></tr>`}</tbody>
+      </table>
     </section>`;
 }
 
-function buildManagedProcessRows(processes, workflowPaused, backend, runnerReachable, diag) {
-  const rows = (processes || [])
-    .filter(isCurrentLongLivedManagedProcess)
-    .map((proc) => {
-      if (proc.kind !== "runner") return proc;
-      return {
-        ...proc,
-        details: runnerProcessDetails(backend, runnerReachable, diag),
-      };
-    });
-  const supervised = backend.process_model === "supervisor";
-  const supervisorOwnsWorkflowToggle = supervised && rows.some((proc) => proc.kind === "supervisor");
-  if (!rows.some((proc) => proc.kind === "target_app")) {
-    rows.push(syntheticTargetAppProcess());
-  }
-  const workflowAction = workflowPauseActionModel({ workflow_paused: workflowPaused });
-  const workflowAutomation = {
-    id: "workflow-automation",
-    kind: "workflow_automation",
-    label: "Workflow automation",
-    status: workflowAction.status,
-    runner_reachable: runnerReachable,
-    pid: null,
-    details: workflowAction.description,
-    paused: workflowPaused,
-    actions: workflowAutomationActionIds(workflowPaused, supervisorOwnsWorkflowToggle),
-    cpu_priority: { label: "-" },
-    max_memory: { label: "-" },
-  };
-  return orderManagedProcessRows(rows, workflowAutomation, supervised);
-}
-
-function normalizeManagedProcess(proc = {}) {
-  const label = String(proc.label || "");
-  if (proc.kind === "daemon") {
-    return { ...proc, kind: "supervisor", label: "Supervisor" };
-  }
-  if (label === "setsid" && (!proc.kind || proc.kind === "process")) {
-    return { ...proc, kind: "supervisor", label: "Supervisor" };
-  }
-  return proc;
-}
-
-function isLongLivedManagedProcess(proc = {}) {
-  return new Set(["supervisor", "ui", "runner", "target_app"]).has(proc.kind);
-}
-
-function isCurrentLongLivedManagedProcess(proc = {}) {
-  if (!isLongLivedManagedProcess(proc)) return false;
-  return isCurrentProcessStatus(proc.status);
-}
-
-function syntheticTargetAppProcess() {
-  const snap = {
-    state: "unknown",
-    has_start_command: false,
-    has_stop_command: false,
-    has_build_command: false,
-    has_start_instructions: false,
-    has_stop_instructions: false,
-    has_build_instructions: false,
-    has_start_action: false,
-    has_stop_action: false,
-    has_build_action: false,
-    has_status_checks: false,
-  };
-  return {
+function buildProcessManagerRows(processData = {}, sourceData = {}) {
+  const processes = (processData.processes || []).filter((proc) =>
+    isCurrentProcessStatus(proc.status),
+  );
+  const disk = processData.repository_disk_usage || {};
+  const targetRecord = processes.find((proc) => proc.kind === "target_app") || {};
+  const targetSnap = processData.target_app || { state: targetRecord.status || "unknown" };
+  const targetApp = {
+    ...targetRecord,
     id: "target-app",
     kind: "target_app",
-    label: "Application",
-    status: snap.state,
-    pid: null,
-    target_app: snap,
-    details: targetAppProcessDetails(snap),
-    actions: [],
-    cpu_priority: { label: "-" },
-    max_memory: { label: "-" },
+    label: "Target app",
+    status: targetSnap.state || targetRecord.status || "unknown",
+    pid: targetRecord.pid || targetSnap.pid || null,
+    target_app: targetSnap,
+    repository_disk_usage: disk.target_app || null,
   };
-}
 
-function isSubprocessRecord(proc = {}) {
-  return !isLongLivedManagedProcess(proc) && !isAgentProviderProcessRecord(proc);
-}
+  const daemonRecord = processes.find((proc) => proc.kind === "daemon")
+    || processes.find((proc) => proc.kind === "supervisor")
+    || {};
+  const daemon = {
+    ...daemonRecord,
+    id: daemonRecord.id || "refine-daemon",
+    kind: "daemon",
+    label: "Refine daemon",
+    status: daemonRecord.status || "running",
+    source_update: sourceData.source_update || {},
+    repository_disk_usage: disk.daemon || null,
+    management_actions: ["update_refine", "stop_daemon"],
+  };
 
-function isCurrentSubprocessRecord(proc = {}) {
-  return isSubprocessRecord(proc) && isCurrentProcessStatus(proc.status);
+  const backgroundWorkers = (processData.background_workers || []).map((worker) => ({
+    ...worker,
+    kind: "background_worker",
+    label: worker.worker_kind || worker.label || "background worker",
+  }));
+  const representedWorkerKinds = new Set(backgroundWorkers.map((worker) => worker.worker_kind));
+  const dynamicBackgroundWorkers = processes
+    .filter((proc) => proc.kind === "runner" && proc.worker_kind
+      && !representedWorkerKinds.has(proc.worker_kind))
+    .map((proc) => ({
+      ...proc,
+      kind: "background_worker",
+      label: proc.worker_kind,
+      management_actions: ["stop_process"],
+    }));
+  const agents = processes.filter(isCurrentAgentProviderProcessRecord);
+  const representedIds = new Set([
+    targetRecord.id,
+    daemonRecord.id,
+    ...backgroundWorkers.map((worker) => worker.process_id),
+    ...dynamicBackgroundWorkers.map((worker) => worker.id),
+    ...agents.map((agent) => agent.id),
+  ].filter(Boolean));
+  const otherProcesses = processes.filter((proc) => !representedIds.has(proc.id));
+  return [targetApp, daemon, ...backgroundWorkers, ...dynamicBackgroundWorkers, ...agents, ...otherProcesses];
 }
 
 function isAgentProviderProcessRecord(proc = {}) {
@@ -192,209 +97,89 @@ function isCurrentProcessStatus(status = "") {
   return !new Set(["exited", "failed", "stopped", "cancelled", "complete", "completed"]).has(status);
 }
 
-function orderManagedProcessRows(rows, workflowAutomation, supervised) {
-  const targetApp = rows.find((proc) => proc.kind === "target_app");
-  const targetAppId = targetApp ? targetApp.id : null;
-  if (!supervised) {
-    return [
-      ...rows.filter((proc) => !targetApp || proc.id !== targetAppId),
-      workflowAutomation,
-      ...(targetApp ? [targetApp] : []),
-    ];
-  }
-  const supervisor = rows.find((proc) => proc.kind === "supervisor");
-  if (!supervisor) {
-    return [
-      ...rows.filter((proc) => !targetApp || proc.id !== targetAppId),
-      workflowAutomation,
-      ...(targetApp ? [targetApp] : []),
-    ];
-  }
-  const childKinds = new Set(["ui", "runner"]);
-  const children = [
-    ...rows.filter((proc) => childKinds.has(proc.kind)),
-    workflowAutomation,
-  ].map((proc) => ({
-    ...proc,
-    supervisor_child: true,
-    supervisor_child_hidden: !supervisorProcessExpanded,
-  }));
-  const childIds = new Set(children.map((proc) => proc.id));
-  const remaining = rows.filter((proc) => (
-    proc.id !== supervisor.id
-    && (!targetApp || proc.id !== targetAppId)
-    && !childIds.has(proc.id)
-  ));
-  return [
-    {
-      ...supervisor,
-      paused: workflowAutomation.paused,
-      runner_reachable: workflowAutomation.runner_reachable,
-      supervisor_parent: true,
-      supervisor_expanded: supervisorProcessExpanded,
-      supervisor_child_count: children.length,
-    },
-    ...children,
-    ...remaining,
-    ...(targetApp ? [targetApp] : []),
-  ];
-}
-
-function runnerProcessDetails(backend = {}, runnerReachable, diag = {}) {
-  const bits = [
-    backendProcessLabel(backend),
-    backendTransportLabel(backend),
-    runnerReachable ? "runner reachable" : "runner unreachable",
-  ];
-  if (diag.mode) bits.push(`mode ${diag.mode}`);
-  if (diag.last_call_at) bits.push(`last call ${fmtTime(diag.last_call_at)}`);
-  if (backend.socket_path) bits.push(`socket ${shortPath(backend.socket_path)}`);
-  if (diag.error?.message) bits.push(`error ${diag.error.message}`);
-  return bits.filter(Boolean).join(" · ");
-}
-
-function renderManagedProcessRow(proc) {
+function renderProcessManagerRow(proc) {
   const kind = proc.kind || "process";
   const pid = proc.pid ? htmlEscape(String(proc.pid)) : `<span class="muted small">-</span>`;
-  const rawLabel = proc.session_id
-    ? `<code>${htmlEscape(proc.session_id)}</code>`
-    : htmlEscape(proc.label || processKindLabel(kind));
-  const label = renderManagedProcessLabel(proc, rawLabel);
-  const details = managedProcessDetails(proc);
+  const label = renderProcessManagerLabel(proc);
+  const details = processManagerDetails(proc);
   const detailsAttrs = details
     ? ` class="process-details-cell" data-full-details="${htmlEscape(details)}" data-detail-title="Process details" title="${htmlEscape(details)}"`
     : "";
-  const rowClasses = [
-    proc.supervisor_parent ? "supervisor-parent" : "",
-    proc.supervisor_child ? "supervisor-child" : "",
-    proc.supervisor_child_hidden ? "supervisor-child-hidden" : "",
-  ].filter(Boolean).join(" ");
-  const rowClassAttr = rowClasses ? ` class="${htmlEscape(rowClasses)}"` : "";
-  const supervisorChildAttr = proc.supervisor_child ? ` data-supervisor-child="1"` : "";
-  const hiddenAttr = proc.supervisor_child_hidden ? " hidden" : "";
   return `
-    <tr${rowClassAttr} data-testid="managed-process-row" data-process-id="${htmlEscape(proc.id || "")}" data-process-kind="${htmlEscape(kind)}"${supervisorChildAttr}${hiddenAttr}>
-      <td data-label="Process">${label}</td>
-      <td data-label="Status" data-testid="managed-process-status" data-process-status>${htmlEscape(processStatusLabel(proc.status || ""))}</td>
+    <tr data-testid="process-manager-row" data-process-id="${htmlEscape(proc.id || "")}" data-process-kind="${htmlEscape(kind)}">
+      <td data-label="Process name">${label}</td>
       <td data-label="PID">${pid}</td>
-      <td data-label="CPU priority">${htmlEscape(processResourceLabel(proc.cpu_priority))}</td>
-      <td data-label="Max memory">${htmlEscape(processResourceLabel(proc.max_memory))}</td>
-      <td data-label="Details" data-testid="managed-process-details" data-process-details${detailsAttrs}>${details ? htmlEscape(details) : `<span class="muted small">-</span>`}</td>
+      <td data-label="Memory used">${htmlEscape(formatProcessBytes(proc.memory_used_bytes))}</td>
+      <td data-label="Processor used">${htmlEscape(formatProcessorUsed(proc.processor_used_percent))}</td>
+      <td data-label="Details" data-testid="process-manager-details" data-process-details${detailsAttrs}>${details ? htmlEscape(details) : `<span class="muted small">-</span>`}</td>
       <td data-label="Actions" class="process-actions"><div class="actions">${renderProcessActions(proc)}</div></td>
     </tr>`;
 }
 
-function renderManagedProcessLabel(proc, rawLabel) {
-  if (proc.supervisor_parent && Number(proc.supervisor_child_count || 0) > 0) {
-    const expanded = !!proc.supervisor_expanded;
-    return `
-      <span class="process-tree-label">
-        <button type="button" class="process-tree-toggle" data-supervisor-toggle
-                data-testid="process-supervisor-toggle"
-                aria-expanded="${expanded ? "true" : "false"}"
-                aria-label="${expanded ? "Collapse supervisor processes" : "Expand supervisor processes"}"
-                title="${expanded ? "Collapse supervisor processes" : "Expand supervisor processes"}">
-          <span aria-hidden="true">${expanded ? "▾" : "▸"}</span>
-        </button>
-        <span>${rawLabel}</span>
-      </span>`;
-  }
-  if (proc.supervisor_child) {
-    return `
-      <span class="process-tree-label supervisor-child-label">
-        <span class="process-tree-spacer" aria-hidden="true"></span>
-        <span>${rawLabel}</span>
-      </span>`;
-  }
-  return rawLabel;
-}
-
-function renderAgentProcessRow(proc, anchorMs) {
-  const kind = proc.kind || "agent";
-  const interactive = kind === "interactive_session";
+function renderProcessManagerLabel(proc) {
   const attachedGoalId = proc.goal_id || proc.attached_goal_id || "";
-  const pid = proc.pid ? htmlEscape(String(proc.pid)) : `<span class="muted small">-</span>`;
-  const elapsed = Number.isFinite(Number(proc.elapsed_seconds))
-    ? `<span class="js-elapsed-tick" data-base="${Number(proc.elapsed_seconds) || 0}" data-anchor-ms="${anchorMs}">${fmtElapsed(proc.elapsed_seconds || 0)}</span>`
-    : `<span class="muted small">-</span>`;
-  const idle = Number.isFinite(Number(proc.idle_seconds))
-    ? `<span class="js-idle-tick" data-base="${Number(proc.idle_seconds) || 0}" data-anchor-ms="${anchorMs}">${fmtElapsed(proc.idle_seconds || 0)}</span>`
-    : `<span class="muted small">-</span>`;
-  const label = kind === "chat"
-    ? `${htmlEscape(proc.mode === "goal" ? "Goal agent session" : proc.mode === "plan" ? "Plan chat" : "Standalone chat")}<br><code>${htmlEscape(proc.session_id || "")}</code>`
-    : attachedGoalId
-    ? `<a href="#/goals/${htmlEscape(attachedGoalId)}">${htmlEscape(attachedGoalId.slice(0, 10))}...</a>`
-    : htmlEscape(proc.label || "Agent");
-  const context = kind === "chat"
-    ? attachedGoalId
-      ? `<a href="#/goals/${htmlEscape(attachedGoalId)}">${htmlEscape(attachedGoalId.slice(0, 10))}...</a>`
-      : "standalone"
-    : interactive
-    ? attachedGoalId
-      ? `<a href="#/goals/${htmlEscape(attachedGoalId)}">${htmlEscape(attachedGoalId.slice(0, 10))}...</a>`
-      : htmlEscape(proc.profile || proc.role || "interactive")
-    : proc.round_idx != null
-    ? String(Number(proc.round_idx) + 1)
-    : "";
-  return `
-    <tr data-testid="agent-process-row" data-process-id="${htmlEscape(proc.id || "")}" data-process-kind="${htmlEscape(kind)}">
-      <td data-label="Agent">${label}</td>
-      <td data-label="Status">${htmlEscape(processStatusLabel(proc.status || ""))}</td>
-      <td data-label="PID">${pid}</td>
-      <td data-label="Context">${context ? context : `<span class="muted small">-</span>`}</td>
-      <td data-label="CPU priority">${htmlEscape(processResourceLabel(proc.cpu_priority))}</td>
-      <td data-label="Max memory">${htmlEscape(processResourceLabel(proc.max_memory))}</td>
-      <td data-label="Elapsed">${elapsed}</td>
-      <td data-label="Idle">${idle}</td>
-      <td data-label="Actions" class="process-actions"><div class="actions">${renderProcessActions(proc)}</div></td>
-    </tr>`;
+  if (isAgentProviderProcessRecord(proc) && attachedGoalId) {
+    return `<a href="#/goals/${htmlEscape(attachedGoalId)}">Agent · ${htmlEscape(attachedGoalId.slice(0, 10))}…</a>`;
+  }
+  if (isAgentProviderProcessRecord(proc)) {
+    return htmlEscape(proc.label || (proc.kind === "chat" ? "Agent session" : "Agent"));
+  }
+  return htmlEscape(proc.label || processKindLabel(proc.kind));
 }
 
-function renderSubprocessProcessRow(proc, anchorMs) {
-  const kind = proc.kind || "process";
-  const pid = proc.pid ? htmlEscape(String(proc.pid)) : `<span class="muted small">-</span>`;
-  const elapsed = Number.isFinite(Number(proc.elapsed_seconds))
-    ? `<span class="js-elapsed-tick" data-base="${Number(proc.elapsed_seconds) || 0}" data-anchor-ms="${anchorMs}">${fmtElapsed(proc.elapsed_seconds || 0)}</span>`
-    : `<span class="muted small">-</span>`;
-  const label = kind === "chat"
-    ? `${htmlEscape(proc.mode === "goal" ? "Goal agent session" : proc.mode === "plan" ? "Plan chat" : "Standalone chat")}<br><code>${htmlEscape(proc.session_id || "")}</code>`
-    : kind === "agent" && proc.goal_id
-      ? `<a href="#/goals/${htmlEscape(proc.goal_id)}">${htmlEscape(proc.goal_id.slice(0, 10))}...</a>`
-      : htmlEscape(proc.label || processKindLabel(kind));
+function processManagerDetails(proc) {
   const details = [
+    processStatusLabel(proc.status || "unknown"),
     proc.goal_id ? `Goal ${proc.goal_id}` : "",
     proc.round_idx != null ? `round ${Number(proc.round_idx) + 1}` : "",
-    managedProcessDetails(proc),
+    proc.provider || "",
+    proc.profile || proc.mode || "",
+    proc.kind === "target_app" ? targetAppProcessDetails(proc.target_app || {}) : "",
+    readableProcessDetails(proc.details),
+    repositoryDiskUsageDetails(proc.repository_disk_usage),
+    proc.kind === "daemon" && proc.source_update?.title ? proc.source_update.title : "",
   ].filter(Boolean).join(" · ");
-  const detailsAttrs = details
-    ? ` class="process-details-cell" data-full-details="${htmlEscape(details)}" data-detail-title="Subprocess details" title="${htmlEscape(details)}"`
-    : "";
-  return `
-    <tr data-testid="subprocess-row" data-process-id="${htmlEscape(proc.id || "")}" data-process-kind="${htmlEscape(kind)}">
-      <td data-label="Subprocess">${label}</td>
-      <td data-label="Status">${htmlEscape(processStatusLabel(proc.status || ""))}</td>
-      <td data-label="PID">${pid}</td>
-      <td data-label="CPU priority">${htmlEscape(processResourceLabel(proc.cpu_priority))}</td>
-      <td data-label="Max memory">${htmlEscape(processResourceLabel(proc.max_memory))}</td>
-      <td data-label="Elapsed">${elapsed}</td>
-      <td data-label="Details" data-process-details${detailsAttrs}>${details ? htmlEscape(details) : `<span class="muted small">-</span>`}</td>
-      <td data-label="Actions" class="process-actions"><div class="actions">${renderProcessActions(proc)}</div></td>
-    </tr>`;
+  return details;
 }
 
-function managedProcessDetails(proc) {
-  if (proc.details) return proc.details;
-  if (proc.kind === "target_app") return targetAppProcessDetails(proc.target_app || {});
-  if (proc.kind === "chat") {
-    return [proc.provider, proc.mode].filter(Boolean).join(" · ");
+function readableProcessDetails(details) {
+  if (!details || typeof details !== "string") return "";
+  try {
+    const parsed = JSON.parse(details);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return details;
+    return [parsed.workflow_state, parsed.behavior, parsed.attention_message]
+      .filter(Boolean)
+      .join(" · ");
+  } catch (_) {
+    return details;
   }
-  return "";
 }
 
-function processResourceLabel(resource) {
-  if (!resource) return "-";
-  if (typeof resource === "string") return resource;
-  return resource.label || "-";
+function repositoryDiskUsageDetails(usage) {
+  if (!usage || !Number.isFinite(Number(usage.bytes))) return "";
+  const worktrees = usage.includes_git_worktrees === true
+    ? " (includes .git worktrees)"
+    : "";
+  return `repository disk ${formatProcessBytes(usage.bytes)}${worktrees}`;
+}
+
+function formatProcessBytes(value) {
+  const bytes = Number(value);
+  if (!Number.isFinite(bytes) || bytes < 0) return "-";
+  if (bytes < 1024) return `${bytes.toFixed(0)} B`;
+  const units = ["KiB", "MiB", "GiB", "TiB"];
+  let amount = bytes / 1024;
+  let unit = units[0];
+  for (let i = 1; i < units.length && amount >= 1024; i += 1) {
+    amount /= 1024;
+    unit = units[i];
+  }
+  return `${amount >= 100 ? amount.toFixed(0) : amount >= 10 ? amount.toFixed(1) : amount.toFixed(2)} ${unit}`;
+}
+
+function formatProcessorUsed(value) {
+  const percent = Number(value);
+  return Number.isFinite(percent) ? `${percent.toFixed(1)}%` : "-";
 }
 
 function targetAppProcessDetails(snap = {}) {
@@ -419,10 +204,11 @@ function targetAppProcessDetails(snap = {}) {
 function processKindLabel(kind) {
   return {
     ui: "UI",
-    supervisor: "Supervisor",
-    daemon: "Supervisor",
+    supervisor: "Refine daemon",
+    daemon: "Refine daemon",
     runner: "Runner",
-    target_app: "Application",
+    target_app: "Target app",
+    background_worker: "Background worker",
     workflow_automation: "workflow automation",
     agent_automation: "workflow automation",
     background_processes: "workflow automation",
@@ -457,14 +243,6 @@ function processStatusLabel(status) {
   }[status] || status || "unknown";
 }
 
-function workflowAutomationActionIds(workflowPaused, supervisorOwnsWorkflowToggle) {
-  const actions = ["hard_reset_worktree"];
-  if (!supervisorOwnsWorkflowToggle) {
-    actions.unshift(workflowPaused ? "unpause_workflow" : "pause_workflow");
-  }
-  return actions;
-}
-
 function workflowPausedFor(value = {}) {
   if (typeof value.workflow_paused === "boolean") return value.workflow_paused;
   if (typeof value.paused === "boolean") return value.paused;
@@ -479,13 +257,13 @@ function workflowPauseActionModel(value = {}) {
   return {
     shouldPause,
     actionId: shouldPause ? "pause_workflow" : "unpause_workflow",
-    direction: shouldPause ? "pause" : "resume",
+    direction: shouldPause ? "pause" : "unpause",
     status: paused ? "paused" : "active",
     description: paused
       ? "New Goal admission is paused; automatic Git sync and inactive-worktree cleanup quiesce at safe boundaries. Active Goal executions continue unless stopped separately."
       : "New Goal admission, automatic Git sync, and inactive-worktree cleanup are eligible. Active Goal executions continue unless stopped separately.",
-    buttonLabel: shouldPause ? "Pause Workflow" : "Resume Workflow",
-    busyLabel: shouldPause ? "Pausing…" : "Resuming…",
+    buttonLabel: shouldPause ? "Pause Workflow" : "Unpause Workflow",
+    busyLabel: shouldPause ? "Pausing…" : "Unpausing…",
     confirmation: shouldPause ? WORKFLOW_PAUSE_CONFIRMATION : null,
     payload: { paused: shouldPause },
   };
@@ -497,23 +275,14 @@ function processActionIds(proc) {
     const supported = proc.actions.filter((actionId) => isSupportedProcessActionId(proc, actionId));
     if (supported.length) return supported;
   }
-  if (proc.kind === "supervisor") {
-    const workflowPaused = workflowPausedFor(proc);
-    return [workflowPaused ? "unpause_workflow" : "pause_workflow"];
-  }
-  if (proc.kind === "workflow_automation" || proc.kind === "agent_automation") {
-    const workflowPaused = workflowPausedFor(proc);
-    return [workflowPaused ? "unpause_workflow" : "pause_workflow", "hard_reset_worktree"];
-  }
-  if (proc.kind === "background_processes") {
-    const workflowPaused = workflowPausedFor(proc);
-    return [workflowPaused ? "unpause_workflow" : "pause_workflow", "hard_reset_worktree"];
-  }
   return null;
 }
 
 function isSupportedProcessActionId(proc, actionId) {
-  if (["pause_workflow", "unpause_workflow", "hard_reset_worktree"].includes(actionId)) return true;
+  if ([
+    "pause_workflow", "unpause_workflow", "start_background_worker",
+    "stop_background_worker", "stop_process", "update_refine", "stop_daemon",
+  ].includes(actionId)) return true;
   if (actionId === "stop_agent") return isAgentProviderProcessRecord(proc) && !!proc.id;
   if (actionId === "cancel_agent") return proc.kind === "agent" && !!proc.goal_id;
   if (actionId === "stop_chat" || actionId === "stop") return proc.kind === "chat" && !!proc.session_id;
@@ -548,6 +317,9 @@ function renderProcessActions(proc) {
       <button class="secondary" id="s-target-run-build" data-testid="process-target-app-build" ${inFlight ? "disabled" : ""}>Build</button>
       <button class="secondary" id="s-target-health-now" data-testid="process-target-app-health">Check</button>`;
   }
+  if (proc.id) {
+    return `<button class="danger" data-testid="process-stop" data-stop-process="${htmlEscape(proc.id)}">Stop</button>`;
+  }
   return `<span class="muted small">-</span>`;
 }
 
@@ -567,9 +339,20 @@ function renderProcessActionButton(proc, actionId) {
     const disabled = workflowToggleDisabled(proc);
     return `<button class="${action.shouldPause ? "secondary" : ""}" data-testid="process-workflow-toggle" data-toggle-workflow="${action.direction}" data-workflow-paused="${action.shouldPause ? "false" : "true"}" ${disabled ? "disabled" : ""}>${action.buttonLabel}</button>`;
   }
-  if (actionId === "hard_reset_worktree") {
-    const disabled = !proc.runner_reachable || hardResetWorktreeDisabled(proc);
-    return `<button class="danger" data-testid="process-hard-reset-worktree" data-hard-reset-worktree ${disabled ? "disabled" : ""}>Hard reset worktree</button>`;
+  if (actionId === "start_background_worker" || actionId === "stop_background_worker") {
+    const start = actionId === "start_background_worker";
+    return `<button class="${start ? "" : "danger"}" data-testid="process-background-worker-${start ? "start" : "stop"}" data-background-worker-action="${start ? "start" : "stop"}" data-worker-kind="${htmlEscape(proc.worker_kind || "")}">${start ? "Start" : "Stop"}</button>`;
+  }
+  if (actionId === "stop_process" && proc.id) {
+    return `<button class="danger" data-testid="process-stop" data-stop-process="${htmlEscape(proc.id)}">Stop</button>`;
+  }
+  if (actionId === "update_refine") {
+    const update = proc.source_update || {};
+    const disabled = update.enabled !== true || update.update_available !== true;
+    return `<button data-testid="process-daemon-update" data-update-refine ${disabled ? "disabled" : ""} title="${htmlEscape(update.title || "Refine update status unavailable")}">Update</button>`;
+  }
+  if (actionId === "stop_daemon") {
+    return `<button class="danger" data-testid="process-daemon-stop" data-stop-daemon>Stop</button>`;
   }
   if (actionId === "stop_agent" && isAgentProviderProcessRecord(proc) && proc.id) {
     return renderStopAgentButton(proc);
@@ -590,14 +373,7 @@ function renderStopAgentButton(proc) {
   return `<button class="danger" data-testid="process-stop-agent" data-stop-agent="${htmlEscape(proc.id)}"${goal}>Stop</button>`;
 }
 
-function workflowToggleDisabled(proc) {
-  return (proc.kind === "workflow_automation" || proc.kind === "agent_automation") && !proc.runner_reachable;
-}
-
-function hardResetWorktreeDisabled(proc) {
-  if (proc.kind === "background_processes") return proc.status === "paused";
-  return workflowPausedFor(proc);
-}
+function workflowToggleDisabled() { return false; }
 
 function targetAppShowsStopAction(state) {
   return ["running", "degraded", "stopping", "building"].includes(state);
@@ -612,100 +388,6 @@ function setTargetAppActionVisible(button, visible) {
     button.setAttribute("aria-hidden", "true");
     button.tabIndex = -1;
   }
-}
-
-function setSupervisorProcessExpanded(expanded) {
-  supervisorProcessExpanded = !!expanded;
-  const button = document.querySelector("[data-supervisor-toggle]");
-  if (button) {
-    button.setAttribute("aria-expanded", supervisorProcessExpanded ? "true" : "false");
-    button.setAttribute(
-      "aria-label",
-      supervisorProcessExpanded ? "Collapse supervisor processes" : "Expand supervisor processes",
-    );
-    button.title = supervisorProcessExpanded
-      ? "Collapse supervisor processes"
-      : "Expand supervisor processes";
-    const icon = button.querySelector("span");
-    if (icon) icon.textContent = supervisorProcessExpanded ? "▾" : "▸";
-  }
-  $$("[data-supervisor-child]").forEach((row) => {
-    row.hidden = !supervisorProcessExpanded;
-    row.classList.toggle("supervisor-child-hidden", !supervisorProcessExpanded);
-  });
-}
-
-function bindSupervisorProcessToggle() {
-  bindOnce(document.querySelector("[data-supervisor-toggle]"), "click", () => {
-    setSupervisorProcessExpanded(!supervisorProcessExpanded);
-  });
-}
-
-function renderRunnerWorkRow(work, anchorMs) {
-  const elapsed = Number.isFinite(Number(work.elapsed_seconds))
-    ? `<span class="js-elapsed-tick" data-base="${Number(work.elapsed_seconds) || 0}" data-anchor-ms="${anchorMs}">${fmtElapsed(work.elapsed_seconds || 0)}</span>`
-    : `<span class="muted small">-</span>`;
-  const queued = Number(work.queued || 0);
-  const details = [
-    work.goal_id ? `Goal ${work.goal_id}` : "",
-    queued ? `queue ${fmtCount(queued)}` : "",
-    work.details || work.last_outcome || "",
-  ].filter(Boolean).join(" · ");
-  const detailsAttrs = details
-    ? ` class="runner-work-details process-details-cell" data-full-details="${htmlEscape(details)}" data-detail-title="Runner worker details" title="${htmlEscape(details)}"`
-    : ` class="runner-work-details"`;
-  return `
-    <tr data-testid="runner-work-row" data-runner-work-kind="${htmlEscape(work.kind || "")}">
-      <td data-label="Worker">${htmlEscape(runnerWorkKindLabel(work.kind))}</td>
-      <td data-label="Status">${htmlEscape(processStatusLabel(work.status || ""))}</td>
-      <td data-label="PID"><span class="muted small">-</span></td>
-      <td data-label="CPU priority"><span class="muted small">-</span></td>
-      <td data-label="Max memory"><span class="muted small">-</span></td>
-      <td data-label="Elapsed">${elapsed}</td>
-      <td data-label="Details"${detailsAttrs}>${details ? htmlEscape(details) : `<span class="muted small">-</span>`}</td>
-      <td data-label="Actions" class="process-actions"><div class="actions">${renderRunnerWorkActions(work)}</div></td>
-    </tr>`;
-}
-
-function renderRunnerWorkActions(work) {
-  if (work.kind === "target_app_builder") {
-    const busy = ["running", "queued", "unknown", "paused"].includes(work.status);
-    return `<button class="secondary" data-testid="runner-target-app-build" data-runner-target-app-build ${busy ? "disabled" : ""}>Build</button>`;
-  }
-  if (work.kind === "target_app_config_generator") {
-    const busy = ["running", "queued", "unknown", "paused"].includes(work.status);
-    return `<button class="secondary" data-testid="runner-target-app-generate" data-runner-target-app-generate ${busy ? "disabled" : ""}>Generate</button>`;
-  }
-  if (work.kind === "sqlite_cache_rebuild") {
-    const busy = ["running", "queued", "unknown", "paused"].includes(work.status);
-    return `<button class="danger" data-testid="runner-cache-rebuild" data-runner-cache-rebuild ${busy ? "disabled" : ""}>Rebuild</button>`;
-  }
-  if (work.kind === "activity_log_cleanup") {
-    const paused = work.status === "paused";
-    return `
-      <select data-testid="runner-log-cleanup-days" data-runner-log-cleanup-days aria-label="Activity log retention" ${paused ? "disabled" : ""}>
-        ${[0, 7, 30, 60, 90, 365].map((n) =>
-          `<option value="${n}" ${n === 7 ? "selected" : ""}>${n === 0 ? "0 days" : `${n} days`}</option>`).join("")}
-      </select>
-      <button class="danger" data-testid="runner-log-cleanup" data-runner-log-cleanup ${paused ? "disabled" : ""}>Clean up</button>`;
-  }
-  return `<span class="muted small">-</span>`;
-}
-
-function runnerWorkKindLabel(kind) {
-  return {
-    merger: "merger",
-    governance: "governance",
-    plan_draft_extractor: "Plan Draft extractor",
-    target_app_builder: "target-app builder",
-    target_app_config_generator: "target-app config generator",
-    sqlite_cache_rebuild: "projection cache rebuilder",
-    activity_log_cleanup: "activity log cleanup",
-    import_prepare: "import preparer",
-    import_persist: "import persister",
-    bulk_update_goals: "bulk Goal updater",
-    bulk_delete_goals: "bulk Goal deleter",
-  }[kind] || "worker";
 }
 
 function bindProcessDetailCells() {
@@ -754,17 +436,6 @@ function backendProcessLabel(backend = {}) {
   if (backend.process_model === "supervisor") return "Supervisor: UI + worker process";
   return "Unknown";
 }
-
-function backendTransportLabel(backend = {}) {
-  if (backend.transport === "unix_socket") return "Unix socket";
-  return "Unknown";
-}
-
-function shortPath(path) {
-  const text = String(path || "");
-  return text.split(/[\\/]/).pop() || text;
-}
-
 
 async function refreshTargetAppStatus() {
   const block = document.getElementById("target-app-status-block");
@@ -916,9 +587,8 @@ function drawTargetAppStatusBlock(snap) {
   }
 }
 
-function bindSettingsProcessesTab(s) {
+function bindSettingsProcessesTab() {
   bindProcessDetailCells();
-  bindSupervisorProcessToggle();
   $$("[data-toggle-workflow]").forEach((b) => {
     bindOnce(b, "click", async () => {
       const action = workflowPauseActionModel({
@@ -941,30 +611,74 @@ function bindSettingsProcessesTab(s) {
       });
     });
   });
-  bindCommand("[data-hard-reset-worktree]", "system.worktree.hard_reset");
+  $$('[data-background-worker-action]').forEach((b) => {
+    bindOnce(b, "click", async () => {
+      const action = b.dataset.backgroundWorkerAction;
+      const workerKind = b.dataset.workerKind;
+      await withButtonBusy(b, action === "start" ? "Starting…" : "Stopping…", async () => {
+        try {
+          await api(
+            "POST",
+            `/api/processes/background-workers/${encodeURIComponent(workerKind)}/${action}`,
+            {},
+          );
+          await refreshProcessesSettingsTab({ force: true });
+          scheduleProcessesTabRefreshes();
+        } catch (e) { await showActionError(e); }
+      });
+    });
+  });
+  $$('[data-stop-process]').forEach((b) => {
+    bindOnce(b, "click", async () => {
+      await withButtonBusy(b, "Stopping…", async () => {
+        try {
+          await api("POST", `/api/processes/${encodeURIComponent(b.dataset.stopProcess)}/stop`, {
+            signal: "kill",
+          });
+          await refreshProcessesSettingsTab({ force: true });
+        } catch (e) { await showActionError(e); }
+      });
+    });
+  });
+  $$('[data-update-refine]').forEach((b) => {
+    bindOnce(b, "click", async () => {
+      await withButtonBusy(b, "Updating…", async () => {
+        try {
+          const result = await api("POST", "/api/system/source/promote", {});
+          toast(result.operation?.message || "Refine update queued; reconnecting after restart", "info");
+          scheduleProcessesTabRefreshes();
+        } catch (e) { await showActionError(e); }
+      });
+    });
+  });
+  $$('[data-stop-daemon]').forEach((b) => {
+    bindOnce(b, "click", async () => {
+      await withButtonBusy(b, "Stopping…", async () => {
+        try {
+          await api("POST", "/api/system/stop", {});
+          toast("Stopping all Refine processes for this runtime", "info");
+        } catch (e) { await showActionError(e); }
+      });
+    });
+  });
   $$("[data-stop-agent]").forEach((b) => {
     bindOnce(b, "click", async () => {
       const processId = b.dataset.stopAgent;
-      const goalId = b.dataset.stopAgentGoal;
-      const ok = await modalConfirm(
-        goalId
-          ? "Stop this agent process? After the exact process exits, Refine will settle its Goal from the authoritative workflow evidence and retain every workflow worktree and branch. Cleanup is a separate explicit operation."
-          : "Stop this agent process?",
-        { title: "Stop agent", okLabel: "Stop agent", danger: true,
-          cancelLabel: "Keep running" },
-      );
-      if (!ok) return;
       await withButtonBusy(b, "Stopping…", async () => {
         try {
           const stopped = await api("POST", `/api/processes/${encodeURIComponent(processId)}/stop`, {
-            signal: "terminate",
+            signal: "kill",
           });
-          if (stopped?.worktree_retention?.retained) {
+          if (typeof removeToolbarTabsForStoppedProcess === "function") {
+            removeToolbarTabsForStoppedProcess(
+              processId,
+              stopped?.process?.session_id || "",
+            );
+          }
+          if (stopped?.worktrees_retained) {
             const goalOutcome = stopped?.goal?.status === "cancelled"
               ? "Explicit Goal cancellation remains terminal."
-              : stopped?.goal?.status === "failed"
-                ? "The current planned attempt failed; start a fresh follow-up Round to retry."
-                : "Goal returned to todo.";
+              : "The Goal is now failed; start a fresh follow-up Round to retry.";
             toast(
               `Agent stopped. ${goalOutcome} Its workflow worktree and branch were retained for inspection or explicit cleanup.`,
               "info",
@@ -975,82 +689,10 @@ function bindSettingsProcessesTab(s) {
       });
     });
   });
-  $$("[data-cancel-agent]").forEach((b) => {
-    bindOnce(b, "click", async () => {
-      const id = b.dataset.cancelAgent;
-      const ok = await modalConfirm(
-        "Cancel this Goal's running subprocess?",
-        { title: "Cancel run", okLabel: "Cancel run", danger: true,
-          cancelLabel: "Keep running" },
-      );
-      if (!ok) return;
-      await withButtonBusy(b, "Cancelling…", async () => {
-        try {
-          await api("POST", `/api/goals/${id}/cancel`);
-          await refreshProcessesSettingsTab();
-        } catch (e) { await showActionError(e); }
-      });
-    });
-  });
-  $$("[data-stop-chat]").forEach((b) => {
-    bindOnce(b, "click", async () => {
-      const id = b.dataset.stopChat;
-      const ok = await modalConfirm(
-        "Stop this chat session?",
-        { title: "Stop chat", okLabel: "Stop chat", danger: true,
-          cancelLabel: "Keep running" },
-      );
-      if (!ok) return;
-      await withButtonBusy(b, "Stopping…", async () => {
-        try {
-          await api("POST", `/api/chat/${id}/stop`);
-          await refreshProcessesSettingsTab();
-        } catch (e) { await showActionError(e); }
-      });
-    });
-  });
-  $$("[data-runner-target-app-build]").forEach((b) => {
-    bindOnce(b, "click", async () => {
-      await withButtonBusy(b, "Queueing…", async () => {
-        try {
-          const queued = await api("POST", "/api/runner-workers/target-app-builder/build");
-          await resolveBackgroundOperationResponse(
-            queued,
-            "Target application build is running in the background",
-          );
-          await refreshProcessesSettingsTab({ force: true });
-        } catch (e) { await showActionError(e); }
-      });
-    });
-  });
-  $$("[data-runner-target-app-generate]").forEach((b) => {
-    bindOnce(b, "click", async () => {
-      await runCommand("target_app.generate", {
-        context: { button: b },
-      });
-    });
-  });
-  $$("[data-runner-cache-rebuild]").forEach((b) => {
-    bindOnce(b, "click", async () => {
-      await runCommand("system.cache.rebuild", { context: { button: b } });
-    });
-  });
-  $$("[data-runner-log-cleanup]").forEach((b) => {
-    bindOnce(b, "click", async () => {
-      const select = b.parentElement?.querySelector("[data-runner-log-cleanup-days]");
-      const days = parseInt(select?.value || "7", 10);
-      await runCommand("system.logs.cleanup", {
-        context: { button: b },
-        params: { days },
-      });
-    });
-  });
   bindCommand("#s-target-run-start", "target_app.start");
   bindCommand("#s-target-run-stop", "target_app.stop");
   bindCommand("#s-target-run-build", "target_app.build");
   bindCommand("#s-target-health-now", "target_app.health");
-  // Kick off the initial status load (and let SSE refresh later).
-  refreshTargetAppStatus();
 }
 
 function scheduleProcessesTabRefreshes() {

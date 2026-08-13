@@ -35,6 +35,12 @@ pub const GIT_SYNC_RUNNER: &str = "git-sync";
 pub const PROJECT_SYNC_RUNNER: &str = "project-sync";
 pub const JIRA_EXPORT_RUNNER: &str = "jira-export";
 pub const DEVELOPMENT_REQUEST_RUNNER: &str = "development-requests";
+pub const BACKGROUND_RUNNERS: [&str; 4] = [
+    GIT_SYNC_RUNNER,
+    WORKFLOW_RUNNER,
+    WORKTREE_CLEANUP_RUNNER,
+    DEVELOPMENT_REQUEST_RUNNER,
+];
 const PAUSE_AWARE_BACKGROUND_RUNNERS: [&str; 2] = [GIT_SYNC_RUNNER, WORKTREE_CLEANUP_RUNNER];
 
 const WORKFLOW_INTERVAL: Duration = Duration::from_secs(1);
@@ -107,6 +113,13 @@ impl FileRunnerWorkerService {
     ) -> RefineResult<BackgroundWorkerEnsure> {
         validate_worker_kind(worker_kind, false)?;
         let supervisor = FileProcessSupervisor::new(&self.runtime_root);
+        if supervisor
+            .pause_state()?
+            .disabled_background_workers
+            .contains(worker_kind)
+        {
+            return Ok(BackgroundWorkerEnsure::Disabled);
+        }
         if PAUSE_AWARE_BACKGROUND_RUNNERS.contains(&worker_kind)
             && self.background_automation_paused()?
         {
@@ -127,6 +140,13 @@ impl FileRunnerWorkerService {
         }
         #[cfg(test)]
         run_background_worker_hook(worker_kind, BackgroundWorkerBoundary::EnsureLaunch);
+        if supervisor
+            .pause_state()?
+            .disabled_background_workers
+            .contains(worker_kind)
+        {
+            return Ok(BackgroundWorkerEnsure::Disabled);
+        }
         if PAUSE_AWARE_BACKGROUND_RUNNERS.contains(&worker_kind)
             && self.background_automation_paused()?
         {
@@ -148,6 +168,33 @@ impl FileRunnerWorkerService {
         Ok(FileProcessSupervisor::new(&self.runtime_root)
             .pause_state()?
             .workflow_paused)
+    }
+
+    pub fn set_background_worker_enabled(
+        &self,
+        worker_kind: &str,
+        enabled: bool,
+    ) -> RefineResult<BackgroundWorkerEnsure> {
+        validate_worker_kind(worker_kind, false)?;
+        let supervisor = FileProcessSupervisor::new(&self.runtime_root);
+        supervisor.set_background_worker_enabled(worker_kind, enabled)?;
+        if enabled {
+            return self.ensure_background_worker(worker_kind);
+        }
+
+        for process in supervisor.recover_owner(ProcessOwner::Runner)? {
+            if process.state == "running" && managed_worker_kind(&process) == Some(worker_kind) {
+                let outcome = supervisor.terminate_owned_and_confirm_exit(
+                    &process,
+                    "kill",
+                    Duration::from_secs(2),
+                )?;
+                supervisor
+                    .cleanup_confirmed_exit(&process, outcome)
+                    .map_err(|failure| failure.error)?;
+            }
+        }
+        Ok(BackgroundWorkerEnsure::Disabled)
     }
 
     pub fn queue_project_sync(&self, target_root: &Path) -> RefineResult<OperationHandle> {
@@ -322,6 +369,7 @@ fn runner_executable(_runtime_root: &Path) -> RefineResult<PathBuf> {
 pub enum BackgroundWorkerEnsure {
     Running(Box<ManagedProcess>),
     Paused,
+    Disabled,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

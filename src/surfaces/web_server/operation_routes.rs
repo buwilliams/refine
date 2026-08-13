@@ -4,6 +4,7 @@ use std::sync::{Mutex, OnceLock};
 
 use serde_json::{Value, json};
 
+use crate::process::runner::{BackgroundWorkerEnsure, FileRunnerWorkerService};
 use crate::process::subprocess::FileProcessSupervisor;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::lifecycle::BackgroundDaemonConfig;
@@ -24,7 +25,9 @@ use crate::tools::host::source_promotion::{
     FileSourcePromotionService, source_promotion_affordance,
 };
 use crate::tools::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
-use crate::tools::observability::processes::FileProcessStatusService;
+use crate::tools::observability::processes::{
+    FileProcessStatusService, enrich_process_resource_usage, repository_disk_usage_value,
+};
 use crate::tools::observability::support_bundle::{FileSupportBundleService, SupportBundleService};
 use crate::tools::product::process_control::FileProcessControlService;
 use crate::workflow::WorkflowEngine;
