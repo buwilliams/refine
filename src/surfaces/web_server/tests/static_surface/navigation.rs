@@ -89,6 +89,7 @@ fn static_main_nav_consolidates_context_and_controls() {
     let theme = fs::read_to_string(static_root.join("js/theme.js")).unwrap();
     let theme_css = fs::read_to_string(static_root.join("css/theme.css")).unwrap();
     let target_app = fs::read_to_string(static_root.join("js/target-app.js")).unwrap();
+    let node_context = fs::read_to_string(static_root.join("js/node-context.js")).unwrap();
     let releases =
         fs::read_to_string(static_root.join("js/features/settings_releases.js")).unwrap();
 
@@ -117,6 +118,7 @@ fn static_main_nav_consolidates_context_and_controls() {
 
     for control_id in [
         r#"id="target-app-indicator""#,
+        r#"id="global-node""#,
         r#"id="global-reporter""#,
         r#"id="agent-status-indicator""#,
         r#"id="btn-source-update""#,
@@ -136,6 +138,19 @@ fn static_main_nav_consolidates_context_and_controls() {
     }
 
     assert!(menu.contains(r#"class="nav-control-status target-app-state""#));
+    let node_select = menu.find(r#"id="global-node""#).unwrap();
+    let reporter_select = menu.find(r#"id="global-reporter""#).unwrap();
+    assert!(
+        node_select < reporter_select,
+        "Node should be immediately before Reporter"
+    );
+    assert!(menu[node_select..reporter_select].contains(r#"aria-label="Node""#));
+    assert!(menu[node_select..reporter_select].contains(r#"data-testid="global-node""#));
+    assert!(node_context.contains("function reconcileNodeContext"));
+    assert!(
+        node_context.contains(r#"api("GET", "/api/project/status", undefined, { cache: false })"#)
+    );
+    assert!(node_context.contains(r#"api("GET", "/api/nodes", undefined, { cache: false })"#));
     assert!(menu.contains(r#"class="nav-control-status agent-status-label""#));
     assert!(menu.contains(r#"class="nav-control-status nav-source-update-status""#));
     assert!(menu.contains(r#"class="nav-control-status nav-theme-status""#));

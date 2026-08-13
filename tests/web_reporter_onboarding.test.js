@@ -314,7 +314,11 @@ test("initial hydration failure can recover through each later event path exactl
 
 test("project attach and scope switch never persist the first Reporter as fallback", async () => {
   assert.doesNotMatch(commonSource, /selectReporterFallback|selectFallback/);
-  assert.match(commonSource, /async function refreshNodeScopedState\(\)/);
+  const nodeRefreshSource = commonSource.match(
+    /async function refreshNodeScopedState\(\) \{[\s\S]*?\n\}/,
+  )?.[0] || "";
+  assert.match(nodeRefreshSource, /await refreshReporters\(\)/);
+  assert.doesNotMatch(nodeRefreshSource, /setLastReporter\(""\)/);
   assert.match(commonSource, /function reconcileLastReporter\(\)[\s\S]*?setLastReporter\(""\)/);
 
   const runtime = reporterRuntime({ lastReporter: "Someone from another app" });

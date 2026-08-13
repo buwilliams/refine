@@ -64,6 +64,7 @@ function composerRuntime({ feature = featureFixture(), reporter = "Buddy", apiHa
   const opened = [];
   const toasts = [];
   const actionErrors = [];
+  let nodeGeneration = 0;
   let handler = apiHandler || (async (method, requestPath) => {
     if (method === "GET" && requestPath.startsWith("/api/features/")) return { feature };
     return { created: true, goal: { id: "GOAL3" } };
@@ -74,7 +75,9 @@ function composerRuntime({ feature = featureFixture(), reporter = "Buddy", apiHa
       return handler(method, requestPath, body, options);
     },
     encodeURIComponent,
+    captureNodeContextGeneration: () => nodeGeneration,
     htmlEscape,
+    isNodeContextGenerationCurrent: (generation) => generation === nodeGeneration,
     openFeatureModal: (nextFeature, options) => opened.push({ feature: nextFeature, options }),
     renderGoalDuplicatePrompt: duplicatePrompt,
     showActionError: async (error, title) => actionErrors.push({ error, title }),
@@ -99,12 +102,57 @@ function composerRuntime({ feature = featureFixture(), reporter = "Buddy", apiHa
   return {
     ...dom,
     actionErrors,
+    advanceNodeGeneration() { nodeGeneration += 1; },
     context,
     feature,
     opened,
     requests,
     runtime,
     setApiHandler(next) { handler = next; },
+    toasts,
+  };
+}
+
+function featureCreateRuntime() {
+  const dom = createBrowserDom("");
+  const requests = [];
+  const toasts = [];
+  const actionErrors = [];
+  const location = { hash: "#/features" };
+  let nodeGeneration = 0;
+  let resolveCreate;
+  const context = vm.createContext({
+    bindOnce(element, eventName, handler) { element?.addEventListener(eventName, handler); },
+    captureNodeContextGeneration: () => nodeGeneration,
+    document: dom.document,
+    encodeURIComponent,
+    htmlEscape,
+    isNodeContextGenerationCurrent: (generation) => generation === nodeGeneration,
+    location,
+    parseHash: () => ({ route: "features" }),
+    showActionError: (error) => actionErrors.push(error),
+    state: {
+      lastReporter: "Buddy",
+      reporters: [{ name: "Buddy" }],
+      underlayHash: "#/features",
+    },
+    toast: (message, kind) => toasts.push({ message, kind }),
+    workflowStatusLabel: (status) => status,
+    api: async (method, requestPath, body) => {
+      requests.push({ method, path: requestPath, body });
+      return new Promise((resolve) => { resolveCreate = resolve; });
+    },
+  });
+  vm.runInContext(featureSource, context);
+  vm.runInContext("globalThis.featureCreateTest = { open: openFeatureModal };", context);
+  context.featureCreateTest.open();
+  return {
+    ...dom,
+    actionErrors,
+    advanceNodeGeneration() { nodeGeneration += 1; },
+    location,
+    requests,
+    resolveCreate(result) { resolveCreate(result); },
     toasts,
   };
 }
@@ -299,6 +347,52 @@ test("Cmd+Enter submits and Escape resets the live composer without closing Feat
   assert.equal(fields.prompt.value, "");
   assert.equal(fields.name.value, "");
   assert.equal(browser.document.activeElement, fields.prompt);
+});
+
+test("a late Feature composer read cannot repaint a new Node context", async () => {
+  let resolveGoal;
+  const browser = composerRuntime({
+    apiHandler: async (method, requestPath) => {
+      if (method === "GET" && requestPath === "/api/goals/GOAL2") {
+        return new Promise((resolve) => { resolveGoal = resolve; });
+      }
+      return { feature: featureFixture() };
+    },
+  });
+  browser.root.querySelector('[data-feature-edit-goal="GOAL2"]').click();
+  while (!resolveGoal) await Promise.resolve();
+  browser.advanceNodeGeneration();
+  resolveGoal({
+    goal: {
+      id: "GOAL2",
+      name: "Old Node Goal",
+      priority: "high",
+      rounds: [{ prompt: "Old Node prompt" }],
+    },
+  });
+  await settle();
+
+  const fields = formFields(browser);
+  assert.equal(fields.goal_id.value, "");
+  assert.equal(fields.prompt.value, "");
+  assert.equal(fields.name.value, "");
+  assert.equal(browser.opened.length, 0);
+});
+
+test("a late Feature create response cannot navigate into the previous Node context", async () => {
+  const browser = featureCreateRuntime();
+  browser.document.querySelector("#feature-name").value = "Old Node Feature";
+  browser.document.querySelector("[data-testid='feature-create-submit']").click();
+  while (!browser.requests.length) await Promise.resolve();
+
+  browser.advanceNodeGeneration();
+  browser.resolveCreate({ feature: { id: "FEATURE-OLD" } });
+  await settle();
+
+  assert.equal(browser.location.hash, "#/features");
+  assert.ok(browser.document.querySelector("[data-testid='feature-create-modal']"));
+  assert.deepEqual(browser.toasts, []);
+  assert.deepEqual(browser.actionErrors, []);
 });
 
 test("wide and narrow viewports compute the intended layout on rendered composer elements", () => {

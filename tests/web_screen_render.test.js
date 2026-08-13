@@ -502,6 +502,54 @@ test("project status active node drives the browser title, navigation, and Goal 
   }
 });
 
+test("Controls Node selector switches by ID and refreshes the visible Node context", { skip: SKIP }, async () => {
+  let activeNodeId = "node-a";
+  const nodes = [
+    { id: "node-a", display_name: "Alpha" },
+    { id: "node-b", display_name: "Beta" },
+    { id: "node-old", display_name: "Archived", archived: true },
+  ];
+  const requests = [];
+  const fixture = (pathname, request) => {
+    if (pathname === "/api/nodes/activate") {
+      const body = request.postDataJSON();
+      requests.push([request.method(), pathname, body]);
+      activeNodeId = body.node_id;
+      return { active_node_id: activeNodeId };
+    }
+    if (pathname === "/api/project/status") {
+      return {
+        attached: true,
+        target_root: "/tmp/app",
+        registry_enabled: true,
+        apps: [],
+        active_node_id: activeNodeId,
+        active_node: nodes.find((node) => node.id === activeNodeId)?.display_name,
+      };
+    }
+    if (pathname === "/api/nodes") {
+      return { nodes, active_node_id: activeNodeId };
+    }
+    return apiFixture(pathname, request);
+  };
+  const app = await openApp({ fixture });
+  try {
+    await assertScreenRenders(app, { route: "#/", marker: "#dash" });
+    const selector = app.page.locator('[data-testid="global-node"]');
+    assert.deepEqual(await selector.locator("option").allTextContents(), ["Alpha", "Beta"]);
+    assert.equal(await selector.inputValue(), "node-a");
+    await selector.selectOption("node-b");
+    await app.page.waitForFunction(() => document.title === "Beta - refine");
+    assert.equal(new URL(app.page.url()).hash, "#/");
+    assert.equal(await selector.inputValue(), "node-b");
+    assert.equal(await app.page.locator("#active-node-label").textContent(), "Beta");
+    assert.deepEqual(requests, [["POST", "/api/nodes/activate", { node_id: "node-b" }]]);
+    assert.deepEqual(app.pageErrors, []);
+  } finally {
+    await app.close();
+  }
+});
+
 test("features list renders from the routed URL", { skip: SKIP }, async () => {
   const app = await openApp();
   try {

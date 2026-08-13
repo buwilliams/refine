@@ -94,12 +94,14 @@ function ensureGoalModalUnderlay() {
 }
 
 async function loadGoalDetail(goalId) {
+  const nodeGeneration = captureNodeContextGeneration();
   try {
     const { goal } = await api("GET", "/api/goals/" + goalId);
-    if (state.currentGoal !== goalId || goal?.id !== goalId) return;
+    if (!isNodeContextGenerationCurrent(nodeGeneration)
+        || state.currentGoal !== goalId || goal?.id !== goalId) return;
     drawGoalDetail(goal);
   } catch (e) {
-    if (state.currentGoal !== goalId) return;
+    if (!isNodeContextGenerationCurrent(nodeGeneration) || state.currentGoal !== goalId) return;
     const container = goalDetailContainer();
     if (container) {
       container.innerHTML = `<p class="muted">Could not load Goal: ${htmlEscape(e.message)}</p>`;

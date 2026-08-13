@@ -57,6 +57,10 @@
               <span class="nav-control-status target-app-state">Status unknown</span>
             </span>
           </a>
+          <label class="nav-menu-label nav-context-section-label" for="global-node">Node</label>
+          <select id="global-node" aria-label="Node" data-testid="global-node" disabled>
+            <option value="">No node</option>
+          </select>
           <label class="nav-menu-label nav-context-section-label" for="global-reporter">Reporter</label>
           <select id="global-reporter" aria-label="Reporter" data-testid="global-reporter"></select>
           <div class="nav-menu-label nav-context-section-label">Status and actions</div>
@@ -174,6 +178,7 @@
   </template>
 
   <script src="/static/js/common.js"></script>
+  <script src="/static/js/node-context.js"></script>
   <script src="/static/js/node-scope-navigation.js"></script>
   <script src="/static/vendor/idiomorph/idiomorph.min.js"></script>
   <script src="/static/js/dom-morph.js"></script>

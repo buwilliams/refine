@@ -904,6 +904,9 @@ async function ensureProjectAttached() {
 }
 
 async function refreshProjectStatus() {
+  const nodeGeneration = typeof captureNodeContextGeneration === "function"
+    ? captureNodeContextGeneration()
+    : 0;
   let snap = null;
   try {
     snap = await api("GET", "/api/project/status");
@@ -911,6 +914,8 @@ async function refreshProjectStatus() {
     toast(e.message || "Could not check project status", "error");
     return null;
   }
+  if (typeof isNodeContextGenerationCurrent === "function"
+      && !isNodeContextGenerationCurrent(nodeGeneration)) return null;
   state.project = snap;
   updateActiveNodeLabel();
   if (snap.attached === false) {
@@ -1184,7 +1189,8 @@ async function applyProjectAttachResult(result, options = {}) {
   if (options.toast !== false) showProjectAttachToast(result);
   resetChatForProjectSwitch();
   initSSE();
-  await refreshNodeScopedState();
+  if (typeof reconcileNodeContext === "function") await reconcileNodeContext();
+  else await refreshNodeScopedState();
   await refreshTargetAppToggle();
   if (location.hash !== "#/node/application") {
     location.hash = "#/node/application";
@@ -1563,7 +1569,9 @@ async function refreshReporters() {
     populateAllReporterDropdowns();
     return;
   }
+  const nodeGeneration = captureNodeContextGeneration();
   const data = await api("GET", "/api/reporters");
+  if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
   state.reporters = data.reporters || [];
   reconcileLastReporter();
   populateAllReporterDropdowns();
@@ -1577,8 +1585,8 @@ async function refreshNodeScopedState() {
   state.reporters = [];
   state.dashboard = null;
   state.currentGoal = null;
-  setLastReporter("");
-  populateAllReporterDropdowns();
+  // Reporter identity is browser-local, not Node-local. Rehydrate the list
+  // before deciding whether the current selection still exists.
   await refreshReporters();
 }
 
@@ -1821,6 +1829,11 @@ function initSSE() {
     invalidateScreenDataCache();
     reconcilePendingBackgroundOperations();
     if (reconnected) toast("Live updates reconnected.", "success");
+    if (reconnected && typeof reconcileNodeContext === "function") {
+      reconcileNodeContext({ external: true }).catch((error) => {
+        toast(`Could not reconcile Node context: ${error.message || error}`, "error");
+      });
+    }
     // SSE is a notification transport, not durable state. Reconcile the visible
     // screen from the authoritative read endpoint on every initial connection
     // and reconnect so a missed frame can never leave the workflow UI stale.
@@ -1935,6 +1948,11 @@ function initSSE() {
     if (state.currentRoute === "node"
         && document.querySelector('[data-tab-pane="reporters"].active')) {
       refreshCurrentSettingsSurface();
+    }
+  });
+  sseSource.addEventListener("api_mutation", (event) => {
+    if (typeof handleNodeContextMutationEvent === "function") {
+      handleNodeContextMutationEvent(event);
     }
   });
   sseSource.addEventListener("project_updated", async (e) => {

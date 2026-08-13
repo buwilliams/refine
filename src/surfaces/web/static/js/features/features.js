@@ -173,6 +173,7 @@ function updateFeaturesFilter(patch) {
 
 async function refreshFeaturesTable() {
   if (state.currentRoute !== "features") return;
+  const nodeGeneration = captureNodeContextGeneration();
   const f = featuresFilterFromHash();
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries({
@@ -183,6 +184,7 @@ async function refreshFeaturesTable() {
     if (value !== "" && value != null) params.set(key, String(value));
   }
   const data = await api("GET", `/api/features?${params}`);
+  if (!isNodeContextGenerationCurrent(nodeGeneration) || state.currentRoute !== "features") return;
   const renderState = { ...f, pageMeta: data.page || {} };
   _lastFeaturesRender = { features: data.features || [], state: renderState };
   drawFeaturesTable(_lastFeaturesRender.features, renderState);
@@ -722,6 +724,7 @@ function ensureFeatureModalUnderlay() {
 }
 
 async function openFeatureDetailModal(featureId) {
+  const nodeGeneration = captureNodeContextGeneration();
   ensureFeatureModalUnderlay();
   if (typeof closeGoalDetailModal === "function") {
     closeGoalDetailModal({ navigateAway: false });
@@ -729,8 +732,10 @@ async function openFeatureDetailModal(featureId) {
   closeFeatureModal({ navigateAway: false });
   try {
     const data = await api("GET", `/api/features/${encodeURIComponent(featureId)}`);
+    if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
     openFeatureModal(data.feature, { navigateAway: true });
   } catch (e) {
+    if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
     const root = document.createElement("div");
     root.className = "modal-backdrop";
     root.innerHTML = `
@@ -882,8 +887,21 @@ function openFeatureModal(feature = null, options = {}) {
     if (reporterSelect) reporterSelect.value = featureReporter;
     const assigneeSelect = root.querySelector("#feature-assignee");
     if (assigneeSelect) assigneeSelect.value = featureAssignee;
+    const initialCreateState = {
+      name: root.querySelector("#feature-name")?.value || "",
+      description: root.querySelector("#feature-description")?.value || "",
+      reporter: reporterSelect?.value || "",
+      assignee: assigneeSelect?.value || "",
+    };
+    root._featureCreateHasDraft = () => (
+      (root.querySelector("#feature-name")?.value || "") !== initialCreateState.name
+      || (root.querySelector("#feature-description")?.value || "") !== initialCreateState.description
+      || (reporterSelect?.value || "") !== initialCreateState.reporter
+      || (assigneeSelect?.value || "") !== initialCreateState.assignee
+    );
     bindOnce(root.querySelector("[data-cancel]"), "click", close);
     bindOnce(root.querySelector("[data-ok]"), "click", async () => {
+      const nodeGeneration = captureNodeContextGeneration();
       const body = {
         name: root.querySelector("#feature-name")?.value.trim() || "",
         description: root.querySelector("#feature-description")?.value.trim() || "",
@@ -896,10 +914,12 @@ function openFeatureModal(feature = null, options = {}) {
       }
       try {
         const saved = await api("POST", "/api/features", body);
+        if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
         close();
         toast("Feature created", "success");
         location.hash = `#/features/${encodeURIComponent(saved.feature.id)}`;
       } catch (e) {
+        if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
         showActionError(e);
       }
     });
@@ -910,7 +930,9 @@ function openFeatureModal(feature = null, options = {}) {
     const assigneeSelect = root.querySelector("#feature-assignee");
     if (assigneeSelect) assigneeSelect.value = feature.assignee || "";
     const reloadModal = async () => {
+      const nodeGeneration = captureNodeContextGeneration();
       const data = await api("GET", `/api/features/${encodeURIComponent(feature.id)}`);
+      if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
       openFeatureModal(data.feature, { goalPage, navigateAway });
     };
     bindFeatureGoalInlineComposer(root, feature, { goalPage, navigateAway });
@@ -938,6 +960,7 @@ function openFeatureModal(feature = null, options = {}) {
 }
 
 function bindFeatureAutosave(root, feature) {
+  const nodeGeneration = captureNodeContextGeneration();
   const controls = [
     root.querySelector("#feature-name"),
     root.querySelector("#feature-description"),
@@ -976,6 +999,7 @@ function bindFeatureAutosave(root, feature) {
       || body.assignee !== saved.assignee;
   };
   const save = async () => {
+    if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
     if (inFlight) {
       pending = true;
       return;
@@ -993,13 +1017,16 @@ function bindFeatureAutosave(root, feature) {
     inFlight = true;
     try {
       const result = await api("PATCH", `/api/features/${encodeURIComponent(feature.id)}`, body);
+      if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
       const updated = result.feature || {};
       saved.name = updated.name || body.name;
       saved.description = updated.description || body.description;
       saved.reporter = updated.reporter || body.reporter;
       saved.assignee = updated.assignee || body.assignee;
+      root.dataset.nodeContextDirty = "false";
       if (state.currentRoute === "features") await refreshFeaturesTable();
     } catch (e) {
+      if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
       restoreSaved();
       showActionError(e, "Feature autosave failed");
     } finally {
@@ -1013,6 +1040,7 @@ function bindFeatureAutosave(root, feature) {
   };
   const autosave = debounce(save, 450);
   const scheduleAutosave = () => {
+    root.dataset.nodeContextDirty = "true";
     if (inFlight) pending = true;
     autosave();
   };

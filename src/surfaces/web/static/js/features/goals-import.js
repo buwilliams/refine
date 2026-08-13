@@ -33,6 +33,7 @@ async function renderGoalImport() {
 }
 
 let _importModalOpen = false;
+let _discardImportForNodeSwitch = null;
 
 function recoverImportSessionOnLoad() {
   const session = readImportSession();

@@ -11,6 +11,7 @@ async function renderGoalNew() {
 let _newGoalModalOpen = false;
 let _newGoalModalDismiss = null;
 let _newGoalModalReturnHash = null;
+let _discardNewGoalForNodeSwitch = null;
 
 function guardNewGoalNavigation({ destinationHash, continueNavigation }) {
   if (!_newGoalModalOpen || !_newGoalModalDismiss) return false;
@@ -90,6 +91,7 @@ function openNewGoalModal(options = {}) {
     _newGoalModalOpen = false;
     _newGoalModalDismiss = null;
     _newGoalModalReturnHash = null;
+    _discardNewGoalForNodeSwitch = null;
     document.removeEventListener("keydown", onKey, true);
     window.removeEventListener("beforeunload", onBeforeUnload);
     root.remove();
@@ -100,6 +102,7 @@ function openNewGoalModal(options = {}) {
       location.hash = "#/goals";
     }
   }
+  _discardNewGoalForNodeSwitch = () => close(true);
   function isDirty() {
     return promptField.value.trim() !== initialFormState.prompt
       || priorityField.value !== initialFormState.priority;
@@ -187,12 +190,14 @@ function openNewGoalModal(options = {}) {
     const effectiveDuplicateDecision = (
       duplicateDecision && duplicateDecisionKey === duplicateKey
     ) ? duplicateDecision : "";
+    const nodeGeneration = captureNodeContextGeneration();
     try {
       const r = await api("POST", "/api/goals", {
         reporter: currentReporter, prompt, priority,
         ...(options.featureId ? { feature_id: options.featureId } : {}),
         duplicate_decision: effectiveDuplicateDecision,
       });
+      if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
       if (r?.created === false) {
         const move = r.move || {};
         if (r.duplicate_action === "move_original_to_backlog") {
@@ -227,6 +232,7 @@ function openNewGoalModal(options = {}) {
         }
       }
     } catch (err) {
+      if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
       if (err.code === "duplicate_goal" && err.error?.duplicate?.match) {
         duplicateDecision = "";
         duplicateDecisionKey = duplicateKey;

@@ -29,6 +29,7 @@ function initTargetAppToggle() {
 }
 
 async function refreshTargetAppToggle() {
+  const nodeGeneration = captureNodeContextGeneration();
   const indicator = document.getElementById("target-app-indicator");
   if (!indicator) return;
   if (!hasAttachedProject()) {
@@ -37,6 +38,7 @@ async function refreshTargetAppToggle() {
   }
   try {
     const snap = await api("GET", "/api/target-app/status");
+    if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
     applyTargetAppSnapshot(snap);
   } catch {
     // Leave whatever state the dot was showing; we'll retry on the next tick.
@@ -62,6 +64,7 @@ function scheduleAgentStatusRefresh() {
 }
 
 async function refreshAgentStatusIndicator() {
+  const nodeGeneration = captureNodeContextGeneration();
   const indicator = document.getElementById("agent-status-indicator");
   if (!indicator) return;
   if (!hasAttachedProject()) {
@@ -75,8 +78,10 @@ async function refreshAgentStatusIndicator() {
   }
   try {
     const snap = await api("GET", "/api/processes?summary=1");
+    if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
     applyAgentStatusSnapshot(snap);
   } catch {
+    if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
     applyAgentStatusSnapshot({
       runner_reachable: false,
       paused: false,

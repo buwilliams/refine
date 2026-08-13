@@ -104,6 +104,7 @@ function openImportModal() {
     }
     closed = true;
     _importModalOpen = false;
+    _discardImportForNodeSwitch = null;
     document.removeEventListener("keydown", onKey, true);
     root.remove();
     if (navigateAway && location.hash.startsWith("#/goals/import")) {
@@ -223,9 +224,9 @@ function openImportModal() {
           : "#import-csv-file-button";
     root.querySelector(focusTarget)?.focus();
   }
-  async function cancelImport() {
+  async function cancelImport({ confirmed = false } = {}) {
     const dirty = importSessionIsDirty(session);
-    if (dirty) {
+    if (dirty && !confirmed) {
       const ok = await modalConfirm(
         "Cancel this import and discard the recoverable import state? Any running save operation will be asked to stop and roll back Goals it created.",
         { title: "Cancel import", okLabel: "Cancel import", danger: true },
@@ -257,6 +258,7 @@ function openImportModal() {
     clearImportSession();
     close(true, { force: true });
   }
+  _discardImportForNodeSwitch = () => cancelImport({ confirmed: true });
   document.addEventListener("keydown", onKey, true);
   root.addEventListener("click", (e) => {
     if (e.target === root) close(true);
