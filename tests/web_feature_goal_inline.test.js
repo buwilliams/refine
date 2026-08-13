@@ -113,6 +113,50 @@ function composerRuntime({ feature = featureFixture(), reporter = "Buddy", apiHa
   };
 }
 
+function featureCreateRuntime() {
+  const dom = createBrowserDom("");
+  const requests = [];
+  const toasts = [];
+  const actionErrors = [];
+  const location = { hash: "#/features" };
+  let nodeGeneration = 0;
+  let resolveCreate;
+  const context = vm.createContext({
+    bindOnce(element, eventName, handler) { element?.addEventListener(eventName, handler); },
+    captureNodeContextGeneration: () => nodeGeneration,
+    document: dom.document,
+    encodeURIComponent,
+    htmlEscape,
+    isNodeContextGenerationCurrent: (generation) => generation === nodeGeneration,
+    location,
+    parseHash: () => ({ route: "features" }),
+    showActionError: (error) => actionErrors.push(error),
+    state: {
+      lastReporter: "Buddy",
+      reporters: [{ name: "Buddy" }],
+      underlayHash: "#/features",
+    },
+    toast: (message, kind) => toasts.push({ message, kind }),
+    workflowStatusLabel: (status) => status,
+    api: async (method, requestPath, body) => {
+      requests.push({ method, path: requestPath, body });
+      return new Promise((resolve) => { resolveCreate = resolve; });
+    },
+  });
+  vm.runInContext(featureSource, context);
+  vm.runInContext("globalThis.featureCreateTest = { open: openFeatureModal };", context);
+  context.featureCreateTest.open();
+  return {
+    ...dom,
+    actionErrors,
+    advanceNodeGeneration() { nodeGeneration += 1; },
+    location,
+    requests,
+    resolveCreate(result) { resolveCreate(result); },
+    toasts,
+  };
+}
+
 function formFields(browser) {
   const form = browser.root.querySelector("[data-feature-goal-form]");
   return {
@@ -333,6 +377,22 @@ test("a late Feature composer read cannot repaint a new Node context", async () 
   assert.equal(fields.prompt.value, "");
   assert.equal(fields.name.value, "");
   assert.equal(browser.opened.length, 0);
+});
+
+test("a late Feature create response cannot navigate into the previous Node context", async () => {
+  const browser = featureCreateRuntime();
+  browser.document.querySelector("#feature-name").value = "Old Node Feature";
+  browser.document.querySelector("[data-testid='feature-create-submit']").click();
+  while (!browser.requests.length) await Promise.resolve();
+
+  browser.advanceNodeGeneration();
+  browser.resolveCreate({ feature: { id: "FEATURE-OLD" } });
+  await settle();
+
+  assert.equal(browser.location.hash, "#/features");
+  assert.ok(browser.document.querySelector("[data-testid='feature-create-modal']"));
+  assert.deepEqual(browser.toasts, []);
+  assert.deepEqual(browser.actionErrors, []);
 });
 
 test("wide and narrow viewports compute the intended layout on rendered composer elements", () => {

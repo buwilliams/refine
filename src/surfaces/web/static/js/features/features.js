@@ -901,6 +901,7 @@ function openFeatureModal(feature = null, options = {}) {
     );
     bindOnce(root.querySelector("[data-cancel]"), "click", close);
     bindOnce(root.querySelector("[data-ok]"), "click", async () => {
+      const nodeGeneration = captureNodeContextGeneration();
       const body = {
         name: root.querySelector("#feature-name")?.value.trim() || "",
         description: root.querySelector("#feature-description")?.value.trim() || "",
@@ -913,10 +914,12 @@ function openFeatureModal(feature = null, options = {}) {
       }
       try {
         const saved = await api("POST", "/api/features", body);
+        if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
         close();
         toast("Feature created", "success");
         location.hash = `#/features/${encodeURIComponent(saved.feature.id)}`;
       } catch (e) {
+        if (!isNodeContextGenerationCurrent(nodeGeneration)) return;
         showActionError(e);
       }
     });
