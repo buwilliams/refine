@@ -29,8 +29,12 @@ function htmlEscape(value) {
 
 function deferred() {
   let resolve;
-  const promise = new Promise((next) => { resolve = next; });
-  return { promise, resolve };
+  let reject;
+  const promise = new Promise((next, fail) => {
+    resolve = next;
+    reject = fail;
+  });
+  return { promise, reject, resolve };
 }
 
 function eventTarget() {
@@ -380,9 +384,11 @@ test("failed submit retains the complete draft and remains protected", async () 
   assert.equal(browser.confirmations.length, 1);
 });
 
-test("a late New Goal response cannot close the preserved previous-Node draft", async () => {
+test("a late New Goal success cannot change the preserved previous-Node draft", async () => {
   const pendingCreate = deferred();
-  const browser = openBrowser({ apiHandler: () => pendingCreate.promise });
+  let saved = 0;
+  const browser = newGoalRuntime({ apiHandler: () => pendingCreate.promise });
+  browser.runtime.open({ onSaved: () => { saved += 1; } });
   dirty(browser, "Goal submitted from the previous Node");
   fields(browser).submit.click();
   assert.equal(browser.requests.length, 1);
@@ -394,7 +400,66 @@ test("a late New Goal response cannot close the preserved previous-Node draft", 
   assert.equal(browser.runtime.isOpen(), true);
   assert.equal(fields(browser).prompt.value, "Goal submitted from the previous Node");
   assert.equal(fields(browser).priority.value, "high");
+  assert.equal(browser.document.querySelector("[data-testid='new-goal-duplicate']"), null);
   assert.deepEqual(browser.toasts, []);
+  assert.equal(browser.location.hash, "#/goals/new");
+  assert.equal(saved, 0);
+});
+
+test("a late New Goal failure cannot change the preserved previous-Node draft", async () => {
+  const pendingCreate = deferred();
+  const browser = openBrowser({ apiHandler: () => pendingCreate.promise });
+  dirty(browser, "Failure from the previous Node");
+  fields(browser).submit.click();
+  assert.equal(browser.requests.length, 1);
+
+  browser.advanceNodeGeneration();
+  pendingCreate.reject(new Error("Previous Node stopped accepting Goals"));
+  await settle();
+
+  assert.equal(browser.runtime.isOpen(), true);
+  assert.equal(fields(browser).prompt.value, "Failure from the previous Node");
+  assert.equal(fields(browser).priority.value, "high");
+  assert.equal(browser.document.querySelector("[data-testid='new-goal-duplicate']"), null);
+  assert.deepEqual(browser.toasts, []);
+  assert.equal(browser.location.hash, "#/goals/new");
+});
+
+test("a late New Goal duplicate cannot change the preserved duplicate decision", async () => {
+  const pendingDuplicate = deferred();
+  let attempts = 0;
+  const browser = openBrowser({
+    apiHandler: async () => {
+      attempts += 1;
+      if (attempts === 1) throw duplicateError();
+      return pendingDuplicate.promise;
+    },
+  });
+  dirty(browser, "Duplicate from the previous Node");
+  fields(browser).submit.click();
+  await settle();
+  browser.document.querySelector("[data-testid='new-goal-duplicate-import']").click();
+  fields(browser).submit.click();
+  assert.equal(browser.requests.length, 2);
+  assert.equal(browser.requests[1].body.duplicate_decision, "original");
+
+  browser.advanceNodeGeneration();
+  pendingDuplicate.reject(duplicateError());
+  await settle();
+
+  assert.equal(browser.runtime.isOpen(), true);
+  assert.equal(fields(browser).prompt.value, "Duplicate from the previous Node");
+  assert.equal(fields(browser).priority.value, "high");
+  assert.equal(fields(browser).submit.textContent, "Create anyway");
+  assert.ok(browser.document.querySelector("[data-testid='new-goal-duplicate']"));
+  assert.deepEqual(browser.toasts, []);
+  assert.equal(browser.location.hash, "#/goals/new");
+
+  const nextCreate = deferred();
+  browser.setApiHandler(() => nextCreate.promise);
+  fields(browser).submit.click();
+  assert.equal(browser.requests.length, 3);
+  assert.equal(browser.requests[2].body.duplicate_decision, "original");
 });
 
 test("duplicate handling and a declined dismissal retain the draft and decision", async () => {
