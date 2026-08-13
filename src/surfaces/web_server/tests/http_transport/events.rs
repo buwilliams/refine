@@ -71,6 +71,31 @@ fn idle_sse_reuses_the_last_batch_until_an_input_changes() {
         tokio::time::sleep(Duration::from_millis(700)).await;
         assert_eq!(daemon.sse_frame_build_count(), 1);
 
+        FileProcessSupervisor::new(&runtime_root)
+            .register(ManagedProcess {
+                id: "internal-repository-reconcile".to_string(),
+                owner: ProcessOwner::Maintenance,
+                pid: Some(std::process::id()),
+                state: "running".to_string(),
+                label: Some("git".to_string()),
+                details: Some(
+                    json!({"kind": "repository_reconcile", "command": "git ls-remote"}).to_string(),
+                ),
+                stdout_path: None,
+                stderr_path: None,
+                stdin_path: None,
+                limits: None,
+                started_at: String::new(),
+                exit_code: None,
+            })
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(700)).await;
+        assert_eq!(
+            daemon.sse_frame_build_count(),
+            1,
+            "internal repository commands must not invalidate the public SSE projection"
+        );
+
         let mut reconnect = daemon.subscribe_sse_frame_batches("events");
         let replay = tokio::time::timeout(Duration::from_secs(1), reconnect.recv())
             .await

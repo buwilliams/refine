@@ -125,6 +125,52 @@ fn local_http_daemon_reports_startup_cache_progress() {
 }
 
 #[test]
+fn runtime_only_changes_do_not_rewrite_the_project_projection_snapshot() {
+    let temp_root = unique_temp_dir("http-runtime-projection-persistence");
+    let runtime_root = temp_root.join("run/8080");
+    fs::create_dir_all(temp_root.join(".refine")).unwrap();
+    let mut server = server_with_projection();
+    server.target_root = Some(temp_root.clone());
+    server.runtime_root = Some(runtime_root.clone());
+    server.warm_current_projection_cache().unwrap();
+
+    let snapshot_path = runtime_root.join("cache").join(PROJECTION_SNAPSHOT_FILE);
+    let before = fs::read(&snapshot_path).unwrap();
+    FileProcessSupervisor::new(&runtime_root)
+        .register(ManagedProcess {
+            id: "visible-runtime-process".to_string(),
+            owner: ProcessOwner::UserHelper,
+            pid: Some(std::process::id()),
+            state: "running".to_string(),
+            label: Some("visible runtime process".to_string()),
+            details: None,
+            stdout_path: None,
+            stderr_path: None,
+            stdin_path: None,
+            limits: None,
+            started_at: String::new(),
+            exit_code: None,
+        })
+        .unwrap();
+
+    let projection = server.current_projection_with_runtime_shared().unwrap();
+    assert!(
+        projection
+            .runtime
+            .processes
+            .iter()
+            .any(|process| process.get("id") == Some(&json!("visible-runtime-process")))
+    );
+    assert_eq!(
+        fs::read(snapshot_path).unwrap(),
+        before,
+        "derived runtime state must stay in memory instead of rewriting the project snapshot"
+    );
+
+    remove_temp_dir(&temp_root);
+}
+
+#[test]
 fn local_http_daemon_refreshes_hot_projection_and_records_screen_metrics() {
     let temp_root = unique_temp_dir("http-hot-projection-metrics");
     let refine_dir = temp_root.join(".refine");

@@ -171,6 +171,19 @@ impl ManagedProcessOutput {
 }
 
 impl ManagedProcess {
+    pub fn is_runtime_projection_visible(&self) -> bool {
+        if self.owner != ProcessOwner::Maintenance {
+            return true;
+        }
+        !self
+            .details
+            .as_deref()
+            .and_then(|details| serde_json::from_str::<serde_json::Value>(details).ok())
+            .is_some_and(|details| {
+                details.get("kind").and_then(Value::as_str) == Some("repository_reconcile")
+            })
+    }
+
     pub fn api_json(&self) -> serde_json::Value {
         let mut value = json!({
             "id": self.id,

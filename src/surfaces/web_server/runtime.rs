@@ -211,7 +211,6 @@ impl InProcessWebServer {
         }
         let mut updated = projection.as_ref().clone();
         updated.runtime = runtime;
-        self.persist_runtime_projection_snapshot(&updated)?;
         let updated = Arc::new(updated);
         if let (Some(runtime_root), Some(refine_dir)) =
             (&self.runtime_root, self.current_refine_dir()?)

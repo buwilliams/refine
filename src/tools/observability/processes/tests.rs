@@ -229,6 +229,57 @@ fn process_summary_discovers_future_background_worker_kinds() {
 }
 
 #[test]
+fn process_summary_keeps_repository_reconciliation_internal() {
+    let runtime_root = std::env::temp_dir().join(format!(
+        "refine-process-manager-internal-reconcile-{}",
+        uuid::Uuid::new_v4()
+    ));
+    let supervisor = FileProcessSupervisor::new(&runtime_root);
+    for (id, details) in [
+        (
+            "repository-reconcile",
+            json!({"kind": "repository_reconcile", "command": "git ls-remote"}),
+        ),
+        (
+            "source-update",
+            json!({"kind": "source_update", "command": "git fetch"}),
+        ),
+    ] {
+        supervisor
+            .register(ManagedProcess {
+                id: id.to_string(),
+                owner: ProcessOwner::Maintenance,
+                pid: Some(std::process::id()),
+                state: "running".to_string(),
+                label: Some("git".to_string()),
+                details: Some(details.to_string()),
+                stdout_path: None,
+                stderr_path: None,
+                stdin_path: None,
+                limits: None,
+                started_at: String::new(),
+                exit_code: None,
+            })
+            .unwrap();
+    }
+
+    let summary = process_summary_value(&runtime_root).unwrap();
+    let processes = summary["processes"].as_array().unwrap();
+    assert!(
+        processes
+            .iter()
+            .all(|process| process["id"] != "repository-reconcile")
+    );
+    assert!(
+        processes
+            .iter()
+            .any(|process| process["id"] == "source-update")
+    );
+
+    std::fs::remove_dir_all(runtime_root).unwrap();
+}
+
+#[test]
 fn repository_disk_usage_includes_git_owned_worktree_storage() {
     let repository_root = std::env::temp_dir().join(format!(
         "refine-process-manager-disk-{}",

@@ -345,6 +345,9 @@ pub(in crate::surfaces::web_server) fn recent_process_sse_events(
         let ProcessOutputObservation::Observed { process, output } = observation else {
             continue;
         };
+        if !process.is_runtime_projection_visible() {
+            continue;
+        }
         let (output, truncated) = if process.stdout_path.is_some() || process.stderr_path.is_some()
         {
             let truncated = output.chars().count() > 4000;

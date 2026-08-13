@@ -55,7 +55,7 @@ fn source_upgrade_operation_cancel_route_delegates_to_typed_owner() {
 }
 
 #[test]
-fn web_server_reads_and_cancels_runtime_operations() {
+fn web_server_reads_and_cancels_runtime_operations_without_persisting_derived_state() {
     let temp_root = unique_temp_dir("http-operations");
     let refine_dir = temp_root.join(".refine");
     let runtime_root = temp_root.join("run/8080");
@@ -77,8 +77,13 @@ fn web_server_reads_and_cancels_runtime_operations() {
         .load_projection_snapshot(&runtime_root.join("cache"))
         .unwrap()
         .unwrap();
-    assert_eq!(cached.runtime.background_operations[0]["id"], operation.id);
-    assert_eq!(cached.runtime.background_operations[0]["status"], "running");
+    assert!(cached.runtime.background_operations.is_empty());
+    let current = server.current_projection_with_runtime_shared().unwrap();
+    assert_eq!(current.runtime.background_operations[0]["id"], operation.id);
+    assert_eq!(
+        current.runtime.background_operations[0]["status"],
+        "running"
+    );
 
     let cancel = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -105,8 +110,10 @@ fn web_server_reads_and_cancels_runtime_operations() {
         .load_projection_snapshot(&runtime_root.join("cache"))
         .unwrap()
         .unwrap();
+    assert!(cached.runtime.background_operations.is_empty());
+    let current = server.current_projection_with_runtime_shared().unwrap();
     assert_eq!(
-        cached.runtime.background_operations[0]["status"],
+        current.runtime.background_operations[0]["status"],
         "cancelled"
     );
 

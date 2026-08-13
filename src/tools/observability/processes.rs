@@ -93,6 +93,9 @@ pub fn process_summary_value_with_chat_sessions(
             if !seen_process_ids.insert(process.id.clone()) {
                 continue;
             }
+            if !process.is_runtime_projection_visible() {
+                continue;
+            }
             let mut value = process.api_json();
             apply_process_management_actions(&mut value, &pause_state);
             if is_current_process_api_value(&value) {

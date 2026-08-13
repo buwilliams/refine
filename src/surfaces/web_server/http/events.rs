@@ -524,6 +524,9 @@ fn active_process_output_paths(runtime_root: Option<&Path>) -> RefineResult<BTre
     };
     let mut paths = BTreeSet::new();
     for process in FileProcessSupervisor::new(runtime_root).list()? {
+        if !process.is_runtime_projection_visible() {
+            continue;
+        }
         paths.extend(process.stdout_path.map(PathBuf::from));
         paths.extend(process.stderr_path.map(PathBuf::from));
     }
