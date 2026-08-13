@@ -29,6 +29,78 @@ fn concurrent_sse_clients_share_one_authoritative_frame_build() {
 }
 
 #[test]
+fn idle_sse_reuses_the_last_batch_until_an_input_changes() {
+    let temp_root = unique_temp_dir("http-sse-idle-batch");
+    let runtime_root = temp_root.join("run/8080");
+    fs::create_dir_all(temp_root.join(".refine")).unwrap();
+    let stdout_path = runtime_root.join("idle-sse.stdout.log");
+    fs::create_dir_all(&runtime_root).unwrap();
+    fs::write(&stdout_path, "initial\n").unwrap();
+    FileProcessSupervisor::new(&runtime_root)
+        .register(ManagedProcess {
+            id: "idle-sse-process".to_string(),
+            owner: ProcessOwner::UserHelper,
+            pid: Some(std::process::id()),
+            state: "running".to_string(),
+            label: Some("idle SSE process".to_string()),
+            details: None,
+            stdout_path: Some(stdout_path.display().to_string()),
+            stderr_path: None,
+            stdin_path: None,
+            limits: None,
+            started_at: String::new(),
+            exit_code: None,
+        })
+        .unwrap();
+    let mut server = server_with_projection();
+    server.target_root = Some(temp_root.clone());
+    server.runtime_root = Some(runtime_root.clone());
+    let daemon = LocalHttpDaemon::new(server, None);
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
+    runtime.block_on(async {
+        let mut first = daemon.subscribe_sse_frame_batches("events");
+        let initial = tokio::time::timeout(Duration::from_secs(2), first.recv())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(700)).await;
+        assert_eq!(daemon.sse_frame_build_count(), 1);
+
+        let mut reconnect = daemon.subscribe_sse_frame_batches("events");
+        let replay = tokio::time::timeout(Duration::from_secs(1), reconnect.recv())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert!(Arc::ptr_eq(&initial, &replay));
+        assert_eq!(daemon.sse_frame_build_count(), 1);
+
+        fs::write(runtime_root.join(API_EVENTS_FILE), "changed\n").unwrap();
+        let _changed = tokio::time::timeout(Duration::from_secs(2), reconnect.recv())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert_eq!(daemon.sse_frame_build_count(), 2);
+
+        fs::write(&stdout_path, "initial\nlater output\n").unwrap();
+        let _output_changed = tokio::time::timeout(Duration::from_secs(2), reconnect.recv())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        assert_eq!(daemon.sse_frame_build_count(), 3);
+    });
+
+    remove_temp_dir(&temp_root);
+}
+
+#[test]
 fn local_http_daemon_persists_successful_mutations_for_sse() {
     let temp_root = unique_temp_dir("http-mutation-sse");
     let refine_dir = temp_root.join(".refine");

@@ -1,4 +1,24 @@
 use super::*;
+use crate::process::subprocess::FileProcessSupervisor;
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct SsePathFingerprint {
+    len: u64,
+    modified: Option<SystemTime>,
+}
+
+#[derive(Debug)]
+struct SseFrameState {
+    projection: Arc<ProjectionSnapshot>,
+    process_output_paths: BTreeSet<PathBuf>,
+    auxiliary: BTreeMap<PathBuf, SsePathFingerprint>,
+}
+
+impl SseFrameState {
+    fn same_inputs(&self, previous: &Self) -> bool {
+        Arc::ptr_eq(&self.projection, &previous.projection) && self.auxiliary == previous.auxiliary
+    }
+}
 
 impl LocalHttpDaemon {
     pub(super) fn sse_response(&self, stream_name: &'static str) -> Response {
@@ -55,14 +75,27 @@ impl LocalHttpDaemon {
         &self,
         stream_name: &'static str,
     ) -> broadcast::Receiver<SseFrameBatch> {
-        let mut producer_running = self
-            .sse_frame_hub
-            .producer_running
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
         let receiver = self.sse_frame_hub.sender.subscribe();
-        if !*producer_running {
+        let start_producer = {
+            let mut producer_running = self
+                .sse_frame_hub
+                .producer_running
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
+            let start = !*producer_running;
             *producer_running = true;
+            start
+        };
+        if let Some(batch) = self
+            .sse_frame_hub
+            .latest_batch
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .clone()
+        {
+            let _ = self.sse_frame_hub.sender.send(batch);
+        }
+        if start_producer {
             let daemon = self.clone();
             tokio::spawn(async move {
                 daemon.produce_sse_frame_batches(stream_name).await;
@@ -72,32 +105,51 @@ impl LocalHttpDaemon {
     }
 
     async fn produce_sse_frame_batches(self, stream_name: &'static str) {
+        let mut previous_state = None;
         loop {
             if self.stop_sse_frame_producer_when_idle() {
                 return;
             }
+            let frame_daemon = self.clone();
+            let prior = previous_state.take();
+            let poll = match tokio::task::spawn_blocking(move || {
+                frame_daemon.changed_sse_frame_batch(stream_name, prior)
+            })
+            .await
+            {
+                Ok(Ok(poll)) => poll,
+                Ok(Err(error)) => {
+                    let batch = Err(Arc::<str>::from(error.to_string()));
+                    let _ = self.sse_frame_hub.sender.send(batch);
+                    self.mark_sse_frame_producer_stopped();
+                    return;
+                }
+                Err(error) => {
+                    let batch = Err(Arc::<str>::from(format!(
+                        "SSE projection worker failed: {error}"
+                    )));
+                    let _ = self.sse_frame_hub.sender.send(batch);
+                    self.mark_sse_frame_producer_stopped();
+                    return;
+                }
+            };
+            let (state, frames) = poll;
+            previous_state = Some(state);
+            let Some(frames) = frames else {
+                tokio::time::sleep(Duration::from_millis(500)).await;
+                continue;
+            };
             #[cfg(test)]
             self.sse_frame_hub
                 .build_count
                 .fetch_add(1, Ordering::Relaxed);
-            let frame_daemon = self.clone();
-            let batch = match tokio::task::spawn_blocking(move || {
-                frame_daemon.server_sent_event_frames(stream_name)
-            })
-            .await
-            {
-                Ok(Ok(frames)) => Ok(Arc::new(frames)),
-                Ok(Err(error)) => Err(Arc::<str>::from(error.to_string())),
-                Err(error) => Err(Arc::<str>::from(format!(
-                    "SSE projection worker failed: {error}"
-                ))),
-            };
-            let failed = batch.is_err();
+            let batch = Ok(Arc::new(frames));
+            *self
+                .sse_frame_hub
+                .latest_batch
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(batch.clone());
             let _ = self.sse_frame_hub.sender.send(batch);
-            if failed {
-                self.mark_sse_frame_producer_stopped();
-                return;
-            }
             tokio::time::sleep(Duration::from_millis(500)).await;
         }
     }
@@ -218,7 +270,54 @@ impl LocalHttpDaemon {
         &self,
         stream: &str,
     ) -> RefineResult<Vec<SseEventFrame>> {
-        let projection = self.server.current_projection_with_runtime()?;
+        let projection = self.server.current_projection_with_runtime_shared()?;
+        self.server_sent_event_frames_for_projection(stream, &projection)
+    }
+
+    fn changed_sse_frame_batch(
+        &self,
+        stream: &str,
+        previous: Option<SseFrameState>,
+    ) -> RefineResult<(SseFrameState, Option<Vec<SseEventFrame>>)> {
+        let state = self.sse_frame_state(previous.as_ref())?;
+        if previous
+            .as_ref()
+            .is_some_and(|previous| state.same_inputs(previous))
+        {
+            return Ok((state, None));
+        }
+        let frames = self.server_sent_event_frames_for_projection(stream, &state.projection)?;
+        Ok((state, Some(frames)))
+    }
+
+    fn sse_frame_state(&self, previous: Option<&SseFrameState>) -> RefineResult<SseFrameState> {
+        let projection = self.server.current_projection_with_runtime_shared()?;
+        let projection_changed =
+            previous.is_none_or(|previous| !Arc::ptr_eq(&projection, &previous.projection));
+        let process_output_paths = if projection_changed {
+            active_process_output_paths(self.server.runtime_root.as_deref())?
+        } else {
+            previous
+                .map(|previous| previous.process_output_paths.clone())
+                .unwrap_or_default()
+        };
+        let auxiliary = sse_auxiliary_fingerprint(
+            self.server.runtime_root.as_deref(),
+            &projection,
+            &process_output_paths,
+        )?;
+        Ok(SseFrameState {
+            projection,
+            process_output_paths,
+            auxiliary,
+        })
+    }
+
+    fn server_sent_event_frames_for_projection(
+        &self,
+        stream: &str,
+        projection: &ProjectionSnapshot,
+    ) -> RefineResult<Vec<SseEventFrame>> {
         let mut events = vec![
             SseEventFrame {
                 event: "ready",
@@ -234,14 +333,14 @@ impl LocalHttpDaemon {
                     "goal_count": projection.goals.len(),
                     "feature_count": projection.features.len(),
                     "status_counts": projection.status_counts(),
-                    "dashboard": projection.dashboard
+                    "dashboard": &projection.dashboard
                 }),
             },
             SseEventFrame {
                 event: "status_change",
                 data: json!({
                     "status_counts": projection.status_counts(),
-                    "attention": projection.dashboard.attention_indicators
+                    "attention": &projection.dashboard.attention_indicators
                 }),
             },
             SseEventFrame {
@@ -371,6 +470,64 @@ impl LocalHttpDaemon {
         }
         Ok(events)
     }
+}
+
+fn sse_auxiliary_fingerprint(
+    runtime_root: Option<&Path>,
+    projection: &ProjectionSnapshot,
+    process_output_paths: &BTreeSet<PathBuf>,
+) -> RefineResult<BTreeMap<PathBuf, SsePathFingerprint>> {
+    let Some(runtime_root) = runtime_root else {
+        return Ok(BTreeMap::new());
+    };
+    let mut paths = BTreeSet::from([
+        runtime_root.join(API_EVENTS_FILE),
+        runtime_root.join("source-promotion.json"),
+        runtime_root.join("source-update-check.json"),
+    ]);
+    paths.extend(process_output_paths.iter().cloned());
+    for operation in &projection.runtime.background_operations {
+        if let Some(id) = operation.get("id").and_then(Value::as_str) {
+            paths.insert(
+                runtime_root
+                    .join("operations")
+                    .join(format!("{id}.logs.jsonl")),
+            );
+        }
+    }
+    let mut fingerprint = BTreeMap::new();
+    for path in paths {
+        let metadata = match fs::metadata(&path) {
+            Ok(metadata) => metadata,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(error) => {
+                return Err(RefineError::Io(format!(
+                    "failed to inspect SSE source {}: {error}",
+                    path.display()
+                )));
+            }
+        };
+        fingerprint.insert(
+            path,
+            SsePathFingerprint {
+                len: metadata.len(),
+                modified: metadata.modified().ok(),
+            },
+        );
+    }
+    Ok(fingerprint)
+}
+
+fn active_process_output_paths(runtime_root: Option<&Path>) -> RefineResult<BTreeSet<PathBuf>> {
+    let Some(runtime_root) = runtime_root else {
+        return Ok(BTreeSet::new());
+    };
+    let mut paths = BTreeSet::new();
+    for process in FileProcessSupervisor::new(runtime_root).list()? {
+        paths.extend(process.stdout_path.map(PathBuf::from));
+        paths.extend(process.stderr_path.map(PathBuf::from));
+    }
+    Ok(paths)
 }
 
 pub(super) fn should_write_sse_frame(

@@ -47,6 +47,12 @@ pub struct WorkflowPassResult {
     pub steps: Vec<WorkflowStepResult>,
 }
 
+impl WorkflowPassResult {
+    pub fn changed_projection(&self) -> bool {
+        self.promoted != 0 || !self.steps.is_empty()
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct WorkflowStepResult {
     pub goal_id: String,

@@ -148,6 +148,7 @@ pub(in crate::surfaces::web_server) type SseFrameBatch = Result<Arc<Vec<SseEvent
 struct SseFrameHub {
     sender: broadcast::Sender<SseFrameBatch>,
     producer_running: Mutex<bool>,
+    latest_batch: Mutex<Option<SseFrameBatch>>,
     #[cfg(test)]
     build_count: AtomicUsize,
 }
@@ -158,6 +159,7 @@ impl Default for SseFrameHub {
         Self {
             sender,
             producer_running: Mutex::new(false),
+            latest_batch: Mutex::new(None),
             #[cfg(test)]
             build_count: AtomicUsize::new(0),
         }

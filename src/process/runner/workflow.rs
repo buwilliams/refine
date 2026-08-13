@@ -52,9 +52,10 @@ pub(super) fn run_workflow_worker(
                 recovered_root = Some(root);
             }
             match workflow.evaluate_workflow() {
-                Ok(_) => {
+                Ok(result) if result.changed_projection() => {
                     let _ = refresh_projection(runtime_root, &target_root);
                 }
+                Ok(_) => {}
                 Err(RefineError::Conflict(message)) if message.contains("paused") => {}
                 Err(error) => {
                     eprintln!("refine workflow runner: {error}");

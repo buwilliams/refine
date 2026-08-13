@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, OnceLock};
-use std::time::{Duration, Instant, UNIX_EPOCH};
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::UNIX_EPOCH;
 
 use crate::process::subprocess::{FileProcessSupervisor, ProcessSupervisor};
 use crate::process::supervisor::config::FileSettingsService;
@@ -28,12 +28,9 @@ use crate::tools::product::work_items::FileWorkItemService;
 use super::support::*;
 use super::*;
 
-const RUNTIME_PROJECTION_CACHE_TTL: Duration = Duration::from_millis(250);
-
 #[derive(Clone, Debug)]
 struct RuntimeProjectionCacheEntry {
     projection: RuntimeProjection,
-    refreshed_at: Instant,
     fingerprint: RuntimeProjectionFingerprint,
 }
 
@@ -45,10 +42,11 @@ struct RuntimeProjectionFingerprint {
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct RuntimePathFingerprint {
     len: u64,
-    modified_unix_ms: Option<u128>,
+    modified_unix_ns: Option<u128>,
 }
 
-static HOT_PROJECTIONS: OnceLock<Mutex<BTreeMap<String, ProjectionSnapshot>>> = OnceLock::new();
+static HOT_PROJECTIONS: OnceLock<Mutex<BTreeMap<String, Arc<ProjectionSnapshot>>>> =
+    OnceLock::new();
 static HOT_RUNTIME_PROJECTIONS: OnceLock<Mutex<BTreeMap<String, RuntimeProjectionCacheEntry>>> =
     OnceLock::new();
 
@@ -105,6 +103,11 @@ impl InProcessWebServer {
     }
 
     pub(super) fn current_projection(&self) -> RefineResult<ProjectionSnapshot> {
+        self.current_projection_shared()
+            .map(|projection| projection.as_ref().clone())
+    }
+
+    pub(super) fn current_projection_shared(&self) -> RefineResult<Arc<ProjectionSnapshot>> {
         if let Some(refine_dir) = self.current_refine_dir()? {
             if let Some(runtime_root) = &self.runtime_root {
                 let key = projection_cache_key(&refine_dir, runtime_root);
@@ -116,14 +119,16 @@ impl InProcessWebServer {
                     return Ok(snapshot);
                 }
                 let snapshot = store.load_or_refresh_projection(&runtime_root.join("cache"))?;
-                store_hot_projection(key, snapshot.clone())?;
+                let snapshot = Arc::new(snapshot);
+                store_hot_projection(key, Arc::clone(&snapshot))?;
                 Ok(snapshot)
             } else {
-                let store = FileProjectProjectionStore::new(refine_dir);
-                store.rebuild_projection()
+                FileProjectProjectionStore::new(refine_dir)
+                    .rebuild_projection()
+                    .map(Arc::new)
             }
         } else {
-            Ok(self.projection.clone())
+            Ok(Arc::new(self.projection.clone()))
         }
     }
 
@@ -192,21 +197,31 @@ impl InProcessWebServer {
     }
 
     pub(super) fn current_projection_with_runtime(&self) -> RefineResult<ProjectionSnapshot> {
-        let mut projection = self.current_projection()?;
+        self.current_projection_with_runtime_shared()
+            .map(|projection| projection.as_ref().clone())
+    }
+
+    pub(super) fn current_projection_with_runtime_shared(
+        &self,
+    ) -> RefineResult<Arc<ProjectionSnapshot>> {
+        let projection = self.current_projection_shared()?;
         let runtime = self.current_runtime_projection()?;
-        if projection.runtime != runtime {
-            projection.runtime = runtime;
-            self.persist_runtime_projection_snapshot(&projection)?;
-            if let (Some(runtime_root), Some(refine_dir)) =
-                (&self.runtime_root, self.current_refine_dir()?)
-            {
-                store_hot_projection(
-                    projection_cache_key(&refine_dir, runtime_root),
-                    projection.clone(),
-                )?;
-            }
+        if projection.runtime == runtime {
+            return Ok(projection);
         }
-        Ok(projection)
+        let mut updated = projection.as_ref().clone();
+        updated.runtime = runtime;
+        self.persist_runtime_projection_snapshot(&updated)?;
+        let updated = Arc::new(updated);
+        if let (Some(runtime_root), Some(refine_dir)) =
+            (&self.runtime_root, self.current_refine_dir()?)
+        {
+            store_hot_projection(
+                projection_cache_key(&refine_dir, runtime_root),
+                Arc::clone(&updated),
+            )?;
+        }
+        Ok(updated)
     }
 
     pub(super) fn current_runtime_projection(&self) -> RefineResult<RuntimeProjection> {
@@ -225,7 +240,6 @@ impl InProcessWebServer {
                     RefineError::Io("runtime projection cache lock was poisoned".to_string())
                 })?;
             if let Some(entry) = cache.get(&key)
-                && entry.refreshed_at.elapsed() < RUNTIME_PROJECTION_CACHE_TTL
                 && entry.fingerprint == current_fingerprint
             {
                 return Ok(entry.projection.clone());
@@ -260,7 +274,6 @@ impl InProcessWebServer {
                 key,
                 RuntimeProjectionCacheEntry {
                     projection: runtime.clone(),
-                    refreshed_at: Instant::now(),
                     fingerprint,
                 },
             );
@@ -338,7 +351,7 @@ impl InProcessWebServer {
             .load_or_refresh_projection(&runtime_root.join("cache"))?;
         store_hot_projection(
             projection_cache_key(&refine_dir, runtime_root),
-            snapshot.clone(),
+            Arc::new(snapshot.clone()),
         )?;
         let _ = self.refresh_runtime_projection_cache()?;
         Ok(Some(snapshot))
@@ -361,7 +374,7 @@ impl InProcessWebServer {
         store.persist_projection_snapshot(&runtime_root.join("cache"), &projection)?;
         store_hot_projection(
             projection_cache_key(&refine_dir, runtime_root),
-            projection.clone(),
+            Arc::new(projection.clone()),
         )?;
         Ok(projection)
     }
@@ -442,7 +455,7 @@ fn runtime_cache_key(runtime_root: &Path) -> String {
     runtime_root.display().to_string()
 }
 
-fn hot_projection(key: &str) -> RefineResult<Option<ProjectionSnapshot>> {
+fn hot_projection(key: &str) -> RefineResult<Option<Arc<ProjectionSnapshot>>> {
     HOT_PROJECTIONS
         .get_or_init(|| Mutex::new(BTreeMap::new()))
         .lock()
@@ -450,7 +463,7 @@ fn hot_projection(key: &str) -> RefineResult<Option<ProjectionSnapshot>> {
         .map(|cache| cache.get(key).cloned())
 }
 
-fn store_hot_projection(key: String, snapshot: ProjectionSnapshot) -> RefineResult<()> {
+fn store_hot_projection(key: String, snapshot: Arc<ProjectionSnapshot>) -> RefineResult<()> {
     HOT_PROJECTIONS
         .get_or_init(|| Mutex::new(BTreeMap::new()))
         .lock()
@@ -510,11 +523,11 @@ fn collect_runtime_path_fingerprint(
         relative,
         RuntimePathFingerprint {
             len: metadata.len(),
-            modified_unix_ms: metadata
+            modified_unix_ns: metadata
                 .modified()
                 .ok()
                 .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
-                .map(|duration| duration.as_millis()),
+                .map(|duration| duration.as_nanos()),
         },
     );
     if metadata.is_dir() && should_scan_runtime_path_children(runtime_root, path) {

@@ -60,3 +60,18 @@ fn git_output(repo: &Path, args: &[&str]) -> String {
     );
     String::from_utf8(output.stdout).unwrap()
 }
+
+#[test]
+fn workflow_pass_reports_only_projection_mutations() {
+    let idle = WorkflowPassResult {
+        promoted: 0,
+        steps: Vec::new(),
+    };
+    let promoted = WorkflowPassResult {
+        promoted: 1,
+        steps: Vec::new(),
+    };
+
+    assert!(!idle.changed_projection());
+    assert!(promoted.changed_projection());
+}
