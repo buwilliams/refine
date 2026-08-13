@@ -26,11 +26,12 @@ use crate::workflow::candidate_handoff::{
 use crate::workflow::context::WorkflowContext;
 use crate::workflow::implementation_planning::begin_implementation_phase;
 use crate::workflow::{
-    GovernanceEvaluation, agent_worktree_cwd, complete_implementation_planning,
-    fail_implementation_phase, governed_implementation_prompt, implementation_branch_name,
-    json_object, now_timestamp, parse_governance_provider_output,
-    post_implementation_governance_prompt, round_agent_context,
-    run_governed_implementation_planning, selected_agent_context, setting_string, setting_usize,
+    GovernanceEvaluation, QualityRecoveryInvestigation, agent_worktree_cwd,
+    complete_implementation_planning, fail_implementation_phase, governed_implementation_prompt,
+    implementation_branch_name, json_object, now_timestamp, parse_governance_provider_output,
+    parse_quality_recovery_provider_output, post_implementation_governance_prompt,
+    quality_recovery_prompt, round_agent_context, run_governed_implementation_planning,
+    selected_agent_context, setting_string, setting_usize,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -805,7 +806,11 @@ impl WorkflowBehavior for WorkflowQuality {
             return Err(reconciliation_failure);
         }
         if !quality.ok {
-            return fail(ctx, "quality", RefineError::Conflict(quality.summary));
+            let recovery = match investigate_quality_failure(ctx, &quality_report, &quality) {
+                Ok(recovery) => recovery,
+                Err(error) => return fail(ctx, "quality_recovery", error),
+            };
+            return handle_quality_finding(ctx, &recovery);
         }
         ctx.request_transition(GoalStatus::Quality, GoalStatus::Governance)?;
         if let Some(handoff) = find_candidate_handoff(
@@ -1301,6 +1306,75 @@ fn is_code_path(path: &str) -> bool {
     )
 }
 
+fn investigate_quality_failure(
+    ctx: &WorkflowContext<'_>,
+    quality_agent_report: &str,
+    quality: &QualityCheckResult,
+) -> RefineResult<QualityRecoveryInvestigation> {
+    let worktree_path = ctx.require_worktree_path()?.to_string();
+    let goal = ctx.work_items.show_goal_detail(&ctx.goal_id)?;
+    let agent_context = ensure_goal_agent_context(ctx, &goal)?;
+    let provider_cwd = agent_worktree_cwd(
+        &worktree_path,
+        setting_string(&ctx.settings, "agent_subpath", "").as_str(),
+    )?;
+    let prompt = quality_recovery_prompt(
+        &ctx.goal_id,
+        ctx.round_idx,
+        &worktree_path,
+        &agent_context,
+        quality_agent_report,
+        quality,
+    )?;
+    let worktree_git = FileGitWorktreeService::with_runtime_root(&worktree_path, ctx.runtime_root);
+    let before = worktree_git.implementation_planning_observation()?;
+    if before.head_commit != quality.candidate_commit {
+        return Err(RefineError::Conflict(format!(
+            "Quality recovery expected candidate {} but worktree HEAD is {}",
+            quality.candidate_commit, before.head_commit
+        )));
+    }
+    if !before.status_porcelain.is_empty() {
+        return Err(RefineError::Conflict(
+            "Quality recovery requires a clean candidate worktree".to_string(),
+        ));
+    }
+
+    let provider = HostAgentProviderService::with_runtime_root(ctx.runtime_root.join("agents"));
+    let output = provider.invoke(ProviderInvocation {
+        provider: ctx.provider.clone(),
+        prompt,
+        session_id: None,
+        cwd: Some(provider_cwd.display().to_string()),
+        process_metadata: ctx
+            .workflow_process_metadata("quality_recovery", "WorkflowQualityRecovery"),
+    })?;
+
+    let after = worktree_git.implementation_planning_observation()?;
+    if after != before {
+        return Err(RefineError::Conflict(
+            "Quality recovery investigation modified the candidate worktree; recovery analysis must be read-only"
+                .to_string(),
+        ));
+    }
+    let mut recovery = parse_quality_recovery_provider_output(&output)?;
+    recovery
+        .details
+        .insert("provider".to_string(), Value::String(ctx.provider.clone()));
+    recovery
+        .details
+        .insert("worktree".to_string(), Value::String(worktree_path));
+    recovery.details.insert(
+        "cwd".to_string(),
+        Value::String(provider_cwd.display().to_string()),
+    );
+    recovery.details.insert(
+        "candidate_commit".to_string(),
+        Value::String(quality.candidate_commit.clone()),
+    );
+    Ok(recovery)
+}
+
 fn evaluate_workflow_governance(
     ctx: &WorkflowContext<'_>,
     worktree_path: &str,
@@ -1434,6 +1508,55 @@ fn record_governance(
     )
 }
 
+fn handle_quality_finding(
+    ctx: &mut WorkflowContext<'_>,
+    recovery: &QualityRecoveryInvestigation,
+) -> RefineResult<WorkflowAdvanceOutcome> {
+    ctx.work_items.update_goal_round_evaluation_summary(
+        &ctx.goal_id,
+        ctx.round_idx,
+        &json!({
+            "quality_recovery_analysis": recovery.analysis,
+            "quality_recovery_round_prompt": recovery.round_prompt,
+            "quality_recovery_details": recovery.details,
+            "quality_recovery_checked_at": now_timestamp()
+        }),
+    )?;
+    let current_attempt = current_automatic_retry_attempt(ctx)?;
+    let max_retries = max_automatic_round_retries(ctx)?;
+    if current_attempt >= max_retries {
+        return fail(
+            ctx,
+            "quality_retry_exhausted",
+            RefineError::Conflict(format!(
+                "Quality findings remain after {max_retries} automatic recovery Rounds"
+            )),
+        );
+    }
+    let next_attempt = current_attempt + 1;
+    ctx.work_items.queue_quality_recovery_summary(
+        &ctx.goal_id,
+        ctx.round_idx,
+        next_attempt,
+        &recovery.analysis,
+        &recovery.round_prompt,
+    )?;
+    ctx.log(
+        "quality",
+        "Quality drafted a fresh automatic recovery Round",
+        Some(json_object(json!({
+            "attempt": next_attempt,
+            "max_automatic_round_retries": max_retries,
+            "source_round": ctx.round_idx + 1
+        }))),
+    )?;
+    ctx.final_status = Some(GoalStatus::Todo);
+    Ok(WorkflowAdvanceOutcome::Completed {
+        final_status: GoalStatus::Todo,
+        reason: "Quality findings queued a fresh recovery Round".to_string(),
+    })
+}
+
 fn handle_governance_finding(
     ctx: &mut WorkflowContext<'_>,
     evaluation: &GovernanceEvaluation,
@@ -1469,22 +1592,8 @@ fn handle_governance_finding(
         (Ok(analysis), Ok(prompt)) => (analysis, prompt),
         (Err(error), _) | (_, Err(error)) => return fail(ctx, "governance", error),
     };
-    let detail = ctx.work_items.show_goal_detail(&ctx.goal_id)?;
-    let current_attempt = detail
-        .get("rounds")
-        .and_then(Value::as_array)
-        .and_then(|rounds| rounds.get(ctx.round_idx))
-        .and_then(|round| round.get("automatic_retry"))
-        .and_then(|retry| retry.get("attempt"))
-        .and_then(Value::as_u64)
-        .and_then(|attempt| u32::try_from(attempt).ok())
-        .unwrap_or(0);
-    let max_retries = FileGovernanceService::new(ctx.refine_dir())
-        .load()?
-        .get("max_automatic_round_retries")
-        .and_then(Value::as_u64)
-        .and_then(|value| u32::try_from(value).ok())
-        .unwrap_or(5);
+    let current_attempt = current_automatic_retry_attempt(ctx)?;
+    let max_retries = max_automatic_round_retries(ctx)?;
     if current_attempt >= max_retries {
         return fail(
             ctx,
@@ -1516,6 +1625,29 @@ fn handle_governance_finding(
         final_status: GoalStatus::Todo,
         reason: "Governance findings queued a fresh recovery Round".to_string(),
     })
+}
+
+fn current_automatic_retry_attempt(ctx: &WorkflowContext<'_>) -> RefineResult<u32> {
+    Ok(ctx
+        .work_items
+        .show_goal_detail(&ctx.goal_id)?
+        .get("rounds")
+        .and_then(Value::as_array)
+        .and_then(|rounds| rounds.get(ctx.round_idx))
+        .and_then(|round| round.get("automatic_retry"))
+        .and_then(|retry| retry.get("attempt"))
+        .and_then(Value::as_u64)
+        .and_then(|attempt| u32::try_from(attempt).ok())
+        .unwrap_or(0))
+}
+
+fn max_automatic_round_retries(ctx: &WorkflowContext<'_>) -> RefineResult<u32> {
+    Ok(FileGovernanceService::new(ctx.refine_dir())
+        .load()?
+        .get("max_automatic_round_retries")
+        .and_then(Value::as_u64)
+        .and_then(|value| u32::try_from(value).ok())
+        .unwrap_or(5))
 }
 
 fn fail<T>(ctx: &WorkflowContext<'_>, category: &str, error: RefineError) -> RefineResult<T> {

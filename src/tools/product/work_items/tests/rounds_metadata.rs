@@ -102,6 +102,48 @@ fn file_work_item_service_appends_and_edits_latest_round() {
 }
 
 #[test]
+fn file_work_item_service_retains_quality_recovery_evidence() {
+    let temp_root = unique_temp_dir("work-item-quality-recovery-evidence");
+    let refine_dir = temp_root.join(".refine");
+    let service = FileWorkItemService::new(&refine_dir);
+    service
+        .create_goal_summary("Quality recovery evidence", Some("GOAL1"))
+        .unwrap();
+    service
+        .append_goal_round_summary("GOAL1", "Reporter", "Prompt")
+        .unwrap();
+
+    service
+        .update_goal_round_evaluation_summary(
+            "GOAL1",
+            0,
+            &json!({
+                "quality_agent_report": "Reviewed and corrected the candidate.",
+                "quality_candidate_commit": "candidate123",
+                "quality_recovery_analysis": "The configured check still fails.",
+                "quality_recovery_round_prompt": "Correct the check and add a regression test.",
+                "quality_recovery_details": {"phase": "quality_recovery"},
+                "quality_recovery_checked_at": "2026-08-13T12:00:00Z"
+            }),
+        )
+        .unwrap();
+
+    let detail = service.show_goal_detail("GOAL1").unwrap();
+    let round = &detail["rounds"][0];
+    assert_eq!(round["quality_candidate_commit"], "candidate123");
+    assert_eq!(
+        round["quality_recovery_details"]["phase"],
+        "quality_recovery"
+    );
+    assert_eq!(
+        round["quality_recovery_round_prompt"],
+        "Correct the check and add a regression test."
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn file_work_item_service_records_latest_round_implementation_report() {
     let temp_root = unique_temp_dir("work-item-implementation-report");
     let refine_dir = temp_root.join(".refine");

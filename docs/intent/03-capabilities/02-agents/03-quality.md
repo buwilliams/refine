@@ -35,6 +35,8 @@ Current implementation details that matter to intent:
   supervised structured results and diagnostics, naming the failed test and observed cause when
   available while retaining the complete structured evidence for inspection;
 - failures should be visible in logs, System, Goal evidence, or review surfaces;
+- a valid failed verdict should trigger a separate read-only investigation that records an evidence-based cause, drafts a complete next-Round request, and returns the Goal to Todo; Quality and Governance share the configured five-Round automatic recovery budget, after which a remaining finding moves the Goal to Failed;
+- provider, parsing, harness, candidate-identity, authority, and infrastructure failures should fail visibly without creating or consuming an automatic recovery Round;
 - quality settings should be shared project context, not hidden UI state;
 - an empty Quality test list should be an explicit successful no-op, not a reason to skip durable Quality evidence.
 

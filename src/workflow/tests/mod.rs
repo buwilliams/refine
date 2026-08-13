@@ -1,5 +1,6 @@
 mod execution_ownership;
 mod governance;
+mod quality_recovery;
 
 use super::*;
 use crate::model::workflow::GoalStatus;

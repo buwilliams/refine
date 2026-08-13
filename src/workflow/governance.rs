@@ -209,7 +209,7 @@ fn governance_evaluation_from_json(
 /// they appear. An opening brace that never balances (unclosed code in prose)
 /// only costs the scan that brace: it resumes right after it instead of
 /// swallowing the rest of the text.
-fn json_object_candidates(raw: &str) -> Vec<Value> {
+pub(super) fn json_object_candidates(raw: &str) -> Vec<Value> {
     let mut candidates = Vec::new();
     let mut search_from = 0usize;
     while let Some(relative_start) = raw[search_from..].find('{') {

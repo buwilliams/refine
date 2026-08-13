@@ -31,7 +31,7 @@ The lifecycle is:
 
 Workflow policy applies soft global, node, provider, and target-app limits based on observed live processes. Feature order and priority shape selection. An in-memory active set avoids duplicate launches in one runner, while synchronized Goal status, node assignment, and Round remain authoritative across nodes.
 
-Workers persist semantic artifacts and reread Goal authority at transitions and consequential boundaries. A restart may schedule the same nonterminal Goal again. Preserved planning, Git, quality, governance, integration, logs, branches, and worktrees make that repetition idempotent and explainable. A valid Governance finding may draft a fresh recovery Round and atomically return the Goal to todo; provider, parsing, Git, and infrastructure failures do not consume that automatic recovery budget.
+Workers persist semantic artifacts and reread Goal authority at transitions and consequential boundaries. A restart may schedule the same nonterminal Goal again. Preserved planning, Git, quality, governance, integration, logs, branches, and worktrees make that repetition idempotent and explainable. A valid Quality or Governance finding may draft a fresh recovery Round and atomically return the Goal to todo; both stages share one bounded retry counter. Provider, parsing, Git, harness, and infrastructure failures do not consume that automatic recovery budget.
 
 Preparation and non-retryable failures move an unchanged active Goal to failed. Retryable local failures use in-memory backoff and do not create durable delay records. Pause controls suppress new work and quiesce supported processes.
 

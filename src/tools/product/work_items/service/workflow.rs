@@ -29,12 +29,54 @@ impl FileWorkItemService {
         analysis: &str,
         prompt: &str,
     ) -> RefineResult<GoalSummaryProjection> {
+        self.queue_automatic_recovery_summary(
+            goal_id,
+            round_idx,
+            attempt,
+            &GoalStatus::Governance,
+            "governance",
+            analysis,
+            prompt,
+        )
+    }
+
+    pub(crate) fn queue_quality_recovery_summary(
+        &self,
+        goal_id: &str,
+        round_idx: usize,
+        attempt: u32,
+        analysis: &str,
+        prompt: &str,
+    ) -> RefineResult<GoalSummaryProjection> {
+        self.queue_automatic_recovery_summary(
+            goal_id,
+            round_idx,
+            attempt,
+            &GoalStatus::Quality,
+            "quality",
+            analysis,
+            prompt,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn queue_automatic_recovery_summary(
+        &self,
+        goal_id: &str,
+        round_idx: usize,
+        attempt: u32,
+        source_status: &GoalStatus,
+        kind: &str,
+        analysis: &str,
+        prompt: &str,
+    ) -> RefineResult<GoalSummaryProjection> {
         let _goal_lock = self.acquire_goal_mutation_lock(goal_id)?;
         let current = self.show_goal_summary(goal_id)?;
         self.ensure_goal_owned(&current)?;
-        if current.goal.status != GoalStatus::Governance {
+        if current.goal.status != *source_status {
             return Err(RefineError::Conflict(format!(
-                "Goal {goal_id} changed from governance to {} before automatic recovery",
+                "Goal {goal_id} changed from {} to {} before automatic recovery",
+                source_status.as_str(),
                 current.goal.status.as_str()
             )));
         }
@@ -49,7 +91,7 @@ impl FileWorkItemService {
             .ok_or_else(|| RefineError::NotFound(format!("Goal {goal_id} has no rounds")))?;
         if rounds.len() != round_idx + 1 {
             return Err(RefineError::Conflict(format!(
-                "Goal {goal_id} round changed before automatic Governance recovery"
+                "Goal {goal_id} round changed before automatic {kind} recovery"
             )));
         }
         let now = now_timestamp();
@@ -59,13 +101,13 @@ impl FileWorkItemService {
             .ok_or_else(|| {
                 RefineError::Serialization("source Round is not an object".to_string())
             })?;
-        source.insert("governance_recovery_analysis".to_string(), json!(analysis));
-        source.insert("governance_recovery_attempt".to_string(), json!(attempt));
+        source.insert(format!("{kind}_recovery_analysis"), json!(analysis));
+        source.insert(format!("{kind}_recovery_attempt"), json!(attempt));
         source.insert("updated".to_string(), json!(now.clone()));
 
         let mut successor = new_round_value("Refine", "Refine", prompt);
         successor["automatic_retry"] = json!({
-            "kind": "governance",
+            "kind": kind,
             "source_round": round_idx + 1,
             "attempt": attempt,
             "generated_at": now

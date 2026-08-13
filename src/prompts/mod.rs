@@ -52,6 +52,7 @@ prompt_templates! {
     ImportNotes => "imports/notes.md",
     PostImplementationQuality => "quality/post-implementation.md",
     GoalWorkflowQualityAgent => "quality/agent.md",
+    GoalWorkflowQualityRecovery => "quality/recovery.md",
     QualityDefaultInstructions => "quality/default-instructions.md",
     ReleaseGoal => "release/goal.md",
     TargetAppGeneration => "target_apps/generation.md",

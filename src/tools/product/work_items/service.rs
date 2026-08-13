@@ -112,6 +112,7 @@ fn validate_automated_goal_transition(from: &GoalStatus, to: &GoalStatus) -> Ref
             | (GoalStatus::Quality, GoalStatus::Governance)
             | (GoalStatus::Governance, GoalStatus::Review)
             | (GoalStatus::Quality, GoalStatus::Done)
+            | (GoalStatus::Quality, GoalStatus::Todo)
             | (GoalStatus::Governance, GoalStatus::Todo)
             | (GoalStatus::Implement, GoalStatus::Failed)
             | (GoalStatus::Quality, GoalStatus::Failed)

@@ -105,12 +105,12 @@ function renderSettingsGovernanceTab(gov) {
     })}
 
     <section class="settings-section">
-      <h3>Automatic Governance recovery</h3>
+      <h3>Automatic Quality and Governance recovery</h3>
       <label for="s-governance-max-retries">Maximum automatic recovery Rounds</label>
       <input id="s-governance-max-retries" type="number" min="0" step="1"
              value="${htmlEscape(String(gov.max_automatic_round_retries ?? 5))}"
              data-testid="governance-max-automatic-round-retries">
-      <p class="muted small">Default: 5. Set to 0 to move the first Governance finding to Failed.</p>
+      <p class="muted small">Shared across Quality and Governance. Default: 5. Set to 0 to move the first finding to Failed.</p>
     </section>
 
     <section class="settings-section">
