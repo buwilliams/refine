@@ -123,7 +123,7 @@ services in the installed release:
 | `.refine/nodes/<id>/reporters.json` | `reporters.json` | Merge reporters by stable identity or name, resolve collisions deliberately, and verify all Goal and Feature reporter references. |
 | v2 governance configuration | `governance.json` | Preserve product, constitution, and rules semantically. Do not discard requirements merely because a current key has a different shape. |
 | `.refine/guidance.json` | `guidance.json` | Normalize to the current guidance list while preserving enabled state and instructions. |
-| v2 Quality checks and timing | `quality/settings.json` | Preserve enforced checks and choose one project-wide `pre_merge` or `post_build` timing. If legacy Node timings diverge, stop for owner judgment. Do not leave `quality_timing` as an independent Node setting. |
+| v2 Quality checks and timing | `quality/settings.json` | Preserve enforced checks. Remove retired timing fields: Quality now always runs after Implement and before Governance. |
 | `target_app_rebuild_*` and `target_app_auto_rebuild*` | `target_app_build_*` and `target_app_auto_build*` Node settings | Preserve commands, instructions, timeouts, and cadence under the current names. |
 | Explicit concurrency limits | `parallel_run_cap`, `parallel_per_node_cap`, `parallel_per_provider_cap`, and `parallel_per_target_app_cap` Node settings | Preserve only limits that were deliberate operator decisions. Omit inherited or seeded defaults so the host-capacity governor remains reachable. |
 | Other supported durable records | the path owned by the current service | Preserve chats, Todo lists, and similar product records only when their current service has a defined destination. Verify references rather than copying directories blindly. |

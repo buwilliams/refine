@@ -5,7 +5,7 @@ mod queries;
 mod rounds;
 use super::{
     ActivityProjectionQuery, ApiRequest, ApiResponse, BacklogPromotionService, BulkGoalSelection,
-    BulkGoalUpdate, FileGoalExportService, FileLogService, FileMergerService,
+    BulkGoalUpdate, FileGoalExportService, FileGovernanceIntegrationService, FileLogService,
     FileProcessControlService, FileRunnerWorkerService, GoalAuthoringRequest, GoalProjectionQuery,
     GoalStatus, InProcessWebServer, LogEntry, PageRequest, ProjectionQuery, RefineError, Value,
     bounded_query_usize, error_response, goal_action_message, goal_id_and_action, goal_id_required,

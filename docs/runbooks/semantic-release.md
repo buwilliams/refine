@@ -23,7 +23,7 @@ confirmation.
    whose prompt contains the trusted release plan.
 5. Follow the linked Goal's real workflow state and agent logs. Its worktree is
    managed by the normal Goal workflow under `.git/refine-worktrees`.
-6. Review and approve the Goal normally. Ready Merge integrates the exact
+6. Review and approve the Goal normally. Governance integrates the exact
    preparation candidate before Review; approval accepts that integration and
    does not perform another merge. Preparation never tags or publishes.
 

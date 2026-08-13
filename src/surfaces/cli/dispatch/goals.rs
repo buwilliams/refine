@@ -236,7 +236,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
             let service = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?);
             let goal = match stage.as_str() {
                 "quality" | "qa" => service.retry_goal_quality_summary(&id)?,
-                "governance" | "merge" => service.retry_goal_merge_summary(&id)?,
+                "governance" => service.retry_goal_governance_summary(&id)?,
                 _ => {
                     return Err(
                         crate::process::supervisor::errors::RefineError::InvalidInput(
@@ -259,27 +259,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                 },
         } => {
             let refine_dir = refine_dir_for_target_root(&target_root)?;
-            let goal = FileMergerService::with_target_root(
-                refine_dir.join("runtime"),
-                &refine_dir,
-                &target_root,
-            )
-            .approve_reviewed_goal(&id)?;
-            println!(
-                "{}",
-                serde_json::to_string_pretty(&json!({"goal": goal.goal})).unwrap()
-            );
-            Ok(())
-        }
-        Commands::Goal {
-            action:
-                GoalAction::Merge {
-                    id,
-                    target_root: Some(target_root),
-                },
-        } => {
-            let refine_dir = refine_dir_for_target_root(&target_root)?;
-            let goal = FileMergerService::with_target_root(
+            let goal = FileGovernanceIntegrationService::with_target_root(
                 refine_dir.join("runtime"),
                 &refine_dir,
                 &target_root,
@@ -517,7 +497,7 @@ pub(super) fn dispatch_goal_daemon(action: GoalAction) -> RefineResult<()> {
         } => {
             let action = match stage.trim().to_ascii_lowercase().as_str() {
                 "quality" => "retry-quality",
-                "governance" | "merge" => "retry-governance",
+                "governance" => "retry-governance",
                 _ => {
                     return Err(
                         crate::process::supervisor::errors::RefineError::InvalidInput(
@@ -546,14 +526,6 @@ pub(super) fn dispatch_goal_daemon(action: GoalAction) -> RefineResult<()> {
         } => daemon_json(
             "POST",
             &format!("/work/goals/{}/approve", path_segment(&id)),
-            None,
-        )?,
-        GoalAction::Merge {
-            id,
-            target_root: None,
-        } => daemon_json(
-            "POST",
-            &format!("/work/goals/{}/merge", path_segment(&id)),
             None,
         )?,
         GoalAction::Undo {

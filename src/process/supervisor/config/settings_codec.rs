@@ -86,7 +86,6 @@ pub(super) fn allowed_settings() -> BTreeSet<&'static str> {
         "git_remote",
         "merge_target_branch",
         "quality_enabled",
-        "quality_timing",
         "allowed_commands",
         "agent_cli",
         "target_app_start_instructions",
@@ -170,18 +169,6 @@ pub(super) fn normalize_setting(key: &str, value: &Value) -> RefineResult<String
             }
         }
         "quality_enabled" => Ok(if value_is_truthy(value) { "1" } else { "0" }.to_string()),
-        "quality_timing" => {
-            let value = as_string(value);
-            if matches!(value.trim(), "post_build" | "post_rebuild") {
-                Ok("post_build".to_string())
-            } else if value.trim() == "pre_merge" {
-                Ok("pre_merge".to_string())
-            } else {
-                Err(RefineError::InvalidInput(
-                    "quality_timing must be one of pre_merge, post_build".to_string(),
-                ))
-            }
-        }
         "target_app_env_json" => {
             let raw = as_string(value);
             let parsed = serde_json::from_str::<Value>(raw.trim()).map_err(|_| {
@@ -256,14 +243,6 @@ fn normalize_worktree_cleanup_generated_paths(value: &Value) -> RefineResult<Str
         paths.insert(raw.replace('\\', "/"));
     }
     Ok(paths.into_iter().collect::<Vec<_>>().join(", "))
-}
-
-pub(super) fn normalize_quality_timing_lossy(value: &str) -> String {
-    if matches!(value.trim(), "post_build" | "post_rebuild") {
-        "post_build".to_string()
-    } else {
-        DEFAULT_QUALITY_TIMING.to_string()
-    }
 }
 
 pub(super) fn sync_target_app_test_settings(

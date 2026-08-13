@@ -129,7 +129,7 @@ mod settings;
 mod tests;
 
 use execution_context::{
-    agent_worktree_cwd, authored_workflow_commitment, hydrate_in_progress_context,
+    agent_worktree_cwd, authored_workflow_commitment, hydrate_plan_or_implement_context,
     hydrate_retry_context, implementation_branch_name,
 };
 use goal_agent_context::{round_agent_context, selected_agent_context};

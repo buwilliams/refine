@@ -180,7 +180,7 @@ pub(crate) fn goal_feature_assignment_and_round_edit_latest(fixture: &Integratio
     );
 }
 
-pub(crate) fn goal_workflow_actions_start_retry_verify_merge_undo(fixture: &IntegrationFixture) {
+pub(crate) fn goal_workflow_actions_start_retry_verify_approve_undo(fixture: &IntegrationFixture) {
     let started_id = fixture.create_goal("goal action start");
     let started = fixture.run_refine(&["goal", "start", &started_id]);
     fixture.assert_success("goal start", &started);
@@ -233,26 +233,27 @@ pub(crate) fn goal_workflow_actions_start_retry_verify_merge_undo(fixture: &Inte
         &fixture.run_refine(&["goal", "delete", &quality_id]),
     );
 
-    let merge_id = fixture.create_goal("goal action merge retry");
-    seed_goal_status(fixture, &merge_id, "failed");
-    let retried_merge = fixture.run_refine(&["goal", "retry", &merge_id, "--stage", "merge"]);
-    fixture.assert_success("goal retry merge", &retried_merge);
+    let governance_id = fixture.create_goal("goal action governance retry");
+    seed_goal_status(fixture, &governance_id, "failed");
+    let retried_governance =
+        fixture.run_refine(&["goal", "retry", &governance_id, "--stage", "governance"]);
+    fixture.assert_success("goal retry governance", &retried_governance);
     assert_eq!(
-        fixture.json_stdout(&retried_merge)["goal"]["status"],
+        fixture.json_stdout(&retried_governance)["goal"]["status"],
         "governance"
     );
-    let merged = fixture.run_refine(&["goal", "merge", &merge_id]);
+    let retired_merge = fixture.run_refine(&["goal", "merge", &governance_id]);
     assert!(
-        !merged.status.success(),
-        "goal merge without a reviewed candidate unexpectedly succeeded"
+        !retired_merge.status.success(),
+        "retired goal merge command unexpectedly remained available"
     );
     fixture.assert_success(
-        "goal cancel merge retry",
-        &fixture.run_refine(&["goal", "cancel", &merge_id]),
+        "goal cancel governance retry",
+        &fixture.run_refine(&["goal", "cancel", &governance_id]),
     );
     fixture.assert_success(
-        "goal delete merge retry",
-        &fixture.run_refine(&["goal", "delete", &merge_id]),
+        "goal delete governance retry",
+        &fixture.run_refine(&["goal", "delete", &governance_id]),
     );
 
     let cancelled_id = fixture.create_goal("goal action undo cancelled");

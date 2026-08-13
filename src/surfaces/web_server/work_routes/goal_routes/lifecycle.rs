@@ -63,15 +63,19 @@ impl InProcessWebServer {
                 let Some(runtime_root) = &self.runtime_root else {
                     return runtime_root_unavailable("approve reviewed Goals");
                 };
-                FileMergerService::with_target_root(runtime_root, &service.refine_dir, &target_root)
-                    .approve_reviewed_goal(goal_id)
+                FileGovernanceIntegrationService::with_target_root(
+                    runtime_root,
+                    &service.refine_dir,
+                    &target_root,
+                )
+                .approve_reviewed_goal(goal_id)
             }
             "verify" => match service.show_goal_summary(goal_id) {
                 Ok(goal) if goal.goal.status == GoalStatus::Review => {
                     let Some(runtime_root) = &self.runtime_root else {
                         return runtime_root_unavailable("approve reviewed Goals");
                     };
-                    FileMergerService::with_target_root(
+                    FileGovernanceIntegrationService::with_target_root(
                         runtime_root,
                         &service.refine_dir,
                         &target_root,
@@ -83,16 +87,8 @@ impl InProcessWebServer {
                 )),
                 Err(error) => Err(error),
             },
-            "merge" => {
-                let Some(runtime_root) = &self.runtime_root else {
-                    return runtime_root_unavailable("approve reviewed Goals");
-                };
-                FileMergerService::with_target_root(runtime_root, &service.refine_dir, &target_root)
-                    .approve_reviewed_goal(goal_id)
-            }
             "retry-quality" => service.retry_goal_quality_summary(goal_id),
-            "retry-governance" | "retry-merge" => service.retry_goal_merge_summary(goal_id),
-            "submit-merge" => service.submit_goal_for_merge_summary(goal_id),
+            "retry-governance" => service.retry_goal_governance_summary(goal_id),
             "undo" => service.undo_goal_summary(goal_id),
             _ => {
                 return ApiResponse::json(

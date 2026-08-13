@@ -1,8 +1,8 @@
 use super::*;
 
 #[test]
-fn governance_push_failure_retries_without_duplicate_merge() {
-    let temp_root = unique_temp_dir("ready-merge-push-retry");
+fn governance_conflict_aborts_without_advancing_or_losing_candidate() {
+    let temp_root = unique_temp_dir("governance-integration-conflict");
     let repo = temp_root.join("repo");
     let refine_dir = repo.join(".refine");
     let runtime_root = temp_root.join("run/8080");
@@ -36,22 +36,12 @@ fn governance_push_failure_retries_without_duplicate_merge() {
         ],
     )
     .unwrap();
-    commit_file(&worktree_path, "feature.txt", "candidate\n", "candidate");
+    commit_file(&worktree_path, "app.txt", "candidate\n", "candidate");
     let candidate_commit = git_stdout(&worktree_path, &["rev-parse", "HEAD"]);
     git(&worktree_path, &["push", "-u", "origin", branch]).unwrap();
-    let hook = remote.join("hooks/pre-receive");
-    fs::write(
-            &hook,
-            "#!/bin/sh\nwhile read old new ref; do\n  test \"$ref\" != refs/heads/main || exit 1\ndone\n",
-        )
-        .unwrap();
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        let mut permissions = fs::metadata(&hook).unwrap().permissions();
-        permissions.set_mode(0o755);
-        fs::set_permissions(&hook, permissions).unwrap();
-    }
+    commit_file(&repo, "app.txt", "target\n", "target");
+    let target_commit = git_stdout(&repo, &["rev-parse", "HEAD"]);
+    git(&repo, &["push", "origin", "main"]).unwrap();
 
     let work_items = FileWorkItemService::new(&refine_dir);
     work_items
@@ -87,23 +77,35 @@ fn governance_push_failure_retries_without_duplicate_merge() {
     work_items
         .advance_automated_goal_status("GOAL1", GoalStatus::Governance)
         .unwrap();
-    let merger = FileMergerService::new(&runtime_root, &refine_dir);
-    let error = merger
+
+    let error = FileGovernanceIntegrationService::new(&runtime_root, &refine_dir)
         .integrate_workflow_candidate("GOAL1", 0, "default", branch, &candidate_commit, "origin")
         .unwrap_err();
     assert!(
-        error.to_string().contains("pre-receive hook declined"),
+        error.to_string().contains("candidate integration failed"),
         "{error}"
     );
-    let integrated_head = git_stdout(&repo, &["rev-parse", "HEAD"]);
-    assert!(git_succeeds(
+    assert_eq!(
+        work_items.show_goal_summary("GOAL1").unwrap().goal.status,
+        GoalStatus::Governance
+    );
+    assert!(
+        work_items.show_goal_detail("GOAL1").unwrap()["rounds"][0]["workflow_integration"]
+            .is_null()
+    );
+    assert_eq!(git_stdout(&repo, &["rev-parse", "HEAD"]), target_commit);
+    assert_eq!(
+        fs::read_to_string(repo.join("app.txt")).unwrap(),
+        "target\n"
+    );
+    assert_eq!(
+        fs::read_to_string(worktree_path.join("app.txt")).unwrap(),
+        "candidate\n"
+    );
+    assert!(git_stdout(&repo, &["diff", "--name-only", "--diff-filter=U"]).is_empty());
+    assert!(!git_succeeds(
         &repo,
-        &[
-            "merge-base",
-            "--is-ancestor",
-            &candidate_commit,
-            &integrated_head
-        ]
+        &["rev-parse", "--verify", "MERGE_HEAD"]
     ));
     assert!(!git_succeeds(
         &repo,
@@ -114,35 +116,6 @@ fn governance_push_failure_retries_without_duplicate_merge() {
             "origin/main"
         ]
     ));
-    assert!(
-        work_items.show_goal_detail("GOAL1").unwrap()["rounds"][0]["workflow_integration"]
-            .is_null()
-    );
-
-    fs::remove_file(&hook).unwrap();
-    let retried = merger
-        .integrate_workflow_candidate("GOAL1", 0, "default", branch, &candidate_commit, "origin")
-        .unwrap();
-    assert_eq!(retried.target_commit, integrated_head);
-    assert!(retried.pushed);
-    assert_eq!(git_stdout(&repo, &["rev-parse", "HEAD"]), integrated_head);
-    assert!(git_succeeds(
-        &repo,
-        &[
-            "merge-base",
-            "--is-ancestor",
-            &candidate_commit,
-            "origin/main"
-        ]
-    ));
-    let audit = fs::read_to_string(repo.join(".git/refine-audit.jsonl")).unwrap();
-    assert_eq!(
-        audit
-            .lines()
-            .filter(|line| line.contains("\"action\":\"merge_commit_no_ff\""))
-            .count(),
-        1
-    );
 
     git(
         &repo,

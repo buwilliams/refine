@@ -89,8 +89,8 @@ use crate::tools::observability::diagnostics::{DiagnosticsService, FileDiagnosti
 use crate::tools::observability::processes::FileProcessStatusService;
 use crate::tools::observability::support_bundle::{FileSupportBundleService, SupportBundleService};
 use crate::tools::product::goal_exports::FileGoalExportService;
+use crate::tools::product::governance_integration::FileGovernanceIntegrationService;
 use crate::tools::product::imports::FileImportService;
-use crate::tools::product::merging::FileMergerService;
 use crate::tools::product::next_actions::FileNextActionsService;
 use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::process_control::FileProcessControlService;
@@ -562,7 +562,6 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
             | GoalAction::Retry { target_root, .. }
             | GoalAction::Approve { target_root, .. }
             | GoalAction::Verify { target_root, .. }
-            | GoalAction::Merge { target_root, .. }
             | GoalAction::Undo { target_root, .. }
             | GoalAction::Delete { target_root, .. }
             | GoalAction::AssignFeature { target_root, .. }

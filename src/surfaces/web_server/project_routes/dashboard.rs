@@ -62,7 +62,7 @@ impl InProcessWebServer {
                 "counts": dashboard.counts,
                 "all_node_counts": dashboard.all_node_counts,
                 "running": [],
-                "merger": null,
+                "governance_integrator": null,
                 "governance": null,
                 "preflight": preflight,
                 "activity": activity,

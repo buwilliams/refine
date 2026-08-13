@@ -11,7 +11,10 @@ impl FileWorkItemService {
         self.show_goal_summary(goal_id)
     }
 
-    pub fn retry_goal_merge_summary(&self, goal_id: &str) -> RefineResult<GoalSummaryProjection> {
+    pub fn retry_goal_governance_summary(
+        &self,
+        goal_id: &str,
+    ) -> RefineResult<GoalSummaryProjection> {
         let current = self.show_goal_summary(goal_id)?;
         validate_goal_operation(&current.goal.status, &GoalOperation::RetryGovernance)?;
         self.set_goal_status_unchecked(goal_id, &GoalStatus::Governance)?;
@@ -199,20 +202,6 @@ impl FileWorkItemService {
         object.insert("updated".to_string(), Value::String(now));
         write_json_atomically(&goal_path, &value)?;
         self.show_goal_summary(goal_id)
-    }
-
-    pub fn submit_goal_for_merge_summary(
-        &self,
-        goal_id: &str,
-    ) -> RefineResult<GoalSummaryProjection> {
-        let current = self.show_goal_summary(goal_id)?;
-        if current.goal.status == GoalStatus::Governance {
-            return Ok(current);
-        }
-        Err(RefineError::Conflict(
-            "Governance integration is workflow-owned; queue or retry the Goal through its current stage"
-                .to_string(),
-        ))
     }
 
     pub fn undo_goal_summary(&self, goal_id: &str) -> RefineResult<GoalSummaryProjection> {

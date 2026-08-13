@@ -185,7 +185,7 @@ fn file_settings_service_normalizes_node_stored_build_settings() {
     assert_eq!(settings["target_app_build_timeout_seconds"], "45");
     assert!(!settings.contains_key("target_app_auto_build"));
     assert!(!settings.contains_key("target_app_auto_build_hour_utc"));
-    assert_eq!(settings["quality_timing"], "post_build");
+    assert!(!settings.contains_key("quality_timing"));
     let written = fs::read_to_string(service.path()).unwrap();
     assert!(written.contains("target_app_build_command"));
     assert!(written.contains("target_app_build_instructions"));
@@ -193,6 +193,7 @@ fn file_settings_service_normalizes_node_stored_build_settings() {
     assert!(!written.contains("target_app_rebuild_instructions"));
     assert!(!written.contains("target_app_auto_rebuild"));
     assert!(!written.contains("target_app_auto_build"));
+    assert!(!written.contains("quality_timing"));
     assert!(!refine_dir.join(SETTINGS_FILE).exists());
 
     fs::remove_dir_all(temp_root).unwrap();

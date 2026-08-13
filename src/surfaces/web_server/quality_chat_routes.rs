@@ -421,10 +421,7 @@ impl InProcessWebServer {
         let Some(session_id) = request
             .path
             .strip_prefix("/chat/")
-            .and_then(|path| {
-                path.strip_suffix("/submit-quality")
-                    .or_else(|| path.strip_suffix("/submit-ready-merge"))
-            })
+            .and_then(|path| path.strip_suffix("/submit-quality"))
             .filter(|session_id| !session_id.is_empty() && !session_id.contains('/'))
         else {
             return chat_session_id_required();

@@ -2,7 +2,7 @@
 
 Outcome: eligible Goals spread across healthy fleet nodes for parallel
 implementation, and reviewable results return to the node where the user makes
-the final acceptance decision. Ready Merge has already integrated a Goal's
+the final acceptance decision. Governance has already integrated a Goal's
 exact candidate before it reaches Review.
 
 ## Preconditions
@@ -42,7 +42,7 @@ refine goal list        # reviewable goals now owned by the review node
 Convergence is the same distribute operation pointed home. It changes ownership
 only; it does not merge or replay the candidate. Review happens once, where the
 human judgment lives, and approval accepts the integration already recorded by
-Ready Merge.
+Governance.
 
 ## Verify
 
@@ -50,7 +50,7 @@ Ready Merge.
 - `refine fleet list` + `refine goal list` show the expected ownership.
 - The applied result matches the reviewed dry-run plan (`moves`,
   `skipped_details`).
-- Each converged Review Goal still records the same candidate and Ready Merge
+- Each converged Review Goal still records the same candidate and Governance
   integration evidence; convergence did not perform another Git operation.
 
 ## Undo

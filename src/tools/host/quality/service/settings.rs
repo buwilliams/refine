@@ -31,7 +31,6 @@ impl FileQualityService {
             tests: stored.tests,
             legacy_commands: stored.legacy_commands,
             enabled: "1".to_string(),
-            timing: stored.timing,
         })
     }
 
@@ -58,11 +57,9 @@ impl FileQualityService {
             stored.tests = tests;
         }
         // `enabled` remains accepted on the compatibility wire shape, but every candidate is
-        // evaluated. It cannot disable Quality.
-        if let Some(timing) = patch.timing {
-            let _ = normalize_timing(&timing)?;
-            stored.timing = PRE_MERGE.to_string();
-        }
+        // evaluated. It cannot disable Quality. Retired timing input is also discarded because
+        // Quality always follows Implement and precedes Governance.
+        let _ = (patch.enabled, patch.timing);
         stored.migration_version = SETTINGS_MIGRATION_VERSION;
         self.write_stored_settings(&stored)?;
         self.load_settings()
@@ -90,30 +87,6 @@ impl FileQualityService {
         if stored.migration_version < SETTINGS_MIGRATION_VERSION {
             let node_service = FileNodeRegistryService::new(&self.refine_dir);
             let mut registry = node_service.load_registry()?;
-            if !existed {
-                let timings = registry
-                    .nodes
-                    .iter()
-                    .map(|node| {
-                        node.settings
-                            .get("quality_timing")
-                            .and_then(Value::as_str)
-                            .map(normalize_timing_lossy)
-                            .unwrap_or_else(|| PRE_MERGE.to_string())
-                    })
-                    .collect::<std::collections::BTreeSet<_>>();
-                if timings.len() > 1 {
-                    return Err(RefineError::Conflict(
-                        "legacy Node quality_timing values diverge; migration cannot choose one project-wide Quality timing"
-                            .to_string(),
-                    ));
-                }
-                stored.timing = timings
-                    .into_iter()
-                    .next()
-                    .unwrap_or_else(|| PRE_MERGE.to_string());
-            }
-
             let mut commands = stored.legacy_commands.clone();
             for node in &registry.nodes {
                 if legacy_quality_enabled(&node.settings) {
@@ -245,7 +218,6 @@ struct StoredQualitySettings {
     instructions: String,
     tests: Vec<String>,
     legacy_commands: Vec<String>,
-    timing: String,
     migration_version: u32,
 }
 
@@ -260,7 +232,6 @@ impl StoredQualitySettings {
             },
             tests: normalize_tests(self.tests),
             legacy_commands: normalize_commands(self.legacy_commands),
-            timing: normalize_timing_lossy(&self.timing),
             migration_version: self.migration_version,
         }
     }
@@ -273,7 +244,6 @@ impl Default for StoredQualitySettings {
             instructions: default_quality_instructions().to_string(),
             tests: Vec::new(),
             legacy_commands: Vec::new(),
-            timing: PRE_MERGE.to_string(),
             migration_version: 0,
         }
     }

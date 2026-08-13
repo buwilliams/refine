@@ -447,7 +447,7 @@ impl InProcessWebServer {
         }
     }
 
-    pub(crate) fn handle_merger_hard_reset_worktree(&self) -> ApiResponse {
+    pub(crate) fn handle_governance_integration_hard_reset_worktree(&self) -> ApiResponse {
         let Some(target_root) = self.target_root() else {
             return target_root_unavailable("hard-reset Git worktree");
         };

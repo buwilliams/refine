@@ -147,7 +147,7 @@ pub enum GoalAction {
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
-        /// Stage to retry: "quality" or "governance". The legacy "merge" alias is accepted.
+        /// Stage to retry: "quality" or "governance".
         #[arg(long, default_value = "quality")]
         stage: String,
     },
@@ -162,15 +162,6 @@ pub enum GoalAction {
     /// Internal verification alias retained for compatibility.
     #[command(hide = true)]
     Verify {
-        /// Goal id.
-        id: String,
-        #[cfg_attr(test, arg(long, hide = true))]
-        #[cfg_attr(not(test), arg(skip = None))]
-        target_root: Option<PathBuf>,
-    },
-    /// Deprecated alias for approving a reviewed Goal.
-    #[command(hide = true)]
-    Merge {
         /// Goal id.
         id: String,
         #[cfg_attr(test, arg(long, hide = true))]

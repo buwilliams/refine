@@ -174,11 +174,11 @@ pub(super) fn hydrate_retry_context(
 
 /// Restores the implementation workspace for an interrupted Plan or Implement Goal.
 ///
-/// In-progress may have stopped anywhere between the durable status transition and the first
+/// Plan or Implement may have stopped anywhere between the durable status transition and the first
 /// candidate commit. The branch name is deterministic, completed planning artifacts live on the
 /// Round, and `ensure_worktree` is idempotent, so restarting is cheaper and safer than persisting
 /// a worker identity.
-pub(super) fn hydrate_in_progress_context(
+pub(super) fn hydrate_plan_or_implement_context(
     ctx: &mut WorkflowContext<'_>,
     branch_pattern: &str,
     target_branch: &str,

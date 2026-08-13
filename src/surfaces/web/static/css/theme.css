@@ -74,7 +74,7 @@ html[data-theme="dark"] .status-pill.governance {
   color: #fbbf24;
 }
 html[data-theme="dark"] .role-pill.agent,
-html[data-theme="dark"] .role-pill.merger {
+html[data-theme="dark"] .role-pill.governance_integrator {
   background: #3a2a10;
   color: #fcd34d;
 }

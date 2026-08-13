@@ -319,24 +319,6 @@ pub(super) fn normalize_commands(commands: Vec<String>) -> Vec<String> {
     normalized
 }
 
-pub(super) fn normalize_timing(value: &str) -> RefineResult<String> {
-    match value.trim() {
-        PRE_MERGE => Ok(PRE_MERGE.to_string()),
-        POST_BUILD | "post_rebuild" => Ok(POST_BUILD.to_string()),
-        _ => Err(RefineError::InvalidInput(
-            "quality timing must be one of pre_merge, post_build".to_string(),
-        )),
-    }
-}
-
-pub(super) fn normalize_timing_lossy(value: &str) -> String {
-    if matches!(value.trim(), POST_BUILD | "post_rebuild") {
-        POST_BUILD.to_string()
-    } else {
-        PRE_MERGE.to_string()
-    }
-}
-
 pub(super) fn shell_program_args(command: &str) -> (String, Vec<String>) {
     #[cfg(windows)]
     {

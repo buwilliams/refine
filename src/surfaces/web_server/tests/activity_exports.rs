@@ -370,7 +370,7 @@ fn web_server_cleans_activity_and_reports_unconnected_native_actions() {
 
     let reset = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/runner-workers/merger/hard-reset-worktree".to_string(),
+        path: "/api/runner-workers/governance-integrator/hard-reset-worktree".to_string(),
         body: None,
     });
     assert_eq!(reset.status, 202);

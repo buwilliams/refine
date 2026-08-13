@@ -12,12 +12,11 @@ fn quality_settings_persist_and_report_configured_state() {
             instructions: Some("Run focused checks".to_string()),
             tests: Some(vec!["Dashboard loads".to_string()]),
             enabled: Some(json!("1")),
-            timing: Some(POST_BUILD.to_string()),
+            timing: Some("post_build".to_string()),
         })
         .unwrap();
 
     assert_eq!(saved.enabled, "1");
-    assert_eq!(saved.timing, PRE_MERGE);
     assert!(saved.configured);
     assert_eq!(saved.tests, vec!["Dashboard loads"]);
     assert!(refine_dir.join(SETTINGS_FILE).exists());
@@ -65,10 +64,19 @@ fn quality_migrates_enabled_legacy_commands_without_a_silent_noop() {
         .unwrap(),
     )
     .unwrap();
+    fs::create_dir_all(refine_dir.join("quality")).unwrap();
+    fs::write(
+        refine_dir.join(SETTINGS_FILE),
+        serde_json::to_string_pretty(&json!({
+            "timing": "post_build",
+            "migration_version": 2
+        }))
+        .unwrap(),
+    )
+    .unwrap();
 
     let service = FileQualityService::new(&refine_dir);
     let migrated = service.load_settings().unwrap();
-    assert_eq!(migrated.timing, POST_BUILD);
     assert_eq!(
         migrated.legacy_commands,
         vec!["printf legacy-one", "printf legacy-two"]
@@ -84,14 +92,20 @@ fn quality_migrates_enabled_legacy_commands_without_a_silent_noop() {
             .all(|node| node["settings"].get("quality_timing").is_none())
     );
 
-    FileSettingsService::new(&refine_dir)
-        .update(&json!({"quality_timing": "pre_merge"}))
-        .unwrap();
-    assert_eq!(service.load_settings().unwrap().timing, PRE_MERGE);
-    assert_eq!(
-        FileSettingsService::new(&refine_dir).load().unwrap()["quality_timing"],
-        PRE_MERGE
+    assert!(
+        FileSettingsService::new(&refine_dir)
+            .update(&json!({"quality_timing": "pre_merge"}))
+            .is_err()
     );
+    assert!(
+        FileSettingsService::new(&refine_dir)
+            .load()
+            .unwrap()
+            .get("quality_timing")
+            .is_none()
+    );
+    let quality_settings = fs::read_to_string(refine_dir.join(SETTINGS_FILE)).unwrap();
+    assert!(!quality_settings.contains("\"timing\""));
 
     let transitioned = service
         .save_settings(QualitySettingsPatch {

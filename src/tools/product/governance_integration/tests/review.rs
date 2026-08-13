@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn governance_integrates_once_and_review_approval_only_accepts() {
-    let temp_root = unique_temp_dir("ready-merge-integration");
+    let temp_root = unique_temp_dir("governance-integration");
     let repo = temp_root.join("repo");
     let refine_dir = repo.join(".refine");
     let runtime_root = temp_root.join("run/8080");
@@ -76,8 +76,8 @@ fn governance_integrates_once_and_review_approval_only_accepts() {
         .advance_automated_goal_status("GOAL1", GoalStatus::Governance)
         .unwrap();
 
-    let merger = FileMergerService::new(&runtime_root, &refine_dir);
-    let wrong_round = merger
+    let integration_service = FileGovernanceIntegrationService::new(&runtime_root, &refine_dir);
+    let wrong_round = integration_service
         .integrate_workflow_candidate("GOAL1", 1, "default", branch, &candidate_commit, "origin")
         .unwrap_err();
     assert!(
@@ -85,7 +85,7 @@ fn governance_integrates_once_and_review_approval_only_accepts() {
         "{wrong_round}"
     );
     assert!(
-        merger
+        integration_service
             .integrate_workflow_candidate(
                 "GOAL1",
                 0,
@@ -98,8 +98,8 @@ fn governance_integrates_once_and_review_approval_only_accepts() {
             .to_string()
             .contains("not other-node")
     );
-    let first = merger.clone();
-    let second = merger.clone();
+    let first = integration_service.clone();
+    let second = integration_service.clone();
     let (first_result, second_result) = thread::scope(|scope| {
         let first = scope.spawn(|| {
             first.integrate_workflow_candidate(
@@ -127,14 +127,14 @@ fn governance_integrates_once_and_review_approval_only_accepts() {
     let concurrent_recovery = second_result.unwrap();
     assert!(integrated.merge.ok);
     assert_eq!(concurrent_recovery, integrated);
-    let repeated = merger
+    let repeated = integration_service
         .integrate_workflow_candidate("GOAL1", 0, "default", branch, &candidate_commit, "origin")
         .unwrap();
     assert_eq!(repeated, integrated);
     work_items
         .update_goal_round_evaluation_summary("GOAL1", 0, &json!({"workflow_integration": null}))
         .unwrap();
-    let recovered = merger
+    let recovered = integration_service
         .integrate_workflow_candidate("GOAL1", 0, "default", branch, &candidate_commit, "origin")
         .unwrap();
     assert_eq!(recovered.candidate_commit, candidate_commit);
@@ -150,7 +150,7 @@ fn governance_integrates_once_and_review_approval_only_accepts() {
         .advance_automated_goal_status("GOAL1", GoalStatus::Review)
         .unwrap();
 
-    let approved = merger.approve_reviewed_goal("GOAL1").unwrap();
+    let approved = integration_service.approve_reviewed_goal("GOAL1").unwrap();
     assert_eq!(approved.goal.status, GoalStatus::Done);
     assert_eq!(git_stdout(&repo, &["rev-parse", "HEAD"]), reviewed_head);
     assert!(worktree_path.exists());

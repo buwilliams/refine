@@ -424,12 +424,19 @@ fn web_server_submit_standalone_chat_creates_quality_goal_and_preserves_worktree
     )
     .unwrap();
 
+    let retired_submit = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: format!("/api/chat/{session_id}/submit-ready-merge"),
+        body: Some(json!({})),
+    });
+    assert_eq!(retired_submit.status, 404);
+
     let submitted = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: format!("/api/chat/{session_id}/submit-quality"),
         body: Some(json!({
             "reporter": "QA",
-            "prompt": "Standalone experiment is ready for the merge workflow.",
+            "prompt": "Standalone experiment is ready for the Governance workflow.",
             "priority": "medium"
         })),
     });

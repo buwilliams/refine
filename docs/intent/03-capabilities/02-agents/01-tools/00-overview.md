@@ -4,7 +4,7 @@
 
 - **Shared Capability Layer**: tools are reusable system powers, not surface-specific helpers.
 - **Host Tools**: Refine should use the host's existing infrastructure: Git, shells, target-app commands, provider CLIs, and local files.
-- **Product Tools**: work item, import, chat, project state, node, merge, and registry services should preserve product semantics.
+- **Product Tools**: work item, import, chat, project state, node, Governance integration, and registry services should preserve product semantics.
 - **Observability Tools**: logs, activity, metrics, diagnostics, support bundles, and process views should make work inspectable.
 - **Agent Usability**: tools should be callable by humans, surfaces, and agents through the same core behavior.
 
@@ -23,7 +23,7 @@ The tools capability should make Refine useful without requiring users to adopt 
 Current implementation details that matter to intent:
 
 - host tools cover agent providers, fleets, deployed updates, Git worktrees, installation, quality, and target apps.
-- product tools cover chat, imports, merging, nodes, project migration, project registry, project state, and work items.
+- product tools cover chat, Governance integration, imports, nodes, project migration, project registry, project state, and work items.
 - observability tools cover activity, diagnostics, logs, metrics, processes, and support bundles.
 - the work item service centralizes Goal and Feature behavior so surfaces share the same rules.
 - chat and standalone worktree behavior are product tools, not browser-only behavior.

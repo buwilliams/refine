@@ -149,18 +149,12 @@ fn web_server_updates_feature_metadata_and_runs_goal_actions() {
     FileWorkItemService::new(&refine_dir)
         .advance_automated_goal_status("GOAL4", GoalStatus::Plan)
         .unwrap();
-    let submitted = server.handle(ApiRequest {
+    let retired_submit_merge = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/goals/GOAL4/submit-merge".to_string(),
         body: Some(json!({})),
     });
-    assert_eq!(submitted.status, 409);
-    assert!(
-        submitted.body["error"]["message"]
-            .as_str()
-            .unwrap()
-            .contains("workflow-owned")
-    );
+    assert_eq!(retired_submit_merge.status, 404);
     FileWorkItemService::new(&refine_dir)
         .advance_automated_goal_status("GOAL4", GoalStatus::Implement)
         .unwrap();
@@ -170,28 +164,22 @@ fn web_server_updates_feature_metadata_and_runs_goal_actions() {
     FileWorkItemService::new(&refine_dir)
         .advance_automated_goal_status("GOAL4", GoalStatus::Governance)
         .unwrap();
-    let submitted_again = server.handle(ApiRequest {
+    let retry_governance = server.handle(ApiRequest {
         method: "POST".to_string(),
-        path: "/api/goals/GOAL4/submit-merge".to_string(),
+        path: "/api/goals/GOAL3/retry-governance".to_string(),
         body: Some(json!({})),
     });
-    assert_eq!(submitted_again.status, 200);
-    assert_eq!(submitted_again.body["goal"]["status"], "governance");
+    assert_eq!(retry_governance.status, 200);
+    assert_eq!(retry_governance.body["goal"]["status"], "governance");
 
-    let retry_merge = server.handle(ApiRequest {
-        method: "POST".to_string(),
-        path: "/api/goals/GOAL3/retry-merge".to_string(),
-        body: Some(json!({})),
-    });
-    assert_eq!(retry_merge.status, 200);
-    assert_eq!(retry_merge.body["goal"]["status"], "governance");
-
-    let merge = server.handle(ApiRequest {
-        method: "POST".to_string(),
-        path: "/api/goals/GOAL3/merge".to_string(),
-        body: Some(json!({})),
-    });
-    assert_eq!(merge.status, 503);
+    for retired_path in ["/api/goals/GOAL3/retry-merge", "/api/goals/GOAL3/merge"] {
+        let response = server.handle(ApiRequest {
+            method: "POST".to_string(),
+            path: retired_path.to_string(),
+            body: Some(json!({})),
+        });
+        assert_eq!(response.status, 404, "{retired_path}");
+    }
     assert_eq!(
         FileWorkItemService::new(&refine_dir)
             .show_goal_summary("GOAL3")

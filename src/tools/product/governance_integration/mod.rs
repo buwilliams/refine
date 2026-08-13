@@ -18,7 +18,7 @@ use crate::tools::product::project_projection::GoalSummaryProjection;
 use crate::tools::product::work_items::FileWorkItemService;
 
 #[derive(Clone, Debug)]
-pub struct FileMergerService {
+pub struct FileGovernanceIntegrationService {
     pub runtime_root: PathBuf,
     pub refine_dir: PathBuf,
     pub target_root: Option<PathBuf>,
@@ -49,7 +49,7 @@ struct GovernanceAuthority {
     remote: String,
 }
 
-impl FileMergerService {
+impl FileGovernanceIntegrationService {
     pub fn new(runtime_root: impl Into<PathBuf>, refine_dir: impl Into<PathBuf>) -> Self {
         Self {
             runtime_root: runtime_root.into(),
@@ -154,7 +154,7 @@ impl FileMergerService {
                 return Ok((existing, transitioned));
             }
             let operation = operations.register_exclusive_with_request(
-                &format!("merger:{goal_id}:{}", round_idx + 1),
+                &format!("governance-integration:{goal_id}:{}", round_idx + 1),
                 json!({
                     "goal_id": goal_id,
                     "round_idx": round_idx,

@@ -152,7 +152,7 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_fleet() {
         body: Some(json!({"reporter": "Bob", "prompt": "Works"})),
     });
     // This dashboard fixture needs a historical terminal Goal. Product surfaces may only reach
-    // Done through reviewed integration approval, which is covered by the merger tests.
+    // Done through reviewed integration approval, which is covered by the Governance integration tests.
     let done_goal_path = refine_dir.join("goals/GO/AL2/goal.json");
     let mut done_goal: serde_json::Value =
         serde_json::from_slice(&fs::read(&done_goal_path).unwrap()).unwrap();

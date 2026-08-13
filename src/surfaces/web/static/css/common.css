@@ -295,8 +295,8 @@ button.settings-tab:hover:not(:disabled) {
   text-transform: lowercase;
 }
 .role-pill.agent  { background: #fff4d0; color: #875e00; }
-.role-pill.merger { background: #ffeac2; color: #7a4500; }
-.merger-row td:last-child { color: var(--muted); }
+.role-pill.governance_integrator { background: #ffeac2; color: #7a4500; }
+.governance_integrator-row td:last-child { color: var(--muted); }
 
 .governance-rule-row {
   display: grid;

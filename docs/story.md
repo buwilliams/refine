@@ -12,9 +12,9 @@ MVP landed, then the first reliability pivot appeared: stuck dispatch handling, 
 
 Effort: Extreme (71 commits, 2 milestones)
 
-Milestones started: single Merger owns host git state; deeper subprocess/watchdog hardening.
+Milestones started: one integration coordinator owns host git state; deeper subprocess/watchdog hardening.
 
-Heavy UI iteration plus serious recovery work: subprocess watchdogs, merge/rebase detection, conflict recovery, `ready-merge`, Undo hardening, and the single Merger architecture.
+Heavy UI iteration plus serious recovery work: subprocess watchdogs, merge/rebase detection, conflict recovery, governed integration, Undo hardening, and a single integration coordinator.
 
 ## Day 3: 2026-05-15 (Friday)
 
@@ -80,9 +80,9 @@ Supervisor runtime: supervised processes, resource caps, Processes UI, `refine p
 
 Effort: Extreme (35 commits, 2 milestones)
 
-Milestones started: recoverable import/reporter workflows; pre-merge Quality gate.
+Milestones started: recoverable import/reporter workflows; Quality gate.
 
-Workflow breadth: recoverable and paginated Goal imports, duplicate review, reporter merge, target-app sync, agent status in nav, pre-merge Quality, Copilot provider support, and performance event pagination.
+Workflow breadth: recoverable and paginated Goal imports, duplicate review, reporter merge, target-app sync, agent status in nav, Quality gating, Copilot provider support, and performance event pagination.
 
 ## Day 12: 2026-05-24 (Sunday)
 
@@ -122,7 +122,7 @@ Effort: High (14 commits, 3 milestones)
 
 Milestones started: management settings simplification; rebuild/quality convergence; runtime setting recovery.
 
-Settings and runtime controls tightened: agent pause returned to the supervisor rows, management surfaces were split and polished, obsolete transfer/sync controls disappeared, file search got more responsive, uv installs gained a pipx fallback, target-app builds moved onto one path, post-build Quality gating landed, and backlog auto-promote settings survived upgrades.
+Settings and runtime controls tightened: agent pause returned to the supervisor rows, management surfaces were split and polished, obsolete transfer/sync controls disappeared, file search got more responsive, uv installs gained a pipx fallback, target-app builds moved onto one path, Quality gating landed, and backlog auto-promote settings survived upgrades.
 
 ## Day 17: 2026-05-29 (Friday)
 
@@ -176,9 +176,9 @@ The supervisor became the real runtime control plane: CLI and UI calls now route
 
 Effort: Very High (19 commits, 5 milestones)
 
-Milestones started: Feature workflow execution; Guide tabs and help polish; update/status visibility; chat and toolbar ergonomics; runtime cache/merger diagnostics.
+Milestones started: Feature workflow execution; Guide tabs and help polish; update/status visibility; chat and toolbar ergonomics; runtime cache/Governance integration diagnostics.
 
-Feature and planning work moved forward: Feature workflow actions landed, Plan became Plan Mode in the create menu, Plan drafts now open as Feature drafts, and Goals got the same workflow visualization as the Dashboard without dashboard label wrapping. Guide tabs, field-help affordances, active-node page titles, global version/status output, and Processes/System responsiveness were tightened. Chat also became more useful with multiline input, richer Goal preambles, recovery-round support, UI notices in the System toolbar, and auto-minimizing draft actions, while the runtime gained stronger worker startup diagnostics and SQLite cache readiness checks that prevent legacy projections from surprising the Merger.
+Feature and planning work moved forward: Feature workflow actions landed, Plan became Plan Mode in the create menu, Plan drafts now open as Feature drafts, and Goals got the same workflow visualization as the Dashboard without dashboard label wrapping. Guide tabs, field-help affordances, active-node page titles, global version/status output, and Processes/System responsiveness were tightened. Chat also became more useful with multiline input, richer Goal preambles, recovery-round support, UI notices in the System toolbar, and auto-minimizing draft actions, while the runtime gained stronger worker startup diagnostics and SQLite cache readiness checks that prevent legacy projections from surprising the integration coordinator.
 
 ## Day 24: 2026-06-05 (Friday)
 
@@ -226,7 +226,7 @@ Effort: Very High (19 commits, 5 milestones)
 
 Milestones started: runtime settings immediacy; scheduler priority-band parallelism; standalone chat worktrees; toolbar terminal; reporter/assignee semantics.
 
-Workflow and toolbar work moved into more complete product shape: runtime settings began applying immediately, scheduling could use parallel capacity within priority bands, backlog promotion became active-node scoped, and projection/process registry bloat was trimmed. Standalone chat gained real worktree ownership, ready-merge handoff, centralized submission paths, streamed agent activity, unborn-HEAD handling, and plan working-state fixes. The toolbar also gained an interactive Terminal tab with faster input handling and nested-scroll polish, while the data model corrected reporter and assignee semantics and project attach learned to create missing local projects.
+Workflow and toolbar work moved into more complete product shape: runtime settings began applying immediately, scheduling could use parallel capacity within priority bands, backlog promotion became active-node scoped, and projection/process registry bloat was trimmed. Standalone chat gained real worktree ownership, governed integration handoff, centralized submission paths, streamed agent activity, unborn-HEAD handling, and plan working-state fixes. The toolbar also gained an interactive Terminal tab with faster input handling and nested-scroll polish, while the data model corrected reporter and assignee semantics and project attach learned to create missing local projects.
 
 ## Day 30: 2026-06-11 (Thursday)
 

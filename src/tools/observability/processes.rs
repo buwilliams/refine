@@ -564,19 +564,19 @@ fn runner_work_summary(runtime_root: &Path) -> Value {
     let operations = FileOperationRegistry::new(runtime_root)
         .recover()
         .unwrap_or_default();
-    let merger_operation = operations
+    let governance_integration_operation = operations
         .iter()
         .rev()
-        .find(|operation| operation.owner.starts_with("merger:"));
+        .find(|operation| operation.owner.starts_with("governance-integration:"));
     let plan_extract_operation = operations
         .iter()
         .rev()
         .find(|operation| operation.owner == "import:extract:plan");
-    let merger_status = merger_operation
+    let governance_integration_status = governance_integration_operation
         .map(|operation| operation.state.as_api_status().to_string())
         .unwrap_or_else(|| "idle".to_string());
-    let merger_goal_id = merger_operation
-        .and_then(|operation| operation.owner.strip_prefix("merger:"))
+    let governance_integration_goal_id = governance_integration_operation
+        .and_then(|operation| operation.owner.strip_prefix("governance-integration:"))
         .map(ToString::to_string);
     let plan_extract_status = plan_extract_operation
         .map(|operation| operation.state.as_api_status().to_string())
@@ -585,7 +585,10 @@ fn runner_work_summary(runtime_root: &Path) -> Value {
         .and_then(|operation| operation.progress.get("message").and_then(Value::as_str))
         .unwrap_or("Plan Draft extraction is ready for Draft Feature requests");
     let mut rows = [
-        ("merger", "serial Goal branch merger"),
+        (
+            "governance_integrator",
+            "Governance integration coordinator",
+        ),
         (
             "plan_draft_extractor",
             "Plan Draft extraction is ready for Draft Feature requests",
@@ -609,15 +612,15 @@ fn runner_work_summary(runtime_root: &Path) -> Value {
     ]
     .into_iter()
     .map(|(kind, details)| {
-        if kind == "merger" {
+        if kind == "governance_integrator" {
             json!({
                 "kind": kind,
-                "status": merger_status,
+                "status": governance_integration_status,
                 "elapsed_seconds": 0,
                 "queued": 0,
                 "details": details,
-                "operation_id": merger_operation.map(|operation| operation.id.clone()),
-                "goal_id": merger_goal_id
+                "operation_id": governance_integration_operation.map(|operation| operation.id.clone()),
+                "goal_id": governance_integration_goal_id
             })
         } else if kind == "plan_draft_extractor" {
             json!({

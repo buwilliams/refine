@@ -369,9 +369,10 @@ impl InProcessWebServer {
             return self.handle_target_app_build_queue();
         }
 
-        if request.method == "POST" && request.path == "/runner-workers/merger/hard-reset-worktree"
+        if request.method == "POST"
+            && request.path == "/runner-workers/governance-integrator/hard-reset-worktree"
         {
-            return self.handle_merger_hard_reset_worktree();
+            return self.handle_governance_integration_hard_reset_worktree();
         }
 
         if request.method == "GET" && request.path == "/changes" {
@@ -664,8 +665,7 @@ impl InProcessWebServer {
 
         if request.method == "POST"
             && request.path.starts_with("/chat/")
-            && (request.path.ends_with("/submit-quality")
-                || request.path.ends_with("/submit-ready-merge"))
+            && request.path.ends_with("/submit-quality")
         {
             return self.handle_chat_submit_quality(request);
         }
@@ -858,9 +858,6 @@ impl InProcessWebServer {
                 || request.path.ends_with("/approve")
                 || request.path.ends_with("/retry-quality")
                 || request.path.ends_with("/retry-governance")
-                || request.path.ends_with("/retry-merge")
-                || request.path.ends_with("/submit-merge")
-                || request.path.ends_with("/merge")
                 || request.path.ends_with("/undo"))
         {
             return self.handle_goal_action(request);

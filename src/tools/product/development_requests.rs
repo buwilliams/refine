@@ -13,7 +13,7 @@ use sha2::{Digest, Sha256};
 use crate::model::workflow::GoalStatus;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::security::{NativeSecretStore, SecretStore};
-use crate::tools::product::merging::FileMergerService;
+use crate::tools::product::governance_integration::FileGovernanceIntegrationService;
 use crate::tools::product::work_items::{
     FeatureGoalPlacement, FileWorkItemService, GoalAuthoringRequest,
 };
@@ -437,7 +437,7 @@ impl FileDevelopmentRequestService {
             if now.signed_duration_since(first_seen).num_seconds()
                 >= settings.auto_approve_after.as_secs() as i64
             {
-                FileMergerService::with_target_root(
+                FileGovernanceIntegrationService::with_target_root(
                     &self.runtime_root,
                     &self.refine_dir,
                     &self.target_root,

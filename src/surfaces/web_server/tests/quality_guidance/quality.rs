@@ -214,11 +214,7 @@ fn web_server_manages_quality_settings_and_checks() {
         path: "/api/settings".to_string(),
         body: Some(json!({"quality_timing": "pre_merge"})),
     });
-    assert_eq!(legacy_timing.status, 200);
-    assert_eq!(
-        legacy_timing.body["settings"]["quality_timing"],
-        "pre_merge"
-    );
+    assert_eq!(legacy_timing.status, 400);
     let effective_quality = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/quality".to_string(),

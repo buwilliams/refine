@@ -47,7 +47,7 @@ use provider_output::*;
 pub use runner::QualityOperationRunner;
 pub(crate) use summary::{quality_error_summary, quality_failure_summary};
 
-pub(super) const SETTINGS_MIGRATION_VERSION: u32 = 2;
+pub(super) const SETTINGS_MIGRATION_VERSION: u32 = 3;
 
 fn default_quality_instructions() -> &'static str {
     PromptEngine::load(PromptTemplate::QualityDefaultInstructions)

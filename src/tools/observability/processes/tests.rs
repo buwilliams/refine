@@ -25,7 +25,7 @@ fn process_summary_preserves_active_work_during_workflow_pause() {
         })
         .unwrap();
     let operations = FileOperationRegistry::new(&runtime_root);
-    operations.register("merger:GOAL1").unwrap();
+    operations.register("governance-integration:GOAL1").unwrap();
     operations.register("import:extract:plan").unwrap();
     supervisor.set_workflow_paused(true).unwrap();
 
@@ -50,7 +50,7 @@ fn process_summary_preserves_active_work_during_workflow_pause() {
             .unwrap()["status"],
         "running"
     );
-    for kind in ["merger", "plan_draft_extractor"] {
+    for kind in ["governance_integrator", "plan_draft_extractor"] {
         assert_eq!(
             paused["runner_work"]
                 .as_array()
@@ -68,7 +68,7 @@ fn process_summary_preserves_active_work_during_workflow_pause() {
             .iter()
             .filter(|work| !matches!(
                 work["kind"].as_str(),
-                Some("merger" | "plan_draft_extractor")
+                Some("governance_integrator" | "plan_draft_extractor")
             ))
             .all(|work| work["status"] == "idle")
     );
@@ -84,7 +84,7 @@ fn process_summary_preserves_active_work_during_workflow_pause() {
             .iter()
             .filter(|work| matches!(
                 work["kind"].as_str(),
-                Some("merger" | "plan_draft_extractor")
+                Some("governance_integrator" | "plan_draft_extractor")
             ))
             .all(|work| work["status"] == "running")
     );

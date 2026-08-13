@@ -1,8 +1,8 @@
 pub mod chat;
 pub mod development_requests;
 pub mod goal_exports;
+pub mod governance_integration;
 pub mod imports;
-pub mod merging;
 pub mod next_actions;
 pub mod nodes;
 pub mod process_control;

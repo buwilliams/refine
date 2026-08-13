@@ -20,7 +20,7 @@ use crate::workflow::reconciliation::IntegratedTargetWorkflowLease;
 
 use super::{
     ACTIVE_WORK_REPLENISH_INTERVAL, WorkflowEngine, WorkflowPassResult, WorkflowStepResult,
-    authored_workflow_commitment, hydrate_in_progress_context, hydrate_retry_context,
+    authored_workflow_commitment, hydrate_plan_or_implement_context, hydrate_retry_context,
     missing_workflow_artifact, priority_rank, setting_string,
 };
 
@@ -305,7 +305,7 @@ impl WorkflowEngine {
                 let pattern =
                     setting_string(&ctx.settings, "branch_name_pattern", "refine/{goal_id}");
                 let target = setting_string(&ctx.settings, "merge_target_branch", "main");
-                hydrate_in_progress_context(&mut ctx, &pattern, &target)?;
+                hydrate_plan_or_implement_context(&mut ctx, &pattern, &target)?;
                 ctx.start_status = start_status;
                 Ok(PreparedGoal::Execute(Box::new(ctx)))
             }

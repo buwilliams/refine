@@ -163,7 +163,7 @@ impl QualityOperationRunner {
                 )
             });
         let post_build =
-            round.get("workflow_quality_timing").and_then(Value::as_str) == Some(POST_BUILD);
+            round.get("workflow_quality_timing").and_then(Value::as_str) == Some("post_build");
         let (cwd, evaluated_commit, evaluation_scope) = if post_build || reconciliation.is_some() {
             let integration = round
                 .get("workflow_integration")

@@ -104,7 +104,7 @@ fn retrying_a_failed_goal_clears_the_recorded_failure_reason() {
 
     // A retry reuses this same round, so the reason it carries is now spent.
     // Leaving it would show a live failure on work that has moved on.
-    service.retry_goal_merge_summary("GOAL1").unwrap();
+    service.retry_goal_governance_summary("GOAL1").unwrap();
 
     let retried = service.show_goal_detail("GOAL1").unwrap();
     assert_eq!(retried["status"], "governance");

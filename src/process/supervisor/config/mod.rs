@@ -25,10 +25,7 @@ pub const GOVERNANCE_FILE: &str = "governance.json";
 pub const GUIDANCE_FILE: &str = "guidance.json";
 pub const REPORTERS_FILE: &str = "reporters.json";
 const REPORTER_CASCADE_FILE: &str = "reporter-cascade.json";
-const QUALITY_SETTINGS_FILE: &str = "quality/settings.json";
-const QUALITY_TIMING_KEY: &str = "quality_timing";
 const RETIRED_SUPERVISOR_STALL_KEY: &str = "supervisor_agent_stall_seconds";
-const DEFAULT_QUALITY_TIMING: &str = "pre_merge";
 
 mod governance;
 mod governance_codec;

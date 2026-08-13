@@ -13,7 +13,9 @@ use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeServi
 use crate::tools::host::quality::{
     QualityCheckResult, QualityOperationRunner, is_quality_harness_fault, quality_error_summary,
 };
-use crate::tools::product::merging::{FileMergerService, ReconciliationRequest};
+use crate::tools::product::governance_integration::{
+    FileGovernanceIntegrationService, ReconciliationRequest,
+};
 use crate::workflow::behavior::{WorkflowAdvanceOutcome, WorkflowBehavior};
 use crate::workflow::candidate_handoff::{
     fail_candidate_handoff, find_candidate_handoff, record_candidate_handoff_commit,
@@ -96,7 +98,7 @@ impl WorkflowBehavior for WorkflowTodo {
         // must cross into Plan before Git may materialize a repository copy.
         ctx.request_transition(GoalStatus::Todo, GoalStatus::Plan)?;
         let (worktree_path, handoff) =
-            match materialize_in_progress_worktree(ctx, &app_git, &branch, &base_commit) {
+            match materialize_plan_worktree(ctx, &app_git, &branch, &base_commit) {
                 Ok(materialized) => materialized,
                 Err(error) => return fail(ctx, "branch", error),
             };
@@ -329,7 +331,7 @@ fn prepare_already_merged_reconciliation(
     }))
 }
 
-fn materialize_in_progress_worktree(
+fn materialize_plan_worktree(
     ctx: &WorkflowContext<'_>,
     app_git: &FileGitWorktreeService,
     branch: &str,
@@ -702,7 +704,7 @@ impl WorkflowBehavior for WorkflowQuality {
                 });
             }
 
-            let merger = FileMergerService::with_target_root(
+            let integration_service = FileGovernanceIntegrationService::with_target_root(
                 ctx.runtime_root,
                 ctx.refine_dir(),
                 ctx.target_root,
@@ -714,7 +716,7 @@ impl WorkflowBehavior for WorkflowQuality {
             let goal_id = ctx.goal_id.clone();
             let round_idx = ctx.round_idx;
             let node_id = ctx.node_id.clone();
-            let reverted = match merger.revert_reconciled_candidate_and_settle(
+            let reverted = match integration_service.revert_reconciled_candidate_and_settle(
                 ReconciliationRequest {
                     goal_id: &goal_id,
                     round_idx,
@@ -851,7 +853,7 @@ impl WorkflowBehavior for WorkflowGovernance {
             with_repository_git_lock(ctx.target_root, || worktree_git.push(&remote, &branch))?;
         }
         let next = GoalStatus::Review;
-        let merger = FileMergerService::with_target_root(
+        let integration_service = FileGovernanceIntegrationService::with_target_root(
             ctx.runtime_root,
             ctx.refine_dir(),
             ctx.target_root,
@@ -859,33 +861,38 @@ impl WorkflowBehavior for WorkflowGovernance {
         let goal_id = ctx.goal_id.clone();
         let node_id = ctx.node_id.clone();
         let round_idx = ctx.round_idx;
-        let (integration, transitioned) = match merger.integrate_workflow_candidate_and_settle(
-            &goal_id,
-            round_idx,
-            &node_id,
-            &branch,
-            &commit,
-            &remote,
-            |integration| {
-                ctx.log(
-                    "merge",
-                    &format!("Governance integrated approved implementation candidate {branch}"),
-                    Some(json_object(json!({
-                        "branch": branch,
-                        "integration": integration
-                    }))),
-                )?;
-                let current = ctx.work_items.show_goal_summary(&ctx.goal_id)?;
-                if current.goal.status == GoalStatus::Cancelled {
-                    Ok(false)
-                } else {
-                    ctx.request_transition(GoalStatus::Governance, GoalStatus::Review)?;
-                    Ok(true)
-                }
-            },
-        ) {
+        let (integration, transitioned) = match integration_service
+            .integrate_workflow_candidate_and_settle(
+                &goal_id,
+                round_idx,
+                &node_id,
+                &branch,
+                &commit,
+                &remote,
+                |integration| {
+                    ctx.log(
+                        "governance_integration",
+                        &format!(
+                            "Governance integrated approved implementation candidate {branch}"
+                        ),
+                        Some(json_object(json!({
+                            "branch": branch,
+                            "integration": integration
+                        }))),
+                    )?;
+                    let current = ctx.work_items.show_goal_summary(&ctx.goal_id)?;
+                    if current.goal.status == GoalStatus::Cancelled {
+                        Ok(false)
+                    } else {
+                        ctx.request_transition(GoalStatus::Governance, GoalStatus::Review)?;
+                        Ok(true)
+                    }
+                },
+            ) {
             Ok(settled) => settled,
-            Err(error @ RefineError::StaleCandidate { .. }) => return fail(ctx, "merge", error),
+            Err(error @ RefineError::StaleCandidate { .. }) => {
+                return fail(ctx, "governance_integration", error);
+            }
             Err(error)
                 if ctx
                     .work_items
@@ -894,7 +901,7 @@ impl WorkflowBehavior for WorkflowGovernance {
             {
                 return Err(error);
             }
-            Err(error) => return fail(ctx, "merge", error),
+            Err(error) => return fail(ctx, "governance_integration", error),
         };
         ctx.merge = Some(integration.merge);
         if let Some(handoff) = find_candidate_handoff(

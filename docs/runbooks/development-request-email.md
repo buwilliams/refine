@@ -94,7 +94,7 @@ For each accepted Fastmail message, Refine:
    source as its sole initial Round, the sender as Reporter, and the normal
    default assignee semantics; no reviewer rewrites accepted trusted source;
 5. lets the normal backlog and workflow automation run;
-6. approves the Goal from Review only after verified Ready Merge evidence; and
+6. approves the Goal from Review only after verified Governance integration evidence; and
 7. sends a threaded resolution reply from `goal@getrefine.dev` after Done.
 
 Request records live only below the installation runtime at

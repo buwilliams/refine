@@ -107,13 +107,13 @@ pub struct GoalRound {
     /// Git remote durably committed before publishing and integrating this candidate.
     #[serde(default)]
     pub workflow_git_remote: Option<String>,
-    /// Successful Ready Merge integration evidence for this exact candidate.
+    /// Successful Governance integration evidence for this exact candidate.
     #[serde(default)]
     pub workflow_integration: Option<RoundIntegration>,
     /// Durable evidence for replaying a round whose candidate is already integrated.
     #[serde(default)]
     pub workflow_reconciliation: Option<serde_json::Value>,
-    /// Durable evidence linking a stale Ready Merge round to its automatically queued successor.
+    /// Durable evidence linking a stale integrated round to its automatically queued successor.
     #[serde(default)]
     pub workflow_recovery: Option<serde_json::Value>,
     /// Provenance for a Round drafted automatically from a Governance finding.

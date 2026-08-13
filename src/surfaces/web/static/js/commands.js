@@ -581,7 +581,7 @@ registerCommand({
   ),
   run: async ({ button } = {}) => {
     await withButtonBusy(button, "Resetting...", async () => {
-      const queued = await api("POST", "/api/runner-workers/merger/hard-reset-worktree");
+      const queued = await api("POST", "/api/runner-workers/governance-integrator/hard-reset-worktree");
       const r = await resolveBackgroundOperationResponse(
         queued,
         "Target worktree reset is running in the background",

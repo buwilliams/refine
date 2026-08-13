@@ -576,7 +576,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
             .map(|work| work["kind"].as_str().unwrap())
             .collect::<Vec<_>>(),
         vec![
-            "merger",
+            "governance_integrator",
             "plan_draft_extractor",
             "target_app_builder",
             "target_app_config_generator",
@@ -835,7 +835,9 @@ fn web_server_lists_processes_and_updates_pause_controls() {
         .advance_automated_goal_status("GOAL-WORKFLOW", GoalStatus::Plan)
         .unwrap();
     let operations = FileOperationRegistry::new(&runtime_root);
-    operations.register("merger:GOAL-WORKFLOW").unwrap();
+    operations
+        .register("governance-integration:GOAL-WORKFLOW")
+        .unwrap();
     operations.register("import:extract:plan").unwrap();
     let paused = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -870,7 +872,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
         "running"
     );
     let paused_work = paused.body["runner_work"].as_array().unwrap();
-    for kind in ["merger", "plan_draft_extractor"] {
+    for kind in ["governance_integrator", "plan_draft_extractor"] {
         assert_eq!(
             paused_work
                 .iter()
@@ -884,7 +886,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
             .iter()
             .filter(|work| !matches!(
                 work["kind"].as_str(),
-                Some("merger" | "plan_draft_extractor")
+                Some("governance_integrator" | "plan_draft_extractor")
             ))
             .all(|work| work["status"] == "idle")
     );
