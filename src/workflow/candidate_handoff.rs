@@ -31,9 +31,10 @@ pub(super) fn register_candidate_handoff(
             worktree_path,
             base_commit,
         )?;
+        settle_superseded_handoffs(&registry, target_root, goal_id, round_idx, &operation.id)?;
         return Ok(operation);
     }
-    registry.register_exclusive_with_request(
+    let operation = registry.register_exclusive_with_request(
         &owner,
         json!({
             "kind": HANDOFF_KIND,
@@ -48,7 +49,9 @@ pub(super) fn register_candidate_handoff(
             "base_commit": base_commit,
             "defer_cancellation_terminal": true
         }),
-    )
+    )?;
+    settle_superseded_handoffs(&registry, target_root, goal_id, round_idx, &operation.id)?;
+    Ok(operation)
 }
 
 pub(super) fn find_candidate_handoff(
@@ -77,6 +80,20 @@ pub(super) fn record_candidate_handoff_commit(
     )
 }
 
+pub(super) fn record_candidate_handoff_governance(
+    runtime_root: &Path,
+    operation_id: &str,
+    candidate_commit: &str,
+) -> RefineResult<OperationHandle> {
+    FileOperationRegistry::new(runtime_root).update_progress(
+        operation_id,
+        json!({
+            "stage": "governance_pending",
+            "candidate_commit": candidate_commit
+        }),
+    )
+}
+
 pub(super) fn settle_candidate_handoff(
     runtime_root: &Path,
     operation_id: &str,
@@ -93,17 +110,26 @@ pub(super) fn settle_candidate_handoff(
     )
 }
 
-pub(super) fn fail_candidate_handoff(
+pub(super) fn retain_candidate_handoff_after_failure(
     runtime_root: &Path,
     operation_id: &str,
     code: &str,
     error: &RefineError,
 ) {
-    let _ = FileOperationRegistry::new(runtime_root).fail_with_error(
+    let registry = FileOperationRegistry::new(runtime_root);
+    let candidate_commit = registry
+        .status(operation_id)
+        .ok()
+        .and_then(|operation| operation.progress.get("candidate_commit").cloned());
+    let _ = registry.update_progress(
         operation_id,
         json!({
-            "code": code,
-            "message": error.to_string()
+            "stage": "workflow_failed_candidate_retained",
+            "candidate_commit": candidate_commit,
+            "failure": {
+                "code": code,
+                "message": error.to_string()
+            }
         }),
     );
 }
@@ -120,6 +146,38 @@ fn active_handoff(
             )
             && operation.request.get("kind").and_then(Value::as_str) == Some(HANDOFF_KIND)
     }))
+}
+
+fn settle_superseded_handoffs(
+    registry: &FileOperationRegistry,
+    target_root: &Path,
+    goal_id: &str,
+    round_idx: usize,
+    current_operation_id: &str,
+) -> RefineResult<()> {
+    for operation in registry.recover()?.into_iter().filter(|operation| {
+        operation.id != current_operation_id
+            && matches!(
+                operation.state,
+                OperationState::Pending | OperationState::Running | OperationState::Cancelling
+            )
+            && operation.request.get("kind").and_then(Value::as_str) == Some(HANDOFF_KIND)
+            && operation.request.get("goal_id").and_then(Value::as_str) == Some(goal_id)
+            && operation.request.get("target_root").and_then(Value::as_str) == target_root.to_str()
+    }) {
+        registry.finish_with_result(
+            &operation.id,
+            OperationState::Succeeded,
+            json!({
+                "disposition": "superseded_by_round",
+                "evidence": {
+                    "successor_round_idx": round_idx,
+                    "successor_operation_id": current_operation_id
+                }
+            }),
+        )?;
+    }
+    Ok(())
 }
 
 fn validate_handoff(

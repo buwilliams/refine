@@ -176,14 +176,15 @@ fn restart_recovery_preserves_active_zero_round_goal_and_recovers_valid_sibling(
 }
 
 #[test]
-fn cleanup_observes_candidate_handoff_until_quality_owns_the_worktree() {
+fn cleanup_observes_candidate_handoff_through_governance_integration() {
     use crate::process::supervisor::operations::{FileOperationRegistry, OperationState};
     use crate::tools::host::git_sync::with_repository_git_lock;
     use crate::tools::product::worktree_cleanup::{
         FileWorktreeCleanupService, WorktreeCleanupOptions,
     };
     use crate::workflow::candidate_handoff::{
-        record_candidate_handoff_commit, register_candidate_handoff, settle_candidate_handoff,
+        record_candidate_handoff_commit, record_candidate_handoff_governance,
+        register_candidate_handoff, settle_candidate_handoff,
     };
 
     let temp_root = unique_temp_dir("candidate-handoff-cleanup");
@@ -257,12 +258,6 @@ fn cleanup_observes_candidate_handoff_until_quality_owns_the_worktree() {
                 "evaluation_scope": "isolated_candidate"
             }),
         )?;
-        settle_candidate_handoff(
-            &runtime_root,
-            &handoff.id,
-            "transferred_to_quality",
-            json!({"quality_operation_id": quality.id}),
-        )?;
         Ok(quality)
     })
     .unwrap();
@@ -278,13 +273,116 @@ fn cleanup_observes_candidate_handoff_until_quality_owns_the_worktree() {
     FileOperationRegistry::new(&runtime_root)
         .finish_with_result(&quality.id, OperationState::Succeeded, json!({"ok": true}))
         .unwrap();
-    let after_transfer = cleanup
+    record_candidate_handoff_governance(&runtime_root, &handoff.id, base.trim()).unwrap();
+    let during_governance = cleanup
         .run(WorktreeCleanupOptions {
             apply: true,
             older_than_seconds: 0,
         })
         .unwrap();
-    assert_eq!(after_transfer.removed, 1);
+    assert_eq!(during_governance.removed, 0);
+    assert!(worktree.exists());
+
+    settle_candidate_handoff(
+        &runtime_root,
+        &handoff.id,
+        "candidate_integrated",
+        json!({"candidate_commit": base.trim()}),
+    )
+    .unwrap();
+    let after_integration = cleanup
+        .run(WorktreeCleanupOptions {
+            apply: true,
+            older_than_seconds: 0,
+        })
+        .unwrap();
+    assert_eq!(after_integration.removed, 1);
     assert!(!worktree.exists());
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn newer_round_handoff_supersedes_only_the_same_goal_candidate() {
+    use crate::process::supervisor::operations::{
+        FileOperationRegistry, OperationRegistry, OperationState,
+    };
+    use crate::workflow::candidate_handoff::{
+        register_candidate_handoff, retain_candidate_handoff_after_failure,
+    };
+
+    let temp_root = unique_temp_dir("candidate-handoff-supersession");
+    let runtime_root = temp_root.join("run/8080");
+    let target_root = temp_root.join("target");
+    let other_target = temp_root.join("other-target");
+    fs::create_dir_all(&target_root).unwrap();
+    fs::create_dir_all(&other_target).unwrap();
+
+    let first = register_candidate_handoff(
+        &runtime_root,
+        &target_root,
+        "GOAL1",
+        0,
+        "default",
+        "refine/GOAL1/round-1",
+        "/tmp/goal1-round-1",
+        "base-1",
+    )
+    .unwrap();
+    retain_candidate_handoff_after_failure(
+        &runtime_root,
+        &first.id,
+        "governance_failed",
+        &RefineError::Conflict("candidate requires another Round".to_string()),
+    );
+    let retained = FileOperationRegistry::new(&runtime_root)
+        .status(&first.id)
+        .unwrap();
+    assert_eq!(retained.state, OperationState::Running);
+    assert_eq!(
+        retained.progress["stage"],
+        "workflow_failed_candidate_retained"
+    );
+    assert_eq!(retained.progress["failure"]["code"], "governance_failed");
+    let unrelated = register_candidate_handoff(
+        &runtime_root,
+        &other_target,
+        "GOAL1",
+        0,
+        "default",
+        "refine/GOAL1/round-1",
+        "/tmp/other-goal1-round-1",
+        "base-1",
+    )
+    .unwrap();
+    let successor = register_candidate_handoff(
+        &runtime_root,
+        &target_root,
+        "GOAL1",
+        1,
+        "default",
+        "refine/GOAL1/round-2",
+        "/tmp/goal1-round-2",
+        "base-2",
+    )
+    .unwrap();
+
+    let registry = FileOperationRegistry::new(&runtime_root);
+    let first = registry.status(&first.id).unwrap();
+    assert_eq!(first.state, OperationState::Succeeded);
+    assert_eq!(first.result["disposition"], "superseded_by_round");
+    assert_eq!(first.result["evidence"]["successor_round_idx"], 1);
+    assert_eq!(
+        first.result["evidence"]["successor_operation_id"],
+        successor.id
+    );
+    assert_eq!(
+        registry.status(&successor.id).unwrap().state,
+        OperationState::Running
+    );
+    assert_eq!(
+        registry.status(&unrelated.id).unwrap().state,
+        OperationState::Running
+    );
+
     fs::remove_dir_all(temp_root).unwrap();
 }

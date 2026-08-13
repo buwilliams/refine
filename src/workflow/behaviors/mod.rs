@@ -20,8 +20,8 @@ use crate::tools::product::governance_integration::{
 };
 use crate::workflow::behavior::{WorkflowAdvanceOutcome, WorkflowBehavior};
 use crate::workflow::candidate_handoff::{
-    fail_candidate_handoff, find_candidate_handoff, record_candidate_handoff_commit,
-    register_candidate_handoff, settle_candidate_handoff,
+    find_candidate_handoff, record_candidate_handoff_commit, record_candidate_handoff_governance,
+    register_candidate_handoff, retain_candidate_handoff_after_failure, settle_candidate_handoff,
 };
 use crate::workflow::context::WorkflowContext;
 use crate::workflow::implementation_planning::begin_implementation_phase;
@@ -603,7 +603,7 @@ impl WorkflowBehavior for WorkflowImplementation {
         ctx.implementation_changed = commit.has_changes_since_base;
         ctx.commit = Some(commit.commit.clone());
         if let Err(error) = ctx.request_transition(GoalStatus::Implement, GoalStatus::Quality) {
-            fail_candidate_handoff(
+            retain_candidate_handoff_after_failure(
                 ctx.runtime_root,
                 &handoff_id,
                 "candidate_handoff_transition_failed",
@@ -814,14 +814,10 @@ impl WorkflowBehavior for WorkflowQuality {
             &ctx.goal_id,
             ctx.round_idx,
         )? {
-            settle_candidate_handoff(
+            record_candidate_handoff_governance(
                 ctx.runtime_root,
                 &handoff.id,
-                "transferred_to_governance",
-                json!({
-                    "candidate_commit": quality.candidate_commit,
-                    "round_idx": ctx.round_idx
-                }),
+                &quality.candidate_commit,
             )?;
         }
         Ok(WorkflowAdvanceOutcome::Transition {
@@ -1529,7 +1525,7 @@ fn fail<T>(ctx: &WorkflowContext<'_>, category: &str, error: RefineError) -> Ref
         &ctx.goal_id,
         ctx.round_idx,
     ) {
-        fail_candidate_handoff(
+        retain_candidate_handoff_after_failure(
             ctx.runtime_root,
             &handoff.id,
             "candidate_handoff_workflow_failed",
