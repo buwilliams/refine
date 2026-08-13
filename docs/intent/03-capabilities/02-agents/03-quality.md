@@ -42,6 +42,8 @@ Current implementation details that matter to intent:
 
 `quality/settings.json` is the authoritative test policy. Goal workflow Quality always evaluates the isolated candidate before Governance. Legacy timing values remain readable for migration and reconciliation but are not emitted as current configuration. Before migration is marked complete, Refine inspects every Node and deduplicates all enabled legacy target-app test commands; a failed migration remains retryable. Imported commands remain enforced as supervised Quality tests until a user saves a replacement test set.
 
+The browser, API, and `refine config quality` surface all use the same partial settings service. Business requirements and instructions support multiline text, tests remain plain-text outcomes, omitted fields remain unchanged, unknown fields and invalid shapes are rejected, and every successful mutation returns the saved normalized policy.
+
 Quality should be strict enough to reveal risk and flexible enough to fit different projects. Refine should not assume every app has the same test command, build step, or verification style.
 
 ## Future Direction

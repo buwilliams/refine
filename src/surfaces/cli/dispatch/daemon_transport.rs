@@ -72,11 +72,18 @@ pub(super) fn parse_daemon_response(response: &[u8]) -> RefineResult<serde_json:
         .and_then(|message| message.as_str())
         .unwrap_or("daemon request failed")
         .to_string();
+    let error_code = value
+        .get("error")
+        .and_then(|error| error.get("code"))
+        .and_then(|code| code.as_str());
     match status {
         400 => Err(RefineError::InvalidInput(message)),
         401 | 403 => Err(RefineError::Unauthorized(message)),
         404 => Err(RefineError::NotFound(message)),
         409 => Err(RefineError::Conflict(message)),
+        503 if error_code == Some("target_root_unavailable") => Err(RefineError::Degraded(
+            format!("missing active app: {message}"),
+        )),
         _ => Err(RefineError::Degraded(message)),
     }
 }

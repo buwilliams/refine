@@ -26,7 +26,7 @@ function renderGuidanceRow(item = {}, idx = 0) {
 
 let _guidanceModalOpen = false;
 
-function openGuidanceModal(items, index = null, refreshTab = "guidance") {
+function openGuidanceModal(items, index = null, refreshTab = "guidance", revision = 0) {
   if (_guidanceModalOpen) return;
   _guidanceModalOpen = true;
   const editing = Number.isInteger(index);
@@ -116,16 +116,21 @@ function openGuidanceModal(items, index = null, refreshTab = "guidance") {
       toast("Name, rule, and instructions are required", "error");
       return;
     }
-    const next = [...items];
-    if (editing) next[index] = item;
-    else next.push(item);
     await withButtonBusy(root.querySelector("[data-ok]"), "Saving…", async () => {
       try {
-        await api("PUT", "/api/guidance", { guidance: next });
+        await api(editing ? "PATCH" : "POST", editing
+          ? `/api/guidance/${encodeURIComponent(current.id)}`
+          : "/api/guidance", { ...item, revision });
         toast(editing ? "Guidance saved" : "Guidance created", "info");
         close();
         await refreshSettingsTab(refreshTab, { force: true });
-      } catch (e) { await showActionError(e); }
+      } catch (e) {
+        if (e.status === 409) {
+          close();
+          await refreshSettingsTab(refreshTab, { force: true });
+        }
+        await showActionError(e);
+      }
     });
   }
   async function remove() {
@@ -135,14 +140,19 @@ function openGuidanceModal(items, index = null, refreshTab = "guidance") {
       { title: "Delete guidance", okLabel: "Delete", danger: true },
     );
     if (!ok) return;
-    const next = items.filter((_item, idx) => idx !== index);
     await withButtonBusy(root.querySelector("[data-delete]"), "Deleting…", async () => {
       try {
-        await api("PUT", "/api/guidance", { guidance: next });
+        await api("DELETE", `/api/guidance/${encodeURIComponent(current.id)}`, { revision });
         toast("Guidance deleted", "info");
         close();
         await refreshSettingsTab(refreshTab, { force: true });
-      } catch (e) { await showActionError(e); }
+      } catch (e) {
+        if (e.status === 409) {
+          close();
+          await refreshSettingsTab(refreshTab, { force: true });
+        }
+        await showActionError(e);
+      }
     });
   }
 
@@ -190,21 +200,21 @@ function renderSettingsGuidanceTab(guidanceItems) {
     </section>`;
 }
 
-function bindSettingsGuidanceTab(guidanceItems, refreshTab = "guidance") {
+function bindSettingsGuidanceTab(guidanceItems, refreshTab = "guidance", revision = 0) {
   const list = $("#guidance-list");
   if (list) list.onclick = (e) => {
     const row = e.target.closest("[data-guidance-open]");
-    if (row) openGuidanceModal(guidanceItems, Number(row.dataset.guidanceOpen), refreshTab);
+    if (row) openGuidanceModal(guidanceItems, Number(row.dataset.guidanceOpen), refreshTab, revision);
   };
   if (list) list.onkeydown = (e) => {
     if (e.key !== "Enter" && e.key !== " ") return;
     const row = e.target.closest("[data-guidance-open]");
     if (!row) return;
     e.preventDefault();
-    openGuidanceModal(guidanceItems, Number(row.dataset.guidanceOpen), refreshTab);
+    openGuidanceModal(guidanceItems, Number(row.dataset.guidanceOpen), refreshTab, revision);
   };
   const add = $("#guidance-add");
   if (add) add.onclick = () => {
-    openGuidanceModal(guidanceItems, null, refreshTab);
+    openGuidanceModal(guidanceItems, null, refreshTab, revision);
   };
 }

@@ -24,6 +24,7 @@ Current implementation details that matter to intent:
 - settings data loads are scoped by active surface and tab;
 - detached mode short-circuits app-scoped calls and keeps app management actionable;
 - target-app settings, quality settings, runtime settings, reporters, governance, guidance, processes, and performance are separate concerns;
+- Guidance editing uses stable item ids and an observed collection revision. Governance rule autosave and generated-rule adoption retain rule ids and the observed rules revision. Both surfaces consume authoritative write responses and refresh visible state after a `409` instead of retrying stale content;
 - Guide icons and guidance surfaces are expected to help explain fields.
 
 Settings should avoid overfetching and avoid hiding invalid states. If Refine is detached, paused, misconfigured, or missing a target app command, the settings surface should make that clear.

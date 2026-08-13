@@ -34,6 +34,12 @@ pub(super) fn normalize_governance(value: &mut Value) {
             .to_string(),
     );
     value["rules"] = rules;
+    value["rules_revision"] = json!(
+        value
+            .get("rules_revision")
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+    );
     value["max_automatic_round_retries"] = json!(
         value
             .get("max_automatic_round_retries")
@@ -66,7 +72,7 @@ pub(super) fn normalize_rules(value: &Value) -> Value {
             .trim()
             .to_string();
         if id.is_empty() || seen.contains(&id) {
-            id = format!("rule-{}", rules.len() + 1);
+            id = new_config_item_id("rule");
         }
         seen.insert(id.clone());
         let created = item
@@ -92,7 +98,7 @@ pub(super) fn normalize_rules(value: &Value) -> Value {
 
 pub(super) fn governance_rule(text: &str, source: &str) -> Value {
     json!({
-        "id": format!("rule-{}", Utc::now().timestamp_millis()),
+        "id": new_config_item_id("rule"),
         "text": text,
         "created": now_timestamp(),
         "updated": now_timestamp(),

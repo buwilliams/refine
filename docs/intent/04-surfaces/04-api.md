@@ -26,6 +26,8 @@ canonical checkout-local runtime root so clients can diagnose ownership.
 
 Those groups are useful because they map surfaces onto shared behavior. They should not drift into page-specific endpoints when a shared service would express the capability better.
 
+Settings, Quality, Governance, and Guidance routes are the shared configuration contract for browser and CLI. Ordinary Settings and Quality writes remain validated partial patches. Governance scalar patches preserve rules, while every rule replacement carries the observed `rules_revision`; Guidance entries have stable ids, item routes mutate one entry under the repository coordination lock, and both item and compatibility whole-list writes carry the observed `revision`. Stale revisions return `409` without overwriting unrelated state, missing ids return `404`, and successful writes return the normalized authoritative collection.
+
 Browser mutations must present an `Origin` or `Referer` whose authority matches
 the request `Host`. CLI and other non-browser clients may omit those headers.
 The local daemon does not add a separate authorization-token boundary, so

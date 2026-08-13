@@ -555,6 +555,18 @@ impl InProcessWebServer {
             return self.handle_guidance_update(request);
         }
 
+        if request.method == "POST" && request.path == "/guidance" {
+            return self.handle_guidance_add(request);
+        }
+
+        if request.method == "PATCH" && request.path.starts_with("/guidance/") {
+            return self.handle_guidance_edit(request);
+        }
+
+        if request.method == "DELETE" && request.path.starts_with("/guidance/") {
+            return self.handle_guidance_remove(request);
+        }
+
         if request.method == "GET" && request.path == "/reporters" {
             return self.handle_reporters_list();
         }

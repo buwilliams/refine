@@ -328,6 +328,100 @@ fn file_project_config_services_persist_governance_guidance_and_reporters() {
     fs::remove_dir_all(temp_root).unwrap();
 }
 
+#[test]
+fn guidance_migrates_stable_ids_and_rejects_stale_item_mutations() {
+    let temp_root = unique_temp_dir("guidance-revisions");
+    let refine_dir = temp_root.join(".refine");
+    fs::create_dir_all(&refine_dir).unwrap();
+    fs::write(
+        refine_dir.join(GUIDANCE_FILE),
+        serde_json::to_vec_pretty(&json!([{
+            "name": "Existing",
+            "rule": "Always",
+            "instructions": "Keep this entry",
+            "enabled": true
+        }]))
+        .unwrap(),
+    )
+    .unwrap();
+    let service = FileGuidanceService::new(&refine_dir);
+
+    let migrated = service.list().unwrap();
+    assert_eq!(migrated["revision"], 0);
+    assert_eq!(migrated["guidance"][0]["id"], "guidance-1");
+    assert!(
+        serde_json::from_str::<Value>(&fs::read_to_string(refine_dir.join(GUIDANCE_FILE)).unwrap())
+            .unwrap()
+            .is_object()
+    );
+
+    let added = service
+        .add(&json!({
+            "revision": 0,
+            "name": "Second",
+            "rule": "When needed",
+            "instructions": "Preserve the first entry",
+            "enabled": false
+        }))
+        .unwrap();
+    assert_eq!(added["revision"], 1);
+    assert_eq!(added["guidance"].as_array().unwrap().len(), 2);
+    let second_id = added["guidance"][1]["id"].as_str().unwrap();
+    assert!(
+        service
+            .edit(second_id, &json!({"revision": 0, "enabled": true}))
+            .is_err()
+    );
+    let edited = service
+        .edit(second_id, &json!({"revision": 1, "enabled": true}))
+        .unwrap();
+    assert_eq!(edited["revision"], 2);
+    assert_eq!(edited["guidance"][0]["name"], "Existing");
+    assert_eq!(edited["guidance"][1]["enabled"], true);
+    assert!(matches!(
+        service.remove("missing", &json!({"revision": 2})),
+        Err(RefineError::NotFound(_))
+    ));
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn governance_rule_revisions_preserve_unrelated_fields_and_fence_stale_writers() {
+    let temp_root = unique_temp_dir("governance-revisions");
+    let refine_dir = temp_root.join(".refine");
+    let service = FileGovernanceService::new(&refine_dir);
+    let saved = service
+        .save(&json!({
+            "product": "Refine",
+            "constitution": "Local first",
+            "rules": [{"text": "One"}],
+            "rules_revision": 0
+        }))
+        .unwrap();
+    assert_eq!(saved["rules_revision"], 1);
+
+    let scalar = service
+        .save(&json!({"max_automatic_round_retries": 2}))
+        .unwrap();
+    assert_eq!(scalar["rules_revision"], 1);
+    assert_eq!(scalar["rules"][0]["text"], "One");
+    assert_eq!(scalar["product"], "Refine");
+
+    assert!(matches!(
+        service.save(&json!({"rules": [{"text": "Stale"}], "rules_revision": 0})),
+        Err(RefineError::Conflict(_))
+    ));
+    let replaced = service
+        .save(&json!({"rules": [{"text": "Two"}], "rules_revision": 1}))
+        .unwrap();
+    assert_eq!(replaced["rules_revision"], 2);
+    assert_eq!(replaced["rules"][0]["text"], "Two");
+    assert_eq!(replaced["constitution"], "Local first");
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
 fn unique_temp_dir(prefix: &str) -> PathBuf {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
