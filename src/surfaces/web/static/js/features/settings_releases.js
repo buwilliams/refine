@@ -132,7 +132,7 @@ async function refreshSourcePromotionStatus({ fetchRemote = false, quiet = false
       fetchRemote ? "POST" : "GET",
       fetchRemote ? "/api/system/source/check" : "/api/system/source",
       fetchRemote ? {} : undefined,
-      { cache: false },
+      { cache: false, recordError: fetchRemote },
     );
     applySourcePromotionStatus(result.source || {}, result.source_check || {});
     applySourceUpdateNavStatus(result);
@@ -282,7 +282,7 @@ async function refreshSourceUpdateNav({ fetchRemote = false, quiet = false } = {
         fetchRemote ? "POST" : "GET",
         fetchRemote ? "/api/system/source/check" : "/api/system/source",
         fetchRemote ? {} : undefined,
-        { cache: false },
+        { cache: false, recordError: fetchRemote },
       );
       applySourceUpdateNavStatus(result);
       return result;

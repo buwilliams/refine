@@ -383,7 +383,9 @@ async function api(method, path, body, options = {}) {
       err.error = data?.error || null;
       err.__uiLogged = true;
       state.lastApiErrorLog = { message: msg, at: Date.now() };
-      if (!options.prefetch) {
+      // Passive capability reads can render their own degraded state without
+      // turning an expected failure into a project mutation.
+      if (!options.prefetch && options.recordError !== false) {
         recordUiError(msg, {
           source: "api",
           path,
@@ -615,8 +617,35 @@ function isDuplicateApiErrorToast(message) {
     || last.message.includes(current);
 }
 
+const UI_ERROR_RECORD_COOLDOWN_MS = 30_000;
+const UI_ERROR_RECORD_LIMIT = 100;
+
 function recordUiError(message, details = {}) {
   if (!message) return;
+  const now = Date.now();
+  const signature = JSON.stringify([
+    String(message),
+    details.source || "ui-error",
+    details.path || "",
+    details.status || "",
+    details.code || "",
+    details.goal_id || "",
+    details.details || "",
+  ]);
+  if (!state.uiErrorRecordTimes) state.uiErrorRecordTimes = new Map();
+  const lastRecordedAt = state.uiErrorRecordTimes.get(signature) || 0;
+  if (now - lastRecordedAt < UI_ERROR_RECORD_COOLDOWN_MS) return;
+  state.uiErrorRecordTimes.set(signature, now);
+  if (state.uiErrorRecordTimes.size > UI_ERROR_RECORD_LIMIT) {
+    for (const [key, recordedAt] of state.uiErrorRecordTimes) {
+      if (now - recordedAt >= UI_ERROR_RECORD_COOLDOWN_MS) {
+        state.uiErrorRecordTimes.delete(key);
+      }
+    }
+    while (state.uiErrorRecordTimes.size > UI_ERROR_RECORD_LIMIT) {
+      state.uiErrorRecordTimes.delete(state.uiErrorRecordTimes.keys().next().value);
+    }
+  }
   recordUiNotice(message, {
     kind: "error",
     source: details.source || "ui-error",

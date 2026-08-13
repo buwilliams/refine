@@ -264,10 +264,7 @@ fn local_http_daemon_serves_static_assets() {
     .unwrap();
     fs::create_dir_all(temp_root.join("css")).unwrap();
     fs::write(temp_root.join("css/base.css"), "body { color: black; }").unwrap();
-    let daemon = LocalHttpDaemon {
-        server: server_with_projection(),
-        static_root: Some(temp_root.clone()),
-    };
+    let daemon = LocalHttpDaemon::new(server_with_projection(), Some(temp_root.clone()));
     daemon.recover_runtime_state().unwrap();
 
     let response = daemon.handle_wire_request(HttpRequest {

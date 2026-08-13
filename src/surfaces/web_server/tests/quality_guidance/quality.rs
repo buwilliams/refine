@@ -60,10 +60,7 @@ fn daemon_startup_recovers_quality_cancellation_for_original_app_after_switch() 
 
     let mut server = server_with_projection();
     server.runtime_root = Some(runtime_root.clone());
-    let daemon = LocalHttpDaemon {
-        server,
-        static_root: None,
-    };
+    let daemon = LocalHttpDaemon::new(server, None);
     daemon.recover_runtime_state().unwrap();
 
     let incomplete = registry.status(&operation.id).unwrap();

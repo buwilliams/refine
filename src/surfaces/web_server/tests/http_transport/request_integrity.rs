@@ -2,10 +2,7 @@ use super::*;
 
 #[test]
 fn local_http_daemon_validates_origin_version_and_idempotency_headers() {
-    let daemon = LocalHttpDaemon {
-        server: server_with_projection(),
-        static_root: None,
-    };
+    let daemon = LocalHttpDaemon::new(server_with_projection(), None);
 
     let forbidden = daemon.handle_wire_request(HttpRequest {
         method: "POST".to_string(),
@@ -148,10 +145,7 @@ fn local_http_daemon_replays_idempotent_mutation_responses() {
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
-    let daemon = LocalHttpDaemon {
-        server,
-        static_root: None,
-    };
+    let daemon = LocalHttpDaemon::new(server, None);
     let body = br#"{"id":"GOAL1","name":"Idempotent Goal"}"#.to_vec();
     let headers = BTreeMap::from([("idempotency-key".to_string(), "create-goal-1".to_string())]);
 
@@ -201,10 +195,7 @@ fn local_http_daemon_rejects_idempotency_key_reuse_for_different_requests() {
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root);
-    let daemon = LocalHttpDaemon {
-        server,
-        static_root: None,
-    };
+    let daemon = LocalHttpDaemon::new(server, None);
     let headers = BTreeMap::from([(
         "idempotency-key".to_string(),
         "create-goal-conflict".to_string(),

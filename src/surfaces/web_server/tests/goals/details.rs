@@ -287,10 +287,7 @@ fn daemon_agent_automation_loop_executes_todo_goals_without_manual_request() {
         body: Some(json!({"status": "todo"})),
     });
 
-    let daemon = LocalHttpDaemon {
-        server: server.clone(),
-        static_root: None,
-    };
+    let daemon = LocalHttpDaemon::new(server.clone(), None);
     let automation_loop = daemon.start_agent_automation_loop(Duration::from_millis(25));
     #[cfg(not(target_os = "macos"))]
     let automation_timeout = Duration::from_secs(15);

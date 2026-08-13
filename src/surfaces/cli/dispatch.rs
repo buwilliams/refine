@@ -41,6 +41,7 @@ use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 #[cfg(not(test))]
 use std::process::Command;
+use std::sync::Arc;
 #[cfg(not(test))]
 use std::sync::mpsc;
 #[cfg(not(test))]
@@ -309,8 +310,8 @@ pub(super) fn run_system_start(
     if let Some(degradation) = project_degradation {
         status.degraded_integrations.push(degradation);
     }
-    let mut daemon = LocalHttpDaemon {
-        server: InProcessWebServer {
+    let mut daemon = LocalHttpDaemon::new(
+        InProcessWebServer {
             status: status.clone(),
             projection: snapshot,
             target_root: None,
@@ -327,8 +328,8 @@ pub(super) fn run_system_start(
                 }
             },
         },
-        static_root: static_root.or_else(default_static_root),
-    };
+        static_root.or_else(default_static_root),
+    );
     if let Err(error) = daemon.recover_runtime_state_with_progress(|message| {
         lifecycle.record_startup_progress(actual_port, message);
         eprintln!("refine: {message}");
@@ -337,7 +338,7 @@ pub(super) fn run_system_start(
         return Err(error);
     }
     let status = lifecycle.mark_ready(status)?;
-    daemon.server.status = status;
+    Arc::make_mut(&mut daemon.server).status = status;
     eprintln!("running foreground Refine daemon at http://{addr}");
     if once {
         daemon.serve_once(listener)?;

@@ -233,10 +233,7 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
     )
     .unwrap();
 
-    let daemon = LocalHttpDaemon {
-        server,
-        static_root: None,
-    };
+    let daemon = LocalHttpDaemon::new(server, None);
     let sse = daemon.handle_wire_request(HttpRequest {
         method: "GET".to_string(),
         path: "/api/sse".to_string(),

@@ -110,7 +110,7 @@ async function loadSettingsSurfaceData() {
     needs.processes ? api("GET", "/api/processes") : Promise.resolve({}),
     needs.releases ? api("GET", "/api/system/releases") : Promise.resolve({}),
     needs.source
-      ? api("GET", "/api/system/source").catch((error) => ({
+      ? api("GET", "/api/system/source", undefined, { recordError: false }).catch((error) => ({
           source_update: {
             enabled: false,
             update_available: false,

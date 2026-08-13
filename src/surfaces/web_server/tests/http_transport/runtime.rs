@@ -2,10 +2,7 @@ use super::*;
 
 #[test]
 fn local_http_daemon_serves_projection_routes_over_tcp() {
-    let daemon = LocalHttpDaemon {
-        server: server_with_projection(),
-        static_root: None,
-    };
+    let daemon = LocalHttpDaemon::new(server_with_projection(), None);
     let listener = LocalHttpDaemon::bind_loopback(0).unwrap();
     let addr = LocalHttpDaemon::local_addr(&listener).unwrap();
     let handle = thread::spawn(move || daemon.serve_once(listener).unwrap());
@@ -25,10 +22,7 @@ fn local_http_daemon_serves_projection_routes_over_tcp() {
 
 #[test]
 fn local_http_daemon_handles_tcp_requests_on_worker_threads() {
-    let daemon = LocalHttpDaemon {
-        server: server_with_projection(),
-        static_root: None,
-    };
+    let daemon = LocalHttpDaemon::new(server_with_projection(), None);
     let listener = LocalHttpDaemon::bind_loopback(0).unwrap();
     let addr = LocalHttpDaemon::local_addr(&listener).unwrap();
     let handle = thread::spawn(move || daemon.serve_once(listener).unwrap());
@@ -69,10 +63,7 @@ fn local_http_daemon_stays_responsive_while_plan_start_waits_for_git() {
     let mut server = server_with_projection();
     server.target_root = Some(app_root);
     server.runtime_root = Some(runtime_root);
-    let daemon = LocalHttpDaemon {
-        server,
-        static_root: None,
-    };
+    let daemon = LocalHttpDaemon::new(server, None);
     let listener = LocalHttpDaemon::bind_loopback(0).unwrap();
     let addr = LocalHttpDaemon::local_addr(&listener).unwrap();
     let server_thread = thread::spawn(move || daemon.serve_once(listener).unwrap());
@@ -115,10 +106,7 @@ fn local_http_daemon_stays_responsive_while_plan_start_waits_for_git() {
 
 #[test]
 fn local_http_daemon_reports_startup_cache_progress() {
-    let daemon = LocalHttpDaemon {
-        server: server_with_projection(),
-        static_root: None,
-    };
+    let daemon = LocalHttpDaemon::new(server_with_projection(), None);
     let mut messages = Vec::new();
 
     daemon
@@ -144,10 +132,7 @@ fn local_http_daemon_refreshes_hot_projection_and_records_screen_metrics() {
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
-    let daemon = LocalHttpDaemon {
-        server,
-        static_root: None,
-    };
+    let daemon = LocalHttpDaemon::new(server, None);
     daemon.recover_runtime_state().unwrap();
 
     let create = daemon.handle_wire_request(HttpRequest {
@@ -237,10 +222,7 @@ fn local_http_daemon_recovers_stale_chat_turns_before_serving() {
     let mut server = server_with_projection();
     server.target_root = Some(temp_root.clone());
     server.runtime_root = Some(runtime_root.clone());
-    let daemon = LocalHttpDaemon {
-        server,
-        static_root: None,
-    };
+    let daemon = LocalHttpDaemon::new(server, None);
     daemon.recover_runtime_state().unwrap();
 
     let recovered: serde_json::Value =

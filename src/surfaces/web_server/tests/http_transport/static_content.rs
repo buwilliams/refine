@@ -3,10 +3,7 @@ use super::*;
 #[test]
 fn local_http_daemon_serves_website_and_markdown_from_repo_root() {
     let repo_root = Path::new(env!("CARGO_MANIFEST_DIR")).to_path_buf();
-    let daemon = LocalHttpDaemon {
-        server: server_with_projection(),
-        static_root: Some(repo_root),
-    };
+    let daemon = LocalHttpDaemon::new(server_with_projection(), Some(repo_root));
 
     let index = daemon.handle_wire_request(HttpRequest {
         method: "GET".to_string(),

@@ -3,38 +3,27 @@ use super::*;
 impl LocalHttpDaemon {
     pub(super) fn sse_response(&self, stream_name: &'static str) -> Response {
         let (tx, rx) = tokio::sync::mpsc::channel::<Result<Event, Infallible>>(32);
-        let daemon = self.clone();
+        let mut batches = self.subscribe_sse_frame_batches(stream_name);
         tokio::spawn(async move {
             let mut last_state_signatures = BTreeMap::new();
             let mut seen_stream_signatures: BTreeMap<&'static str, BTreeSet<String>> =
                 BTreeMap::new();
             loop {
-                let frame_daemon = daemon.clone();
-                let frames = match tokio::task::spawn_blocking(move || {
-                    frame_daemon.server_sent_event_frames(stream_name)
-                })
-                .await
-                {
+                let frames = match batches.recv().await {
                     Ok(Ok(frames)) => frames,
                     Ok(Err(error)) => {
                         let event = Event::default()
                             .event("error")
-                            .data(json!({"message": error.to_string()}).to_string());
+                            .data(json!({"message": error.as_ref()}).to_string());
                         let _ = tx.send(Ok(event)).await;
                         break;
                     }
-                    Err(error) => {
-                        let event = Event::default().event("error").data(
-                            json!({"message": format!("SSE projection worker failed: {error}")})
-                                .to_string(),
-                        );
-                        let _ = tx.send(Ok(event)).await;
-                        break;
-                    }
+                    Err(broadcast::error::RecvError::Lagged(_)) => continue,
+                    Err(broadcast::error::RecvError::Closed) => break,
                 };
-                for frame in frames {
+                for frame in frames.iter() {
                     if should_write_sse_frame(
-                        &frame,
+                        frame,
                         &mut last_state_signatures,
                         &mut seen_stream_signatures,
                     ) {
@@ -51,7 +40,6 @@ impl LocalHttpDaemon {
                         }
                     }
                 }
-                tokio::time::sleep(Duration::from_millis(500)).await;
             }
         });
         Sse::new(ReceiverStream::new(rx))
@@ -61,6 +49,83 @@ impl LocalHttpDaemon {
                     .text("heartbeat"),
             )
             .into_response()
+    }
+
+    pub(in crate::surfaces::web_server) fn subscribe_sse_frame_batches(
+        &self,
+        stream_name: &'static str,
+    ) -> broadcast::Receiver<SseFrameBatch> {
+        let mut producer_running = self
+            .sse_frame_hub
+            .producer_running
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let receiver = self.sse_frame_hub.sender.subscribe();
+        if !*producer_running {
+            *producer_running = true;
+            let daemon = self.clone();
+            tokio::spawn(async move {
+                daemon.produce_sse_frame_batches(stream_name).await;
+            });
+        }
+        receiver
+    }
+
+    async fn produce_sse_frame_batches(self, stream_name: &'static str) {
+        loop {
+            if self.stop_sse_frame_producer_when_idle() {
+                return;
+            }
+            #[cfg(test)]
+            self.sse_frame_hub
+                .build_count
+                .fetch_add(1, Ordering::Relaxed);
+            let frame_daemon = self.clone();
+            let batch = match tokio::task::spawn_blocking(move || {
+                frame_daemon.server_sent_event_frames(stream_name)
+            })
+            .await
+            {
+                Ok(Ok(frames)) => Ok(Arc::new(frames)),
+                Ok(Err(error)) => Err(Arc::<str>::from(error.to_string())),
+                Err(error) => Err(Arc::<str>::from(format!(
+                    "SSE projection worker failed: {error}"
+                ))),
+            };
+            let failed = batch.is_err();
+            let _ = self.sse_frame_hub.sender.send(batch);
+            if failed {
+                self.mark_sse_frame_producer_stopped();
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+    }
+
+    fn stop_sse_frame_producer_when_idle(&self) -> bool {
+        let mut producer_running = self
+            .sse_frame_hub
+            .producer_running
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if self.sse_frame_hub.sender.receiver_count() != 0 {
+            return false;
+        }
+        *producer_running = false;
+        true
+    }
+
+    fn mark_sse_frame_producer_stopped(&self) {
+        *self
+            .sse_frame_hub
+            .producer_running
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = false;
+    }
+
+    #[cfg(test)]
+    pub(in crate::surfaces::web_server) fn sse_frame_build_count(&self) -> usize {
+        self.sse_frame_hub.build_count.load(Ordering::Relaxed)
     }
 
     pub(super) fn terminal_sse_response(&self, session_id: String, initial_after: u64) -> Response {

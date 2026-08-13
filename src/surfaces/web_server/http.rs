@@ -11,6 +11,8 @@ use std::env;
 use std::fs;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpListener};
 use std::path::{Path, PathBuf};
+#[cfg(test)]
+use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
@@ -31,7 +33,7 @@ use events::should_write_sse_frame;
 use pulldown_cmark::{CowStr, Event as MarkdownEvent, Options, Parser, Tag, html};
 use serde_json::{Value, json};
 use static_content::*;
-use tokio::sync::{Notify, oneshot};
+use tokio::sync::{Notify, broadcast, oneshot};
 use tokio_stream::wrappers::ReceiverStream;
 
 use crate::process::agent_sessions::find_agent_session;
@@ -132,9 +134,34 @@ fn sse_event(event: &str, data: Value) -> RefineResult<String> {
 }
 
 #[derive(Clone, Debug)]
-struct SseEventFrame {
+pub(in crate::surfaces::web_server) struct SseEventFrame {
     event: &'static str,
     data: Value,
+}
+
+pub(in crate::surfaces::web_server) type SseFrameBatch = Result<Arc<Vec<SseEventFrame>>, Arc<str>>;
+
+/// Builds one authoritative frame batch for all current SSE clients. Each
+/// client still owns replay deduplication, so a newly connected browser gets
+/// the next complete batch without rebuilding the project projection itself.
+#[derive(Debug)]
+struct SseFrameHub {
+    sender: broadcast::Sender<SseFrameBatch>,
+    producer_running: Mutex<bool>,
+    #[cfg(test)]
+    build_count: AtomicUsize,
+}
+
+impl Default for SseFrameHub {
+    fn default() -> Self {
+        let (sender, _) = broadcast::channel(4);
+        Self {
+            sender,
+            producer_running: Mutex::new(false),
+            #[cfg(test)]
+            build_count: AtomicUsize::new(0),
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -159,8 +186,11 @@ const GIT_RECONCILE_RETRY_INTERVAL: Duration = Duration::from_secs(2);
 
 #[derive(Clone, Debug)]
 pub struct LocalHttpDaemon {
-    pub server: InProcessWebServer,
+    /// Shared request authority. Daemon/router/worker clones must not deep-clone
+    /// the bootstrap projection retained by `InProcessWebServer`.
+    pub server: Arc<InProcessWebServer>,
     pub static_root: Option<PathBuf>,
+    sse_frame_hub: Arc<SseFrameHub>,
 }
 
 pub(super) struct AgentWorkflowLoop {
@@ -204,6 +234,14 @@ struct AxumDaemonState {
 }
 
 impl LocalHttpDaemon {
+    pub fn new(server: InProcessWebServer, static_root: Option<PathBuf>) -> Self {
+        Self {
+            server: Arc::new(server),
+            static_root,
+            sse_frame_hub: Arc::new(SseFrameHub::default()),
+        }
+    }
+
     #[cfg(test)]
     pub(super) fn start_agent_automation_loop(&self, interval: Duration) -> AgentWorkflowLoop {
         let stop = Arc::new(AtomicBool::new(false));

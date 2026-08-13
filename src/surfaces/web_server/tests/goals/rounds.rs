@@ -231,10 +231,7 @@ fn native_sse_streams_projected_goal_round_logs() {
             searchable_text: "Agent edited the implementation".to_string(),
         },
     );
-    let daemon = LocalHttpDaemon {
-        server,
-        static_root: None,
-    };
+    let daemon = LocalHttpDaemon::new(server, None);
 
     let events = daemon.server_sent_events("events").unwrap();
 

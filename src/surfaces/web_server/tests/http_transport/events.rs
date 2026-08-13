@@ -1,6 +1,34 @@
 use super::*;
 
 #[test]
+fn concurrent_sse_clients_share_one_authoritative_frame_build() {
+    let daemon = LocalHttpDaemon::new(server_with_projection(), None);
+    assert!(Arc::ptr_eq(&daemon.server, &daemon.clone().server));
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
+    runtime.block_on(async {
+        let mut first = daemon.subscribe_sse_frame_batches("events");
+        let mut second = daemon.subscribe_sse_frame_batches("events");
+        let first_batch = tokio::time::timeout(Duration::from_secs(2), first.recv())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+        let second_batch = tokio::time::timeout(Duration::from_secs(2), second.recv())
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+
+        assert!(Arc::ptr_eq(&first_batch, &second_batch));
+        assert_eq!(daemon.sse_frame_build_count(), 1);
+    });
+}
+
+#[test]
 fn local_http_daemon_persists_successful_mutations_for_sse() {
     let temp_root = unique_temp_dir("http-mutation-sse");
     let refine_dir = temp_root.join(".refine");
@@ -8,10 +36,7 @@ fn local_http_daemon_persists_successful_mutations_for_sse() {
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
     server.runtime_root = Some(runtime_root.clone());
-    let daemon = LocalHttpDaemon {
-        server,
-        static_root: None,
-    };
+    let daemon = LocalHttpDaemon::new(server, None);
 
     let create = daemon.handle_wire_request(HttpRequest {
         method: "POST".to_string(),
@@ -38,10 +63,7 @@ fn local_http_daemon_persists_successful_mutations_for_sse() {
 
 #[test]
 fn local_http_daemon_keeps_sse_stream_open_over_tcp() {
-    let daemon = LocalHttpDaemon {
-        server: server_with_projection(),
-        static_root: None,
-    };
+    let daemon = LocalHttpDaemon::new(server_with_projection(), None);
     let listener = LocalHttpDaemon::bind_loopback(0).unwrap();
     let addr = LocalHttpDaemon::local_addr(&listener).unwrap();
     let _handle = thread::spawn(move || daemon.serve_once(listener).unwrap());
@@ -128,10 +150,7 @@ fn local_http_daemon_keeps_sse_open_when_process_is_reaped_between_enumeration_a
 
     let mut server = server_with_projection();
     server.runtime_root = Some(runtime_root.clone());
-    let daemon = LocalHttpDaemon {
-        server,
-        static_root: None,
-    };
+    let daemon = LocalHttpDaemon::new(server, None);
     let listener = LocalHttpDaemon::bind_loopback(0).unwrap();
     let addr = LocalHttpDaemon::local_addr(&listener).unwrap();
     let handle = thread::spawn(move || daemon.serve_once(listener).unwrap());
