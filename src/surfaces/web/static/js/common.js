@@ -231,7 +231,6 @@ function screenDataCacheablePath(path) {
     "/api/reporters",
     "/api/fleet",
     "/api/quality",
-    "/api/performance",
     "/api/upgrade",
     "/api/target-app/status",
   ].includes(route);
@@ -272,7 +271,6 @@ function defaultScreenDataPaths() {
     "/api/settings",
     "/api/processes",
     "/api/diagnostics",
-    "/api/performance?limit=50&offset=0",
   ];
 }
 

@@ -21,6 +21,21 @@ pub enum SystemAction {
     Build,
     /// Remove the production binary and its deployed marker. Launcher-owned: run as `./r system clean`.
     Clean,
+    /// Show daemon performance metrics: per-operation summaries and the slowest recent requests.
+    Performance {
+        /// Filter events to one operation name (for example http.request).
+        #[arg(long)]
+        operation: Option<String>,
+        /// Show only failed events.
+        #[arg(long)]
+        failures: bool,
+        /// Recent events to include (1-1000).
+        #[arg(long, default_value_t = 50)]
+        limit: usize,
+        /// Print the raw JSON report instead of the table.
+        #[arg(long)]
+        json: bool,
+    },
     /// Repair an existing installation: recreate launchers and services for the recorded version.
     Repair {
         /// Daemon port the installation is configured for.

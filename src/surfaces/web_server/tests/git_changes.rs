@@ -77,18 +77,14 @@ fn web_server_rebuilds_projection_cache_and_serves_changes_performance_routes() 
         performance.body["operations"],
         json!(["cache.rebuild", "provider.turn"])
     );
+    // The report is served from the in-memory event ring; reading it must not
+    // write a cached copy into the projection snapshot (a write on a read
+    // path that also grew the snapshot).
     let cached = FileProjectProjectionStore::new(&refine_dir)
         .load_projection_snapshot(&runtime_root.join("cache"))
         .unwrap()
         .unwrap();
-    assert_eq!(
-        cached
-            .runtime
-            .performance
-            .unwrap()
-            .get("filtered_event_count"),
-        Some(&json!(1))
-    );
+    assert_eq!(cached.runtime.performance, None);
 
     remove_temp_dir(&temp_root);
 }

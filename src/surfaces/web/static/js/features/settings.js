@@ -100,7 +100,7 @@ async function loadSettingsSurfaceData() {
   }
   const needs = settingsSurfaceDataNeeds(surface, activeSlug);
   const [
-    s, diag, reps, gov, quality, dash, nodes, guidance, performance, processes, releases, source,
+    s, diag, reps, gov, quality, dash, nodes, guidance, processes, releases, source,
   ] = await Promise.all([
     needs.settings ? api("GET", "/api/settings") : Promise.resolve({}),
     needs.diagnostics ? api("GET", "/api/diagnostics") : Promise.resolve({}),
@@ -110,9 +110,6 @@ async function loadSettingsSurfaceData() {
     needs.dashboard ? api("GET", "/api/dashboard") : Promise.resolve({}),
     needs.nodes ? api("GET", "/api/nodes") : Promise.resolve({}),
     needs.guidance ? api("GET", "/api/guidance") : Promise.resolve({}),
-    needs.performance ? api("GET", typeof performanceApiPath === "function"
-      ? performanceApiPath()
-      : "/api/performance") : Promise.resolve({}),
     needs.processes ? api("GET", "/api/processes") : Promise.resolve({}),
     needs.releases ? api("GET", "/api/system/releases") : Promise.resolve({}),
     needs.source
@@ -155,8 +152,6 @@ async function loadSettingsSurfaceData() {
     activeNodeLabel,
     guidanceItems: guidance.guidance || [],
     guidanceRevision: guidance.revision || 0,
-    performance: performance || {},
-    performanceBackend: (performance || {}).backend || (diag || {}).backend || {},
     processes: processes || {},
     releases: releases.releases || { operations: [] },
     source: source || {},
@@ -178,7 +173,6 @@ function settingsSurfaceDataNeeds(surface, slug) {
     dashboard: false,
     nodes: false,
     guidance: false,
-    performance: false,
     processes: false,
     releases: false,
     source: false,
@@ -189,15 +183,6 @@ function settingsSurfaceDataNeeds(surface, slug) {
     } else if (slug === "processes") {
       needs.processes = true;
       needs.source = true;
-    } else if (slug === "performance") {
-      needs.settings = true;
-      needs.diagnostics = true;
-      needs.reporters = true;
-      needs.governance = true;
-      needs.dashboard = true;
-      needs.nodes = true;
-      needs.guidance = true;
-      needs.performance = true;
     }
   } else if (surface === SETTINGS_SURFACES.node) {
     if (slug === "releases") {
@@ -213,15 +198,6 @@ function settingsSurfaceDataNeeds(surface, slug) {
     } else if (slug === "processes") {
       needs.processes = true;
       needs.source = true;
-    } else if (slug === "performance") {
-      needs.settings = true;
-      needs.diagnostics = true;
-      needs.reporters = true;
-      needs.governance = true;
-      needs.dashboard = true;
-      needs.nodes = true;
-      needs.guidance = true;
-      needs.performance = true;
     }
   } else if (surface === SETTINGS_SURFACES.project) {
     if (slug === "quality") {
@@ -260,8 +236,6 @@ function detachedSettingsSurfaceData(project = {}) {
     activeNodeLabel,
     guidanceItems: [],
     guidanceRevision: 0,
-    performance: {},
-    performanceBackend: {},
     processes: {
       runner_reachable: false,
       paused: false,
@@ -746,7 +720,6 @@ const SETTINGS_SURFACES = {
     storageKey: "refine_system_tab",
     tabs: [
       { slug: "processes", label: "Processes" },
-      { slug: "performance", label: "Performance" },
       { slug: "releases", label: "Refine (dev)" },
     ],
   },
@@ -755,10 +728,9 @@ const SETTINGS_SURFACES = {
     basePath: "#/node",
     storageKey: "refine_node_tab",
     tabs: [
+      { slug: "processes", label: "Processes" },
       { slug: "application", label: "Application" },
       { slug: "reporters", label: "Reporters" },
-      { slug: "processes", label: "Processes" },
-      { slug: "performance", label: "Performance" },
       { slug: "target-app", label: "Target App Config" },
       { slug: "runtime", label: "Runtime Config" },
       { slug: "releases", label: "Refine (dev)" },
@@ -971,9 +943,6 @@ function renderSettingsTabBody(surface, slug, data) {
     if (slug === "processes") {
       return renderProcessesTab(data.processes, data.source);
     }
-    if (slug === "performance") {
-      return renderSettingsPerformanceTab(data.performance, data.performanceBackend);
-    }
   }
   if (surface === SETTINGS_SURFACES.node) {
     if (slug === "releases") {
@@ -981,9 +950,6 @@ function renderSettingsTabBody(surface, slug, data) {
     }
     if (slug === "processes") {
       return renderProcessesTab(data.processes, data.source);
-    }
-    if (slug === "performance") {
-      return renderSettingsPerformanceTab(data.performance, data.performanceBackend);
     }
     if (slug === "reporters") {
       return renderSettingsReportersTab(data.reps, data.activeNodeLabel);
@@ -1073,23 +1039,9 @@ function bindSettingsTabBody(surface, slug, data) {
   if (surface === SETTINGS_SURFACES.settings) {
     if (slug === "releases") bindSettingsReleasesTab(data.releases);
     else if (slug === "processes") bindSettingsProcessesTab(data.source);
-    else if (slug === "performance") {
-      bindSettingsPerformanceTab(
-        data.s, data.diag, data.reps, null, data.gov,
-        data.dash, { nodes: data.nodes, counts: data.nodeCounts },
-        { guidance: data.guidanceItems }, data.performanceBackend,
-      );
-    }
   } else if (surface === SETTINGS_SURFACES.node) {
     if (slug === "releases") bindSettingsReleasesTab(data.releases);
     else if (slug === "processes") bindSettingsProcessesTab(data.source);
-    else if (slug === "performance") {
-      bindSettingsPerformanceTab(
-        data.s, data.diag, data.reps, null, data.gov,
-        data.dash, { nodes: data.nodes, counts: data.nodeCounts },
-        { guidance: data.guidanceItems }, data.performanceBackend,
-      );
-    }
     else if (slug === "reporters") bindSettingsReportersTab();
     else if (slug === "application") {
       bindSettingsApplicationTab(data.currentProject);

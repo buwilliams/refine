@@ -687,6 +687,7 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
             SystemAction::Install { .. }
             | SystemAction::Build
             | SystemAction::Clean
+            | SystemAction::Performance { .. }
             | SystemAction::Repair { .. }
             | SystemAction::Update { .. }
             | SystemAction::ReleasePlan { .. }

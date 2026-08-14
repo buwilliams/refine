@@ -390,22 +390,11 @@ impl InProcessWebServer {
                 _ => None,
             }),
         };
-        if query == PerformanceQuery::default()
-            && let Ok(runtime) = self.current_runtime_projection()
-            && let Some(performance) = runtime.performance
-        {
-            return ApiResponse::json(200, serde_json::Value::Object(performance));
-        }
+        // The report is computed from the in-memory event ring, so it is
+        // answered directly; the old projection-cached copy persisted the
+        // whole snapshot on a read path.
         match performance_report_value(runtime_root, query) {
-            Ok(value) => {
-                let response = ApiResponse::json(200, value.clone());
-                if let Some(performance) = value.as_object().cloned() {
-                    let _ = self.persist_runtime_projection_override(|runtime| {
-                        runtime.performance = Some(performance);
-                    });
-                }
-                response
-            }
+            Ok(value) => ApiResponse::json(200, value),
             Err(error) => error_response(error),
         }
     }

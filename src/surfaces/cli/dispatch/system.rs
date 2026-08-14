@@ -39,6 +39,30 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
         )),
         Commands::System {
             action:
+                SystemAction::Performance {
+                    operation,
+                    failures,
+                    limit,
+                    json,
+                },
+        } => {
+            let mut path = format!("/performance?limit={}&offset=0", limit.clamp(1, 1000));
+            if let Some(operation) = operation.as_deref().filter(|value| !value.is_empty()) {
+                path.push_str(&format!("&operation={operation}"));
+            }
+            if failures {
+                path.push_str("&success=false");
+            }
+            let report = daemon_json("GET", &path, None)?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&report).unwrap());
+                return Ok(());
+            }
+            print_performance_report(&report);
+            Ok(())
+        }
+        Commands::System {
+            action:
                 SystemAction::Repair {
                     port,
                     runtime_root,
@@ -564,4 +588,77 @@ pub(super) fn minimal_status_process(process: &Value) -> Value {
         "status": process.get("status").cloned().unwrap_or(Value::Null),
         "label": process.get("label").cloned().unwrap_or(Value::Null),
     })
+}
+
+/// Render the performance report as a readable table: this command exists to
+/// answer "how is Refine performing right now" from a terminal.
+fn print_performance_report(report: &Value) {
+    let summary = report
+        .get("summary")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let total = report
+        .get("total_event_count")
+        .and_then(Value::as_u64)
+        .unwrap_or(0);
+    println!("Events in memory since daemon start: {total}");
+    println!();
+    if summary.is_empty() {
+        println!("No performance events recorded yet.");
+        return;
+    }
+    println!(
+        "{:<24} {:>7} {:>9} {:>9} {:>9} {:>9}",
+        "operation", "count", "failures", "avg ms", "p95 ms", "max ms"
+    );
+    for row in &summary {
+        println!(
+            "{:<24} {:>7} {:>9} {:>9.1} {:>9.1} {:>9.1}",
+            row.get("operation").and_then(Value::as_str).unwrap_or("?"),
+            row.get("count").and_then(Value::as_u64).unwrap_or(0),
+            row.get("failures").and_then(Value::as_u64).unwrap_or(0),
+            row.get("avg_ms").and_then(Value::as_f64).unwrap_or(0.0),
+            row.get("p95_ms").and_then(Value::as_f64).unwrap_or(0.0),
+            row.get("max_ms").and_then(Value::as_f64).unwrap_or(0.0),
+        );
+    }
+    let mut recent = report
+        .get("recent")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    recent.sort_by(|a, b| {
+        let elapsed = |event: &Value| event.get("elapsed_ms").and_then(Value::as_f64).unwrap_or(0.0);
+        elapsed(b).partial_cmp(&elapsed(a)).unwrap_or(std::cmp::Ordering::Equal)
+    });
+    if !recent.is_empty() {
+        println!();
+        println!("Slowest recent events:");
+        for event in recent.iter().take(10) {
+            let details = event.get("details").cloned().unwrap_or(Value::Null);
+            let target = details
+                .get("path")
+                .and_then(Value::as_str)
+                .map(ToString::to_string)
+                .unwrap_or_else(|| {
+                    event
+                        .get("operation")
+                        .and_then(Value::as_str)
+                        .unwrap_or("?")
+                        .to_string()
+                });
+            println!(
+                "{:>9.1}ms  {}  {}  {}",
+                event.get("elapsed_ms").and_then(Value::as_f64).unwrap_or(0.0),
+                if event.get("success").and_then(Value::as_bool).unwrap_or(true) {
+                    "ok "
+                } else {
+                    "ERR"
+                },
+                event.get("occurred_at").and_then(Value::as_str).unwrap_or(""),
+                target,
+            );
+        }
+    }
 }
