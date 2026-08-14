@@ -15,10 +15,15 @@ use crate::tools::host::project_layout::git_common_dir;
 use crate::tools::product::chat::{ChatAttachment, ChatSessionRecord, FileChatService};
 use crate::tools::product::project_projection::RuntimeProjection;
 
-const REPOSITORY_DISK_USAGE_CACHE_TTL: Duration = Duration::from_secs(15);
+const REPOSITORY_DISK_USAGE_REFRESH_INTERVAL: Duration = Duration::from_secs(30);
 
 static REPOSITORY_DISK_USAGE_CACHE: OnceLock<Mutex<BTreeMap<PathBuf, (Instant, u64)>>> =
     OnceLock::new();
+/// Roots the background refresher keeps measured. Populated by the first
+/// request that asks about a root; bounded by the repositories a daemon
+/// serves.
+static REPOSITORY_DISK_USAGE_TARGETS: OnceLock<Mutex<BTreeSet<PathBuf>>> = OnceLock::new();
+static REPOSITORY_DISK_USAGE_REFRESHER: OnceLock<()> = OnceLock::new();
 
 #[derive(Clone, Debug)]
 pub struct FileProcessStatusService {
@@ -233,6 +238,51 @@ pub fn enrich_process_resource_usage(summary: &mut Value) {
     }
 }
 
+/// Memory and processor usage per pid, read straight from `/proc`: spawning a
+/// `ps` subprocess put a constant fork-and-exec floor under every process-list
+/// request. The processor figure matches what `ps pcpu` reports — cpu time
+/// over the process's lifetime.
+#[cfg(target_os = "linux")]
+fn process_resource_observations(pids: &BTreeSet<u32>) -> BTreeMap<u32, (u64, f64)> {
+    if pids.is_empty() {
+        return BTreeMap::new();
+    }
+    let page_bytes = unsafe { libc::sysconf(libc::_SC_PAGESIZE) }.max(1) as u64;
+    let ticks_per_second = unsafe { libc::sysconf(libc::_SC_CLK_TCK) }.max(1) as f64;
+    let uptime_seconds = std::fs::read_to_string("/proc/uptime")
+        .ok()
+        .and_then(|text| text.split_whitespace().next()?.parse::<f64>().ok());
+    pids.iter()
+        .filter_map(|pid| {
+            let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
+            // Skip past the parenthesized command, which may itself contain
+            // spaces and parentheses; fields after it are whitespace-split.
+            let after_comm = &stat[stat.rfind(')')? + 1..];
+            let fields = after_comm.split_whitespace().collect::<Vec<_>>();
+            let utime_ticks = fields.get(11)?.parse::<u64>().ok()?;
+            let stime_ticks = fields.get(12)?.parse::<u64>().ok()?;
+            let start_ticks = fields.get(19)?.parse::<u64>().ok()?;
+            let statm = std::fs::read_to_string(format!("/proc/{pid}/statm")).ok()?;
+            let resident_pages = statm.split_whitespace().nth(1)?.parse::<u64>().ok()?;
+            let processor_percent = uptime_seconds
+                .map(|uptime| {
+                    let elapsed = uptime - start_ticks as f64 / ticks_per_second;
+                    if elapsed <= 0.0 {
+                        0.0
+                    } else {
+                        (utime_ticks + stime_ticks) as f64 / ticks_per_second / elapsed * 100.0
+                    }
+                })
+                .unwrap_or(0.0);
+            Some((
+                *pid,
+                (resident_pages.saturating_mul(page_bytes), processor_percent),
+            ))
+        })
+        .collect()
+}
+
+#[cfg(not(target_os = "linux"))]
 fn process_resource_observations(pids: &BTreeSet<u32>) -> BTreeMap<u32, (u64, f64)> {
     if pids.is_empty() {
         return BTreeMap::new();
@@ -283,14 +333,62 @@ pub fn repository_disk_usage_value(repository_root: &Path) -> Value {
     })
 }
 
+/// Serves disk usage from a cache a background thread keeps fresh.
+///
+/// A `du` walk over a repository with a build directory costs one to two
+/// hundred milliseconds, and the old time-to-live recomputed it inline
+/// whenever it expired — every fifteen seconds some process-list request drew
+/// the slow straw. Only the first request for a root ever measures inline;
+/// after that the refresher re-measures off the request path and staleness is
+/// bounded by its interval.
 fn cached_directory_disk_usage_bytes(path: &Path) -> Option<u64> {
+    if let Ok(mut targets) = REPOSITORY_DISK_USAGE_TARGETS
+        .get_or_init(|| Mutex::new(BTreeSet::new()))
+        .lock()
+    {
+        targets.insert(path.to_path_buf());
+    }
+    ensure_disk_usage_refresher();
     let cache = REPOSITORY_DISK_USAGE_CACHE.get_or_init(|| Mutex::new(BTreeMap::new()));
     if let Ok(cache) = cache.lock()
-        && let Some((measured_at, bytes)) = cache.get(path)
-        && measured_at.elapsed() < REPOSITORY_DISK_USAGE_CACHE_TTL
+        && let Some((_, bytes)) = cache.get(path)
     {
         return Some(*bytes);
     }
+    let bytes = measure_directory_disk_usage_bytes(path)?;
+    if let Ok(mut cache) = cache.lock() {
+        cache.insert(path.to_path_buf(), (Instant::now(), bytes));
+    }
+    Some(bytes)
+}
+
+fn ensure_disk_usage_refresher() {
+    REPOSITORY_DISK_USAGE_REFRESHER.get_or_init(|| {
+        std::thread::spawn(|| {
+            loop {
+                std::thread::sleep(REPOSITORY_DISK_USAGE_REFRESH_INTERVAL);
+                let targets = REPOSITORY_DISK_USAGE_TARGETS
+                    .get_or_init(|| Mutex::new(BTreeSet::new()))
+                    .lock()
+                    .map(|targets| targets.iter().cloned().collect::<Vec<_>>())
+                    .unwrap_or_default();
+                for path in targets {
+                    // A failed measurement keeps the previous figure; stale
+                    // beats absent for a dashboard-style number.
+                    if let Some(bytes) = measure_directory_disk_usage_bytes(&path)
+                        && let Ok(mut cache) = REPOSITORY_DISK_USAGE_CACHE
+                            .get_or_init(|| Mutex::new(BTreeMap::new()))
+                            .lock()
+                    {
+                        cache.insert(path.clone(), (Instant::now(), bytes));
+                    }
+                }
+            }
+        });
+    });
+}
+
+fn measure_directory_disk_usage_bytes(path: &Path) -> Option<u64> {
     let output = Command::new("du").args(["-sk"]).arg(path).output().ok()?;
     if !output.status.success() {
         return None;
@@ -300,11 +398,7 @@ fn cached_directory_disk_usage_bytes(path: &Path) -> Option<u64> {
         .next()?
         .parse::<u64>()
         .ok()?;
-    let bytes = kib.saturating_mul(1024);
-    if let Ok(mut cache) = cache.lock() {
-        cache.insert(path.to_path_buf(), (Instant::now(), bytes));
-    }
-    Some(bytes)
+    Some(kib.saturating_mul(1024))
 }
 
 pub fn is_current_process_object(process: &JsonObject) -> bool {

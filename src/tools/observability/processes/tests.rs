@@ -304,3 +304,20 @@ fn repository_disk_usage_includes_git_owned_worktree_storage() {
 
     std::fs::remove_dir_all(repository_root).unwrap();
 }
+
+#[cfg(target_os = "linux")]
+#[test]
+fn proc_resource_observations_report_this_process() {
+    let mut pids = BTreeSet::new();
+    pids.insert(std::process::id());
+    // A pid that cannot exist must simply be absent, not an error.
+    pids.insert(u32::MAX);
+
+    let observations = process_resource_observations(&pids);
+
+    let (memory_used_bytes, processor_used_percent) =
+        observations.get(&std::process::id()).unwrap();
+    assert!(*memory_used_bytes > 0);
+    assert!(*processor_used_percent >= 0.0);
+    assert!(!observations.contains_key(&u32::MAX));
+}
