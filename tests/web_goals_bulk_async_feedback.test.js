@@ -23,7 +23,7 @@ async function settle() {
   await new Promise((resolve) => setImmediate(resolve));
 }
 
-function bulkFeedbackRuntime({ commands = false } = {}) {
+function bulkFeedbackRuntime({ command = "" } = {}) {
   const apiResponse = deferred();
   const requests = [];
   const resolverCalls = [];
@@ -65,27 +65,36 @@ function bulkFeedbackRuntime({ commands = false } = {}) {
     _openModal: async () => "todo",
   });
   vm.runInContext(bulkSource, context);
-  if (commands) vm.runInContext(commandsSource, context);
+  if (command) vm.runInContext(commandsSource, context);
   vm.runInContext(`
     globalThis.bulkFeedbackTest = {
       panel: () => openBulkModal("status"),
-      command: () => runBulkStatusCommand({ source: "backlog", dest: "todo" }),
+      statusCommand: () => runBulkStatusCommand({ source: "backlog", dest: "todo" }),
+      failedBackCommand: () => runFailedBackCommand(),
     };
   `, context);
+  const run = {
+    "": context.bulkFeedbackTest.panel,
+    status: context.bulkFeedbackTest.statusCommand,
+    failedBack: context.bulkFeedbackTest.failedBackCommand,
+  }[command];
   return {
     apiResponse,
     requests,
     resolverCalls,
-    run: commands ? context.bulkFeedbackTest.command : context.bulkFeedbackTest.panel,
+    run,
     toasts,
   };
 }
 
-async function assertImmediateSingleAcknowledgement(browser) {
+async function assertImmediateSingleAcknowledgement(browser, expectedUpdate) {
   const completion = browser.run();
   await settle();
 
   assert.equal(browser.requests.length, 1);
+  assert.equal(browser.requests[0].method, "POST");
+  assert.equal(browser.requests[0].path, "/api/goals/bulk");
+  assert.equal(browser.requests[0].payload.update.status, expectedUpdate);
   assert.deepEqual(browser.toasts.map(({ message, kind }) => ({ message, kind })), [{
     message: "Refine is working on it asynchronously.",
     kind: "info",
@@ -108,9 +117,16 @@ async function assertImmediateSingleAcknowledgement(browser) {
 }
 
 test("Goals bulk panel acknowledges asynchronous work before the API settles", async () => {
-  await assertImmediateSingleAcknowledgement(bulkFeedbackRuntime());
+  await assertImmediateSingleAcknowledgement(bulkFeedbackRuntime(), "todo");
 });
 
 test("Goals bulk command shares immediate acknowledgement without an operation duplicate", async () => {
-  await assertImmediateSingleAcknowledgement(bulkFeedbackRuntime({ commands: true }));
+  await assertImmediateSingleAcknowledgement(bulkFeedbackRuntime({ command: "status" }), "todo");
+});
+
+test("failed Goals retry command shares immediate acknowledgement without an operation duplicate", async () => {
+  await assertImmediateSingleAcknowledgement(
+    bulkFeedbackRuntime({ command: "failedBack" }),
+    "__last_workflow_state",
+  );
 });
