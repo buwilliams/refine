@@ -281,8 +281,9 @@ reading source code:
 - `./r next` — recommends the next operations from current project and fleet
   state, each with the exact command. Call it whenever you are deciding what
   to do next.
-- `./r commands` — machine-readable JSON catalog of every CLI command with
-  descriptions. Load once instead of exploring `--help` per subcommand.
+- `./r commands` — machine-readable JSON catalog of supported user-facing
+  production-binary commands with descriptions. Load once instead of
+  exploring `--help` per subcommand.
 - `docs/runbooks/` — task-oriented guides (manage the fleet, distribute and
   converge work) with preconditions, user questions, verification, and undo
   steps.

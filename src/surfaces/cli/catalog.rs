@@ -295,6 +295,10 @@ mod tests {
             );
         }
         assert!(
+            !all.contains("catalog of every CLI command"),
+            "operational runbooks must not claim hidden worker or launcher commands are cataloged"
+        );
+        assert!(
             !all.contains("Refine `4.0.0`"),
             "migration guidance must use the installed v4 version"
         );
