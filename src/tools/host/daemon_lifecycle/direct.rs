@@ -112,6 +112,29 @@ fn wait_until_stopped(
     }
 }
 
+/// How long the post-stop probe may retry an ambiguous observation. A freshly
+/// killed daemon's listening socket can accept-then-reset a connection for a
+/// few milliseconds while the kernel tears it down; stop now confirms process
+/// exit fast enough to probe inside that window, which read as "reachability
+/// unknown" and turned every successful stop into a reported failure. The
+/// socket settles to a clean refusal almost immediately, so retrying while
+/// ambiguous makes the outcome deterministic.
+const STOP_PROBE_SETTLE_WINDOW: Duration = Duration::from_secs(2);
+const STOP_PROBE_SETTLE_POLL: Duration = Duration::from_millis(100);
+
+fn settled_stop_reachability(
+    port: u16,
+    probe: &mut impl FnMut(u16) -> DaemonReachability,
+) -> DaemonReachability {
+    let deadline = Instant::now() + STOP_PROBE_SETTLE_WINDOW;
+    let mut observation = probe(port);
+    while matches!(observation, DaemonReachability::Unknown(_)) && Instant::now() < deadline {
+        thread::sleep(STOP_PROBE_SETTLE_POLL);
+        observation = probe(port);
+    }
+    observation
+}
+
 fn stop_direct_daemon_with(
     lifecycle: &FileDaemonLifecycleService,
     port: u16,
@@ -119,7 +142,7 @@ fn stop_direct_daemon_with(
     mut probe: impl FnMut(u16) -> DaemonReachability,
 ) -> RefineResult<DaemonStatus> {
     let control_result = control();
-    let observation = probe(port);
+    let observation = settled_stop_reachability(port, &mut probe);
     let command_error = control_result.as_ref().err().map(ToString::to_string);
     match observation {
         DaemonReachability::Unreachable(_) => {
@@ -238,6 +261,42 @@ mod tests {
             supervisor.wait("direct-daemon"),
             Err(RefineError::NotFound(_))
         ));
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn transient_connection_reset_during_socket_teardown_still_confirms_stop() {
+        let (root, lifecycle) = lifecycle("teardown-reset");
+        lifecycle.mark_ready(running_status(4557)).unwrap();
+        // First probe lands in the kernel's socket-teardown window and reads a
+        // reset; the retry observes the settled refusal.
+        let mut probes = 0;
+        let status = stop_direct_daemon_with(
+            &lifecycle,
+            4557,
+            || Ok(()),
+            |_| {
+                probes += 1;
+                if probes == 1 {
+                    DaemonReachability::Unknown(
+                        "failed to read daemon probe: Connection reset by peer".to_string(),
+                    )
+                } else {
+                    DaemonReachability::Unreachable("connection refused".to_string())
+                }
+            },
+        )
+        .unwrap();
+        assert_eq!(status.worker_state, "stopped");
+        assert_eq!(
+            status
+                .lifecycle_evidence
+                .as_ref()
+                .unwrap()
+                .outcome
+                .as_str(),
+            "direct_stop_confirmed"
+        );
         fs::remove_dir_all(root).unwrap();
     }
 

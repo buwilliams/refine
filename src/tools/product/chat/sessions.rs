@@ -314,7 +314,11 @@ impl FileChatService {
             ))
         })?;
         let path = self.sessions_dir().join(format!(".{session_id}.lock"));
-        for _ in 0..500 {
+        // Deadline-based rather than attempt-counted: a fixed try count made
+        // the effective wait collapse on a saturated host, where a holder's
+        // few milliseconds of work can stretch across whole scheduler quanta.
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        loop {
             match OpenOptions::new().write(true).create_new(true).open(&path) {
                 Ok(_) => return Ok(ChatSessionLock { path }),
                 Err(error) if error.kind() == ErrorKind::AlreadyExists => {
@@ -327,7 +331,12 @@ impl FileChatService {
                         let _ = fs::remove_file(&path);
                         continue;
                     }
-                    thread::sleep(Duration::from_millis(2));
+                    if std::time::Instant::now() >= deadline {
+                        return Err(RefineError::Conflict(format!(
+                            "Chat session {session_id} is busy; retry shortly"
+                        )));
+                    }
+                    thread::sleep(Duration::from_millis(5));
                 }
                 Err(error) => {
                     return Err(RefineError::Io(format!(
@@ -336,8 +345,5 @@ impl FileChatService {
                 }
             }
         }
-        Err(RefineError::Conflict(format!(
-            "Chat session {session_id} is busy; retry shortly"
-        )))
     }
 }
