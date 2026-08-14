@@ -512,14 +512,6 @@ pub(super) fn dispatch_goal_daemon(action: GoalAction) -> RefineResult<()> {
                 None,
             )?
         }
-        GoalAction::Verify {
-            id,
-            target_root: None,
-        } => daemon_json(
-            "POST",
-            &format!("/work/goals/{}/verify", path_segment(&id)),
-            None,
-        )?,
         GoalAction::Approve {
             id,
             target_root: None,

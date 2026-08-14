@@ -159,15 +159,6 @@ pub enum GoalAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Internal verification alias retained for compatibility.
-    #[command(hide = true)]
-    Verify {
-        /// Goal id.
-        id: String,
-        #[cfg_attr(test, arg(long, hide = true))]
-        #[cfg_attr(not(test), arg(skip = None))]
-        target_root: Option<PathBuf>,
-    },
     /// Walk a Goal's status backwards: done goes to review; cancelled goes to todo.
     ///
     /// To decline a reviewed Goal, submit a new auditable round instead.

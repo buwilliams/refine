@@ -17,10 +17,6 @@ pub enum SystemAction {
         #[arg(long, default_value = env!("CARGO_PKG_VERSION"))]
         version: String,
     },
-    /// Rebuild the production binary from source. Launcher-owned: run as `./r system build`.
-    Build,
-    /// Remove the production binary and its deployed marker. Launcher-owned: run as `./r system clean`.
-    Clean,
     /// Show daemon performance metrics: per-operation summaries and the slowest recent requests.
     Performance {
         /// Filter events to one operation name (for example http.request).

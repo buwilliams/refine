@@ -48,7 +48,7 @@ fn cli_surface_suite() {
     system_doctor_and_api_groups_run(&fixture);
     goal_create_list_show_edit_note_round_delete(&fixture);
     goal_feature_assignment_and_round_edit_latest(&fixture);
-    goal_workflow_actions_start_retry_verify_approve_undo(&fixture);
+    goal_workflow_actions_start_retry_and_undo(&fixture);
     feature_create_membership_rollup_and_delete(&fixture);
     feature_show_edit_reorder_move_cancel_and_import(&fixture);
     todo_commands_share_reporter_scoped_api_capability(&fixture);

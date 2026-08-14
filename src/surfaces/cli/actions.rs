@@ -112,8 +112,8 @@ pub enum Commands {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Print a machine-readable JSON catalog of every CLI command with descriptions.
-    /// Load this once instead of exploring --help per subcommand.
+    /// Print a machine-readable JSON catalog of supported user-facing CLI commands.
+    /// Hidden worker entry points and checkout-launcher operations are intentionally omitted.
     Commands,
     /// Serve the Refine website as a local static file server (no daemon or project state required).
     Website {
