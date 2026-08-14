@@ -124,6 +124,93 @@ fn todo_commands_parse_explicit_reporter_and_identifiers() {
 }
 
 #[test]
+fn retired_and_launcher_only_commands_are_not_binary_subcommands() {
+    for argv in [
+        vec!["refine", "goal", "verify", "GOAL1"],
+        vec!["refine", "system", "build"],
+        vec!["refine", "system", "clean"],
+    ] {
+        assert!(
+            Cli::try_parse_from(&argv).is_err(),
+            "obsolete production-binary command remained parseable: {argv:?}"
+        );
+    }
+}
+
+#[test]
+fn required_hidden_worker_commands_remain_parseable() {
+    for argv in [
+        vec![
+            "refine",
+            "system",
+            "source-promote-helper",
+            "--checkout",
+            "/tmp/refine",
+            "--port-runtime-root",
+            "/tmp/refine/run/8082",
+            "--port",
+            "8082",
+            "--operation-id",
+            "promote-1",
+        ],
+        vec![
+            "refine",
+            "system",
+            "source-upgrade-capability",
+            "--checkout",
+            "/tmp/refine",
+            "--port-runtime-root",
+            "/tmp/refine/run/8082",
+            "--port",
+            "8082",
+            "--operation-id",
+            "upgrade-1",
+            "--action",
+            "inspect-source",
+        ],
+        vec![
+            "refine",
+            "system",
+            "source-check-worker",
+            "--checkout",
+            "/tmp/refine",
+            "--port-runtime-root",
+            "/tmp/refine/run/8082",
+            "--port",
+            "8082",
+            "--operation-id",
+            "check-1",
+        ],
+        vec![
+            "refine",
+            "system",
+            "daemon-lifecycle-helper",
+            "--action",
+            "restart",
+            "--port",
+            "8082",
+            "--runtime-root",
+            "/tmp/refine/run",
+            "--operation-id",
+            "restart-1",
+        ],
+        vec![
+            "refine",
+            "system",
+            "runner-worker",
+            "--kind",
+            "workflow",
+            "--port-runtime-root",
+            "/tmp/refine/run/8082",
+        ],
+    ] {
+        Cli::try_parse_from(&argv).unwrap_or_else(|error| {
+            panic!("required worker command failed to parse {argv:?}: {error}")
+        });
+    }
+}
+
+#[test]
 fn default_static_root_finds_checkout_assets() {
     let root = super::helpers::default_static_root().expect("static root should exist");
     assert!(root.join("index.html").is_file());

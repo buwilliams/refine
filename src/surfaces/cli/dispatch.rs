@@ -607,7 +607,6 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
             | GoalAction::Cancel { target_root, .. }
             | GoalAction::Retry { target_root, .. }
             | GoalAction::Approve { target_root, .. }
-            | GoalAction::Verify { target_root, .. }
             | GoalAction::Undo { target_root, .. }
             | GoalAction::Delete { target_root, .. }
             | GoalAction::AssignFeature { target_root, .. }
@@ -685,8 +684,6 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
         Commands::System { action } => match action {
             SystemAction::Doctor { target_root, .. } => target_root.as_ref(),
             SystemAction::Install { .. }
-            | SystemAction::Build
-            | SystemAction::Clean
             | SystemAction::Performance { .. }
             | SystemAction::Repair { .. }
             | SystemAction::Update { .. }
