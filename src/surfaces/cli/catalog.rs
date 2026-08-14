@@ -126,6 +126,10 @@ mod tests {
             .iter()
             .map(|command| command["name"].as_str().unwrap())
             .collect::<Vec<_>>();
+        assert!(
+            system_names.contains(&"performance"),
+            "current-main performance command was lost during recovery: {system_names:?}"
+        );
         for unadvertised in [
             "build",
             "clean",

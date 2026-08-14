@@ -138,6 +138,34 @@ fn retired_and_launcher_only_commands_are_not_binary_subcommands() {
 }
 
 #[test]
+fn current_main_performance_command_remains_parseable() {
+    let parsed = Cli::try_parse_from([
+        "refine",
+        "system",
+        "performance",
+        "--operation",
+        "http.request",
+        "--failures",
+        "--limit",
+        "17",
+        "--json",
+    ])
+    .unwrap();
+
+    assert!(matches!(
+        parsed.command,
+        Commands::System {
+            action: SystemAction::Performance {
+                operation: Some(ref operation),
+                failures: true,
+                limit: 17,
+                json: true,
+            }
+        } if operation == "http.request"
+    ));
+}
+
+#[test]
 fn required_hidden_worker_commands_remain_parseable() {
     for argv in [
         vec![
