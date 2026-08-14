@@ -27,6 +27,12 @@ confirmation.
    preparation candidate before Review; approval accepts that integration and
    does not perform another merge. Preparation never tags or publishes.
 
+The supported CLI acceptance command, after the Goal reaches Review, is:
+
+```text
+refine goal approve <goal-id>
+```
+
 CLI equivalents:
 
 ```text

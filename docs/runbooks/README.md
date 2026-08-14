@@ -11,9 +11,10 @@ source code:
 - `refine next` — inspects the current project and fleet state and recommends
   the next operations, each with the exact command to run. Call it whenever
   you are unsure what to do; call it again after acting.
-- `refine commands` — a machine-readable JSON catalog of every CLI command
-  with descriptions. Load it once instead of exploring `--help` per
-  subcommand.
+- `refine commands` — a machine-readable JSON catalog of supported
+  user-facing production-binary commands with descriptions. Hidden worker
+  entry points and checkout-launcher operations are intentionally omitted.
+  Load it once instead of exploring `--help` per subcommand.
 
 Runbooks:
 
@@ -41,7 +42,9 @@ Runbooks:
   concurrency after upgrading an existing v4 node.
 
 Conventions: commands are shown as `refine …`; inside a source checkout use
-`./r …`, which is the same surface. Use `--dry-run` only when a command's CLI
-entry documents it. Currently, use dry-run before `fleet distribute` and
-`fleet bootstrap`; do not invent a dry-run flag for transfer, enable/disable,
-maintenance, or removal commands.
+`./r …`, which delegates to the same production-binary surface. The exceptions
+are launcher-owned `./r system build` and `./r system clean`, documented in the
+install runbook. Use `--dry-run` only when a command's CLI entry documents it.
+Currently, use dry-run before `fleet distribute` and `fleet bootstrap`; do not
+invent a dry-run flag for transfer, enable/disable, maintenance, or removal
+commands.

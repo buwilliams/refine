@@ -99,6 +99,10 @@ Manage the production binary directly with:
 ./r system clean   # remove bin/refine and the deployed marker
 ```
 
+These are checkout-launcher operations, not `refine system` subcommands, so
+they are intentionally absent from `refine system --help` and `refine commands`.
+Use `./r system build --help` or `./r system clean --help` for their direct help.
+
 A published installation is intentionally gitless and is identified by
 `.refine-deployed` plus `bin/refine`. It supports ordinary daemon, web, MCP,
 provider, and published-update operations. Source status and source promotion
@@ -187,7 +191,10 @@ cd <refine-checkout>
 
 ## CLI Management
 
-Use `./r --help` and `./r <group> --help` as the source of truth for management commands. There is no generic `./r status`; use the specific command group.
+Use `./r --help` and `./r <group> --help` as the source of truth for
+production-binary management commands, plus the direct launcher help described
+above for `system build` and `system clean`. There is no generic `./r status`;
+use the specific command group.
 
 Core management commands:
 

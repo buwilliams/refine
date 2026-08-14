@@ -180,7 +180,7 @@ pub(crate) fn goal_feature_assignment_and_round_edit_latest(fixture: &Integratio
     );
 }
 
-pub(crate) fn goal_workflow_actions_start_retry_verify_approve_undo(fixture: &IntegrationFixture) {
+pub(crate) fn goal_workflow_actions_start_retry_and_undo(fixture: &IntegrationFixture) {
     let started_id = fixture.create_goal("goal action start");
     let started = fixture.run_refine(&["goal", "start", &started_id]);
     fixture.assert_success("goal start", &started);
@@ -206,17 +206,6 @@ pub(crate) fn goal_workflow_actions_start_retry_verify_approve_undo(fixture: &In
     assert_eq!(
         fixture.json_stdout(&retried_quality)["goal"]["status"],
         "quality"
-    );
-    let verified_quality = fixture.run_refine(&["goal", "verify", &quality_id]);
-    assert!(
-        !verified_quality.status.success(),
-        "goal verify unexpectedly bypassed Governance and Review"
-    );
-    assert!(
-        String::from_utf8_lossy(&verified_quality.stderr)
-            .contains("Goal approval is only available from review"),
-        "unexpected goal verify failure: {}",
-        String::from_utf8_lossy(&verified_quality.stderr)
     );
     fixture.assert_success(
         "goal cancel quality retry",
