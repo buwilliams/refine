@@ -198,7 +198,12 @@ fn target_app_wrapper_turns_partial_ai_web_config_into_managed_server() {
     assert!(script.contains("python3 -m http.server"));
     assert!(script.contains("STATUS_COMMAND='curl -fsS"));
 
-    let start = std::process::Command::new(&wrapper_path)
+    // Run through `sh` rather than executing the freshly written script:
+    // a concurrently spawning test can hold a fork-inherited copy of the
+    // write descriptor for a moment, and direct execution then fails with
+    // ETXTBSY. The interpreter only opens the script for reading.
+    let start = std::process::Command::new("sh")
+        .arg(&wrapper_path)
         .arg("start")
         .current_dir(&target_root)
         .output()
@@ -210,12 +215,12 @@ fn target_app_wrapper_turns_partial_ai_web_config_into_managed_server() {
         String::from_utf8_lossy(&start.stderr)
     );
     assert!(!target_root.join(".refine").exists());
-    let status = std::process::Command::new(&wrapper_path)
+    let status = std::process::Command::new("sh").arg(&wrapper_path)
         .arg("status")
         .current_dir(&target_root)
         .output()
         .unwrap();
-    let stop = std::process::Command::new(&wrapper_path)
+    let stop = std::process::Command::new("sh").arg(&wrapper_path)
         .arg("stop")
         .current_dir(&target_root)
         .output()

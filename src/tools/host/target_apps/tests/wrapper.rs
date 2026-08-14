@@ -61,7 +61,12 @@ fn target_app_service_writes_manage_app_wrapper() {
     assert!(script.contains("# Analysis notes: provider analysis"));
     assert!(script.contains("export WRAP_VALUE='wrapped'"));
 
-    let output = std::process::Command::new(&wrapper_path)
+    // Run through `sh` rather than executing the freshly written script:
+    // a concurrently spawning test can hold a fork-inherited copy of the
+    // write descriptor for a moment, and direct execution then fails with
+    // ETXTBSY. The interpreter only opens the script for reading.
+    let output = std::process::Command::new("sh")
+        .arg(&wrapper_path)
         .arg("start")
         .current_dir(&target_root)
         .output()

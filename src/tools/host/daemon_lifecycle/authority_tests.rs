@@ -276,7 +276,14 @@ fn uninstalling_registered_but_inactive_installation_stops_observed_direct_runti
     let evidence = stopped.lifecycle_evidence.unwrap();
     assert_eq!(evidence.service_manager, "direct_process");
     assert_eq!(evidence.observed_reachable, Some(false));
-    assert_ne!(supervisor.wait(&process.id).unwrap().state, "running");
+    // An explicit stop removes the registration and every artifact it owned,
+    // so the settled outcome is a missing process; a terminal record is also
+    // acceptable if this wait observes the exit before cleanup finishes.
+    match supervisor.wait(&process.id) {
+        Ok(process) => assert_ne!(process.state, "running"),
+        Err(RefineError::NotFound(_)) => {}
+        Err(error) => panic!("failed to confirm stopped process: {error}"),
+    }
     assert!(!installation.status().unwrap().installed);
     assert!(!installation.backend_path().exists());
     assert_eq!(

@@ -428,6 +428,17 @@ impl FileProcessSupervisor {
     }
 
     pub(super) fn remove_process_artifacts(&self, process: &ManagedProcess) -> RefineResult<()> {
+        let lock = self.cleanup_lock(&process.id)?;
+        let removed = self.remove_process_artifacts_locked(process);
+        // The lock file itself is removed on this terminal path; the only
+        // contenders are the reaper and stoppers, and re-running these
+        // idempotent removals is harmless if one slips past the unlink.
+        let _ = fs::remove_file(self.cleanup_lock_path(&process.id));
+        FileExt::unlock(&lock).ok();
+        removed
+    }
+
+    fn remove_process_artifacts_locked(&self, process: &ManagedProcess) -> RefineResult<()> {
         let handoff_path = self.artifact_handoff_path(&process.id);
         // A live workflow consumer owns the transcript through this lease. Reconciliation may
         // already persist a truthful terminal state, but deletion waits until consumption ends.
@@ -540,6 +551,48 @@ impl FileProcessSupervisor {
         })
     }
 
+    /// Serializes terminal archiving against explicit-stop cleanup.
+    ///
+    /// The launching process's reaper and a stopper are usually different
+    /// supervisor instances — often different OS processes — so in-memory
+    /// coordination cannot order them. Without this lock the two interleaved
+    /// freely: archive-then-remove left nothing (fine), but remove-then-archive
+    /// resurrected a history record for a process an explicit stop had already
+    /// cleaned. The flock is advisory, per process id, and released on drop.
+    pub(super) fn cleanup_lock(&self, process_id: &str) -> RefineResult<fs::File> {
+        fs::create_dir_all(self.processes_dir()).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to create process registry {}: {error}",
+                self.processes_dir().display()
+            ))
+        })?;
+        let path = self.cleanup_lock_path(process_id);
+        let file = OpenOptions::new()
+            .create(true)
+            .truncate(false)
+            .read(true)
+            .write(true)
+            .open(&path)
+            .map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to open process cleanup lock {}: {error}",
+                    path.display()
+                ))
+            })?;
+        file.lock_exclusive().map_err(|error| {
+            RefineError::Io(format!(
+                "failed to lock process cleanup lock {}: {error}",
+                path.display()
+            ))
+        })?;
+        Ok(file)
+    }
+
+    pub(super) fn cleanup_lock_path(&self, process_id: &str) -> PathBuf {
+        self.processes_dir()
+            .join(format!(".{process_id}.cleanup.lock"))
+    }
+
     pub(super) fn archive_terminal_process(
         &self,
         process: &ManagedProcess,
@@ -549,6 +602,23 @@ impl FileProcessSupervisor {
                 "running process {} cannot be archived as terminal",
                 process.id
             )));
+        }
+        let lock = self.cleanup_lock(&process.id)?;
+        let archived = self.archive_terminal_process_locked(process);
+        FileExt::unlock(&lock).ok();
+        archived
+    }
+
+    fn archive_terminal_process_locked(
+        &self,
+        process: &ManagedProcess,
+    ) -> RefineResult<ManagedProcess> {
+        let registration = self.processes_dir().join(format!("{}.json", process.id));
+        // A missing registration means an explicit stop already removed this
+        // process and every artifact it owned; writing history now would
+        // resurrect a record the stop deliberately deleted.
+        if !registration.exists() {
+            return Ok(process.clone());
         }
         fs::create_dir_all(self.process_history_dir()).map_err(|error| {
             RefineError::Io(format!(
@@ -568,10 +638,7 @@ impl FileProcessSupervisor {
             &encoded,
             "process history",
         )?;
-        remove_file_if_present(
-            &self.processes_dir().join(format!("{}.json", archived.id)),
-            "active process registry",
-        )?;
+        remove_file_if_present(&registration, "active process registry")?;
         remove_file_if_present(
             &self.process_identity_path(&archived.id),
             "process identity",

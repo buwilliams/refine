@@ -219,6 +219,29 @@ impl InProcessWebServer {
             Ok(paths.checkout.clone())
         }) {
             Ok(checkout) => checkout,
+            // A checkout that cannot take source updates — a development run
+            // without a deployed binary — is a normal state, not a request
+            // error. The UI probes this passively on page load, so the status
+            // read answers with the unavailable affordance; an explicit check
+            // still surfaces the underlying error.
+            Err(error) if !fetch => {
+                return ApiResponse::json(
+                    200,
+                    json!({
+                        "available": false,
+                        "detail": error.to_string(),
+                        "source": {"operation": null},
+                        "source_check": {"freshness": "unknown", "in_flight": false},
+                        "source_update": {
+                            "visible": false,
+                            "enabled": false,
+                            "state": "unavailable",
+                            "update_available": false,
+                            "title": "Refine source updates are unavailable for this checkout"
+                        }
+                    }),
+                );
+            }
             Err(error) => return error_response(error),
         };
         self.handle_source_status_for_checkout(fetch, checkout)

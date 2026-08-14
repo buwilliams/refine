@@ -168,6 +168,14 @@ impl FileProcessSupervisor {
     where
         F: FnMut(ProcessCleanupStage) -> RefineResult<()>,
     {
+        // Serialize against the launcher's reaper (see `cleanup_lock`): without
+        // this, an archive racing the removal below could resurrect records
+        // for a process this cleanup deliberately retired. Held until return;
+        // the flock releases when the file handle drops.
+        let _cleanup_lock = match self.cleanup_lock(&expected.id) {
+            Ok(lock) => lock,
+            Err(error) => return Err(ConfirmedProcessCleanupFailure { outcome, error }),
+        };
         let handoff_path = self.artifact_handoff_path(&expected.id);
         let handoff = match OpenOptions::new()
             .read(true)
@@ -239,6 +247,7 @@ impl FileProcessSupervisor {
         {
             return Err(ConfirmedProcessCleanupFailure { outcome, error });
         }
+        let _ = fs::remove_file(self.cleanup_lock_path(&expected.id));
         Ok(outcome)
     }
 }
