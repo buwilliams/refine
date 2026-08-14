@@ -15,6 +15,14 @@ const BULK_STATUS_OPTIONS = [
   { value: "cancelled", label: "cancelled" },
 ];
 
+const GOALS_BULK_PENDING_MESSAGE = "Refine is working on it asynchronously.";
+
+async function submitGoalsBulkAction(payload) {
+  toast(GOALS_BULK_PENDING_MESSAGE, "info", { source: "goals-bulk" });
+  const response = await api("POST", "/api/goals/bulk", payload);
+  return await resolveBackgroundOperationResponse(response);
+}
+
 function goalsBulkFilterFromHash() {
   const f = goalsFilterFromHash();
   const filter = {};
@@ -118,13 +126,9 @@ async function openBulkModal(field) {
   if (next === null) return;
   if (!next) return;          // user opened the picker but didn't choose
   try {
-    let r = await api("POST", "/api/goals/bulk", {
+    const r = await submitGoalsBulkAction({
       filter, ...selectionFields, update: { [field]: next },
     });
-    r = await resolveBackgroundOperationResponse(
-      r,
-      `Bulk ${label.toLowerCase()} update is running in the background`,
-    );
     const failedN = Number(r.failed || (r.failures || []).length || 0);
     if (failedN) {
       toast(`Updated ${r.updated} goal${r.updated === 1 ? "" : "s"}; ` +

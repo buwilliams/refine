@@ -66,14 +66,10 @@ async function runBulkStatusCommand({ source, dest, button = null }) {
   );
   if (!ok) return;
   await withButtonBusy(button, "Moving...", async () => {
-    let r = await api("POST", "/api/goals/bulk", {
+    const r = await submitGoalsBulkAction({
       filter: currentNodeBulkFilter(source),
       update: { status: dest },
     });
-    r = await resolveBackgroundOperationResponse(
-      r,
-      "Bulk status update is running in the background",
-    );
     toast(`Updated ${r.updated} goal${r.updated === 1 ? "" : "s"}`, "info");
     if (state.currentRoute === "goals") await renderGoalsList();
     if (state.currentRoute === "dashboard") await refreshDashboard();
@@ -91,14 +87,10 @@ async function runFailedBackCommand({ button = null } = {}) {
   );
   if (!ok) return;
   await withButtonBusy(button, "Moving...", async () => {
-    let r = await api("POST", "/api/goals/bulk", {
+    const r = await submitGoalsBulkAction({
       filter: currentNodeBulkFilter("failed"),
       update: { status: "__last_workflow_state" },
     });
-    r = await resolveBackgroundOperationResponse(
-      r,
-      "Bulk retry is running in the background",
-    );
     toast(`Updated ${r.updated} goal${r.updated === 1 ? "" : "s"}`, "info");
     if (state.currentRoute === "goals") await renderGoalsList();
     if (state.currentRoute === "dashboard") await refreshDashboard();
