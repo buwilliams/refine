@@ -59,56 +59,40 @@ fn file_metrics_service_records_summarizes_filters_and_prunes() {
     assert_eq!(cleared.deleted, 2);
     assert!(!service.path().exists());
 
-    fs::remove_dir_all(temp_root).unwrap();
+    let _ = fs::remove_dir_all(temp_root);
 }
 
 #[test]
-fn file_metrics_service_tolerates_concatenated_jsonl_events() {
-    let temp_root = unique_temp_dir("metrics-corrupt-jsonl");
-    let service = FileMetricsService::new(temp_root.join("run/8080"));
-    let event_a = PerformanceEvent {
-        id: "a".to_string(),
-        occurred_at: "2026-01-01T00:00:00Z".to_string(),
-        operation: "http.request".to_string(),
-        elapsed_ms: 1.0,
-        success: true,
-        goal_id: None,
-        provider: None,
-        query_mode: None,
-        rows_returned: None,
-        rows_scanned: None,
-        details: json!({"path": "/nodes"}),
-    };
-    let event_b = PerformanceEvent {
-        id: "b".to_string(),
-        occurred_at: "2026-01-01T00:00:01Z".to_string(),
-        operation: "http.request".to_string(),
-        elapsed_ms: 2.0,
-        success: true,
-        goal_id: None,
-        provider: None,
-        query_mode: None,
-        rows_returned: None,
-        rows_scanned: None,
-        details: json!({"path": "/dashboard"}),
-    };
+fn metrics_are_memory_resident_bounded_and_remove_the_legacy_log() {
+    let temp_root = unique_temp_dir("metrics-memory");
+    let runtime_root = temp_root.join("run/8080");
+    let service = FileMetricsService::new(&runtime_root);
+
+    // A legacy on-disk log from an older build is removed by cleanup so
+    // upgraded installations reclaim the disk.
     fs::create_dir_all(service.path().parent().unwrap()).unwrap();
-    fs::write(
-        service.path(),
-        format!(
-            "{}{}\nnot-json\n",
-            serde_json::to_string(&event_a).unwrap(),
-            serde_json::to_string(&event_b).unwrap()
-        ),
-    )
-    .unwrap();
+    fs::write(service.path(), "legacy\n").unwrap();
+    service.cleanup(false).unwrap();
+    assert!(!service.path().exists());
 
+    // Recording never touches the filesystem.
+    service
+        .record_operation("http.request", 1.0, true, json!({"path": "/nodes"}))
+        .unwrap();
+    assert!(!service.path().exists());
+    assert!(!service.path().parent().unwrap().exists());
+
+    // The ring keeps the newest events once capacity is exceeded.
+    for index in 0..(RECENT_EVENT_CAPACITY + 10) {
+        service
+            .record_operation("http.request", index as f64, true, json!({}))
+            .unwrap();
+    }
     let report = service.report(PerformanceQuery::default()).unwrap();
-    assert_eq!(report.total_event_count, 2);
-    assert_eq!(report.events[0].id, "b");
-    assert_eq!(report.events[1].id, "a");
+    assert_eq!(report.total_event_count, RECENT_EVENT_CAPACITY);
 
-    fs::remove_dir_all(temp_root).unwrap();
+    service.cleanup(true).unwrap();
+    let _ = fs::remove_dir_all(temp_root);
 }
 
 fn unique_temp_dir(prefix: &str) -> PathBuf {
