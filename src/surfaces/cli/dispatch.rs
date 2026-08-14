@@ -685,6 +685,8 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
         Commands::System { action } => match action {
             SystemAction::Doctor { target_root, .. } => target_root.as_ref(),
             SystemAction::Install { .. }
+            | SystemAction::Build
+            | SystemAction::Clean
             | SystemAction::Repair { .. }
             | SystemAction::Update { .. }
             | SystemAction::ReleasePlan { .. }

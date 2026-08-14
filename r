@@ -1,10 +1,37 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# ./r always runs the production (release) binary at bin/refine — never a
+# debug build. `system start`, `system install`, and `system build` create or
+# refresh that binary; every other command requires it to exist already.
+
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
-MODE="${REFINE_RUN_MODE:-auto}"
 RELEASE_BIN="${REFINE_RELEASE_BIN:-$ROOT/bin/refine}"
 DEPLOYED_MARKER="${REFINE_DEPLOYED_MARKER:-$ROOT/.refine-deployed}"
+
+args_contain_help() {
+  for arg in "$@"; do
+    case "$arg" in
+      --help|-h) return 0 ;;
+    esac
+  done
+  return 1
+}
+
+# The production binary is stale when any build input is newer than it. Cargo
+# remains the authority on what actually recompiles; this check only decides
+# whether invoking Cargo is worth it at all, so `system start` on an unchanged
+# tree costs one directory scan instead of a build.
+source_changed_since_build() {
+  [ -x "$RELEASE_BIN" ] || return 0
+  local candidates=()
+  local path
+  for path in "$ROOT/src" "$ROOT/Cargo.toml" "$ROOT/Cargo.lock" "$ROOT/vendor" "$ROOT/build.rs"; do
+    [ -e "$path" ] && candidates+=("$path")
+  done
+  [ "${#candidates[@]}" -gt 0 ] || return 1
+  [ -n "$(find "${candidates[@]}" -newer "$RELEASE_BIN" -print -quit 2>/dev/null)" ]
+}
 
 install_release_binary() {
   local built_bin="$ROOT/target/release/refine"
@@ -16,6 +43,14 @@ install_release_binary() {
     printf 'refine: release build succeeded but did not produce %s\n' "$built_bin" >&2
     exit 1
   fi
+  if [ -f "$RELEASE_BIN" ] && cmp -s "$built_bin" "$RELEASE_BIN"; then
+    # The rebuild reproduced the installed binary. Refresh its timestamp so
+    # unchanged sources stop looking newer than it, and keep the marker.
+    touch "$RELEASE_BIN"
+    [ -f "$DEPLOYED_MARKER" ] || printf 'mode=deployed\nrelease_bin=bin/refine\n' > "$DEPLOYED_MARKER"
+    printf 'refine: production binary is already up to date: %s\n' "$RELEASE_BIN"
+    return 0
+  fi
   mkdir -p "$(dirname "$RELEASE_BIN")" "$(dirname "$DEPLOYED_MARKER")"
   trap 'rm -f "$staged_bin" "$staged_marker"' EXIT
   install -m 755 "$built_bin" "$staged_bin"
@@ -23,38 +58,26 @@ install_release_binary() {
   mv -f "$staged_bin" "$RELEASE_BIN"
   mv -f "$staged_marker" "$DEPLOYED_MARKER"
   trap - EXIT
+  printf 'refine: production binary updated: %s\n' "$RELEASE_BIN"
 }
 
-system_install_requested() {
-  [ "${1:-}" = "system" ] && [ "${2:-}" = "install" ] || return 1
-  for arg in "$@"; do
-    case "$arg" in
-      --help|-h) return 1 ;;
-    esac
-  done
-  return 0
+ensure_release_binary() {
+  local context="$1"
+  if [ ! -x "$RELEASE_BIN" ]; then
+    printf 'refine: production binary is missing; building it before %s\n' "$context"
+  elif source_changed_since_build; then
+    printf 'refine: source changed since the last production build; rebuilding before %s\n' "$context"
+  else
+    return 0
+  fi
+  install_release_binary
 }
 
-select_mode() {
-  case "$MODE" in
-    ""|auto)
-      if [ -f "$DEPLOYED_MARKER" ] && [ -x "$RELEASE_BIN" ]; then
-        printf '%s\n' "binary"
-      else
-        printf '%s\n' "cargo"
-      fi
-      ;;
-    cargo|dev|development)
-      printf '%s\n' "cargo"
-      ;;
-    binary|release|deployed)
-      printf '%s\n' "binary"
-      ;;
-    *)
-      printf 'refine: invalid REFINE_RUN_MODE=%s (expected auto, cargo, or binary)\n' "$MODE" >&2
-      exit 2
-      ;;
-  esac
+system_command_requested() {
+  local wanted="$1"
+  shift
+  [ "${1:-}" = "system" ] && [ "${2:-}" = "$wanted" ] || return 1
+  ! args_contain_help "$@"
 }
 
 print_test_usage() {
@@ -222,22 +245,56 @@ if [ "${1:-}" = "test" ]; then
   run_test_command "$@"
 fi
 
-if [ "${REFINE_R_DRY_RUN:-0}" != "1" ] \
-  && system_install_requested "$@"; then
-  install_release_binary
+# `system build` and `system clean` are launcher-owned: they manage the
+# production binary itself, so they never delegate to it.
+if [ "${1:-}" = "system" ] && { [ "${2:-}" = "build" ] || [ "${2:-}" = "clean" ]; }; then
+  BINARY_ACTION="$2"
+  shift 2
+  if args_contain_help "$@"; then
+    if [ "$BINARY_ACTION" = "build" ]; then
+      printf 'Usage: ./r system build\n\nRebuild the production binary from source and publish it as bin/refine.\n'
+    else
+      printf 'Usage: ./r system clean\n\nRemove the published production binary (bin/refine) and its deployed marker.\n'
+    fi
+    exit 0
+  fi
+  if [ "$#" -ne 0 ]; then
+    printf 'refine: ./r system %s accepts no arguments\n' "$BINARY_ACTION" >&2
+    exit 2
+  fi
+  if [ "${REFINE_R_DRY_RUN:-0}" = "1" ]; then
+    printf 'mode=%s\n' "$BINARY_ACTION"
+    if [ "$BINARY_ACTION" = "build" ]; then
+      printf 'executable=cargo\n'
+      printf 'command=cargo build --release --locked --target-dir %s/target --manifest-path %s/Cargo.toml\n' "$ROOT" "$ROOT"
+    else
+      printf 'executable=rm\n'
+      printf 'command=rm -f %s %s\n' "$RELEASE_BIN" "$DEPLOYED_MARKER"
+    fi
+    exit 0
+  fi
+  if [ "$BINARY_ACTION" = "build" ]; then
+    printf 'refine: building production binary from source\n'
+    install_release_binary
+  else
+    rm -f "$RELEASE_BIN" "$DEPLOYED_MARKER"
+    printf 'refine: removed production binary %s\n' "$RELEASE_BIN"
+  fi
+  exit 0
 fi
 
-SELECTED_MODE="$(select_mode)"
+if [ "${REFINE_R_DRY_RUN:-0}" != "1" ]; then
+  if system_command_requested install "$@"; then
+    ensure_release_binary "system install"
+  elif system_command_requested start "$@"; then
+    ensure_release_binary "system start"
+  fi
+fi
 
 if [ "${REFINE_R_DRY_RUN:-0}" = "1" ]; then
-  printf 'mode=%s\n' "$SELECTED_MODE"
-  if [ "$SELECTED_MODE" = "binary" ]; then
-    printf 'executable=%s\n' "$RELEASE_BIN"
-    printf 'command=%s' "$RELEASE_BIN"
-  else
-    printf 'executable=cargo\n'
-    printf 'command=cargo run --quiet --manifest-path %s/Cargo.toml --' "$ROOT"
-  fi
+  printf 'mode=binary\n'
+  printf 'executable=%s\n' "$RELEASE_BIN"
+  printf 'command=%s' "$RELEASE_BIN"
   for arg in "$@"; do
     printf ' %s' "$arg"
   done
@@ -245,17 +302,18 @@ if [ "${REFINE_R_DRY_RUN:-0}" = "1" ]; then
   exit 0
 fi
 
-if [ "$SELECTED_MODE" = "binary" ]; then
-  if [ ! -x "$RELEASE_BIN" ]; then
-    printf 'refine: deployed binary is missing or not executable: %s\n' "$RELEASE_BIN" >&2
-    printf 'refine: rebuild it per docs/runbooks/install.md, or use REFINE_RUN_MODE=cargo ./r ...\n' >&2
-    exit 127
-  fi
-  export REFINE_LAUNCH_MODE="binary"
-  export REFINE_LAUNCH_EXECUTABLE="$RELEASE_BIN"
-  exec "$RELEASE_BIN" "$@"
+if [ ! -x "$RELEASE_BIN" ]; then
+  printf 'refine: production binary is missing: %s\n' "$RELEASE_BIN" >&2
+  printf 'refine: build it with ./r system build (system start and system install build it automatically)\n' >&2
+  exit 127
 fi
 
-export REFINE_LAUNCH_MODE="cargo"
-unset REFINE_LAUNCH_EXECUTABLE
-exec cargo run --quiet --manifest-path "$ROOT/Cargo.toml" -- "$@"
+# Other commands run whatever binary is published; they never build. Surface
+# staleness so a stale binary is a visible choice rather than a surprise.
+if source_changed_since_build; then
+  printf 'refine: note: source changed since the last production build; run ./r system build to refresh bin/refine\n' >&2
+fi
+
+export REFINE_LAUNCH_MODE="binary"
+export REFINE_LAUNCH_EXECUTABLE="$RELEASE_BIN"
+exec "$RELEASE_BIN" "$@"

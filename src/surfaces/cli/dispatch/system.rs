@@ -28,6 +28,16 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
             Ok(())
         }
         Commands::System {
+            action: SystemAction::Build,
+        } => Err(RefineError::InvalidInput(
+            "system build manages the production binary itself and runs through the checkout launcher: ./r system build".to_string(),
+        )),
+        Commands::System {
+            action: SystemAction::Clean,
+        } => Err(RefineError::InvalidInput(
+            "system clean manages the production binary itself and runs through the checkout launcher: ./r system clean".to_string(),
+        )),
+        Commands::System {
             action:
                 SystemAction::Repair {
                     port,

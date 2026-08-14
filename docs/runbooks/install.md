@@ -81,14 +81,23 @@ Do not offer `smoke-ai` during installation. It is reserved for deterministic te
 
 ## Product and runtime ownership
 
-The directory selected above is the product home. Installed mode uses its
-stable `<refine-checkout>/bin/refine`; source/debug mode uses the active Cargo
-executable from the same checkout. Both modes use the same base runtime,
-`<refine-checkout>/run`, and port `<port>` owns only
-`<refine-checkout>/run/<port>`. `./r` anchors the invocation to that product
-home; the directory from which a user launches it is not an ownership signal.
-Do not configure HOME, XDG, platform support directories, or a neighboring
-checkout as the runtime root.
+The directory selected above is the product home. `./r` always runs the
+stable production binary `<refine-checkout>/bin/refine` — never a debug
+build. `./r system start`, `./r system install`, and `./r system build`
+create or refresh that binary (rebuilding only when the source has changed
+since the last production build) and say so on stdout; every other command
+requires it to already exist. The base runtime is `<refine-checkout>/run`,
+and port `<port>` owns only `<refine-checkout>/run/<port>`. `./r` anchors the
+invocation to that product home; the directory from which a user launches it
+is not an ownership signal. Do not configure HOME, XDG, platform support
+directories, or a neighboring checkout as the runtime root.
+
+Manage the production binary directly with:
+
+```bash
+./r system build   # rebuild bin/refine from source
+./r system clean   # remove bin/refine and the deployed marker
+```
 
 A published installation is intentionally gitless and is identified by
 `.refine-deployed` plus `bin/refine`. It supports ordinary daemon, web, MCP,
@@ -142,10 +151,7 @@ rm -rf "$tmp"
 
 ```bash
 cd <refine-checkout>
-cargo build --release --locked
-mkdir -p bin
-install -m 755 target/release/refine bin/refine
-printf 'mode=deployed\nrelease_bin=bin/refine\n' > .refine-deployed
+./r system build
 ```
 
 4. When updating manually, restart Refine and verify it is healthy:

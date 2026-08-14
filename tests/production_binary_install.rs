@@ -3,106 +3,65 @@ use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
-fn wrapper_auto_mode_selects_cargo_for_source_and_binary_for_deployed_checkout() {
+fn wrapper_always_selects_the_production_binary() {
     let repo = env!("CARGO_MANIFEST_DIR");
-    let temp_root = unique_temp_dir("wrapper-mode");
-    let marker = temp_root.join(".refine-deployed");
-    fs::create_dir_all(&temp_root).unwrap();
 
-    let source = Command::new("bash")
+    let plain = Command::new("bash")
         .arg("r")
         .arg("--help")
         .current_dir(repo)
         .env("REFINE_R_DRY_RUN", "1")
-        .env("REFINE_DEPLOYED_MARKER", &marker)
         .env("REFINE_RELEASE_BIN", "/bin/echo")
         .output()
         .unwrap();
-    assert!(source.status.success());
-    let source_output = String::from_utf8_lossy(&source.stdout);
-    assert!(source_output.contains("mode=cargo"));
-    assert!(source_output.contains("command=cargo run --quiet"));
+    assert!(plain.status.success());
+    let plain_output = String::from_utf8_lossy(&plain.stdout);
+    assert!(plain_output.contains("mode=binary"));
+    assert!(plain_output.contains("executable=/bin/echo"));
+    assert!(plain_output.contains("command=/bin/echo --help"));
 
-    fs::write(&marker, "mode=deployed\n").unwrap();
-    let deployed = Command::new("bash")
-        .arg("r")
-        .arg("system")
-        .arg("status")
-        .current_dir(repo)
-        .env("REFINE_R_DRY_RUN", "1")
-        .env("REFINE_DEPLOYED_MARKER", &marker)
-        .env("REFINE_RELEASE_BIN", "/bin/echo")
-        .output()
-        .unwrap();
-    assert!(deployed.status.success());
-    let deployed_output = String::from_utf8_lossy(&deployed.stdout);
-    assert!(deployed_output.contains("mode=binary"));
-    assert!(deployed_output.contains("executable=/bin/echo"));
-    assert!(deployed_output.contains("command=/bin/echo system status"));
-
+    // The launcher never runs a debug build: the historical cargo-mode
+    // override is ignored rather than honored.
     let forced = Command::new("bash")
         .arg("r")
-        .arg("system")
-        .arg("status")
+        .args(["system", "status"])
         .current_dir(repo)
         .env("REFINE_R_DRY_RUN", "1")
         .env("REFINE_RUN_MODE", "cargo")
-        .env("REFINE_DEPLOYED_MARKER", &marker)
         .env("REFINE_RELEASE_BIN", "/bin/echo")
         .output()
         .unwrap();
     assert!(forced.status.success());
     let forced_output = String::from_utf8_lossy(&forced.stdout);
-    assert!(forced_output.contains("mode=cargo"));
-
-    fs::remove_dir_all(temp_root).unwrap();
+    assert!(forced_output.contains("mode=binary"));
+    assert!(forced_output.contains("command=/bin/echo system status"));
 }
 
 #[test]
-fn wrapper_system_install_builds_and_publishes_release_before_service_registration() {
-    let repo = env!("CARGO_MANIFEST_DIR");
-    let temp_root = unique_temp_dir("wrapper-system-install");
-    let fake_bin = temp_root.join("fake-bin");
-    fs::create_dir_all(&fake_bin).unwrap();
-    fs::copy(format!("{repo}/r"), temp_root.join("r")).unwrap();
-    fs::write(temp_root.join("Cargo.toml"), "[package]\nname='fixture'\n").unwrap();
+fn wrapper_system_install_builds_only_when_source_changed() {
+    let temp_root = wrapper_fixture("wrapper-system-install");
     let cargo_log = temp_root.join("cargo.log");
-    let fake_cargo = fake_bin.join("cargo");
-    fs::write(
-        &fake_cargo,
-        format!(
-            "#!/usr/bin/env bash\nset -euo pipefail\nprintf '%s\\n' \"$*\" > '{}'\nmkdir -p '{}/target/release'\ncat > '{}/target/release/refine' <<'EOF'\n#!/usr/bin/env bash\nprintf 'installed-command=%s\\n' \"$*\"\nEOF\nchmod +x '{}/target/release/refine'\n",
-            cargo_log.display(),
-            temp_root.display(),
-            temp_root.display(),
-            temp_root.display(),
-        ),
-    )
-    .unwrap();
-    make_executable(&fake_cargo);
-    make_executable(&temp_root.join("r"));
+    let path_env = fixture_path_env(&temp_root);
 
+    // First install: no production binary yet, so the wrapper builds and
+    // publishes it before delegating to the installed binary.
     let output = Command::new("bash")
         .arg("r")
         .args(["system", "install", "--port", "8082"])
         .current_dir(&temp_root)
-        .env(
-            "PATH",
-            format!(
-                "{}:{}",
-                fake_bin.display(),
-                std::env::var("PATH").unwrap_or_default()
-            ),
-        )
+        .env("PATH", &path_env)
         .output()
         .unwrap();
-
     assert!(
         output.status.success(),
         "stdout:\n{}\nstderr:\n{}",
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("production binary is missing; building it before system install"));
+    assert!(stdout.contains("production binary updated"));
+    assert!(stdout.contains("installed-command=system install --port 8082"));
     assert_eq!(
         fs::read_to_string(&cargo_log).unwrap().trim(),
         format!(
@@ -116,75 +75,60 @@ fn wrapper_system_install_builds_and_publishes_release_before_service_registrati
         fs::read_to_string(temp_root.join(".refine-deployed")).unwrap(),
         "mode=deployed\nrelease_bin=bin/refine\n"
     );
+
+    // Second install with unchanged source: no rebuild, straight delegation.
+    fs::remove_file(&cargo_log).unwrap();
+    let unchanged = Command::new("bash")
+        .arg("r")
+        .args(["system", "install", "--port", "8082"])
+        .current_dir(&temp_root)
+        .env("PATH", &path_env)
+        .output()
+        .unwrap();
+    assert!(unchanged.status.success());
     assert_eq!(
-        String::from_utf8_lossy(&output.stdout).trim(),
+        String::from_utf8_lossy(&unchanged.stdout).trim(),
         "installed-command=system install --port 8082"
     );
+    assert!(!cargo_log.exists(), "unchanged source must not rebuild");
 
-    fs::remove_file(&cargo_log).unwrap();
+    // Dry runs and help never build.
     let dry_run = Command::new("bash")
         .arg("r")
         .args(["system", "install", "--port", "8082"])
         .current_dir(&temp_root)
         .env("REFINE_R_DRY_RUN", "1")
-        .env(
-            "PATH",
-            format!(
-                "{}:{}",
-                fake_bin.display(),
-                std::env::var("PATH").unwrap_or_default()
-            ),
-        )
+        .env("PATH", &path_env)
         .output()
         .unwrap();
     assert!(dry_run.status.success());
     assert!(!cargo_log.exists(), "dry-run must not build the release");
-
     let help = Command::new("bash")
         .arg("r")
         .args(["system", "install", "--port", "8082", "--help"])
         .current_dir(&temp_root)
-        .env(
-            "PATH",
-            format!(
-                "{}:{}",
-                fake_bin.display(),
-                std::env::var("PATH").unwrap_or_default()
-            ),
-        )
+        .env("PATH", &path_env)
         .output()
         .unwrap();
     assert!(help.status.success());
     assert!(!cargo_log.exists(), "help must not build the release");
 
+    // Changed source with a failing build: the failure propagates, service
+    // registration never runs, and the published binary is untouched.
     let installed_before = fs::read(temp_root.join("bin/refine")).unwrap();
     let marker_before = fs::read(temp_root.join(".refine-deployed")).unwrap();
-    fs::write(
-        &fake_cargo,
-        format!(
-            "#!/usr/bin/env bash\nprintf '%s\\n' \"$*\" > '{}'\nexit 23\n",
-            cargo_log.display()
-        ),
-    )
-    .unwrap();
-    make_executable(&fake_cargo);
+    fs::write(temp_root.join("Cargo.toml"), "[package]\nname='fixture'\n").unwrap();
+    write_failing_fake_cargo(&temp_root, &cargo_log, 23);
     let failed = Command::new("bash")
         .arg("r")
         .args(["system", "install", "--port", "8082"])
         .current_dir(&temp_root)
-        .env(
-            "PATH",
-            format!(
-                "{}:{}",
-                fake_bin.display(),
-                std::env::var("PATH").unwrap_or_default()
-            ),
-        )
+        .env("PATH", &path_env)
         .output()
         .unwrap();
     assert_eq!(failed.status.code(), Some(23));
     assert!(
-        failed.stdout.is_empty(),
+        !String::from_utf8_lossy(&failed.stdout).contains("installed-command="),
         "service registration must not run"
     );
     assert_eq!(
@@ -195,6 +139,136 @@ fn wrapper_system_install_builds_and_publishes_release_before_service_registrati
         fs::read(temp_root.join(".refine-deployed")).unwrap(),
         marker_before
     );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn wrapper_system_start_builds_missing_production_binary() {
+    let temp_root = wrapper_fixture("wrapper-system-start");
+    let cargo_log = temp_root.join("cargo.log");
+    let path_env = fixture_path_env(&temp_root);
+
+    let output = Command::new("bash")
+        .arg("r")
+        .args(["system", "start", "--port", "9099"])
+        .current_dir(&temp_root)
+        .env("PATH", &path_env)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("production binary is missing; building it before system start"));
+    assert!(stdout.contains("installed-command=system start --port 9099"));
+    assert!(temp_root.join("bin/refine").is_file());
+
+    // Unchanged source: start delegates without rebuilding.
+    fs::remove_file(&cargo_log).unwrap();
+    let unchanged = Command::new("bash")
+        .arg("r")
+        .args(["system", "start", "--port", "9099"])
+        .current_dir(&temp_root)
+        .env("PATH", &path_env)
+        .output()
+        .unwrap();
+    assert!(unchanged.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&unchanged.stdout).trim(),
+        "installed-command=system start --port 9099"
+    );
+    assert!(!cargo_log.exists(), "unchanged source must not rebuild");
+
+    // Changed source: start rebuilds before delegating.
+    fs::write(temp_root.join("Cargo.toml"), "[package]\nname='fixture'\n").unwrap();
+    let rebuilt = Command::new("bash")
+        .arg("r")
+        .args(["system", "start", "--port", "9099"])
+        .current_dir(&temp_root)
+        .env("PATH", &path_env)
+        .output()
+        .unwrap();
+    assert!(rebuilt.status.success());
+    let rebuilt_stdout = String::from_utf8_lossy(&rebuilt.stdout);
+    assert!(rebuilt_stdout.contains("source changed since the last production build"));
+    assert!(rebuilt_stdout.contains("installed-command=system start --port 9099"));
+    assert!(cargo_log.exists());
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn wrapper_system_build_and_clean_manage_the_production_binary() {
+    let temp_root = wrapper_fixture("wrapper-build-clean");
+    let cargo_log = temp_root.join("cargo.log");
+    let path_env = fixture_path_env(&temp_root);
+
+    let build = Command::new("bash")
+        .arg("r")
+        .args(["system", "build"])
+        .current_dir(&temp_root)
+        .env("PATH", &path_env)
+        .output()
+        .unwrap();
+    assert!(
+        build.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&build.stdout),
+        String::from_utf8_lossy(&build.stderr)
+    );
+    let build_stdout = String::from_utf8_lossy(&build.stdout);
+    assert!(build_stdout.contains("building production binary from source"));
+    assert!(build_stdout.contains("production binary updated"));
+    assert!(temp_root.join("bin/refine").is_file());
+    assert!(temp_root.join(".refine-deployed").is_file());
+
+    // A repeat build always invokes Cargo but reports an unchanged binary.
+    fs::remove_file(&cargo_log).unwrap();
+    let rebuild = Command::new("bash")
+        .arg("r")
+        .args(["system", "build"])
+        .current_dir(&temp_root)
+        .env("PATH", &path_env)
+        .output()
+        .unwrap();
+    assert!(rebuild.status.success());
+    assert!(
+        String::from_utf8_lossy(&rebuild.stdout).contains("production binary is already up to date")
+    );
+    assert!(cargo_log.exists(), "system build always runs the build");
+
+    let clean = Command::new("bash")
+        .arg("r")
+        .args(["system", "clean"])
+        .current_dir(&temp_root)
+        .env("PATH", &path_env)
+        .output()
+        .unwrap();
+    assert!(clean.status.success());
+    assert!(String::from_utf8_lossy(&clean.stdout).contains("removed production binary"));
+    assert!(!temp_root.join("bin/refine").exists());
+    assert!(!temp_root.join(".refine-deployed").exists());
+
+    // Commands other than start/install/build never build; without the
+    // production binary they fail with guidance instead of falling back to a
+    // debug build.
+    fs::remove_file(&cargo_log).unwrap();
+    let status = Command::new("bash")
+        .arg("r")
+        .args(["system", "status"])
+        .current_dir(&temp_root)
+        .env("PATH", &path_env)
+        .output()
+        .unwrap();
+    assert_eq!(status.status.code(), Some(127));
+    let status_stderr = String::from_utf8_lossy(&status.stderr);
+    assert!(status_stderr.contains("production binary is missing"));
+    assert!(status_stderr.contains("./r system build"));
+    assert!(!cargo_log.exists());
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -223,7 +297,6 @@ fn wrapper_test_command_routes_to_cargo_and_xtask_suites() {
         .arg("full")
         .current_dir(repo)
         .env("REFINE_R_DRY_RUN", "1")
-        .env("REFINE_RUN_MODE", "binary")
         .output()
         .unwrap();
     assert!(full.status.success());
@@ -301,8 +374,59 @@ fn install_runbook_uses_system_install_as_the_complete_build_and_registration_bo
     assert!(runbook.contains("./r system start --port <port>"));
     assert!(runbook.contains("Default: `8082`"));
     assert!(runbook.contains("Do not offer `smoke-ai` during installation"));
+    assert!(runbook.contains("./r system build"));
+    assert!(runbook.contains("./r system clean"));
     assert!(gitignore.lines().any(|line| line == "/bin/"));
     assert!(gitignore.lines().any(|line| line == "/.refine-deployed"));
+}
+
+/// A minimal checkout: the launcher script, a Cargo manifest, and a fake
+/// `cargo` on PATH whose `build` writes a shell script standing in for the
+/// release binary and records its arguments.
+fn wrapper_fixture(prefix: &str) -> std::path::PathBuf {
+    let repo = env!("CARGO_MANIFEST_DIR");
+    let temp_root = unique_temp_dir(prefix);
+    let fake_bin = temp_root.join("fake-bin");
+    fs::create_dir_all(&fake_bin).unwrap();
+    fs::copy(format!("{repo}/r"), temp_root.join("r")).unwrap();
+    fs::write(temp_root.join("Cargo.toml"), "[package]\nname='fixture'\n").unwrap();
+    let cargo_log = temp_root.join("cargo.log");
+    let fake_cargo = fake_bin.join("cargo");
+    fs::write(
+        &fake_cargo,
+        format!(
+            "#!/usr/bin/env bash\nset -euo pipefail\nprintf '%s\\n' \"$*\" > '{}'\nmkdir -p '{}/target/release'\ncat > '{}/target/release/refine' <<'EOF'\n#!/usr/bin/env bash\nprintf 'installed-command=%s\\n' \"$*\"\nEOF\nchmod +x '{}/target/release/refine'\n",
+            cargo_log.display(),
+            temp_root.display(),
+            temp_root.display(),
+            temp_root.display(),
+        ),
+    )
+    .unwrap();
+    make_executable(&fake_cargo);
+    make_executable(&temp_root.join("r"));
+    temp_root
+}
+
+fn fixture_path_env(temp_root: &std::path::Path) -> String {
+    format!(
+        "{}:{}",
+        temp_root.join("fake-bin").display(),
+        std::env::var("PATH").unwrap_or_default()
+    )
+}
+
+fn write_failing_fake_cargo(temp_root: &std::path::Path, cargo_log: &std::path::Path, code: i32) {
+    let fake_cargo = temp_root.join("fake-bin/cargo");
+    fs::write(
+        &fake_cargo,
+        format!(
+            "#!/usr/bin/env bash\nprintf '%s\\n' \"$*\" > '{}'\nexit {code}\n",
+            cargo_log.display()
+        ),
+    )
+    .unwrap();
+    make_executable(&fake_cargo);
 }
 
 fn make_executable(path: &std::path::Path) {
