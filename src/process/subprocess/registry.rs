@@ -239,6 +239,23 @@ impl FileProcessSupervisor {
         write_json_atomically(&path, &encoded, "process")
     }
 
+    /// Register a run-to-completion process whose record is unlinked before the
+    /// launch call returns. The record only serves live observability, so it is
+    /// written without the durability fsync a long-lived registration needs.
+    pub(super) fn write_process_transient(&self, process: &ManagedProcess) -> RefineResult<()> {
+        fs::create_dir_all(self.processes_dir()).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to create process registry {}: {error}",
+                self.processes_dir().display()
+            ))
+        })?;
+        let path = self.processes_dir().join(format!("{}.json", process.id));
+        let encoded = serde_json::to_vec_pretty(process).map_err(|error| {
+            RefineError::Serialization(format!("failed to encode process: {error}"))
+        })?;
+        write_json_atomically_transient(&path, &encoded, "process")
+    }
+
     pub(super) fn write_process_identity(
         &self,
         identity: &ManagedProcessIdentity,
@@ -263,15 +280,45 @@ impl FileProcessSupervisor {
         &self,
         process: &ManagedProcess,
     ) -> RefineResult<ManagedProcessIdentity> {
-        let identity = ManagedProcessIdentity {
+        let identity = self.build_process_identity(process)?;
+        self.write_process_identity(&identity)?;
+        Ok(identity)
+    }
+
+    /// Identity for a run-to-completion process; see [`Self::write_process_transient`].
+    pub(super) fn create_process_identity_transient(
+        &self,
+        process: &ManagedProcess,
+    ) -> RefineResult<ManagedProcessIdentity> {
+        let identity = self.build_process_identity(process)?;
+        fs::create_dir_all(self.process_identities_dir()).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to create process identity registry {}: {error}",
+                self.process_identities_dir().display()
+            ))
+        })?;
+        let encoded = serde_json::to_vec_pretty(&identity).map_err(|error| {
+            RefineError::Serialization(format!("failed to encode process identity: {error}"))
+        })?;
+        write_json_atomically_transient(
+            &self.process_identity_path(&identity.process_id),
+            &encoded,
+            "process identity",
+        )?;
+        Ok(identity)
+    }
+
+    fn build_process_identity(
+        &self,
+        process: &ManagedProcess,
+    ) -> RefineResult<ManagedProcessIdentity> {
+        Ok(ManagedProcessIdentity {
             process_id: process.id.clone(),
             owner: process.owner.clone(),
             pid: process.pid,
             os_identity: process.pid.map(os_process_identity).transpose()?.flatten(),
             registered_at: now_millis_string(),
-        };
-        self.write_process_identity(&identity)?;
-        Ok(identity)
+        })
     }
 
     pub(super) fn load_process_identity(

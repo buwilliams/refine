@@ -43,7 +43,7 @@ impl InProcessWebServer {
     }
 
     pub(crate) fn handle_features_list(&self, raw_path: &str) -> ApiResponse {
-        let projection = match self.current_projection() {
+        let projection = match self.current_projection_shared() {
             Ok(projection) => projection,
             Err(error) => return error_response(error),
         };

@@ -269,7 +269,68 @@ impl FileActivityService {
         }
         Ok(entries)
     }
+
+    /// Newest `limit` entries decoded from the log's tail bytes, or `None`
+    /// when the tail cannot answer authoritatively and the caller must fall
+    /// back to a full read. A line cut in half by the seek is skipped.
+    fn recent_from_tail(&self, limit: usize) -> RefineResult<Option<Vec<ActivityEntry>>> {
+        use std::io::{Read, Seek, SeekFrom};
+        let path = self.path();
+        let mut file = match fs::File::open(&path) {
+            Ok(file) => file,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(Some(Vec::new()));
+            }
+            Err(error) => {
+                return Err(RefineError::Io(format!(
+                    "failed to open activity log {}: {error}",
+                    path.display()
+                )));
+            }
+        };
+        let len = file
+            .metadata()
+            .map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to stat activity log {}: {error}",
+                    path.display()
+                ))
+            })?
+            .len();
+        let seek_to = len.saturating_sub(ACTIVITY_TAIL_BYTES);
+        if seek_to > 0 {
+            file.seek(SeekFrom::Start(seek_to)).map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to seek activity log {}: {error}",
+                    path.display()
+                ))
+            })?;
+        }
+        let mut text = String::new();
+        file.read_to_string(&mut text).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to read activity log {}: {error}",
+                path.display()
+            ))
+        })?;
+        let mut entries = text
+            .lines()
+            .skip(if seek_to > 0 { 1 } else { 0 })
+            .filter(|line| !line.trim().is_empty())
+            .filter_map(|line| serde_json::from_str::<ActivityEntry>(line).ok())
+            .collect::<Vec<_>>();
+        if entries.len() < limit && seek_to > 0 {
+            return Ok(None);
+        }
+        entries.sort_by(|a, b| b.datetime.cmp(&a.datetime).then_with(|| b.id.cmp(&a.id)));
+        entries.truncate(limit);
+        Ok(Some(entries))
+    }
 }
+
+/// Windows at or below this size are served from the log tail.
+const ACTIVITY_TAIL_FAST_PATH_LIMIT: usize = 50;
+const ACTIVITY_TAIL_BYTES: u64 = 128 * 1024;
 
 impl ActivityService for FileActivityService {
     fn append(&self, entry: ActivityEntry) -> RefineResult<()> {
@@ -307,6 +368,14 @@ impl ActivityService for FileActivityService {
     }
 
     fn recent(&self, limit: usize) -> RefineResult<Vec<ActivityEntry>> {
+        // The SSE producer asks for the newest entry twice a second; parsing
+        // the entire append-only log for that made the poll cost grow with the
+        // log's lifetime. Small windows are answered from the file's tail.
+        if limit <= ACTIVITY_TAIL_FAST_PATH_LIMIT
+            && let Some(entries) = self.recent_from_tail(limit)?
+        {
+            return Ok(entries);
+        }
         self.query(ActivityQuery {
             limit,
             ..ActivityQuery::default()

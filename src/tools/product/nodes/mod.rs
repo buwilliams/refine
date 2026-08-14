@@ -428,9 +428,19 @@ fn write_json(path: &Path, value: &impl serde::Serialize) -> RefineResult<()> {
     let encoded = serde_json::to_string_pretty(value).map_err(|error| {
         RefineError::Serialization(format!("failed to encode node registry: {error}"))
     })?;
-    fs::write(path, format!("{encoded}\n")).map_err(|error| {
+    // Temp-and-rename: a crash mid-write on a bare `fs::write` truncates the
+    // node registry, and concurrent readers could observe the partial file.
+    let temp = path.with_extension(format!("json.{}.tmp", std::process::id()));
+    fs::write(&temp, format!("{encoded}\n")).map_err(|error| {
         RefineError::Io(format!(
             "failed to write node registry {}: {error}",
+            temp.display()
+        ))
+    })?;
+    fs::rename(&temp, path).map_err(|error| {
+        let _ = fs::remove_file(&temp);
+        RefineError::Io(format!(
+            "failed to commit node registry {}: {error}",
             path.display()
         ))
     })

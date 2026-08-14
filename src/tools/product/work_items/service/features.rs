@@ -137,7 +137,7 @@ impl FileWorkItemService {
 
     pub fn list_feature_summaries(&self) -> RefineResult<Vec<FeatureSummaryProjection>> {
         let snapshot = self.projection_snapshot()?;
-        Ok(snapshot.features.into_values().collect())
+        Ok(snapshot.features.values().cloned().collect())
     }
 
     pub fn assign_goal_to_feature(

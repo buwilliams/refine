@@ -29,7 +29,20 @@ impl LocalHttpDaemon {
             let mut seen_stream_signatures: BTreeMap<&'static str, BTreeSet<String>> =
                 BTreeMap::new();
             loop {
-                let frames = match batches.recv().await {
+                // The recv is bounded so the stream can observe shutdown and
+                // finish; an SSE connection that never ends would hold the
+                // graceful drain open forever.
+                let received =
+                    match tokio::time::timeout(Duration::from_secs(1), batches.recv()).await {
+                        Ok(received) => received,
+                        Err(_) => {
+                            if DAEMON_SHUTTING_DOWN.load(Ordering::SeqCst) {
+                                break;
+                            }
+                            continue;
+                        }
+                    };
+                let frames = match received {
                     Ok(Ok(frames)) => frames,
                     Ok(Err(error)) => {
                         let event = Event::default()
@@ -107,6 +120,10 @@ impl LocalHttpDaemon {
     async fn produce_sse_frame_batches(self, stream_name: &'static str) {
         let mut previous_state = None;
         loop {
+            if DAEMON_SHUTTING_DOWN.load(Ordering::SeqCst) {
+                self.mark_sse_frame_producer_stopped();
+                return;
+            }
             if self.stop_sse_frame_producer_when_idle() {
                 return;
             }
@@ -188,6 +205,9 @@ impl LocalHttpDaemon {
             let mut last_attention = None;
             let mut attached = false;
             loop {
+                if DAEMON_SHUTTING_DOWN.load(Ordering::SeqCst) {
+                    return;
+                }
                 let Some(runtime_root) = runtime_root.as_deref() else {
                     let event = Event::default()
                         .event("terminal_error")
@@ -554,11 +574,19 @@ pub(super) fn should_write_sse_frame(
         last_state_signatures.insert(frame.event, signature);
         return true;
     }
-    seen_stream_signatures
-        .entry(frame.event)
-        .or_default()
-        .insert(signature)
+    let signatures = seen_stream_signatures.entry(frame.event).or_default();
+    // Pure dedup memory: the connection re-sends a replayed frame after a
+    // wholesale clear, and every client handler already tolerates replays.
+    // Without the cap this set grew for the life of the connection.
+    if signatures.len() > SEEN_STREAM_SIGNATURE_CAPACITY {
+        signatures.clear();
+    }
+    signatures.insert(signature)
 }
+
+/// Distinct stream-frame signatures one SSE connection remembers per event
+/// type before the dedup memory is discarded wholesale.
+const SEEN_STREAM_SIGNATURE_CAPACITY: usize = 4_096;
 
 pub(super) fn state_sse_event(event: &str) -> bool {
     matches!(
@@ -574,8 +602,13 @@ pub(super) fn state_sse_event(event: &str) -> bool {
 
 pub(super) fn sse_frame_signature(frame: &SseEventFrame) -> String {
     let mut data = frame.data.clone();
-    if matches!(frame.event, "system_operation" | "operation_progress")
-        && let Some(object) = data.as_object_mut()
+    // The build-time timestamp would make every rebuild's frame unique: the
+    // dedup set never matched and retained one full-output signature per
+    // second per process for the life of the connection.
+    if matches!(
+        frame.event,
+        "system_operation" | "operation_progress" | "process_output"
+    ) && let Some(object) = data.as_object_mut()
     {
         object.remove("timestamp");
     }

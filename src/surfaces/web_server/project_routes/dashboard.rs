@@ -7,7 +7,7 @@ impl InProcessWebServer {
             Err(error) => return error_response(error),
         };
         let attached = current_target_root.is_some();
-        let projection = match self.current_projection_with_runtime() {
+        let projection = match self.current_projection_with_runtime_shared() {
             Ok(projection) => projection,
             Err(error) => return error_response(error),
         };

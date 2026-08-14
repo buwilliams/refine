@@ -53,15 +53,21 @@ pub(super) fn change_projection_key(change: &ChangeSummaryProjection) -> String 
     )
 }
 
+/// Joins a commit to a Goal by finding a Goal id embedded in its subject or
+/// branch. Ids are looked up token-by-token against the Goal map instead of
+/// scanning every Goal per commit: with a thousand recent commits the old scan
+/// was the largest cost of projecting changes. Ids appear delimited by
+/// non-alphanumeric characters in every branch and subject Refine writes.
 pub(super) fn matching_change_goal<'a>(
     goals: &'a BTreeMap<String, GoalSummaryProjection>,
     branch: Option<&str>,
     subject: &str,
 ) -> Option<&'a GoalSummaryProjection> {
-    goals.values().find(|goal| {
-        subject.contains(&goal.goal.id)
-            || branch.is_some_and(|branch| branch.contains(&goal.goal.id))
-    })
+    [Some(subject), branch]
+        .into_iter()
+        .flatten()
+        .flat_map(|text| text.split(|ch: char| !ch.is_ascii_alphanumeric()))
+        .find_map(|token| goals.get(token))
 }
 
 /// How much searchable text a Goal keeps resident in the projection.

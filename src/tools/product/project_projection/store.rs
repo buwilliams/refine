@@ -5,8 +5,7 @@ use std::io::{BufRead, BufReader};
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
-#[cfg(test)]
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::Value;
@@ -35,6 +34,31 @@ pub(crate) const PROJECTED_ACTIVITY_PER_GOAL_LIMIT: usize = 50;
 const PROJECTED_ACTIVITY_LIMIT: usize = 5_000;
 #[cfg(test)]
 static PROJECTION_REBUILD_COUNTS: OnceLock<Mutex<BTreeMap<PathBuf, u64>>> = OnceLock::new();
+
+/// In-memory tier of the snapshot cache, shared by every consumer in the
+/// process — web handlers, workflow services, and CLI paths alike. Validated
+/// by the same source fingerprints as the disk snapshot, so a hit costs one
+/// stat per source instead of re-reading and re-parsing the snapshot file.
+/// Keyed by refine dir + cache dir; bounded by the projects opened in-process.
+static SNAPSHOT_MEMORY_CACHE: OnceLock<Mutex<BTreeMap<String, Arc<ProjectionSnapshot>>>> =
+    OnceLock::new();
+
+pub(self) fn cached_snapshot(key: &str) -> Option<Arc<ProjectionSnapshot>> {
+    SNAPSHOT_MEMORY_CACHE
+        .get_or_init(|| Mutex::new(BTreeMap::new()))
+        .lock()
+        .ok()
+        .and_then(|cache| cache.get(key).cloned())
+}
+
+pub(self) fn store_cached_snapshot(key: String, snapshot: Arc<ProjectionSnapshot>) {
+    if let Ok(mut cache) = SNAPSHOT_MEMORY_CACHE
+        .get_or_init(|| Mutex::new(BTreeMap::new()))
+        .lock()
+    {
+        cache.insert(key, snapshot);
+    }
+}
 
 /// Builds and caches a disposable read model of project Goals, Features, and activity.
 ///

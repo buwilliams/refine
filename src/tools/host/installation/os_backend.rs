@@ -363,7 +363,7 @@ impl FileInstallationService {
             .map(|port| format!(" --port {}", systemd_escape_arg(&port.to_string())))
             .unwrap_or_default();
         Ok(format!(
-            "[Unit]\nDescription=Refine daemon\nAfter=network-online.target\n\n[Service]\nType=simple\nExecStart={} system start --foreground{} --runtime-root {}\nRestart=on-failure\nRestartSec=3\nWorkingDirectory={}\nStandardOutput=append:{}/daemon.log\nStandardError=append:{}/daemon.err.log\n\n[Install]\nWantedBy=default.target\n",
+            "[Unit]\nDescription=Refine daemon\nAfter=network-online.target\n\n[Service]\nType=simple\nExecStart={} system start --foreground{} --runtime-root {}\nRestart=on-failure\nRestartSec=3\nTimeoutStopSec=15\nWorkingDirectory={}\nStandardOutput=append:{}/daemon.log\nStandardError=append:{}/daemon.err.log\n\n[Install]\nWantedBy=default.target\n",
             systemd_escape_arg(&exe),
             port_args,
             systemd_escape_arg(&self.runtime_root.display().to_string()),

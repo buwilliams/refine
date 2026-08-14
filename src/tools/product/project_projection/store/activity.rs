@@ -139,10 +139,20 @@ impl FileProjectProjectionStore {
 
     pub(super) fn git_head_fingerprint(&self) -> Option<SourceFingerprint> {
         let target_root = self.target_root()?;
-        let service = self.git_service(target_root);
-        let head = service.head_ref().ok()?;
-        let branch = head.branch.unwrap_or_default();
-        let latest = head.commit.unwrap_or_default();
+        // Staleness checks call this several times a second, so HEAD is read
+        // straight from the Git directory; forking `git` twice per check is
+        // kept only as a fallback for layouts the file walk cannot decode.
+        let (branch, latest) = match head_identity_from_files(&target_root) {
+            Some(identity) => identity,
+            None => {
+                let service = self.git_service(target_root);
+                let head = service.head_ref().ok()?;
+                (
+                    head.branch.unwrap_or_default(),
+                    head.commit.unwrap_or_default(),
+                )
+            }
+        };
         if branch.is_empty() && latest.is_empty() {
             return None;
         }
@@ -162,4 +172,59 @@ impl FileProjectProjectionStore {
             FileGitWorktreeService::new(target_root)
         }
     }
+}
+
+/// Decode `(branch, head identity)` from the Git directory without a
+/// subprocess. The identity only has to change when HEAD moves: a loose ref
+/// contributes its commit hash, a packed ref its pack file's size and mtime.
+fn head_identity_from_files(target_root: &std::path::Path) -> Option<(String, String)> {
+    let git_entry = target_root.join(".git");
+    let git_dir = if git_entry.is_dir() {
+        git_entry
+    } else {
+        // A linked worktree's `.git` is a file: `gitdir: <path>`.
+        let pointer = fs::read_to_string(&git_entry).ok()?;
+        let raw = pointer.strip_prefix("gitdir:")?.trim();
+        let path = std::path::PathBuf::from(raw);
+        if path.is_absolute() {
+            path
+        } else {
+            target_root.join(path)
+        }
+    };
+    let head = fs::read_to_string(git_dir.join("HEAD")).ok()?;
+    let head = head.trim();
+    let Some(reference) = head.strip_prefix("ref:") else {
+        // Detached HEAD: the file holds the commit hash itself.
+        return Some((String::new(), head.to_string()));
+    };
+    let reference = reference.trim();
+    let branch = reference
+        .strip_prefix("refs/heads/")
+        .unwrap_or(reference)
+        .to_string();
+    // Refs are shared across worktrees; a linked worktree names the shared
+    // directory in its `commondir` file.
+    let common_dir = match fs::read_to_string(git_dir.join("commondir")) {
+        Ok(common) => {
+            let path = std::path::PathBuf::from(common.trim());
+            if path.is_absolute() {
+                path
+            } else {
+                git_dir.join(path)
+            }
+        }
+        Err(_) => git_dir,
+    };
+    if let Ok(commit) = fs::read_to_string(common_dir.join(reference)) {
+        return Some((branch, commit.trim().to_string()));
+    }
+    let packed = fs::metadata(common_dir.join("packed-refs")).ok()?;
+    let modified = packed
+        .modified()
+        .ok()
+        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+        .map(|duration| duration.as_nanos())
+        .unwrap_or_default();
+    Some((branch, format!("packed:{}:{modified}", packed.len())))
 }

@@ -155,18 +155,60 @@ impl FileProjectProjectionStore {
     /// recomputed in memory. Full rebuilds are left to a cold or unreadable
     /// cache.
     pub fn load_or_refresh_projection(&self, cache_dir: &Path) -> RefineResult<ProjectionSnapshot> {
-        if let Some(snapshot) = self.load_projection_snapshot(cache_dir)? {
+        self.load_or_refresh_projection_shared(cache_dir)
+            .map(|snapshot| snapshot.as_ref().clone())
+    }
+
+    /// Shared-ownership variant of [`Self::load_or_refresh_projection`].
+    ///
+    /// Consults the process-wide in-memory snapshot first, so a current
+    /// projection costs one stat per source; the disk snapshot is only read
+    /// when this process has never held the projection. Prefer this variant —
+    /// the owned one deep-clones the entire snapshot per call.
+    pub fn load_or_refresh_projection_shared(
+        &self,
+        cache_dir: &Path,
+    ) -> RefineResult<Arc<ProjectionSnapshot>> {
+        let key = self.memory_cache_key(cache_dir);
+        if let Some(snapshot) = cached_snapshot(&key) {
             let delta = self.source_delta(&snapshot.source_fingerprints)?;
             if delta.is_empty() {
                 return Ok(snapshot);
             }
-            let patched = self.patch_projection(snapshot, delta)?;
+            let patched = self.patch_projection(snapshot.as_ref().clone(), delta)?;
             self.persist_projection_snapshot(cache_dir, &patched)?;
+            let patched = Arc::new(patched);
+            store_cached_snapshot(key, Arc::clone(&patched));
             return Ok(patched);
         }
-        let snapshot = self.rebuild_projection()?;
-        self.persist_projection_snapshot(cache_dir, &snapshot)?;
+        let snapshot = if let Some(snapshot) = self.load_projection_snapshot(cache_dir)? {
+            let delta = self.source_delta(&snapshot.source_fingerprints)?;
+            if delta.is_empty() {
+                snapshot
+            } else {
+                let patched = self.patch_projection(snapshot, delta)?;
+                self.persist_projection_snapshot(cache_dir, &patched)?;
+                patched
+            }
+        } else {
+            let snapshot = self.rebuild_projection()?;
+            self.persist_projection_snapshot(cache_dir, &snapshot)?;
+            snapshot
+        };
+        let snapshot = Arc::new(snapshot);
+        store_cached_snapshot(key, Arc::clone(&snapshot));
         Ok(snapshot)
+    }
+
+    /// Replace the in-memory snapshot for this store's cache location. Used by
+    /// callers that enrich a snapshot (runtime overlays) or rebuild it wholesale
+    /// and want subsequent readers to share the result.
+    pub fn store_shared_snapshot(&self, cache_dir: &Path, snapshot: Arc<ProjectionSnapshot>) {
+        store_cached_snapshot(self.memory_cache_key(cache_dir), snapshot);
+    }
+
+    fn memory_cache_key(&self, cache_dir: &Path) -> String {
+        format!("{}|{}", self.refine_dir.display(), cache_dir.display())
     }
 
     pub(super) fn relative_path(&self, path: &Path) -> RefineResult<String> {

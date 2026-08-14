@@ -288,9 +288,11 @@ fn is_read_only_git_command(args: &[&str]) -> bool {
     match args {
         ["branch", "--show-current"] => true,
         ["worktree", "list", "--porcelain"] => true,
+        ["remote"] | ["remote", "get-url", ..] => true,
         [command, ..] => matches!(
             *command,
-            "cat-file" | "diff" | "log" | "rev-list" | "rev-parse" | "show" | "status"
+            "cat-file" | "diff" | "log" | "merge-base" | "rev-list" | "rev-parse" | "show"
+                | "status"
         ),
         [] => false,
     }

@@ -246,6 +246,11 @@ pub(in crate::surfaces::web_server) fn append_api_mutation_event(
         RefineError::Serialization(format!("failed to encode API mutation event: {error}"))
     })?;
     let path = runtime_root.join(API_EVENTS_FILE);
+    // One rotation generation keeps disk usage bounded; nothing reads more
+    // than the recent tail, but the log previously grew forever.
+    if fs::metadata(&path).is_ok_and(|metadata| metadata.len() > API_EVENTS_ROTATE_BYTES) {
+        let _ = fs::rename(&path, runtime_root.join(format!("{API_EVENTS_FILE}.1")));
+    }
     let mut file = fs::OpenOptions::new()
         .create(true)
         .append(true)
@@ -264,6 +269,11 @@ pub(in crate::surfaces::web_server) fn append_api_mutation_event(
     })
 }
 
+const API_EVENTS_ROTATE_BYTES: u64 = 1_000_000;
+/// How much of the API event log's tail is read when recent events are
+/// requested; consumers only want the last few entries.
+const API_EVENTS_TAIL_BYTES: u64 = 64 * 1024;
+
 pub(in crate::surfaces::web_server) fn recent_api_mutation_events(
     runtime_root: &Path,
     limit: usize,
@@ -272,7 +282,37 @@ pub(in crate::surfaces::web_server) fn recent_api_mutation_events(
     if !path.exists() {
         return Ok(Vec::new());
     }
-    let text = fs::read_to_string(&path).map_err(|error| {
+    // Read only the tail: this runs on every SSE frame build, and reading the
+    // whole log made the poll cost grow with the log's lifetime. The first
+    // line after a mid-line seek is discarded as partial.
+    let mut file = fs::File::open(&path).map_err(|error| {
+        RefineError::Io(format!(
+            "failed to read API event log {}: {error}",
+            path.display()
+        ))
+    })?;
+    let len = file
+        .metadata()
+        .map_err(|error| {
+            RefineError::Io(format!(
+                "failed to stat API event log {}: {error}",
+                path.display()
+            ))
+        })?
+        .len();
+    let seek_to = len.saturating_sub(API_EVENTS_TAIL_BYTES);
+    if seek_to > 0 {
+        use std::io::Seek;
+        file.seek(std::io::SeekFrom::Start(seek_to)).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to seek API event log {}: {error}",
+                path.display()
+            ))
+        })?;
+    }
+    let mut text = String::new();
+    use std::io::Read;
+    file.read_to_string(&mut text).map_err(|error| {
         RefineError::Io(format!(
             "failed to read API event log {}: {error}",
             path.display()
@@ -280,6 +320,9 @@ pub(in crate::surfaces::web_server) fn recent_api_mutation_events(
     })?;
     let mut events = text
         .lines()
+        .skip(if seek_to > 0 { 1 } else { 0 })
+        .collect::<Vec<_>>()
+        .into_iter()
         .rev()
         .take(limit)
         .filter_map(|line| serde_json::from_str::<ApiMutationEvent>(line).ok())
@@ -366,6 +409,20 @@ pub(in crate::surfaces::web_server) fn recent_process_sse_events(
     Ok(events)
 }
 
+/// How many trailing transcript events per session the SSE cache retains;
+/// callers never request more than the newest few.
+const CHAT_SSE_EVENT_WINDOW: usize = 25;
+
+struct ChatSessionSseCacheEntry {
+    len: u64,
+    modified: Option<std::time::SystemTime>,
+    session: ChatSessionRecord,
+}
+
+static CHAT_SSE_CACHE: std::sync::OnceLock<
+    std::sync::Mutex<std::collections::BTreeMap<PathBuf, ChatSessionSseCacheEntry>>,
+> = std::sync::OnceLock::new();
+
 pub(in crate::surfaces::web_server) fn recent_chat_sse_events(
     refine_dir: &Path,
     limit: usize,
@@ -374,6 +431,14 @@ pub(in crate::surfaces::web_server) fn recent_chat_sse_events(
     if !sessions_dir.exists() {
         return Ok(Vec::new());
     }
+    // The SSE producer calls this twice a second; parsing every transcript in
+    // full each time cost the whole chat history per tick. Unchanged files are
+    // served from a memo of their trailing events, keyed by size and mtime.
+    let cache = CHAT_SSE_CACHE.get_or_init(|| std::sync::Mutex::new(Default::default()));
+    let mut cache = cache
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let mut seen = std::collections::BTreeSet::new();
     let mut sessions = Vec::new();
     for entry in fs::read_dir(&sessions_dir).map_err(|error| {
         RefineError::Io(format!(
@@ -387,23 +452,50 @@ pub(in crate::surfaces::web_server) fn recent_chat_sse_events(
                 sessions_dir.display()
             ))
         })?;
-        if entry.path().extension().and_then(|ext| ext.to_str()) != Some("json") {
+        let path = entry.path();
+        if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
             continue;
         }
-        let bytes = fs::read_to_string(entry.path()).map_err(|error| {
+        seen.insert(path.clone());
+        let metadata = entry.metadata().ok();
+        let len = metadata.as_ref().map(|metadata| metadata.len()).unwrap_or(0);
+        let modified = metadata.and_then(|metadata| metadata.modified().ok());
+        if let Some(cached) = cache.get(&path)
+            && cached.len == len
+            && cached.modified == modified
+        {
+            sessions.push(cached.session.clone());
+            continue;
+        }
+        let bytes = fs::read_to_string(&path).map_err(|error| {
             RefineError::Io(format!(
                 "failed to read chat session {}: {error}",
-                entry.path().display()
+                path.display()
             ))
         })?;
-        let session = serde_json::from_str::<ChatSessionRecord>(&bytes).map_err(|error| {
+        let mut session = serde_json::from_str::<ChatSessionRecord>(&bytes).map_err(|error| {
             RefineError::Serialization(format!(
                 "failed to parse chat session {}: {error}",
-                entry.path().display()
+                path.display()
             ))
         })?;
+        let keep_from = session
+            .transcript_events
+            .len()
+            .saturating_sub(CHAT_SSE_EVENT_WINDOW);
+        session.transcript_events.drain(..keep_from);
+        cache.insert(
+            path,
+            ChatSessionSseCacheEntry {
+                len,
+                modified,
+                session: session.clone(),
+            },
+        );
         sessions.push(session);
     }
+    cache.retain(|path, _| seen.contains(path));
+    drop(cache);
     sessions.sort_by(|a, b| {
         a.updated_at
             .cmp(&b.updated_at)

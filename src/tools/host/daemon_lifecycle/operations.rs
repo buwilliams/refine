@@ -126,11 +126,14 @@ impl FileDaemonLifecycleOperationService {
         action: DaemonLifecycleAction,
         config: BackgroundDaemonConfig,
     ) -> RefineResult<DaemonLifecycleOperation> {
+        // Long enough for the daemon to flush the small loopback response that
+        // acknowledged this operation; every extra millisecond here is pure
+        // added latency on UI-initiated stop and restart.
         self.run_helper_with(
             operation_id,
             action,
             config,
-            Duration::from_millis(750),
+            Duration::from_millis(250),
             execute_daemon_lifecycle,
         )
     }

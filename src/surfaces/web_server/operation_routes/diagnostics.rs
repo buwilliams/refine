@@ -73,7 +73,7 @@ impl InProcessWebServer {
                 return Ok(value);
             }
         }
-        let projection = self.current_projection_with_runtime()?;
+        let projection = self.current_projection_with_runtime_shared()?;
         let mut diagnostics =
             FileDiagnosticsService::new(target_root, runtime_root.clone(), repo_root);
         if let Some(project_registry_root) = self.app_registry_runtime_root() {

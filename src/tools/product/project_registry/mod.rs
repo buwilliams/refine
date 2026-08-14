@@ -97,9 +97,20 @@ impl FileProjectRegistryService {
             RefineError::Serialization(format!("failed to encode app registry: {error}"))
         })?;
         let path = self.path();
-        fs::write(&path, format!("{encoded}\n")).map_err(|error| {
+        // Temp-and-rename: the daemon reads this registry while other threads
+        // save it, and a bare write could expose a truncated file to a reader
+        // or lose the registry to a crash mid-write.
+        let temp = path.with_extension(format!("json.{}.tmp", std::process::id()));
+        fs::write(&temp, format!("{encoded}\n")).map_err(|error| {
             RefineError::Io(format!(
                 "failed to write app registry {}: {error}",
+                temp.display()
+            ))
+        })?;
+        fs::rename(&temp, &path).map_err(|error| {
+            let _ = fs::remove_file(&temp);
+            RefineError::Io(format!(
+                "failed to commit app registry {}: {error}",
                 path.display()
             ))
         })
@@ -121,22 +132,33 @@ impl FileProjectRegistryService {
             .current_target_root
             .as_ref()
             .map(|path| path.display().to_string());
+        let mut dirty = false;
         if registry.active_app.is_none() {
             registry.active_app = startup_app.clone();
+            dirty = registry.active_app.is_some();
         }
         let current = registry.active_app.clone();
         if let Some(current) = &startup_app {
-            let app = RegisteredApp {
-                name: Path::new(current)
-                    .file_name()
-                    .and_then(|value| value.to_str())
-                    .unwrap_or(current)
-                    .to_string(),
-                path: current.clone(),
-                added_at: now_timestamp(),
-                last_used_at: Some(now_timestamp()),
-            };
-            upsert_app(&mut registry, app, false);
+            // Register the startup app only when it is actually missing.
+            // Re-upserting with fresh timestamps rewrote the registry on every
+            // status read — a write on a read path polled several times a
+            // second.
+            if !registry.apps.contains_key(current) {
+                let app = RegisteredApp {
+                    name: Path::new(current)
+                        .file_name()
+                        .and_then(|value| value.to_str())
+                        .unwrap_or(current)
+                        .to_string(),
+                    path: current.clone(),
+                    added_at: now_timestamp(),
+                    last_used_at: Some(now_timestamp()),
+                };
+                upsert_app(&mut registry, app, false);
+                dirty = true;
+            }
+        }
+        if dirty {
             self.save(&registry)?;
         }
         if let Some(current) = &current {

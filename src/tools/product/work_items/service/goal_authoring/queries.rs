@@ -146,6 +146,6 @@ impl FileWorkItemService {
 
     pub fn list_goal_summaries(&self) -> RefineResult<Vec<GoalSummaryProjection>> {
         let snapshot = self.projection_snapshot()?;
-        Ok(snapshot.goals.into_values().collect())
+        Ok(snapshot.goals.values().cloned().collect())
     }
 }

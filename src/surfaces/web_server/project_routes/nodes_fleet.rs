@@ -351,7 +351,7 @@ impl InProcessWebServer {
         let Some(refine_dir) = self.current_refine_dir()? else {
             return Ok(detached_nodes_response(BTreeMap::new()));
         };
-        let projection = self.current_projection()?;
+        let projection = self.current_projection_shared()?;
         let mut counts: BTreeMap<String, BTreeMap<String, usize>> = BTreeMap::new();
         for goal in projection.goals.values() {
             let node_id = goal

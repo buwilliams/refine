@@ -1,5 +1,5 @@
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::process::subprocess::{FileProcessSupervisor, ProcessOwner, ProcessSupervisor};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
@@ -43,18 +43,20 @@ fn stop_direct_runtime(lifecycle: &FileDaemonLifecycleService, port: u16) -> Ref
             ));
             continue;
         }
-        thread::sleep(Duration::from_millis(100));
-        let still_running = match supervisor.wait(&process.id) {
-            Ok(observed) => observed.state == "running",
-            Err(RefineError::NotFound(_)) => false,
-            Err(error) => {
-                failures.push(format!(
-                    "failed to confirm process {} after terminate: {error}",
-                    process.id
-                ));
-                continue;
-            }
-        };
+        // Poll until the process is actually gone: a fixed sleep per process
+        // made every stop pay its worst case regardless of how quickly the
+        // process died.
+        let still_running =
+            match wait_until_stopped(&supervisor, &process.id, DIRECT_STOP_TERMINATE_WAIT) {
+                Ok(still_running) => still_running,
+                Err(error) => {
+                    failures.push(format!(
+                        "failed to confirm process {} after terminate: {error}",
+                        process.id
+                    ));
+                    continue;
+                }
+            };
         if !still_running {
             continue;
         }
@@ -62,14 +64,12 @@ fn stop_direct_runtime(lifecycle: &FileDaemonLifecycleService, port: u16) -> Ref
             failures.push(format!("failed to kill process {}: {error}", process.id));
             continue;
         }
-        thread::sleep(Duration::from_millis(100));
-        match supervisor.wait(&process.id) {
-            Ok(observed) if observed.state == "running" => failures.push(format!(
+        match wait_until_stopped(&supervisor, &process.id, DIRECT_STOP_KILL_WAIT) {
+            Ok(true) => failures.push(format!(
                 "process {} remained running after terminate and kill",
                 process.id
             )),
-            Ok(_) => {}
-            Err(RefineError::NotFound(_)) => {}
+            Ok(false) => {}
             Err(error) => failures.push(format!(
                 "failed to confirm process {} after kill: {error}",
                 process.id
@@ -83,6 +83,32 @@ fn stop_direct_runtime(lifecycle: &FileDaemonLifecycleService, port: u16) -> Ref
             "direct daemon shutdown failed: {}",
             failures.join("; ")
         )))
+    }
+}
+
+const DIRECT_STOP_TERMINATE_WAIT: Duration = Duration::from_secs(2);
+const DIRECT_STOP_KILL_WAIT: Duration = Duration::from_secs(1);
+const DIRECT_STOP_POLL: Duration = Duration::from_millis(10);
+
+/// Returns whether the process is still running once the deadline passes;
+/// exits as soon as it stops.
+fn wait_until_stopped(
+    supervisor: &FileProcessSupervisor,
+    process_id: &str,
+    deadline: Duration,
+) -> RefineResult<bool> {
+    let started = Instant::now();
+    loop {
+        match supervisor.wait(process_id) {
+            Ok(observed) if observed.state == "running" => {}
+            Ok(_) => return Ok(false),
+            Err(RefineError::NotFound(_)) => return Ok(false),
+            Err(error) => return Err(error),
+        }
+        if started.elapsed() >= deadline {
+            return Ok(true);
+        }
+        thread::sleep(DIRECT_STOP_POLL);
     }
 }
 

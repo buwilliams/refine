@@ -15,11 +15,11 @@ impl InProcessWebServer {
         else {
             return operation_id_required();
         };
-        match self.current_projection_with_runtime() {
+        match self.current_projection_with_runtime_shared() {
             Ok(projection) => projection
                 .runtime
                 .background_operations
-                .into_iter()
+                .iter()
                 .find(|operation| {
                     operation.get("id").and_then(|value| value.as_str()) == Some(operation_id)
                 })

@@ -113,24 +113,10 @@ impl Drop for RepositoryFileLock {
 }
 
 pub(super) fn repository_lock_file(target_root: &std::path::Path) -> RefineResult<Option<File>> {
-    let output = Command::new("git")
-        .args(["rev-parse", "--git-common-dir"])
-        .current_dir(target_root)
-        .env("GIT_TERMINAL_PROMPT", "0")
-        .output()
-        .map_err(|error| RefineError::Io(format!("failed to locate Git directory: {error}")))?;
-    if !output.status.success() {
-        return Ok(None);
-    }
-    let raw = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    if raw.is_empty() {
-        return Ok(None);
-    }
-    let common_dir = PathBuf::from(raw);
-    let common_dir = if common_dir.is_absolute() {
-        common_dir
-    } else {
-        target_root.join(common_dir)
+    let common_dir = match crate::tools::host::project_layout::git_common_dir(target_root) {
+        Ok(dir) => dir,
+        Err(RefineError::Io(error)) => return Err(RefineError::Io(error)),
+        Err(_) => return Ok(None),
     };
     let path = common_dir.join("refine-repository.lock");
     OpenOptions::new()

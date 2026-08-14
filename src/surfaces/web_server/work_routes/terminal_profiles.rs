@@ -45,7 +45,7 @@ pub(crate) fn terminal_profile_prompt(
         ));
     }
     let projection = (goal_id.is_some() || feature_id.is_some())
-        .then(|| server.current_projection())
+        .then(|| server.current_projection_shared())
         .transpose()?;
     if let Some(goal_id) = goal_id {
         let goal = projection

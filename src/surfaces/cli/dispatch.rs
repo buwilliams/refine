@@ -351,6 +351,7 @@ pub(super) fn run_system_start(
     }
     let status = lifecycle.mark_ready(status)?;
     Arc::make_mut(&mut daemon.server).status = status;
+    daemon.warm_caches_in_background();
     eprintln!("running foreground Refine daemon at http://{addr}");
     if once {
         daemon.serve_once(listener)?;
@@ -541,6 +542,15 @@ fn refine_dir_for_target_root(target_root: &Path) -> RefineResult<PathBuf> {
         return Ok(target_root.join(".refine"));
     }
     prepare_refine_dir(target_root)
+}
+
+/// Work-item service for direct (daemonless) CLI commands. Backed by the
+/// snapshot cache under the state directory's `runtime/` so a single command
+/// parses one snapshot instead of rebuilding the projection from every record.
+fn direct_work_item_service(target_root: &Path) -> RefineResult<FileWorkItemService> {
+    let refine_dir = refine_dir_for_target_root(target_root)?;
+    let cache_dir = refine_dir.join("runtime/cache");
+    Ok(FileWorkItemService::with_snapshot_cache(refine_dir, cache_dir))
 }
 
 pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> {

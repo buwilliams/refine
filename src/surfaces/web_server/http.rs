@@ -205,6 +205,20 @@ pub(super) struct GitSyncLoop {
     handle: Option<JoinHandle<()>>,
 }
 
+pub(super) struct RetentionLoop {
+    stop: Arc<AtomicBool>,
+    handle: Option<JoinHandle<()>>,
+}
+
+impl Drop for RetentionLoop {
+    fn drop(&mut self) {
+        self.stop.store(true, Ordering::Relaxed);
+        if let Some(handle) = self.handle.take() {
+            let _ = handle.join();
+        }
+    }
+}
+
 impl AgentWorkflowLoop {
     #[cfg(test)]
     pub(super) fn stop_for_test(mut self) {
@@ -379,6 +393,12 @@ fn serve_once_shutdown() -> AxumShutdown {
     }
 }
 
+/// Set when shutdown begins so long-lived SSE streams end themselves. Axum's
+/// graceful shutdown waits for every in-flight connection, and an SSE stream
+/// never finishes on its own — one open browser tab would otherwise wedge a
+/// graceful shutdown indefinitely.
+pub(super) static DAEMON_SHUTTING_DOWN: AtomicBool = AtomicBool::new(false);
+
 fn lifecycle_shutdown(lifecycle: FileDaemonLifecycleService, port: u16) -> AxumShutdown {
     let (tx, rx) = oneshot::channel();
     thread::spawn(move || {
@@ -389,6 +409,7 @@ fn lifecycle_shutdown(lifecycle: FileDaemonLifecycleService, port: u16) -> AxumS
                 _ => break,
             }
         }
+        DAEMON_SHUTTING_DOWN.store(true, Ordering::SeqCst);
         let _ = tx.send(());
     });
     AxumShutdown {

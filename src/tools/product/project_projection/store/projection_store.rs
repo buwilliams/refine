@@ -67,7 +67,12 @@ impl FileProjectProjectionStore {
                 "failed to commit projection snapshot {}: {error}",
                 snapshot_path.display()
             ))
-        })
+        })?;
+        // The in-memory tier must observe every explicit persist, or a reader
+        // whose source fingerprints still match would keep serving the
+        // pre-persist snapshot.
+        self.store_shared_snapshot(cache_dir, Arc::new(snapshot.clone()));
+        Ok(())
     }
 
     pub fn rebuild_projection(&self) -> RefineResult<ProjectionSnapshot> {
@@ -147,13 +152,25 @@ pub(super) fn derive_features(
     goals: &BTreeMap<String, GoalSummaryProjection>,
     feature_records: impl IntoIterator<Item = FeatureIndexProjection>,
 ) -> BTreeMap<String, FeatureSummaryProjection> {
+    // Grouped once up front: filtering the full Goal map per Feature made this
+    // O(Features × Goals) on every incremental patch.
+    let mut goals_by_feature: BTreeMap<&str, Vec<&GoalIndexProjection>> = BTreeMap::new();
+    for goal in goals.values() {
+        if let Some(feature_id) = goal.goal.feature_id.as_deref() {
+            goals_by_feature.entry(feature_id).or_default().push(&goal.goal);
+        }
+    }
     let mut features = BTreeMap::new();
     for feature in feature_records {
-        let mut feature_goals: Vec<GoalIndexProjection> = goals
-            .values()
-            .filter(|goal| goal.goal.feature_id.as_deref() == Some(feature.id.as_str()))
-            .map(|goal| goal.goal.clone())
-            .collect();
+        let mut feature_goals: Vec<GoalIndexProjection> = goals_by_feature
+            .get(feature.id.as_str())
+            .map(|feature_goals| {
+                feature_goals
+                    .iter()
+                    .map(|goal| (*goal).clone())
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default();
         feature_goals.sort_by(|a, b| {
             compare_feature_goal_order(a.feature_order, b.feature_order)
                 .then_with(|| a.id.cmp(&b.id))

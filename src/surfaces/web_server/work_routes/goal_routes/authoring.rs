@@ -19,7 +19,7 @@ impl InProcessWebServer {
 
     pub(super) fn handle_goal_create_locked(&self, request: ApiRequest) -> ApiResponse {
         let refine_dir = require_refine_dir!(self, "create work items");
-        let snapshot = match self.current_projection() {
+        let snapshot = match self.current_projection_shared() {
             Ok(snapshot) => snapshot,
             Err(error) => return error_response(error),
         };

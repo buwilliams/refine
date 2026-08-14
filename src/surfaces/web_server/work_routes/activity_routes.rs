@@ -16,7 +16,7 @@ impl InProcessWebServer {
         }) else {
             return target_root_unavailable("read activity");
         };
-        let projection = match self.current_projection() {
+        let projection = match self.current_projection_shared() {
             Ok(projection) => projection,
             Err(error) => return error_response(error),
         };
@@ -111,7 +111,7 @@ impl InProcessWebServer {
     }
 
     pub(crate) fn handle_changes_list(&self, raw_path: &str) -> ApiResponse {
-        let projection = match self.current_projection() {
+        let projection = match self.current_projection_shared() {
             Ok(projection) => projection,
             Err(error) => return error_response(error),
         };
@@ -203,7 +203,7 @@ impl InProcessWebServer {
         let Some(runtime_root) = &self.runtime_root else {
             return runtime_root_unavailable("undo Git changes");
         };
-        let linked_goal_id = self.current_projection().ok().and_then(|projection| {
+        let linked_goal_id = self.current_projection_shared().ok().and_then(|projection| {
             projection
                 .changes
                 .values()

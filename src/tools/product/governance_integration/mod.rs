@@ -275,16 +275,25 @@ impl FileGovernanceIntegrationService {
                 )));
             }
             if integration.pushed {
-                git.fetch_branch(&integration.remote, &integration.target_branch)?;
-                let published = git.resolve_commit(&format!(
-                    "{}/{}",
-                    integration.remote, integration.target_branch
-                ))?;
-                if !git.commit_is_ancestor(&candidate_commit, &published)? {
-                    return Err(RefineError::Conflict(format!(
-                        "Reviewed candidate {candidate_commit} is not published to {}/{}",
-                        integration.remote, integration.target_branch
-                    )));
+                // Refine pushed the candidate itself, so the local tracking ref
+                // normally already proves publication; a network fetch inside
+                // this request — while holding the repository lock — is only
+                // worth its latency when that local evidence is insufficient.
+                let remote_ref =
+                    format!("{}/{}", integration.remote, integration.target_branch);
+                let published_locally = match git.resolve_commit(&remote_ref) {
+                    Ok(published) => git.commit_is_ancestor(&candidate_commit, &published)?,
+                    Err(_) => false,
+                };
+                if !published_locally {
+                    git.fetch_branch(&integration.remote, &integration.target_branch)?;
+                    let published = git.resolve_commit(&remote_ref)?;
+                    if !git.commit_is_ancestor(&candidate_commit, &published)? {
+                        return Err(RefineError::Conflict(format!(
+                            "Reviewed candidate {candidate_commit} is not published to {}/{}",
+                            integration.remote, integration.target_branch
+                        )));
+                    }
                 }
             }
             Ok(())

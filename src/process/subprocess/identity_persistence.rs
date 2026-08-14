@@ -13,6 +13,27 @@ pub(super) fn now_millis_string() -> String {
 /// Settings and registry records are read by the daemon while workflow threads
 /// write them, so a plain `fs::write` lets a reader observe zero bytes.
 pub(crate) fn write_json_atomically(path: &Path, encoded: &[u8], label: &str) -> RefineResult<()> {
+    write_json_atomically_inner(path, encoded, label, true)
+}
+
+/// Atomic like [`write_json_atomically`], minus the durability fsync. For
+/// records that are written and unlinked within a single call — run-to-completion
+/// process bookkeeping — surviving a crash buys nothing, and the sync is the
+/// dominant cost of launching a short git command.
+pub(crate) fn write_json_atomically_transient(
+    path: &Path,
+    encoded: &[u8],
+    label: &str,
+) -> RefineResult<()> {
+    write_json_atomically_inner(path, encoded, label, false)
+}
+
+fn write_json_atomically_inner(
+    path: &Path,
+    encoded: &[u8],
+    label: &str,
+    durable: bool,
+) -> RefineResult<()> {
     let Some(parent) = path.parent() else {
         return Err(RefineError::Io(format!(
             "failed to write {label} {}: path has no parent",
@@ -37,12 +58,14 @@ pub(crate) fn write_json_atomically(path: &Path, encoded: &[u8], label: &str) ->
                 tmp_path.display()
             ))
         })?;
-        tmp.sync_all().map_err(|error| {
-            RefineError::Io(format!(
-                "failed to sync {label} temp file {}: {error}",
-                tmp_path.display()
-            ))
-        })?;
+        if durable {
+            tmp.sync_all().map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to sync {label} temp file {}: {error}",
+                    tmp_path.display()
+                ))
+            })?;
+        }
     }
     fs::rename(&tmp_path, path).map_err(|error| {
         let _ = fs::remove_file(&tmp_path);
@@ -141,10 +164,15 @@ pub(super) fn os_process_identity(pid: u32) -> RefineResult<Option<String>> {
             stat_path.display()
         ))
     })?;
-    let boot_id = fs::read_to_string("/proc/sys/kernel/random/boot_id")
-        .unwrap_or_default()
-        .trim()
-        .to_string();
+    // The boot id is fixed for the life of the host; identity checks run per
+    // process launch, so it is read once.
+    static BOOT_ID: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+    let boot_id = BOOT_ID.get_or_init(|| {
+        fs::read_to_string("/proc/sys/kernel/random/boot_id")
+            .unwrap_or_default()
+            .trim()
+            .to_string()
+    });
     Ok(Some(format!("linux:{boot_id}:{start_ticks}")))
 }
 

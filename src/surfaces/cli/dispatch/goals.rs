@@ -10,7 +10,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     id,
                 },
         } => {
-            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
+            let goal = direct_work_item_service(&target_root)?
                 .create_goal_summary(&name, id.as_deref())?;
             println!(
                 "{}",
@@ -23,7 +23,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                 target_root: Some(target_root),
             },
         } => {
-            let goals: Vec<_> = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
+            let goals: Vec<_> = direct_work_item_service(&target_root)?
                 .list_goal_summaries()?
                 .into_iter()
                 .map(|goal| goal.goal)
@@ -41,7 +41,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
+            let goal = direct_work_item_service(&target_root)?
                 .show_goal_detail(&id)?;
             println!(
                 "{}",
@@ -71,7 +71,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     priority,
                 },
         } => {
-            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
+            let goal = direct_work_item_service(&target_root)?
                 .update_goal_metadata_summary(
                     &id,
                     name.as_deref(),
@@ -94,7 +94,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     author,
                 },
         } => {
-            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
+            let goal = direct_work_item_service(&target_root)?
                 .add_goal_note_summary(&id, &author, &body)?;
             println!(
                 "{}",
@@ -111,7 +111,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let service = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?);
+            let service = direct_work_item_service(&target_root)?;
             let detail = service.show_goal_detail(&id)?;
             let notes = edit_goal_note_values(goal_notes_from_detail(&detail), &note_id, &body)?;
             let goal = service.replace_goal_notes_summary(&id, &notes)?;
@@ -129,7 +129,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let service = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?);
+            let service = direct_work_item_service(&target_root)?;
             let detail = service.show_goal_detail(&id)?;
             let notes = delete_goal_note_values(goal_notes_from_detail(&detail), &note_id)?;
             let goal = service.replace_goal_notes_summary(&id, &notes)?;
@@ -149,7 +149,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     edit_latest,
                 },
         } => {
-            let service = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?);
+            let service = direct_work_item_service(&target_root)?;
             let goal = if edit_latest {
                 service.edit_latest_goal_round_summary(
                     &id,
@@ -187,7 +187,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
+            direct_work_item_service(&target_root)?
                 .delete_goal_record(&id)?;
             println!(
                 "{}",
@@ -202,7 +202,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
+            let goal = direct_work_item_service(&target_root)?
                 .cancel_goal_summary(&id)?;
             println!(
                 "{}",
@@ -217,7 +217,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
+            let goal = direct_work_item_service(&target_root)?
                 .start_goal_workflow(&id)?;
             println!(
                 "{}",
@@ -233,7 +233,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     stage,
                 },
         } => {
-            let service = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?);
+            let service = direct_work_item_service(&target_root)?;
             let goal = match stage.as_str() {
                 "quality" | "qa" => service.retry_goal_quality_summary(&id)?,
                 "governance" => service.retry_goal_governance_summary(&id)?,
@@ -278,7 +278,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let goal = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
+            let goal = direct_work_item_service(&target_root)?
                 .undo_goal_summary(&id)?;
             println!(
                 "{}",
@@ -294,7 +294,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
+            let feature = direct_work_item_service(&target_root)?
                 .assign_goal_to_feature(&feature_id, &id)?;
             println!(
                 "{}",
@@ -314,7 +314,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let service = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?);
+            let service = direct_work_item_service(&target_root)?;
             let current = service.show_goal_summary(&id)?;
             let Some(feature_id) = current.goal.feature_id.clone() else {
                 return Err(

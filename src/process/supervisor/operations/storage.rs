@@ -49,6 +49,65 @@ impl FileOperationRegistry {
         Ok(file)
     }
 
+    /// Remove terminal-state operation records and their logs once they age out
+    /// of the retention window. No deletion path existed at all, so completed
+    /// operations — and the runtime projection assembled from them — grew for
+    /// the life of the installation.
+    pub fn cleanup_terminal_operations(&self, retention: Duration) -> RefineResult<usize> {
+        let dir = self.operations_dir();
+        if !dir.exists() {
+            return Ok(0);
+        }
+        let cutoff = SystemTime::now()
+            .checked_sub(retention)
+            .unwrap_or(SystemTime::UNIX_EPOCH);
+        let lock = self.mutation_lock()?;
+        let mut removed = 0usize;
+        let entries = fs::read_dir(&dir).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to read operation registry {}: {error}",
+                dir.display()
+            ))
+        })?;
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+                continue;
+            };
+            let Some(operation_id) = name.strip_suffix(".json") else {
+                continue;
+            };
+            let old_enough = entry
+                .metadata()
+                .ok()
+                .and_then(|metadata| metadata.modified().ok())
+                .is_some_and(|modified| modified < cutoff);
+            if !old_enough {
+                continue;
+            }
+            let terminal = fs::read(&path)
+                .ok()
+                .and_then(|bytes| serde_json::from_slice::<OperationHandle>(&bytes).ok())
+                .is_some_and(|operation| {
+                    matches!(
+                        operation.state,
+                        OperationState::Succeeded
+                            | OperationState::Failed
+                            | OperationState::Cancelled
+                    )
+                });
+            if !terminal {
+                continue;
+            }
+            if fs::remove_file(&path).is_ok() {
+                removed += 1;
+            }
+            let _ = fs::remove_file(self.log_path(operation_id));
+        }
+        FileExt::unlock(&lock).ok();
+        Ok(removed)
+    }
+
     pub fn active_launch_guard(&self, operation_id: &str) -> RefineResult<OperationLaunchGuard> {
         let lock = self.mutation_lock()?;
         let operation = self.status(operation_id)?;

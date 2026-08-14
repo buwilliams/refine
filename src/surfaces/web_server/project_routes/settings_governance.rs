@@ -50,7 +50,7 @@ impl InProcessWebServer {
                     return error_response(error);
                 }
                 let value = self.with_runtime_settings(value);
-                if let Err(error) = self.current_projection_with_runtime() {
+                if let Err(error) = self.current_projection_with_runtime_shared() {
                     return error_response(error);
                 }
                 ApiResponse::json(200, value)

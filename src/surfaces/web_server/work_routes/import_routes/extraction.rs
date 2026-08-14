@@ -243,7 +243,7 @@ impl InProcessWebServer {
             Ok(drafts) => drafts,
             Err(error) => return error_response(error),
         };
-        let projection = match self.current_projection() {
+        let projection = match self.current_projection_shared() {
             Ok(projection) => projection,
             Err(error) => return error_response(error),
         };

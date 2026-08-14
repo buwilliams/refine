@@ -91,24 +91,51 @@ pub(super) fn record_http_request_metric(
     let normalized_path = normalize_api_path(&raw_path);
     let status = response.status;
     let bytes = response.body.len() as u64;
-    thread::spawn(move || {
-        let _ = FileMetricsService::new(runtime_root).record_operation(
-            "http.request",
-            elapsed_ms,
-            status < 400,
-            json!({
-                "method": method,
-                "path": normalized_path,
-                "raw_path": raw_path,
-                "status": status,
-                "bytes": bytes,
-                "cache_mode": cache_mode,
-                "budget_ms": 50.0,
-                "over_budget": elapsed_ms > 50.0
-            }),
-        );
+    // One long-lived writer drains a bounded queue. A thread per request piled
+    // up stacks behind the global metrics-log mutex under concurrent load; a
+    // full queue drops the sample instead — metrics are best-effort.
+    let _ = metrics_writer().try_send(MetricsSample {
+        runtime_root,
+        elapsed_ms,
+        success: status < 400,
+        details: json!({
+            "method": method,
+            "path": normalized_path,
+            "raw_path": raw_path,
+            "status": status,
+            "bytes": bytes,
+            "cache_mode": cache_mode,
+            "budget_ms": 50.0,
+            "over_budget": elapsed_ms > 50.0
+        }),
     });
     true
+}
+
+struct MetricsSample {
+    runtime_root: PathBuf,
+    elapsed_ms: f64,
+    success: bool,
+    details: serde_json::Value,
+}
+
+fn metrics_writer() -> &'static std::sync::mpsc::SyncSender<MetricsSample> {
+    static WRITER: std::sync::OnceLock<std::sync::mpsc::SyncSender<MetricsSample>> =
+        std::sync::OnceLock::new();
+    WRITER.get_or_init(|| {
+        let (sender, receiver) = std::sync::mpsc::sync_channel::<MetricsSample>(1024);
+        thread::spawn(move || {
+            while let Ok(sample) = receiver.recv() {
+                let _ = FileMetricsService::new(sample.runtime_root).record_operation(
+                    "http.request",
+                    sample.elapsed_ms,
+                    sample.success,
+                    sample.details,
+                );
+            }
+        });
+        sender
+    })
 }
 
 pub(super) fn screen_critical_http_request(method: &str, path: &str, cache_mode: &str) -> bool {

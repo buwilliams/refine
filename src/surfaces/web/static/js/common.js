@@ -383,10 +383,11 @@ async function api(method, path, body, options = {}) {
       throw err;
     }
     if (method !== "GET") {
+      // The screen the user is on refreshes itself after its own mutation, and
+      // SSE announces the change to every other screen. Forcing an 11-request
+      // prefetch burst here multiplied every click into a page-load's worth of
+      // traffic against a server that had just invalidated its caches.
       invalidateScreenDataCache();
-      if (/^\/api\/(project|apps|goals|features|activity|changes|nodes|settings|cache)\b/.test(path)) {
-        scheduleMainScreenPrefetch({ force: true, delayMs: 250 });
-      }
     }
     return data;
   })();
@@ -1810,6 +1811,33 @@ function sseEventChanged(key, event) {
   return true;
 }
 
+// One SSE batch often carries both a status_change and a project_updated
+// frame; refreshing the visible screen once per frame doubled every fetch and
+// re-morphed the goal detail twice. Route refreshes coalesce through this
+// debounced scheduler instead.
+const ROUTE_DATA_REFRESH_DEBOUNCE_MS = 150;
+let routeDataRefreshTimer = null;
+function scheduleRouteDataRefresh() {
+  if (routeDataRefreshTimer) return;
+  routeDataRefreshTimer = setTimeout(() => {
+    routeDataRefreshTimer = null;
+    if (state.currentRoute === "dashboard") refreshDashboard();
+    // Refresh only the table on background updates so an active workflow
+    // keystroke in the search box isn't interrupted by a full re-render.
+    if (state.currentRoute === "goals") refreshGoalsTable();
+    if (state.currentRoute === "logs") loadLogs();
+    if (["settings", "node", "project"].includes(state.currentRoute || "")) {
+      refreshCurrentSettingsSurface();
+    }
+    // Changes screen: an approved implementation can land asynchronously;
+    // a cancellation flips an existing row's Undo button state.
+    if (state.currentRoute === "changes") loadChanges();
+    if (state.currentRoute === "goals_detail" && state.currentGoal) {
+      loadGoalDetail(state.currentGoal);
+    }
+  }, ROUTE_DATA_REFRESH_DEBOUNCE_MS);
+}
+
 function activitySystemOperationDetails(entry) {
   const details = entry?.details && typeof entry.details === "object" && !Array.isArray(entry.details)
     ? { ...entry.details }
@@ -1883,20 +1911,7 @@ function initSSE() {
     invalidateScreenDataCache();
     if (typeof scheduleAgentStatusRefresh === "function") scheduleAgentStatusRefresh();
     if (typeof refreshTargetAppToggle === "function") refreshTargetAppToggle();
-    if (state.currentRoute === "dashboard") refreshDashboard();
-    // Refresh only the table on background updates so an active workflow
-    // keystroke in the search box isn't interrupted by a full re-render.
-    if (state.currentRoute === "goals") refreshGoalsTable();
-    if (state.currentRoute === "logs") loadLogs();
-    if (["settings", "node", "project"].includes(state.currentRoute || "")) {
-      refreshCurrentSettingsSurface();
-    }
-    // Changes screen: an approved implementation can land asynchronously;
-    // a cancellation flips an existing row's Undo button state.
-    if (state.currentRoute === "changes") loadChanges();
-    if (state.currentRoute === "goals_detail" && state.currentGoal) {
-      loadGoalDetail(state.currentGoal);
-    }
+    scheduleRouteDataRefresh();
   });
   sseSource.addEventListener("runtime_change", () => {
     invalidateScreenDataCache();
@@ -1965,14 +1980,7 @@ function initSSE() {
     if (typeof refreshAgentStatusIndicator === "function") refreshAgentStatusIndicator();
     if (typeof refreshTargetAppToggle === "function") refreshTargetAppToggle();
     if (typeof refreshSourceUpdateNav === "function") refreshSourceUpdateNav({ quiet: true });
-    if (state.currentRoute === "dashboard") refreshDashboard();
-    if (state.currentRoute === "goals") refreshGoalsTable();
-    if (state.currentRoute === "logs") loadLogs();
-    if (["settings", "node", "project"].includes(state.currentRoute || "")) refreshCurrentSettingsSurface();
-    if (state.currentRoute === "changes") loadChanges();
-    if (state.currentRoute === "goals_detail" && state.currentGoal) {
-      loadGoalDetail(state.currentGoal);
-    }
+    scheduleRouteDataRefresh();
   });
   sseSource.addEventListener("round_log_added", () => {
     if (state.currentRoute === "logs") loadLogs();

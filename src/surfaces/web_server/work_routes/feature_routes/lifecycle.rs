@@ -87,7 +87,7 @@ impl InProcessWebServer {
         else {
             return feature_id_required();
         };
-        let goal_ids = match self.current_projection() {
+        let goal_ids = match self.current_projection_shared() {
             Ok(projection) => projection
                 .features
                 .get(feature_id)

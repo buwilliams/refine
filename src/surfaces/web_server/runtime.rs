@@ -45,14 +45,12 @@ struct RuntimePathFingerprint {
     modified_unix_ns: Option<u128>,
 }
 
-static HOT_PROJECTIONS: OnceLock<Mutex<BTreeMap<String, Arc<ProjectionSnapshot>>>> =
-    OnceLock::new();
 static HOT_RUNTIME_PROJECTIONS: OnceLock<Mutex<BTreeMap<String, RuntimeProjectionCacheEntry>>> =
     OnceLock::new();
 
 impl OperationProjectionRefresher for InProcessWebServer {
     fn refresh_operation_projection(&self) -> RefineResult<()> {
-        self.current_projection_with_runtime().map(|_| ())
+        self.current_projection_with_runtime_shared().map(|_| ())
     }
 }
 
@@ -110,18 +108,11 @@ impl InProcessWebServer {
     pub(super) fn current_projection_shared(&self) -> RefineResult<Arc<ProjectionSnapshot>> {
         if let Some(refine_dir) = self.current_refine_dir()? {
             if let Some(runtime_root) = &self.runtime_root {
-                let key = projection_cache_key(&refine_dir, runtime_root);
-                let store =
-                    FileProjectProjectionStore::with_runtime_root(&refine_dir, runtime_root);
-                if let Some(snapshot) = hot_projection(&key)?
-                    && store.source_fingerprints_match(&snapshot.source_fingerprints)?
-                {
-                    return Ok(snapshot);
-                }
-                let snapshot = store.load_or_refresh_projection(&runtime_root.join("cache"))?;
-                let snapshot = Arc::new(snapshot);
-                store_hot_projection(key, Arc::clone(&snapshot))?;
-                Ok(snapshot)
+                // The store's process-wide memory tier validates against source
+                // fingerprints itself, so a current snapshot costs one stat
+                // walk and no snapshot-file parse.
+                FileProjectProjectionStore::with_runtime_root(&refine_dir, runtime_root)
+                    .load_or_refresh_projection_shared(&runtime_root.join("cache"))
             } else {
                 FileProjectProjectionStore::new(refine_dir)
                     .rebuild_projection()
@@ -215,10 +206,11 @@ impl InProcessWebServer {
         if let (Some(runtime_root), Some(refine_dir)) =
             (&self.runtime_root, self.current_refine_dir()?)
         {
-            store_hot_projection(
-                projection_cache_key(&refine_dir, runtime_root),
-                Arc::clone(&updated),
-            )?;
+            // Share the runtime-enriched snapshot so the next caller with an
+            // unchanged runtime gets the same Arc back (SSE relies on pointer
+            // identity to skip rebuilding frames).
+            FileProjectProjectionStore::with_runtime_root(&refine_dir, runtime_root)
+                .store_shared_snapshot(&runtime_root.join("cache"), Arc::clone(&updated));
         }
         Ok(updated)
     }
@@ -329,14 +321,12 @@ impl InProcessWebServer {
         let Some(refine_dir) = self.current_refine_dir()? else {
             return Ok(());
         };
-        HOT_PROJECTIONS
-            .get_or_init(|| Mutex::new(BTreeMap::new()))
-            .lock()
-            .map_err(|_| RefineError::Io("projection cache lock was poisoned".to_string()))?
-            .remove(&projection_cache_key(&refine_dir, runtime_root));
-        // The SSE stream performs the next authoritative projection read on its own worker.
-        // Source fingerprints also protect direct reads that arrive before that refresh.
-        Ok(())
+        // Refresh in place rather than evict: the mutation is patched into the
+        // shared snapshot here (one changed-record read), so the follow-up GET
+        // and the next SSE frame start warm instead of both reloading cold.
+        FileProjectProjectionStore::with_runtime_root(&refine_dir, runtime_root)
+            .load_or_refresh_projection_shared(&runtime_root.join("cache"))
+            .map(|_| ())
     }
 
     pub(super) fn warm_current_projection_cache(&self) -> RefineResult<Option<ProjectionSnapshot>> {
@@ -347,13 +337,9 @@ impl InProcessWebServer {
             return Ok(None);
         };
         let snapshot = FileProjectProjectionStore::with_runtime_root(&refine_dir, runtime_root)
-            .load_or_refresh_projection(&runtime_root.join("cache"))?;
-        store_hot_projection(
-            projection_cache_key(&refine_dir, runtime_root),
-            Arc::new(snapshot.clone()),
-        )?;
+            .load_or_refresh_projection_shared(&runtime_root.join("cache"))?;
         let _ = self.refresh_runtime_projection_cache()?;
-        Ok(Some(snapshot))
+        Ok(Some(snapshot.as_ref().clone()))
     }
 
     pub(super) fn rebuild_current_projection_cache(&self) -> RefineResult<ProjectionSnapshot> {
@@ -371,10 +357,7 @@ impl InProcessWebServer {
         let mut projection = store.rebuild_projection()?;
         projection.runtime = self.refresh_runtime_projection_cache()?;
         store.persist_projection_snapshot(&runtime_root.join("cache"), &projection)?;
-        store_hot_projection(
-            projection_cache_key(&refine_dir, runtime_root),
-            Arc::new(projection.clone()),
-        )?;
+        store.store_shared_snapshot(&runtime_root.join("cache"), Arc::new(projection.clone()));
         Ok(projection)
     }
 
@@ -442,33 +425,8 @@ impl InProcessWebServer {
     }
 }
 
-fn projection_cache_key(refine_dir: &Path, runtime_root: &Path) -> String {
-    format!(
-        "{}|{}",
-        refine_dir.display(),
-        runtime_root.join("cache").display()
-    )
-}
-
 fn runtime_cache_key(runtime_root: &Path) -> String {
     runtime_root.display().to_string()
-}
-
-fn hot_projection(key: &str) -> RefineResult<Option<Arc<ProjectionSnapshot>>> {
-    HOT_PROJECTIONS
-        .get_or_init(|| Mutex::new(BTreeMap::new()))
-        .lock()
-        .map_err(|_| RefineError::Io("projection cache lock was poisoned".to_string()))
-        .map(|cache| cache.get(key).cloned())
-}
-
-fn store_hot_projection(key: String, snapshot: Arc<ProjectionSnapshot>) -> RefineResult<()> {
-    HOT_PROJECTIONS
-        .get_or_init(|| Mutex::new(BTreeMap::new()))
-        .lock()
-        .map_err(|_| RefineError::Io("projection cache lock was poisoned".to_string()))?
-        .insert(key, snapshot);
-    Ok(())
 }
 
 fn runtime_projection_fingerprint(

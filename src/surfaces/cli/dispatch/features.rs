@@ -12,7 +12,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     reporter,
                 },
         } => {
-            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
+            let feature = direct_work_item_service(&target_root)?
                 .create_feature_summary(
                     &name,
                     id.as_deref(),
@@ -41,7 +41,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     reporter,
                 },
         } => {
-            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
+            let feature = direct_work_item_service(&target_root)?
                 .update_feature_metadata_summary(
                     &id,
                     name.as_deref(),
@@ -67,7 +67,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                 },
         } => {
             let features: Vec<_> =
-                FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
+                direct_work_item_service(&target_root)?
                     .list_feature_summaries()?
                     .into_iter()
                     .map(|feature| {
@@ -91,7 +91,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
+            let feature = direct_work_item_service(&target_root)?
                 .show_feature_summary(&id)?;
             println!(
                 "{}",
@@ -112,7 +112,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
+            let feature = direct_work_item_service(&target_root)?
                 .assign_goal_to_feature(&id, &goal_id)?;
             println!(
                 "{}",
@@ -133,7 +133,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
+            let feature = direct_work_item_service(&target_root)?
                 .remove_goal_from_feature(&id, &goal_id)?;
             println!(
                 "{}",
@@ -155,7 +155,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
+            let feature = direct_work_item_service(&target_root)?
                 .reorder_goal_in_feature(&id, &goal_id, order)?;
             println!(
                 "{}",
@@ -176,7 +176,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
+            let feature = direct_work_item_service(&target_root)?
                 .order_goal_in_feature(&id, &goal_id)?;
             println!(
                 "{}",
@@ -197,7 +197,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
+            let feature = direct_work_item_service(&target_root)?
                 .unorder_goal_in_feature(&id, &goal_id)?;
             println!(
                 "{}",
@@ -225,7 +225,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     ),
                 );
             };
-            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
+            let feature = direct_work_item_service(&target_root)?
                 .move_feature_workflow(&id, target)?;
             println!(
                 "{}",
@@ -246,7 +246,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let result = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
+            let result = direct_work_item_service(&target_root)?
                 .transfer_feature_to_node(&node_id, &id)?;
             println!("{}", serde_json::to_string_pretty(&result).unwrap());
             Ok(())
@@ -258,7 +258,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let feature = FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
+            let feature = direct_work_item_service(&target_root)?
                 .cancel_feature_summary(&id)?;
             println!(
                 "{}",
@@ -278,7 +278,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            FileWorkItemService::new(refine_dir_for_target_root(&target_root)?)
+            direct_work_item_service(&target_root)?
                 .delete_feature_record(&id)?;
             println!(
                 "{}",

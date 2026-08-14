@@ -117,6 +117,17 @@ pub(super) fn is_runtime_only_refine_path(path: &std::path::Path) -> bool {
     {
         return true;
     }
+    // Chat sessions are node-local conversation evidence: the record embeds
+    // its full transcript and is rewritten on every provider output line, so
+    // synchronizing it committed a fresh full blob of each active session per
+    // sync tick — the largest growth source on `refine/state` and a tax on
+    // every later sync.
+    let mut components = path
+        .components()
+        .filter_map(|component| component.as_os_str().to_str());
+    if components.next() == Some("chat") && components.next() == Some("sessions") {
+        return true;
+    }
     // Per-Goal log sidecars sit beside the Goal record at
     // `goals/<shard>/<id>/logs.jsonl`, so the leading-component rule above never
     // matched them and every node published its agent logs to `refine/state`.

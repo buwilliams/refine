@@ -366,9 +366,10 @@ impl FileDaemonLifecycleService {
         let port_root = self.runtime_root.port_root(port);
         let supervisor = FileProcessSupervisor::new(&port_root);
         let before_recovery = supervisor.list()?;
-        supervisor.recover()?;
         let recovered_operations =
             FileOperationRegistry::new(&port_root).recover_active_supervised()?;
+        // One reconciling pass after operation recovery; recovering twice
+        // re-verified every process's identity against the OS on the boot path.
         let recovered = supervisor.recover()?;
         let mut status = running_status(port);
         status.active_operations = recovered

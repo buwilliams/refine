@@ -1,6 +1,8 @@
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Mutex;
 
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 
@@ -8,8 +10,35 @@ pub const LEGACY_REFINE_DIR: &str = ".refine";
 pub const LIVE_REFINE_STATE_DIR: &str = "refine-live-state";
 pub const REFINE_STATE_WORKTREE_DIR: &str = "refine-state-worktree";
 
+// A repository's common Git directory cannot move while the process runs, so
+// successful resolutions are memoized: this sits on nearly every request and
+// daemon tick, and each miss costs a `git rev-parse` subprocess.
+static GIT_COMMON_DIR_CACHE: Mutex<BTreeMap<PathBuf, PathBuf>> = Mutex::new(BTreeMap::new());
+
+// Legacy-state migration is one-time per target root; once `prepare_refine_dir`
+// has succeeded the migration guards never need to run again in this process.
+static PREPARED_REFINE_DIRS: Mutex<BTreeMap<PathBuf, PathBuf>> = Mutex::new(BTreeMap::new());
+
 /// Locate the repository's shared Git directory.
 pub fn git_common_dir(target_root: &Path) -> RefineResult<PathBuf> {
+    if let Some(cached) = GIT_COMMON_DIR_CACHE
+        .lock()
+        .expect("git common dir cache poisoned")
+        .get(target_root)
+        .cloned()
+        && cached.is_dir()
+    {
+        return Ok(cached);
+    }
+    let resolved = git_common_dir_uncached(target_root)?;
+    GIT_COMMON_DIR_CACHE
+        .lock()
+        .expect("git common dir cache poisoned")
+        .insert(target_root.to_path_buf(), resolved.clone());
+    Ok(resolved)
+}
+
+fn git_common_dir_uncached(target_root: &Path) -> RefineResult<PathBuf> {
     let output = Command::new("git")
         .args(["rev-parse", "--git-common-dir"])
         .current_dir(target_root)
@@ -96,6 +125,24 @@ pub fn prepare_refine_dir(target_root: &Path) -> RefineResult<PathBuf> {
     if !target_root.join(".git").exists() {
         return Ok(target_root.join(LEGACY_REFINE_DIR));
     }
+    if let Some(prepared) = PREPARED_REFINE_DIRS
+        .lock()
+        .expect("prepared refine dir cache poisoned")
+        .get(target_root)
+        .cloned()
+        && prepared.parent().is_some_and(Path::is_dir)
+    {
+        return Ok(prepared);
+    }
+    let refine_dir = prepare_refine_dir_uncached(target_root)?;
+    PREPARED_REFINE_DIRS
+        .lock()
+        .expect("prepared refine dir cache poisoned")
+        .insert(target_root.to_path_buf(), refine_dir.clone());
+    Ok(refine_dir)
+}
+
+fn prepare_refine_dir_uncached(target_root: &Path) -> RefineResult<PathBuf> {
     let refine_dir = refine_dir_for_target_root(target_root)?;
     let legacy = target_root.join(LEGACY_REFINE_DIR);
     if legacy.exists() {

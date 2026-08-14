@@ -78,27 +78,20 @@ impl FileGitSyncService {
         self.sync_locked(fetch_scope)
     }
 
-    /// Fingerprint durable Refine state without invoking Git or touching the
-    /// user's checkout. The daemon uses this to debounce nearby mutations.
+    /// Fingerprint durable Refine state without touching the user's checkout.
+    /// The daemon polls this several times a second to debounce nearby
+    /// mutations, so it leans on the memoized content-hash map: unchanged
+    /// records cost one stat each instead of a full content read.
     pub fn durable_state_fingerprint(&self) -> RefineResult<u64> {
         let root = prepare_refine_dir(&self.target_root)?;
         if !root.exists() {
             return Ok(0);
         }
-        let mut files = Vec::new();
-        collect_durable_state_files(&root, &root, &mut files)?;
-        files.sort();
+        let state = durable_state_map(&root)?;
         let mut hasher = DefaultHasher::new();
-        for path in files {
-            path.strip_prefix(&root).unwrap_or(&path).hash(&mut hasher);
-            fs::read(&path)
-                .map_err(|error| {
-                    RefineError::Io(format!(
-                        "failed to fingerprint durable Refine state {}: {error}",
-                        path.display()
-                    ))
-                })?
-                .hash(&mut hasher);
+        for (path, content_hash) in &state {
+            path.hash(&mut hasher);
+            content_hash.hash(&mut hasher);
         }
         Ok(hasher.finish())
     }

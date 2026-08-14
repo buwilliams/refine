@@ -3,19 +3,23 @@ use super::*;
 #[test]
 fn durable_state_ignores_transient_lock_temp_and_copy_files() {
     let root = unique_temp_dir("transient-state");
+    fs::create_dir_all(&root).unwrap();
+    fs::write(root.join("refine.json"), "{}\n").unwrap();
+    fs::write(root.join(".refine.json.lock"), "").unwrap();
+    fs::write(root.join("refine.json.interrupted.tmp"), "partial\n").unwrap();
+    fs::write(root.join(".refine-sync-123-0"), "partial\n").unwrap();
+    fs::write(root.join("supervisor-agent.lock"), "").unwrap();
+    // Chat sessions embed their whole transcript and are rewritten per output
+    // line; they are node-local runtime evidence, not synchronized state.
     let sessions = root.join("chat/sessions");
     fs::create_dir_all(&sessions).unwrap();
     fs::write(sessions.join("session.json"), "{}\n").unwrap();
-    fs::write(sessions.join(".session.lock"), "").unwrap();
-    fs::write(sessions.join("session.json.interrupted.tmp"), "partial\n").unwrap();
-    fs::write(sessions.join(".refine-sync-123-0"), "partial\n").unwrap();
-    fs::write(root.join("supervisor-agent.lock"), "").unwrap();
 
     let state = durable_state_map(&root).unwrap();
 
     assert_eq!(
         state.keys().cloned().collect::<Vec<_>>(),
-        vec![PathBuf::from("chat/sessions/session.json")]
+        vec![PathBuf::from("refine.json")]
     );
     fs::remove_dir_all(root).unwrap();
 }

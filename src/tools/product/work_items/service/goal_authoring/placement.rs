@@ -105,9 +105,18 @@ impl FileWorkItemService {
             return Ok(());
         };
         let log_service = FileLogService::new(&self.refine_dir);
+        // One sidecar read for all rounds; per-round reads reparsed the whole
+        // log file once per round.
+        let mut logs_by_round: std::collections::BTreeMap<usize, Vec<_>> =
+            std::collections::BTreeMap::new();
+        for entry in log_service.all_round_logs(goal_id)? {
+            if let Some(round_idx) = entry.round_idx {
+                logs_by_round.entry(round_idx).or_default().push(entry);
+            }
+        }
         let round_count = rounds.len();
         for (idx, round) in rounds.iter_mut().enumerate() {
-            let logs = log_service.round_logs(goal_id, idx)?;
+            let logs = logs_by_round.remove(&idx).unwrap_or_default();
             let Some(round_object) = round.as_object_mut() else {
                 continue;
             };

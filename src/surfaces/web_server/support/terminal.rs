@@ -25,6 +25,9 @@ use crate::tools::product::process_control::FileProcessControlService;
 
 const TERMINAL_INPUT_LIMIT: usize = 16_000;
 const TERMINAL_EVENT_BACKLOG: usize = 1_000;
+/// How long a naturally-exited session stays registered so attached streams
+/// can drain its final frames before the entry is dropped.
+const TERMINAL_EXIT_RETENTION: Duration = Duration::from_secs(30);
 const TERMINAL_DEFAULT_COLS: u16 = 100;
 const TERMINAL_DEFAULT_ROWS: u16 = 30;
 
@@ -464,6 +467,20 @@ impl TerminalSession {
             reader_session.finish_process(exit.as_ref());
             reader_session.push_event("terminal_exit", status);
             reader_session.exited.store(true, Ordering::Release);
+            // Attached streams poll every 80 ms and deliver the exit frame
+            // well within the drain grace. After it, drop the dead session —
+            // its PTY descriptors and scrollback otherwise stayed resident in
+            // the registry for the life of the daemon, since only an explicit
+            // stop removed entries. A reattach after removal reads as a closed
+            // session, which is what it is.
+            thread::sleep(TERMINAL_EXIT_RETENTION);
+            if let Ok(mut sessions) = sessions().lock()
+                && sessions
+                    .get(&reader_session.id)
+                    .is_some_and(|current| Arc::ptr_eq(current, &reader_session))
+            {
+                sessions.remove(&reader_session.id);
+            }
         });
         Ok(session)
     }

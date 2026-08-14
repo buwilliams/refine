@@ -184,7 +184,13 @@ fn command_status(
         cwd: None,
         env: Vec::new(),
         stdin: None,
-        limits: None,
+        // Diagnostics probes run on the boot path; a wedged CLI (a stuck
+        // Docker socket is common on WSL2) must degrade the report, not block
+        // startup indefinitely.
+        limits: Some(crate::process::subprocess::ProcessResourceLimits {
+            stall_timeout_seconds: Some(10),
+            ..crate::process::subprocess::ProcessResourceLimits::default()
+        }),
         authorization_command: Some(format!("{} {}", command, args.join(" "))),
         sensitive: false,
         metadata: Default::default(),

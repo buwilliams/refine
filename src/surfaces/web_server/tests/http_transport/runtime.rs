@@ -105,7 +105,7 @@ fn local_http_daemon_stays_responsive_while_plan_start_waits_for_git() {
 }
 
 #[test]
-fn local_http_daemon_reports_startup_cache_progress() {
+fn startup_recovery_no_longer_blocks_on_cache_warming() {
     let daemon = LocalHttpDaemon::new(server_with_projection(), None);
     let mut messages = Vec::new();
 
@@ -113,14 +113,14 @@ fn local_http_daemon_reports_startup_cache_progress() {
         .recover_runtime_state_with_progress(|message| messages.push(message.to_string()))
         .unwrap();
 
-    assert_eq!(
-        messages,
-        vec![
-            "warming project and runtime caches",
-            "warming diagnostics cache",
-            "warming static asset cache",
-            "startup cache warming complete",
-        ]
+    // Cache warming moved behind readiness (`warm_caches_in_background`):
+    // every warmed cache rebuilds on demand, so holding the port closed for
+    // warming only delayed boot. Recovery itself reports no warming steps.
+    assert!(
+        messages
+            .iter()
+            .all(|message| !message.contains("warming")),
+        "recovery emitted cache-warming steps: {messages:?}"
     );
 }
 

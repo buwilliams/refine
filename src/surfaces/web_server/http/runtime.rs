@@ -41,14 +41,19 @@ impl LocalHttpDaemon {
                     "Daemon restarted before the provider turn completed.",
                 )?;
         }
-        report("warming project and runtime caches");
-        let _ = self.server.warm_current_projection_cache()?;
-        report("warming diagnostics cache");
-        self.server.warm_diagnostics_cache()?;
-        report("warming static asset cache");
-        self.warm_static_cache()?;
-        report("startup cache warming complete");
         Ok(())
+    }
+
+    /// Cache warming runs after readiness: every cache here rebuilds on demand,
+    /// so a request racing the warm pays that request's own cost at worst,
+    /// while holding the port closed for warming delayed every boot.
+    pub fn warm_caches_in_background(&self) {
+        let daemon = self.clone();
+        thread::spawn(move || {
+            let _ = daemon.server.warm_current_projection_cache();
+            let _ = daemon.server.warm_diagnostics_cache();
+            let _ = daemon.warm_static_cache();
+        });
     }
 
     pub(super) fn warm_static_cache(&self) -> RefineResult<()> {
@@ -98,6 +103,7 @@ impl LocalHttpDaemon {
             Some(self.start_agent_automation_loop(AGENT_WORKFLOW_INTERVAL))
         };
         let _git_sync_loop = self.start_git_sync_loop();
+        let _retention_loop = self.start_retention_loop();
         self.serve_listener(listener, Some(lifecycle_shutdown(lifecycle, port)))
     }
 }

@@ -5,7 +5,6 @@ use std::io::{ErrorKind, Write};
 #[cfg(test)]
 use std::path::Path;
 use std::path::PathBuf;
-use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, TryLockError};
 use std::thread;
@@ -15,7 +14,9 @@ use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 
-use crate::process::subprocess::{FileProcessSupervisor, ManagedProcessSpec, ProcessOwner};
+use crate::process::subprocess::{
+    FileProcessSupervisor, ManagedProcessSpec, ProcessOwner, ProcessResourceLimits,
+};
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 #[cfg(test)]

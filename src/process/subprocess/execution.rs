@@ -122,12 +122,12 @@ impl FileProcessSupervisor {
             started_at: now_millis_string(),
             exit_code: None,
         };
-        if let Err(error) = self.write_process(&process) {
+        if let Err(error) = self.write_process_transient(&process) {
             let _ = child.kill();
             let _ = child.wait();
             return Err(error);
         }
-        if let Err(error) = self.create_process_identity(&process) {
+        if let Err(error) = self.create_process_identity_transient(&process) {
             let _ = child.kill();
             let _ = child.wait();
             let _ = self.remove_process_artifacts(&process);

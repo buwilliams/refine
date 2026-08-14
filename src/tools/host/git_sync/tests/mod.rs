@@ -4,6 +4,7 @@ mod synchronization;
 
 use super::*;
 use std::fs;
+use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[cfg(unix)]
