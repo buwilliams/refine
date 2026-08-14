@@ -73,6 +73,7 @@ impl InProcessWebServer {
                 "runner_reachable": runner_reachable,
                 "assignee_stats": assignee_stats_rows(&dashboard.assignee_stats),
                 "reporter_stats": assignee_stats_rows(&dashboard.reporter_stats),
+                "contributor_rankings": contributor_ranking_rows(&dashboard.reporter_stats),
                 "node_scope": dashboard.node_filter,
                 "node_filter": dashboard.node_filter,
                 "active_node_id": dashboard.current_node_id,

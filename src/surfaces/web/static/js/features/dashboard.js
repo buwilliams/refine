@@ -182,9 +182,9 @@ function drawDashboard(d, opts = {}) {
   const counts = d.counts || {};
   const orderedStatuses = workflowStatuses();
   const dash = $("#dash");
-  const assigneeStats = d.assignee_stats || d.reporter_stats || [];
+  const contributorRankings = d.contributor_rankings || [];
   const reviewsShellOpen = dashboardPanelOpen("reviews-for-reporter-card", true);
-  const assigneeStatsShellOpen = dashboardPanelOpen("dashboard-assignee-stats-shell", false);
+  const rankingsShellOpen = dashboardPanelOpen("dashboard-contributor-rankings-shell", false);
   const showReviewPanel = !!reviewReporter || needsAttention.length > 0;
   syncDashboardScopeSwitch(scope);
   // Guard against late-arriving SSE refreshes after the user navigated
@@ -258,60 +258,58 @@ function drawDashboard(d, opts = {}) {
       </div>
     </details>` : ""}
 
-    <details class="filter-shell dashboard-collapsible-shell" id="dashboard-assignee-stats-shell" data-testid="dashboard-assignee-stats-panel"${assigneeStatsShellOpen ? " open" : ""}>
-      <summary data-testid="dashboard-assignee-stats-summary">
-        <span class="filter-shell-title">Assignee throughput</span>
-        <span class="filter-pill" data-testid="dashboard-assignee-stats-count">${fmtCount(assigneeStats.length)}</span>
+    <details class="filter-shell dashboard-collapsible-shell" id="dashboard-contributor-rankings-shell" data-testid="dashboard-contributor-rankings-panel"${rankingsShellOpen ? " open" : ""}>
+      <summary data-testid="dashboard-contributor-rankings-summary">
+        <span class="filter-shell-title">Contributor rankings</span>
+        <span class="filter-pill" data-testid="dashboard-contributor-rankings-count">${fmtCount(contributorRankings.length)}</span>
       </summary>
       <div class="filter-shell-body">
-        ${assigneeStats.length === 0
-          ? `<p class="muted">No assignee activity yet.</p>`
+        ${contributorRankings.length === 0
+          ? `<p class="muted">No contributor activity yet.</p>`
           : `<table class="table">
               <thead><tr>
-                <th>Assignee</th>
-                <th>Active</th>
-                <th>Done</th>
-                <th>Assigned</th>
-                <th>Review</th>
-                <th>Done / Assigned</th>
+                <th>#</th>
+                <th>Contributor</th>
+                <th>Reported</th>
+                <th>Delivered</th>
+                <th>Delivered %</th>
+                <th>Score</th>
               </tr></thead>
               <tbody>
-                ${assigneeStats.map((s) => {
-                  const assignee = s.assignee || s.reporter || "";
-                  return `
-                  <tr class="assignee-stats-row"
-                      data-testid="dashboard-assignee-stats-row"
-                      data-assignee="${htmlEscape(assignee)}"
-                      title="See Goals assigned to ${htmlEscape(assignee)}">
-                    <td>${htmlEscape(assignee)}</td>
-                    <td>${fmtCount(s.active)}</td>
-                    <td>${fmtCount(s.done)}</td>
-                    <td>${fmtCount(s.assigned || 0)}</td>
-                    <td>${fmtCount(s.assigned_review || 0)}</td>
-                    <td><span class="metric-good">${s.completion_rate.toFixed(1)}%</span></td>
-                  </tr>`;
-                }).join("")}
+                ${contributorRankings.map((s) => `
+                  <tr class="contributor-ranking-row"
+                      data-testid="dashboard-contributor-ranking-row"
+                      data-reporter="${htmlEscape(s.contributor || "")}"
+                      title="See Goals reported by ${htmlEscape(s.contributor || "")}">
+                    <td class="muted">${fmtCount(s.rank)}</td>
+                    <td>${htmlEscape(s.contributor || "")}</td>
+                    <td>${fmtCount(s.reported)}</td>
+                    <td>${fmtCount(s.delivered)}</td>
+                    <td>${(s.delivery_rate || 0).toFixed(0)}%</td>
+                    <td><span class="metric-good">${(s.score || 0).toFixed(1)}</span></td>
+                  </tr>`).join("")}
               </tbody>
-            </table>`}
+            </table>
+            <p class="muted small">Score = Delivered × Delivered %: shipping more ranks higher, scaled by how much of the reported work shipped. Cancelled Goals count toward neither side.</p>`}
       </div>
     </details>
 
   `, () => {
-    // Click any assignee row -> deep-link into the Goals list filtered by that
-    // assignee. We use data-assignee so the name can contain spaces/quotes
-    // without HTML-escaping hazards. The scope is read live rather than captured:
-    // this handler is bound once and outlives the render that bound it.
-    $$(".assignee-stats-row").forEach((row) => {
+    // Click any contributor row -> deep-link into the Goals list filtered by
+    // that reporter. We use data-reporter so the name can contain spaces or
+    // quotes without HTML-escaping hazards. The scope is read live rather than
+    // captured: this handler is bound once and outlives the render that bound it.
+    $$(".contributor-ranking-row").forEach((row) => {
       bindOnce(row, "click", () => {
         location.hash = goalsHash({
-          assignee: row.dataset.assignee,
+          reporter: row.dataset.reporter,
           node: dashboardScopeFromHash(),
         });
       });
     });
 
     wireDashboardPanelPersistence("reviews-for-reporter-card");
-    wireDashboardPanelPersistence("dashboard-assignee-stats-shell");
+    wireDashboardPanelPersistence("dashboard-contributor-rankings-shell");
     wireReviewsForReporter(reviewsForReporter);
   });
 }

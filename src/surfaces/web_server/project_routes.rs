@@ -349,6 +349,63 @@ fn todo_route_not_found() -> ApiResponse {
     )
 }
 
+/// Ranks contributors by delivered volume weighted by delivery rate.
+///
+/// A plain completion percentage made two-for-two look better than forty
+/// delivered out of a hundred twenty filed, and a plain count rewarded filing
+/// volume regardless of what shipped. The score multiplies the two:
+/// `delivered × (delivered / reported)` — shipping more raises it linearly,
+/// and the share of your filed work that ships scales it. Cancelled Goals are
+/// withdrawn work, so they count toward neither side. Ties fall back to
+/// delivered volume, then reported volume, then name.
+fn contributor_ranking_rows(
+    reporter_stats: &BTreeMap<String, BTreeMap<GoalStatus, usize>>,
+) -> Vec<Value> {
+    let mut rows = reporter_stats
+        .iter()
+        .filter(|(reporter, _)| reporter.as_str() != "unknown")
+        .map(|(reporter, counts)| {
+            let cancelled = counts
+                .get(&GoalStatus::Cancelled)
+                .copied()
+                .unwrap_or_default();
+            let reported = counts
+                .values()
+                .copied()
+                .sum::<usize>()
+                .saturating_sub(cancelled);
+            let delivered = counts.get(&GoalStatus::Done).copied().unwrap_or_default();
+            let delivery_rate = if reported == 0 {
+                0.0
+            } else {
+                delivered as f64 / reported as f64
+            };
+            let score = delivered as f64 * delivery_rate;
+            (reporter.clone(), reported, delivered, delivery_rate, score)
+        })
+        .collect::<Vec<_>>();
+    rows.sort_by(|a, b| {
+        b.4.partial_cmp(&a.4)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| b.2.cmp(&a.2))
+            .then_with(|| b.1.cmp(&a.1))
+            .then_with(|| a.0.cmp(&b.0))
+    });
+    rows.into_iter()
+        .enumerate()
+        .map(|(index, (reporter, reported, delivered, delivery_rate, score))| {
+            json!({
+                "rank": index + 1,
+                "contributor": reporter,
+                "reported": reported,
+                "delivered": delivered,
+                "delivery_rate": delivery_rate * 100.0,
+                "score": score,
+            })
+        })
+        .collect()
+}
+
 fn assignee_stats_rows(
     assignee_stats: &BTreeMap<String, BTreeMap<GoalStatus, usize>>,
 ) -> Vec<Value> {
@@ -381,4 +438,55 @@ fn assignee_stats_rows(
             })
         })
         .collect()
+}
+
+#[cfg(test)]
+mod contributor_ranking_tests {
+    use super::*;
+
+    fn counts(pairs: &[(GoalStatus, usize)]) -> BTreeMap<GoalStatus, usize> {
+        pairs.iter().cloned().collect()
+    }
+
+    #[test]
+    fn volume_outranks_a_perfect_but_tiny_record() {
+        let mut stats = BTreeMap::new();
+        // Two filed, two delivered: perfect rate, little contribution.
+        stats.insert(
+            "reporter-a".to_string(),
+            counts(&[(GoalStatus::Done, 2)]),
+        );
+        // 120 filed, 40 delivered: far more shipped work despite the lower rate.
+        stats.insert(
+            "reporter-b".to_string(),
+            counts(&[
+                (GoalStatus::Done, 40),
+                (GoalStatus::Backlog, 60),
+                (GoalStatus::Failed, 20),
+            ]),
+        );
+        // Cancelled work is withdrawn: it must not dilute the rate.
+        stats.insert(
+            "reporter-c".to_string(),
+            counts(&[(GoalStatus::Done, 10), (GoalStatus::Cancelled, 90)]),
+        );
+        stats.insert("unknown".to_string(), counts(&[(GoalStatus::Done, 99)]));
+
+        let rows = contributor_ranking_rows(&stats);
+
+        let order: Vec<&str> = rows
+            .iter()
+            .map(|row| row["contributor"].as_str().unwrap())
+            .collect();
+        assert_eq!(order, vec!["reporter-b", "reporter-c", "reporter-a"]);
+        assert_eq!(rows[0]["rank"], 1);
+        assert_eq!(rows[0]["reported"], 120);
+        assert_eq!(rows[0]["delivered"], 40);
+        assert!((rows[0]["score"].as_f64().unwrap() - 40.0 * (40.0 / 120.0)).abs() < 1e-9);
+        // reporter-c's 90 cancelled Goals leave a perfect 10-of-10 record.
+        assert_eq!(rows[1]["reported"], 10);
+        assert_eq!(rows[1]["delivery_rate"], 100.0);
+        assert_eq!(rows[1]["score"], 10.0);
+        assert_eq!(rows[2]["score"], 2.0);
+    }
 }
