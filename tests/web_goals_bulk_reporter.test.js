@@ -122,8 +122,14 @@ test("bulk cancellation surfaces per-Goal partial failure", async () => {
 
   await browser.runtime.openStatus();
 
-  assert.deepEqual(browser.toasts, [{
-    message: "Updated 2 goals; 1 failed or need attention.",
-    kind: "warn",
-  }]);
+  assert.deepEqual(browser.toasts, [
+    {
+      message: "Refine is working on it asynchronously.",
+      kind: "info",
+    },
+    {
+      message: "Updated 2 goals; 1 failed or need attention.",
+      kind: "warn",
+    },
+  ]);
 });

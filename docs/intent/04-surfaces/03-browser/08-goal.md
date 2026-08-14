@@ -39,6 +39,7 @@ Current implementation details that matter to intent:
 - failed Feature-blocking Goals should explain what they block and log user-visible notices to System;
 - new rounds can be submitted for failed or review states where shared rules allow it;
 - bulk operations should use shared work item behavior and preserve node/Feature constraints;
+- confirmed bulk actions should immediately acknowledge that Refine is working on them asynchronously, before the authoritative outcome is available;
 - the bulk status picker should include review and done while the shared workflow capability
   protects Goals in automated states from generic status replacement; cancelled is the
   lifecycle exception that delegates selected active, failed, or review Goals to shared
