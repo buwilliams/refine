@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, OpenOptions};
-use std::io::{BufRead, BufReader, Write};
+use std::io::Write;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock};
@@ -14,6 +14,11 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 
 pub const METRICS_LOG_FILE: &str = "metrics/performance.jsonl";
 pub const DEFAULT_METRICS_RETENTION_DAYS: i64 = 30;
+/// Hard ceiling on the metrics log; the trim keeps [`METRICS_TAIL_BYTES`].
+const METRICS_MAX_BYTES: u64 = 16 * 1024 * 1024;
+/// How much of the log's tail reads and trims retain (~tens of thousands of
+/// events — far more than any aggregate or page consumes).
+const METRICS_TAIL_BYTES: u64 = 8 * 1024 * 1024;
 
 static METRICS_LOG_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
@@ -198,6 +203,9 @@ impl FileMetricsService {
     }
 
     pub fn cleanup(&self, clear: bool) -> RefineResult<MetricsCleanupResult> {
+        // Size first, without parsing; the date pass below then works on a
+        // bounded window instead of the log's full lifetime.
+        self.enforce_size_cap()?;
         let events = self.read_all()?;
         let existing = events.len();
         let path = self.path();
@@ -275,31 +283,122 @@ impl FileMetricsService {
         })
     }
 
+    /// Recent events from the log's tail. Every consumer aggregates or pages a
+    /// recent window; parsing the whole file made one status query allocate in
+    /// proportion to the log's lifetime — a single read of a mature log grew
+    /// the daemon by hundreds of retained megabytes. A line cut in half by the
+    /// seek is skipped.
     fn read_all(&self) -> RefineResult<Vec<PerformanceEvent>> {
+        use std::io::{Read, Seek, SeekFrom};
         let path = self.path();
-        if !path.exists() {
-            return Ok(Vec::new());
+        let mut file = match fs::File::open(&path) {
+            Ok(file) => file,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+            Err(error) => {
+                return Err(RefineError::Io(format!(
+                    "failed to open metrics log {}: {error}",
+                    path.display()
+                )));
+            }
+        };
+        let len = file
+            .metadata()
+            .map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to stat metrics log {}: {error}",
+                    path.display()
+                ))
+            })?
+            .len();
+        let seek_to = len.saturating_sub(METRICS_TAIL_BYTES);
+        if seek_to > 0 {
+            file.seek(SeekFrom::Start(seek_to)).map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to seek metrics log {}: {error}",
+                    path.display()
+                ))
+            })?;
         }
-        let file = fs::File::open(&path).map_err(|error| {
+        let mut text = String::new();
+        file.read_to_string(&mut text).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to read metrics log {}: {error}",
+                path.display()
+            ))
+        })?;
+        let mut events = Vec::new();
+        for line in text.lines().skip(if seek_to > 0 { 1 } else { 0 }) {
+            if line.trim().is_empty() {
+                continue;
+            }
+            events.extend(parse_performance_events_line(line));
+        }
+        Ok(events)
+    }
+
+    /// Trim the log to its newest tail once it outgrows the cap, without
+    /// parsing it. Age-based retention alone let the file grow to whatever a
+    /// month of traffic produced.
+    fn enforce_size_cap(&self) -> RefineResult<()> {
+        use std::io::{Read, Seek, SeekFrom};
+        let path = self.path();
+        if !fs::metadata(&path).is_ok_and(|metadata| metadata.len() > METRICS_MAX_BYTES) {
+            return Ok(());
+        }
+        let _guard = METRICS_LOG_LOCK
+            .get_or_init(|| Mutex::new(()))
+            .lock()
+            .map_err(|_| RefineError::Io("metrics log lock was poisoned".to_string()))?;
+        let mut file = fs::File::open(&path).map_err(|error| {
             RefineError::Io(format!(
                 "failed to open metrics log {}: {error}",
                 path.display()
             ))
         })?;
-        let mut events = Vec::new();
-        for line in BufReader::new(file).lines() {
-            let line = line.map_err(|error| {
+        let len = file
+            .metadata()
+            .map_err(|error| {
                 RefineError::Io(format!(
-                    "failed to read metrics log {}: {error}",
+                    "failed to stat metrics log {}: {error}",
+                    path.display()
+                ))
+            })?
+            .len();
+        if len <= METRICS_MAX_BYTES {
+            return Ok(());
+        }
+        file.seek(SeekFrom::Start(len - METRICS_TAIL_BYTES))
+            .map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to seek metrics log {}: {error}",
                     path.display()
                 ))
             })?;
-            if line.trim().is_empty() {
-                continue;
-            }
-            events.extend(parse_performance_events_line(&line));
-        }
-        Ok(events)
+        let mut tail = String::new();
+        file.read_to_string(&mut tail).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to read metrics log {}: {error}",
+                path.display()
+            ))
+        })?;
+        let tail = match tail.find('\n') {
+            Some(newline) => &tail[newline + 1..],
+            None => "",
+        };
+        let temp = path.with_extension(format!("jsonl.{}.tmp", std::process::id()));
+        fs::write(&temp, tail).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to write trimmed metrics log {}: {error}",
+                temp.display()
+            ))
+        })?;
+        fs::rename(&temp, &path).map_err(|error| {
+            let _ = fs::remove_file(&temp);
+            RefineError::Io(format!(
+                "failed to commit trimmed metrics log {}: {error}",
+                path.display()
+            ))
+        })
     }
 
     fn replace_all(&self, events: &[PerformanceEvent]) -> RefineResult<()> {

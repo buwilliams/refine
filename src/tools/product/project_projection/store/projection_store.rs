@@ -16,26 +16,20 @@ impl FileProjectProjectionStore {
                 snapshot_path.display()
             ))
         })?;
-        // Projection snapshots are derived cache data, not durable project state.
-        // Inspect the version before deserializing the current schema so an older
-        // snapshot that lacks newly required fields is treated as a cache miss.
-        // Malformed or incomplete snapshots are likewise safe to rebuild.
-        let value: Value = match serde_json::from_slice(&bytes) {
-            Ok(value) => value,
-            Err(_) => return Ok(None),
-        };
-        if value.get("version").and_then(Value::as_u64) != Some(PROJECTION_SNAPSHOT_VERSION) {
-            return Ok(None);
-        }
-        match serde_json::from_value::<ProjectionSnapshot>(value) {
-            // The source directory is not serialized, so a snapshot read back
-            // from cache has to be pointed at its records again before text
-            // search can consult them.
-            Ok(mut snapshot) => {
+        // Projection snapshots are derived cache data, not durable project
+        // state: any snapshot that does not parse as the current schema at the
+        // current version is simply a cache miss. One direct parse — the old
+        // version probe built a full Value tree of a multi-megabyte document
+        // and then deserialized it a second time.
+        match serde_json::from_slice::<ProjectionSnapshot>(&bytes) {
+            Ok(mut snapshot) if snapshot.version == PROJECTION_SNAPSHOT_VERSION => {
+                // The source directory is not serialized, so a snapshot read
+                // back from cache has to be pointed at its records again
+                // before text search can consult them.
                 snapshot.refine_dir = Some(self.refine_dir.clone());
                 Ok(Some(snapshot))
             }
-            Err(_) => Ok(None),
+            _ => Ok(None),
         }
     }
 
@@ -52,7 +46,9 @@ impl FileProjectProjectionStore {
         })?;
         let snapshot_path = Self::snapshot_path(cache_dir);
         let temp_path = Self::snapshot_temp_path(cache_dir);
-        let bytes = serde_json::to_vec_pretty(snapshot).map_err(|error| {
+        // Compact encoding: this file is rewritten on every projection patch,
+        // so its byte size is a per-write cost, and no human reads it.
+        let bytes = serde_json::to_vec(snapshot).map_err(|error| {
             RefineError::Serialization(format!("failed to encode projection snapshot: {error}"))
         })?;
 
@@ -113,6 +109,7 @@ impl FileProjectProjectionStore {
 
         let mut activity = self.project_activity()?;
         activity.extend(self.project_goal_round_activity(&goals)?);
+        cap_projected_activity(&mut activity);
         if activity_path.exists() {
             let rel_path = self.relative_path(&activity_path)?;
             source_fingerprints.insert(rel_path, Self::metadata_fingerprint(&activity_path)?);
@@ -188,6 +185,38 @@ pub(super) fn derive_features(
         );
     }
     features
+}
+
+/// Bounds resident activity across BOTH sources — the shared activity log and
+/// the per-Goal round sidecars. The round-log side was already windowed, but
+/// the activity log projected its entire history: every consumer reads a
+/// recent slice (a fifty-item dashboard, paged recent-first feeds, a
+/// two-hundred-frame SSE replay), yet the unbounded map dominated the snapshot
+/// — sixteen of eighteen megabytes on a mature project — and was re-serialized
+/// on every persist and re-cloned on every SSE rebuild. Complete history stays
+/// on disk in the activity log and sidecars.
+pub(super) fn cap_projected_activity(
+    activity: &mut BTreeMap<String, ActivitySummaryProjection>,
+) {
+    if activity.len() <= PROJECTED_ACTIVITY_LIMIT {
+        return;
+    }
+    let mut order: Vec<(String, String)> = activity
+        .values()
+        .map(|projection| {
+            (
+                projection.entry.datetime.clone(),
+                projection.entry.id.clone(),
+            )
+        })
+        .collect();
+    order.sort_by(|a, b| b.cmp(a));
+    let keep = order
+        .into_iter()
+        .take(PROJECTED_ACTIVITY_LIMIT)
+        .map(|(_, id)| id)
+        .collect::<std::collections::BTreeSet<_>>();
+    activity.retain(|id, _| keep.contains(id));
 }
 
 /// Cross-references activity back onto the Goals it belongs to. Replaces rather

@@ -384,11 +384,14 @@ impl LocalHttpDaemon {
                 }),
             },
         ];
+        // Sort references and clone only the kept window; this runs on every
+        // frame rebuild, and cloning the full activity set to keep 200 entries
+        // charged each rebuild for the whole resident history.
         let mut recent_goal_logs = projection
             .activity
             .values()
             .filter(|activity| activity.entry.id.starts_with("round-log:"))
-            .map(|activity| activity.entry.clone())
+            .map(|activity| &activity.entry)
             .collect::<Vec<_>>();
         recent_goal_logs.sort_by(|left, right| {
             left.datetime
@@ -396,7 +399,7 @@ impl LocalHttpDaemon {
                 .then_with(|| left.id.cmp(&right.id))
         });
         let keep_from = recent_goal_logs.len().saturating_sub(200);
-        for entry in recent_goal_logs.drain(keep_from..) {
+        for entry in &recent_goal_logs[keep_from..] {
             events.push(SseEventFrame {
                 event: "goal_log_added",
                 data: json!(entry),

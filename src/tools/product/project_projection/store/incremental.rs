@@ -1,6 +1,8 @@
 use std::collections::BTreeSet;
 
-use super::projection_store::{attach_activity_ids, derive_dashboard, derive_features};
+use super::projection_store::{
+    attach_activity_ids, cap_projected_activity, derive_dashboard, derive_features,
+};
 use super::*;
 
 /// What changed on disk since a cached projection was built.
@@ -211,6 +213,7 @@ impl FileProjectProjectionStore {
         {
             let mut activity = self.project_activity()?;
             activity.extend(self.project_goal_round_activity(&snapshot.goals)?);
+            cap_projected_activity(&mut activity);
             snapshot.activity = activity;
         }
 
