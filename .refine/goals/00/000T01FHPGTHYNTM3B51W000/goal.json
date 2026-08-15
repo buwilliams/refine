@@ -786,8 +786,37 @@
           "round_idx": 1,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-08-15T16:25:23Z",
+        "criticism": {
+          "completed_at": "2026-08-15T16:27:40Z",
+          "git_after": {
+            "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-2",
+            "head_commit": "0e0de3d43fe9284156e9f951dc8c981c1f996fd7",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-2",
+            "head_commit": "0e0de3d43fe9284156e9f951dc8c981c1f996fd7",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P1",
+                  "P8"
+                ],
+                "description": "The checklist says to carry forward the reviewed regressions but does not require executing the Latest Round's targeted formatting and cumulative diff checks or explicitly proving that the recovered current-main delta preserves the complete reviewed base-to-candidate behavior without unrelated drift.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Revise P8 or add a verification item that runs the focused deterministic suites and targeted formatting, compares the recovered cumulative delta with the reviewed base-to-candidate delta, and checks the cumulative current-main diff for unrelated changes while reporting baseline failures and browser skips separately."
+              }
+            ],
+            "summary": "Add an explicit recovery-fidelity and verification step before implementation."
+          },
+          "started_at": "2026-08-15T16:25:23Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-08-15T16:27:40Z",
         "proposal": {
           "completed_at": "2026-08-15T16:25:23Z",
           "git_after": {
@@ -846,7 +875,7 @@
         "schema_version": 2,
         "started_at": "2026-08-15T16:23:52Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T16:25:23Z"
+        "updated_at": "2026-08-15T16:27:40Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -860,7 +889,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T16:25:23Z",
+      "updated": "2026-08-15T16:27:40Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T16:23:51Z",
         "round_idx": 1,
@@ -872,6 +901,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-15T16:25:23Z",
-  "workflow_revision": 41
+  "updated": "2026-08-15T16:27:40Z",
+  "workflow_revision": 43
 }
