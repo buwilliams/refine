@@ -1,7 +1,7 @@
 {
   "base_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
   "branch_name": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-2",
-  "candidate_commit": null,
+  "candidate_commit": "0dcc1254d8142cc63fba5b7833dd7313504c366c",
   "created": "2026-08-15T17:44:01Z",
   "feature_id": null,
   "feature_order": null,
@@ -597,7 +597,28 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-15T19:31:39Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
@@ -608,6 +629,7 @@
           "round_idx": 1,
           "target_branch": "main"
         },
+        "completed_at": "2026-08-15T19:31:39Z",
         "criticism": {
           "completed_at": "2026-08-15T19:03:29Z",
           "git_after": {
@@ -743,6 +765,91 @@
           },
           "started_at": "2026-08-15T19:03:29Z"
         },
+        "implementation": {
+          "completed_at": "2026-08-15T19:31:39Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Started Round 2 at current-main commit 4519b5ff2c5894b0fccf1c4c0e57612f694ffe79, compared it with the retained Round 1 worktree, and selectively reapplied only Goal behavior. No merge, reset, cleanup, commit, or push was performed; the existing planning-summary and command-channel handoff contracts remain in the base.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Implemented one bounded three-attempt structured-output path for proposal, criticism, and revision. Every invalid raw response and diagnostic is retained, retries resume the same phase from prior valid artifacts, execution authority is revalidated around provider and persistence boundaries, and exhausted invalid output is classified separately from provider failure.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Applied the shared bounded repair policy to Quality, retaining provider receipts and all raw attempts in operation and Round evidence. Valid failed findings remain implementation findings, while exhausted parsing is a quality_output_contract_fault; cancellation and authority-loss regressions prove later provider attempts do not launch.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added a versioned durable Quality proof carrying Goal ID, zero-based Round, isolated evaluation scope, operation ID, checked and source candidate commits, passed state, timestamp, and recorded results. Legacy evidence normalizes only when all exact identity fields can be reconstructed.",
+                "id": "P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Already-merged reconciliation now requires current-Round integration identity and exact-candidate passed Governance plus retained or completely normalized isolated Quality proof; otherwise it materializes a clean managed checkout of the exact candidate and reruns Quality. Tests reject ancestry-only, shared-descendant, and wrong-branch regeneration evidence.",
+                "id": "P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Eligible already-merged settlement is idempotent and atomic under repository observation and Round/workflow-revision authority, transitions Quality to Review only with exact proof, records retained/normalized/regenerated proof mode, and leaves unavailable proof explicit.",
+                "id": "P6",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Candidate refresh distinguishes target movement from provenance failure and requires exact resolvable base/candidate identities, an exact clean candidate branch, target descent from base, and a linear unambiguous base-to-candidate delta before rebasing.",
+                "id": "P7",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "The integrated-target repository lease now spans final revalidation, refresh, atomic old/replacement identity persistence, replacement Quality and Governance, push/integration, and settlement. Status, node, Round, workflow revision, operation state, and cancellation authority are reread at provider, gate, Git, and durable-state boundaries.",
+                "id": "P8",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Conflicted or ambiguous refresh aborts without moving or deleting the original candidate and records original base, candidate, branch, handoff, gate, target, and conflict evidence. Recovery uses automatic_retry kind integration with source Round and the shared monotonic attempt count, creates one fenced Round within max_automatic_round_retries, and otherwise records integration_retry_exhausted without a successor.",
+                "id": "P9",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated only affected planning, Quality, Governance, failed-state, merge-review Git/worktree, execution-ownership, and workflow-consistency intent pages for bounded repair, proof regeneration, lease duration, candidate history, retry exhaustion, and authority-fenced recovery.",
+                "id": "P10",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Round 1 remains at branch refine/DR6626D11FDB6F9A57F6EA4B0F/round-1 and HEAD 4519b5ff2c5894b0fccf1c4c0e57612f694ffe79 with the identical tracked binary-diff SHA-256 f36d5f6f347d6c97bea3c8bb7766dcbd3ce54732292472ed06359dfb720ed77f and unchanged dirty/untracked audit paths. Focused tests cover planning/Quality repair, retained attempts, authority/cancellation loss, exact-proof normalization/regeneration rejection, concurrent refresh serialization, conflict recovery, shared retry counting, and exhaustion. Round 2 has only intended source/docs/test changes, git diff --check is clean, and no integration or review boundary was crossed.",
+                "id": "P11",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "cargo check --all-targets: exit 0; finished dev profile successfully.",
+              "cargo clippy --all-targets -- -D warnings: failed only on four pre-existing warnings in untouched files (two needless_pub_self, one unnecessary_sort_by, one items_after_test_module).",
+              "cargo clippy --all-targets -- -A clippy::needless_pub_self -A clippy::unnecessary_sort_by -A clippy::items_after_test_module -D warnings: exit 0; finished successfully.",
+              "mapfile -t files < <({ git diff --name-only --diff-filter=ACM; git ls-files --others --exclude-standard; } | LC_ALL=C sort -u | awk '/\\.rs$/'); rustfmt --edition 2024 --config skip_children=true --check \"${files[@]}\": exit 0; checked 40 changed Rust files.",
+              "git diff --check: exit 0.",
+              "cargo test --lib governed_planning_repairs_invalid_proposal_and_retains_the_attempt: 1 passed, 0 failed.",
+              "cargo test --lib quality_repairs_one_invalid_response_and_retains_both_attempts: 1 passed, 0 failed.",
+              "cargo test --lib workflow_quality_authority_loss_prevents_provider_launch: 1 passed, 0 failed.",
+              "cargo test --lib quality_cancellation_during_repair_prevents_further_attempts: 1 passed, 0 failed.",
+              "cargo test --lib quality_operation_settles_parsing_failure_and_persists_the_same_goal_evidence: 1 passed, 0 failed.",
+              "cargo test --lib workflow::tests::candidate_refresh: 5 passed, 0 failed.",
+              "cargo test --lib tools::product::governance_integration::tests::reconciliation: 8 passed, 0 failed.",
+              "cargo test --lib -- --skip prompts::tests::agent_prompts_keep_only_task_specific_contracts --skip surfaces::cli::catalog::tests::operational_runbooks_use_current_cli_and_layout_contracts: 859 passed, 0 failed, 6 ignored, 2 filtered out.",
+              "cargo test --lib: 857 passed, 4 failed, 6 ignored; two deterministic failures are unchanged baseline contracts in src/prompts/implementation_planning/plan.md and docs/runbooks/install.md, and the two unrelated concurrent-state failures each passed when rerun in isolation.",
+              "git diff --quiet -- src/prompts/implementation_planning/plan.md docs/runbooks/install.md: exit 0, confirming both deterministic baseline-failure inputs are untouched.",
+              "git -C /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR6626D11FDB6F9A57F6EA4B0F-round-1 rev-parse HEAD: 4519b5ff2c5894b0fccf1c4c0e57612f694ffe79.",
+              "git -C /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR6626D11FDB6F9A57F6EA4B0F-round-1 diff --binary | sha256sum: f36d5f6f347d6c97bea3c8bb7766dcbd3ce54732292472ed06359dfb720ed77f; identical to the pre-recovery fingerprint.",
+              "git -C /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR6626D11FDB6F9A57F6EA4B0F-round-1 diff --check: exit 0.",
+              "jq . /home/buddy/projects/refine/run/8082/processes/goal-agent-5b49841a-fa73-4e4e-b65d-5f4b5f9c5272.signal.json.tmp >/dev/null && mv /home/buddy/projects/refine/run/8082/processes/goal-agent-5b49841a-fa73-4e4e-b65d-5f4b5f9c5272.signal.json.tmp /home/buddy/projects/refine/run/8082/processes/goal-agent-5b49841a-fa73-4e4e-b65d-5f4b5f9c5272.signal.json: exit 0."
+            ]
+          },
+          "report": "Recovered the substantive Round 1 workflow changes selectively onto current main without modifying or merging the retained audit worktree. Added bounded authority-fenced planning and Quality output repair; exact-candidate durable Quality proof and safe already-merged regeneration; serialized provable candidate refresh with replacement-gate reruns; bounded shared integration recovery with explicit exhaustion; and affected intent documentation. Verification passed for compilation, scoped formatting, lint after enumerated baseline allowances, focused recovery/race regressions, and the broad library suite with only two confirmed unchanged baseline contract failures excluded.",
+          "started_at": "2026-08-15T19:04:44Z"
+        },
         "phase": "implement",
         "phase_started_at": "2026-08-15T19:04:44Z",
         "proposal": {
@@ -802,11 +909,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-08-15T18:58:49Z",
-        "state": "in_progress",
-        "updated_at": "2026-08-15T19:04:44Z"
+        "state": "completed",
+        "updated_at": "2026-08-15T19:31:39Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Recovered the substantive Round 1 workflow changes selectively onto current main without modifying or merging the retained audit worktree. Added bounded authority-fenced planning and Quality output repair; exact-candidate durable Quality proof and safe already-merged regeneration; serialized provable candidate refresh with replacement-gate reruns; bounded shared integration recovery with explicit exhaustion; and affected intent documentation. Verification passed for compilation, scoped formatting, lint after enumerated baseline allowances, focused recovery/race regressions, and the broad library suite with only two confirmed unchanged baseline contract failures excluded.",
+      "implementation_reported_at": "2026-08-15T19:31:39Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -817,7 +924,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T19:04:44Z",
+      "updated": "2026-08-15T19:31:39Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T18:58:48Z",
         "round_idx": 1,
@@ -827,8 +934,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-15T19:04:44Z",
-  "workflow_revision": 30
+  "updated": "2026-08-15T19:31:39Z",
+  "workflow_revision": 35
 }
