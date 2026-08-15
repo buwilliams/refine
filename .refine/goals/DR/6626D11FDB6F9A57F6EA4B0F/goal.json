@@ -106,12 +106,63 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-08-15T17:44:02Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-08-15T17:47:37Z",
+        "proposal": {
+          "completed_at": "2026-08-15T17:47:37Z",
+          "git_after": {
+            "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-1",
+            "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-1",
+            "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Add a bounded structured-output repair loop that returns precise schema or validation diagnostics to planning agents, preserves every invalid attempt, and resumes from the last valid proposal or criticism before declaring the phase failed.",
+                "id": "P1"
+              },
+              {
+                "description": "Apply the same bounded contract-repair policy to unreadable Quality evaluations while keeping real implementation findings distinct from provider, parsing, and infrastructure faults.",
+                "id": "P2"
+              },
+              {
+                "description": "Preserve the current relaxed summary contract and artifact-handoff ownership semantics, with regression scenarios covering formerly oversized plans and reaper-versus-settlement command-channel races.",
+                "id": "P3"
+              },
+              {
+                "description": "Define a backward-compatible already-merged evidence classifier that accepts an exact current-Round integration identity plus candidate-bound passed Governance and durable compatible Quality evidence, but never treats ancestry by itself as approval.",
+                "id": "P4"
+              },
+              {
+                "description": "Settle eligible already-merged Goals atomically and idempotently to Review under repository and Goal authority fences while recording which durable evidence justified reconciliation and retaining ambiguous cases as explicit failures.",
+                "id": "P5"
+              },
+              {
+                "description": "At the serialized integration boundary, revalidate the target and cleanly rebase an out-of-date candidate onto its latest tip, then persist the new base and candidate identities and rerun candidate-bound Quality and Governance before integration.",
+                "id": "P6"
+              },
+              {
+                "description": "Abort conflicted rebases without losing the original branch or evidence and queue a fresh actionable recovery Round instead of terminally failing stale-base or merge-conflict cases.",
+                "id": "P7"
+              },
+              {
+                "description": "Update the affected Plan, Quality, Governance, Failed, and consistency intent pages to document bounded output repair, compatible reconciliation evidence, and serialized shared-target recovery without weakening exact-candidate authority.",
+                "id": "P8"
+              }
+            ],
+            "summary": "Build on the relaxed planning-summary limit and Goal Agent artifact-handoff safeguards already present on current main by making structured planning and Quality outputs repairable before a Round fails, allowing already-integrated candidates to recover from compatible durable gate evidence without trusting reachability alone, and refreshing candidates safely when a serialized shared target advances. The workflow will preserve exact Round, candidate, authority, and audit boundaries while converting recoverable formatting, stale-base, and merge-conflict conditions into bounded correction or explicit recovery instead of terminal harness failures."
+          },
+          "started_at": "2026-08-15T17:44:02Z"
+        },
         "schema_version": 2,
         "started_at": "2026-08-15T17:44:02Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T17:44:02Z"
+        "updated_at": "2026-08-15T17:47:37Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -125,7 +176,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T17:44:02Z",
+      "updated": "2026-08-15T17:47:37Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T17:44:02Z",
         "round_idx": 0,
@@ -137,6 +188,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-15T17:44:02Z",
-  "workflow_revision": 7
+  "updated": "2026-08-15T17:47:37Z",
+  "workflow_revision": 9
 }
