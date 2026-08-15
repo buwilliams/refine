@@ -2818,15 +2818,35 @@
         "kind": "quality",
         "source_round": 3
       },
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-08-15T21:19:07Z",
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
-      "governance_candidate_commit": "",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_candidate_commit": "3c548e4eb371abbc40ca1d1c53c738a079bfa17e",
+      "governance_checked_at": "2026-08-15T22:03:02Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR6626D11FDB6F9A57F6EA4B0F-round-4",
+        "failed_actions": [],
+        "governance_configured": true,
+        "guidance_checked": 2,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No actual governance rule or enabled-guidance violations found.\",\"violations\":[],\"recovery_analysis\":\"\",\"recovery_round_prompt\":\"\"}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "No actual governance rule or enabled-guidance violations found.",
+          "recovery_analysis": "",
+          "recovery_round_prompt": "",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR6626D11FDB6F9A57F6EA4B0F-round-4"
+      },
+      "governance_message": "No actual governance rule or enabled-guidance violations found.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
       "governance_rule_actions": [],
       "guidance_decision": {
         "applied": [
@@ -3083,8 +3103,8 @@
       "implementation_report": "Selectively restored candidate 68d2c526's complete infrastructure-reliability implementation and intent coverage onto the Round 4 base, preserved fail-closed first-result already-merged Quality settlement, and replaced both checkout-dependent inheritance tests with one deterministic synthetic source-product fixture. All requested focused and broad checks passed with only confirmed unchanged baseline exclusions; all retained Round audit evidence is unchanged.",
       "implementation_reported_at": "2026-08-15T21:39:39Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Start a fresh Round from current main and selectively preserve the complete relevant behavior and Quality coverage from candidate 68d2c526a7199e2018dac9a1be3baa98ba2052b6; do not blindly merge it. Preserve all retained Round worktrees and audit evidence unchanged. Keep the authority-fenced, fail-closed already-merged Quality implementation: the first valid failed exact-candidate evaluation must settle terminally with its original operation ID, identity, timestamp, results, diagnostics, and provider attempts; no resolver, second Quality run, approval, or Review transition may occur, including after restart, repeated handling, or superseded authority. Fix source_worker_inherits_debug_executable_without_installed_binary and source_lifecycle_handoff_inherits_debug_executable_without_installed_binary so they do not combine env!(\"CARGO_MANIFEST_DIR\") with an externally located current_exe(). Use a deterministic synthetic source-product fixture whose runtime root and fake debug executable share the same canonical product home, retain explicit foreign-home rejection coverage, and do not relax RefineCheckoutPaths::require_owned_executable or production ownership rules. Run the previously failing tests individually, the planning, Quality, reconciliation, candidate-refresh, already-merged, and workflow-behavior suites, cargo check --all-targets, scoped rustfmt, strict Clippy with unchanged warnings reported separately, and the broad library suite with only confirmed unchanged baseline exclusions. Run broad verification from the candidate checkout with its checkout-local target directory—no target symlink or external CARGO_TARGET_DIR crossing product homes—and report exact clean-worktree and preserved-audit evidence.",
       "quality_agent_report": "Quality review found no further defects requiring correction. Round 4 commit 3c548e4eb371abbc40ca1d1c53c738a079bfa17e selectively preserves candidate 68d2c526a7199e2018dac9a1be3baa98ba2052b6 and adds a shared synthetic source-product fixture for the two formerly failing executable-inheritance tests; production ownership rules remain unchanged. Both regressions, all requested focused suites, all-target compilation, scoped formatting, baseline-adjusted strict Clippy, and the broad library suite with only two confirmed unchanged baseline exclusions pass. Retained Round 1-3 worktrees and audit evidence are unchanged, and Round 4 is clean.",
       "quality_candidate_commit": "3c548e4eb371abbc40ca1d1c53c738a079bfa17e",
@@ -3113,19 +3133,29 @@
       "quality_message": "All Quality tests passed with observed supervised evidence.",
       "quality_state": "passed",
       "reporter": "Refine",
-      "rule_state": "unclassified",
-      "updated": "2026-08-15T21:59:13Z",
-      "workflow_attempt_authority": {
-        "claimed_at": "2026-08-15T21:19:08Z",
-        "round_idx": 3,
-        "workflow_revision": 64
+      "rule_state": "passed",
+      "updated": "2026-08-15T22:03:06Z",
+      "workflow_attempt_authority": null,
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "3c548e4eb371abbc40ca1d1c53c738a079bfa17e",
+        "integrated_at": "2026-08-15T22:03:06.661277398+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Auto-merging docs/intent/03-capabilities/02-agents/05-merge-review-git-worktrees.md\nAuto-merging src/process/runner/tests.rs\nAuto-merging src/workflow/behaviors/mod.rs\nMerge made by the 'ort' strategy.\n .../intent/03-capabilities/02-agents/03-quality.md |   5 +-\n .../03-capabilities/02-agents/04-governance.md     |   1 +\n .../02-agents/05-merge-review-git-worktrees.md     |   5 +-\n .../03-capabilities/02-agents/07-planning.md       |   2 +\n docs/intent/03-capabilities/03-workflow/03-plan.md |   4 +-\n .../03-capabilities/03-workflow/05-quality.md      |   8 +-\n .../03-capabilities/03-workflow/06-governance.md   |   4 +-\n .../03-capabilities/03-workflow/09-failed.md       |   2 +\n .../03-workflow/11-consistency-contract.md         |   8 +-\n .../03-capabilities/04-execution-ownership.md      |   4 +-\n src/model/goal/implementation_plan.rs              |  15 +\n src/model/goal/mod.rs                              |   2 +\n src/model/goal/quality_proof.rs                    |  23 ++\n src/process/runner/tests.rs                        |  11 +-\n src/prompts/goal_workflow/recover-integration.md   |  10 +\n src/prompts/mod.rs                                 |   2 +\n src/prompts/quality/structured-output-repair.md    |  13 +\n src/surfaces/web_server/tests/goals/lifecycle.rs   |   1 +\n src/tools/host/checkout.rs                         |   3 +\n src/tools/host/checkout/test_fixture.rs            |  58 +++\n .../host/daemon_lifecycle/operations_tests.rs      |  11 +-\n src/tools/host/git_worktrees/changes.rs            |  49 +++\n src/tools/host/git_worktrees/integration.rs        |  19 +\n src/tools/host/mod.rs                              |   1 +\n src/tools/host/quality/identity.rs                 |  19 +-\n src/tools/host/quality/mod.rs                      |   6 +-\n src/tools/host/quality/service.rs                  |  29 +-\n src/tools/host/quality/service/execution.rs        | 102 ++++-\n src/tools/host/quality/service/provider_output.rs  |  56 +++\n src/tools/host/quality/service/runner.rs           | 216 +++++++---\n src/tools/host/quality/service/settings.rs         |  26 ++\n src/tools/host/quality/service/settlement.rs       |  63 ++-\n src/tools/host/quality/tests/execution.rs          | 176 ++++++++-\n src/tools/host/quality/tests/results.rs            |   8 +-\n src/tools/host/structured_output.rs                |   3 +\n src/tools/product/governance_integration/mod.rs    |  60 ++-\n .../governance_integration/reconciliation.rs       |  57 ++-\n .../governance_integration/tests/reconciliation.rs | 124 +++++-\n src/tools/product/work_items/service.rs            |   2 +\n .../product/work_items/service/already_merged.rs   | 252 ++++++++++--\n .../service/already_merged_quality_failure.rs      | 323 +++++++++++++++\n .../work_items/service/integration_recovery.rs     | 218 ++++++++++\n .../work_items/service/rounds_and_metadata.rs      |   1 +\n .../work_items/service/workflow_attempts.rs        |  28 ++\n .../product/work_items/tests/rounds_metadata.rs    |   1 +\n src/workflow/behaviors/mod.rs                      | 402 +++++++++++++++----\n src/workflow/behaviors/tests.rs                    |  12 +\n .../tests/already_merged_quality_failure.rs        | 422 ++++++++++++++++++++\n src/workflow/candidate_refresh.rs                  | 259 ++++++++++++\n src/workflow/context.rs                            |  13 +\n src/workflow/implementation_planning/mod.rs        | 116 ++++--\n src/workflow/implementation_planning/prompts.rs    |  29 ++\n src/workflow/implementation_planning/runtime.rs    |   4 +\n src/workflow/mod.rs                                |   2 +\n src/workflow/tests/already_merged.rs               |   8 +\n src/workflow/tests/candidate_refresh.rs            | 438 +++++++++++++++++++++\n src/workflow/tests/mod.rs                          |   2 +\n src/workflow/tests/planning_repair.rs              | 144 +++++++\n 58 files changed, 3632 insertions(+), 250 deletions(-)\n create mode 100644 src/model/goal/quality_proof.rs\n create mode 100644 src/prompts/goal_workflow/recover-integration.md\n create mode 100644 src/prompts/quality/structured-output-repair.md\n create mode 100644 src/tools/host/checkout/test_fixture.rs\n create mode 100644 src/tools/host/structured_output.rs\n create mode 100644 src/tools/product/work_items/service/already_merged_quality_failure.rs\n create mode 100644 src/tools/product/work_items/service/integration_recovery.rs\n create mode 100644 src/workflow/behaviors/tests/already_merged_quality_failure.rs\n create mode 100644 src/workflow/candidate_refresh.rs\n create mode 100644 src/workflow/tests/candidate_refresh.rs\n create mode 100644 src/workflow/tests/planning_repair.rs",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "0b561bcd40255af2d9b651175903f64326700433"
       },
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "governance",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-08-15T21:59:13Z",
-  "workflow_revision": 85
+  "updated": "2026-08-15T22:03:06Z",
+  "workflow_revision": 89
 }
