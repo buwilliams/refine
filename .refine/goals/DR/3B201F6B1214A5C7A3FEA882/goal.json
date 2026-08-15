@@ -469,15 +469,33 @@
         "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
       },
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-08-15T17:48:15Z",
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
-      "governance_candidate_commit": "",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_candidate_commit": "f70c529cb133a8f8ae5ff8be07ac4adf90b40399",
+      "governance_checked_at": "2026-08-15T19:23:35Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR3B201F6B1214A5C7A3FEA882-round-2",
+        "failed_actions": [],
+        "governance_configured": true,
+        "guidance_checked": 2,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No actual governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "No actual governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR3B201F6B1214A5C7A3FEA882-round-2"
+      },
+      "governance_message": "No actual governance rule violations found.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
       "governance_rule_actions": [],
       "guidance_decision": {
         "applied": [
@@ -765,8 +783,8 @@
       "implementation_report": "Implemented complete structured state-sync conflict evidence, stale-fenced valid-baseline preview/apply with manifest-owned resumable publication and record-lease hydration, schema-safe Goal merging, correlated health settlement, terminal daemon-routed sync CLI results, compact Dashboard diagnostics, and affected intent/runbook documentation. Exact verification is recorded in implementation_evidence.verification, including separately identified pre-existing and infrastructure-only failures.",
       "implementation_reported_at": "2026-08-15T19:03:25Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Try again.",
       "quality_agent_report": "Quality corrected two authority defects: late successful reconciliation now clears an older failure episode without overwriting newer attempt metadata, and valid-baseline recovery retries keep manifest stages monotonic and cannot finalize a baseline before the owned hydration boundary. Added focused interleaving and premature-boundary coverage. Candidate-focused Rust, JavaScript, formatting, and Clippy checks pass. The full Rust run has only two confirmed pre-existing failures in untouched prompt/install-runbook files; the integration harness passed CLI and smoke suites before the SSH Docker fixture was blocked by a missing docker-buildx plugin.",
       "quality_candidate_commit": "f70c529cb133a8f8ae5ff8be07ac4adf90b40399",
@@ -795,19 +813,29 @@
       "quality_message": "All Quality tests passed with observed supervised evidence.",
       "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-08-15T19:19:26Z",
-      "workflow_attempt_authority": {
-        "claimed_at": "2026-08-15T18:44:51Z",
-        "round_idx": 1,
-        "workflow_revision": 27
+      "rule_state": "passed",
+      "updated": "2026-08-15T19:23:40Z",
+      "workflow_attempt_authority": null,
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "f70c529cb133a8f8ae5ff8be07ac4adf90b40399",
+        "integrated_at": "2026-08-15T19:23:40.118596932+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n docs/intent/02-foundation/03-target-app.md         |  13 +-\n docs/intent/02-foundation/04-fleet.md              |  20 +-\n .../02-agents/06-activity-evidence.md              |   2 +-\n docs/intent/04-surfaces/02-cli.md                  |   9 +\n docs/intent/04-surfaces/03-browser/05-dashboard.md |   9 +-\n docs/intent/04-surfaces/04-api.md                  |   8 +\n docs/runbooks/README.md                            |   3 +\n docs/runbooks/state-sync-recovery.md               |  45 ++\n src/process/runner.rs                              |   4 +-\n src/process/runner/git_sync.rs                     |  23 +-\n src/process/runner/project_sync.rs                 |  41 +-\n src/process/runner/state_sync_health.rs            |  41 +-\n src/process/runner/tests.rs                        |  26 +-\n src/surfaces/cli/actions/projects.rs               |   9 +-\n src/surfaces/cli/dispatch.rs                       |   2 +\n src/surfaces/cli/dispatch/daemon_transport.rs      |  93 +++\n src/surfaces/cli/dispatch/fleet.rs                 |   4 +-\n src/surfaces/cli/dispatch/projects.rs              |  44 +-\n src/surfaces/cli/tests/mod.rs                      |   7 +-\n src/surfaces/cli/tests/parsing.rs                  |   1 +\n src/surfaces/cli/tests/projects.rs                 |  49 ++\n src/surfaces/web/static/js/features/dashboard.js   |   6 +\n src/surfaces/web_server/http/events.rs             |   6 +\n src/surfaces/web_server/project_routes/projects.rs |  22 +-\n src/surfaces/web_server/tests/git_changes.rs       |   2 +-\n src/tools/host/git_sync/conflict_report.rs         | 272 +++++++++\n src/tools/host/git_sync/git_commands.rs            |  11 +-\n src/tools/host/git_sync/goal_merge.rs              | 228 ++++++++\n src/tools/host/git_sync/mod.rs                     |  35 +-\n src/tools/host/git_sync/recovery/contracts.rs      |  56 ++\n src/tools/host/git_sync/recovery/hydration.rs      | 135 +++--\n src/tools/host/git_sync/recovery/inspection.rs     |  24 +-\n src/tools/host/git_sync/recovery/mod.rs            |   4 +\n src/tools/host/git_sync/recovery/reported.rs       | 621 +++++++++++++++++++++\n .../host/git_sync/recovery/reported_support.rs     | 202 +++++++\n src/tools/host/git_sync/recovery/service.rs        |  37 +-\n src/tools/host/git_sync/service.rs                 |  97 +++-\n src/tools/host/git_sync/state_codec.rs             | 174 +-----\n src/tools/host/git_sync/tests/recovery.rs          | 397 +++++++++++++\n src/tools/host/git_sync/tests/remote.rs            |  12 +-\n src/tools/host/git_sync/tests/synchronization.rs   | 178 +++++-\n src/tools/host/state_sync_health.rs                | 167 ++++++\n src/tools/host/state_sync_health/tests.rs          | 120 ++++\n tests/cli_surface/fleet.rs                         |  12 +-\n tests/web_dashboard_attention.test.js              |   6 +\n 45 files changed, 2943 insertions(+), 334 deletions(-)\n create mode 100644 docs/runbooks/state-sync-recovery.md\n create mode 100644 src/tools/host/git_sync/conflict_report.rs\n create mode 100644 src/tools/host/git_sync/goal_merge.rs\n create mode 100644 src/tools/host/git_sync/recovery/reported.rs\n create mode 100644 src/tools/host/git_sync/recovery/reported_support.rs",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f"
       },
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "governance",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-08-15T19:19:26Z",
-  "workflow_revision": 38
+  "updated": "2026-08-15T19:23:40Z",
+  "workflow_revision": 42
 }

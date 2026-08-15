@@ -1,7 +1,7 @@
 {
   "base_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
   "branch_name": "refine/00000T01FHPGTHYNTM3B51W000/round-4",
-  "candidate_commit": null,
+  "candidate_commit": "dfdfa68f093cd695ecb106f8dd6a19e8fb3ea867",
   "created": "2026-08-15T15:02:01Z",
   "feature_id": null,
   "feature_order": null,
@@ -2596,7 +2596,28 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-15T19:23:41Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
@@ -2607,6 +2628,7 @@
           "round_idx": 3,
           "target_branch": "main"
         },
+        "completed_at": "2026-08-15T19:23:40Z",
         "criticism": {
           "completed_at": "2026-08-15T19:09:46Z",
           "git_after": {
@@ -2697,6 +2719,77 @@
           },
           "started_at": "2026-08-15T19:09:46Z"
         },
+        "implementation": {
+          "completed_at": "2026-08-15T19:23:40Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Started clean at current main 4519b5ff2c5894b0fccf1c4c0e57612f694ffe79, compared its three command-channel paths with the retained 0e0de3d4..b003a0de Goal delta, and found no path overlap. Replayed only b0eace69 then b003a0de; main and refine/00000T01FHPGTHYNTM3B51W000/round-3 remain at 4519b5ff and b003a0de respectively.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Recovered the dedicated missing-baseline failure, optional typed recovery kind, and target-and-node-bound health settlement exactly from the retained candidate. All 15 state_sync tests passed, including typed eligibility, binding, unrelated-failure preservation, and success clearing.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Recovered the daemon-owned complete-preview preview/apply contract, git_busy and stale_preview reasons, generic conflict fallback, and unchanged-preview fencing. All 15 Git recovery tests and 3 state-recovery API/CLI tests passed.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Recovered the cohesive 337-line Dashboard recovery controller and neutral panel with typed-eligibility-only preview fetch, complete identities, heads, counts, bounded conflicts, consequences, evidence, unselected authority, and separate exact-preview confirmation. All 11 focused Dashboard tests passed.",
+                "id": "P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Recovered target, node, route, scope, eligibility, preview-identity, and late-response fencing. Dashboard regressions passed for context changes, git_busy retaining preview while clearing confirmation, stale_preview clearing reviewed state, and late apply completion not restoring stale state.",
+                "id": "P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Recovered intended-target health clearing and retained success evidence for baseline, heads, audit ref, manifest, evidence identity, counts, authority, detail, and cleared-error status. State-sync, API, and Dashboard success/health-clearing tests passed.",
+                "id": "P6",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Carried forward the focused daemon, API, and browser regressions and only the Dashboard intent, API intent, and existing manage-fleet missing-baseline runbook changes. The recovery controller remains a cohesive 337-line module and no unrelated documentation was added.",
+                "id": "P7",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Created clean Round 4 candidate dfdfa68f093cd695ecb106f8dd6a19e8fb3ea867 as commits 5a3c2647 and dfdfa68f on top of 4519b5ff. The cumulative Round 4 Goal scope is exactly 25 paths, 1096 insertions, and 52 deletions; the three command-channel paths are unchanged from main and all non-command-channel paths are identical to b003a0de.",
+                "id": "P8",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Bound fresh verification to clean candidate dfdfa68f093cd695ecb106f8dd6a19e8fb3ea867. Range-diff mapped both patches with '='; formatting, cargo check, 15 Git recovery tests, 15 state-sync tests, 3 state-recovery API/CLI tests, 11 focused Dashboard tests, and the handoff regression passed. Browser harness: 201 passed, 0 failed, 27 environment skips. Full Rust gate: 849 passed, 2 failed, 6 ignored; both failures are on unchanged current-main prompt/runbook paths.",
+                "id": "P9",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "git range-diff 0e0de3d43fe9284156e9f951dc8c981c1f996fd7..b003a0decf2bc2667cda876a601dcccf69c8006b 4519b5ff2c5894b0fccf1c4c0e57612f694ffe79..HEAD -> exit 0; b0eace69=5a3c2647 and b003a0de=dfdfa68f",
+              "git diff --exit-code 4519b5ff2c5894b0fccf1c4c0e57612f694ffe79..HEAD -- src/process/agent_sessions/tests.rs src/process/subprocess/registry.rs src/process/subprocess/tests/registry.rs -> exit 0; command-channel fix unchanged",
+              "git diff --exit-code b003a0decf2bc2667cda876a601dcccf69c8006b..HEAD -- . with the three command-channel paths excluded -> exit 0; recovered Goal tree exact",
+              "git diff --check 4519b5ff2c5894b0fccf1c4c0e57612f694ffe79..HEAD -> exit 0",
+              "rustfmt --edition 2024 --check on all changed Rust files -> exit 0",
+              "cargo check -> exit 0",
+              "cargo test --lib tools::host::git_sync::tests::recovery -- --test-threads=1 -> exit 0; 15 passed, 0 failed",
+              "cargo test --lib state_sync -- --test-threads=1 -> exit 0; 15 passed, 0 failed",
+              "cargo test --lib state_recovery -- --test-threads=1 -> exit 0; 3 passed, 0 failed",
+              "node --test tests/web_dashboard_attention.test.js -> exit 0; 11 passed, 0 failed, 0 skipped",
+              "cargo run --manifest-path xtask/Cargo.toml -- test-browser -> exit 0; 201 passed, 0 failed, 27 skipped because no Playwright Chromium build is available",
+              "cargo test --lib process::agent_sessions::tests::workflow_goal_agent_handoff_survives_dead_process_recovery -- --exact --test-threads=1 -> exit 0; 1 passed, 0 failed",
+              "cargo test -> exit 1; 849 passed, 2 failed, 6 ignored. Unchanged-current-main failures: prompts::tests::agent_prompts_keep_only_task_specific_contracts (plan.md 95 words) and surfaces::cli::catalog::tests::operational_runbooks_use_current_cli_and_layout_contracts (install.md documents refine system update)",
+              "git diff --exit-code 4519b5ff2c5894b0fccf1c4c0e57612f694ffe79..HEAD -- src/prompts/mod.rs src/prompts/implementation_planning/plan.md docs/runbooks/install.md src/surfaces/cli/catalog.rs -> exit 0; all full-gate failure paths unchanged",
+              "git status --short --branch -> clean refine/00000T01FHPGTHYNTM3B51W000/round-4 at dfdfa68f093cd695ecb106f8dd6a19e8fb3ea867"
+            ]
+          },
+          "report": "Recovered the complete missing-baseline Dashboard workflow onto current main as clean Round 4 candidate dfdfa68f093cd695ecb106f8dd6a19e8fb3ea867. The retained two-patch Goal delta maps exactly onto new commits 5a3c2647 and dfdfa68f, while current main's command-channel handoff fix remains unchanged. Fresh focused Rust, API, Dashboard, formatting, fidelity, and scope checks passed; the browser harness passed 201 tests and skipped 27 because Playwright Chromium is unavailable. The full Rust gate passed 849 tests, failed 2 unchanged-current-main baseline checks, and ignored 6.",
+          "started_at": "2026-08-15T19:11:46Z"
+        },
         "phase": "implement",
         "phase_started_at": "2026-08-15T19:11:46Z",
         "proposal": {
@@ -2752,11 +2845,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-08-15T19:05:44Z",
-        "state": "in_progress",
-        "updated_at": "2026-08-15T19:11:46Z"
+        "state": "completed",
+        "updated_at": "2026-08-15T19:23:40Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Recovered the complete missing-baseline Dashboard workflow onto current main as clean Round 4 candidate dfdfa68f093cd695ecb106f8dd6a19e8fb3ea867. The retained two-patch Goal delta maps exactly onto new commits 5a3c2647 and dfdfa68f, while current main's command-channel handoff fix remains unchanged. Fresh focused Rust, API, Dashboard, formatting, fidelity, and scope checks passed; the browser harness passed 201 tests and skipped 27 because Playwright Chromium is unavailable. The full Rust gate passed 849 tests, failed 2 unchanged-current-main baseline checks, and ignored 6.",
+      "implementation_reported_at": "2026-08-15T19:23:41Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -2767,7 +2860,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T19:11:46Z",
+      "updated": "2026-08-15T19:23:41Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T19:05:44Z",
         "round_idx": 3,
@@ -2777,8 +2870,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-15T19:11:46Z",
-  "workflow_revision": 80
+  "updated": "2026-08-15T19:23:41Z",
+  "workflow_revision": 85
 }
