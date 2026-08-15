@@ -786,12 +786,67 @@
           "round_idx": 1,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-08-15T16:23:52Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-08-15T16:25:23Z",
+        "proposal": {
+          "completed_at": "2026-08-15T16:25:23Z",
+          "git_after": {
+            "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-2",
+            "head_commit": "0e0de3d43fe9284156e9f951dc8c981c1f996fd7",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-2",
+            "head_commit": "0e0de3d43fe9284156e9f951dc8c981c1f996fd7",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Reapply the reviewed base-to-candidate semantic delta onto Round 2 while preserving current-main behavior and retaining the Round 1 branch, worktree, commits, logs, failed attempts, and Quality evidence unchanged.",
+                "id": "P1"
+              },
+              {
+                "description": "Restore the dedicated missing-baseline domain failure and optional typed state-sync recovery kind, including Quality's conditional settlement so success, generic failure, unconfigured state, and unrelated failure episodes cannot be misclassified or cleared.",
+                "id": "P2"
+              },
+              {
+                "description": "Restore daemon-owned git_busy and stale_preview recovery conflict classifications through the existing preview and apply API contract while preserving unchanged-complete-preview fencing and generic handling for unrelated conflicts.",
+                "id": "P3"
+              },
+              {
+                "description": "Restore the cohesive Dashboard recovery controller so it fetches previews only for authoritative typed eligibility and invalidates recovery state across target, node, route, scope, eligibility, preview identity, and late-response context changes.",
+                "id": "P4"
+              },
+              {
+                "description": "Restore neutral rendering of target and repository identities, configured remote, heads, snapshots, evidence identity, bounded conflict details, all comparison counts, and the consequences of live or remote authority without inference, recommendation, or preselection.",
+                "id": "P5"
+              },
+              {
+                "description": "Restore the separate explicit authority choice and exact-preview confirmation gate, with renewed confirmation after Git-busy rejection and mandatory preview, authority, and confirmation refresh after stale-preview rejection.",
+                "id": "P6"
+              },
+              {
+                "description": "Restore successful recovery reconciliation so authoritative state-sync health is settled and refreshed while the Dashboard retains the cleared error, baseline, resulting heads, audit ref, manifest, evidence identity, counts, authority, and detail.",
+                "id": "P7"
+              },
+              {
+                "description": "Carry forward the focused Rust daemon and API regressions plus browser regressions for eligibility, complete rendering, deliberate confirmation, busy and stale fencing, rejection without mutation, context races, successful evidence retention, and health clearing.",
+                "id": "P8"
+              },
+              {
+                "description": "Carry forward only the affected Dashboard intent, API intent, and existing missing-baseline fleet runbook updates that document typed eligibility, conflict reasons, explicit authority boundaries, refresh and retry semantics, and retained audit evidence.",
+                "id": "P9"
+              }
+            ],
+            "summary": "Recover the complete Quality-reviewed missing-baseline dashboard recovery behavior from the retained Round 1 candidate onto the clean Round 2 branch based on the original-base, candidate, and current-main comparison, preserving current main's unrelated workflow and updater changes and leaving all historical branches, worktrees, commits, logs, attempts, and review evidence untouched; the recovered behavior will retain daemon-owned eligibility and mutation boundaries, explicit authority and stale-preview fencing, auditable success evidence, focused regression coverage, and only the affected intent and runbook contracts."
+          },
+          "started_at": "2026-08-15T16:23:52Z"
+        },
         "schema_version": 2,
         "started_at": "2026-08-15T16:23:52Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T16:23:52Z"
+        "updated_at": "2026-08-15T16:25:23Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -805,7 +860,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T16:23:52Z",
+      "updated": "2026-08-15T16:25:23Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T16:23:51Z",
         "round_idx": 1,
@@ -817,6 +872,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-15T16:23:52Z",
-  "workflow_revision": 39
+  "updated": "2026-08-15T16:25:23Z",
+  "workflow_revision": 41
 }
