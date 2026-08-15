@@ -828,6 +828,93 @@ test("Agent terminal renders transported ANSI control sequences through xterm", 
   }
 });
 
+test("Agent terminal refits from visible geometry after minimize and fullscreen", { skip: SKIP }, async () => {
+  const backendSizes = [];
+  const app = await openApp({
+    fixture(pathname) {
+      if (pathname === "/api/terminal/browser-responsive-agent/resize") return { ok: true };
+      return apiFixture(pathname);
+    },
+    onRequest(pathname, request) {
+      if (pathname === "/api/terminal/browser-responsive-agent/resize") {
+        backendSizes.push(request.postDataJSON());
+      }
+    },
+  });
+  const terminalGeometry = async (action = null) => app.page.evaluate(async (nextAction) => {
+    if (nextAction === "minimize") minimizeToolbar();
+    if (nextAction === "restore") toggleToolbar();
+    if (nextAction === "fullscreen") toggleToolbarFullscreen();
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    const terminal = terminalStateFor("responsive-agent");
+    return {
+      cols: terminal.term.cols,
+      rows: terminal.term.rows,
+      backendCols: terminal.lastCols,
+      backendRows: terminal.lastRows,
+    };
+  }, action);
+
+  try {
+    await app.page.setViewportSize({ width: 760, height: 600 });
+    await assertScreenRenders(app, { route: "#/", marker: "#dash" });
+    await app.page.evaluate(() => {
+      window.EventSource = class {
+        addEventListener() {}
+        close() {}
+      };
+      chatState.tabs = {
+        "responsive-agent": normalizeInteractiveTerminalTab({
+          goalId: null,
+          label: "Agent",
+          mode: "agent",
+          sessionId: "browser-responsive-agent",
+          processId: "browser-responsive-agent-process",
+        }),
+      };
+      chatState.activeTabId = "responsive-agent";
+      chatState.open = true;
+      chatState.bodyHeight = 320;
+      const terminal = terminalStateFor("responsive-agent");
+      terminal.sessionId = "browser-responsive-agent";
+      terminal.processId = "browser-responsive-agent-process";
+      terminal.connected = true;
+      terminal.statusChecked = true;
+      terminal.reattaching = false;
+      drawToolbar();
+    });
+
+    const initial = await terminalGeometry();
+    const visibleResizeCount = backendSizes.length;
+    assert.ok(initial.cols > 20);
+    assert.equal(initial.backendCols, initial.cols);
+    assert.equal(initial.backendRows, initial.rows);
+
+    const hidden = await terminalGeometry("minimize");
+    assert.deepEqual(hidden, initial);
+    assert.equal(backendSizes.length, visibleResizeCount);
+
+    await app.page.setViewportSize({ width: 1400, height: 900 });
+    const restored = await terminalGeometry("restore");
+    assert.ok(restored.cols > initial.cols);
+    assert.equal(restored.backendCols, restored.cols);
+    assert.equal(restored.backendRows, restored.rows);
+
+    const fullscreen = await terminalGeometry("fullscreen");
+    assert.ok(fullscreen.rows > restored.rows);
+    assert.equal(fullscreen.backendCols, fullscreen.cols);
+    assert.equal(fullscreen.backendRows, fullscreen.rows);
+    assert.deepEqual(backendSizes.at(-1), {
+      cols: fullscreen.cols,
+      rows: fullscreen.rows,
+    });
+    assert.deepEqual(app.pageErrors, []);
+  } finally {
+    await app.close();
+  }
+});
+
 test("Todo List renders an item-first workspace with responsive list navigation", { skip: SKIP }, async () => {
   const app = await openApp();
   try {

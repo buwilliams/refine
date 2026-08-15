@@ -25,6 +25,8 @@ class FakeElement {
     this._innerHTML = "";
     this.clientWidth = 1000;
     this.clientHeight = 400;
+    this.children = [];
+    this.firstElementChild = null;
     this.scrollHeight = 0;
     this.scrollTop = 0;
   }
@@ -35,7 +37,10 @@ class FakeElement {
   contains(element) { return element === this; }
   focus() {}
   remove() {}
-  replaceChildren() {}
+  replaceChildren(...children) {
+    this.children = children;
+    this.firstElementChild = children[0] || null;
+  }
   getBoundingClientRect() {
     return {
       width: this.clientWidth,
@@ -333,11 +338,17 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
       deleteTodoItem(listId, itemId) { return deleteTodoItem(listId, itemId); },
       installTerminalResizer(tabId, resize) {
         ensureTestTab(tabId);
-        terminalStateFor(tabId).term = { resize };
+        terminalStateFor(tabId).term = {
+          element: document.createElement("div"),
+          focus() {},
+          resize,
+        };
       },
       installTerminalResizerWithUnavailableDimensions(tabId, resize) {
         ensureTestTab(tabId);
         terminalStateFor(tabId).term = {
+          element: document.createElement("div"),
+          focus() {},
           resize,
           _core: {
             _renderService: {
@@ -391,6 +402,14 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
         const terminal = terminalStateFor(chatState.activeTabId);
         terminal.outputResizeObserver?.trigger();
       },
+      setOutputSize(width, height) {
+        const output = document.querySelector(".terminal-output");
+        output.clientWidth = width;
+        output.clientHeight = height;
+      },
+      minimizeToolbar,
+      toggleToolbar,
+      toggleToolbarFullscreen,
       beginToolbarResize(clientY, pointerId = 1) {
         const handle = document.querySelector("#toolbar-dock-resize");
         handle?.listeners.get("pointerdown")?.({
@@ -1247,6 +1266,59 @@ test("terminal columns refit when its rendered width changes", async () => {
   const backendResize = requests.filter((request) => request.path.endsWith("/resize")).at(-1);
   assert.equal(backendResize.body.cols, sizes[1].cols);
   assert.equal(backendResize.body.rows, sizes[1].rows);
+});
+
+test("terminal retains valid geometry while hidden and refits after layout transitions", async () => {
+  const browser = browserRuntime();
+  const requests = [];
+  const sizes = [];
+  browser.runtime.setApi(async (method, requestPath, body) => {
+    requests.push({ method, path: requestPath, body });
+    if (requestPath !== "/api/terminal/session") return { ok: true };
+    return {
+      id: "responsive-agent",
+      process_id: "interactive-responsive-agent",
+      cwd: "/repo",
+      profile: "agent",
+      provider: "codex",
+    };
+  });
+  await browser.runtime.click("agent");
+  browser.runtime.installTerminalResizer("agent", (cols, rows) => sizes.push({ cols, rows }));
+
+  browser.runtime.resizeOutput(800, 300);
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  const visibleSize = sizes.at(-1);
+  const visibleBackend = requests.filter((request) => request.path.endsWith("/resize")).at(-1);
+  assert.equal(visibleBackend.body.cols, visibleSize.cols);
+  assert.equal(visibleBackend.body.rows, visibleSize.rows);
+
+  browser.runtime.resizeOutput(0, 0);
+  browser.runtime.minimizeToolbar();
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  assert.equal(sizes.length, 1);
+  assert.equal(sizes[0], visibleSize);
+  assert.equal(requests.filter((request) => request.path.endsWith("/resize")).length, 1);
+
+  browser.runtime.setOutputSize(1200, 360);
+  browser.runtime.toggleToolbar();
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  const restoredSize = sizes.at(-1);
+  const restoredBackend = requests.filter((request) => request.path.endsWith("/resize")).at(-1);
+  assert.ok(restoredSize.cols > visibleSize.cols);
+  assert.ok(restoredSize.rows > visibleSize.rows);
+  assert.equal(restoredBackend.body.cols, restoredSize.cols);
+  assert.equal(restoredBackend.body.rows, restoredSize.rows);
+
+  browser.runtime.setOutputSize(1400, 600);
+  browser.runtime.toggleToolbarFullscreen();
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  const fullscreenSize = sizes.at(-1);
+  const fullscreenBackend = requests.filter((request) => request.path.endsWith("/resize")).at(-1);
+  assert.ok(fullscreenSize.cols > restoredSize.cols);
+  assert.ok(fullscreenSize.rows > restoredSize.rows);
+  assert.equal(fullscreenBackend.body.cols, fullscreenSize.cols);
+  assert.equal(fullscreenBackend.body.rows, fullscreenSize.rows);
 });
 
 test("terminal resize falls back when xterm renderer dimensions are unavailable", async () => {
