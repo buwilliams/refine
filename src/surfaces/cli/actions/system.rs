@@ -44,28 +44,6 @@ pub enum SystemAction {
         #[arg(long, default_value = env!("CARGO_PKG_VERSION"))]
         version: String,
     },
-    /// Update Refine to the latest fetched source commit using the same
-    /// restart-safe promotion the web Update control queues; uncommitted
-    /// changes are stashed and reported, never reapplied automatically.
-    Update {
-        /// Deprecated: updates run without confirmation.
-        #[arg(long, hide = true)]
-        yes: bool,
-        /// Agent provider that orchestrates the update and rescues failures.
-        /// Defaults to the target app's configured provider, then the first
-        /// installed provider CLI in alphabetical order.
-        #[arg(long)]
-        provider: Option<String>,
-        /// Skip the one-shot agent rescue of blockers and failures.
-        #[arg(long)]
-        no_rescue: bool,
-        /// Port whose checkout-local runtime owns the update operation.
-        #[arg(long, default_value_t = 8082)]
-        port: u16,
-        /// Runtime directory where Refine keeps daemon state.
-        #[arg(long, default_value = "run")]
-        runtime_root: PathBuf,
-    },
     /// Preview a semantic release without changing files.
     ReleasePlan {
         /// Semantic version increment: major, minor, or patch.

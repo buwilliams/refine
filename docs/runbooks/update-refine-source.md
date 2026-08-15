@@ -12,15 +12,14 @@ healthy. Published-release updates remain unchanged.
 - The installed update Agent can pause new workflow admission and observe or
   safely reconcile preserved active work on the selected port.
 
-Uncommitted staged, unstaged, or untracked changes are not a blocker: queueing
-an update preserves them automatically in a named git stash
-(`refine-update-<timestamp>`), reports the stash reference in the operation
-record and UI, and never reapplies the stash itself. The stash is created only
-after a real fast-forward update is confirmed, so a checkout with nothing to do
-is never touched. Local commits that diverge from the upstream still block
-promotion; `./r system update` can escalate divergence to the configured agent
-provider once, while the granular `system source-promote` path stays strict and
-performs no stashing at all.
+Uncommitted staged, unstaged, or untracked changes are not a blocker for the
+web source-promotion workflow: queueing an update preserves them automatically
+in a named git stash (`refine-update-<timestamp>`), reports the stash reference
+in the operation record and UI, and never reapplies the stash itself. The stash
+is created only after a real fast-forward update is confirmed, so a checkout
+with nothing to do is never touched. Local commits that diverge from the
+upstream still block promotion. The granular `system source-promote` path stays
+strict and performs no stashing at all.
 
 This workflow is unavailable for a gitless published product home. Use the
 published-release update workflow there; do not add Git metadata or infer a
@@ -49,13 +48,15 @@ supervised fetch.
 
 ## CLI Parity
 
-Run the complete one-command update (queues the same operation as the UI
-control, waits for the terminal state, streams progress, and escalates
-blockers to the configured agent provider once):
+Run the launcher's deterministic local update. It stops the default daemon,
+runs `git stash` and `git pull`, rebuilds, and starts the default daemon:
 
 ```sh
-./r system update --port 8082 --runtime-root run
+./r system update
 ```
+
+This launcher command is intentionally separate from the restart-safe UI
+workflow and accepts no arguments.
 
 Inspect without fetching:
 

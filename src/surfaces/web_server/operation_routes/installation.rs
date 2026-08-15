@@ -117,7 +117,7 @@ impl InProcessWebServer {
             return error_response(error);
         }
         error_response(RefineError::NotImplemented(
-            "HTTP system update is disabled; use the Update control in the web UI or run `./r system update` from the Refine checkout — both queue the same restart-safe source promotion.".to_string(),
+            "HTTP system update is disabled; use the restart-safe Update control in the web UI, or run `./r system update` from the Refine checkout for the local stop, stash/pull, build, and start sequence.".to_string(),
         ))
     }
 

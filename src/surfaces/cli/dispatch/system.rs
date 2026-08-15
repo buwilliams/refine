@@ -66,35 +66,6 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
         }
         Commands::System {
             action:
-                SystemAction::Update {
-                    yes: _,
-                    provider,
-                    no_rescue,
-                    port,
-                    runtime_root,
-                },
-        } => {
-            let paths = RefineCheckoutPaths::discover()?;
-            let _ = resolve_system_runtime_root_for_paths(runtime_root, &paths)?;
-            let report = run_system_update(
-                &paths,
-                SystemUpdateOptions {
-                    provider,
-                    port,
-                    rescue: !no_rescue,
-                },
-                &mut |line| eprintln!("refine update: {line}"),
-            );
-            print_json(&serde_json::to_value(&report).unwrap());
-            if !report.ok {
-                return Err(RefineError::Degraded(
-                    "system update failed; see JSON summary above".to_string(),
-                ));
-            }
-            Ok(())
-        }
-        Commands::System {
-            action:
                 SystemAction::ReleasePlan {
                     bump,
                     repo_root,

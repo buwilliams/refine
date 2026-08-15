@@ -274,6 +274,83 @@ fn wrapper_system_build_and_clean_manage_the_production_binary() {
 }
 
 #[test]
+fn wrapper_system_update_runs_the_fixed_local_sequence() {
+    let temp_root = wrapper_fixture("wrapper-system-update");
+    let operation_log = temp_root.join("operation.log");
+    let path_env = fixture_path_env(&temp_root);
+
+    fs::create_dir_all(temp_root.join("bin")).unwrap();
+    fs::write(
+        temp_root.join("bin/refine"),
+        "#!/usr/bin/env bash\nprintf 'refine:%s\\n' \"$*\" >> \"$REFINE_TEST_OPERATION_LOG\"\n",
+    )
+    .unwrap();
+    make_executable(&temp_root.join("bin/refine"));
+
+    let fake_git = temp_root.join("fake-bin/git");
+    fs::write(
+        &fake_git,
+        "#!/usr/bin/env bash\nprintf 'git:%s\\n' \"$*\" >> \"$REFINE_TEST_OPERATION_LOG\"\n",
+    )
+    .unwrap();
+    make_executable(&fake_git);
+
+    let fake_cargo = temp_root.join("fake-bin/cargo");
+    fs::write(
+        &fake_cargo,
+        format!(
+            "#!/usr/bin/env bash\nset -euo pipefail\nprintf 'cargo:%s\\n' \"$*\" >> \"$REFINE_TEST_OPERATION_LOG\"\nmkdir -p '{0}/target/release'\ncat > '{0}/target/release/refine' <<'EOF'\n#!/usr/bin/env bash\nprintf 'refine:%s\\n' \"$*\" >> \"$REFINE_TEST_OPERATION_LOG\"\nEOF\nchmod +x '{0}/target/release/refine'\n",
+            temp_root.display(),
+        ),
+    )
+    .unwrap();
+    make_executable(&fake_cargo);
+
+    let output = Command::new("bash")
+        .arg("r")
+        .args(["system", "update"])
+        .current_dir(&temp_root)
+        .env("PATH", &path_env)
+        .env("REFINE_TEST_OPERATION_LOG", &operation_log)
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "stdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let operations = fs::read_to_string(&operation_log).unwrap();
+    let lines: Vec<_> = operations.lines().collect();
+    assert_eq!(lines[0], "refine:system stop");
+    assert_eq!(lines[1], "git:stash");
+    assert_eq!(lines[2], "git:pull");
+    assert!(lines[3].starts_with("cargo:build --release --locked"));
+    assert_eq!(lines[4], "refine:system start");
+    assert_eq!(lines.len(), 5, "unexpected operations:\n{operations}");
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn wrapper_system_update_dry_run_reports_the_fixed_sequence() {
+    let repo = env!("CARGO_MANIFEST_DIR");
+    let output = Command::new("bash")
+        .arg("r")
+        .args(["system", "update"])
+        .current_dir(repo)
+        .env("REFINE_R_DRY_RUN", "1")
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout),
+        "mode=update\ncommand=./r system stop\ncommand=git stash\ncommand=git pull\ncommand=./r system build\ncommand=./r system start\n"
+    );
+}
+
+#[test]
 fn wrapper_test_command_routes_to_cargo_and_xtask_suites() {
     let repo = env!("CARGO_MANIFEST_DIR");
 

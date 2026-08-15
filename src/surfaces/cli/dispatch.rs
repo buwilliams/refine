@@ -88,7 +88,6 @@ use crate::tools::host::node_init::{WorkerInitOptions, initialize_worker};
 use crate::tools::host::project_layout::prepare_refine_dir;
 use crate::tools::host::release::{FileReleaseService, ReleaseBump};
 use crate::tools::host::source_promotion::FileSourcePromotionService;
-use crate::tools::host::system_update::{SystemUpdateOptions, run_system_update};
 use crate::tools::observability::activity::{ActivityQuery, ActivityService, FileActivityService};
 use crate::tools::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
 use crate::tools::observability::processes::FileProcessStatusService;
@@ -690,7 +689,6 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
             SystemAction::Install { .. }
             | SystemAction::Performance { .. }
             | SystemAction::Repair { .. }
-            | SystemAction::Update { .. }
             | SystemAction::ReleasePlan { .. }
             | SystemAction::ReleasePrepare { .. }
             | SystemAction::ReleasePublish { .. }

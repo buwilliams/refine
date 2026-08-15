@@ -3,7 +3,8 @@ set -euo pipefail
 
 # ./r always runs the production (release) binary at bin/refine — never a
 # debug build. `system start`, `system install`, and `system build` create or
-# refresh that binary; every other command requires it to exist already.
+# refresh that binary. `system update` owns the stop, Git update, rebuild, and
+# start sequence. Every other command requires the binary to exist already.
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 RELEASE_BIN="${REFINE_RELEASE_BIN:-$ROOT/bin/refine}"
@@ -163,6 +164,37 @@ run_test_command() {
   esac
 }
 
+run_system_update() {
+  if args_contain_help "$@"; then
+    cat <<'EOF'
+Usage: ./r system update
+
+Stop Refine, stash local changes and pull from Git, rebuild the production
+binary, then start Refine.
+EOF
+    return 0
+  fi
+  if [ "$#" -ne 0 ]; then
+    printf 'refine: ./r system update accepts no arguments\n' >&2
+    return 2
+  fi
+  if [ "${REFINE_R_DRY_RUN:-0}" = "1" ]; then
+    printf 'mode=update\n'
+    printf 'command=./r system stop\n'
+    printf 'command=git stash\n'
+    printf 'command=git pull\n'
+    printf 'command=./r system build\n'
+    printf 'command=./r system start\n'
+    return 0
+  fi
+
+  cd "$ROOT"
+  ./r system stop
+  git stash && git pull
+  ./r system build
+  ./r system start
+}
+
 print_test_dry_run() {
   local suite
   suite="$(normalize_test_suite "${1:-unit}")"
@@ -245,8 +277,14 @@ if [ "${1:-}" = "test" ]; then
   run_test_command "$@"
 fi
 
-# `system build` and `system clean` are launcher-owned: they manage the
-# production binary itself, so they never delegate to it.
+if [ "${1:-}" = "system" ] && [ "${2:-}" = "update" ]; then
+  shift 2
+  run_system_update "$@"
+  exit $?
+fi
+
+# `system build`, `system clean`, and `system update` are launcher-owned: they
+# manage the production binary itself, so they never delegate to it.
 if [ "${1:-}" = "system" ] && { [ "${2:-}" = "build" ] || [ "${2:-}" = "clean" ]; }; then
   BINARY_ACTION="$2"
   shift 2

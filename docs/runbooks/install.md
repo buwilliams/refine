@@ -127,20 +127,27 @@ exact original registration and retains the journal.
 
 ## Update Refine
 
-`./r system update` is the one-command update for a Git source checkout, and it queues the same restart-safe source promotion as the web UI's Controls > Management > Update Refine control — updating is handled in one place regardless of which surface starts it. The command:
+`./r system update` is the deterministic one-command update for a Git source
+checkout. It runs these commands in order and stops immediately if any command
+fails:
 
-- starts the daemon through its systemd/launchd service when one is registered (or directly otherwise) if it is not already running,
-- fetches the configured upstream through the shared cached update-check worker,
-- exits successfully without touching anything when the checkout is already current,
-- stashes uncommitted local changes automatically (`git stash push --include-untracked`), reports the stash reference, and never reapplies the stash itself,
-- builds the candidate release binary in an isolated worktree before any daemon stops,
-- hot-swaps `bin/refine`, fast-forwards the checkout, restarts through the service manager, and verifies the daemon's identity and health,
-- rolls back with recorded evidence when a step fails, and
-- escalates blockers deterministic logic cannot clear — a diverged checkout or a failed operation — to the configured agent provider once, then retries once (`--no-rescue` disables this).
+```bash
+./r system stop
+git stash && git pull
+./r system build
+./r system start
+```
 
-Progress is streamed as it happens and the final JSON report includes the operation record, any stash reference, and recovery guidance. Failed or interrupted updates started from the web UI stay retryable from the same Update control.
+The stash is not reapplied automatically. Because this path intentionally uses
+plain `git stash`, untracked files are not included. The command uses the
+default daemon port and runtime root and accepts no arguments.
 
-The steps below remain for **gitless published installations** (a checkout without a usable `.git` directory), where `./r system update` fails closed and points here.
+The web UI's Controls > Management > Update Refine control remains a separate,
+restart-safe source-promotion workflow with durable progress and recovery.
+
+The steps below remain for **gitless published installations** (a checkout
+without a usable `.git` directory), where the Git commands in `./r system
+update` cannot succeed.
 
 1. Stop the running daemons first:
 
