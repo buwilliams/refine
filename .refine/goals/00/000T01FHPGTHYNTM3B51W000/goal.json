@@ -1,6 +1,6 @@
 {
-  "base_commit": null,
-  "branch_name": null,
+  "base_commit": "f50b1571672da4a7c308d47918746eac3931bfaa",
+  "branch_name": "refine/00000T01FHPGTHYNTM3B51W000/round-1",
   "candidate_commit": null,
   "created": "2026-08-15T15:02:01Z",
   "feature_id": null,
@@ -9,11 +9,133 @@
   "name": "Make missing-baseline state recovery safely actionable from the dashboard",
   "node_id": "default",
   "notes": [],
-  "priority": "low",
+  "priority": "high",
   "reporter": null,
-  "rounds": [],
-  "status": "backlog",
-  "target_branch": null,
-  "updated": "2026-08-15T15:02:01Z",
-  "workflow_revision": 1
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-15T15:02:31Z",
+        "current_round": {
+          "assignee": "buddy.williams@insurity.com",
+          "prompt": "Implement a dashboard recovery workflow for the exceptional project state-synchronization condition where the persisted three-way baseline is missing while both non-bootstrap live state and origin/refine/state exist. Reuse the existing daemon-backed GET /api/project/state-recovery/preview and POST /api/project/state-recovery/apply endpoints, including the complete-preview stale fence. Present the target and remote identities and heads, bounded conflict details, live-only/remote-only/differing/equal counts, and clear consequences of choosing live or remote authority. Never infer, recommend, or preselect authority. Require deliberate confirmation before apply. Keep browser code thin: all Git and state mutations must remain daemon-owned, and the existing fail-closed startup and synchronization behavior must not be weakened. Preserve and display the resulting audit ref, recovery manifest, published/baseline heads, and other recovery evidence. Treat Git-busy and stale-preview HTTP 409 responses as recoverable conditions with explicit refresh and retry actions that require a fresh preview and confirmation as appropriate. After a successful apply, refresh state-sync health and show that the error cleared together with the resulting heads and evidence. Add focused web and API regression coverage for preview rendering, deliberate confirmation, busy and stale rejection, successful recovery, and health-error clearing. Update affected intent or runbook documentation only where this dashboard/API surface contract changes.",
+          "reporter": "buddy.williams@insurity.com",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "buddy.williams@insurity.com",
+          "id": "00000T01FHPGTHYNTM3B51W000",
+          "name": "Make missing-baseline state recovery safely actionable from the dashboard",
+          "node_id": "default",
+          "priority": "high",
+          "reporter": "buddy.williams@insurity.com"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "assignee": "buddy.williams@insurity.com",
+      "constitution_state": "unclassified",
+      "created": "2026-08-15T15:02:29Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "guidance_decision": null,
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "f50b1571672da4a7c308d47918746eac3931bfaa",
+          "context_digest": "89f4bfe95d8f65c88f0fa51b18ec92f08a4db5048f5459baf9b32a247b2994a6",
+          "context_version": 1,
+          "goal_id": "00000T01FHPGTHYNTM3B51W000",
+          "implementation_branch": "refine/00000T01FHPGTHYNTM3B51W000/round-1",
+          "round_idx": 0,
+          "target_branch": "main"
+        },
+        "phase": "plan",
+        "phase_started_at": "2026-08-15T15:02:31Z",
+        "schema_version": 2,
+        "started_at": "2026-08-15T15:02:31Z",
+        "state": "in_progress",
+        "updated_at": "2026-08-15T15:02:31Z"
+      },
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Implement a dashboard recovery workflow for the exceptional project state-synchronization condition where the persisted three-way baseline is missing while both non-bootstrap live state and origin/refine/state exist. Reuse the existing daemon-backed GET /api/project/state-recovery/preview and POST /api/project/state-recovery/apply endpoints, including the complete-preview stale fence. Present the target and remote identities and heads, bounded conflict details, live-only/remote-only/differing/equal counts, and clear consequences of choosing live or remote authority. Never infer, recommend, or preselect authority. Require deliberate confirmation before apply. Keep browser code thin: all Git and state mutations must remain daemon-owned, and the existing fail-closed startup and synchronization behavior must not be weakened. Preserve and display the resulting audit ref, recovery manifest, published/baseline heads, and other recovery evidence. Treat Git-busy and stale-preview HTTP 409 responses as recoverable conditions with explicit refresh and retry actions that require a fresh preview and confirmation as appropriate. After a successful apply, refresh state-sync health and show that the error cleared together with the resulting heads and evidence. Add focused web and API regression coverage for preview rendering, deliberate confirmation, busy and stale rejection, successful recovery, and health-error clearing. Update affected intent or runbook documentation only where this dashboard/API surface contract changes.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "buddy.williams@insurity.com",
+      "rule_state": "unclassified",
+      "updated": "2026-08-15T15:02:31Z",
+      "workflow_attempt_authority": {
+        "claimed_at": "2026-08-15T15:02:31Z",
+        "round_idx": 0,
+        "workflow_revision": 4
+      },
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    }
+  ],
+  "status": "plan",
+  "target_branch": "main",
+  "updated": "2026-08-15T15:02:31Z",
+  "workflow_revision": 9
 }
