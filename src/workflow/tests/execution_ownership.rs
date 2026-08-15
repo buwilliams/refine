@@ -332,6 +332,7 @@ fn newer_round_handoff_supersedes_only_the_same_goal_candidate() {
         &runtime_root,
         &first.id,
         "governance_failed",
+        Some("quality-candidate"),
         &RefineError::Conflict("candidate requires another Round".to_string()),
     );
     let retained = FileOperationRegistry::new(&runtime_root)
@@ -343,6 +344,7 @@ fn newer_round_handoff_supersedes_only_the_same_goal_candidate() {
         "workflow_failed_candidate_retained"
     );
     assert_eq!(retained.progress["failure"]["code"], "governance_failed");
+    assert_eq!(retained.progress["candidate_commit"], "quality-candidate");
     let unrelated = register_candidate_handoff(
         &runtime_root,
         &other_target,
