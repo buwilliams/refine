@@ -105,8 +105,25 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-08-15T15:09:04Z",
+        "criticism": {
+          "completed_at": "2026-08-15T15:10:50Z",
+          "git_after": {
+            "branch": "refine/DRB4C53A0CA76FFE4042A58438/round-1",
+            "head_commit": "f50b1571672da4a7c308d47918746eac3931bfaa",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRB4C53A0CA76FFE4042A58438/round-1",
+            "head_commit": "f50b1571672da4a7c308d47918746eac3931bfaa",
+            "status_porcelain": []
+          },
+          "result": {
+            "summary": "The proposed plan is complete and safely scoped to malformed completion-signal recovery."
+          },
+          "started_at": "2026-08-15T15:09:04Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-08-15T15:10:50Z",
         "proposal": {
           "completed_at": "2026-08-15T15:09:04Z",
           "git_after": {
@@ -153,7 +170,7 @@
         "schema_version": 2,
         "started_at": "2026-08-15T15:06:55Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T15:09:04Z"
+        "updated_at": "2026-08-15T15:10:50Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -167,7 +184,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T15:09:04Z",
+      "updated": "2026-08-15T15:10:50Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T15:06:55Z",
         "round_idx": 0,
@@ -179,6 +196,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-15T15:09:04Z",
-  "workflow_revision": 9
+  "updated": "2026-08-15T15:10:50Z",
+  "workflow_revision": 11
 }
