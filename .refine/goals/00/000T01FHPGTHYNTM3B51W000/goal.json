@@ -105,8 +105,48 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-08-15T15:04:10Z",
+        "criticism": {
+          "completed_at": "2026-08-15T15:07:02Z",
+          "git_after": {
+            "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-1",
+            "head_commit": "f50b1571672da4a7c308d47918746eac3931bfaa",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-1",
+            "head_commit": "f50b1571672da4a7c308d47918746eac3931bfaa",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P1",
+                  "P7"
+                ],
+                "description": "The plan does not define a daemon-owned, machine-readable signal that the failed state-sync health is specifically the missing-baseline recovery topology; the current dashboard health exposes only status and redacted error text, while calling preview for every degraded state performs remote Git inspection and changes ordinary failure behavior.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Add and test a typed recovery-eligibility or failure-kind contract from the daemon, and fetch the preview only for that condition without browser message parsing."
+              },
+              {
+                "checklist_item_ids": [
+                  "P4",
+                  "P7",
+                  "P8"
+                ],
+                "description": "The plan promises distinct busy and stale handling, but the existing API maps both conditions and other recovery conflicts to the same 409 code `conflict`, leaving a thin browser no stable way to choose the required refresh-versus-retry flow.",
+                "id": "C2",
+                "material": true,
+                "recommendation": "Define, document, and test structured recovery conflict reasons for Git-busy and stale-preview responses, then bind each UI action to that typed reason and invalidate confirmation whenever a fresh preview is required."
+              }
+            ],
+            "summary": "Revise the plan to expose stable recovery eligibility and conflict classifications before implementing the dashboard flow."
+          },
+          "started_at": "2026-08-15T15:04:10Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-08-15T15:07:02Z",
         "proposal": {
           "completed_at": "2026-08-15T15:04:10Z",
           "git_after": {
@@ -161,7 +201,7 @@
         "schema_version": 2,
         "started_at": "2026-08-15T15:02:31Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T15:04:10Z"
+        "updated_at": "2026-08-15T15:07:02Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -175,7 +215,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T15:04:10Z",
+      "updated": "2026-08-15T15:07:02Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T15:02:31Z",
         "round_idx": 0,
@@ -187,6 +227,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-15T15:04:10Z",
-  "workflow_revision": 11
+  "updated": "2026-08-15T15:07:02Z",
+  "workflow_revision": 13
 }
