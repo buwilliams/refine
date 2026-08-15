@@ -1,0 +1,142 @@
+{
+  "base_commit": "0b561bcd40255af2d9b651175903f64326700433",
+  "branch_name": "refine/00000T01WRE7C0ZGABFY3K6000/round-1",
+  "candidate_commit": null,
+  "created": "2026-08-15T22:43:46Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000T01WRE7C0ZGABFY3K6000",
+  "name": "Web UI surface, Controls > Node should take the user to /#/node/processes",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-15T22:43:47Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Web UI surface, Controls > Node should take the user to /#/node/processes",
+          "reporter": "Buddy Williams",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000T01WRE7C0ZGABFY3K6000",
+          "name": "Web UI surface, Controls > Node should take the user to /#/node/processes",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-08-15T22:43:46Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_candidate_commit": "",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "guidance_decision": null,
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "0b561bcd40255af2d9b651175903f64326700433",
+          "context_digest": "2175766eb4ce9316dc1f5ea0b3e333d66d1d6ef1c525eb0b116e3782d824726a",
+          "context_version": 1,
+          "goal_id": "00000T01WRE7C0ZGABFY3K6000",
+          "implementation_branch": "refine/00000T01WRE7C0ZGABFY3K6000/round-1",
+          "round_idx": 0,
+          "target_branch": "main"
+        },
+        "phase": "plan",
+        "phase_started_at": "2026-08-15T22:43:47Z",
+        "schema_version": 2,
+        "started_at": "2026-08-15T22:43:47Z",
+        "state": "in_progress",
+        "updated_at": "2026-08-15T22:43:47Z"
+      },
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Web UI surface, Controls > Node should take the user to /#/node/processes",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-08-15T22:43:47Z",
+      "workflow_attempt_authority": {
+        "claimed_at": "2026-08-15T22:43:46Z",
+        "round_idx": 0,
+        "workflow_revision": 2
+      },
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    }
+  ],
+  "status": "plan",
+  "target_branch": "main",
+  "updated": "2026-08-15T22:43:47Z",
+  "workflow_revision": 7
+}
