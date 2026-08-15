@@ -1,7 +1,7 @@
 {
   "base_commit": "d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f",
   "branch_name": "refine/00000T01FHPGTHYNTM3B51W000/round-5",
-  "candidate_commit": null,
+  "candidate_commit": "1394d8d16f8d2898a1b025496ebdeb53a438721a",
   "created": "2026-08-15T15:02:01Z",
   "feature_id": null,
   "feature_order": null,
@@ -3952,7 +3952,28 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-15T21:05:52Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f",
@@ -3963,6 +3984,7 @@
           "round_idx": 4,
           "target_branch": "main"
         },
+        "completed_at": "2026-08-15T21:05:52Z",
         "criticism": {
           "completed_at": "2026-08-15T20:45:45Z",
           "git_after": {
@@ -4075,6 +4097,90 @@
           },
           "started_at": "2026-08-15T20:45:45Z"
         },
+        "implementation": {
+          "completed_at": "2026-08-15T21:05:52Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Fetched configured origin/main and re-read all authorities: pinned Round 5/local main stayed d8a6285c, origin/main stayed 9729b9b4 and descends from local main, Round 4 base is 4519b5ff, pre-Quality candidate is dfdfa68f, and corrected evidence candidate is 827c7f56. Compared path sets before mutation: 16 retained Goal paths overlap local recovery extensions, while the six remote-only handoff paths do not overlap the Goal delta and were left untouched.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Integrated StateSyncMissingBaseline and optional missing_baseline recovery_kind into current main's monotonic attempt model. settle_failure now records eligibility only for an authoritative non-superseded attempt, correlated success clears it only with the active failure evidence, unconfigured state clears eligibility, and conditional recovery settlement is atomically target/node/kind-bound. All 16 state_sync tests passed.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Restored stable git_busy and stale_preview classifications plus unchanged complete-preview fencing without replacing current main's valid-baseline reported conflicts, per-path decisions, owned manifests, resumability, or audit behavior. All 23 enlarged Git recovery tests passed, including rejection-before-side-effects and exact-manifest resume coverage.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Reconciled the thin project routes with current StateRecoveryDecision support. Apply keeps request-scoped target identity, returns typed conflict reasons, atomically settles matching health, and returns settlement status, authoritative health, heads, audit ref, manifest, counts, authority, detail, and evidence. Three state_recovery API/CLI tests passed.",
+                "id": "P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Restored the cohesive 362-line dashboard_state_recovery.js controller and neutral panel. Preview fetch is gated only by typed missing_baseline eligibility and rendering includes target/repository/remote identities, heads, snapshots, all counts, bounded conflicts, consequences, and evidence with no inferred or preselected authority.",
+                "id": "P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Restored separate authority selection and exact-preview confirmation. Evidence, target, node, scope, route, eligibility, stale-preview, Git-busy, and late-response transitions invalidate authority or confirmation according to whether the reviewed preview remains trustworthy. All 12 focused Dashboard tests passed.",
+                "id": "P6",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Carried forward Round 4's lifecycle correction byte-for-byte: stable patch-id c8a2268adc40d7df6d8eab1ea43b85fe951ec307 matches retained commit 827c7f56. The focused regression proves a newer same-context missing-baseline episode replaces retained success with a fresh neutral preview and reset authority/confirmation.",
+                "id": "P7",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Reconciled rather than replaced current main's enlarged suites. Exact candidate passed 23 Git-recovery tests, 16 state-sync tests, 3 state-recovery API/CLI tests, 12 Dashboard tests, 202 browser-harness tests, and the command-channel handoff regression; rejection, mutation fencing, context races, retained success, health clearing, reported conflicts, and resumability remain covered.",
+                "id": "P8",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated only the existing Dashboard intent, API intent, and established missing-baseline section of manage-fleet.md. Preserved current main's separate valid-conflict state-sync-recovery runbook without duplicating or restructuring it.",
+                "id": "P9",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Created fresh Round 5 commits 1323e61c, 97338865, 4564a293, and reconciliation commit 1394d8d1 on pinned base d8a6285c. Fresh and retained cumulative path sets are identical at 25 paths; non-overlapping Goal paths are tree-identical to 827c7f56; overlapping paths retain current main's newer behavior; the six origin/main-only handoff paths are unchanged. Historical branches/commits and primary main were not mutated.",
+                "id": "P10",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Recorded and asserted exact candidate 1394d8d16f8d2898a1b025496ebdeb53a438721a before and after independently supervised checks. The tree is clean; formatting, cumulative diff, cargo check, focused Rust/API/CLI/Dashboard, browser, command-channel, path-scope, lifecycle patch identity, remote-only non-overlap, historical-ref, and baseline-failure-path predicates passed. Full cargo test's two failures are unchanged-base files and Playwright's 27 skips are environment-only.",
+                "id": "P11",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "sha256sum prompt.md and wc -c prompt.md -> 004c321a563561d8f1b99350604600efbbb49f53215634c119bdc2e6d6feb89d and 95854 bytes; prompt read in ordered chunks through EOF",
+              "git fetch origin main && git rev-parse main && git rev-parse origin/main -> d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f and 9729b9b4be27f7a58629d8f04a1c0e8171636c82",
+              "git diff --name-only 4519b5ff..827c7f56 versus git diff --name-only d8a6285c..1394d8d1 with cmp -> identical 25-path Goal scope",
+              "git diff --exit-code 827c7f56..1394d8d1 over retained non-overlap paths -> exit 0; paths are tree-identical",
+              "git patch-id --stable for 827c7f56 and 4564a293 -> identical c8a2268adc40d7df6d8eab1ea43b85fe951ec307",
+              "git diff --exit-code d8a6285c..1394d8d1 over the six origin/main-only handoff paths -> exit 0",
+              "git diff --exit-code d8a6285c..1394d8d1 -- src/prompts/mod.rs src/prompts/implementation_planning/plan.md docs/runbooks/install.md src/surfaces/cli/catalog.rs -> exit 0; full-gate failure paths unchanged",
+              "git diff --name-only d8a6285c..1394d8d1 -- \"*.rs\" | xargs -r rustfmt --edition 2024 --check -> exit 0",
+              "git diff --check d8a6285c..1394d8d1 -> exit 0",
+              "cargo check -> exit 0",
+              "cargo test --lib tools::host::git_sync::tests::recovery -- --test-threads=1 -> 23 passed, 0 failed",
+              "cargo test --lib state_sync -- --test-threads=1 -> 16 passed, 0 failed",
+              "cargo test --lib state_recovery -- --test-threads=1 -> 3 passed, 0 failed",
+              "node --test tests/web_dashboard_attention.test.js -> 12 passed, 0 failed, 0 skipped",
+              "cargo test --lib process::agent_sessions::tests::workflow_goal_agent_handoff_survives_dead_process_recovery -- --exact --test-threads=1 -> 1 passed, 0 failed",
+              "cargo run --manifest-path xtask/Cargo.toml -- test-browser -> 202 passed, 0 failed, 27 skipped because no Playwright Chromium build is available",
+              "cargo test -> 862 passed, 2 failed, 6 ignored; unchanged-base failures are implementation_planning/plan.md at 95 words and docs/runbooks/install.md documenting unknown refine system update",
+              "git status --short --branch -> clean refine/00000T01FHPGTHYNTM3B51W000/round-5 at 1394d8d16f8d2898a1b025496ebdeb53a438721a; primary main also clean at d8a6285c"
+            ]
+          },
+          "report": "Recovered the complete missing-baseline Dashboard workflow and Round 4 lifecycle correction onto pinned Round 5 base d8a6285c as clean exact candidate 1394d8d16f8d2898a1b025496ebdeb53a438721a. Reconciled typed eligibility and target/node-bound settlement with current main's monotonic attempt, conflict-report, decision override, resumability, and audit contracts; preserved the daemon mutation boundary, complete-preview fencing, typed git_busy/stale_preview handling, neutral exact-preview confirmation, late/context response fencing, retained success evidence, and existing intent/runbook structure. The cumulative delta has the same 25-path scope as retained candidate 827c7f56; its lifecycle correction has identical stable patch identity; the six origin/main-only handoff paths and both unchanged full-gate failure paths are untouched. Exact-candidate formatting, cargo check, 23 Git-recovery tests, 16 state-sync tests, 3 state-recovery API/CLI tests, 12 focused Dashboard tests, the command-channel handoff regression, and 202 browser-harness tests passed. Browser harness skipped 27 tests only because Playwright Chromium is unavailable. Full cargo test reported 862 passed, 2 unchanged-base failures, and 6 ignored: plan.md remains too prescriptive at 95 words and install.md still documents unknown refine system update.",
+          "started_at": "2026-08-15T20:47:48Z"
+        },
         "phase": "implement",
         "phase_started_at": "2026-08-15T20:47:48Z",
         "proposal": {
@@ -4138,11 +4244,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-08-15T20:40:25Z",
-        "state": "in_progress",
-        "updated_at": "2026-08-15T20:47:48Z"
+        "state": "completed",
+        "updated_at": "2026-08-15T21:05:52Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Recovered the complete missing-baseline Dashboard workflow and Round 4 lifecycle correction onto pinned Round 5 base d8a6285c as clean exact candidate 1394d8d16f8d2898a1b025496ebdeb53a438721a. Reconciled typed eligibility and target/node-bound settlement with current main's monotonic attempt, conflict-report, decision override, resumability, and audit contracts; preserved the daemon mutation boundary, complete-preview fencing, typed git_busy/stale_preview handling, neutral exact-preview confirmation, late/context response fencing, retained success evidence, and existing intent/runbook structure. The cumulative delta has the same 25-path scope as retained candidate 827c7f56; its lifecycle correction has identical stable patch identity; the six origin/main-only handoff paths and both unchanged full-gate failure paths are untouched. Exact-candidate formatting, cargo check, 23 Git-recovery tests, 16 state-sync tests, 3 state-recovery API/CLI tests, 12 focused Dashboard tests, the command-channel handoff regression, and 202 browser-harness tests passed. Browser harness skipped 27 tests only because Playwright Chromium is unavailable. Full cargo test reported 862 passed, 2 unchanged-base failures, and 6 ignored: plan.md remains too prescriptive at 95 words and install.md still documents unknown refine system update.",
+      "implementation_reported_at": "2026-08-15T21:05:52Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -4153,7 +4259,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T20:47:48Z",
+      "updated": "2026-08-15T21:05:52Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T20:40:24Z",
         "round_idx": 4,
@@ -4163,8 +4269,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-15T20:47:48Z",
-  "workflow_revision": 102
+  "updated": "2026-08-15T21:05:52Z",
+  "workflow_revision": 107
 }
