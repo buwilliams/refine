@@ -261,8 +261,8 @@ impl InProcessWebServer {
     }
 
     pub(crate) fn handle_project_state_recovery_preview(&self) -> ApiResponse {
-        let (service, target_root) = match self.current_git_sync_service_with_target() {
-            Ok(Some(service_and_target)) => service_and_target,
+        let service = match self.current_git_sync_service() {
+            Ok(Some(service)) => service,
             Ok(None) => return target_root_unavailable("preview state synchronization recovery"),
             Err(error) => return error_response(error),
         };

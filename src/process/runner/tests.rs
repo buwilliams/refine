@@ -114,8 +114,19 @@ fn state_sync_missing_baseline_failure_records_typed_recovery_eligibility() {
     let runtime_root = temp_root.join("run/8082");
     std::fs::create_dir_all(target_root.join(".refine")).unwrap();
     let error = RefineError::StateSyncMissingBaseline("baseline missing".to_string());
+    let source = "test";
+    let attempt_id =
+        record_state_sync_attempt(&runtime_root, &target_root, "default", source).unwrap();
 
-    record_state_sync_failure(&runtime_root, &target_root, "default", &error).unwrap();
+    record_state_sync_failure(
+        &runtime_root,
+        &target_root,
+        "default",
+        attempt_id,
+        source,
+        &error,
+    )
+    .unwrap();
 
     let health = FileStateSyncHealthService::new(&runtime_root)
         .inspect(&target_root, "default", Duration::from_secs(900))
