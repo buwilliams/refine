@@ -3086,13 +3086,15 @@
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
       "prompt": "Start a fresh Round from current main and selectively preserve the complete relevant behavior and Quality coverage from candidate 68d2c526a7199e2018dac9a1be3baa98ba2052b6; do not blindly merge it. Preserve all retained Round worktrees and audit evidence unchanged. Keep the authority-fenced, fail-closed already-merged Quality implementation: the first valid failed exact-candidate evaluation must settle terminally with its original operation ID, identity, timestamp, results, diagnostics, and provider attempts; no resolver, second Quality run, approval, or Review transition may occur, including after restart, repeated handling, or superseded authority. Fix source_worker_inherits_debug_executable_without_installed_binary and source_lifecycle_handoff_inherits_debug_executable_without_installed_binary so they do not combine env!(\"CARGO_MANIFEST_DIR\") with an externally located current_exe(). Use a deterministic synthetic source-product fixture whose runtime root and fake debug executable share the same canonical product home, retain explicit foreign-home rejection coverage, and do not relax RefineCheckoutPaths::require_owned_executable or production ownership rules. Run the previously failing tests individually, the planning, Quality, reconciliation, candidate-refresh, already-merged, and workflow-behavior suites, cargo check --all-targets, scoped rustfmt, strict Clippy with unchanged warnings reported separately, and the broad library suite with only confirmed unchanged baseline exclusions. Run broad verification from the candidate checkout with its checkout-local target directory—no target symlink or external CARGO_TARGET_DIR crossing product homes—and report exact clean-worktree and preserved-audit evidence.",
+      "quality_agent_report": "Quality review found no further defects requiring correction. Round 4 commit 3c548e4eb371abbc40ca1d1c53c738a079bfa17e selectively preserves candidate 68d2c526a7199e2018dac9a1be3baa98ba2052b6 and adds a shared synthetic source-product fixture for the two formerly failing executable-inheritance tests; production ownership rules remain unchanged. Both regressions, all requested focused suites, all-target compilation, scoped formatting, baseline-adjusted strict Clippy, and the broad library suite with only two confirmed unchanged baseline exclusions pass. Retained Round 1-3 worktrees and audit evidence are unchanged, and Round 4 is clean.",
+      "quality_candidate_commit": "3c548e4eb371abbc40ca1d1c53c738a079bfa17e",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T21:39:39Z",
+      "updated": "2026-08-15T21:49:29Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T21:19:08Z",
         "round_idx": 3,
@@ -3104,6 +3106,6 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-15T21:39:39Z",
-  "workflow_revision": 81
+  "updated": "2026-08-15T21:49:29Z",
+  "workflow_revision": 83
 }
