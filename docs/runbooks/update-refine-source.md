@@ -48,8 +48,11 @@ supervised fetch.
 
 ## CLI Parity
 
-Run the launcher's deterministic local update. It stops the default daemon,
-runs `git stash` and `git pull`, rebuilds, and starts the default daemon:
+Run the launcher's deterministic local update. It fetches the configured
+upstream first. When that upstream has no new commits, it exits without
+stopping Refine, stashing work, rebuilding, or restarting. Otherwise, it stops
+the default daemon, runs `git stash` and `git pull`, rebuilds, and starts the
+default daemon:
 
 ```sh
 ./r system update

@@ -128,8 +128,10 @@ exact original registration and retains the journal.
 ## Update Refine
 
 `./r system update` is the deterministic one-command update for a Git source
-checkout. It runs these commands in order and stops immediately if any command
-fails:
+checkout. It first fetches and checks the configured upstream. If there are no
+new upstream commits, it exits without stopping Refine or modifying the
+checkout. When an update is available, it runs these commands in order and
+stops immediately if any command fails:
 
 ```bash
 ./r system stop

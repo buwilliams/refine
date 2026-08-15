@@ -170,7 +170,8 @@ run_system_update() {
 Usage: ./r system update
 
 Stop Refine, stash local changes and pull from Git, rebuild the production
-binary, then start Refine.
+binary, then start Refine. If the configured upstream has no new commits,
+leave the checkout and running Refine process unchanged.
 EOF
     return 0
   fi
@@ -180,6 +181,9 @@ EOF
   fi
   if [ "${REFINE_R_DRY_RUN:-0}" = "1" ]; then
     printf 'mode=update\n'
+    printf 'command=git fetch --quiet\n'
+    printf "command=git rev-list --count HEAD..@{upstream}\n"
+    printf 'condition=continue only when upstream has new commits\n'
     printf 'command=./r system stop\n'
     printf 'command=git stash\n'
     printf 'command=git pull\n'
@@ -189,6 +193,13 @@ EOF
   fi
 
   cd "$ROOT"
+  git fetch --quiet
+  local update_count
+  update_count="$(git rev-list --count HEAD..'@{upstream}')"
+  if [ "$update_count" = "0" ]; then
+    printf 'refine: already up to date; no update required\n'
+    return 0
+  fi
   ./r system stop
   git stash && git pull
   ./r system build

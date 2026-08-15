@@ -290,7 +290,7 @@ fn wrapper_system_update_runs_the_fixed_local_sequence() {
     let fake_git = temp_root.join("fake-bin/git");
     fs::write(
         &fake_git,
-        "#!/usr/bin/env bash\nprintf 'git:%s\\n' \"$*\" >> \"$REFINE_TEST_OPERATION_LOG\"\n",
+        "#!/usr/bin/env bash\nprintf 'git:%s\\n' \"$*\" >> \"$REFINE_TEST_OPERATION_LOG\"\nif [ \"${1:-}\" = \"rev-list\" ]; then printf '1\\n'; fi\n",
     )
     .unwrap();
     make_executable(&fake_git);
@@ -323,12 +323,58 @@ fn wrapper_system_update_runs_the_fixed_local_sequence() {
 
     let operations = fs::read_to_string(&operation_log).unwrap();
     let lines: Vec<_> = operations.lines().collect();
-    assert_eq!(lines[0], "refine:system stop");
-    assert_eq!(lines[1], "git:stash");
-    assert_eq!(lines[2], "git:pull");
-    assert!(lines[3].starts_with("cargo:build --release --locked"));
-    assert_eq!(lines[4], "refine:system start");
-    assert_eq!(lines.len(), 5, "unexpected operations:\n{operations}");
+    assert_eq!(lines[0], "git:fetch --quiet");
+    assert_eq!(lines[1], "git:rev-list --count HEAD..@{upstream}");
+    assert_eq!(lines[2], "refine:system stop");
+    assert_eq!(lines[3], "git:stash");
+    assert_eq!(lines[4], "git:pull");
+    assert!(lines[5].starts_with("cargo:build --release --locked"));
+    assert_eq!(lines[6], "refine:system start");
+    assert_eq!(lines.len(), 7, "unexpected operations:\n{operations}");
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn wrapper_system_update_does_nothing_when_upstream_has_no_new_commits() {
+    let temp_root = wrapper_fixture("wrapper-system-update-current");
+    let operation_log = temp_root.join("operation.log");
+    let path_env = fixture_path_env(&temp_root);
+
+    fs::create_dir_all(temp_root.join("bin")).unwrap();
+    fs::write(
+        temp_root.join("bin/refine"),
+        "#!/usr/bin/env bash\nprintf 'refine:%s\\n' \"$*\" >> \"$REFINE_TEST_OPERATION_LOG\"\n",
+    )
+    .unwrap();
+    make_executable(&temp_root.join("bin/refine"));
+
+    let fake_git = temp_root.join("fake-bin/git");
+    fs::write(
+        &fake_git,
+        "#!/usr/bin/env bash\nprintf 'git:%s\\n' \"$*\" >> \"$REFINE_TEST_OPERATION_LOG\"\nif [ \"${1:-}\" = \"rev-list\" ]; then printf '0\\n'; fi\n",
+    )
+    .unwrap();
+    make_executable(&fake_git);
+
+    let output = Command::new("bash")
+        .arg("r")
+        .args(["system", "update"])
+        .current_dir(&temp_root)
+        .env("PATH", &path_env)
+        .env("REFINE_TEST_OPERATION_LOG", &operation_log)
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout),
+        "refine: already up to date; no update required\n"
+    );
+    assert_eq!(
+        fs::read_to_string(&operation_log).unwrap(),
+        "git:fetch --quiet\ngit:rev-list --count HEAD..@{upstream}\n"
+    );
+    assert!(!temp_root.join("cargo.log").exists());
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -346,7 +392,7 @@ fn wrapper_system_update_dry_run_reports_the_fixed_sequence() {
     assert!(output.status.success());
     assert_eq!(
         String::from_utf8_lossy(&output.stdout),
-        "mode=update\ncommand=./r system stop\ncommand=git stash\ncommand=git pull\ncommand=./r system build\ncommand=./r system start\n"
+        "mode=update\ncommand=git fetch --quiet\ncommand=git rev-list --count HEAD..@{upstream}\ncondition=continue only when upstream has new commits\ncommand=./r system stop\ncommand=git stash\ncommand=git pull\ncommand=./r system build\ncommand=./r system start\n"
     );
 }
 
