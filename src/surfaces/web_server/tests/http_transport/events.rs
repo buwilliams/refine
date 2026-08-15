@@ -29,6 +29,30 @@ fn concurrent_sse_clients_share_one_authoritative_frame_build() {
 }
 
 #[test]
+fn sse_exposes_typed_state_sync_health() {
+    let temp_root = unique_temp_dir("http-sse-state-sync-health");
+    let runtime_root = temp_root.join("run/8080");
+    fs::create_dir_all(temp_root.join(".refine")).unwrap();
+    crate::tools::host::state_sync_health::FileStateSyncHealthService::new(&runtime_root)
+        .record_failure(&temp_root, "default", "git fetch failed")
+        .unwrap();
+    let mut server = server_with_projection();
+    server.target_root = Some(temp_root.clone());
+    server.runtime_root = Some(runtime_root);
+    let events = LocalHttpDaemon::new(server, None)
+        .server_sent_events("events")
+        .unwrap();
+    assert!(events.contains("event: state_sync_health"), "{events}");
+    assert!(events.contains("\"status\":\"failed\""), "{events}");
+    assert!(
+        events.contains("\"aggregate_counts_authoritative\":false"),
+        "{events}"
+    );
+
+    remove_temp_dir(&temp_root);
+}
+
+#[test]
 fn idle_sse_reuses_the_last_batch_until_an_input_changes() {
     let temp_root = unique_temp_dir("http-sse-idle-batch");
     let runtime_root = temp_root.join("run/8080");

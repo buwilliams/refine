@@ -148,6 +148,33 @@ function scheduleDashboardRetry() {
   }, 2000);
 }
 
+function renderDashboardStateSyncHealth(d) {
+  const health = d.state_sync_health;
+  if (!health) return "";
+  const degraded = health.status === "failed" || health.status === "stale";
+  const field = (label, value) => value
+    ? `<span><strong>${htmlEscape(label)}:</strong> ${htmlEscape(value)}</span>`
+    : "";
+  return `
+    <section class="dashboard-sync-health ${degraded ? "degraded" : ""}"
+             data-testid="dashboard-state-sync-health"
+             data-state-sync-status="${htmlEscape(health.status || "unknown")}">
+      <div>
+        <strong>State sync: ${htmlEscape(health.status || "unknown")}</strong>
+        ${d.aggregate_counts_authoritative === false
+          ? `<span class="filter-pill dashboard-count-authority" data-testid="dashboard-count-authority">All-node counts: ${htmlEscape(d.all_node_counts_label || "non-authoritative")}</span>`
+          : ""}
+      </div>
+      <div class="muted small dashboard-sync-health-metadata">
+        ${field("Last attempt", health.last_attempt_at)}
+        ${field("Last success", health.last_success_at)}
+        ${field("Failure since", health.failure_since)}
+        ${field("Stale since", health.stale_since)}
+      </div>
+      ${health.last_error ? `<div class="small dashboard-sync-error">${htmlEscape(health.last_error)}</div>` : ""}
+    </section>`;
+}
+
 function drawDashboard(d, opts = {}) {
   const reviewsForReporter = opts.reviewsForReporter || [];
   const reviewReporter = opts.reporter || "";
@@ -191,6 +218,7 @@ function drawDashboard(d, opts = {}) {
   // away — the container is gone, so just bail silently.
   if (!dash) return;
   renderInto(dash, `
+    ${renderDashboardStateSyncHealth(d)}
     ${renderWorkflowVisualization({
       counts,
       statuses: orderedStatuses,

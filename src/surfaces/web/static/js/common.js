@@ -1920,6 +1920,14 @@ function initSSE() {
       refreshCurrentSettingsSurface();
     }
   });
+  sseSource.addEventListener("state_sync_health", () => {
+    invalidateScreenDataCache();
+    if (state.currentRoute === "dashboard") refreshDashboard();
+    if (state.currentRoute === "logs") loadLogs();
+    if (["settings", "node", "project"].includes(state.currentRoute || "")) {
+      refreshCurrentSettingsSurface();
+    }
+  });
   sseSource.addEventListener("operation_progress", (e) => {
     try {
       const payload = JSON.parse(e.data || "{}");

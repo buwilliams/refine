@@ -18,8 +18,11 @@ use crate::process::supervisor::operations::{
 use crate::tools::host::checkout::RefineCheckoutPaths;
 use crate::tools::host::git_sync::{FileGitSyncService, GitSyncResult};
 use crate::tools::host::project_layout::{prepare_refine_dir, refine_dir_for_target_root};
+use crate::tools::host::state_sync_health::{FileStateSyncHealthService, StateSyncHealthActivity};
+use crate::tools::observability::activity::{ActivityService, FileActivityService};
 use crate::tools::product::chat::FileChatService;
 use crate::tools::product::goal_exports::FileGoalExportService;
+use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::project_projection::FileProjectProjectionStore;
 use crate::tools::product::project_registry::FileProjectRegistryService;
 use crate::tools::product::work_items::BulkGoalSelection;
@@ -48,6 +51,7 @@ const WORKTREE_CLEANUP_INTERVAL: Duration = Duration::from_secs(60);
 const WORKTREE_CLEANUP_POLL_INTERVAL: Duration = Duration::from_secs(1);
 const DEFAULT_REMOTE_FETCH_INTERVAL: Duration = Duration::from_secs(300);
 const DEFAULT_GIT_SYNC_DEBOUNCE: Duration = Duration::from_secs(5);
+const DEFAULT_STATE_SYNC_STALE_THRESHOLD: Duration = Duration::from_secs(900);
 const GIT_RECONCILE_POLL_INTERVAL: Duration = Duration::from_millis(250);
 const GIT_RECONCILE_RETRY_INTERVAL: Duration = Duration::from_secs(2);
 const DEVELOPMENT_REQUEST_POLL_INTERVAL: Duration = Duration::from_secs(1);
@@ -75,6 +79,7 @@ mod git_sync;
 mod jira_export;
 mod project_sync;
 mod schedule;
+mod state_sync_health;
 #[cfg(test)]
 mod test_hooks;
 mod worker_specs;
@@ -87,7 +92,9 @@ use development_requests::*;
 use git_sync::*;
 use jira_export::*;
 use project_sync::*;
+pub(crate) use schedule::state_sync_stale_threshold;
 use schedule::*;
+use state_sync_health::*;
 #[cfg(test)]
 use test_hooks::*;
 use worker_specs::*;

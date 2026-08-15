@@ -5,6 +5,7 @@ pub(super) fn run_git_sync_worker(
     project_registry_root: Option<&Path>,
 ) -> RefineResult<()> {
     let mut active_root: Option<PathBuf> = None;
+    let mut active_node_id: Option<String> = None;
     let mut last_observed_fingerprint = None;
     let mut pending_sync = None;
     // When the oldest unpublished change was first observed. The debounce is
@@ -28,16 +29,21 @@ pub(super) fn run_git_sync_worker(
             let root = target_root
                 .canonicalize()
                 .unwrap_or_else(|_| target_root.clone());
-            if active_root.as_ref() != Some(&root) {
+            let observed_node_id = state_sync_node_id(runtime_root, &target_root)?;
+            if active_root.as_ref() != Some(&root)
+                || active_node_id.as_deref() != Some(observed_node_id.as_str())
+            {
                 // Resume from the persisted fingerprint: without it, every
                 // worker restart looked like a state change and scheduled a
                 // spurious sync.
                 last_observed_fingerprint = load_persisted_fingerprint(runtime_root, &root);
                 active_root = Some(root);
+                active_node_id = Some(observed_node_id.clone());
                 pending_sync = None;
                 pending_since = None;
                 next_remote_fetch = None;
                 active_schedule = None;
+                bind_state_sync_health(runtime_root, &target_root, &observed_node_id)?;
             }
             let service = FileGitSyncService::new(&target_root, runtime_root);
             if let Ok(fingerprint) = service.durable_state_fingerprint() {
@@ -63,6 +69,8 @@ pub(super) fn run_git_sync_worker(
                 let demand_due = pending_sync.is_some_and(|deadline| now >= deadline);
                 let remote_fetch_due = next_remote_fetch.is_some_and(|deadline| now >= deadline);
                 if demand_due || remote_fetch_due {
+                    let node_id = state_sync_node_id(runtime_root, &target_root)?;
+                    record_state_sync_attempt(runtime_root, &target_root, &node_id)?;
                     let result = match run_background_repository_operation(
                         runtime_root,
                         GIT_SYNC_RUNNER,
@@ -79,6 +87,12 @@ pub(super) fn run_git_sync_worker(
                     };
                     match result {
                         Ok(result) if !result.deferred => {
+                            record_state_sync_result(
+                                runtime_root,
+                                &target_root,
+                                &node_id,
+                                &result,
+                            )?;
                             last_observed_fingerprint = service
                                 .durable_state_fingerprint()
                                 .ok()
@@ -96,10 +110,22 @@ pub(super) fn run_git_sync_worker(
                             next_attempt = now;
                             let _ = refresh_projection(runtime_root, &target_root);
                         }
-                        Ok(_) => {
+                        Ok(result) => {
+                            record_state_sync_result(
+                                runtime_root,
+                                &target_root,
+                                &node_id,
+                                &result,
+                            )?;
                             next_attempt = now + GIT_RECONCILE_RETRY_INTERVAL;
                         }
-                        Err(_error) => {
+                        Err(error) => {
+                            record_state_sync_failure(
+                                runtime_root,
+                                &target_root,
+                                &node_id,
+                                &error,
+                            )?;
                             next_attempt = now + GIT_RECONCILE_RETRY_INTERVAL;
                         }
                     }

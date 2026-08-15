@@ -20,6 +20,9 @@ The Dashboard should provide broad context without replacing deeper surfaces. Us
 Current implementation details that matter to intent:
 
 - dashboard data comes from daemon-backed projection and diagnostic summaries;
+- state-sync health shows the serving node's last attempt, last successful reconciliation, failure start, stale boundary, and redacted error;
+- failed or stale sync is prominent needs-attention state, and all-node counts are explicitly labeled as a non-authoritative local projection while degraded;
+- typed state-sync-health SSE updates refresh Dashboard, Nodes, and Logs on failure, stale-threshold crossing, recovery, initial connection, and reconnect;
 - workflow visualization is shared with the Goals screen;
 - an intentionally paused workflow is neutral operating context, not a runtime-worker failure needing attention;
 - target-app and agent status are part of the operating context;

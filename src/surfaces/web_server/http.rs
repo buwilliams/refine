@@ -50,6 +50,7 @@ use crate::process::supervisor::lifecycle::{
 };
 use crate::process::supervisor::operations::{FileOperationRegistry, OperationRegistry};
 use crate::tools::host::quality::QualityOperationRunner;
+use crate::tools::host::state_sync_health::StateSyncHealth;
 use crate::tools::observability::activity::{ActivityService, FileActivityService};
 use crate::tools::observability::metrics::FileMetricsService;
 #[cfg(not(test))]

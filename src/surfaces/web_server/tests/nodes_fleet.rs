@@ -417,3 +417,40 @@ fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_fleet() {
 
     remove_temp_dir(&temp_root);
 }
+
+#[test]
+fn nodes_reports_local_state_sync_health_only_for_the_active_node() {
+    let temp_root = unique_temp_dir("http-node-state-sync-health");
+    let refine_dir = temp_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
+    fs::create_dir_all(&refine_dir).unwrap();
+    let mut server = server_with_projection();
+    server.target_root = Some(temp_root.clone());
+    server.runtime_root = Some(runtime_root.clone());
+    server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/nodes".to_string(),
+        body: Some(json!({"id": "node-b"})),
+    });
+    crate::tools::host::state_sync_health::FileStateSyncHealthService::new(&runtime_root)
+        .record_success(&temp_root, "default")
+        .unwrap();
+
+    let response = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/nodes".to_string(),
+        body: None,
+    });
+    assert_eq!(response.status, 200, "{:#}", response.body);
+    let nodes = response.body["nodes"].as_array().unwrap();
+    let active = nodes.iter().find(|node| node["id"] == "default").unwrap();
+    let other = nodes.iter().find(|node| node["id"] == "node-b").unwrap();
+    assert_eq!(active["state_sync_health"]["status"], "healthy");
+    assert_eq!(other["state_sync_health"]["status"], "unknown");
+    assert_eq!(
+        other["state_sync_health"]["reason"],
+        "node_local_evidence_unavailable"
+    );
+
+    remove_temp_dir(&temp_root);
+}

@@ -79,6 +79,7 @@ pub(super) fn dashboard_attention_items(
     indicators: &[String],
     runner_reachable: bool,
     workflow_paused: bool,
+    state_sync_health: Option<&crate::tools::host::state_sync_health::StateSyncHealth>,
 ) -> Vec<Value> {
     let mut items = indicators
         .iter()
@@ -93,6 +94,23 @@ pub(super) fn dashboard_attention_items(
             })
         })
         .collect::<Vec<_>>();
+    if let Some(health) = state_sync_health {
+        if health.status == "failed" {
+            let since = health.failure_since.as_deref().unwrap_or("an unknown time");
+            items.push(json!({
+                "kind": "banner",
+                "severity": "error",
+                "message": format!("State sync has failed since {since}. All-node counts are local and non-authoritative until synchronization recovers.")
+            }));
+        } else if health.status == "stale" {
+            let since = health.stale_since.as_deref().unwrap_or("an unknown time");
+            items.push(json!({
+                "kind": "banner",
+                "severity": "warn",
+                "message": format!("State sync is stale since {since}. All-node counts are local and non-authoritative.")
+            }));
+        }
+    }
     if workflow_paused {
         items.push(json!({
             "kind": "banner",

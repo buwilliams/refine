@@ -86,3 +86,31 @@
   overflow-y: auto;
   min-height: 0;
 }
+.dashboard-sync-health {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.dashboard-sync-health.degraded {
+  border-color: var(--color-danger);
+}
+
+.dashboard-count-authority {
+  margin-left: 8px;
+}
+
+.dashboard-sync-health-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+}
+
+.dashboard-sync-error {
+  color: var(--color-danger);
+  overflow-wrap: anywhere;
+}

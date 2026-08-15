@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::UNIX_EPOCH;
 
+use crate::process::runner::{GIT_SYNC_RUNNER, state_sync_stale_threshold};
 use crate::process::subprocess::{FileProcessSupervisor, ProcessSupervisor};
 use crate::process::supervisor::config::FileSettingsService;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
@@ -17,6 +18,7 @@ use crate::tools::host::git_sync::FileGitSyncService;
 use crate::tools::host::project_layout::prepare_refine_dir;
 #[cfg(test)]
 use crate::tools::host::project_layout::refine_dir_for_target_root;
+use crate::tools::host::state_sync_health::{FileStateSyncHealthService, StateSyncHealth};
 use crate::tools::product::chat::FileChatService;
 use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::project_projection::{
@@ -55,6 +57,32 @@ impl OperationProjectionRefresher for InProcessWebServer {
 }
 
 impl InProcessWebServer {
+    pub(super) fn current_state_sync_health(&self) -> RefineResult<Option<StateSyncHealth>> {
+        let (Some(runtime_root), Some(target_root)) =
+            (self.runtime_root.as_deref(), self.current_target_root()?)
+        else {
+            return Ok(None);
+        };
+        let refine_dir = prepare_refine_dir(&target_root)?;
+        let node_id = FileNodeRegistryService::with_active_root(&refine_dir, runtime_root)
+            .active_node_id()?;
+        let threshold = state_sync_stale_threshold(runtime_root, &target_root)?;
+        let mut health = FileStateSyncHealthService::new(runtime_root).inspect(
+            &target_root,
+            &node_id,
+            threshold,
+        )?;
+        let pause = FileProcessSupervisor::new(runtime_root).pause_state()?;
+        if health.status != "failed" && pause.workflow_paused {
+            health.status = "paused".to_string();
+        } else if health.status != "failed"
+            && pause.disabled_background_workers.contains(GIT_SYNC_RUNNER)
+        {
+            health.status = "disabled".to_string();
+        }
+        Ok(Some(health))
+    }
+
     pub(super) fn product_paths(&self) -> RefineResult<&RefineCheckoutPaths> {
         self.product_paths.as_ref().ok_or_else(|| {
             RefineError::NotFound(

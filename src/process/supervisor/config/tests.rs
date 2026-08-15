@@ -8,6 +8,10 @@ fn file_settings_service_lists_defaults_and_persists_updates() {
     let service = FileSettingsService::new(&refine_dir);
 
     assert_eq!(service.load().unwrap()["agent_cli"], "claude");
+    assert_eq!(
+        service.load().unwrap()["state_sync_stale_threshold_seconds"],
+        "900"
+    );
     assert!(
         !service
             .load()
@@ -35,6 +39,18 @@ fn file_settings_service_lists_defaults_and_persists_updates() {
         .update(&serde_json::json!({"agent_cli": "/opt/refine/custom-agent"}))
         .unwrap();
     assert_eq!(generic["settings"]["agent_cli"], "/opt/refine/custom-agent");
+    assert!(
+        service
+            .update(&serde_json::json!({"state_sync_stale_threshold_seconds": 0}))
+            .is_err()
+    );
+    let threshold = service
+        .update(&serde_json::json!({"state_sync_stale_threshold_seconds": 1800}))
+        .unwrap();
+    assert_eq!(
+        threshold["settings"]["state_sync_stale_threshold_seconds"],
+        "1800"
+    );
 
     fs::remove_dir_all(temp_root).unwrap();
 }

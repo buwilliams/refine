@@ -1,0 +1,511 @@
+use std::fs::{self, OpenOptions};
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+
+use chrono::{DateTime, SecondsFormat, Utc};
+use fs2::FileExt;
+use serde::{Deserialize, Serialize};
+
+use crate::process::supervisor::errors::{RefineError, RefineResult};
+
+pub const STATE_SYNC_HEALTH_FILE: &str = "state-sync-health.json";
+const STATE_SYNC_HEALTH_LOCK_FILE: &str = "state-sync-health.lock";
+const FAILURE_REMINDER_INTERVAL: Duration = Duration::from_secs(30 * 60);
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct StateSyncHealthRecord {
+    pub target_root: String,
+    pub node_id: String,
+    pub monitoring_since: String,
+    pub last_attempt_at: Option<String>,
+    pub last_attempt_outcome: Option<String>,
+    pub last_success_at: Option<String>,
+    pub failure_since: Option<String>,
+    pub last_failure_at: Option<String>,
+    pub last_error: Option<String>,
+    pub last_reminder_at: Option<String>,
+    pub remote_configured: Option<bool>,
+    pub revision: u64,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct StateSyncHealth {
+    pub status: String,
+    pub target_root: String,
+    pub node_id: String,
+    pub monitoring_since: String,
+    pub last_attempt_at: Option<String>,
+    pub last_attempt_outcome: Option<String>,
+    pub last_success_at: Option<String>,
+    pub failure_since: Option<String>,
+    pub stale_since: Option<String>,
+    pub last_error: Option<String>,
+    pub remote_configured: Option<bool>,
+    pub stale_threshold_seconds: u64,
+    pub aggregate_counts_authoritative: bool,
+    pub revision: u64,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum StateSyncHealthActivity {
+    FailureStarted { error: String },
+    FailureReminder { error: String },
+    Recovered { failure_since: String },
+}
+
+#[derive(Clone, Debug)]
+pub struct FileStateSyncHealthService {
+    runtime_root: PathBuf,
+}
+
+impl FileStateSyncHealthService {
+    pub fn new(runtime_root: impl Into<PathBuf>) -> Self {
+        Self {
+            runtime_root: runtime_root.into(),
+        }
+    }
+
+    pub fn path(&self) -> PathBuf {
+        self.runtime_root.join(STATE_SYNC_HEALTH_FILE)
+    }
+
+    pub fn bind(&self, target_root: &Path, node_id: &str) -> RefineResult<()> {
+        self.update(target_root, node_id, |_| {})
+    }
+
+    pub fn record_attempt(&self, target_root: &Path, node_id: &str) -> RefineResult<()> {
+        self.update(target_root, node_id, |record| {
+            record.last_attempt_at = Some(now_timestamp());
+            record.last_attempt_outcome = Some("attempting".to_string());
+        })
+    }
+
+    pub fn record_neutral(
+        &self,
+        target_root: &Path,
+        node_id: &str,
+        outcome: &str,
+        remote_configured: Option<bool>,
+    ) -> RefineResult<()> {
+        self.update(target_root, node_id, |record| {
+            record.last_attempt_at = Some(now_timestamp());
+            record.last_attempt_outcome = Some(outcome.to_string());
+            if let Some(remote_configured) = remote_configured {
+                record.remote_configured = Some(remote_configured);
+            }
+        })
+    }
+
+    pub fn record_success(
+        &self,
+        target_root: &Path,
+        node_id: &str,
+    ) -> RefineResult<Option<StateSyncHealthActivity>> {
+        let mut activity = None;
+        self.update(target_root, node_id, |record| {
+            if let Some(failure_since) = record.failure_since.clone() {
+                activity = Some(StateSyncHealthActivity::Recovered { failure_since });
+            }
+            let now = now_timestamp();
+            record.last_attempt_at = Some(now.clone());
+            record.last_attempt_outcome = Some("succeeded".to_string());
+            record.last_success_at = Some(now);
+            record.failure_since = None;
+            record.last_failure_at = None;
+            record.last_error = None;
+            record.last_reminder_at = None;
+            record.remote_configured = Some(true);
+        })?;
+        Ok(activity)
+    }
+
+    pub fn record_failure(
+        &self,
+        target_root: &Path,
+        node_id: &str,
+        error: &str,
+    ) -> RefineResult<Option<StateSyncHealthActivity>> {
+        let error = redact_sync_error(error);
+        let mut activity = None;
+        self.update(target_root, node_id, |record| {
+            let now = now_timestamp();
+            record.last_attempt_at = Some(now.clone());
+            record.last_attempt_outcome = Some("failed".to_string());
+            record.last_failure_at = Some(now.clone());
+            record.last_error = Some(error.clone());
+            record.remote_configured = Some(true);
+            if record.failure_since.is_none() {
+                record.failure_since = Some(now.clone());
+                record.last_reminder_at = Some(now);
+                activity = Some(StateSyncHealthActivity::FailureStarted {
+                    error: error.clone(),
+                });
+            } else if reminder_due(record.last_reminder_at.as_deref()) {
+                record.last_reminder_at = Some(now);
+                activity = Some(StateSyncHealthActivity::FailureReminder {
+                    error: error.clone(),
+                });
+            }
+        })?;
+        Ok(activity)
+    }
+
+    pub fn inspect(
+        &self,
+        target_root: &Path,
+        node_id: &str,
+        stale_threshold: Duration,
+    ) -> RefineResult<StateSyncHealth> {
+        let canonical_target = canonical_target(target_root);
+        let record = self
+            .read()?
+            .filter(|record| record.target_root == canonical_target && record.node_id == node_id);
+        let record = record.unwrap_or_else(|| new_record(canonical_target, node_id));
+        Ok(derive_health(record, stale_threshold, Utc::now()))
+    }
+
+    fn update(
+        &self,
+        target_root: &Path,
+        node_id: &str,
+        mutate: impl FnOnce(&mut StateSyncHealthRecord),
+    ) -> RefineResult<()> {
+        fs::create_dir_all(&self.runtime_root).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to create state-sync health root {}: {error}",
+                self.runtime_root.display()
+            ))
+        })?;
+        let lock_path = self.runtime_root.join(STATE_SYNC_HEALTH_LOCK_FILE);
+        let lock = OpenOptions::new()
+            .create(true)
+            .read(true)
+            .write(true)
+            .open(&lock_path)
+            .map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to open state-sync health lock {}: {error}",
+                    lock_path.display()
+                ))
+            })?;
+        lock.lock_exclusive().map_err(|error| {
+            RefineError::Io(format!(
+                "failed to lock state-sync health {}: {error}",
+                lock_path.display()
+            ))
+        })?;
+        let target_root = canonical_target(target_root);
+        let existing = self.read()?;
+        let previous_revision = existing
+            .as_ref()
+            .map(|record| record.revision)
+            .unwrap_or_default();
+        let mut record = existing
+            .filter(|record| record.target_root == target_root && record.node_id == node_id)
+            .unwrap_or_else(|| {
+                let mut record = new_record(target_root, node_id);
+                record.revision = previous_revision;
+                record
+            });
+        mutate(&mut record);
+        record.revision = record.revision.saturating_add(1);
+        self.write(&record)
+    }
+
+    fn read(&self) -> RefineResult<Option<StateSyncHealthRecord>> {
+        let path = self.path();
+        let bytes = match fs::read(&path) {
+            Ok(bytes) => bytes,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(error) => {
+                return Err(RefineError::Io(format!(
+                    "failed to read state-sync health {}: {error}",
+                    path.display()
+                )));
+            }
+        };
+        serde_json::from_slice(&bytes).map(Some).map_err(|error| {
+            RefineError::Serialization(format!(
+                "failed to parse state-sync health {}: {error}",
+                path.display()
+            ))
+        })
+    }
+
+    fn write(&self, record: &StateSyncHealthRecord) -> RefineResult<()> {
+        let path = self.path();
+        let temp = path.with_extension(format!("json.{}.tmp", std::process::id()));
+        let bytes = serde_json::to_vec_pretty(record).map_err(|error| {
+            RefineError::Serialization(format!("failed to encode state-sync health: {error}"))
+        })?;
+        let mut file = fs::File::create(&temp).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to create state-sync health {}: {error}",
+                temp.display()
+            ))
+        })?;
+        file.write_all(&bytes)
+            .and_then(|_| file.sync_all())
+            .map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to persist state-sync health {}: {error}",
+                    temp.display()
+                ))
+            })?;
+        fs::rename(&temp, &path).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to replace state-sync health {}: {error}",
+                path.display()
+            ))
+        })
+    }
+}
+
+fn derive_health(
+    record: StateSyncHealthRecord,
+    stale_threshold: Duration,
+    now: DateTime<Utc>,
+) -> StateSyncHealth {
+    let freshness_base = record
+        .last_success_at
+        .as_deref()
+        .or(Some(record.monitoring_since.as_str()));
+    let stale_boundary = freshness_base
+        .and_then(parse_timestamp)
+        .map(|timestamp| timestamp + chrono::Duration::seconds(stale_threshold.as_secs() as i64));
+    let stale = stale_boundary.is_some_and(|boundary| now >= boundary);
+    let status = if record.remote_configured == Some(false) {
+        "unconfigured"
+    } else if record.failure_since.is_some() {
+        "failed"
+    } else if stale {
+        "stale"
+    } else if record.last_success_at.is_some() {
+        "healthy"
+    } else {
+        "unknown"
+    };
+    StateSyncHealth {
+        status: status.to_string(),
+        target_root: record.target_root,
+        node_id: record.node_id,
+        monitoring_since: record.monitoring_since,
+        last_attempt_at: record.last_attempt_at,
+        last_attempt_outcome: record.last_attempt_outcome,
+        last_success_at: record.last_success_at,
+        failure_since: record.failure_since,
+        stale_since: stale.then(|| timestamp(stale_boundary.expect("stale boundary"))),
+        last_error: record.last_error,
+        remote_configured: record.remote_configured,
+        stale_threshold_seconds: stale_threshold.as_secs(),
+        aggregate_counts_authoritative: !matches!(status, "failed" | "stale"),
+        revision: record.revision,
+    }
+}
+
+fn reminder_due(last_reminder_at: Option<&str>) -> bool {
+    let Some(last_reminder_at) = last_reminder_at.and_then(parse_timestamp) else {
+        return true;
+    };
+    Utc::now() - last_reminder_at
+        >= chrono::Duration::seconds(FAILURE_REMINDER_INTERVAL.as_secs() as i64)
+}
+
+fn canonical_target(target_root: &Path) -> String {
+    target_root
+        .canonicalize()
+        .unwrap_or_else(|_| target_root.to_path_buf())
+        .display()
+        .to_string()
+}
+
+fn new_record(target_root: String, node_id: &str) -> StateSyncHealthRecord {
+    StateSyncHealthRecord {
+        target_root,
+        node_id: node_id.to_string(),
+        monitoring_since: now_timestamp(),
+        last_attempt_at: None,
+        last_attempt_outcome: None,
+        last_success_at: None,
+        failure_since: None,
+        last_failure_at: None,
+        last_error: None,
+        last_reminder_at: None,
+        remote_configured: None,
+        revision: 0,
+    }
+}
+
+fn parse_timestamp(value: &str) -> Option<DateTime<Utc>> {
+    DateTime::parse_from_rfc3339(value)
+        .ok()
+        .map(|value| value.with_timezone(&Utc))
+}
+
+fn timestamp(value: DateTime<Utc>) -> String {
+    value.to_rfc3339_opts(SecondsFormat::Secs, true)
+}
+
+fn now_timestamp() -> String {
+    timestamp(Utc::now())
+}
+
+pub fn redact_sync_error(error: &str) -> String {
+    error
+        .split_whitespace()
+        .map(redact_error_token)
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn redact_error_token(token: &str) -> String {
+    let lower = token.to_ascii_lowercase();
+    if lower.starts_with("password=") || lower.starts_with("token=") {
+        return token
+            .split_once('=')
+            .map(|(key, _)| format!("{key}=[REDACTED]"))
+            .unwrap_or_else(|| "[REDACTED]".to_string());
+    }
+    let Some(scheme_end) = token.find("://").map(|index| index + 3) else {
+        return token.to_string();
+    };
+    let Some(at) = token[scheme_end..]
+        .find('@')
+        .map(|index| scheme_end + index)
+    else {
+        return token.to_string();
+    };
+    format!("{}[REDACTED]{}", &token[..scheme_end], &token[at..])
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn temp_root(label: &str) -> PathBuf {
+        std::env::temp_dir().join(format!("refine-{label}-{}", uuid::Uuid::new_v4()))
+    }
+
+    #[test]
+    fn failure_episode_is_redacted_and_recovery_is_transition_based() {
+        let temp = temp_root("state-sync-failure");
+        let target = temp.join("target");
+        fs::create_dir_all(&target).expect("target");
+        let service = FileStateSyncHealthService::new(temp.join("run"));
+        let first = service
+            .record_failure(
+                &target,
+                "node-a",
+                "git fetch https://user:secret@example.com password=hunter2",
+            )
+            .expect("failure");
+        assert_eq!(
+            first,
+            Some(StateSyncHealthActivity::FailureStarted {
+                error: "git fetch https://[REDACTED]@example.com password=[REDACTED]".to_string()
+            })
+        );
+        assert!(
+            service
+                .record_failure(&target, "node-a", "still failed")
+                .expect("retry")
+                .is_none()
+        );
+        let health = service
+            .inspect(&target, "node-a", Duration::from_secs(900))
+            .expect("health");
+        assert_eq!(health.status, "failed");
+        assert!(!health.aggregate_counts_authoritative);
+        assert_eq!(health.last_error.as_deref(), Some("still failed"));
+        assert!(matches!(
+            service.record_success(&target, "node-a").expect("success"),
+            Some(StateSyncHealthActivity::Recovered { .. })
+        ));
+        assert_eq!(
+            service
+                .inspect(&target, "node-a", Duration::from_secs(900))
+                .expect("recovered")
+                .status,
+            "healthy"
+        );
+        assert!(
+            service
+                .record_success(&target, "node-a")
+                .expect("repeat")
+                .is_none()
+        );
+        fs::remove_dir_all(temp).expect("cleanup");
+    }
+
+    #[test]
+    fn binding_is_scoped_to_target_and_node() {
+        let temp = temp_root("state-sync-binding");
+        let target = temp.join("target");
+        let other = temp.join("other");
+        fs::create_dir_all(&target).expect("target");
+        fs::create_dir_all(&other).expect("other");
+        let service = FileStateSyncHealthService::new(temp.join("run"));
+        service.record_success(&target, "node-a").expect("success");
+        let original_revision = service
+            .inspect(&target, "node-a", Duration::from_secs(900))
+            .expect("original")
+            .revision;
+        service.bind(&other, "node-a").expect("rebind");
+        assert_eq!(
+            service
+                .inspect(&other, "node-a", Duration::from_secs(900))
+                .expect("other")
+                .status,
+            "unknown"
+        );
+        assert!(
+            service
+                .inspect(&other, "node-a", Duration::from_secs(900))
+                .expect("rebound")
+                .revision
+                > original_revision
+        );
+        assert_eq!(
+            service
+                .inspect(&target, "node-b", Duration::from_secs(900))
+                .expect("node")
+                .status,
+            "unknown"
+        );
+        fs::remove_dir_all(temp).expect("cleanup");
+    }
+
+    #[test]
+    fn freshness_derivation_crosses_the_wall_clock_threshold() {
+        let monitoring_since = "2026-08-15T12:00:00Z".to_string();
+        let record = StateSyncHealthRecord {
+            target_root: "/target".to_string(),
+            node_id: "node-a".to_string(),
+            monitoring_since: monitoring_since.clone(),
+            last_attempt_at: None,
+            last_attempt_outcome: None,
+            last_success_at: Some(monitoring_since),
+            failure_since: None,
+            last_failure_at: None,
+            last_error: None,
+            last_reminder_at: None,
+            remote_configured: Some(true),
+            revision: 7,
+        };
+        let before = derive_health(
+            record.clone(),
+            Duration::from_secs(900),
+            parse_timestamp("2026-08-15T12:14:59Z").unwrap(),
+        );
+        assert_eq!(before.status, "healthy");
+        let stale = derive_health(
+            record,
+            Duration::from_secs(900),
+            parse_timestamp("2026-08-15T12:15:00Z").unwrap(),
+        );
+        assert_eq!(stale.status, "stale");
+        assert_eq!(stale.stale_since.as_deref(), Some("2026-08-15T12:15:00Z"));
+        assert!(!stale.aggregate_counts_authoritative);
+    }
+}

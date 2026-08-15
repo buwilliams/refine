@@ -14,9 +14,10 @@ pub(super) fn validate_worker_kind(worker_kind: &str, allow_one_shot: bool) -> R
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(super) struct GitSyncSchedule {
+pub(crate) struct GitSyncSchedule {
     pub(super) debounce: Duration,
     pub(super) remote_fetch_interval: Option<Duration>,
+    pub(crate) stale_threshold: Duration,
 }
 
 impl Default for GitSyncSchedule {
@@ -24,6 +25,7 @@ impl Default for GitSyncSchedule {
         Self {
             debounce: DEFAULT_GIT_SYNC_DEBOUNCE,
             remote_fetch_interval: Some(DEFAULT_REMOTE_FETCH_INTERVAL),
+            stale_threshold: DEFAULT_STATE_SYNC_STALE_THRESHOLD,
         }
     }
 }
@@ -43,7 +45,18 @@ pub(super) fn git_sync_schedule(
             settings.get("project_update_pulse_interval_seconds"),
             DEFAULT_REMOTE_FETCH_INTERVAL,
         ),
+        stale_threshold: positive_duration(
+            settings.get("state_sync_stale_threshold_seconds"),
+            DEFAULT_STATE_SYNC_STALE_THRESHOLD,
+        ),
     })
+}
+
+pub(crate) fn state_sync_stale_threshold(
+    runtime_root: &Path,
+    target_root: &Path,
+) -> RefineResult<Duration> {
+    git_sync_schedule(runtime_root, target_root).map(|schedule| schedule.stale_threshold)
 }
 
 pub(super) fn positive_duration(value: Option<&Value>, fallback: Duration) -> Duration {

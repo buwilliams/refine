@@ -12,11 +12,37 @@ struct SseFrameState {
     projection: Arc<ProjectionSnapshot>,
     process_output_paths: BTreeSet<PathBuf>,
     auxiliary: BTreeMap<PathBuf, SsePathFingerprint>,
+    state_sync_health: Option<StateSyncHealthFingerprint>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+struct StateSyncHealthFingerprint {
+    node_id: String,
+    status: String,
+    last_success_at: Option<String>,
+    failure_since: Option<String>,
+    stale_since: Option<String>,
+    last_error: Option<String>,
+}
+
+impl From<&StateSyncHealth> for StateSyncHealthFingerprint {
+    fn from(health: &StateSyncHealth) -> Self {
+        Self {
+            node_id: health.node_id.clone(),
+            status: health.status.clone(),
+            last_success_at: health.last_success_at.clone(),
+            failure_since: health.failure_since.clone(),
+            stale_since: health.stale_since.clone(),
+            last_error: health.last_error.clone(),
+        }
+    }
 }
 
 impl SseFrameState {
     fn same_inputs(&self, previous: &Self) -> bool {
-        Arc::ptr_eq(&self.projection, &previous.projection) && self.auxiliary == previous.auxiliary
+        Arc::ptr_eq(&self.projection, &previous.projection)
+            && self.auxiliary == previous.auxiliary
+            && self.state_sync_health == previous.state_sync_health
     }
 }
 
@@ -326,10 +352,16 @@ impl LocalHttpDaemon {
             &projection,
             &process_output_paths,
         )?;
+        let state_sync_health = self
+            .server
+            .current_state_sync_health()?
+            .as_ref()
+            .map(StateSyncHealthFingerprint::from);
         Ok(SseFrameState {
             projection,
             process_output_paths,
             auxiliary,
+            state_sync_health,
         })
     }
 
@@ -384,6 +416,12 @@ impl LocalHttpDaemon {
                 }),
             },
         ];
+        if let Some(health) = self.server.current_state_sync_health()? {
+            events.push(SseEventFrame {
+                event: "state_sync_health",
+                data: json!(health),
+            });
+        }
         // Sort references and clone only the kept window; this runs on every
         // frame rebuild, and cloning the full activity set to keep 200 entries
         // charged each rebuild for the whole resident history.
@@ -600,6 +638,7 @@ pub(super) fn state_sse_event(event: &str) -> bool {
             | "activity_added"
             | "system_operation"
             | "source_update"
+            | "state_sync_health"
     )
 }
 

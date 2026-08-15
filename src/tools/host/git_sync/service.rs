@@ -337,6 +337,7 @@ impl FileGitSyncService {
             branch: Some(REFINE_STATE_BRANCH.to_string()),
             commit,
             detail: nonempty_detail(details),
+            remote_configured: Some(remote_configured),
             deferred: concurrent_local_change,
         })
     }
