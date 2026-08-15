@@ -355,6 +355,7 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
         let forcedScrolls = 0;
         terminal.term = {
           buffer: { active: buffer },
+          focus() {},
           write() {
             const wasAtBottom = buffer.viewportY === buffer.baseY;
             buffer.baseY += 1;
@@ -375,9 +376,6 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
           },
           scrollUp(lines = 1) {
             buffer.viewportY = Math.max(0, buffer.viewportY - lines);
-          },
-          scrollToBottom() {
-            buffer.viewportY = buffer.baseY;
           },
         };
       },
@@ -843,12 +841,13 @@ test("Agent, Plan, Goal, and Standalone render the shared terminal surface", asy
   }
 });
 
-test("agent terminals follow at the bottom and preserve user scrollback until returned", async () => {
+test("switching back to each Agent terminal scrolls to bottom without disturbing scrollback earlier", async () => {
   const browser = browserRuntime();
   const planTabId = await browser.runtime.openPlan("Design a retry queue");
   await browser.runtime.openGoal("GOAL1");
 
   for (const tabId of ["agent", planTabId, "GOAL1", "standalone"]) {
+    browser.runtime.show(tabId);
     const scroll = browser.runtime.installTerminalScrollModel(tabId);
 
     browser.runtime.receive(tabId, "first line\n");
@@ -858,9 +857,17 @@ test("agent terminals follow at the bottom and preserve user scrollback until re
     browser.runtime.receive(tabId, "second line\n");
     assert.deepEqual({ ...scroll.position() }, { baseY: 2, viewportY: 0, forcedScrolls: 0 });
 
-    scroll.scrollToBottom();
+    browser.runtime.draw();
+    browser.runtime.resizeOutput(900, 360);
+    await browser.runtime.activate(tabId);
+    assert.deepEqual({ ...scroll.position() }, { baseY: 2, viewportY: 0, forcedScrolls: 0 });
+
+    browser.runtime.show("system");
+    await browser.runtime.activate(tabId);
+    assert.deepEqual({ ...scroll.position() }, { baseY: 2, viewportY: 2, forcedScrolls: 1 });
+
     browser.runtime.receive(tabId, "third line\n");
-    assert.deepEqual({ ...scroll.position() }, { baseY: 3, viewportY: 3, forcedScrolls: 0 });
+    assert.deepEqual({ ...scroll.position() }, { baseY: 3, viewportY: 3, forcedScrolls: 1 });
   }
 });
 

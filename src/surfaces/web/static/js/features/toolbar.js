@@ -6,6 +6,7 @@
 const CHAT_TABS_STORAGE_KEY = "refine_chat_tabs";
 const CHAT_TABS_STORAGE_VERSION = 2;
 const INTERACTIVE_TERMINAL_MODES = new Set(["terminal", "agent", "plan", "goal", "standalone"]);
+const AGENT_TERMINAL_MODES = new Set(["agent", "plan", "goal", "standalone"]);
 const SYSTEM_OPERATION_LOG_LIMIT = 250;
 const GOAL_LOG_TAIL_LIMIT = 200;
 const GOAL_LOG_DEFAULT_ORDER = "tail";
@@ -70,6 +71,10 @@ function toolbarStateStorage() {
 
 function toolbarTabUsesTerminal(tab) {
   return !!tab && INTERACTIVE_TERMINAL_MODES.has(tab.mode);
+}
+
+function toolbarTabUsesAgentTerminal(tab) {
+  return !!tab && AGENT_TERMINAL_MODES.has(tab.mode);
 }
 
 function normalizeInteractiveTerminalTab(tab) {
@@ -466,7 +471,9 @@ async function activateToolbarTab(tabId, { toggleIfActive = false } = {}) {
   ensureStandaloneTab();
   const tab = chatState.tabs[tabId];
   if (!tab) return;
-  const wasActive = chatState.activeTabId === tabId;
+  const previousTabId = chatState.activeTabId;
+  const wasActive = previousTabId === tabId;
+  const switchedTabs = !!previousTabId && !wasActive;
   const terminal = toolbarTabUsesTerminal(tab) ? terminalStateFor(tabId) : null;
   let shouldStart = !!terminal && !terminal.loading && !terminal.stopping &&
     (!terminal.sessionId || (terminal.statusChecked && terminal.exited));
@@ -480,6 +487,9 @@ async function activateToolbarTab(tabId, { toggleIfActive = false } = {}) {
   chatState.open = true;
   saveChatStateToStorage();
   drawToolbar();
+  if (switchedTabs && toolbarTabUsesAgentTerminal(tab)) {
+    terminal?.term?.scrollToBottom?.();
+  }
   if (terminal?.sessionId && !terminal.statusChecked) {
     await reattachTerminalSession(tab, terminal);
     shouldStart = !terminal.connected && !terminal.loading && terminal.statusChecked && terminal.exited;
