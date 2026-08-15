@@ -479,6 +479,7 @@ fn browser_terminal_stop_fails_the_goal_after_stopping_its_local_agent() {
     let app_root = temp_root.join("app");
     let refine_dir = app_root.join(".refine");
     let runtime_root = temp_root.join("run/8082");
+    let active_node = "terminal-stop-active-node";
     let provider = temp_root.join("smoke-ai");
     fs::create_dir_all(&app_root).unwrap();
     fs::write(
@@ -498,7 +499,13 @@ fn browser_terminal_stop_fails_the_goal_after_stopping_its_local_agent() {
         std::env::set_var("REFINE_SMOKE_AI_PATH", &provider);
     }
 
-    let work_items = FileWorkItemService::new(&refine_dir);
+    let nodes = crate::tools::product::nodes::FileNodeRegistryService::with_active_root(
+        &refine_dir,
+        &runtime_root,
+    );
+    nodes.create(active_node).unwrap();
+    nodes.activate(active_node).unwrap();
+    let work_items = FileWorkItemService::for_node(&refine_dir, active_node);
     work_items
         .create_goal_summary("Stop workflow Goal Agent", Some("GOAL-TERMINAL-STOP"))
         .unwrap();
@@ -521,7 +528,7 @@ fn browser_terminal_stop_fails_the_goal_after_stopping_its_local_agent() {
         let mut metadata = serde_json::Map::new();
         metadata.insert("goal_id".to_string(), json!("GOAL-TERMINAL-STOP"));
         metadata.insert("kind".to_string(), json!("workflow"));
-        metadata.insert("node_id".to_string(), json!("default"));
+        metadata.insert("node_id".to_string(), json!(active_node));
         metadata.insert("provider".to_string(), json!("smoke-ai"));
         metadata.insert(
             "target_app_id".to_string(),
@@ -577,6 +584,7 @@ fn browser_terminal_stop_fails_the_goal_after_stopping_its_local_agent() {
     assert_eq!(stopped.body["termination"]["confirmed_exit"], true);
     assert_eq!(stopped.body["goal"]["id"], "GOAL-TERMINAL-STOP");
     assert_eq!(stopped.body["goal"]["status"], "failed");
+    assert_eq!(stopped.body["goal"]["node_id"], active_node);
     assert_eq!(stopped.body["worktrees_retained"], true);
     assert!(
         FileProcessSupervisor::new(&runtime_root)
