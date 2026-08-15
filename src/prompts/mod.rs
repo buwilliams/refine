@@ -1,6 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
+pub mod implementation_planning;
+
 macro_rules! prompt_templates {
     ($($variant:ident => $path:literal),+ $(,)?) => {
         #[derive(Clone, Copy, Debug, Eq, PartialEq)]

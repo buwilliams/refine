@@ -48,6 +48,8 @@ fn planning_sessions_require_the_phase_specific_structured_result() {
     assert!(plan.contains("\"checklist\""));
     assert!(criticize.contains("\"findings\""));
     assert!(revise.contains("\"criticism_resolutions\""));
+    assert!(revise.contains("\"criticism_id\":\"C1\""));
+    assert!(revise.contains("\"resolution\":\"how the revised plan resolves"));
 }
 
 #[test]

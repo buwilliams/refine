@@ -1,23 +1,33 @@
 use std::collections::BTreeSet;
 
-use serde::de::DeserializeOwned;
-use serde_json::Value;
+use serde_json::{Map, Value};
 
 use crate::model::goal::{ImplementationCriticism, ProposedImplementationPlan};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::tools::host::structured_output::decode_bounded;
 
 const MAX_CRITICISM_FINDINGS: usize = 3;
 const MAX_SUMMARY_CHARS: usize = 20_000;
 const MAX_ITEM_CHARS: usize = 28_000;
 
 pub(super) fn decode_plan(output: &str) -> RefineResult<ProposedImplementationPlan> {
-    let plan: ProposedImplementationPlan = decode_json(output, "implementation plan")?;
+    let plan: ProposedImplementationPlan = decode_bounded(
+        output,
+        "implementation plan JSON",
+        &["planning_result", "result"],
+        normalize_criticism_resolution_ids,
+    )?;
     validate_plan(&plan)?;
     Ok(plan)
 }
 
 pub(super) fn decode_criticism(output: &str) -> RefineResult<ImplementationCriticism> {
-    let criticism: ImplementationCriticism = decode_json(output, "implementation criticism")?;
+    let criticism: ImplementationCriticism = decode_bounded(
+        output,
+        "implementation criticism JSON",
+        &["planning_result", "result"],
+        |_| Ok(()),
+    )?;
     validate_compact_text(
         "implementation criticism summary",
         &criticism.summary,
@@ -184,47 +194,45 @@ fn validate_compact_text(label: &str, value: &str, max_chars: usize) -> RefineRe
     Ok(())
 }
 
-fn decode_json<T: DeserializeOwned>(output: &str, label: &str) -> RefineResult<T> {
-    let output = output.trim();
-    let candidates = [
-        Some(output),
-        output.find("```json").and_then(|start| {
-            output[start + 7..]
-                .find("```")
-                .map(|end| &output[start + 7..start + 7 + end])
-        }),
-        output
-            .find('{')
-            .zip(output.rfind('}'))
-            .filter(|(start, end)| start <= end)
-            .map(|(start, end)| &output[start..=end]),
-    ];
-    for candidate in candidates.into_iter().flatten() {
-        if let Ok(value) = serde_json::from_str::<Value>(candidate.trim())
-            && let Some(decoded) = decode_value(value)
-        {
-            return Ok(decoded);
-        }
+fn normalize_criticism_resolution_ids(value: &mut Value) -> RefineResult<()> {
+    let Some(resolutions) = value
+        .as_object_mut()
+        .and_then(|plan| plan.get_mut("criticism_resolutions"))
+        .and_then(Value::as_array_mut)
+    else {
+        return Ok(());
+    };
+    for (index, resolution) in resolutions.iter_mut().enumerate() {
+        let Some(resolution) = resolution.as_object_mut() else {
+            continue;
+        };
+        normalize_resolution_id(resolution, index)?;
     }
-    Err(RefineError::Serialization(format!(
-        "agent returned no valid structured {label} JSON"
-    )))
+    Ok(())
 }
 
-fn decode_value<T: DeserializeOwned>(value: Value) -> Option<T> {
-    if let Ok(decoded) = serde_json::from_value(value.clone()) {
-        return Some(decoded);
+fn normalize_resolution_id(resolution: &mut Map<String, Value>, index: usize) -> RefineResult<()> {
+    const ALIASES: [&str; 3] = ["criticismId", "finding_id", "id"];
+    let aliases = ALIASES
+        .into_iter()
+        .filter(|alias| resolution.contains_key(*alias))
+        .collect::<Vec<_>>();
+    if resolution.contains_key("criticism_id") && !aliases.is_empty() || aliases.len() > 1 {
+        let mut fields = Vec::from(["criticism_id"]);
+        fields.retain(|field| resolution.contains_key(*field));
+        fields.extend(aliases);
+        return Err(RefineError::Serialization(format!(
+            "agent returned invalid structured implementation plan JSON: field `criticism_resolutions[{index}]` has ambiguous identifier fields: {}",
+            fields.join(", ")
+        )));
     }
-    match value {
-        Value::Object(mut object) => object
-            .remove("planning_result")
-            .or_else(|| object.remove("result"))
-            .and_then(decode_value),
-        Value::String(encoded) => serde_json::from_str::<Value>(&encoded)
-            .ok()
-            .and_then(decode_value),
-        _ => None,
+    if let Some(alias) = aliases.first() {
+        let id = resolution
+            .remove(*alias)
+            .expect("present resolution id alias");
+        resolution.insert("criticism_id".to_string(), id);
     }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -315,5 +323,97 @@ mod tests {
         )
         .unwrap();
         assert!(validate_revised_plan(&plan, &criticism).is_err());
+    }
+
+    fn material_criticism() -> ImplementationCriticism {
+        decode_criticism(
+            r#"{"summary":"Gap","findings":[{"id":"C1","material":true,"description":"Missing failure path","recommendation":"Add it"}]}"#,
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn revised_plans_normalize_only_supported_resolution_identifier_spellings() {
+        for field in ["criticism_id", "criticismId", "finding_id", "id"] {
+            let output = format!(
+                r#"{{"state":"completed","planning_result":{{"summary":"Do it","checklist":[{{"id":"P1","description":"Change it"}}],"criticism_resolutions":[{{"{field}":"C1","resolution":"Added the failure path"}}]}}}}"#
+            );
+            let plan = decode_plan(&output).unwrap();
+            assert_eq!(plan.criticism_resolutions[0].criticism_id, "C1");
+            validate_revised_plan(&plan, &material_criticism()).unwrap();
+        }
+    }
+
+    #[test]
+    fn revised_plans_reject_malformed_ambiguous_duplicate_unknown_and_incomplete_resolutions() {
+        let malformed = decode_plan(
+            r#"{"summary":"Do it","checklist":[{"id":"P1","description":"Change it"}],"criticism_resolutions":[}"#,
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(malformed.contains("invalid JSON"));
+
+        let ambiguous = decode_plan(
+            r#"{"summary":"Do it","checklist":[{"id":"P1","description":"Change it"}],"criticism_resolutions":[{"criticism_id":"C1","id":"C1","resolution":"Added it"}]}"#,
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(ambiguous.contains("ambiguous identifier fields"));
+
+        let unsupported_alias = decode_plan(
+            r#"{"summary":"Do it","checklist":[{"id":"P1","description":"Change it"}],"criticism_resolutions":[{"criticismID":"C1","resolution":"Added it"}]}"#,
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(unsupported_alias.contains("unknown field `criticismID`"));
+
+        let duplicate = decode_plan(
+            r#"{"summary":"Do it","checklist":[{"id":"P1","description":"Change it"}],"criticism_resolutions":[{"criticism_id":"C1","resolution":"Added it"},{"criticismId":"C1","resolution":"Also added it"}]}"#,
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(duplicate.contains("repeats criticism resolution C1"));
+
+        let unknown = decode_plan(
+            r#"{"summary":"Do it","checklist":[{"id":"P1","description":"Change it"}],"criticism_resolutions":[{"criticism_id":"C2","resolution":"Added it"}]}"#,
+        )
+        .unwrap();
+        assert!(
+            validate_revised_plan(&unknown, &material_criticism())
+                .unwrap_err()
+                .to_string()
+                .contains("unknown or non-material criticism: C2")
+        );
+
+        let incomplete = decode_plan(
+            r#"{"summary":"Do it","checklist":[{"id":"P1","description":"Change it"}],"criticism_resolutions":[{"criticism_id":"C1"}]}"#,
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(incomplete.contains("field `criticism_resolutions[0]`"));
+        assert!(incomplete.contains("missing field `resolution`"));
+
+        let missing_id = decode_plan(
+            r#"{"summary":"Do it","checklist":[{"id":"P1","description":"Change it"}],"criticism_resolutions":[{"resolution":"Added it"}]}"#,
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(missing_id.contains("field `criticism_resolutions[0]`"));
+        assert!(missing_id.contains("missing field `criticism_id`"));
+
+        let structurally_different = decode_plan(
+            r#"{"summary":"Do it","checklist":[{"id":"P1","description":"Change it"}],"criticism_resolutions":[{"criticism_id":"C1","resolution":"Added it","details":"extra shape"}]}"#,
+        )
+        .unwrap_err()
+        .to_string();
+        assert!(structurally_different.contains("unknown field `details`"));
+
+        let over_nested = format!("{}0{}", "[".repeat(40), "]".repeat(40));
+        assert!(
+            decode_plan(&over_nested)
+                .unwrap_err()
+                .to_string()
+                .contains("maximum JSON nesting depth")
+        );
     }
 }

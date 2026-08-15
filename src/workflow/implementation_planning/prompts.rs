@@ -2,6 +2,7 @@ use serde_json::to_string_pretty;
 
 use crate::model::goal::{ImplementationCriticism, ProposedImplementationPlan};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::prompts::implementation_planning::revision_result_contract_json;
 use crate::prompts::{PromptTemplate, render};
 
 pub(super) fn planning_prompt(spec: &str) -> String {
@@ -29,12 +30,14 @@ pub(super) fn revision_prompt(
 ) -> RefineResult<String> {
     let proposal = to_string_pretty(proposal).map_err(encode_error)?;
     let criticism = to_string_pretty(criticism).map_err(encode_error)?;
+    let revision_contract = revision_result_contract_json();
     Ok(render(
         PromptTemplate::ImplementationPlanningRevise,
         &[
             ("spec", spec),
             ("proposal", &proposal),
             ("criticism", &criticism),
+            ("revision_contract", &revision_contract),
         ],
     ))
 }
@@ -119,6 +122,8 @@ mod tests {
         assert!(!plan.contains("governance_rationale"));
         assert!(criticize.contains("\"id\": \"P1\""));
         assert!(revise.contains("Missing recovery coverage"));
+        assert!(revise.contains(r#""criticism_id":"C1""#));
+        assert!(revise.contains(r#""resolution":"how the revised plan resolves"#));
     }
 
     #[test]
