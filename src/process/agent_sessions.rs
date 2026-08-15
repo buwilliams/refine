@@ -22,6 +22,7 @@ use crate::tools::host::agent_providers::HostAgentProviderService;
 
 const COMMAND_POLL_INTERVAL: Duration = Duration::from_millis(40);
 const SIGNAL_WRITE_GRACE_PERIOD: Duration = Duration::from_secs(2);
+const MAX_INVALID_SIGNAL_REPLACEMENTS: usize = 3;
 const DEFAULT_COLS: u16 = 120;
 const DEFAULT_ROWS: u16 = 36;
 const MAX_INPUT_BYTES: usize = 16_000;
@@ -90,7 +91,7 @@ enum AgentSessionCommand {
 
 #[derive(Clone, Debug, Deserialize)]
 struct AgentSessionSignal {
-    state: String,
+    state: AgentSessionState,
     #[serde(default)]
     message: String,
     #[serde(default)]
@@ -101,14 +102,24 @@ struct AgentSessionSignal {
     planning_result: Option<Value>,
 }
 
+#[derive(Clone, Debug, Deserialize)]
+enum AgentSessionState {
+    #[serde(rename = "completed", alias = "complete")]
+    Completed,
+    #[serde(rename = "needs_input", alias = "waiting_for_user")]
+    NeedsInput,
+}
+
 mod codec;
 mod session_runtime;
+mod signal_recovery;
 
 #[cfg(test)]
 use session_runtime::run_goal_agent_session;
 pub use session_runtime::{run_goal_agent, run_goal_agent_with_settlement};
 
 use codec::*;
+use signal_recovery::*;
 
 pub fn find_goal_agent_session(
     runtime_root: &Path,
@@ -241,5 +252,7 @@ pub fn agent_session_events_range(
     })])
 }
 
+#[cfg(test)]
+mod recovery_tests;
 #[cfg(test)]
 mod tests;
