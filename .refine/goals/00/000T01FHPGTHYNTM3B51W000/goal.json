@@ -1,7 +1,7 @@
 {
   "base_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
   "branch_name": "refine/00000T01FHPGTHYNTM3B51W000/round-4",
-  "candidate_commit": "dfdfa68f093cd695ecb106f8dd6a19e8fb3ea867",
+  "candidate_commit": "827c7f56fa94b7f8d61eda21dc4ff813cc16d98f",
   "created": "2026-08-15T15:02:01Z",
   "feature_id": null,
   "feature_order": null,
@@ -2854,13 +2854,15 @@
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
       "prompt": "Recover the original Goal after Rounds 2 and 3 failed because the pre-fix Refine daemon deleted Goal Agent command channels. Preserve the retained Git evidence and do not delete, reset, or directly merge the old branch. Round 3 worktree has been retired, but its complete candidate chain remains reachable as b0eace6911bc687804b12418c018bba0fc73df7a followed by b003a0decf2bc2667cda876a601dcccf69c8006b on refine/00000T01FHPGTHYNTM3B51W000/round-3. Start from current main, which contains 4519b5ff Preserve Goal Agent command channels during handoff. Compare current main with 0e0de3d43fe9284156e9f951dc8c981c1f996fd7..b003a0decf2bc2667cda876a601dcccf69c8006b, selectively reapply and reconcile the complete relevant behavior, and preserve unrelated current-main changes. Do not claim b003a0de passed exact-candidate Quality: the prior Quality attempt failed on infrastructure. Run fresh exact-candidate verification, then let Governance and Quality proceed normally with durable evidence.",
+      "quality_agent_report": "Quality corrected one Dashboard recovery lifecycle defect: retained success now yields to a newer missing-baseline failure episode for the same target, node, and scope, triggering a fresh preview with authority and confirmation reset. Added a focused browser regression. Fresh focused Rust, API, Dashboard, formatting, fidelity, and scope checks passed. The browser harness passed 202 tests with 27 Playwright Chromium environment skips. The full Rust gate passed 849 tests with 2 unchanged pinned-main baseline failures and 6 ignored tests. No commit, merge, push, or Governance action was performed.",
+      "quality_candidate_commit": "827c7f56fa94b7f8d61eda21dc4ff813cc16d98f",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T19:23:41Z",
+      "updated": "2026-08-15T19:36:02Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T19:05:44Z",
         "round_idx": 3,
@@ -2872,6 +2874,6 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-15T19:23:41Z",
-  "workflow_revision": 85
+  "updated": "2026-08-15T19:36:02Z",
+  "workflow_revision": 87
 }
