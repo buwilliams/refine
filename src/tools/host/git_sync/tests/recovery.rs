@@ -375,6 +375,28 @@ fn valid_baseline_recovery_resumes_the_exact_manifest_after_baseline_interruptio
             .exists()
     );
 
+    let mut premature = interrupted_manifest.clone();
+    premature.stage = StateRecoveryStage::Published;
+    fs::write(
+        &manifest_path,
+        serde_json::to_vec_pretty(&premature).unwrap(),
+    )
+    .unwrap();
+    let premature_error = service
+        .apply_state_recovery_decision(decision.clone(), preview.clone())
+        .unwrap_err();
+    assert!(
+        premature_error
+            .to_string()
+            .contains("before the manifest recorded its hydration boundary"),
+        "{premature_error}"
+    );
+    fs::write(
+        &manifest_path,
+        serde_json::to_vec_pretty(&interrupted_manifest).unwrap(),
+    )
+    .unwrap();
+
     let different = service
         .apply_state_recovery_decision(
             StateRecoveryDecision::uniform(StateRecoveryAuthority::Live),

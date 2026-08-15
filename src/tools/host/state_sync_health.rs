@@ -200,11 +200,11 @@ impl FileStateSyncHealthService {
     ) -> RefineResult<Option<StateSyncHealthActivity>> {
         let mut activity = None;
         self.update(target_root, node_id, |record| {
-            if record.last_attempt_id != Some(attempt_id)
-                || record.last_attempt_source.as_deref() != Some(source)
-            {
+            if record.last_success_attempt_id.unwrap_or_default() > attempt_id {
                 return;
             }
+            let is_latest_attempt = record.last_attempt_id == Some(attempt_id)
+                && record.last_attempt_source.as_deref() == Some(source);
             if let Some(failure_since) = record.failure_since.clone()
                 && record.last_failure_attempt_id.unwrap_or_default() <= attempt_id
             {
@@ -217,8 +217,10 @@ impl FileStateSyncHealthService {
                 record.last_conflict_report_location = None;
             }
             let now = now_timestamp();
-            record.last_attempt_at = Some(now.clone());
-            record.last_attempt_outcome = Some("succeeded".to_string());
+            if is_latest_attempt {
+                record.last_attempt_at = Some(now.clone());
+                record.last_attempt_outcome = Some("succeeded".to_string());
+            }
             record.last_success_at = Some(now);
             record.last_success_attempt_id = Some(attempt_id);
             record.remote_configured = Some(true);

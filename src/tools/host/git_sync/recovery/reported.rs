@@ -173,6 +173,15 @@ impl FileGitSyncService {
         let source_ref = self.reported_source_ref(preview);
         let target_ref = self.reported_target_ref(preview, &decision_id);
         if baseline_is_owned_target {
+            if existing
+                .as_ref()
+                .is_none_or(|manifest| manifest.stage < StateRecoveryStage::Hydrated)
+            {
+                return Err(RefineError::Conflict(
+                    "The owned recovery baseline appeared before the manifest recorded its hydration boundary."
+                        .to_string(),
+                ));
+            }
             return self.finalize_reported_recovery(
                 preview,
                 decision,
@@ -346,15 +355,17 @@ impl FileGitSyncService {
             )?,
         };
 
-        manifest.local_state_head_after = Some(target_head.clone());
-        manifest.remote_state_head_after = Some(target_head.clone());
-        manifest.target_snapshot = Some(target_snapshot.clone());
-        manifest.target_location = Some(target_ref.clone());
-        manifest.stage = StateRecoveryStage::TargetPersisted;
-        manifest.outcome = StateRecoveryOutcome::Started;
-        manifest.message =
-            "Recovery target persisted; remote and live state are unchanged.".to_string();
-        write_manifest(&manifest_path, &manifest)?;
+        if manifest.stage == StateRecoveryStage::Started {
+            manifest.local_state_head_after = Some(target_head.clone());
+            manifest.remote_state_head_after = Some(target_head.clone());
+            manifest.target_snapshot = Some(target_snapshot.clone());
+            manifest.target_location = Some(target_ref.clone());
+            manifest.stage = StateRecoveryStage::TargetPersisted;
+            manifest.outcome = StateRecoveryOutcome::Started;
+            manifest.message =
+                "Recovery target persisted; remote and live state are unchanged.".to_string();
+            write_manifest(&manifest_path, &manifest)?;
+        }
 
         if manifest.stage < StateRecoveryStage::Published {
             let current_remote = self.remote_state_head(&remote)?.ok_or_else(|| {

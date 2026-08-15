@@ -188,25 +188,55 @@ fn correlated_attempt_settlement_keeps_newer_metadata_and_active_failure_evidenc
             Some("/run/conflicts/latest.json"),
         )
         .unwrap();
+    let third = service
+        .begin_attempt(&target, "node-a", "background")
+        .unwrap();
     service
-        .settle_neutral(&target, "node-a", second, "manual", "deferred", Some(true))
+        .settle_neutral(
+            &target,
+            "node-a",
+            third,
+            "background",
+            "deferred",
+            Some(true),
+        )
         .unwrap();
 
     let failed = service
         .inspect(&target, "node-a", Duration::from_secs(900))
         .unwrap();
     assert_eq!(failed.status, "failed");
-    assert_eq!(failed.last_attempt_id, Some(second));
-    assert_eq!(failed.last_attempt_source.as_deref(), Some("manual"));
+    assert_eq!(failed.last_attempt_id, Some(third));
+    assert_eq!(failed.last_attempt_source.as_deref(), Some("background"));
     assert_eq!(failed.last_attempt_outcome.as_deref(), Some("deferred"));
     assert_eq!(failed.last_failure_attempt_id, Some(first));
     assert_eq!(failed.last_conflict_report_id.as_deref(), Some("report-1"));
 
-    let third = service
+    service
+        .settle_success(&target, "node-a", second, "manual")
+        .unwrap();
+    let late_success = service
+        .inspect(&target, "node-a", Duration::from_secs(900))
+        .unwrap();
+    assert_eq!(late_success.status, "healthy");
+    assert_eq!(late_success.last_attempt_id, Some(third));
+    assert_eq!(
+        late_success.last_attempt_source.as_deref(),
+        Some("background")
+    );
+    assert_eq!(
+        late_success.last_attempt_outcome.as_deref(),
+        Some("deferred")
+    );
+    assert!(late_success.last_success_at.is_some());
+    assert!(late_success.failure_since.is_none());
+    assert!(late_success.last_conflict_report_id.is_none());
+
+    let fourth = service
         .begin_attempt(&target, "node-a", "background")
         .unwrap();
     service
-        .settle_success(&target, "node-a", third, "background")
+        .settle_success(&target, "node-a", fourth, "background")
         .unwrap();
     let recovered = service
         .inspect(&target, "node-a", Duration::from_secs(900))
@@ -215,18 +245,18 @@ fn correlated_attempt_settlement_keeps_newer_metadata_and_active_failure_evidenc
     assert!(recovered.failure_since.is_none());
     assert!(recovered.last_conflict_report_id.is_none());
 
-    let fourth = service
+    let fifth = service
         .begin_attempt(&target, "node-a", "background")
         .unwrap();
-    let fifth = service.begin_attempt(&target, "node-a", "manual").unwrap();
+    let sixth = service.begin_attempt(&target, "node-a", "manual").unwrap();
     service
-        .settle_success(&target, "node-a", fifth, "manual")
+        .settle_success(&target, "node-a", sixth, "manual")
         .unwrap();
     service
         .settle_failure(
             &target,
             "node-a",
-            fourth,
+            fifth,
             "background",
             "late conflict",
             Some("stale-report"),
@@ -237,7 +267,7 @@ fn correlated_attempt_settlement_keeps_newer_metadata_and_active_failure_evidenc
         .inspect(&target, "node-a", Duration::from_secs(900))
         .unwrap();
     assert_eq!(still_healthy.status, "healthy");
-    assert_eq!(still_healthy.last_attempt_id, Some(fifth));
+    assert_eq!(still_healthy.last_attempt_id, Some(sixth));
     assert_eq!(
         still_healthy.last_attempt_outcome.as_deref(),
         Some("succeeded")
