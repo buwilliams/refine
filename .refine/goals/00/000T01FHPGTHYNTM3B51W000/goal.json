@@ -1,0 +1,19 @@
+{
+  "base_commit": null,
+  "branch_name": null,
+  "candidate_commit": null,
+  "created": "2026-08-15T15:02:01Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000T01FHPGTHYNTM3B51W000",
+  "name": "Make missing-baseline state recovery safely actionable from the dashboard",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": null,
+  "rounds": [],
+  "status": "backlog",
+  "target_branch": null,
+  "updated": "2026-08-15T15:02:01Z",
+  "workflow_revision": 1
+}
