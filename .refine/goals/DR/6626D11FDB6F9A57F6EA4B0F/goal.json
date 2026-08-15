@@ -1620,8 +1620,48 @@
           "round_idx": 2,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-08-15T20:01:37Z",
+        "criticism": {
+          "completed_at": "2026-08-15T20:05:33Z",
+          "git_after": {
+            "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-3",
+            "head_commit": "d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-3",
+            "head_commit": "d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P3",
+                  "P4",
+                  "P5"
+                ],
+                "description": "The candidate persists a failed Quality proof and its details before resolve_already_merged_quality performs terminal Goal settlement, while current proof lookup accepts only passed proofs. The plan recognizes an already-settled failure but does not cover interruption after that first failed result is durable and before settlement, so repeated handling can still launch a second evaluation and replace the first-result contract.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Define a restart-safe protocol that either settles the Goal atomically with the first failed result or validates and settles an already-persisted exact failed proof or terminal operation before any launch; test the crash-between-persistence-and-settlement path as well as repeated terminal handling."
+              },
+              {
+                "checklist_item_ids": [
+                  "P1",
+                  "P5"
+                ],
+                "description": "The checklist does not require the Latest Round's full verification and clean audit handoff: rerunning the failed Quality command, all named focused suites, cargo check, scoped rustfmt and Clippy, the broad suite with baseline exclusions separated, and exact unchanged identity and dirtiness evidence for both retained worktrees.",
+                "id": "C2",
+                "material": true,
+                "recommendation": "Add a verification checklist item that records those exact commands and outcomes, fingerprints both retained worktrees before and after, separates unchanged baseline failures from candidate failures, and confirms the Round 3 diff is clean and reviewable."
+              }
+            ],
+            "summary": "The plan needs crash-safe first-result reuse and an explicit verification handoff."
+          },
+          "started_at": "2026-08-15T20:01:37Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-08-15T20:05:33Z",
         "proposal": {
           "completed_at": "2026-08-15T20:01:37Z",
           "git_after": {
@@ -1668,7 +1708,7 @@
         "schema_version": 2,
         "started_at": "2026-08-15T19:58:08Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T20:01:37Z"
+        "updated_at": "2026-08-15T20:05:33Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -1682,7 +1722,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T20:01:37Z",
+      "updated": "2026-08-15T20:05:33Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T19:58:07Z",
         "round_idx": 2,
@@ -1694,6 +1734,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-15T20:01:37Z",
-  "workflow_revision": 47
+  "updated": "2026-08-15T20:05:33Z",
+  "workflow_revision": 49
 }
