@@ -2607,12 +2607,63 @@
           "round_idx": 3,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-08-15T19:05:44Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-08-15T19:07:57Z",
+        "proposal": {
+          "completed_at": "2026-08-15T19:07:56Z",
+          "git_after": {
+            "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-4",
+            "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-4",
+            "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Compare current main with the original base-to-retained-candidate chain and selectively recover only the complete Goal-specific semantic delta while preserving the command-channel fix, unrelated main changes, and every retained historical ref and commit.",
+                "id": "P1"
+              },
+              {
+                "description": "Restore the dedicated missing-baseline failure and optional typed state-sync recovery kind with atomic target-and-node-bound settlement so unrelated, stale, detached, bootstrap, and generic failure states remain fail-closed and correctly classified.",
+                "id": "P2"
+              },
+              {
+                "description": "Restore the shared daemon preview-and-apply contract with unchanged complete-preview fencing, stable git_busy and stale_preview conflict reasons, generic handling for other conflicts, and all Git and durable-state mutation kept out of browser code.",
+                "id": "P3"
+              },
+              {
+                "description": "Restore the cohesive Dashboard recovery controller and panel so only typed eligibility fetches a preview, all required identities, heads, counts, bounded conflicts, consequences, and evidence are shown neutrally, and authority remains unselected until a separate exact-preview confirmation.",
+                "id": "P4"
+              },
+              {
+                "description": "Restore context and response fencing so target, node, route, scope, eligibility, preview identity, late responses, Git-busy retry, and stale-preview refresh transitions invalidate authority or confirmation exactly when their reviewed evidence is no longer sufficient.",
+                "id": "P5"
+              },
+              {
+                "description": "Restore successful recovery reconciliation so authoritative health clears only for the intended target while the Dashboard retains the resulting baseline, heads, audit ref, manifest, evidence identity, counts, authority, detail, and cleared-error status.",
+                "id": "P6"
+              },
+              {
+                "description": "Carry forward the focused daemon, API, and browser regression coverage together with only the affected Dashboard intent, API intent, and missing-baseline runbook updates, keeping the recovery controller and other changed files within their established cohesive responsibilities.",
+                "id": "P7"
+              },
+              {
+                "description": "Produce a clean Round 4 exact candidate whose cumulative scope faithfully combines current main with the recovered Goal behavior, preserving b003a0de only as historical recovery evidence so fresh evaluation attaches to the new candidate commit.",
+                "id": "P8"
+              }
+            ],
+            "summary": "Recover the complete missing-baseline dashboard workflow from the retained Round 3 commit chain onto current main without merging or altering the historical branch, reconciling only where needed so the new command-channel handoff fix and other unrelated main behavior remain intact. The recovered candidate will restore daemon-owned typed eligibility, conflict fencing, target-bound health settlement, deliberate neutral authority confirmation, late-response protection, retained audit evidence, focused regressions, and only the affected intent and runbook contracts, while treating the old candidate as recovery evidence rather than as an exact-candidate Quality approval."
+          },
+          "started_at": "2026-08-15T19:05:44Z"
+        },
         "schema_version": 2,
         "started_at": "2026-08-15T19:05:44Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T19:05:44Z"
+        "updated_at": "2026-08-15T19:07:57Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -2626,7 +2677,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T19:05:44Z",
+      "updated": "2026-08-15T19:07:57Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T19:05:44Z",
         "round_idx": 3,
@@ -2638,6 +2689,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-15T19:05:44Z",
-  "workflow_revision": 73
+  "updated": "2026-08-15T19:07:57Z",
+  "workflow_revision": 75
 }
