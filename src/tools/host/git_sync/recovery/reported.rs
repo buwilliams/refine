@@ -93,9 +93,7 @@ impl FileGitSyncService {
         let _guard = match lock.try_lock() {
             Ok(guard) => guard,
             Err(TryLockError::WouldBlock) => {
-                return Err(RefineError::Conflict(
-                    "Repository Git operations are busy; recovery was not started.".to_string(),
-                ));
+                return Err(git_busy_recovery());
             }
             Err(TryLockError::Poisoned(_)) => {
                 return Err(RefineError::Conflict(
@@ -104,9 +102,7 @@ impl FileGitSyncService {
             }
         };
         let Some(_file_guard) = RepositoryFileLock::try_acquire(&self.target_root)? else {
-            return Err(RefineError::Conflict(
-                "Repository Git operations are busy; recovery was not started.".to_string(),
-            ));
+            return Err(git_busy_recovery());
         };
         let result = self.apply_reported_state_recovery_locked(&decision, &preview);
         if result.is_err() {

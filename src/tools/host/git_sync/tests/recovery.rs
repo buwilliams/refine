@@ -80,6 +80,43 @@ fn valid_baseline_conflict_report_is_complete_and_preview_is_exact() {
 }
 
 #[test]
+fn valid_baseline_recovery_reports_typed_git_busy_without_mutation() {
+    let fixture = valid_baseline_conflict_fixture("reported-recovery-git-busy");
+    let service = fixture.service(&fixture.b);
+    let preview = service.preview_state_recovery().unwrap();
+    let (held_tx, held_rx) = std::sync::mpsc::channel();
+    let (release_tx, release_rx) = std::sync::mpsc::channel();
+    let locked_target = fixture.b.clone();
+    let holder = std::thread::spawn(move || {
+        with_repository_git_lock(&locked_target, || {
+            held_tx.send(()).unwrap();
+            release_rx.recv().unwrap();
+            Ok(())
+        })
+        .unwrap();
+    });
+    held_rx.recv().unwrap();
+
+    let error = service
+        .apply_state_recovery_decision(
+            StateRecoveryDecision::uniform(StateRecoveryAuthority::Live),
+            preview.clone(),
+        )
+        .unwrap_err();
+
+    assert!(matches!(
+        error,
+        RefineError::StateRecoveryConflict {
+            reason: crate::process::supervisor::errors::StateRecoveryConflictReason::GitBusy,
+            ..
+        }
+    ));
+    release_tx.send(()).unwrap();
+    holder.join().unwrap();
+    assert_eq!(service.preview_state_recovery().unwrap(), preview);
+}
+
+#[test]
 fn valid_baseline_conflict_report_keeps_every_path_while_the_error_stays_bounded() {
     let fixture = SyncFixture::new("reported-recovery-complete-paths");
     for index in 0..128 {

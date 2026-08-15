@@ -84,7 +84,12 @@ fn missing_baseline_recovery_kind_is_typed_and_cleared_by_success() {
     );
 
     let (settled, activity) = service
-        .record_recovery_success(&target, "node-a", StateSyncRecoveryKind::MissingBaseline)
+        .record_recovery_success(
+            &target,
+            "node-a",
+            StateSyncRecoveryKind::MissingBaseline,
+            failed.revision,
+        )
         .expect("recovered");
     assert!(settled);
     assert!(matches!(
@@ -98,6 +103,38 @@ fn missing_baseline_recovery_kind_is_typed_and_cleared_by_success() {
     assert_eq!(recovered.recovery_kind, None);
 
     service
+        .record_failure_with_recovery_kind(
+            &target,
+            "node-a",
+            "newer baseline failure",
+            Some(StateSyncRecoveryKind::MissingBaseline),
+        )
+        .expect("newer typed failure");
+    let newer_revision = service
+        .inspect(&target, "node-a", Duration::from_secs(900))
+        .expect("newer failed health")
+        .revision;
+    let (settled, activity) = service
+        .record_recovery_success(
+            &target,
+            "node-a",
+            StateSyncRecoveryKind::MissingBaseline,
+            failed.revision,
+        )
+        .expect("stale conditional settlement");
+    assert!(!settled);
+    assert_eq!(activity, None);
+    let newer_unchanged = service
+        .inspect(&target, "node-a", Duration::from_secs(900))
+        .expect("preserved newer failed health");
+    assert_eq!(newer_unchanged.status, "failed");
+    assert_eq!(newer_unchanged.revision, newer_revision);
+    assert_eq!(
+        newer_unchanged.recovery_kind,
+        Some(StateSyncRecoveryKind::MissingBaseline)
+    );
+
+    service
         .record_failure(&target, "node-a", "unrelated fetch failure")
         .expect("unrelated failure");
     let unrelated_revision = service
@@ -105,7 +142,12 @@ fn missing_baseline_recovery_kind_is_typed_and_cleared_by_success() {
         .expect("unrelated health")
         .revision;
     let (settled, activity) = service
-        .record_recovery_success(&target, "node-a", StateSyncRecoveryKind::MissingBaseline)
+        .record_recovery_success(
+            &target,
+            "node-a",
+            StateSyncRecoveryKind::MissingBaseline,
+            unrelated_revision,
+        )
         .expect("conditional settlement");
     assert!(!settled);
     assert_eq!(activity, None);

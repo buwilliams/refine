@@ -236,9 +236,11 @@ impl FileStateSyncHealthService {
         target_root: &Path,
         node_id: &str,
         expected_kind: StateSyncRecoveryKind,
+        expected_revision: u64,
     ) -> RefineResult<(bool, Option<StateSyncHealthActivity>)> {
         let activity = self.update_if(target_root, node_id, |record| {
-            (record.recovery_kind == Some(expected_kind)).then(|| settle_success_record(record))
+            (record.revision == expected_revision && record.recovery_kind == Some(expected_kind))
+                .then(|| settle_success_record(record))
         })?;
         Ok(match activity {
             Some(activity) => (true, activity),

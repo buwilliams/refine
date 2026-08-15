@@ -54,3 +54,10 @@ fn stale_recovery(reason: &str) -> RefineError {
         ),
     }
 }
+
+fn git_busy_recovery() -> RefineError {
+    RefineError::StateRecoveryConflict {
+        reason: crate::process::supervisor::errors::StateRecoveryConflictReason::GitBusy,
+        message: "Repository Git operations are busy; recovery was not started.".to_string(),
+    }
+}

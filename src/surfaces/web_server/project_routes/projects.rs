@@ -307,15 +307,21 @@ impl InProcessWebServer {
                 ));
             }
         };
+        let recovery_health = self.current_state_sync_health().ok().flatten();
         match service.apply_state_recovery_decision(decision, preview) {
             Ok(result) => {
-                let settlement = self.runtime_root.as_deref().and_then(|runtime_root| {
-                    crate::process::runner::settle_state_recovery_success(
-                        runtime_root,
-                        &target_root,
-                    )
-                    .ok()
-                });
+                let settlement = self
+                    .runtime_root
+                    .as_deref()
+                    .zip(recovery_health.as_ref())
+                    .and_then(|(runtime_root, expected_health)| {
+                        crate::process::runner::settle_state_recovery_success(
+                            runtime_root,
+                            &target_root,
+                            expected_health,
+                        )
+                        .ok()
+                    });
                 let health_settled = settlement.as_ref().is_some_and(|(settled, _)| *settled);
                 let state_sync_health = settlement.map(|(_, health)| health);
                 let mut value = serde_json::to_value(result).unwrap();
