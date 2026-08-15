@@ -79,7 +79,7 @@ impl FileSourcePromotionService {
         failpoint: F,
     ) -> RefineResult<SourcePromotionOperation> {
         let _queue_guard = self.acquire_agent_queue_lock()?;
-        if let Some(operation) = self.reconcile_interrupted_agent()?
+        if let Some(operation) = self.reconcile_interrupted_agent_locked()?
             && matches!(operation.status.as_str(), "queued" | "running")
         {
             return Ok(operation);
@@ -131,7 +131,7 @@ impl FileSourcePromotionService {
             )
             .map_err(with_stash_context)?;
         if !created {
-            return self.reconcile_interrupted_agent()?.ok_or_else(|| {
+            return self.reconcile_interrupted_agent_locked()?.ok_or_else(|| {
                 RefineError::Conflict(format!(
                     "source-upgrade operation {} has no durable source projection",
                     registry_operation.id
@@ -373,6 +373,26 @@ impl FileSourcePromotionService {
     }
 
     fn acquire_agent_queue_lock(&self) -> RefineResult<fs::File> {
+        let (file, path) = self.open_agent_queue_lock()?;
+        file.lock_exclusive().map_err(|error| {
+            RefineError::Io(format!("failed to lock {}: {error}", path.display()))
+        })?;
+        Ok(file)
+    }
+
+    fn try_acquire_agent_queue_lock(&self) -> RefineResult<Option<fs::File>> {
+        let (file, path) = self.open_agent_queue_lock()?;
+        match file.try_lock_exclusive() {
+            Ok(()) => Ok(Some(file)),
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => Ok(None),
+            Err(error) => Err(RefineError::Io(format!(
+                "failed to lock {}: {error}",
+                path.display()
+            ))),
+        }
+    }
+
+    fn open_agent_queue_lock(&self) -> RefineResult<(fs::File, std::path::PathBuf)> {
         fs::create_dir_all(&self.port_runtime_root).map_err(|error| {
             RefineError::Io(format!(
                 "failed to create source-upgrade runtime root {}: {error}",
@@ -389,15 +409,45 @@ impl FileSourcePromotionService {
             .map_err(|error| {
                 RefineError::Io(format!("failed to open {}: {error}", path.display()))
             })?;
-        file.lock_exclusive().map_err(|error| {
-            RefineError::Io(format!("failed to lock {}: {error}", path.display()))
-        })?;
-        Ok(file)
+        Ok((file, path))
     }
 
     pub(crate) fn reconcile_interrupted_agent(
         &self,
     ) -> RefineResult<Option<SourcePromotionOperation>> {
+        let Some(observed) = self.load_operation()? else {
+            return Ok(None);
+        };
+        let needs_launch_reconciliation = matches!(observed.status.as_str(), "queued" | "running")
+            && observed.handoff_attempt.is_none()
+            && !observed.stage.starts_with("restart_safe_handoff")
+            && !matches!(
+                observed.stage.as_str(),
+                "build_candidate"
+                    | "verify_idle"
+                    | "prepare_service_registration"
+                    | "stop_daemon"
+                    | "activate_source"
+                    | "restart_daemon"
+                    | "verify_daemon"
+                    | "post_restart_reconciliation"
+                    | "complete"
+            );
+        if needs_launch_reconciliation {
+            // `queue_agent_inner` holds this lock from durable reservation until
+            // the supervised process receipt is persisted. A concurrent status
+            // read must not reinterpret that intentional launch window as a
+            // crashed launcher. If the launcher really dies, the OS releases the
+            // file lock and the next observation performs normal recovery.
+            let Some(_queue_guard) = self.try_acquire_agent_queue_lock()? else {
+                return Ok(Some(observed));
+            };
+            return self.reconcile_interrupted_agent_locked();
+        }
+        self.reconcile_interrupted_agent_locked()
+    }
+
+    fn reconcile_interrupted_agent_locked(&self) -> RefineResult<Option<SourcePromotionOperation>> {
         let Some(mut operation) = self.load_operation()? else {
             return Ok(None);
         };

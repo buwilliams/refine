@@ -387,6 +387,64 @@ fn upgrade_reservation_without_agent_settles_interrupted_and_retryable_after_res
     fs::remove_dir_all(repo.root).unwrap();
 }
 
+#[test]
+fn active_launch_reservation_is_not_settled_before_its_process_receipt() {
+    use fs2::FileExt;
+
+    let root = test_directory("source-upgrade-active-launch-reservation");
+    let runtime = root.join("run/8080");
+    let service = FileSourcePromotionService::new(root.join("checkout"), &runtime, 8080);
+    let registered = service
+        .operation_registry()
+        .register_exclusive_with_request(
+            "maintenance:source-upgrade",
+            json!({"restart_recovery": "capability"}),
+        )
+        .unwrap();
+    let mut active = operation();
+    active.id = registered.id.clone();
+    active.status = "queued".to_string();
+    active.stage = "agent_queued".to_string();
+    service.save_operation(&active).unwrap();
+
+    fs::create_dir_all(&runtime).unwrap();
+    let lock = fs::OpenOptions::new()
+        .create(true)
+        .read(true)
+        .write(true)
+        .truncate(false)
+        .open(runtime.join(".source-upgrade-queue.lock"))
+        .unwrap();
+    lock.lock_exclusive().unwrap();
+
+    let observed = service.reconcile_interrupted_agent().unwrap().unwrap();
+    assert_eq!(observed.status, "queued");
+    assert_eq!(observed.stage, "agent_queued");
+    assert_eq!(
+        service
+            .operation_registry()
+            .status(&registered.id)
+            .unwrap()
+            .state,
+        OperationState::Running
+    );
+
+    drop(lock);
+    let settled = service.reconcile_interrupted_agent().unwrap().unwrap();
+    assert_eq!(settled.status, "interrupted");
+    assert_eq!(settled.stage, "agent_interrupted");
+    assert_eq!(
+        service
+            .operation_registry()
+            .status(&registered.id)
+            .unwrap()
+            .state,
+        OperationState::Failed
+    );
+
+    fs::remove_dir_all(root).unwrap();
+}
+
 #[cfg(unix)]
 #[test]
 fn launched_upgrade_agent_is_adopted_without_projection_receipt_and_not_duplicated() {

@@ -174,6 +174,7 @@ fn capture_from_shell(shell: &str, flags: &str, home: Option<&Path>) -> BTreeMap
         .args([flags, &format!("printf '%s\\0' {ENV_SENTINEL}; env -0")])
         .stdin(Stdio::null())
         .stderr(Stdio::null());
+    configure_shell_capture_lifecycle(&mut command);
     if let Some(home) = home {
         command.env("HOME", home);
     }
@@ -185,6 +186,28 @@ fn capture_from_shell(shell: &str, flags: &str, home: Option<&Path>) -> BTreeMap
     }
     parse_nul_env(&output.stdout)
 }
+
+/// Interactive shells initialize terminal job control even when stdin is
+/// closed. If Refine itself was launched from a terminal, that initialization
+/// can stop the entire updater process group. A new session gives the capture
+/// no controlling terminal, while still allowing the shell to source the same
+/// profile and rc files.
+#[cfg(unix)]
+fn configure_shell_capture_lifecycle(command: &mut Command) {
+    use std::os::unix::process::CommandExt;
+
+    unsafe {
+        command.pre_exec(|| {
+            if libc::setsid() == -1 {
+                return Err(std::io::Error::last_os_error());
+            }
+            Ok(())
+        });
+    }
+}
+
+#[cfg(not(unix))]
+fn configure_shell_capture_lifecycle(_command: &mut Command) {}
 
 /// Marks where the environment dump begins, so shell startup chatter on stdout is
 /// not mistaken for it.
@@ -430,6 +453,41 @@ mod tests {
         assert_eq!(
             captured.get("SHARED_BY_BOTH").map(String::as_str),
             Some("from_rc")
+        );
+
+        let _ = std::fs::remove_dir_all(&home);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn shell_capture_runs_outside_the_callers_terminal_session() {
+        if !Path::new("/bin/bash").exists() {
+            return;
+        }
+        let home = std::env::temp_dir().join(format!(
+            "refine-agent-env-session-{}-{:?}",
+            std::process::id(),
+            std::thread::current().id()
+        ));
+        let _ = std::fs::remove_dir_all(&home);
+        std::fs::create_dir_all(&home).unwrap();
+        std::fs::write(
+            home.join(".bashrc"),
+            "export REFINE_CAPTURE_SESSION_ID=\"$(ps -o sid= -p $$ | tr -d ' ')\"\n",
+        )
+        .unwrap();
+        std::fs::write(home.join(".profile"), "\n").unwrap();
+
+        let captured = shell_env("/bin/bash", Some(&home));
+        let parent_session = unsafe { libc::getsid(0) }.to_string();
+        let capture_session = captured
+            .get("REFINE_CAPTURE_SESSION_ID")
+            .filter(|session| !session.is_empty())
+            .expect("the fixture must observe the capture shell session");
+
+        assert_ne!(
+            capture_session, &parent_session,
+            "the capture shell must not share Refine's controlling-terminal session"
         );
 
         let _ = std::fs::remove_dir_all(&home);
