@@ -3963,8 +3963,47 @@
           "round_idx": 4,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-08-15T20:43:06Z",
+        "criticism": {
+          "completed_at": "2026-08-15T20:45:45Z",
+          "git_after": {
+            "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-5",
+            "head_commit": "d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-5",
+            "head_commit": "d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P8",
+                  "P10"
+                ],
+                "description": "P8 only reconciles regression coverage and P10 only produces a clean fidelity-scoped candidate; neither requires recording the final Round 5 SHA and executing the Latest Round's full formatting, cargo check, focused Git recovery, state-sync, state-recovery API and CLI, Dashboard, browser, and command-channel handoff checks against that exact commit, nor repeats the shell-safe predicate constraint whose omission caused the Round 4 harness fault.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Add a final verification item that records and asserts the exact candidate SHA and clean tree, proves recovered-delta and cumulative-scope fidelity, runs every requested check with independently supervised or safely quoted commands, and reports unchanged baseline failures and Playwright Chromium skips separately."
+              },
+              {
+                "checklist_item_ids": [
+                  "P1",
+                  "P10"
+                ],
+                "description": "Round 5 is pinned at local base d8a6285c while origin/main is its descendant 9729b9b4 with six unrelated, non-overlapping handoff paths, but P10 says the Round 5 candidate will preserve the remote handoff changes without saying whether they are merely comparison evidence or should be imported into the candidate; importing them would broaden the clean Goal-specific candidate beyond its bound base.",
+                "id": "C2",
+                "material": true,
+                "recommendation": "State that origin/main is a read-only drift and non-overlap fence: keep the candidate on the pinned Round 5 base and prove it does not touch the six remote-only paths unless a newly bound current-main base already contains them."
+              }
+            ],
+            "summary": "Add exact-candidate verification and clarify that the remote-only handoff delta is comparison evidence, not Round 5 candidate scope."
+          },
+          "started_at": "2026-08-15T20:43:06Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-08-15T20:45:45Z",
         "proposal": {
           "completed_at": "2026-08-15T20:43:06Z",
           "git_after": {
@@ -4027,7 +4066,7 @@
         "schema_version": 2,
         "started_at": "2026-08-15T20:40:25Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T20:43:06Z"
+        "updated_at": "2026-08-15T20:45:45Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -4041,7 +4080,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T20:43:06Z",
+      "updated": "2026-08-15T20:45:45Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T20:40:24Z",
         "round_idx": 4,
@@ -4053,6 +4092,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-15T20:43:06Z",
-  "workflow_revision": 97
+  "updated": "2026-08-15T20:45:45Z",
+  "workflow_revision": 99
 }
