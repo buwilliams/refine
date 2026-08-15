@@ -49,6 +49,7 @@ fn cli_surface_suite() {
     goal_create_list_show_edit_note_round_delete(&fixture);
     goal_feature_assignment_and_round_edit_latest(&fixture);
     goal_workflow_actions_start_retry_and_undo(&fixture);
+    goal_cancel_uses_active_node_and_rejects_foreign_owner(&fixture);
     feature_create_membership_rollup_and_delete(&fixture);
     feature_show_edit_reorder_move_cancel_and_import(&fixture);
     todo_commands_share_reporter_scoped_api_capability(&fixture);
