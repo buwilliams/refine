@@ -1,7 +1,7 @@
 {
-  "base_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
-  "branch_name": "refine/00000T01FHPGTHYNTM3B51W000/round-4",
-  "candidate_commit": "827c7f56fa94b7f8d61eda21dc4ff813cc16d98f",
+  "base_commit": "d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f",
+  "branch_name": "refine/00000T01FHPGTHYNTM3B51W000/round-5",
+  "candidate_commit": null,
   "created": "2026-08-15T15:02:01Z",
   "feature_id": null,
   "feature_order": null,
@@ -2875,10 +2875,1125 @@
       },
       "workflow_reconciliation": null,
       "workflow_recovery": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-15T20:40:25Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Recover the missing-baseline Dashboard recovery workflow through a fresh Round 5 because Round 4 ended in a Quality harness fault, not a product or candidate failure. Preserve every prior Round, branch, commit, log, failed operation, and Quality report as immutable evidence; do not delete, reset, amend, clean, or directly merge historical artifacts. The retained corrected Round 4 candidate is 827c7f56fa94b7f8d61eda21dc4ff813cc16d98f on refine/00000T01FHPGTHYNTM3B51W000/round-4, with pre-Quality candidate dfdfa68f093cd695ecb106f8dd6a19e8fb3ea867 and original Round 4 base 4519b5ff2c5894b0fccf1c4c0e57612f694ffe79. Round 4 Quality changed only src/surfaces/web/static/js/features/dashboard_state_recovery.js and tests/web_dashboard_attention.test.js so retained success yields to a newer missing-baseline failure episode for the same target, node, and scope, triggering a fresh preview with authority and confirmation reset. Its recorded focused checks passed, but the final predicate never ran because a single-quoted bash -lc wrapper could not parse nested single-quoted Git exclude pathspecs. Treat 827c7f56 as recovery evidence, not passing exact-candidate Quality. At Round 5 claim time, compare the actual current main and configured remote main with 4519b5ff..827c7f56, then selectively reapply and reconcile the complete Goal-specific semantic delta while preserving all unrelated current-main behavior. Current inspection found local main d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f and origin/main 9729b9b4be27f7a58629d8f04a1c0e8171636c82; their six-path worktree-handoff advance has no path overlap with the 25-path Goal delta, but re-read both heads because main may move again. Preserve the original contract: daemon-owned Git and durable-state mutation, typed missing-baseline eligibility, atomic target-and-node-bound health settlement, complete-preview stale fencing, typed git_busy and stale_preview recovery, neutral unselected authority plus separate exact-preview confirmation, late-response and context fencing, retained recovery audit evidence, focused Rust API and browser regressions, and only the affected Dashboard, API, and runbook documentation. Include the Round 4 lifecycle correction and regression. Produce a clean fresh candidate from the Round 5 base, prove recovered-delta fidelity and cumulative scope without blind merging, and run fresh exact-candidate formatting, cargo check, focused Git recovery, state-sync, state-recovery API and CLI, Dashboard, browser, and command-channel handoff checks. Report unchanged baseline failures and unavailable Playwright Chromium skips separately. Keep predicate commands shell-safe: do not nest single-quoted Git pathspecs inside a single-quoted bash -lc payload; use independently supervised commands or quoting that the outer shell preserves. Let fresh Quality and Governance evaluate the new exact candidate normally. Do not approve, merge, or push.",
+          "reporter": "Buddy Williams",
+          "round": 5
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000T01FHPGTHYNTM3B51W000",
+          "name": "Make missing-baseline state recovery safely actionable from the dashboard",
+          "node_id": "default",
+          "priority": "high",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "Buddy Williams",
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "id": "guidance-1",
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                },
+                {
+                  "enabled": true,
+                  "id": "guidance-2",
+                  "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+                  "name": "Cohesive code files",
+                  "rule": "Apply whenever an agent adds or changes code files in any language."
+                }
+              ],
+              "code_files_changed": true,
+              "context_version": 1,
+              "recorded_at": "2026-08-15T15:27:30Z",
+              "skipped": []
+            },
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "f50b1571672da4a7c308d47918746eac3931bfaa",
+                "context_digest": "89f4bfe95d8f65c88f0fa51b18ec92f08a4db5048f5459baf9b32a247b2994a6",
+                "context_version": 1,
+                "goal_id": "00000T01FHPGTHYNTM3B51W000",
+                "implementation_branch": "refine/00000T01FHPGTHYNTM3B51W000/round-1",
+                "round_idx": 0,
+                "target_branch": "main"
+              },
+              "completed_at": "2026-08-15T15:27:30Z",
+              "criticism": {
+                "completed_at": "2026-08-15T15:07:02Z",
+                "git_after": {
+                  "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-1",
+                  "head_commit": "f50b1571672da4a7c308d47918746eac3931bfaa",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-1",
+                  "head_commit": "f50b1571672da4a7c308d47918746eac3931bfaa",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "findings": [
+                    {
+                      "checklist_item_ids": [
+                        "P1",
+                        "P7"
+                      ],
+                      "description": "The plan does not define a daemon-owned, machine-readable signal that the failed state-sync health is specifically the missing-baseline recovery topology; the current dashboard health exposes only status and redacted error text, while calling preview for every degraded state performs remote Git inspection and changes ordinary failure behavior.",
+                      "id": "C1",
+                      "material": true,
+                      "recommendation": "Add and test a typed recovery-eligibility or failure-kind contract from the daemon, and fetch the preview only for that condition without browser message parsing."
+                    },
+                    {
+                      "checklist_item_ids": [
+                        "P4",
+                        "P7",
+                        "P8"
+                      ],
+                      "description": "The plan promises distinct busy and stale handling, but the existing API maps both conditions and other recovery conflicts to the same 409 code `conflict`, leaving a thin browser no stable way to choose the required refresh-versus-retry flow.",
+                      "id": "C2",
+                      "material": true,
+                      "recommendation": "Define, document, and test structured recovery conflict reasons for Git-busy and stale-preview responses, then bind each UI action to that typed reason and invalidate confirmation whenever a fresh preview is required."
+                    }
+                  ],
+                  "summary": "Revise the plan to expose stable recovery eligibility and conflict classifications before implementing the dashboard flow."
+                },
+                "started_at": "2026-08-15T15:04:10Z"
+              },
+              "final_plan": {
+                "completed_at": "2026-08-15T15:09:08Z",
+                "git_after": {
+                  "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-1",
+                  "head_commit": "f50b1571672da4a7c308d47918746eac3931bfaa",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-1",
+                  "head_commit": "f50b1571672da4a7c308d47918746eac3931bfaa",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Represent the missing-baseline topology as a dedicated daemon domain failure and persist an optional typed recovery kind in state-sync health so ordinary failed, stale, detached, bootstrap, and ineligible states remain distinguishable without parsing error text.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Introduce daemon-owned state-recovery conflict classifications that serialize apply-time HTTP 409 responses with stable git_busy and stale_preview reasons while leaving unrelated conflicts safely generic.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Extend the Dashboard health controller to request and retain a recovery preview only when authoritative health reports the missing-baseline recovery kind, and clear recovery state when the app, node, route context, eligibility, or preview identity changes.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Render the complete preview's target and repository identities, configured remote, local and remote heads, evidence and snapshot identifiers, live-only, remote-only, differing, and equal counts, bounded conflicting paths and truncation count, and neutral plain-language consequences of live and remote authority.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Provide initially unselected live and remote authority controls plus a separate deliberate confirmation bound to the exact displayed preview, enabling apply only after both actions and resetting confirmation whenever reviewed evidence or context changes.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Post only the explicit authority and unchanged complete preview to the existing apply route, treating git_busy as an explicit retry state that retains the preview but requires renewed confirmation and treating stale_preview as an explicit refresh state that discards the preview, authority, and confirmation before another apply.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "After a successful daemon apply, settle and refetch authoritative state-sync health, preserve the success panel across that refresh, and display the cleared error, baseline creation, resulting published and local heads, recovery audit ref, manifest path, evidence identity, counts, authority, and returned detail.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Add focused daemon, API, and browser regressions for typed eligibility, eligible-only preview fetching, complete preview rendering, neutral authority controls, deliberate confirmation and invalidation, typed busy retry, stale refresh fencing, successful evidence retention, and post-apply health-error clearing without mutation on rejected requests.",
+                      "id": "P8"
+                    },
+                    {
+                      "description": "Update only the Dashboard and API intent pages and the existing missing-baseline runbook section for the typed eligibility and conflict contracts, explicit authority boundary, refresh and retry semantics, and retained recovery evidence.",
+                      "id": "P9"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "C1",
+                      "resolution": "P1 makes missing-baseline recovery a daemon-owned typed health condition, P3 gates preview inspection on that condition, and P8 covers the eligibility contract and eligible-only fetch behavior."
+                    },
+                    {
+                      "criticism_id": "C2",
+                      "resolution": "P2 defines stable git_busy and stale_preview 409 reasons, P6 binds each reason to safe retry or mandatory refresh behavior with confirmation invalidation, and P8-P9 cover and document the contract."
+                    }
+                  ],
+                  "summary": "Make the exceptional missing-baseline condition safely actionable from the Dashboard by exposing daemon-owned recovery eligibility and conflict reasons, then adding a neutral preview-and-confirm flow that never chooses authority for the user, preserves the complete stale-fenced evidence, and shows authoritative health clearing and audit results after recovery without weakening ordinary fail-closed synchronization."
+                },
+                "started_at": "2026-08-15T15:07:02Z"
+              },
+              "implementation": {
+                "completed_at": "2026-08-15T15:27:30Z",
+                "execution": {
+                  "checklist": [
+                    {
+                      "evidence": "Added StateSyncMissingBaseline and optional serialized StateSyncRecoveryKind::MissingBaseline health evidence; success, generic failures, and unconfigured state clear eligibility without parsing text.",
+                      "id": "P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added daemon StateRecoveryConflictReason classifications and API error.reason values git_busy and stale_preview while generic errors omit reason.",
+                      "id": "P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added a dedicated Dashboard recovery controller gated only by authoritative failed health with recovery_kind missing_baseline; target, node, scope, route, eligibility, and preview changes reset review state.",
+                      "id": "P3",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Dashboard renders target/repository/remote identities, local and remote heads, snapshots/evidence, all four counts, bounded conflicts/truncation, and neutral live/remote consequences.",
+                      "id": "P4",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Authority starts unselected; an exact-evidence confirmation is separately required, invalidates on authority/evidence/context changes, and gates apply.",
+                      "id": "P5",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Browser posts only explicit authority and the unchanged complete preview; git_busy retains evidence but clears confirmation, while stale_preview clears preview, authority, and confirmation until explicit refresh.",
+                      "id": "P6",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Successful apply settles authoritative state-sync health, refreshes Dashboard without losing the success panel, and displays cleared health, baseline creation, heads, audit ref, manifest, evidence identity, counts, authority, and detail.",
+                      "id": "P7",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added daemon health/domain tests, API stale/busy/no-mutation/success/health-clearing coverage, and browser eligible-only fetch, complete render, neutral selection, confirmation invalidation, conflict recovery, exact payload, and success evidence tests.",
+                      "id": "P8",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Updated only Dashboard intent, API intent, and the existing missing-baseline fleet runbook section for the new surface contracts.",
+                      "id": "P9",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "rustfmt --edition 2024 --check src/process/runner.rs src/process/runner/state_sync_health.rs src/process/runner/tests.rs src/process/supervisor/errors/mod.rs src/surfaces/web_server/http/events.rs src/surfaces/web_server/project_routes/projects.rs src/surfaces/web_server/support/errors.rs src/surfaces/web_server/tests/git_changes.rs src/tools/host/git_sync/recovery/mod.rs src/tools/host/git_sync/recovery/service.rs src/tools/host/git_sync/service.rs src/tools/host/git_sync/tests/recovery.rs src/tools/host/source_promotion/git_support.rs src/tools/host/state_sync_health.rs src/tools/host/state_sync_health/tests.rs -> passed",
+                    "cargo check -> passed",
+                    "cargo test --lib tools::host::git_sync::tests::recovery -- --test-threads=1 -> 15 passed, 0 failed",
+                    "cargo test --lib state_sync -- --test-threads=1 -> 15 passed, 0 failed",
+                    "cargo test --lib state_recovery -- --test-threads=1 -> 3 passed, 0 failed",
+                    "node --test tests/web_dashboard_attention.test.js -> 9 passed, 0 failed",
+                    "cargo run --manifest-path xtask/Cargo.toml -- test-browser -> 199 passed, 0 failed, 27 skipped because no Playwright Chromium build is available",
+                    "cargo test -> 840 passed, 1 failed, 6 ignored; unchanged baseline failure: prompts::tests::agent_prompts_keep_only_task_specific_contracts reports implementation_planning/plan.md is too prescriptive at 95 words; git diff --exit-code -- src/prompts passed",
+                    "git diff --check -> passed"
+                  ]
+                },
+                "report": "Implemented typed missing-baseline recovery eligibility and typed git_busy/stale_preview conflicts; added the neutral Dashboard preview, explicit authority plus exact-preview confirmation, safe retry/refresh fencing, successful health clearing and retained recovery evidence; updated focused intent/runbook documentation. Focused Rust/API/browser verification passes. The full Rust unit gate has one unchanged baseline prompt-length failure, with 840 passing and 6 ignored tests.",
+                "started_at": "2026-08-15T15:09:08Z"
+              },
+              "phase": "implement",
+              "phase_started_at": "2026-08-15T15:09:08Z",
+              "proposal": {
+                "completed_at": "2026-08-15T15:04:10Z",
+                "git_after": {
+                  "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-1",
+                  "head_commit": "f50b1571672da4a7c308d47918746eac3931bfaa",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-1",
+                  "head_commit": "f50b1571672da4a7c308d47918746eac3931bfaa",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Extend the dashboard state-sync health flow to discover and retain an eligible daemon recovery preview for the missing-baseline condition while keeping ordinary degraded, stale, detached, and ineligible states unchanged.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Render the preview's target and repository identities, configured remote, local and remote heads, evidence and snapshot identifiers, all four path counts, bounded differing paths, truncation count, and plain-language consequences for live and remote authority.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Add unselected live and remote authority controls and a separate deliberate confirmation gate bound to the currently displayed complete preview, resetting both whenever the preview is refreshed, replaced, rejected, or the dashboard context changes.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Submit only the chosen authority and unchanged complete preview to the daemon apply endpoint, and handle Git-busy and stale-preview HTTP 409 responses as recoverable states with explicit fresh-preview and retry actions that require renewed review and confirmation.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "On successful apply, reconcile daemon-owned state-sync health and refresh the dashboard while preserving a success summary that displays the cleared error, created baseline, resulting local and remote heads, audit recovery ref, manifest path, counts, and returned recovery detail.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Add focused browser regressions for complete preview rendering, neutral authority presentation, deliberate confirmation, confirmation invalidation, busy and stale recovery actions, successful evidence rendering, and post-apply health refresh behavior.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Extend API regressions around the existing routes to cover complete-preview enforcement, Git-busy and stale 409 rejection without mutation, successful recovery evidence, and clearing of the prior state-sync health failure.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Update only the dashboard and API intent pages and the existing missing-baseline runbook section to document the new browser recovery contract, its explicit authority boundary, conflict refresh behavior, and retained audit evidence.",
+                      "id": "P8"
+                    }
+                  ],
+                  "summary": "Add a recovery panel to the dashboard's degraded state-sync health experience that uses the existing daemon preview and apply endpoints to make the exceptional missing-baseline condition understandable and safely actionable without weakening fail-closed synchronization: it will show the complete bounded comparison and consequences of each authority choice, require an unselected explicit choice plus deliberate confirmation, invalidate reviewed evidence on conflicts, and retain the successful heads, audit ref, manifest, and health-clearing evidence."
+                },
+                "started_at": "2026-08-15T15:02:31Z"
+              },
+              "schema_version": 2,
+              "started_at": "2026-08-15T15:02:31Z",
+              "state": "completed",
+              "updated_at": "2026-08-15T15:27:30Z"
+            },
+            "implementation_report": "Implemented typed missing-baseline recovery eligibility and typed git_busy/stale_preview conflicts; added the neutral Dashboard preview, explicit authority plus exact-preview confirmation, safe retry/refresh fencing, successful health clearing and retained recovery evidence; updated focused intent/runbook documentation. Focused Rust/API/browser verification passes. The full Rust unit gate has one unchanged baseline prompt-length failure, with 840 passing and 6 ignored tests.",
+            "implementation_reported_at": "2026-08-15T15:27:30Z",
+            "prompt": "Implement a dashboard recovery workflow for the exceptional project state-synchronization condition where the persisted three-way baseline is missing while both non-bootstrap live state and origin/refine/state exist. Reuse the existing daemon-backed GET /api/project/state-recovery/preview and POST /api/project/state-recovery/apply endpoints, including the complete-preview stale fence. Present the target and remote identities and heads, bounded conflict details, live-only/remote-only/differing/equal counts, and clear consequences of choosing live or remote authority. Never infer, recommend, or preselect authority. Require deliberate confirmation before apply. Keep browser code thin: all Git and state mutations must remain daemon-owned, and the existing fail-closed startup and synchronization behavior must not be weakened. Preserve and display the resulting audit ref, recovery manifest, published/baseline heads, and other recovery evidence. Treat Git-busy and stale-preview HTTP 409 responses as recoverable conditions with explicit refresh and retry actions that require a fresh preview and confirmation as appropriate. After a successful apply, refresh state-sync health and show that the error cleared together with the resulting heads and evidence. Add focused web and API regression coverage for preview rendering, deliberate confirmation, busy and stale rejection, successful recovery, and health-error clearing. Update affected intent or runbook documentation only where this dashboard/API surface contract changes.",
+            "quality_checked_at": "2026-08-15T15:43:16Z",
+            "quality_details": {
+              "candidate_commit": "bedb1a5503f65a8fe6a54dd41c7d0bb9930f27a4",
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T01FHPGTHYNTM3B51W000-round-1",
+              "diagnostics": [
+                "{\"ok\":true,\"summary\":\"Candidate satisfies the Goal and relevant Dashboard/API intent contracts. Focused checks passed; no live production recovery was attempted from the isolated candidate worktree.\",\"results\":[{\"test\":\"The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\",\"status\":\"passed\",\"evidence\":\"Exit 0. cargo check passed; 15 Git-recovery tests, 15 state-sync tests, 3 state-recovery API/CLI tests, and 11 Dashboard tests passed with zero failures or skips; targeted rustfmt and cumulative git diff checks passed.\",\"command\":\"set -euo pipefail\\nrustfmt --edition 2024 --check src/process/runner.rs src/process/runner/state_sync_health.rs src/process/runner/tests.rs src/process/supervisor/errors/mod.rs src/surfaces/web_server/http/events.rs src/surfaces/web_server/project_routes/projects.rs src/surfaces/web_server/runtime.rs src/surfaces/web_server/support/errors.rs src/surfaces/web_server/tests/git_changes.rs src/tools/host/git_sync/recovery/mod.rs src/tools/host/git_sync/recovery/service.rs src/tools/host/git_sync/service.rs src/tools/host/git_sync/tests/recovery.rs src/tools/host/source_promotion/git_support.rs src/tools/host/state_sync_health.rs src/tools/host/state_sync_health/tests.rs\\ncargo check\\ncargo test --lib tools::host::git_sync::tests::recovery -- --test-threads=1\\ncargo test --lib state_sync -- --test-threads=1\\ncargo test --lib state_recovery -- --test-threads=1\\nnode --test tests/web_dashboard_attention.test.js\\ngit diff --check f50b1571672da4a7c308d47918746eac3931bfaa..HEAD\"}]}",
+                "Observed supervised process proc-1786808590215-1755700-272 exited 0. stdout: unconfigured_remote_are_neutral ... ok\ntest tools::host::state_sync_health::tests::failure_episode_is_redacted_and_recovery_is_transition_based ... ok\ntest tools::host::state_sync_health::tests::freshness_derivation_crosses_the_wall_clock_threshold ... ok\ntest tools::host::state_sync_health::tests::missing_baseline_recovery_kind_is_typed_and_cleared_by_success ... ok\n\ntest result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 832 filtered out; finished in 1.59s\n\n\nrunning 3 tests\ntest surfaces::cli::tests::parsing::project_state_recovery_requires_a_preview_file_and_explicit_authority ... ok\ntest surfaces::web_server::tests::git_changes::web_server_state_recovery_preview_and_apply_use_the_shared_service ... ok\ntest surfaces::web_server::tests::git_changes::web_server_state_recovery_routes_are_thin_and_structured ... ok\n\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 844 filtered out; finished in 0.33s\n\n✔ failed Goal recovery attention links to the selected reporter and node scope (4.187252ms)\n✔ degraded state sync labels aggregate counts and exposes freshness metadata (2.165272ms)\n✔ dashboard state sync health renders below the workflow status grid (0.269089ms)\n✔ browser SSE reconciles state sync surfaces from authoritative endpoints (0.383265ms)\n✔ recovery preview renders complete evidence with neutral unselected authority (1.686529ms)\n✔ authority and exact-preview confirmation are separate and invalidated safely (2.031724ms)\n✔ busy retains preview while stale rejection requires a fresh review (1.203045ms)\n✔ recovery preview is fetched only for typed eligible health (2.602637ms)\n✔ successful recovery retains evidence and renders authoritative health clearing (1.199773ms)\n✔ successful apply paints retained evidence before the health refetch settles (1.675485ms)\n✔ late apply completion cannot restore recovery state after route context changes (1.013308ms)\nℹ tests 11\nℹ suites 0\nℹ pass 11\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 120.383459 stderr: Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.08s\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)"
+              ],
+              "evaluation_scope": "isolated_candidate",
+              "operation_id": "1a00615123d1aca347",
+              "results": [
+                {
+                  "command": "set -euo pipefail\nrustfmt --edition 2024 --check src/process/runner.rs src/process/runner/state_sync_health.rs src/process/runner/tests.rs src/process/supervisor/errors/mod.rs src/surfaces/web_server/http/events.rs src/surfaces/web_server/project_routes/projects.rs src/surfaces/web_server/runtime.rs src/surfaces/web_server/support/errors.rs src/surfaces/web_server/tests/git_changes.rs src/tools/host/git_sync/recovery/mod.rs src/tools/host/git_sync/recovery/service.rs src/tools/host/git_sync/service.rs src/tools/host/git_sync/tests/recovery.rs src/tools/host/source_promotion/git_support.rs src/tools/host/state_sync_health.rs src/tools/host/state_sync_health/tests.rs\ncargo check\ncargo test --lib tools::host::git_sync::tests::recovery -- --test-threads=1\ncargo test --lib state_sync -- --test-threads=1\ncargo test --lib state_recovery -- --test-threads=1\nnode --test tests/web_dashboard_attention.test.js\ngit diff --check f50b1571672da4a7c308d47918746eac3931bfaa..HEAD",
+                  "evidence": "Observed supervised process proc-1786808590215-1755700-272 exited 0. stdout: unconfigured_remote_are_neutral ... ok\ntest tools::host::state_sync_health::tests::failure_episode_is_redacted_and_recovery_is_transition_based ... ok\ntest tools::host::state_sync_health::tests::freshness_derivation_crosses_the_wall_clock_threshold ... ok\ntest tools::host::state_sync_health::tests::missing_baseline_recovery_kind_is_typed_and_cleared_by_success ... ok\n\ntest result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 832 filtered out; finished in 1.59s\n\n\nrunning 3 tests\ntest surfaces::cli::tests::parsing::project_state_recovery_requires_a_preview_file_and_explicit_authority ... ok\ntest surfaces::web_server::tests::git_changes::web_server_state_recovery_preview_and_apply_use_the_shared_service ... ok\ntest surfaces::web_server::tests::git_changes::web_server_state_recovery_routes_are_thin_and_structured ... ok\n\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 844 filtered out; finished in 0.33s\n\n✔ failed Goal recovery attention links to the selected reporter and node scope (4.187252ms)\n✔ degraded state sync labels aggregate counts and exposes freshness metadata (2.165272ms)\n✔ dashboard state sync health renders below the workflow status grid (0.269089ms)\n✔ browser SSE reconciles state sync surfaces from authoritative endpoints (0.383265ms)\n✔ recovery preview renders complete evidence with neutral unselected authority (1.686529ms)\n✔ authority and exact-preview confirmation are separate and invalidated safely (2.031724ms)\n✔ busy retains preview while stale rejection requires a fresh review (1.203045ms)\n✔ recovery preview is fetched only for typed eligible health (2.602637ms)\n✔ successful recovery retains evidence and renders authoritative health clearing (1.199773ms)\n✔ successful apply paints retained evidence before the health refetch settles (1.675485ms)\n✔ late apply completion cannot restore recovery state after route context changes (1.013308ms)\nℹ tests 11\nℹ suites 0\nℹ pass 11\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 120.383459 stderr: Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.08s\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e) Agent report: Exit 0. cargo check passed; 15 Git-recovery tests, 15 state-sync tests, 3 state-recovery API/CLI tests, and 11 Dashboard tests passed with zero failures or skips; targeted rustfmt and cumulative git diff checks passed.",
+                  "exit_code": 0,
+                  "process_id": "proc-1786808590215-1755700-272",
+                  "status": "passed",
+                  "test": "The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks."
+                }
+              ],
+              "source_candidate_commit": "bedb1a5503f65a8fe6a54dd41c7d0bb9930f27a4"
+            },
+            "quality_message": "All Quality tests passed with observed supervised evidence.",
+            "quality_state": "passed",
+            "reporter": "Buddy Williams",
+            "round": 1
+          },
+          {
+            "assignee": "Buddy Williams",
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "0e0de3d43fe9284156e9f951dc8c981c1f996fd7",
+                "context_digest": "be730c19a3375c940c54f560f4d9954216de40f4d4683c501211cbc2189bba6b",
+                "context_version": 1,
+                "goal_id": "00000T01FHPGTHYNTM3B51W000",
+                "implementation_branch": "refine/00000T01FHPGTHYNTM3B51W000/round-2",
+                "round_idx": 1,
+                "target_branch": "main"
+              },
+              "criticism": {
+                "completed_at": "2026-08-15T16:27:40Z",
+                "git_after": {
+                  "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-2",
+                  "head_commit": "0e0de3d43fe9284156e9f951dc8c981c1f996fd7",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-2",
+                  "head_commit": "0e0de3d43fe9284156e9f951dc8c981c1f996fd7",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "findings": [
+                    {
+                      "checklist_item_ids": [
+                        "P1",
+                        "P8"
+                      ],
+                      "description": "The checklist says to carry forward the reviewed regressions but does not require executing the Latest Round's targeted formatting and cumulative diff checks or explicitly proving that the recovered current-main delta preserves the complete reviewed base-to-candidate behavior without unrelated drift.",
+                      "id": "C1",
+                      "material": true,
+                      "recommendation": "Revise P8 or add a verification item that runs the focused deterministic suites and targeted formatting, compares the recovered cumulative delta with the reviewed base-to-candidate delta, and checks the cumulative current-main diff for unrelated changes while reporting baseline failures and browser skips separately."
+                    }
+                  ],
+                  "summary": "Add an explicit recovery-fidelity and verification step before implementation."
+                },
+                "started_at": "2026-08-15T16:25:23Z"
+              },
+              "failure": {
+                "category": "provider",
+                "failed_at": "2026-08-15T16:36:58Z",
+                "message": "failed to read Goal Agent command channel /home/buddy/projects/refine/run/8082/processes/goal-agent-7cb2a161-ab43-45ed-b595-8b1fd41629df.commands.jsonl: No such file or directory (os error 2)",
+                "phase": "implement"
+              },
+              "final_plan": {
+                "completed_at": "2026-08-15T16:29:15Z",
+                "git_after": {
+                  "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-2",
+                  "head_commit": "0e0de3d43fe9284156e9f951dc8c981c1f996fd7",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-2",
+                  "head_commit": "0e0de3d43fe9284156e9f951dc8c981c1f996fd7",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Selectively reapply the reviewed original-base-to-candidate semantic delta onto Round 2 while preserving unrelated current-main behavior and leaving the Round 1 branch, worktree, commits, logs, failed attempts, and Quality evidence unchanged.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Restore the dedicated missing-baseline domain failure and optional typed state-sync recovery kind, including conditional settlement so success, generic failure, unconfigured state, and unrelated failure episodes cannot be misclassified or cleared.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Restore daemon-owned git_busy and stale_preview recovery conflict classifications through the existing preview and apply API contract while preserving unchanged-complete-preview fencing and generic handling for unrelated conflicts.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Restore the cohesive Dashboard recovery controller so it fetches previews only for authoritative typed eligibility and invalidates recovery state across target, node, route, scope, eligibility, preview identity, and late-response context changes.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Restore neutral rendering of target and repository identities, configured remote, heads, snapshots, evidence identity, bounded conflict details, all comparison counts, and the consequences of live or remote authority without inference, recommendation, or preselection.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Restore the separate explicit authority choice and exact-preview confirmation gate, with renewed confirmation after Git-busy rejection and mandatory preview, authority, and confirmation refresh after stale-preview rejection.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Restore successful recovery reconciliation so authoritative state-sync health is settled and refreshed while the Dashboard retains the cleared error, baseline, resulting heads, audit ref, manifest, evidence identity, counts, authority, and detail.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Carry forward the focused Rust daemon and API regressions plus browser regressions for eligibility, complete rendering, deliberate confirmation, busy and stale fencing, rejection without mutation, context races, successful evidence retention, and health clearing.",
+                      "id": "P8"
+                    },
+                    {
+                      "description": "Carry forward only the affected Dashboard intent, API intent, and existing missing-baseline fleet runbook updates that document typed eligibility, conflict reasons, explicit authority boundaries, refresh and retry semantics, and retained audit evidence.",
+                      "id": "P9"
+                    },
+                    {
+                      "description": "Prove that the recovered current-main delta preserves the complete reviewed base-to-candidate behavior without unrelated drift, then run the focused deterministic suites and targeted formatting and cumulative diff checks while reporting unrelated baseline failures and unavailable-browser skips separately.",
+                      "id": "P10"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "C1",
+                      "resolution": "P10 adds the requested recovery-fidelity comparison, focused deterministic execution, targeted formatting and cumulative diff checks, and separate reporting for baseline failures and browser skips."
+                    }
+                  ],
+                  "summary": "Recover the complete Quality-reviewed missing-baseline dashboard recovery behavior from the retained Round 1 candidate onto the clean current-main Round 2 branch by selectively replaying the original-base-to-candidate semantic delta, preserving unrelated current-main workflow and updater behavior and all historical evidence; the recovered result will retain daemon-owned eligibility and mutation boundaries, typed conflict fencing, deliberate unselected authority confirmation, durable audit evidence, focused regressions, and only the affected intent and runbook contracts, with explicit proof that the current-main result matches the reviewed behavior without unrelated drift."
+                },
+                "started_at": "2026-08-15T16:27:40Z"
+              },
+              "phase": "implement",
+              "phase_started_at": "2026-08-15T16:29:16Z",
+              "proposal": {
+                "completed_at": "2026-08-15T16:25:23Z",
+                "git_after": {
+                  "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-2",
+                  "head_commit": "0e0de3d43fe9284156e9f951dc8c981c1f996fd7",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-2",
+                  "head_commit": "0e0de3d43fe9284156e9f951dc8c981c1f996fd7",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Reapply the reviewed base-to-candidate semantic delta onto Round 2 while preserving current-main behavior and retaining the Round 1 branch, worktree, commits, logs, failed attempts, and Quality evidence unchanged.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Restore the dedicated missing-baseline domain failure and optional typed state-sync recovery kind, including Quality's conditional settlement so success, generic failure, unconfigured state, and unrelated failure episodes cannot be misclassified or cleared.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Restore daemon-owned git_busy and stale_preview recovery conflict classifications through the existing preview and apply API contract while preserving unchanged-complete-preview fencing and generic handling for unrelated conflicts.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Restore the cohesive Dashboard recovery controller so it fetches previews only for authoritative typed eligibility and invalidates recovery state across target, node, route, scope, eligibility, preview identity, and late-response context changes.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Restore neutral rendering of target and repository identities, configured remote, heads, snapshots, evidence identity, bounded conflict details, all comparison counts, and the consequences of live or remote authority without inference, recommendation, or preselection.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Restore the separate explicit authority choice and exact-preview confirmation gate, with renewed confirmation after Git-busy rejection and mandatory preview, authority, and confirmation refresh after stale-preview rejection.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Restore successful recovery reconciliation so authoritative state-sync health is settled and refreshed while the Dashboard retains the cleared error, baseline, resulting heads, audit ref, manifest, evidence identity, counts, authority, and detail.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Carry forward the focused Rust daemon and API regressions plus browser regressions for eligibility, complete rendering, deliberate confirmation, busy and stale fencing, rejection without mutation, context races, successful evidence retention, and health clearing.",
+                      "id": "P8"
+                    },
+                    {
+                      "description": "Carry forward only the affected Dashboard intent, API intent, and existing missing-baseline fleet runbook updates that document typed eligibility, conflict reasons, explicit authority boundaries, refresh and retry semantics, and retained audit evidence.",
+                      "id": "P9"
+                    }
+                  ],
+                  "summary": "Recover the complete Quality-reviewed missing-baseline dashboard recovery behavior from the retained Round 1 candidate onto the clean Round 2 branch based on the original-base, candidate, and current-main comparison, preserving current main's unrelated workflow and updater changes and leaving all historical branches, worktrees, commits, logs, attempts, and review evidence untouched; the recovered behavior will retain daemon-owned eligibility and mutation boundaries, explicit authority and stale-preview fencing, auditable success evidence, focused regression coverage, and only the affected intent and runbook contracts."
+                },
+                "started_at": "2026-08-15T16:23:52Z"
+              },
+              "schema_version": 2,
+              "started_at": "2026-08-15T16:23:52Z",
+              "state": "failed",
+              "updated_at": "2026-08-15T16:36:58Z"
+            },
+            "prompt": "Recover the completed and Quality-reviewed Round 1 dashboard missing-baseline recovery behavior onto current main after the Refine runtime shutdown and generic failed-state recovery admission cleared the top-level candidate pointer. Preserve Round 1, its branch, worktree, commits, logs, failed attempts, and Quality evidence. Use original base f50b1571672da4a7c308d47918746eac3931bfaa, retained reviewed candidate bedb1a5503f65a8fe6a54dd41c7d0bb9930f27a4, branch refine/00000T01FHPGTHYNTM3B51W000/round-1, and current main as evidence. Compare original base, retained candidate, and current main; selectively reapply the reviewed behavior onto this clean Round 2 worktree while preserving unrelated current-main behavior. Do not blind-merge, rewrite, clean, or amend historical evidence. Preserve the original Goal contract, Plan-Criticize-Revise-Implement workflow, thin daemon-owned mutation boundary, typed eligibility and conflict fencing, deliberate authority confirmation, retained audit evidence, focused Rust API and browser regression coverage, and affected intent/runbook documentation. Run focused deterministic checks, targeted formatting and cumulative diff checks; report unrelated baseline failures or missing-browser skips separately. Do not merge, push, approve, or bypass Quality or Governance.",
+            "reporter": "Buddy Williams",
+            "round": 2
+          },
+          {
+            "assignee": "Buddy Williams",
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "id": "guidance-1",
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                },
+                {
+                  "enabled": true,
+                  "id": "guidance-2",
+                  "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+                  "name": "Cohesive code files",
+                  "rule": "Apply whenever an agent adds or changes code files in any language."
+                }
+              ],
+              "code_files_changed": true,
+              "context_version": 1,
+              "recorded_at": "2026-08-15T16:55:01Z",
+              "skipped": []
+            },
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "0e0de3d43fe9284156e9f951dc8c981c1f996fd7",
+                "context_digest": "41e33084fef1c75b38dbc78ad64b27456971f21db6d6f77d06f8e25caf64757a",
+                "context_version": 1,
+                "goal_id": "00000T01FHPGTHYNTM3B51W000",
+                "implementation_branch": "refine/00000T01FHPGTHYNTM3B51W000/round-3",
+                "round_idx": 2,
+                "target_branch": "main"
+              },
+              "completed_at": "2026-08-15T16:55:01Z",
+              "criticism": {
+                "completed_at": "2026-08-15T16:45:08Z",
+                "git_after": {
+                  "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-3",
+                  "head_commit": "0e0de3d43fe9284156e9f951dc8c981c1f996fd7",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-3",
+                  "head_commit": "0e0de3d43fe9284156e9f951dc8c981c1f996fd7",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "summary": "The proposed plan is complete, safely scoped, and connected to the retained reviewed behavior."
+                },
+                "started_at": "2026-08-15T16:43:08Z"
+              },
+              "final_plan": {
+                "completed_at": "2026-08-15T16:45:56Z",
+                "git_after": {
+                  "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-3",
+                  "head_commit": "0e0de3d43fe9284156e9f951dc8c981c1f996fd7",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-3",
+                  "head_commit": "0e0de3d43fe9284156e9f951dc8c981c1f996fd7",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Compare current main, the original and Round 2 bases, and both retained candidates, then selectively reapply the complete reviewed semantic delta with patch-fidelity and cumulative-scope evidence while preserving historical evidence and unrelated current-main behavior.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Restore the dedicated missing-baseline domain failure and optional typed state-sync recovery kind with atomic target-bound settlement so success, generic failure, unconfigured state, and unrelated failure episodes remain correctly classified.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Restore daemon-owned git_busy and stale_preview conflict reasons through the existing preview and apply API contract while preserving complete-preview fencing and safe generic handling for other conflicts.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Restore the cohesive Dashboard recovery controller so preview fetching is gated by authoritative typed eligibility and recovery state is invalidated across target, node, route, scope, eligibility, preview identity, and late-response context changes.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Restore neutral rendering of target and repository identities, configured remote, heads, snapshots, evidence identity, bounded conflict details, all comparison counts, and the consequences of live or remote authority without inference, recommendation, or preselection.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Restore the separate explicit authority choice and exact-preview confirmation gate, requiring renewed confirmation after Git-busy rejection and a fresh preview, authority choice, and confirmation after stale-preview rejection.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Restore successful recovery reconciliation so authoritative state-sync health clears atomically for the intended target while the Dashboard retains the baseline, resulting heads, audit ref, manifest, evidence identity, counts, authority, detail, and cleared-error status.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Carry forward the focused daemon, API, and browser regressions covering typed eligibility, rejection without mutation, complete rendering, deliberate confirmation, busy and stale fencing, late-response races, retained success evidence, and health clearing.",
+                      "id": "P8"
+                    },
+                    {
+                      "description": "Carry forward only the affected Dashboard intent, API intent, and existing missing-baseline runbook updates while keeping each changed code file within its cohesive established responsibility.",
+                      "id": "P9"
+                    }
+                  ],
+                  "summary": "Recover the complete reviewed missing-baseline dashboard workflow onto the clean Round 3 branch by selectively carrying forward the retained implementation and correction while preserving unrelated current-main behavior and every historical branch, worktree, commit, log, failure, operation, and review record; the result will keep recovery eligibility and all Git and state mutation daemon-owned, require a neutral exact-preview authority decision, fence stale or late activity, retain auditable success evidence, and limit documentation and code structure changes to the established product boundaries."
+                },
+                "started_at": "2026-08-15T16:45:08Z"
+              },
+              "implementation": {
+                "completed_at": "2026-08-15T16:55:01Z",
+                "execution": {
+                  "checklist": [
+                    {
+                      "evidence": "Compared original base f50b1571, current-main/Round 2 base 0e0de3d4, reviewed Round 1 candidate bedb1a55, retained Round 2 candidate 1da0708a, and both two-patch series. Cherry-picked only e82202df and 1da0708a into Round 3 as b0eace69 and b003a0de. Both range-diffs map every patch with '=', git diff --exit-code 1da0708a..HEAD is empty, and the cumulative scope is the same 25 Goal paths with 1096 insertions and 52 deletions. Round 1, Round 2, and main stayed clean at their recorded heads.",
+                      "id": "P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Restored the dedicated missing-baseline failure, optional typed recovery kind, and target/node-bound atomic settlement from the retained reviewed tree. The 15 state_sync tests passed, including typed eligibility, target/node binding, unrelated failure preservation, and recovery clearing.",
+                      "id": "P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Restored daemon-owned git_busy and stale_preview classifications, unchanged complete-preview fencing, and generic conflict fallback. The 15 Git recovery tests and 3 state-recovery API/CLI tests passed with no failures.",
+                      "id": "P3",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Restored the dedicated 337-line Dashboard recovery controller, typed-eligibility-only preview fetch, context invalidation, and late-response fencing. All 11 focused Dashboard tests passed, including eligible-only fetching and late apply completion after route changes.",
+                      "id": "P4",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Restored complete neutral preview rendering for identities, remote, heads, snapshots, evidence, counts, bounded conflicts, truncation, and consequences without recommendation or preselection. Focused Dashboard rendering tests passed.",
+                      "id": "P5",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Restored separate unselected authority choice and exact-preview confirmation, renewed confirmation after git_busy, and mandatory preview/authority/confirmation refresh after stale_preview. Focused Dashboard confirmation and conflict tests passed.",
+                      "id": "P6",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Restored target-bound health settlement and retained success evidence for baseline, heads, audit ref, manifest, evidence identity, counts, authority, detail, and cleared status. State-sync, API, and Dashboard success/health-clearing regressions passed.",
+                      "id": "P7",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Carried forward all focused daemon, API, and browser regressions byte-for-byte from retained Round 2. Verification passed 15 Git recovery tests, 15 state-sync tests, 3 state-recovery API/CLI tests, and 11 focused Dashboard tests; the broader browser harness passed 201 with 27 environment skips and no failures.",
+                      "id": "P8",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Carried forward only the affected Dashboard intent page, API intent page, and existing fleet runbook section. The new recovery controller remains a cohesive 337-line module; no unrelated documentation or structural edits were added in Round 3.",
+                      "id": "P9",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "git range-diff f50b1571672da4a7c308d47918746eac3931bfaa..bedb1a5503f65a8fe6a54dd41c7d0bb9930f27a4 0e0de3d43fe9284156e9f951dc8c981c1f996fd7..HEAD -> exit 0; both patches mapped with '='",
+                    "git range-diff 0e0de3d43fe9284156e9f951dc8c981c1f996fd7..1da0708ae7bb13179e3388ce29341ab6f8703fa0 0e0de3d43fe9284156e9f951dc8c981c1f996fd7..HEAD -> exit 0; both patches mapped with '='",
+                    "git diff --exit-code 1da0708ae7bb13179e3388ce29341ab6f8703fa0..HEAD -> exit 0; retained Round 2 and Round 3 candidate trees are identical",
+                    "git diff --check 0e0de3d43fe9284156e9f951dc8c981c1f996fd7..HEAD -> exit 0",
+                    "rustfmt --edition 2024 --check src/process/runner.rs src/process/runner/state_sync_health.rs src/process/runner/tests.rs src/process/supervisor/errors/mod.rs src/surfaces/web_server/http/events.rs src/surfaces/web_server/project_routes/projects.rs src/surfaces/web_server/runtime.rs src/surfaces/web_server/support/errors.rs src/surfaces/web_server/tests/git_changes.rs src/tools/host/git_sync/recovery/mod.rs src/tools/host/git_sync/recovery/service.rs src/tools/host/git_sync/service.rs src/tools/host/git_sync/tests/recovery.rs src/tools/host/source_promotion/git_support.rs src/tools/host/state_sync_health.rs src/tools/host/state_sync_health/tests.rs -> exit 0",
+                    "cargo check -> exit 0",
+                    "cargo test --lib tools::host::git_sync::tests::recovery -- --test-threads=1 -> exit 0; 15 passed, 0 failed",
+                    "cargo test --lib state_sync -- --test-threads=1 -> exit 0; 15 passed, 0 failed",
+                    "cargo test --lib state_recovery -- --test-threads=1 -> exit 0; 3 passed, 0 failed",
+                    "node --test tests/web_dashboard_attention.test.js -> exit 0; 11 passed, 0 failed, 0 skipped",
+                    "cargo run --manifest-path xtask/Cargo.toml -- test-browser -> exit 0; 201 passed, 0 failed, 27 skipped because no Playwright Chromium build is available",
+                    "cargo test -> exit 1; 848 passed, 3 failed, 6 ignored. Unrelated failures: prompt plan.md is 95 words, install.md documents unknown refine system update, and release-worker DirectoryNotEmpty under the concurrent full suite",
+                    "cargo test --lib prompts::tests::agent_prompts_keep_only_task_specific_contracts -- --exact --test-threads=1 -> exit 101; unchanged current-main baseline failure: implementation_planning/plan.md is too prescriptive at 95 words",
+                    "cargo test --lib surfaces::cli::catalog::tests::operational_runbooks_use_current_cli_and_layout_contracts -- --exact --test-threads=1 -> exit 101; unchanged current-main baseline failure: docs/runbooks/install.md documents unknown command refine system update",
+                    "cargo test --lib surfaces::cli::tests::system::release_workers::system_start_refuses_jira_retry_when_orphan_exit_cannot_be_confirmed -- --exact --test-threads=1 -> exit 0; 1 passed, confirming the full-suite DirectoryNotEmpty failure is concurrency-only",
+                    "git diff --exit-code 0e0de3d43fe9284156e9f951dc8c981c1f996fd7..HEAD -- src/prompts/mod.rs src/prompts/implementation_planning/plan.md docs/runbooks/install.md src/surfaces/cli/catalog.rs src/surfaces/cli/tests/system/release_workers.rs -> exit 0; all full-suite failure paths are outside the Goal delta",
+                    "git status --short --branch -> clean Round 3 branch at b003a0decf2bc2667cda876a601dcccf69c8006b"
+                  ]
+                },
+                "report": "Recovered the complete reviewed missing-baseline dashboard recovery semantic delta onto Round 3 as commits b0eace69 and b003a0de, preserving current-main behavior and all historical evidence. The Round 3 tree is identical to retained Round 2 candidate 1da0708a; focused Rust, API, Dashboard, formatting, and scope checks pass. The browser harness passed 201 tests and skipped 27 only because Playwright Chromium is unavailable. The full Rust gate reported 848 passed, 3 failed, and 6 ignored: two deterministic failures are on unchanged current-main prompt/runbook files, and the unrelated release-worker DirectoryNotEmpty failure passed when rerun alone.",
+                "started_at": "2026-08-15T16:45:56Z"
+              },
+              "phase": "implement",
+              "phase_started_at": "2026-08-15T16:45:56Z",
+              "proposal": {
+                "completed_at": "2026-08-15T16:43:08Z",
+                "git_after": {
+                  "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-3",
+                  "head_commit": "0e0de3d43fe9284156e9f951dc8c981c1f996fd7",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-3",
+                  "head_commit": "0e0de3d43fe9284156e9f951dc8c981c1f996fd7",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Compare current main, the original and Round 2 bases, and both retained candidates, then selectively reapply the complete reviewed semantic delta without altering historical evidence or unrelated current-main behavior.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Restore the dedicated missing-baseline domain failure and optional typed state-sync recovery kind with atomic target-bound settlement so success, generic failure, unconfigured state, and unrelated failure episodes remain correctly classified.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Restore daemon-owned git_busy and stale_preview conflict reasons through the existing preview and apply API contract while preserving complete-preview fencing and safe generic handling for other conflicts.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Restore the cohesive Dashboard recovery controller so preview fetching is gated by authoritative typed eligibility and recovery state is invalidated across target, node, route, scope, eligibility, preview identity, and late-response context changes.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Restore neutral rendering of target and repository identities, configured remote, heads, snapshots, evidence identity, bounded conflict details, all comparison counts, and the consequences of live or remote authority without inference, recommendation, or preselection.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Restore the separate explicit authority choice and exact-preview confirmation gate, requiring renewed confirmation after Git-busy rejection and a fresh preview, authority choice, and confirmation after stale-preview rejection.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Restore successful recovery reconciliation so authoritative state-sync health clears atomically for the intended target while the Dashboard retains the baseline, resulting heads, audit ref, manifest, evidence identity, counts, authority, detail, and cleared-error status.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Carry forward the focused daemon, API, and browser regressions covering typed eligibility, rejection without mutation, complete rendering, deliberate confirmation, busy and stale fencing, late-response races, retained success evidence, and health clearing.",
+                      "id": "P8"
+                    },
+                    {
+                      "description": "Carry forward only the affected Dashboard intent, API intent, and existing missing-baseline runbook updates while keeping each changed code file within its cohesive established responsibility.",
+                      "id": "P9"
+                    },
+                    {
+                      "description": "Demonstrate that the Round 3 cumulative delta faithfully matches the reviewed behavior without unrelated scope, and exercise the requested focused checks, targeted formatting, and cumulative diff checks with baseline failures or browser unavailability reported separately.",
+                      "id": "P10"
+                    }
+                  ],
+                  "summary": "Recover the complete Quality-reviewed missing-baseline dashboard workflow onto the clean Round 3 branch by selectively carrying forward the retained implementation and correction while preserving unrelated current-main behavior and every historical branch, worktree, commit, log, failure, operation, and review record; the result will keep recovery eligibility and all Git and state mutation daemon-owned, require a neutral exact-preview authority decision, fence stale or late activity, retain auditable success evidence, and limit documentation and code structure changes to the established product boundaries."
+                },
+                "started_at": "2026-08-15T16:41:45Z"
+              },
+              "schema_version": 2,
+              "started_at": "2026-08-15T16:41:45Z",
+              "state": "completed",
+              "updated_at": "2026-08-15T16:55:01Z"
+            },
+            "implementation_report": "Recovered the complete reviewed missing-baseline dashboard recovery semantic delta onto Round 3 as commits b0eace69 and b003a0de, preserving current-main behavior and all historical evidence. The Round 3 tree is identical to retained Round 2 candidate 1da0708a; focused Rust, API, Dashboard, formatting, and scope checks pass. The browser harness passed 201 tests and skipped 27 only because Playwright Chromium is unavailable. The full Rust gate reported 848 passed, 3 failed, and 6 ignored: two deterministic failures are on unchanged current-main prompt/runbook files, and the unrelated release-worker DirectoryNotEmpty failure passed when rerun alone.",
+            "implementation_reported_at": "2026-08-15T16:55:01Z",
+            "prompt": "Recover the completed missing-baseline dashboard recovery behavior through a fresh Round 3 after the Round 2 provider command-channel failure prevented durable candidate handoff. Preserve Round 1 and Round 2 branches, worktrees, commits, logs, failures, operation 1a0063c9f7123381, and all recorded Quality evidence without editing, cleaning, amending, or deleting them. Use current main 0e0de3d43fe9284156e9f951dc8c981c1f996fd7, original base f50b1571672da4a7c308d47918746eac3931bfaa, reviewed Round 1 candidate bedb1a5503f65a8fe6a54dd41c7d0bb9930f27a4, and the clean retained Round 2 branch refine/00000T01FHPGTHYNTM3B51W000/round-2 at 1da0708ae7bb13179e3388ce29341ab6f8703fa0 as evidence. Investigation found that Round 2 contains implementation e82202dfef7748c546d26bfd89c58c8c1c4afb0a plus retained Quality correction 1da0708ae7bb13179e3388ce29341ab6f8703fa0, and git range-diff maps those two patches exactly to Round 1 commits 166300c1a57665ed720954d8376f610df4e93973 and bedb1a5503f65a8fe6a54dd41c7d0bb9930f27a4; the Round 2 worktree is clean and the reviewed Goal paths match. Do not treat Round 2 commit labels as fresh durable Quality or Governance approval. In the clean Round 3 worktree, compare current main, both prior bases, and both retained candidates, then selectively reapply the complete reviewed semantic delta while preserving unrelated current-main behavior. Preserve the original Goal contract, finalized Plan-Criticize-Revise-Implement checklist, daemon-owned mutation boundary, typed missing-baseline eligibility, atomic target-bound health settlement, typed git_busy and stale_preview fencing, exact-preview deliberate unselected authority confirmation, late browser response fencing, retained audit evidence, focused Rust API and browser regressions, and only the affected intent and runbook documentation. Prove patch fidelity and cumulative scope, run focused deterministic checks plus targeted formatting and cumulative diff checks, and report unrelated baseline failures or unavailable-browser skips separately. Do not merge, push, approve, bypass Quality or Governance, or mutate historical recovery evidence.",
+            "reporter": "Buddy Williams",
+            "round": 3
+          },
+          {
+            "assignee": "Buddy Williams",
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "id": "guidance-1",
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                },
+                {
+                  "enabled": true,
+                  "id": "guidance-2",
+                  "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+                  "name": "Cohesive code files",
+                  "rule": "Apply whenever an agent adds or changes code files in any language."
+                }
+              ],
+              "code_files_changed": true,
+              "context_version": 1,
+              "recorded_at": "2026-08-15T19:23:41Z",
+              "skipped": []
+            },
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+                "context_digest": "cecefc453c8aa43a15280a342314254567892237f179d232ad3efd47a8f28e31",
+                "context_version": 1,
+                "goal_id": "00000T01FHPGTHYNTM3B51W000",
+                "implementation_branch": "refine/00000T01FHPGTHYNTM3B51W000/round-4",
+                "round_idx": 3,
+                "target_branch": "main"
+              },
+              "completed_at": "2026-08-15T19:23:40Z",
+              "criticism": {
+                "completed_at": "2026-08-15T19:09:46Z",
+                "git_after": {
+                  "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-4",
+                  "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-4",
+                  "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "findings": [
+                    {
+                      "checklist_item_ids": [
+                        "P7",
+                        "P8"
+                      ],
+                      "description": "P7 carries forward regression coverage and P8 produces a new candidate for later evaluation, but neither requires running fresh verification against the exact final Round 4 commit, so the plan does not fulfill the Latest Round instruction to replace the infrastructure-failed prior attempt with durable exact-candidate evidence.",
+                      "id": "C1",
+                      "material": true,
+                      "recommendation": "Revise P8 or add a verification item that records the final candidate SHA, proves recovered-delta and cumulative-scope fidelity, and runs the focused Rust/API/browser suites plus targeted formatting and cumulative diff checks on that exact commit, reporting baseline failures or environment skips separately."
+                    }
+                  ],
+                  "summary": "Add explicit fresh exact-candidate verification so the recovered Round 4 commit has durable evidence independent of the failed prior Quality attempt."
+                },
+                "started_at": "2026-08-15T19:07:57Z"
+              },
+              "final_plan": {
+                "completed_at": "2026-08-15T19:11:45Z",
+                "git_after": {
+                  "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-4",
+                  "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-4",
+                  "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Compare current main with the original base-to-retained-candidate chain and selectively recover only the complete Goal-specific semantic delta while preserving the command-channel fix, unrelated main changes, and every retained historical ref and commit.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Restore the dedicated missing-baseline failure and optional typed state-sync recovery kind with atomic target-and-node-bound settlement so unrelated, stale, detached, bootstrap, and generic failure states remain fail-closed and correctly classified.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Restore the shared daemon preview-and-apply contract with unchanged complete-preview fencing, stable git_busy and stale_preview conflict reasons, generic handling for other conflicts, and all Git and durable-state mutation kept out of browser code.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Restore the cohesive Dashboard recovery controller and panel so only typed eligibility fetches a preview, all required identities, heads, counts, bounded conflicts, consequences, and evidence are shown neutrally, and authority remains unselected until a separate exact-preview confirmation.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Restore context and response fencing so target, node, route, scope, eligibility, preview identity, late responses, Git-busy retry, and stale-preview refresh transitions invalidate authority or confirmation exactly when their reviewed evidence is no longer sufficient.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Restore successful recovery reconciliation so authoritative health clears only for the intended target while the Dashboard retains the resulting baseline, heads, audit ref, manifest, evidence identity, counts, authority, detail, and cleared-error status.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Carry forward the focused daemon, API, and browser regression coverage together with only the affected Dashboard intent, API intent, and missing-baseline runbook updates, keeping the recovery controller and other changed files within their established cohesive responsibilities.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Produce a clean Round 4 candidate whose cumulative scope faithfully combines current main with the recovered Goal behavior, preserving b003a0de only as historical recovery evidence so evaluation attaches to the new candidate commit.",
+                      "id": "P8"
+                    },
+                    {
+                      "description": "Record the final Round 4 candidate SHA and run fresh checks against that exact commit to prove recovered-delta and cumulative-scope fidelity and exercise the focused Rust, API, and browser coverage plus targeted formatting, reporting unrelated baseline failures or environment skips separately.",
+                      "id": "P9"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "C1",
+                      "resolution": "P9 binds fresh recovery-fidelity, scope, formatting, and focused suite evidence to the recorded final Round 4 SHA, replacing reliance on the prior infrastructure-failed Quality attempt while separating baseline failures and environment skips."
+                    }
+                  ],
+                  "summary": "Recover the complete missing-baseline Dashboard workflow from the retained Round 3 commit chain onto current main without merging or altering the historical branch, reconciling only where needed so the command-channel handoff fix and other unrelated main behavior remain intact. The new Round 4 candidate will restore the daemon-owned recovery contracts, neutral exact-preview authority flow, response fencing, retained audit evidence, focused regressions, and affected documentation, then receive fresh verification bound to its final commit rather than inheriting approval from the infrastructure-failed prior attempt."
+                },
+                "started_at": "2026-08-15T19:09:46Z"
+              },
+              "implementation": {
+                "completed_at": "2026-08-15T19:23:40Z",
+                "execution": {
+                  "checklist": [
+                    {
+                      "evidence": "Started clean at current main 4519b5ff2c5894b0fccf1c4c0e57612f694ffe79, compared its three command-channel paths with the retained 0e0de3d4..b003a0de Goal delta, and found no path overlap. Replayed only b0eace69 then b003a0de; main and refine/00000T01FHPGTHYNTM3B51W000/round-3 remain at 4519b5ff and b003a0de respectively.",
+                      "id": "P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Recovered the dedicated missing-baseline failure, optional typed recovery kind, and target-and-node-bound health settlement exactly from the retained candidate. All 15 state_sync tests passed, including typed eligibility, binding, unrelated-failure preservation, and success clearing.",
+                      "id": "P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Recovered the daemon-owned complete-preview preview/apply contract, git_busy and stale_preview reasons, generic conflict fallback, and unchanged-preview fencing. All 15 Git recovery tests and 3 state-recovery API/CLI tests passed.",
+                      "id": "P3",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Recovered the cohesive 337-line Dashboard recovery controller and neutral panel with typed-eligibility-only preview fetch, complete identities, heads, counts, bounded conflicts, consequences, evidence, unselected authority, and separate exact-preview confirmation. All 11 focused Dashboard tests passed.",
+                      "id": "P4",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Recovered target, node, route, scope, eligibility, preview-identity, and late-response fencing. Dashboard regressions passed for context changes, git_busy retaining preview while clearing confirmation, stale_preview clearing reviewed state, and late apply completion not restoring stale state.",
+                      "id": "P5",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Recovered intended-target health clearing and retained success evidence for baseline, heads, audit ref, manifest, evidence identity, counts, authority, detail, and cleared-error status. State-sync, API, and Dashboard success/health-clearing tests passed.",
+                      "id": "P6",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Carried forward the focused daemon, API, and browser regressions and only the Dashboard intent, API intent, and existing manage-fleet missing-baseline runbook changes. The recovery controller remains a cohesive 337-line module and no unrelated documentation was added.",
+                      "id": "P7",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Created clean Round 4 candidate dfdfa68f093cd695ecb106f8dd6a19e8fb3ea867 as commits 5a3c2647 and dfdfa68f on top of 4519b5ff. The cumulative Round 4 Goal scope is exactly 25 paths, 1096 insertions, and 52 deletions; the three command-channel paths are unchanged from main and all non-command-channel paths are identical to b003a0de.",
+                      "id": "P8",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Bound fresh verification to clean candidate dfdfa68f093cd695ecb106f8dd6a19e8fb3ea867. Range-diff mapped both patches with '='; formatting, cargo check, 15 Git recovery tests, 15 state-sync tests, 3 state-recovery API/CLI tests, 11 focused Dashboard tests, and the handoff regression passed. Browser harness: 201 passed, 0 failed, 27 environment skips. Full Rust gate: 849 passed, 2 failed, 6 ignored; both failures are on unchanged current-main prompt/runbook paths.",
+                      "id": "P9",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "git range-diff 0e0de3d43fe9284156e9f951dc8c981c1f996fd7..b003a0decf2bc2667cda876a601dcccf69c8006b 4519b5ff2c5894b0fccf1c4c0e57612f694ffe79..HEAD -> exit 0; b0eace69=5a3c2647 and b003a0de=dfdfa68f",
+                    "git diff --exit-code 4519b5ff2c5894b0fccf1c4c0e57612f694ffe79..HEAD -- src/process/agent_sessions/tests.rs src/process/subprocess/registry.rs src/process/subprocess/tests/registry.rs -> exit 0; command-channel fix unchanged",
+                    "git diff --exit-code b003a0decf2bc2667cda876a601dcccf69c8006b..HEAD -- . with the three command-channel paths excluded -> exit 0; recovered Goal tree exact",
+                    "git diff --check 4519b5ff2c5894b0fccf1c4c0e57612f694ffe79..HEAD -> exit 0",
+                    "rustfmt --edition 2024 --check on all changed Rust files -> exit 0",
+                    "cargo check -> exit 0",
+                    "cargo test --lib tools::host::git_sync::tests::recovery -- --test-threads=1 -> exit 0; 15 passed, 0 failed",
+                    "cargo test --lib state_sync -- --test-threads=1 -> exit 0; 15 passed, 0 failed",
+                    "cargo test --lib state_recovery -- --test-threads=1 -> exit 0; 3 passed, 0 failed",
+                    "node --test tests/web_dashboard_attention.test.js -> exit 0; 11 passed, 0 failed, 0 skipped",
+                    "cargo run --manifest-path xtask/Cargo.toml -- test-browser -> exit 0; 201 passed, 0 failed, 27 skipped because no Playwright Chromium build is available",
+                    "cargo test --lib process::agent_sessions::tests::workflow_goal_agent_handoff_survives_dead_process_recovery -- --exact --test-threads=1 -> exit 0; 1 passed, 0 failed",
+                    "cargo test -> exit 1; 849 passed, 2 failed, 6 ignored. Unchanged-current-main failures: prompts::tests::agent_prompts_keep_only_task_specific_contracts (plan.md 95 words) and surfaces::cli::catalog::tests::operational_runbooks_use_current_cli_and_layout_contracts (install.md documents refine system update)",
+                    "git diff --exit-code 4519b5ff2c5894b0fccf1c4c0e57612f694ffe79..HEAD -- src/prompts/mod.rs src/prompts/implementation_planning/plan.md docs/runbooks/install.md src/surfaces/cli/catalog.rs -> exit 0; all full-gate failure paths unchanged",
+                    "git status --short --branch -> clean refine/00000T01FHPGTHYNTM3B51W000/round-4 at dfdfa68f093cd695ecb106f8dd6a19e8fb3ea867"
+                  ]
+                },
+                "report": "Recovered the complete missing-baseline Dashboard workflow onto current main as clean Round 4 candidate dfdfa68f093cd695ecb106f8dd6a19e8fb3ea867. The retained two-patch Goal delta maps exactly onto new commits 5a3c2647 and dfdfa68f, while current main's command-channel handoff fix remains unchanged. Fresh focused Rust, API, Dashboard, formatting, fidelity, and scope checks passed; the browser harness passed 201 tests and skipped 27 because Playwright Chromium is unavailable. The full Rust gate passed 849 tests, failed 2 unchanged-current-main baseline checks, and ignored 6.",
+                "started_at": "2026-08-15T19:11:46Z"
+              },
+              "phase": "implement",
+              "phase_started_at": "2026-08-15T19:11:46Z",
+              "proposal": {
+                "completed_at": "2026-08-15T19:07:56Z",
+                "git_after": {
+                  "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-4",
+                  "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-4",
+                  "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Compare current main with the original base-to-retained-candidate chain and selectively recover only the complete Goal-specific semantic delta while preserving the command-channel fix, unrelated main changes, and every retained historical ref and commit.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Restore the dedicated missing-baseline failure and optional typed state-sync recovery kind with atomic target-and-node-bound settlement so unrelated, stale, detached, bootstrap, and generic failure states remain fail-closed and correctly classified.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Restore the shared daemon preview-and-apply contract with unchanged complete-preview fencing, stable git_busy and stale_preview conflict reasons, generic handling for other conflicts, and all Git and durable-state mutation kept out of browser code.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Restore the cohesive Dashboard recovery controller and panel so only typed eligibility fetches a preview, all required identities, heads, counts, bounded conflicts, consequences, and evidence are shown neutrally, and authority remains unselected until a separate exact-preview confirmation.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Restore context and response fencing so target, node, route, scope, eligibility, preview identity, late responses, Git-busy retry, and stale-preview refresh transitions invalidate authority or confirmation exactly when their reviewed evidence is no longer sufficient.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Restore successful recovery reconciliation so authoritative health clears only for the intended target while the Dashboard retains the resulting baseline, heads, audit ref, manifest, evidence identity, counts, authority, detail, and cleared-error status.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Carry forward the focused daemon, API, and browser regression coverage together with only the affected Dashboard intent, API intent, and missing-baseline runbook updates, keeping the recovery controller and other changed files within their established cohesive responsibilities.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Produce a clean Round 4 exact candidate whose cumulative scope faithfully combines current main with the recovered Goal behavior, preserving b003a0de only as historical recovery evidence so fresh evaluation attaches to the new candidate commit.",
+                      "id": "P8"
+                    }
+                  ],
+                  "summary": "Recover the complete missing-baseline dashboard workflow from the retained Round 3 commit chain onto current main without merging or altering the historical branch, reconciling only where needed so the new command-channel handoff fix and other unrelated main behavior remain intact. The recovered candidate will restore daemon-owned typed eligibility, conflict fencing, target-bound health settlement, deliberate neutral authority confirmation, late-response protection, retained audit evidence, focused regressions, and only the affected intent and runbook contracts, while treating the old candidate as recovery evidence rather than as an exact-candidate Quality approval."
+                },
+                "started_at": "2026-08-15T19:05:44Z"
+              },
+              "schema_version": 2,
+              "started_at": "2026-08-15T19:05:44Z",
+              "state": "completed",
+              "updated_at": "2026-08-15T19:23:40Z"
+            },
+            "implementation_report": "Recovered the complete missing-baseline Dashboard workflow onto current main as clean Round 4 candidate dfdfa68f093cd695ecb106f8dd6a19e8fb3ea867. The retained two-patch Goal delta maps exactly onto new commits 5a3c2647 and dfdfa68f, while current main's command-channel handoff fix remains unchanged. Fresh focused Rust, API, Dashboard, formatting, fidelity, and scope checks passed; the browser harness passed 201 tests and skipped 27 because Playwright Chromium is unavailable. The full Rust gate passed 849 tests, failed 2 unchanged-current-main baseline checks, and ignored 6.",
+            "implementation_reported_at": "2026-08-15T19:23:41Z",
+            "prompt": "Recover the original Goal after Rounds 2 and 3 failed because the pre-fix Refine daemon deleted Goal Agent command channels. Preserve the retained Git evidence and do not delete, reset, or directly merge the old branch. Round 3 worktree has been retired, but its complete candidate chain remains reachable as b0eace6911bc687804b12418c018bba0fc73df7a followed by b003a0decf2bc2667cda876a601dcccf69c8006b on refine/00000T01FHPGTHYNTM3B51W000/round-3. Start from current main, which contains 4519b5ff Preserve Goal Agent command channels during handoff. Compare current main with 0e0de3d43fe9284156e9f951dc8c981c1f996fd7..b003a0decf2bc2667cda876a601dcccf69c8006b, selectively reapply and reconcile the complete relevant behavior, and preserve unrelated current-main changes. Do not claim b003a0de passed exact-candidate Quality: the prior Quality attempt failed on infrastructure. Run fresh exact-candidate verification, then let Governance and Quality proceed normally with durable evidence.",
+            "quality_checked_at": "2026-08-15T19:39:35Z",
+            "quality_details": {
+              "candidate_commit": "827c7f56fa94b7f8d61eda21dc4ff813cc16d98f",
+              "error": "Quality command harness fault: supervised shell /usr/bin/bash could not parse \"timeout 900s env CI=1 bash -lc '\\nset -euo pipefail\\nbase=4519b5ff2c5894b0fccf1c4c0e57612f694ffe79\\nrecovered=b003a0decf2bc2667cda876a601dcccf69c8006b\\npre_quality=dfdfa68f093cd695ecb106f8dd6a19e8fb3ea867\\ncandidate=827c7f56fa94b7f8d61eda21dc4ff813cc16d98f\\ntest \\\"$(git rev-parse HEAD)\\\" = \\\"$candidate\\\"\\ntest -z \\\"$(git status --porcelain)\\\"\\ntest \\\"$(git diff --name-only \\\"$pre_quality\\\"..HEAD)\\\" = $'src/surfaces/web/static/js/features/dashboard_state_recovery.js\\\\ntests/web_dashboard_attention.test.js'\\ngit diff --check \\\"$base\\\"..HEAD\\ngit diff --exit-code \\\"$base\\\"..HEAD -- src/process/agent_sessions/tests.rs src/process/subprocess/registry.rs src/process/subprocess/tests/registry.rs\\ngit diff --exit-code \\\"$recovered\\\"..\\\"$pre_quality\\\" -- . ':(exclude)src/process/agent_sessions/tests.rs' ':(exclude)src/process/subprocess/registry.rs' ':(exclude)src/process/subprocess/tests/registry.rs'\\ngit diff --name-only \\\"$base\\\"..HEAD -- '*.rs' | xargs -r rustfmt --edition 2024 --check\\ncargo check\\ncargo test --lib tools::host::git_sync::tests::recovery -- --test-threads=1\\ncargo test --lib state_sync -- --test-threads=1\\ncargo test --lib state_recovery -- --test-threads=1\\nnode --test tests/web_dashboard_attention.test.js\\ncargo test --lib process::agent_sessions::tests::workflow_goal_agent_handoff_survives_dead_process_recovery -- --exact --test-threads=1\\nprintf 'QUALITY_PREDICATE_PASS candidate=%s clean=yes focused_checks=all_passed\\\\n' \\\"$candidate\\\"\\n'\". Observed supervised process proc-1786822775042-972354-175 exited 2. stderr: /usr/bin/bash: -c: line 12: syntax error near unexpected token `('\n/usr/bin/bash: -c: line 12: `git diff --exit-code \"$recovered\"..\"$pre_quality\" -- . ':(exclude)src/process/agent_sessions/tests.rs' ':(exclude)src/process/subprocess/registry.rs' ':(exclude)src/process/subprocess/tests/registry.rs''",
+              "error_kind": "harness_fault",
+              "operation_id": "1a006ec94e5ed6425"
+            },
+            "quality_message": "Quality command harness fault: supervised shell /usr/bin/bash could not parse \"timeout 900s env CI=1 bash -lc '\\nset -euo pipefail\\nbase=4519b5ff2c5894b0fccf1c4c0e57612f694ffe79\\nrecovered=b003a0decf2bc2667cda876a601dcccf69c8006b\\npre_quality=dfdfa68f093cd695ecb106f8dd6a19e8fb3ea867\\ncandidate=827c7f56fa94b7f8d61eda21dc4ff813cc16d98f\\ntest \\\"$(git rev-parse HEAD)\\\" = \\\"$candidate\\\"\\ntest -z \\\"$(g…",
+            "quality_state": "harness_fault",
+            "reporter": "Buddy Williams",
+            "round": 4
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-08-15T20:40:24Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_candidate_commit": "",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "guidance_decision": null,
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f",
+          "context_digest": "46c80fa328b4651cd557f09b7498c6172691c91ab9e8d75cf83577cbfce96201",
+          "context_version": 1,
+          "goal_id": "00000T01FHPGTHYNTM3B51W000",
+          "implementation_branch": "refine/00000T01FHPGTHYNTM3B51W000/round-5",
+          "round_idx": 4,
+          "target_branch": "main"
+        },
+        "phase": "plan",
+        "phase_started_at": "2026-08-15T20:40:25Z",
+        "schema_version": 2,
+        "started_at": "2026-08-15T20:40:25Z",
+        "state": "in_progress",
+        "updated_at": "2026-08-15T20:40:25Z"
+      },
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Recover the missing-baseline Dashboard recovery workflow through a fresh Round 5 because Round 4 ended in a Quality harness fault, not a product or candidate failure. Preserve every prior Round, branch, commit, log, failed operation, and Quality report as immutable evidence; do not delete, reset, amend, clean, or directly merge historical artifacts. The retained corrected Round 4 candidate is 827c7f56fa94b7f8d61eda21dc4ff813cc16d98f on refine/00000T01FHPGTHYNTM3B51W000/round-4, with pre-Quality candidate dfdfa68f093cd695ecb106f8dd6a19e8fb3ea867 and original Round 4 base 4519b5ff2c5894b0fccf1c4c0e57612f694ffe79. Round 4 Quality changed only src/surfaces/web/static/js/features/dashboard_state_recovery.js and tests/web_dashboard_attention.test.js so retained success yields to a newer missing-baseline failure episode for the same target, node, and scope, triggering a fresh preview with authority and confirmation reset. Its recorded focused checks passed, but the final predicate never ran because a single-quoted bash -lc wrapper could not parse nested single-quoted Git exclude pathspecs. Treat 827c7f56 as recovery evidence, not passing exact-candidate Quality. At Round 5 claim time, compare the actual current main and configured remote main with 4519b5ff..827c7f56, then selectively reapply and reconcile the complete Goal-specific semantic delta while preserving all unrelated current-main behavior. Current inspection found local main d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f and origin/main 9729b9b4be27f7a58629d8f04a1c0e8171636c82; their six-path worktree-handoff advance has no path overlap with the 25-path Goal delta, but re-read both heads because main may move again. Preserve the original contract: daemon-owned Git and durable-state mutation, typed missing-baseline eligibility, atomic target-and-node-bound health settlement, complete-preview stale fencing, typed git_busy and stale_preview recovery, neutral unselected authority plus separate exact-preview confirmation, late-response and context fencing, retained recovery audit evidence, focused Rust API and browser regressions, and only the affected Dashboard, API, and runbook documentation. Include the Round 4 lifecycle correction and regression. Produce a clean fresh candidate from the Round 5 base, prove recovered-delta fidelity and cumulative scope without blind merging, and run fresh exact-candidate formatting, cargo check, focused Git recovery, state-sync, state-recovery API and CLI, Dashboard, browser, and command-channel handoff checks. Report unchanged baseline failures and unavailable Playwright Chromium skips separately. Keep predicate commands shell-safe: do not nest single-quoted Git pathspecs inside a single-quoted bash -lc payload; use independently supervised commands or quoting that the outer shell preserves. Let fresh Quality and Governance evaluate the new exact candidate normally. Do not approve, merge, or push.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-08-15T20:40:25Z",
+      "workflow_attempt_authority": {
+        "claimed_at": "2026-08-15T20:40:24Z",
+        "round_idx": 4,
+        "workflow_revision": 90
+      },
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
     }
   ],
-  "status": "failed",
+  "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-15T19:39:35Z",
-  "workflow_revision": 89
+  "updated": "2026-08-15T20:40:25Z",
+  "workflow_revision": 95
 }
