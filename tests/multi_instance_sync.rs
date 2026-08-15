@@ -21,22 +21,26 @@ struct RefineInstance {
     runtime_root: PathBuf,
     app_root: PathBuf,
     artifact_root: PathBuf,
+    binary: PathBuf,
     child: Option<Child>,
 }
 
 impl RefineInstance {
-    fn start(name: &str, runtime_root: &Path, app_root: &Path, artifacts: &Path) -> Self {
+    fn start(name: &str, _runtime_root: &Path, app_root: &Path, artifacts: &Path) -> Self {
         let repo_root = repo_root();
         let static_root = repo_root.join("src/surfaces/web/static");
         let artifact_root = artifacts.join(name);
+        let product_home = artifact_root.join("product-home");
+        let binary = prepare_test_product_home(&repo_root, &product_home);
+        let runtime_root = product_home.join("run");
         fs::create_dir_all(&artifact_root).unwrap();
-        fs::create_dir_all(runtime_root).unwrap();
+        fs::create_dir_all(&runtime_root).unwrap();
         let port = free_port();
-        stop_daemon(port, runtime_root);
+        stop_daemon(&binary, port, &runtime_root);
 
         let stdout = fs::File::create(artifact_root.join("daemon.stdout.log")).unwrap();
         let stderr = fs::File::create(artifact_root.join("daemon.stderr.log")).unwrap();
-        let mut child = Command::new(refine_bin())
+        let mut child = Command::new(&binary)
             .args([
                 "system",
                 "start",
@@ -49,7 +53,7 @@ impl RefineInstance {
                 static_root.to_str().unwrap(),
             ])
             .current_dir(&repo_root)
-            .envs(instance_env(port, runtime_root, app_root))
+            .envs(instance_env(port, &runtime_root, app_root))
             .stdout(Stdio::from(stdout))
             .stderr(Stdio::from(stderr))
             .spawn()
@@ -58,9 +62,10 @@ impl RefineInstance {
         wait_for_daemon(port, &mut child, &artifact_root);
         let instance = Self {
             port,
-            runtime_root: runtime_root.to_path_buf(),
+            runtime_root,
             app_root: app_root.to_path_buf(),
             artifact_root,
+            binary,
             child: Some(child),
         };
         let attach = instance.run_refine(&["project", "attach", app_root.to_str().unwrap()]);
@@ -128,7 +133,7 @@ impl RefineInstance {
     }
 
     fn run_refine(&self, args: &[&str]) -> Output {
-        let output = Command::new(refine_bin())
+        let output = Command::new(&self.binary)
             .args(args)
             .current_dir(repo_root())
             .envs(instance_env(self.port, &self.runtime_root, &self.app_root))
@@ -147,7 +152,7 @@ impl RefineInstance {
     }
 
     fn stop(&mut self) {
-        stop_daemon(self.port, &self.runtime_root);
+        stop_daemon(&self.binary, self.port, &self.runtime_root);
         if let Some(mut child) = self.child.take() {
             for _ in 0..30 {
                 if child.try_wait().ok().flatten().is_some() {
@@ -200,8 +205,8 @@ fn configure_repo(root: &Path) {
     git(root, &["config", "user.name", "Refine Sync Test"]);
 }
 
-fn stop_daemon(port: u16, runtime_root: &Path) {
-    let _ = Command::new(refine_bin())
+fn stop_daemon(binary: &Path, port: u16, runtime_root: &Path) {
+    let _ = Command::new(binary)
         .args([
             "system",
             "stop",
@@ -360,6 +365,23 @@ fn query_component(value: &str) -> String {
 
 fn refine_bin() -> PathBuf {
     PathBuf::from(env!("CARGO_BIN_EXE_refine"))
+}
+
+fn prepare_test_product_home(repo_root: &Path, product_home: &Path) -> PathBuf {
+    let binary = product_home.join("bin/refine");
+    fs::create_dir_all(binary.parent().unwrap()).unwrap();
+    fs::create_dir_all(product_home.join("src")).unwrap();
+    fs::create_dir_all(product_home.join("docs/runbooks")).unwrap();
+    fs::copy(refine_bin(), &binary).unwrap();
+    for relative in ["Cargo.toml", "src/main.rs", "docs/runbooks/install.md", "r"] {
+        fs::copy(repo_root.join(relative), product_home.join(relative)).unwrap();
+    }
+    fs::write(
+        product_home.join(".refine-deployed"),
+        "mode=deployed\nrelease_bin=bin/refine\n",
+    )
+    .unwrap();
+    binary
 }
 
 fn repo_root() -> PathBuf {

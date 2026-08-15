@@ -3,9 +3,11 @@ use super::*;
 #[test]
 fn sync_rebases_disjoint_state_when_nodes_race() {
     let fixture = SyncFixture::new("race");
+    write_goal(&fixture.a, "SEED");
+    fixture.service(&fixture.a).sync().unwrap();
+    fixture.service(&fixture.b).sync().unwrap();
     write_goal(&fixture.a, "GOALA");
     write_goal(&fixture.b, "GOALB");
-
     fixture.service(&fixture.a).sync().unwrap();
     let second = fixture.service(&fixture.b).sync().unwrap();
     assert!(

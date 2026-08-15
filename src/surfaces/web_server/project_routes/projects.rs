@@ -260,6 +260,47 @@ impl InProcessWebServer {
         }
     }
 
+    pub(crate) fn handle_project_state_recovery_preview(&self) -> ApiResponse {
+        let service = match self.current_git_sync_service() {
+            Ok(Some(service)) => service,
+            Ok(None) => return target_root_unavailable("preview state synchronization recovery"),
+            Err(error) => return error_response(error),
+        };
+        match service.preview_state_recovery() {
+            Ok(preview) => ApiResponse::json(200, serde_json::to_value(preview).unwrap()),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(crate) fn handle_project_state_recovery_apply(&self, request: ApiRequest) -> ApiResponse {
+        let service = match self.current_git_sync_service() {
+            Ok(Some(service)) => service,
+            Ok(None) => return target_root_unavailable("apply state synchronization recovery"),
+            Err(error) => return error_response(error),
+        };
+        let body = request.body.unwrap_or_else(|| json!({}));
+        let authority = match body.get("authority").cloned().map(serde_json::from_value) {
+            Some(Ok(authority)) => authority,
+            _ => {
+                return error_response(RefineError::InvalidInput(
+                    "authority must be either live or remote".to_string(),
+                ));
+            }
+        };
+        let preview = match body.get("preview").cloned().map(serde_json::from_value) {
+            Some(Ok(preview)) => preview,
+            _ => {
+                return error_response(RefineError::InvalidInput(
+                    "the complete preview object is required".to_string(),
+                ));
+            }
+        };
+        match service.apply_state_recovery(authority, preview) {
+            Ok(result) => ApiResponse::json(200, serde_json::to_value(result).unwrap()),
+            Err(error) => error_response(error),
+        }
+    }
+
     pub(crate) fn handle_project_worktree_cleanup(&self, request: ApiRequest) -> ApiResponse {
         let Some(runtime_root) = &self.runtime_root else {
             return runtime_root_unavailable("clean target-app worktrees");

@@ -588,6 +588,10 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
             | ProjectAction::Sync { target_root, .. }
             | ProjectAction::CleanupWorktrees { target_root, .. }
             | ProjectAction::Doctor { target_root, .. } => target_root.as_ref(),
+            ProjectAction::StateRecovery { action } => match action {
+                ProjectStateRecoveryAction::Preview { target_root }
+                | ProjectStateRecoveryAction::Apply { target_root, .. } => target_root.as_ref(),
+            },
         },
         Commands::Goal { action } => match action {
             GoalAction::Create { target_root, .. }

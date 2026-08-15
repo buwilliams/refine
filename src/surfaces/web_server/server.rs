@@ -511,6 +511,14 @@ impl InProcessWebServer {
             return self.handle_project_sync();
         }
 
+        if request.method == "GET" && request.path == "/project/state-recovery/preview" {
+            return self.handle_project_state_recovery_preview();
+        }
+
+        if request.method == "POST" && request.path == "/project/state-recovery/apply" {
+            return self.handle_project_state_recovery_apply(request);
+        }
+
         if request.method == "POST" && request.path == "/project/worktrees/cleanup" {
             return self.handle_project_worktree_cleanup(request);
         }

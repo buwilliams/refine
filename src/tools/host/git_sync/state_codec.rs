@@ -306,7 +306,7 @@ pub(super) fn merge_state_into_live(
 /// records straight into the live store without going through the write path.
 /// Without this, work another Node published would be invisible to scheduling
 /// until something unrelated forced a reconstruction.
-fn record_synchronized_goal(
+pub(super) fn record_synchronized_goal(
     live_root: &std::path::Path,
     relative: &std::path::Path,
     destination: &std::path::Path,
@@ -322,7 +322,7 @@ fn record_synchronized_goal(
     }
 }
 
-fn forget_synchronized_goal(live_root: &std::path::Path, relative: &std::path::Path) {
+pub(super) fn forget_synchronized_goal(live_root: &std::path::Path, relative: &std::path::Path) {
     if !is_goal_record(relative) {
         return;
     }

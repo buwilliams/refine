@@ -46,12 +46,22 @@ static STATE_COPY_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 mod git_commands;
 mod locks;
+mod recovery;
 mod service;
 mod state_codec;
 mod state_files;
 mod state_worktree;
 
 pub use locks::with_repository_git_lock;
+pub use recovery::{
+    StateRecoveryAuthority, StateRecoveryManifest, StateRecoveryOutcome, StateRecoveryPathCounts,
+    StateRecoveryPreview, StateRecoveryResult,
+};
+#[cfg(test)]
+use recovery::{
+    hydrate_remote_with_recovery_cas, install_after_recovery_authority_hook,
+    install_after_recovery_baseline_hook,
+};
 
 use locks::*;
 use state_codec::*;

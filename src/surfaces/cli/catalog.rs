@@ -377,6 +377,22 @@ mod tests {
                 });
                 argument_start = 2;
             }
+            while documented_command.has_subcommands() {
+                let Some(candidate) = tokens.get(argument_start).copied() else {
+                    break;
+                };
+                let candidate = candidate.trim_matches(|character: char| {
+                    !character.is_ascii_alphanumeric() && !matches!(character, '-' | '_')
+                });
+                if candidate.starts_with('-') {
+                    break;
+                }
+                let Some(nested) = documented_command.find_subcommand(candidate) else {
+                    break;
+                };
+                documented_command = nested;
+                argument_start += 1;
+            }
             for token in &tokens[argument_start..] {
                 let token = token.trim_matches(|character: char| {
                     !character.is_ascii_alphanumeric() && !matches!(character, '-' | '_' | '=')

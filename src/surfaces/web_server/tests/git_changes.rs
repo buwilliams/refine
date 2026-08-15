@@ -271,6 +271,124 @@ fn web_server_project_sync_reports_no_git_repo_and_missing_upstream() {
 }
 
 #[test]
+fn web_server_state_recovery_routes_are_thin_and_structured() {
+    let temp_root = unique_temp_dir("http-state-recovery-routes");
+    let app_root = temp_root.join("app");
+    let runtime_root = temp_root.join("run/8080");
+    fs::create_dir_all(&app_root).unwrap();
+    let mut server = server_with_projection();
+    server.target_root = Some(app_root);
+    server.runtime_root = Some(runtime_root);
+
+    let preview = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/project/state-recovery/preview".to_string(),
+        body: None,
+    });
+    assert_eq!(preview.status, 400, "{:#}", preview.body);
+    assert_eq!(preview.body["error"]["code"], "invalid_input");
+
+    let apply = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/project/state-recovery/apply".to_string(),
+        body: Some(json!({})),
+    });
+    assert_eq!(apply.status, 400, "{:#}", apply.body);
+    assert_eq!(apply.body["error"]["code"], "invalid_input");
+    assert!(
+        apply.body["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("authority")
+    );
+
+    remove_temp_dir(&temp_root);
+}
+
+#[test]
+fn web_server_state_recovery_preview_and_apply_use_the_shared_service() {
+    let temp_root = unique_temp_dir("http-state-recovery-success");
+    let remote = temp_root.join("remote.git");
+    let seed = temp_root.join("seed");
+    let a = temp_root.join("a");
+    let b = temp_root.join("b");
+    fs::create_dir_all(&seed).unwrap();
+    git(&temp_root, &["init", "--bare", remote.to_str().unwrap()]).unwrap();
+    git(&seed, &["init", "-b", "main"]).unwrap();
+    git(&seed, &["config", "user.email", "test@example.com"]).unwrap();
+    git(&seed, &["config", "user.name", "Test User"]).unwrap();
+    fs::write(seed.join("app.txt"), "initial\n").unwrap();
+    git(&seed, &["add", "app.txt"]).unwrap();
+    git(&seed, &["commit", "-m", "initial"]).unwrap();
+    git(
+        &seed,
+        &["remote", "add", "origin", remote.to_str().unwrap()],
+    )
+    .unwrap();
+    git(&seed, &["push", "-u", "origin", "main"]).unwrap();
+    git(
+        &temp_root,
+        &[
+            "clone",
+            "--branch",
+            "main",
+            remote.to_str().unwrap(),
+            a.to_str().unwrap(),
+        ],
+    )
+    .unwrap();
+    git(
+        &temp_root,
+        &[
+            "clone",
+            "--branch",
+            "main",
+            remote.to_str().unwrap(),
+            b.to_str().unwrap(),
+        ],
+    )
+    .unwrap();
+    for root in [&a, &b] {
+        git(root, &["config", "user.email", "test@example.com"]).unwrap();
+        git(root, &["config", "user.name", "Test User"]).unwrap();
+    }
+    let refine_a = refine_dir_for_target_root(&a).unwrap();
+    let refine_b = refine_dir_for_target_root(&b).unwrap();
+    fs::create_dir_all(refine_a.join("goals/REMOTE")).unwrap();
+    fs::write(
+        refine_a.join("goals/REMOTE/goal.json"),
+        "{\"id\":\"REMOTE\"}\n",
+    )
+    .unwrap();
+    crate::tools::host::git_sync::FileGitSyncService::new(&a, a.join("run"))
+        .sync()
+        .unwrap();
+    fs::create_dir_all(refine_b.join("goals/LIVE")).unwrap();
+    fs::write(refine_b.join("goals/LIVE/goal.json"), "{\"id\":\"LIVE\"}\n").unwrap();
+
+    let mut server = server_with_projection();
+    server.target_root = Some(b.clone());
+    server.runtime_root = Some(b.join("run"));
+    let preview = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/project/state-recovery/preview".to_string(),
+        body: None,
+    });
+    assert_eq!(preview.status, 200, "{:#}", preview.body);
+    let applied = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/project/state-recovery/apply".to_string(),
+        body: Some(json!({"authority": "remote", "preview": preview.body})),
+    });
+    assert_eq!(applied.status, 200, "{:#}", applied.body);
+    assert_eq!(applied.body["baseline_created"], true);
+    assert!(refine_b.join("goals/REMOTE/goal.json").exists());
+    assert!(!refine_b.join("goals/LIVE/goal.json").exists());
+
+    remove_temp_dir(&temp_root);
+}
+
+#[test]
 fn web_server_project_sync_returns_while_repository_worker_is_busy() {
     let temp_root = unique_temp_dir("http-project-sync-nonblocking");
     let app_root = temp_root.join("app");
