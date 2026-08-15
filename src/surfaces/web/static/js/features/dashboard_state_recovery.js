@@ -11,6 +11,8 @@ function newDashboardStateRecovery(contextKey) {
     confirmedEvidenceId: "",
     reviewedEvidenceId: "",
     previewRefreshRequired: false,
+    completedFailureSince: "",
+    completedHealthRevision: -1,
     error: "",
     result: null,
   };
@@ -34,6 +36,21 @@ function dashboardRecoveryEligible(d) {
     && d.state_sync_health.recovery_kind === DASHBOARD_MISSING_BASELINE_RECOVERY;
 }
 
+function dashboardRecoveryHealthRevision(health) {
+  const revision = Number(health?.revision);
+  return Number.isFinite(revision) ? revision : -1;
+}
+
+function dashboardRecoverySuccessSuperseded(d) {
+  if (!dashboardRecoveryEligible(d)) return false;
+  const health = d.state_sync_health;
+  const failureSince = health.failure_since || "";
+  if (failureSince && dashboardStateRecovery.completedFailureSince
+      && failureSince !== dashboardStateRecovery.completedFailureSince) return true;
+  return dashboardRecoveryHealthRevision(health)
+    > dashboardStateRecovery.completedHealthRevision;
+}
+
 function dashboardRecoverySetPreview(preview) {
   const previousEvidence = dashboardStateRecovery.preview?.evidence_id || "";
   if (previousEvidence && previousEvidence !== preview.evidence_id) {
@@ -52,14 +69,15 @@ async function reconcileDashboardStateRecovery(d) {
   if (dashboardStateRecovery.contextKey !== contextKey) {
     dashboardStateRecovery = newDashboardStateRecovery(contextKey);
   }
+  if (dashboardStateRecovery.phase === "success") {
+    if (!dashboardRecoverySuccessSuperseded(d)) return;
+    dashboardStateRecovery = newDashboardStateRecovery(contextKey);
+  }
   if (!dashboardRecoveryEligible(d)) {
-    if (dashboardStateRecovery.phase !== "success") {
-      dashboardStateRecovery = newDashboardStateRecovery(contextKey);
-    }
+    dashboardStateRecovery = newDashboardStateRecovery(contextKey);
     return;
   }
-  if (dashboardStateRecovery.phase === "success"
-      || dashboardStateRecovery.previewRefreshRequired
+  if (dashboardStateRecovery.previewRefreshRequired
       || dashboardStateRecovery.preview) return;
   dashboardStateRecovery.phase = "loading";
   try {
@@ -282,6 +300,8 @@ async function applyDashboardStateRecovery() {
   const context = {
     contextKey: dashboardStateRecovery.contextKey,
     evidenceId: dashboardStateRecovery.preview.evidence_id,
+    failureSince: state.dashboard?.state_sync_health?.failure_since || "",
+    healthRevision: dashboardRecoveryHealthRevision(state.dashboard?.state_sync_health),
     scope: dashboardScopeFromHash(),
     nodeGeneration: captureNodeContextGeneration(),
   };
@@ -303,6 +323,11 @@ async function applyDashboardStateRecovery() {
   if (!dashboardRecoveryApplyContextCurrent(context)) return;
   dashboardStateRecovery.phase = "success";
   dashboardStateRecovery.confirmedEvidenceId = "";
+  dashboardStateRecovery.completedFailureSince = context.failureSince;
+  dashboardStateRecovery.completedHealthRevision = Math.max(
+    context.healthRevision,
+    dashboardRecoveryHealthRevision(result?.state_sync_health),
+  );
   dashboardStateRecovery.result = result;
   dashboardStateRecovery.error = "";
   redrawDashboardRecovery();

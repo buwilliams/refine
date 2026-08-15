@@ -144,6 +144,8 @@ function recoveryDashboard() {
       recovery_kind: "missing_baseline",
       target_root: "/target",
       node_id: "default",
+      failure_since: "failure-1",
+      revision: 1,
     },
   };
 }
@@ -312,6 +314,44 @@ test("successful apply paints retained evidence before the health refetch settle
   assert.deepEqual(phases, ["applying", "success", "success"]);
   assert.equal(runtime.recoveryState().phase, "success");
   assert.match(runtime.renderRecovery(dashboard), /State-sync error cleared:<\/strong> Yes/);
+});
+
+test("a newer missing-baseline episode replaces retained success with fresh neutral evidence", async () => {
+  const runtime = browserRuntime();
+  const dashboard = recoveryDashboard();
+  runtime.setRecoveryContext(dashboard);
+  runtime.setRecoveryPreview(recoveryPreview());
+  runtime.selectRecoveryAuthority("remote");
+  runtime.confirmRecovery(true, "evidence-123");
+  let previewRequests = 0;
+  runtime.setDashboardApi(async (method) => {
+    if (method === "POST") return recoveryResult();
+    previewRequests++;
+    return { ...recoveryPreview(), evidence_id: "evidence-456" };
+  });
+  runtime.setRecoveryUiHooks(() => {}, async () => {});
+
+  await runtime.applyRecovery();
+  assert.equal(runtime.recoveryState().phase, "success");
+
+  await runtime.reconcileRecovery(dashboard);
+  assert.equal(runtime.recoveryState().phase, "success");
+  assert.equal(previewRequests, 0);
+
+  await runtime.reconcileRecovery({
+    ...dashboard,
+    state_sync_health: {
+      ...dashboard.state_sync_health,
+      failure_since: "failure-2",
+      revision: 3,
+    },
+  });
+
+  assert.equal(previewRequests, 1);
+  assert.equal(runtime.recoveryState().phase, "ready");
+  assert.equal(runtime.recoveryState().preview.evidence_id, "evidence-456");
+  assert.equal(runtime.recoveryState().authority, "");
+  assert.equal(runtime.recoveryReady(), false);
 });
 
 test("late apply completion cannot restore recovery state after route context changes", async () => {
