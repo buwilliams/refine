@@ -106,8 +106,25 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-08-15T22:45:03Z",
+        "criticism": {
+          "completed_at": "2026-08-15T22:46:12Z",
+          "git_after": {
+            "branch": "refine/00000T01WRE7C0ZGABFY3K6000/round-1",
+            "head_commit": "0b561bcd40255af2d9b651175903f64326700433",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T01WRE7C0ZGABFY3K6000/round-1",
+            "head_commit": "0b561bcd40255af2d9b651175903f64326700433",
+            "status_porcelain": []
+          },
+          "result": {
+            "summary": "The proposed plan is complete, focused, and safe to implement as written."
+          },
+          "started_at": "2026-08-15T22:45:03Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-08-15T22:46:12Z",
         "proposal": {
           "completed_at": "2026-08-15T22:45:02Z",
           "git_after": {
@@ -142,7 +159,7 @@
         "schema_version": 2,
         "started_at": "2026-08-15T22:43:47Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T22:45:03Z"
+        "updated_at": "2026-08-15T22:46:12Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -156,7 +173,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T22:45:03Z",
+      "updated": "2026-08-15T22:46:12Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T22:43:46Z",
         "round_idx": 0,
@@ -168,6 +185,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-15T22:45:03Z",
-  "workflow_revision": 9
+  "updated": "2026-08-15T22:46:12Z",
+  "workflow_revision": 11
 }
