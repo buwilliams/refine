@@ -68,6 +68,8 @@ pub(super) fn record_state_sync_failure(
         .filter(|report| {
             report.attempt_id == attempt_id.to_string() && report.attempt_source == source
         });
+    let recovery_kind = matches!(error, RefineError::StateSyncMissingBaseline(_))
+        .then_some(crate::tools::host::state_sync_health::StateSyncRecoveryKind::MissingBaseline);
     let activity = FileStateSyncHealthService::new(runtime_root).settle_failure(
         target_root,
         node_id,
@@ -78,8 +80,19 @@ pub(super) fn record_state_sync_failure(
         report
             .as_ref()
             .map(|report| report.report_location.as_str()),
+        recovery_kind,
     )?;
     append_state_sync_activity(target_root, node_id, activity, report.as_ref())
+}
+
+pub(crate) fn settle_state_recovery_success(
+    runtime_root: &Path,
+    target_root: &Path,
+) -> RefineResult<()> {
+    let node_id = state_sync_node_id(runtime_root, target_root)?;
+    let activity =
+        FileStateSyncHealthService::new(runtime_root).record_success(target_root, &node_id)?;
+    append_state_sync_activity(target_root, &node_id, activity)
 }
 
 fn append_state_sync_activity(

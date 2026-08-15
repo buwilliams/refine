@@ -1,5 +1,20 @@
 use thiserror::Error;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum StateRecoveryConflictReason {
+    GitBusy,
+    StalePreview,
+}
+
+impl StateRecoveryConflictReason {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::GitBusy => "git_busy",
+            Self::StalePreview => "stale_preview",
+        }
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum RefineError {
     #[error("{0}")]
@@ -10,6 +25,13 @@ pub enum RefineError {
     Unauthorized(String),
     #[error("{0}")]
     Conflict(String),
+    #[error("{0}")]
+    StateSyncMissingBaseline(String),
+    #[error("{message}")]
+    StateRecoveryConflict {
+        reason: StateRecoveryConflictReason,
+        message: String,
+    },
     #[error(
         "Candidate {candidate_commit} is stale: recorded base {recorded_base} is not its ancestor"
     )]
@@ -52,6 +74,8 @@ impl RefineError {
             Self::NotFound(_) => ErrorCategory::NotFound,
             Self::Unauthorized(_) => ErrorCategory::Unauthorized,
             Self::Conflict(_)
+            | Self::StateSyncMissingBaseline(_)
+            | Self::StateRecoveryConflict { .. }
             | Self::StaleCandidate { .. }
             | Self::QualityCandidateInfrastructure(_) => ErrorCategory::Conflict,
             Self::Degraded(_) => ErrorCategory::Degraded,

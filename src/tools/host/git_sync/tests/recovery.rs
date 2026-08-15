@@ -467,6 +467,7 @@ fn missing_baseline_preview_is_bounded_and_does_not_mutate_target_state() {
 fn ordinary_sync_fails_closed_with_actionable_recovery_and_a_clean_state_worktree() {
     let fixture = missing_baseline_fixture("recovery-fail-closed");
     let error = fixture.service(&fixture.b).sync().unwrap_err();
+    assert!(matches!(&error, RefineError::StateSyncMissingBaseline(_)));
     let message = error.to_string();
     assert!(message.contains("baseline is missing"), "{message}");
     assert!(message.contains("state-recovery preview"), "{message}");
@@ -634,6 +635,13 @@ fn recovery_rejects_stale_live_and_remote_previews_without_a_baseline() {
             .to_string()
             .contains("live state snapshot changed")
     );
+    assert!(matches!(
+        live_error,
+        RefineError::StateRecoveryConflict {
+            reason: crate::process::supervisor::errors::StateRecoveryConflictReason::StalePreview,
+            ..
+        }
+    ));
     assert!(
         !git_common_dir(&fixture.b)
             .unwrap()
@@ -686,6 +694,13 @@ fn recovery_honors_configured_remote_and_rejects_repository_lock_contention() {
         .apply_state_recovery(StateRecoveryAuthority::Remote, preview)
         .unwrap_err();
     assert!(error.to_string().contains("Git operations are busy"));
+    assert!(matches!(
+        error,
+        RefineError::StateRecoveryConflict {
+            reason: crate::process::supervisor::errors::StateRecoveryConflictReason::GitBusy,
+            ..
+        }
+    ));
     release_tx.send(()).unwrap();
     holder.join().unwrap();
 }

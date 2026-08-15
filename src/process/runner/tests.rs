@@ -105,6 +105,29 @@ fn state_sync_health_emits_one_failure_episode_and_one_recovery_activity() {
 }
 
 #[test]
+fn state_sync_missing_baseline_failure_records_typed_recovery_eligibility() {
+    let temp_root = std::env::temp_dir().join(format!(
+        "refine-state-sync-recovery-kind-{}",
+        uuid::Uuid::new_v4()
+    ));
+    let target_root = temp_root.join("target");
+    let runtime_root = temp_root.join("run/8082");
+    std::fs::create_dir_all(target_root.join(".refine")).unwrap();
+    let error = RefineError::StateSyncMissingBaseline("baseline missing".to_string());
+
+    record_state_sync_failure(&runtime_root, &target_root, "default", &error).unwrap();
+
+    let health = FileStateSyncHealthService::new(&runtime_root)
+        .inspect(&target_root, "default", Duration::from_secs(900))
+        .unwrap();
+    assert_eq!(
+        health.recovery_kind,
+        Some(crate::tools::host::state_sync_health::StateSyncRecoveryKind::MissingBaseline)
+    );
+    std::fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn source_worker_inherits_debug_executable_without_installed_binary() {
     let checkout = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .canonicalize()

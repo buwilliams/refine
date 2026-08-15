@@ -214,16 +214,24 @@ refine project state-recovery apply --authority live \
    The equivalent daemon API is
    `GET /api/project/state-recovery/preview` followed by
    `POST /api/project/state-recovery/apply` with `authority` and the complete
-   `preview` object.
+   `preview` object. When authoritative Dashboard health reports recovery kind
+   `missing_baseline`, the Dashboard exposes the same neutral preview and
+   requires a separate authority choice and exact-preview confirmation. It
+   never recommends or preselects authority.
 4. Read the result and inspect the reported recovery ref and manifest under the
    repository's Git common directory in `refine-state-recoveries/`. The bounded
    manifest records authority, node, target and remote identity, before/after
    heads, counts, timestamps, outcome, and recovery location. Only a successful
    result creates the baseline.
 5. If apply fails or is interrupted, do not delete its recovery ref or
-   manifest and do not fabricate a baseline. Retry with the same preview when
-   the failure is retryable; a changed target, repository, remote, remote head,
-   or unrelated live write requires a new preview and operator review.
+   manifest and do not fabricate a baseline. A `409` reason of `git_busy`
+   retains the same preview for retry, but requires deliberate confirmation
+   again. A `409` reason of `stale_preview` requires a new preview, authority
+   choice, and confirmation. Any changed target, repository, remote, remote
+   head, or unrelated live write likewise requires new operator review. After
+   success, confirm that Dashboard state-sync health cleared and retain the
+   displayed audit ref, manifest, published and local heads, evidence identity,
+   counts, authority, and detail.
 
 Never run this live recovery from a Goal candidate or other isolated worktree.
 Run it through the daemon attached to the production target app. Recovery never

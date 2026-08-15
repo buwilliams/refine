@@ -56,6 +56,46 @@ fn failure_episode_is_redacted_and_recovery_is_transition_based() {
 }
 
 #[test]
+fn missing_baseline_recovery_kind_is_typed_and_cleared_by_success() {
+    let temp = temp_root("state-sync-recovery-kind");
+    let target = temp.join("target");
+    fs::create_dir_all(&target).expect("target");
+    let service = FileStateSyncHealthService::new(temp.join("run"));
+
+    service
+        .record_failure_with_recovery_kind(
+            &target,
+            "node-a",
+            "baseline is missing",
+            Some(StateSyncRecoveryKind::MissingBaseline),
+        )
+        .expect("typed failure");
+    let failed = service
+        .inspect(&target, "node-a", Duration::from_secs(900))
+        .expect("failed health");
+    assert_eq!(failed.status, "failed");
+    assert_eq!(
+        failed.recovery_kind,
+        Some(StateSyncRecoveryKind::MissingBaseline)
+    );
+    assert_eq!(
+        serde_json::to_value(&failed).unwrap()["recovery_kind"],
+        "missing_baseline"
+    );
+
+    service
+        .record_success(&target, "node-a")
+        .expect("recovered");
+    let recovered = service
+        .inspect(&target, "node-a", Duration::from_secs(900))
+        .expect("recovered health");
+    assert_eq!(recovered.status, "healthy");
+    assert_eq!(recovered.recovery_kind, None);
+
+    fs::remove_dir_all(temp).expect("cleanup");
+}
+
+#[test]
 fn binding_is_scoped_to_target_and_node() {
     let temp = temp_root("state-sync-binding");
     let target = temp.join("target");
@@ -121,6 +161,23 @@ fn deferrals_and_an_unconfigured_remote_are_neutral() {
     assert!(unconfigured.failure_since.is_none());
     assert!(unconfigured.aggregate_counts_authoritative);
 
+    service
+        .record_failure_with_recovery_kind(
+            &target,
+            "node-a",
+            "baseline missing",
+            Some(StateSyncRecoveryKind::MissingBaseline),
+        )
+        .expect("recovery failure");
+    service
+        .record_neutral(&target, "node-a", "unconfigured", Some(false))
+        .expect("remote removed");
+    let no_longer_eligible = service
+        .inspect(&target, "node-a", Duration::from_secs(900))
+        .expect("ineligible health");
+    assert_eq!(no_longer_eligible.status, "unconfigured");
+    assert_eq!(no_longer_eligible.recovery_kind, None);
+
     fs::remove_dir_all(temp).expect("cleanup");
 }
 
@@ -145,6 +202,7 @@ fn freshness_derivation_crosses_the_wall_clock_threshold() {
         last_failure_source: None,
         last_conflict_report_id: None,
         last_conflict_report_location: None,
+        recovery_kind: None,
         last_reminder_at: None,
         remote_configured: Some(true),
         revision: 7,
@@ -186,6 +244,7 @@ fn correlated_attempt_settlement_keeps_newer_metadata_and_active_failure_evidenc
             "conflict",
             Some("report-1"),
             Some("/run/conflicts/latest.json"),
+            None,
         )
         .unwrap();
     let third = service
@@ -261,6 +320,7 @@ fn correlated_attempt_settlement_keeps_newer_metadata_and_active_failure_evidenc
             "late conflict",
             Some("stale-report"),
             Some("/run/conflicts/stale.json"),
+            None,
         )
         .unwrap();
     let still_healthy = service

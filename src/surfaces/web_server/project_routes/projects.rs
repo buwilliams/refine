@@ -261,8 +261,8 @@ impl InProcessWebServer {
     }
 
     pub(crate) fn handle_project_state_recovery_preview(&self) -> ApiResponse {
-        let service = match self.current_git_sync_service() {
-            Ok(Some(service)) => service,
+        let (service, target_root) = match self.current_git_sync_service_with_target() {
+            Ok(Some(service_and_target)) => service_and_target,
             Ok(None) => return target_root_unavailable("preview state synchronization recovery"),
             Err(error) => return error_response(error),
         };
@@ -308,7 +308,27 @@ impl InProcessWebServer {
             }
         };
         match service.apply_state_recovery_decision(decision, preview) {
-            Ok(result) => ApiResponse::json(200, serde_json::to_value(result).unwrap()),
+            Ok(result) => {
+                let health_settled = self.runtime_root.as_deref().is_some_and(|runtime_root| {
+                    crate::process::runner::settle_state_recovery_success(
+                        runtime_root,
+                        &target_root,
+                    )
+                    .is_ok()
+                });
+                let mut value = serde_json::to_value(result).unwrap();
+                if let Value::Object(fields) = &mut value {
+                    fields.insert("health_settled".to_string(), json!(health_settled));
+                    fields.insert(
+                        "state_sync_health".to_string(),
+                        self.current_state_sync_health()
+                            .ok()
+                            .flatten()
+                            .map_or(Value::Null, |health| json!(health)),
+                    );
+                }
+                ApiResponse::json(200, value)
+            }
             Err(error) => error_response(error),
         }
     }

@@ -27,6 +27,8 @@ Current implementation details that matter to intent:
 - failed or stale sync is prominent needs-attention state, and all-node counts
   keep one compact explicit non-authoritative label while degraded; the
   Dashboard does not load or render the complete path set;
+- only the typed missing-baseline condition opens the daemon-backed recovery preview. The Dashboard presents complete target, repository, head, snapshot, count, bounded-conflict, and evidence identity without recommending or preselecting authority; live or remote authority and exact-preview confirmation are separate deliberate actions;
+- Git-busy recovery rejection retains the preview but invalidates confirmation before retry. Stale-preview rejection clears the preview and choice until a fresh preview is reviewed. Successful recovery retains its audit ref, manifest, resulting heads, authority, counts, detail, and evidence while authoritative state-sync health refreshes and shows the failure cleared;
 - typed state-sync-health SSE updates refresh Dashboard, Nodes, and Logs on failure, stale-threshold crossing, recovery, initial connection, and reconnect;
 - workflow visualization is shared with the Goals screen;
 - an intentionally paused workflow is neutral operating context, not a runtime-worker failure needing attention;

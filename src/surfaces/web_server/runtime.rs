@@ -98,6 +98,14 @@ impl InProcessWebServer {
     }
 
     pub(super) fn current_git_sync_service(&self) -> RefineResult<Option<FileGitSyncService>> {
+        Ok(self
+            .current_git_sync_service_with_target()?
+            .map(|(service, _)| service))
+    }
+
+    pub(super) fn current_git_sync_service_with_target(
+        &self,
+    ) -> RefineResult<Option<(FileGitSyncService, PathBuf)>> {
         let Some(target_root) = self.current_target_root()? else {
             return Ok(None);
         };
@@ -105,7 +113,10 @@ impl InProcessWebServer {
             .runtime_root
             .clone()
             .unwrap_or(refine_dir_for_target_root(&target_root)?.join("runtime"));
-        Ok(Some(FileGitSyncService::new(target_root, runtime_root)))
+        Ok(Some((
+            FileGitSyncService::new(&target_root, runtime_root),
+            target_root,
+        )))
     }
 
     pub(super) fn app_registry_runtime_root(&self) -> Option<PathBuf> {

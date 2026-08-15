@@ -17,6 +17,12 @@ pub const STATE_SYNC_HEALTH_FILE: &str = "state-sync-health.json";
 const STATE_SYNC_HEALTH_LOCK_FILE: &str = "state-sync-health.lock";
 const FAILURE_REMINDER_INTERVAL: Duration = Duration::from_secs(30 * 60);
 
+#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StateSyncRecoveryKind {
+    MissingBaseline,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct StateSyncHealthRecord {
     pub target_root: String,
@@ -44,6 +50,8 @@ pub struct StateSyncHealthRecord {
     pub last_conflict_report_id: Option<String>,
     #[serde(default)]
     pub last_conflict_report_location: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recovery_kind: Option<StateSyncRecoveryKind>,
     pub last_reminder_at: Option<String>,
     pub remote_configured: Option<bool>,
     pub revision: u64,
@@ -67,6 +75,8 @@ pub struct StateSyncHealth {
     pub last_failure_source: Option<String>,
     pub last_conflict_report_id: Option<String>,
     pub last_conflict_report_location: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recovery_kind: Option<StateSyncRecoveryKind>,
     pub remote_configured: Option<bool>,
     pub stale_threshold_seconds: u64,
     pub aggregate_counts_authoritative: bool,
@@ -145,6 +155,9 @@ impl FileStateSyncHealthService {
             record.last_attempt_outcome = Some(outcome.to_string());
             if let Some(remote_configured) = remote_configured {
                 record.remote_configured = Some(remote_configured);
+                if !remote_configured {
+                    record.recovery_kind = None;
+                }
             }
         })
     }
@@ -161,6 +174,9 @@ impl FileStateSyncHealthService {
             record.last_attempt_outcome = Some(outcome.to_string());
             if let Some(remote_configured) = remote_configured {
                 record.remote_configured = Some(remote_configured);
+                if !remote_configured {
+                    record.recovery_kind = None;
+                }
             }
         })
     }
@@ -185,6 +201,7 @@ impl FileStateSyncHealthService {
             record.last_error = None;
             record.last_conflict_report_id = None;
             record.last_conflict_report_location = None;
+            record.recovery_kind = None;
             record.last_reminder_at = None;
             record.remote_configured = Some(true);
         })?;
@@ -215,6 +232,7 @@ impl FileStateSyncHealthService {
                 record.last_reminder_at = None;
                 record.last_conflict_report_id = None;
                 record.last_conflict_report_location = None;
+                record.recovery_kind = None;
             }
             let now = now_timestamp();
             if is_latest_attempt {
@@ -234,6 +252,16 @@ impl FileStateSyncHealthService {
         node_id: &str,
         error: &str,
     ) -> RefineResult<Option<StateSyncHealthActivity>> {
+        self.record_failure_with_recovery_kind(target_root, node_id, error, None)
+    }
+
+    pub fn record_failure_with_recovery_kind(
+        &self,
+        target_root: &Path,
+        node_id: &str,
+        error: &str,
+        recovery_kind: Option<StateSyncRecoveryKind>,
+    ) -> RefineResult<Option<StateSyncHealthActivity>> {
         let error = redact_sync_error(error);
         let mut activity = None;
         self.update(target_root, node_id, |record| {
@@ -242,6 +270,7 @@ impl FileStateSyncHealthService {
             record.last_attempt_outcome = Some("failed".to_string());
             record.last_failure_at = Some(now.clone());
             record.last_error = Some(error.clone());
+            record.recovery_kind = recovery_kind;
             record.remote_configured = Some(true);
             if record.failure_since.is_none() {
                 record.failure_since = Some(now.clone());
@@ -269,6 +298,7 @@ impl FileStateSyncHealthService {
         error: &str,
         conflict_report_id: Option<&str>,
         conflict_report_location: Option<&str>,
+        recovery_kind: Option<StateSyncRecoveryKind>,
     ) -> RefineResult<Option<StateSyncHealthActivity>> {
         let error = redact_sync_error(error);
         let mut activity = None;
@@ -291,6 +321,7 @@ impl FileStateSyncHealthService {
             record.last_error = Some(error.clone());
             record.last_conflict_report_id = conflict_report_id.map(str::to_string);
             record.last_conflict_report_location = conflict_report_location.map(str::to_string);
+            record.recovery_kind = recovery_kind;
             record.remote_configured = Some(true);
             if record.failure_since.is_none() {
                 record.failure_since = Some(now.clone());
@@ -461,6 +492,7 @@ fn derive_health(
         last_failure_source: record.last_failure_source,
         last_conflict_report_id: record.last_conflict_report_id,
         last_conflict_report_location: record.last_conflict_report_location,
+        recovery_kind: record.recovery_kind,
         remote_configured: record.remote_configured,
         stale_threshold_seconds: stale_threshold.as_secs(),
         aggregate_counts_authoritative: !matches!(status, "failed" | "stale"),
@@ -503,6 +535,7 @@ fn new_record(target_root: String, node_id: &str) -> StateSyncHealthRecord {
         last_failure_source: None,
         last_conflict_report_id: None,
         last_conflict_report_location: None,
+        recovery_kind: None,
         last_reminder_at: None,
         remote_configured: None,
         revision: 0,
