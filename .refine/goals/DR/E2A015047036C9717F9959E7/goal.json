@@ -123,8 +123,55 @@
           },
           "started_at": "2026-08-15T23:39:04Z"
         },
-        "phase": "revise",
-        "phase_started_at": "2026-08-15T23:41:05Z",
+        "final_plan": {
+          "completed_at": "2026-08-15T23:42:25Z",
+          "git_after": {
+            "branch": "refine/DRE2A015047036C9717F9959E7/round-1",
+            "head_commit": "6d284fb82c3a8bb999558fcebb3c7f0cfe9eb083",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRE2A015047036C9717F9959E7/round-1",
+            "head_commit": "6d284fb82c3a8bb999558fcebb3c7f0cfe9eb083",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Give the existing host structured-output capability a cohesive bounded decoder for direct, fenced, mixed-text, completion-wrapped, and recursively stringified JSON without accepting ambiguous candidates or unbounded nesting and payloads.",
+                "id": "P1"
+              },
+              {
+                "description": "Preserve JSON parse failures and path-aware typed-deserialization errors for the selected candidate so structured-output repair identifies the exact contract field that failed.",
+                "id": "P2"
+              },
+              {
+                "description": "Route Plan, Criticize, and Revise responses through the shared decoder while retaining their phase-specific compactness, uniqueness, materiality, and complete criticism-resolution validators.",
+                "id": "P3"
+              },
+              {
+                "description": "Normalize only documented semantically equivalent criticism-resolution identifier spellings to canonical criticism_id before deserialization while continuing to reject missing, duplicate, unknown, or structurally different resolutions.",
+                "id": "P4"
+              },
+              {
+                "description": "Make the revise phase prompt and Goal Agent completion contract expose the canonical populated resolution shape with criticism_id and resolution fields, derived from the same typed contract used by the workflow.",
+                "id": "P5"
+              },
+              {
+                "description": "Add focused contract fixtures for the observed successful envelopes and identifier variants plus malformed, ambiguous, over-nested, duplicate, unknown, and incomplete revise payloads.",
+                "id": "P6"
+              },
+              {
+                "description": "Update the planning intent page to describe bounded transport normalization, canonical typed planning artifacts, actionable repair diagnostics, and unchanged strict Plan-Criticize-Revise semantics.",
+                "id": "P7"
+              }
+            ],
+            "summary": "Refine will make governed planning decode agent responses through one bounded structured-output boundary and align the revise instructions with the typed criticism-resolution schema, so valid plans using supported completion envelopes or equivalent resolution identifier spellings survive transport differences while malformed, ambiguous, incomplete, or unrelated resolutions remain rejected with actionable field-level repair diagnostics."
+          },
+          "started_at": "2026-08-15T23:41:05Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-15T23:42:25Z",
         "proposal": {
           "completed_at": "2026-08-15T23:39:04Z",
           "git_after": {
@@ -175,7 +222,7 @@
         "schema_version": 2,
         "started_at": "2026-08-15T23:35:38Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T23:41:05Z"
+        "updated_at": "2026-08-15T23:42:25Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -189,7 +236,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T23:41:05Z",
+      "updated": "2026-08-15T23:42:25Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T23:35:38Z",
         "round_idx": 0,
@@ -199,8 +246,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-08-15T23:41:05Z",
-  "workflow_revision": 11
+  "updated": "2026-08-15T23:42:25Z",
+  "workflow_revision": 14
 }
