@@ -1,7 +1,7 @@
 {
   "base_commit": "f50b1571672da4a7c308d47918746eac3931bfaa",
   "branch_name": "refine/00000T01FHPGTHYNTM3B51W000/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "166300c1a57665ed720954d8376f610df4e93973",
   "created": "2026-08-15T15:02:01Z",
   "feature_id": null,
   "feature_order": null,
@@ -94,7 +94,28 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-15T15:27:30Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "f50b1571672da4a7c308d47918746eac3931bfaa",
@@ -105,6 +126,7 @@
           "round_idx": 0,
           "target_branch": "main"
         },
+        "completed_at": "2026-08-15T15:27:30Z",
         "criticism": {
           "completed_at": "2026-08-15T15:07:02Z",
           "git_after": {
@@ -210,6 +232,71 @@
           },
           "started_at": "2026-08-15T15:07:02Z"
         },
+        "implementation": {
+          "completed_at": "2026-08-15T15:27:30Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Added StateSyncMissingBaseline and optional serialized StateSyncRecoveryKind::MissingBaseline health evidence; success, generic failures, and unconfigured state clear eligibility without parsing text.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added daemon StateRecoveryConflictReason classifications and API error.reason values git_busy and stale_preview while generic errors omit reason.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added a dedicated Dashboard recovery controller gated only by authoritative failed health with recovery_kind missing_baseline; target, node, scope, route, eligibility, and preview changes reset review state.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Dashboard renders target/repository/remote identities, local and remote heads, snapshots/evidence, all four counts, bounded conflicts/truncation, and neutral live/remote consequences.",
+                "id": "P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Authority starts unselected; an exact-evidence confirmation is separately required, invalidates on authority/evidence/context changes, and gates apply.",
+                "id": "P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Browser posts only explicit authority and the unchanged complete preview; git_busy retains evidence but clears confirmation, while stale_preview clears preview, authority, and confirmation until explicit refresh.",
+                "id": "P6",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Successful apply settles authoritative state-sync health, refreshes Dashboard without losing the success panel, and displays cleared health, baseline creation, heads, audit ref, manifest, evidence identity, counts, authority, and detail.",
+                "id": "P7",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added daemon health/domain tests, API stale/busy/no-mutation/success/health-clearing coverage, and browser eligible-only fetch, complete render, neutral selection, confirmation invalidation, conflict recovery, exact payload, and success evidence tests.",
+                "id": "P8",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated only Dashboard intent, API intent, and the existing missing-baseline fleet runbook section for the new surface contracts.",
+                "id": "P9",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "rustfmt --edition 2024 --check src/process/runner.rs src/process/runner/state_sync_health.rs src/process/runner/tests.rs src/process/supervisor/errors/mod.rs src/surfaces/web_server/http/events.rs src/surfaces/web_server/project_routes/projects.rs src/surfaces/web_server/support/errors.rs src/surfaces/web_server/tests/git_changes.rs src/tools/host/git_sync/recovery/mod.rs src/tools/host/git_sync/recovery/service.rs src/tools/host/git_sync/service.rs src/tools/host/git_sync/tests/recovery.rs src/tools/host/source_promotion/git_support.rs src/tools/host/state_sync_health.rs src/tools/host/state_sync_health/tests.rs -> passed",
+              "cargo check -> passed",
+              "cargo test --lib tools::host::git_sync::tests::recovery -- --test-threads=1 -> 15 passed, 0 failed",
+              "cargo test --lib state_sync -- --test-threads=1 -> 15 passed, 0 failed",
+              "cargo test --lib state_recovery -- --test-threads=1 -> 3 passed, 0 failed",
+              "node --test tests/web_dashboard_attention.test.js -> 9 passed, 0 failed",
+              "cargo run --manifest-path xtask/Cargo.toml -- test-browser -> 199 passed, 0 failed, 27 skipped because no Playwright Chromium build is available",
+              "cargo test -> 840 passed, 1 failed, 6 ignored; unchanged baseline failure: prompts::tests::agent_prompts_keep_only_task_specific_contracts reports implementation_planning/plan.md is too prescriptive at 95 words; git diff --exit-code -- src/prompts passed",
+              "git diff --check -> passed"
+            ]
+          },
+          "report": "Implemented typed missing-baseline recovery eligibility and typed git_busy/stale_preview conflicts; added the neutral Dashboard preview, explicit authority plus exact-preview confirmation, safe retry/refresh fencing, successful health clearing and retained recovery evidence; updated focused intent/runbook documentation. Focused Rust/API/browser verification passes. The full Rust unit gate has one unchanged baseline prompt-length failure, with 840 passing and 6 ignored tests.",
+          "started_at": "2026-08-15T15:09:08Z"
+        },
         "phase": "implement",
         "phase_started_at": "2026-08-15T15:09:08Z",
         "proposal": {
@@ -265,11 +352,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-08-15T15:02:31Z",
-        "state": "in_progress",
-        "updated_at": "2026-08-15T15:09:08Z"
+        "state": "completed",
+        "updated_at": "2026-08-15T15:27:30Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Implemented typed missing-baseline recovery eligibility and typed git_busy/stale_preview conflicts; added the neutral Dashboard preview, explicit authority plus exact-preview confirmation, safe retry/refresh fencing, successful health clearing and retained recovery evidence; updated focused intent/runbook documentation. Focused Rust/API/browser verification passes. The full Rust unit gate has one unchanged baseline prompt-length failure, with 840 passing and 6 ignored tests.",
+      "implementation_reported_at": "2026-08-15T15:27:30Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -280,7 +367,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T15:09:08Z",
+      "updated": "2026-08-15T15:27:30Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T15:02:31Z",
         "round_idx": 0,
@@ -290,8 +377,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-15T15:09:08Z",
-  "workflow_revision": 17
+  "updated": "2026-08-15T15:27:30Z",
+  "workflow_revision": 22
 }
