@@ -105,12 +105,63 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-08-15T15:02:31Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-08-15T15:04:10Z",
+        "proposal": {
+          "completed_at": "2026-08-15T15:04:10Z",
+          "git_after": {
+            "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-1",
+            "head_commit": "f50b1571672da4a7c308d47918746eac3931bfaa",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-1",
+            "head_commit": "f50b1571672da4a7c308d47918746eac3931bfaa",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Extend the dashboard state-sync health flow to discover and retain an eligible daemon recovery preview for the missing-baseline condition while keeping ordinary degraded, stale, detached, and ineligible states unchanged.",
+                "id": "P1"
+              },
+              {
+                "description": "Render the preview's target and repository identities, configured remote, local and remote heads, evidence and snapshot identifiers, all four path counts, bounded differing paths, truncation count, and plain-language consequences for live and remote authority.",
+                "id": "P2"
+              },
+              {
+                "description": "Add unselected live and remote authority controls and a separate deliberate confirmation gate bound to the currently displayed complete preview, resetting both whenever the preview is refreshed, replaced, rejected, or the dashboard context changes.",
+                "id": "P3"
+              },
+              {
+                "description": "Submit only the chosen authority and unchanged complete preview to the daemon apply endpoint, and handle Git-busy and stale-preview HTTP 409 responses as recoverable states with explicit fresh-preview and retry actions that require renewed review and confirmation.",
+                "id": "P4"
+              },
+              {
+                "description": "On successful apply, reconcile daemon-owned state-sync health and refresh the dashboard while preserving a success summary that displays the cleared error, created baseline, resulting local and remote heads, audit recovery ref, manifest path, counts, and returned recovery detail.",
+                "id": "P5"
+              },
+              {
+                "description": "Add focused browser regressions for complete preview rendering, neutral authority presentation, deliberate confirmation, confirmation invalidation, busy and stale recovery actions, successful evidence rendering, and post-apply health refresh behavior.",
+                "id": "P6"
+              },
+              {
+                "description": "Extend API regressions around the existing routes to cover complete-preview enforcement, Git-busy and stale 409 rejection without mutation, successful recovery evidence, and clearing of the prior state-sync health failure.",
+                "id": "P7"
+              },
+              {
+                "description": "Update only the dashboard and API intent pages and the existing missing-baseline runbook section to document the new browser recovery contract, its explicit authority boundary, conflict refresh behavior, and retained audit evidence.",
+                "id": "P8"
+              }
+            ],
+            "summary": "Add a recovery panel to the dashboard's degraded state-sync health experience that uses the existing daemon preview and apply endpoints to make the exceptional missing-baseline condition understandable and safely actionable without weakening fail-closed synchronization: it will show the complete bounded comparison and consequences of each authority choice, require an unselected explicit choice plus deliberate confirmation, invalidate reviewed evidence on conflicts, and retain the successful heads, audit ref, manifest, and health-clearing evidence."
+          },
+          "started_at": "2026-08-15T15:02:31Z"
+        },
         "schema_version": 2,
         "started_at": "2026-08-15T15:02:31Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T15:02:31Z"
+        "updated_at": "2026-08-15T15:04:10Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -124,7 +175,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T15:02:31Z",
+      "updated": "2026-08-15T15:04:10Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T15:02:31Z",
         "round_idx": 0,
@@ -136,6 +187,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-15T15:02:31Z",
-  "workflow_revision": 9
+  "updated": "2026-08-15T15:04:10Z",
+  "workflow_revision": 11
 }
