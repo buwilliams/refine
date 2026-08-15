@@ -32,6 +32,7 @@ Current implementation details that matter to intent:
 - Todo commands require an explicit Reporter and route list and item operations through the shared daemon API and `FileTodoService`, returning the same machine-usable JSON as other Todo surfaces.
 - `goal draft` turns Plan text into exactly one reviewable, unpersisted Goal draft through the shared import-extraction API.
 - `goal approve` is the only CLI command for accepting a Goal after it reaches Review; obsolete verification and merge aliases are not retained.
+- `goal resolve-merged <id>` is the supported operator recovery for a Quality Goal whose authoritative current-Round candidate was already integrated. It routes through the daemon to the same idempotent, fail-closed resolver used by workflow automation and does not weaken Review-only approval.
 - `agent open` starts a general Agent by default. `--profile goal <goal-id>`
   attaches the current terminal to the workflow-owned Goal Agent, while
   `--profile plan` and `--profile standalone` open those role sessions. Ctrl-]

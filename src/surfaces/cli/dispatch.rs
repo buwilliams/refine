@@ -28,6 +28,8 @@ use features::dispatch_feature_daemon;
 use fleet::dispatch_fleet_daemon;
 #[cfg(not(test))]
 use goals::dispatch_goal_daemon;
+#[cfg(test)]
+pub(super) use goals::resolve_merged_daemon_route;
 #[cfg(not(test))]
 use logs::dispatch_log_daemon;
 #[cfg(not(test))]
@@ -607,6 +609,7 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
             | GoalAction::Start { target_root, .. }
             | GoalAction::Cancel { target_root, .. }
             | GoalAction::Retry { target_root, .. }
+            | GoalAction::ResolveMerged { target_root, .. }
             | GoalAction::Approve { target_root, .. }
             | GoalAction::Undo { target_root, .. }
             | GoalAction::Delete { target_root, .. }

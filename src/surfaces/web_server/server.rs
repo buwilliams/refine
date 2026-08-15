@@ -878,6 +878,7 @@ impl InProcessWebServer {
                 || request.path.ends_with("/approve")
                 || request.path.ends_with("/retry-quality")
                 || request.path.ends_with("/retry-governance")
+                || request.path.ends_with("/resolve-merged")
                 || request.path.ends_with("/undo"))
         {
             return self.handle_goal_action(request);

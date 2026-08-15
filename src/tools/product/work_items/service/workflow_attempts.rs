@@ -186,7 +186,7 @@ impl FileWorkItemService {
     }
 }
 
-fn goal_status(object: &Map<String, Value>) -> GoalStatus {
+pub(super) fn goal_status(object: &Map<String, Value>) -> GoalStatus {
     object
         .get("status")
         .and_then(Value::as_str)
@@ -194,7 +194,7 @@ fn goal_status(object: &Map<String, Value>) -> GoalStatus {
         .unwrap_or(GoalStatus::Backlog)
 }
 
-fn require_current_attempt(
+pub(super) fn require_current_attempt(
     goal_id: &str,
     object: &Map<String, Value>,
     authority: WorkflowAttemptAuthority,

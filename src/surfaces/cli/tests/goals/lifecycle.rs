@@ -1,6 +1,26 @@
 use super::*;
 
 #[test]
+fn goal_resolve_merged_cli_parses_and_dispatches_to_daemon_route() {
+    let parsed =
+        Cli::try_parse_from(["refine", "goal", "resolve-merged", "GOAL / merged"]).unwrap();
+    let Commands::Goal {
+        action: GoalAction::ResolveMerged {
+            id,
+            target_root: None,
+        },
+    } = parsed.command
+    else {
+        panic!("expected resolve-merged Goal action");
+    };
+    assert_eq!(id, "GOAL / merged");
+    assert_eq!(
+        resolve_merged_daemon_route(&id),
+        "/work/goals/GOAL%20%2F%20merged/resolve-merged"
+    );
+}
+
+#[test]
 fn goal_edit_note_delete_use_shared_file_work_item_service() {
     let temp_root = unique_temp_dir("cli-goal-edit-note-delete");
     let target_root = temp_root.clone();

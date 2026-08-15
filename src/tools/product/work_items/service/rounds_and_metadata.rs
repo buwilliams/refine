@@ -502,6 +502,7 @@ impl FileWorkItemService {
             "governance_message",
             "governance_details",
             "governance_checked_at",
+            "governance_candidate_commit",
             "governance_rule_actions",
             "governance_recovery_analysis",
             "governance_recovery_round_prompt",

@@ -1,3 +1,4 @@
+mod already_merged;
 mod bulk_operations;
 mod features;
 mod goal_authoring;
@@ -43,6 +44,10 @@ use crate::tools::product::project_projection::{
 
 use super::types::*;
 
+pub(crate) use already_merged::{
+    AlreadyMergedInspection, AlreadyMergedResolutionSnapshot, AlreadyMergedSettlement,
+    AlreadyMergedSettlementDecision,
+};
 use goal_filters::*;
 use record_persistence::*;
 use round_helpers::*;

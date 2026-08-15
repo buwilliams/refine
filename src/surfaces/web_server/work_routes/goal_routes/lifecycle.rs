@@ -89,6 +89,30 @@ impl InProcessWebServer {
             },
             "retry-quality" => service.retry_goal_quality_summary(goal_id),
             "retry-governance" => service.retry_goal_governance_summary(goal_id),
+            "resolve-merged" => {
+                let Some(runtime_root) = &self.runtime_root else {
+                    return runtime_root_unavailable("resolve already-merged Goals");
+                };
+                return match FileGovernanceIntegrationService::with_target_root(
+                    runtime_root,
+                    &service.refine_dir,
+                    &target_root,
+                )
+                .resolve_already_merged_goal(goal_id)
+                {
+                    Ok(resolution) => ApiResponse::json(
+                        200,
+                        json!({
+                            "ok": true,
+                            "message": goal_action_message(action),
+                            "resolution": resolution.disposition.as_str(),
+                            "goal": resolution.goal.goal,
+                            "evidence": resolution.evidence
+                        }),
+                    ),
+                    Err(error) => error_response(error),
+                };
+            }
             "undo" => service.undo_goal_summary(goal_id),
             _ => {
                 return ApiResponse::json(

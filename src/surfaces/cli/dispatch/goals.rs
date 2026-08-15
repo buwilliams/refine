@@ -273,6 +273,31 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
         }
         Commands::Goal {
             action:
+                GoalAction::ResolveMerged {
+                    id,
+                    target_root: Some(target_root),
+                },
+        } => {
+            let refine_dir = refine_dir_for_target_root(&target_root)?;
+            let resolution = FileGovernanceIntegrationService::with_target_root(
+                refine_dir.join("runtime"),
+                &refine_dir,
+                &target_root,
+            )
+            .resolve_already_merged_goal(&id)?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({
+                    "resolution": resolution.disposition.as_str(),
+                    "goal": resolution.goal.goal,
+                    "evidence": resolution.evidence
+                }))
+                .unwrap()
+            );
+            Ok(())
+        }
+        Commands::Goal {
+            action:
                 GoalAction::Undo {
                     id,
                     target_root: Some(target_root),
@@ -520,6 +545,10 @@ pub(super) fn dispatch_goal_daemon(action: GoalAction) -> RefineResult<()> {
             &format!("/work/goals/{}/approve", path_segment(&id)),
             None,
         )?,
+        GoalAction::ResolveMerged {
+            id,
+            target_root: None,
+        } => daemon_json("POST", &resolve_merged_daemon_route(&id), None)?,
         GoalAction::Undo {
             id,
             target_root: None,
@@ -579,6 +608,10 @@ pub(super) fn dispatch_goal_daemon(action: GoalAction) -> RefineResult<()> {
     };
     print_json(&response);
     Ok(())
+}
+
+pub(in crate::surfaces::cli) fn resolve_merged_daemon_route(goal_id: &str) -> String {
+    format!("/work/goals/{}/resolve-merged", path_segment(goal_id))
 }
 
 pub(super) fn write_goal_export(

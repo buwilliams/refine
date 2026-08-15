@@ -107,6 +107,10 @@ pub(super) fn new_round_value(reporter: &str, assignee: &str, prompt: &str) -> V
         Value::String(String::new()),
     );
     round.insert(
+        "governance_candidate_commit".to_string(),
+        Value::String(String::new()),
+    );
+    round.insert(
         "governance_rule_actions".to_string(),
         Value::Array(Vec::new()),
     );
