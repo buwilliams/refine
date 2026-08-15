@@ -23,6 +23,7 @@ Current implementation details that matter to intent:
 - command registration is shared rather than hardcoded only in page buttons;
 - file search integrates with toolbar file behavior;
 - keyboard selection should make the next Enter action explicit.
+- global palette shortcuts yield while focus is within the toolbar so terminal and agent interactions retain their native keyboard behavior.
 
 The palette should not become an unrelated shortcut list. It should mirror real product capability.
 

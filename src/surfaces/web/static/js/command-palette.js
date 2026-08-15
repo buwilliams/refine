@@ -23,6 +23,10 @@ function initCommandPalette() {
     if (document.querySelector(".modal-backdrop:not(.command-palette-backdrop)")) {
       return;
     }
+    const toolbarDock = document.querySelector("#toolbar-dock");
+    if (toolbarDock?.contains(e.target)) {
+      return;
+    }
     e.preventDefault();
     e.stopPropagation();
     openCommandPalette();
