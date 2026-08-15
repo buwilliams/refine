@@ -61,14 +61,13 @@ fn completion_signal_rejects_guidance_names_as_a_schema_error() {
     )
     .unwrap();
 
-    let error = SignalReader::default().take(&signal_path).unwrap_err();
+    let read = SignalReader::default().take(&signal_path).unwrap();
+    let SignalRead::Rejected(diagnostic) = read else {
+        panic!("schema-invalid signal must be rejected");
+    };
 
-    assert!(
-        error
-            .to_string()
-            .contains("does not match the required schema")
-    );
-    assert!(error.to_string().contains("guidance_applied"));
+    assert!(diagnostic.contains("does not match the required schema"));
+    assert!(diagnostic.contains("guidance_applied"));
     assert!(signal_path.is_file());
     fs::remove_dir_all(root).unwrap();
 }
@@ -81,10 +80,15 @@ fn completion_signal_allows_partial_json_only_for_the_write_grace_period() {
     fs::write(&signal_path, r#"{"state":"completed"#).unwrap();
     let mut reader = SignalReader::new(Duration::ZERO);
 
-    assert!(reader.take(&signal_path).unwrap().is_none());
-    let error = reader.take(&signal_path).unwrap_err();
+    assert!(matches!(
+        reader.take(&signal_path).unwrap(),
+        SignalRead::Pending
+    ));
+    let SignalRead::Rejected(diagnostic) = reader.take(&signal_path).unwrap() else {
+        panic!("stable invalid JSON must be rejected after the grace period");
+    };
 
-    assert!(error.to_string().contains("remained invalid JSON"));
+    assert!(diagnostic.contains("invalid JSON after 0 ms"));
     assert!(signal_path.is_file());
     fs::remove_dir_all(root).unwrap();
 }

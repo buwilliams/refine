@@ -340,6 +340,7 @@ where
     let mut planning_result = None;
     let completion_started_at = std::time::Instant::now();
     let mut signal_reader = SignalReader::default();
+    let mut invalid_signal_recovery = InvalidSignalRecovery::default();
     let status_result = (|| -> RefineResult<_> {
         loop {
             for command in read_commands_since(&command_path, &mut command_offset)? {
@@ -371,45 +372,77 @@ where
                 }
             }
 
-            if let Some(signal) = signal_reader.take(&signal_path)? {
-                match signal.state.trim() {
-                    "completed" | "complete" => {
-                        completed_by_signal = true;
-                        completion_report = (!signal.message.trim().is_empty())
-                            .then(|| signal.message.trim().to_string());
-                        guidance_applied = signal.guidance_applied;
-                        implementation_evidence = signal.implementation_evidence;
-                        planning_result = signal.planning_result;
-                        metadata.insert("attention_state".to_string(), json!("completed"));
-                        metadata.remove("attention_message");
-                        process.details = Some(encode_metadata(&metadata)?);
-                        supervisor.register(process.clone())?;
-                        let _ = child.kill();
+            let process_exit = child.try_wait().map_err(|error| {
+                RefineError::Io(format!("failed to inspect Goal Agent process: {error}"))
+            })?;
+            let signal_read = if process_exit.is_some() {
+                signal_reader.finish(&signal_path)?
+            } else {
+                signal_reader.take(&signal_path)?
+            };
+            match signal_read {
+                SignalRead::Pending => {
+                    if process_exit.is_some()
+                        && let Some(error) =
+                            invalid_signal_recovery.agent_exited_without_replacement(&signal_path)
+                    {
+                        return Err(error);
                     }
-                    "needs_input" | "waiting_for_user" => {
-                        let message = if signal.message.trim().is_empty() {
-                            "The Goal Agent needs user input before it can continue.".to_string()
-                        } else {
-                            signal.message.trim().to_string()
-                        };
-                        metadata.insert("attention_state".to_string(), json!("needs_input"));
-                        metadata.insert("attention_message".to_string(), json!(&message));
-                        metadata.insert("attention_reason".to_string(), json!("agent_signal"));
-                        process.details = Some(encode_metadata(&metadata)?);
-                        supervisor.register(process.clone())?;
-                        on_attention(GoalAgentAttention { message });
+                }
+                SignalRead::Rejected(diagnostic) => {
+                    match invalid_signal_recovery.reject(
+                        &signal_path,
+                        &diagnostic,
+                        process_exit.is_none(),
+                    )? {
+                        InvalidSignalDisposition::Retry(instruction) => {
+                            writer
+                                .write_all(instruction.as_bytes())
+                                .and_then(|_| writer.flush())
+                                .map_err(|error| {
+                                    RefineError::Io(format!(
+                                        "failed to send invalid-signal rewrite instruction to Goal Agent: {error}"
+                                    ))
+                                })?;
+                        }
+                        InvalidSignalDisposition::Fail(error) => return Err(error),
                     }
-                    other => {
-                        return Err(RefineError::InvalidInput(format!(
-                            "Goal Agent wrote unsupported session state {other}"
-                        )));
+                }
+                SignalRead::Valid(signal) => {
+                    invalid_signal_recovery.accept_valid();
+                    match signal.state {
+                        AgentSessionState::Completed => {
+                            completed_by_signal = true;
+                            completion_report = (!signal.message.trim().is_empty())
+                                .then(|| signal.message.trim().to_string());
+                            guidance_applied = signal.guidance_applied;
+                            implementation_evidence = signal.implementation_evidence;
+                            planning_result = signal.planning_result;
+                            metadata.insert("attention_state".to_string(), json!("completed"));
+                            metadata.remove("attention_message");
+                            process.details = Some(encode_metadata(&metadata)?);
+                            supervisor.register(process.clone())?;
+                            let _ = child.kill();
+                        }
+                        AgentSessionState::NeedsInput => {
+                            let message = if signal.message.trim().is_empty() {
+                                "The Goal Agent needs user input before it can continue."
+                                    .to_string()
+                            } else {
+                                signal.message.trim().to_string()
+                            };
+                            metadata.insert("attention_state".to_string(), json!("needs_input"));
+                            metadata.insert("attention_message".to_string(), json!(&message));
+                            metadata.insert("attention_reason".to_string(), json!("agent_signal"));
+                            process.details = Some(encode_metadata(&metadata)?);
+                            supervisor.register(process.clone())?;
+                            on_attention(GoalAgentAttention { message });
+                        }
                     }
                 }
             }
 
-            if let Some(status) = child.try_wait().map_err(|error| {
-                RefineError::Io(format!("failed to inspect Goal Agent process: {error}"))
-            })? {
+            if let Some(status) = process_exit {
                 break Ok(status);
             }
             if let Some(timeout) =
