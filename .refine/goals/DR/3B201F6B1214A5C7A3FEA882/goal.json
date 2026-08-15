@@ -106,8 +106,60 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-08-15T17:41:28Z",
+        "criticism": {
+          "completed_at": "2026-08-15T17:44:52Z",
+          "git_after": {
+            "branch": "refine/DR3B201F6B1214A5C7A3FEA882/round-1",
+            "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR3B201F6B1214A5C7A3FEA882/round-1",
+            "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P1",
+                  "P2",
+                  "P3",
+                  "P4",
+                  "P5",
+                  "P6",
+                  "P7"
+                ],
+                "description": "The checklist contains no verification item for a recovery path that can publish shared state, hydrate the live store, and advance durable authority, so completion would not require evidence for conflict-report completeness, stale fencing, push races, interruption recovery, health interleavings, or terminal CLI behavior.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Add a verification item covering first-pass and push-retry reports, atomic report persistence, stale and fabricated decisions, concurrent remote and live changes, interruption at each recovery boundary, health attempt interleavings, daemon-routed CLI success and failure, and the applicable non-external latency contract."
+              },
+              {
+                "checklist_item_ids": [
+                  "P4"
+                ],
+                "description": "Revalidating under the repository mutation lock does not fence Goal and other durable-state writers, so live state can change after preview validation and be overwritten during hydration or omitted from the new baseline; the item also does not explicitly preserve the existing resumable owned-apply semantics across publish, hydration, baseline, and manifest failure windows.",
+                "id": "C2",
+                "material": true,
+                "recommendation": "Require snapshot or per-path compare-and-swap fencing for every live-state mutation, preserve post-preview writes or fail before establishing the baseline, and make retries idempotently resume only the exact manifest-owned partial apply."
+              },
+              {
+                "checklist_item_ids": [
+                  "P5"
+                ],
+                "description": "The proposed merge of independently updated Round fields lacks an identity rule: GoalRound entries have no stable id, and combining positional round edits with status or other workflow fields can synthesize a record that no node wrote and that violates workflow authority.",
+                "id": "C3",
+                "material": true,
+                "recommendation": "Enumerate narrowly allowed merge families keyed by stable identity, keep rounds atomic unless identity and unchanged ordering are proven from the base, and deserialize plus validate the merged Goal and cross-field workflow invariants before treating the path as resolved."
+              }
+            ],
+            "summary": "Add verification and preserve strict live-state and Goal-round authority before implementation."
+          },
+          "started_at": "2026-08-15T17:41:28Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-08-15T17:44:52Z",
         "proposal": {
           "completed_at": "2026-08-15T17:41:27Z",
           "git_after": {
@@ -162,7 +214,7 @@
         "schema_version": 2,
         "started_at": "2026-08-15T17:38:31Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T17:41:28Z"
+        "updated_at": "2026-08-15T17:44:52Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -176,7 +228,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T17:41:28Z",
+      "updated": "2026-08-15T17:44:52Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T17:38:30Z",
         "round_idx": 0,
@@ -188,6 +240,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-15T17:41:28Z",
-  "workflow_revision": 9
+  "updated": "2026-08-15T17:44:52Z",
+  "workflow_revision": 11
 }
