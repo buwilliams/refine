@@ -160,6 +160,7 @@ fn operation() -> SourcePromotionOperation {
         registration_rollback_succeeded: None,
         observed_executable: None,
         rollback_evidence: None,
+        stashed_changes: None,
         agent_process_id: None,
         agent_worker_process_id: None,
         agent_provider: None,
@@ -398,13 +399,20 @@ fn source_promotion_affordance_covers_target_readiness_and_persisted_operations(
     assert_eq!(available.state, "available");
     assert!(available.title.contains("bbb"));
 
+    // A dirty checkout no longer blocks: queueing stashes and reports it.
     source.clean = false;
+    let dirty = source_promotion_affordance(true, &source);
+    assert!(dirty.enabled);
+    assert_eq!(dirty.state, "available");
+
+    source.fast_forward = false;
     let blocked = source_promotion_affordance(true, &source);
     assert!(!blocked.enabled);
     assert_eq!(blocked.state, "blocked");
-    assert!(blocked.title.contains("uncommitted changes"));
+    assert!(blocked.title.contains("fast-forward"));
 
     source.clean = true;
+    source.fast_forward = true;
     source.operation = Some(operation());
     let updating = source_promotion_affordance(true, &source);
     assert!(!updating.enabled);
@@ -421,6 +429,131 @@ fn source_promotion_affordance_covers_target_readiness_and_persisted_operations(
     let current = source_promotion_affordance(true, &source);
     assert!(current.enabled);
     assert_eq!(current.state, "current");
+}
+
+#[test]
+fn validate_update_intent_ignores_cleanliness_and_gates_on_reachable_updates() {
+    let mut snapshot = test_snapshot(Path::new("/refine"));
+    snapshot.clean = false;
+    assert!(validate_update_intent(&snapshot).is_ok());
+
+    snapshot.fast_forward = false;
+    let diverged = validate_update_intent(&snapshot).unwrap_err();
+    assert!(diverged.to_string().contains("diverged"));
+
+    snapshot.fast_forward = true;
+    snapshot.update_available = false;
+    let current = validate_update_intent(&snapshot).unwrap_err();
+    assert!(current.to_string().contains("already at the latest"));
+}
+
+#[test]
+fn stash_dirty_tree_preserves_work_in_a_named_stash_and_reports_it() {
+    let root = test_directory("source-stash-dirty");
+    initialize_git_repository(&root);
+    fs::write(
+        root.join("Cargo.toml"),
+        "[package]\nname = \"stash-fixture\"\nversion = \"0.1.0\"\n",
+    )
+    .unwrap();
+    git_ok(&root, &["add", "Cargo.toml"]).unwrap();
+    git_ok(&root, &["commit", "--quiet", "-m", "manifest"]).unwrap();
+    let service = FileSourcePromotionService::new(&root, root.join("run/8080"), 8080);
+
+    assert_eq!(service.stash_dirty_tree().unwrap(), None);
+
+    fs::write(root.join("fixture.txt"), "dirty tracked change\n").unwrap();
+    fs::write(root.join("untracked.txt"), "untracked work\n").unwrap();
+    let reference = service.stash_dirty_tree().unwrap().unwrap();
+    assert!(
+        reference.contains("refine-update-"),
+        "stash reference should carry the label: {reference}"
+    );
+    assert!(git_text(&root, &["status", "--porcelain"]).unwrap().is_empty());
+    let stash_list = git_text(&root, &["stash", "list"]).unwrap();
+    assert!(stash_list.contains("refine-update-"), "{stash_list}");
+    assert!(!root.join("untracked.txt").exists());
+
+    assert_eq!(service.stash_dirty_tree().unwrap(), None);
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn wait_for_terminal_reports_transitions_and_returns_the_terminal_operation() {
+    let root = test_directory("source-wait-terminal");
+    let runtime = root.join("run/8080");
+    let service = FileSourcePromotionService::new(root.join("checkout"), &runtime, 8080);
+    let mut running = operation();
+    running.status = "running".to_string();
+    running.stage = "build_candidate".to_string();
+    running.message = "Building the fetched source candidate before activation".to_string();
+    service.save_operation(&running).unwrap();
+
+    let writer_service = FileSourcePromotionService::new(root.join("checkout"), &runtime, 8080);
+    let mut later = running.clone();
+    let writer = std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(700));
+        later.stage = "stop_daemon".to_string();
+        later.message = "Candidate built; stopping the Refine daemon".to_string();
+        writer_service.save_operation(&later).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(700));
+        later.status = "succeeded".to_string();
+        later.stage = "complete".to_string();
+        later.message = "Latest source promoted and Refine is healthy".to_string();
+        writer_service.save_operation(&later).unwrap();
+    });
+
+    let mut transitions = Vec::new();
+    let terminal = service
+        .wait_for_terminal(
+            "source-test",
+            std::time::Duration::from_secs(20),
+            &mut |observed| transitions.push((observed.stage.clone(), observed.status.clone())),
+        )
+        .unwrap();
+    writer.join().unwrap();
+    assert_eq!(terminal.status, "succeeded");
+    assert_eq!(terminal.stage, "complete");
+    assert!(transitions.len() >= 2, "transitions: {transitions:?}");
+    assert_eq!(
+        transitions.first().map(|(stage, _)| stage.as_str()),
+        Some("build_candidate")
+    );
+    assert_eq!(
+        transitions.last().map(|(stage, _)| stage.as_str()),
+        Some("complete")
+    );
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn wait_for_terminal_rejects_a_superseding_operation_and_times_out_visibly() {
+    let root = test_directory("source-wait-mismatch");
+    let runtime = root.join("run/8080");
+    let service = FileSourcePromotionService::new(root.join("checkout"), &runtime, 8080);
+    let mut running = operation();
+    running.status = "running".to_string();
+    running.stage = "build_candidate".to_string();
+    service.save_operation(&running).unwrap();
+
+    let mismatch = service
+        .wait_for_terminal(
+            "source-someone-else",
+            std::time::Duration::from_secs(5),
+            &mut |_observed| {},
+        )
+        .unwrap_err();
+    assert!(mismatch.to_string().contains("superseded"));
+
+    let timeout = service
+        .wait_for_terminal(
+            "source-test",
+            std::time::Duration::from_millis(600),
+            &mut |_observed| {},
+        )
+        .unwrap_err();
+    assert!(timeout.to_string().contains("continues in the background"));
+    fs::remove_dir_all(root).unwrap();
 }
 
 #[path = "promotion_tests.rs"]

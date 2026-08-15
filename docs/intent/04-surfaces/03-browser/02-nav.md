@@ -33,7 +33,7 @@ Whenever the running Refine checkout and update channel are discoverable, the
 Controls menu exposes one compact source-update control independently of the
 attached target app. It reads authoritative cached state and moves through
 current, stale, checking, available, Agent progress, reconnecting, success,
-failure, and retry states. Upgrade is one-click authorization with no second
+failure, and retry states. Update is one-click authorization with no second
 confirmation; concurrent clients converge on the same operation and attempt.
 
 ## Future Direction

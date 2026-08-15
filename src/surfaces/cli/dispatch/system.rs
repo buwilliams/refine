@@ -67,27 +67,26 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
         Commands::System {
             action:
                 SystemAction::Update {
-                    yes,
+                    yes: _,
                     provider,
+                    no_rescue,
                     port,
                     runtime_root,
                 },
         } => {
             let paths = RefineCheckoutPaths::discover()?;
-            let runtime_root = resolve_system_runtime_root_for_paths(runtime_root, &paths)?;
-            let checkout_path = paths.checkout;
-            let provider = resolve_agent_provider(&runtime_root, provider)?;
-            let mut host =
-                FileDeployedUpdateHost::with_controlling_port(runtime_root.clone(), port);
-            let summary = run_deployed_update(
-                &mut host,
-                DeployedUpdateOptions::new(checkout_path, runtime_root)
-                    .with_assume_yes(yes)
-                    .with_provider(provider)
-                    .with_controlling_port(port),
+            let _ = resolve_system_runtime_root_for_paths(runtime_root, &paths)?;
+            let report = run_system_update(
+                &paths,
+                SystemUpdateOptions {
+                    provider,
+                    port,
+                    rescue: !no_rescue,
+                },
+                &mut |line| eprintln!("refine update: {line}"),
             );
-            print_json(&serde_json::to_value(&summary).unwrap());
-            if !summary.ok {
+            print_json(&serde_json::to_value(&report).unwrap());
+            if !report.ok {
                 return Err(RefineError::Degraded(
                     "system update failed; see JSON summary above".to_string(),
                 ));

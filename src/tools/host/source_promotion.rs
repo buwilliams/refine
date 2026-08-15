@@ -49,7 +49,7 @@ pub(crate) use agent::AgentLaunchFailpoint;
 pub use execution::run_source_promotion;
 pub use service::FileSourcePromotionService;
 pub use update_check::{CachedSourcePromotionStatus, SourceUpdateCheckState};
-pub use validation::validate_promotion;
+pub use validation::{validate_promotion, validate_update_intent};
 
 use git_support::*;
 use host::*;
@@ -111,6 +111,10 @@ pub struct SourcePromotionOperation {
     pub observed_executable: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rollback_evidence: Option<SourcePromotionRollbackEvidence>,
+    /// Stash commit that preserves uncommitted work found at queue time. The
+    /// stash is reported to the operator and never reapplied automatically.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stashed_changes: Option<String>,
     /// The one dedicated managed maintenance Agent launched for this operation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub agent_process_id: Option<String>,
@@ -212,6 +216,7 @@ impl SourcePromotionOperation {
             registration_rollback_succeeded: None,
             observed_executable: None,
             rollback_evidence: None,
+            stashed_changes: None,
             agent_process_id: None,
             agent_worker_process_id: None,
             agent_provider: None,
@@ -273,10 +278,9 @@ pub fn source_promotion_affordance(
         };
     }
 
+    // A dirty checkout is not a blocker: queueing an update stashes and
+    // reports uncommitted work automatically.
     let mut blockers = Vec::new();
-    if !source.clean {
-        blockers.push("checkout has uncommitted changes".to_string());
-    }
     if !source.fast_forward {
         blockers.push("upstream is not a fast-forward".to_string());
     }

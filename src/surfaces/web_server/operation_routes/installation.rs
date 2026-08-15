@@ -117,7 +117,7 @@ impl InProcessWebServer {
             return error_response(error);
         }
         error_response(RefineError::NotImplemented(
-            "HTTP system update is disabled; run `./r system update` from the Refine checkout so it can stop daemons, delegate the update to the configured agent, and restart ports.".to_string(),
+            "HTTP system update is disabled; use the Update control in the web UI or run `./r system update` from the Refine checkout — both queue the same restart-safe source promotion.".to_string(),
         ))
     }
 
@@ -325,8 +325,7 @@ impl InProcessWebServer {
                 .as_ref()
                 .filter(|operation| matches!(operation.status.as_str(), "failed" | "interrupted"))
             {
-                source_update.enabled =
-                    source.clean && source.fast_forward && source.update_available;
+                source_update.enabled = source.fast_forward && source.update_available;
                 source_update.state = operation.status.clone();
                 source_update.title = match operation.error.as_deref() {
                     Some(error) => format!("{}: {error}", operation.message),

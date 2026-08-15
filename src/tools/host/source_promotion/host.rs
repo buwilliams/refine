@@ -160,7 +160,7 @@ impl SourcePromotionHost for FileSourcePromotionHost {
         }
         if !self.previous_executable.is_file() {
             return Err(RefineError::NotFound(format!(
-                "checkout-local deployed binary is missing: {}; run `./r system update` before source promotion",
+                "checkout-local deployed binary is missing: {}; run `./r system build` to restore it, then retry the update",
                 self.previous_executable.display()
             )));
         }

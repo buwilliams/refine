@@ -188,6 +188,29 @@ impl FileSourcePromotionService {
         self.inspect(true)
     }
 
+    /// Preserve any uncommitted work in a named git stash so an update can
+    /// proceed on a clean tree. Returns the stash reference when work was
+    /// stashed, or `None` when the tree was already clean. The stash is never
+    /// reapplied automatically; it is reported to the operator instead.
+    pub(crate) fn stash_dirty_tree(&self) -> RefineResult<Option<String>> {
+        ensure_checkout(&self.checkout_path)?;
+        if git_text(&self.checkout_path, &["status", "--porcelain"])?.is_empty() {
+            return Ok(None);
+        }
+        let label = format!("refine-update-{}", now_timestamp());
+        git_ok(
+            &self.checkout_path,
+            &["stash", "push", "--include-untracked", "-m", &label],
+        )
+        .map_err(|error| {
+            RefineError::Conflict(format!(
+                "the checkout has uncommitted changes and they could not be preserved in a stash: {error}"
+            ))
+        })?;
+        let commit = git_text(&self.checkout_path, &["rev-parse", "stash@{0}"])?;
+        Ok(Some(format!("{commit} ({label})")))
+    }
+
     pub fn queue(&self) -> RefineResult<SourcePromotionOperation> {
         http_probe(self.port).map_err(|_| {
             RefineError::Conflict(format!(
@@ -276,6 +299,75 @@ impl FileSourcePromotionService {
             return Err(launch_error);
         }
         Ok(())
+    }
+
+    /// Block until the durable operation reaches a terminal status, invoking
+    /// `on_transition` whenever its (status, stage, message) triple changes.
+    ///
+    /// Polling is file-based and reconciles interrupted agents each tick, so
+    /// it survives the daemon restart that a successful promotion performs.
+    /// Brief read misses are tolerated: the projection is written by atomic
+    /// rename and the registry by compare-and-set, so a reader can catch a
+    /// gap between the two.
+    pub fn wait_for_terminal(
+        &self,
+        operation_id: &str,
+        timeout: Duration,
+        on_transition: &mut dyn FnMut(&SourcePromotionOperation),
+    ) -> RefineResult<SourcePromotionOperation> {
+        const MAX_CONSECUTIVE_MISSES: usize = 10;
+        let deadline = std::time::Instant::now() + timeout;
+        let mut last_transition: Option<(String, String, String)> = None;
+        let mut consecutive_misses = 0usize;
+        loop {
+            match self.reconcile_interrupted_agent() {
+                Ok(Some(operation)) => {
+                    consecutive_misses = 0;
+                    if operation.id != operation_id {
+                        return Err(RefineError::Conflict(format!(
+                            "source-update operation {operation_id} was superseded by {}",
+                            operation.id
+                        )));
+                    }
+                    let transition = (
+                        operation.status.clone(),
+                        operation.stage.clone(),
+                        operation.message.clone(),
+                    );
+                    if last_transition.as_ref() != Some(&transition) {
+                        last_transition = Some(transition);
+                        on_transition(&operation);
+                    }
+                    if matches!(
+                        operation.status.as_str(),
+                        "succeeded" | "failed" | "interrupted" | "cancelled"
+                    ) {
+                        return Ok(operation);
+                    }
+                }
+                Ok(None) => {
+                    consecutive_misses += 1;
+                    if consecutive_misses > MAX_CONSECUTIVE_MISSES {
+                        return Err(RefineError::NotFound(format!(
+                            "source-update operation {operation_id} disappeared while waiting for it"
+                        )));
+                    }
+                }
+                Err(error) => {
+                    consecutive_misses += 1;
+                    if consecutive_misses > MAX_CONSECUTIVE_MISSES {
+                        return Err(error);
+                    }
+                }
+            }
+            if std::time::Instant::now() >= deadline {
+                return Err(RefineError::Degraded(format!(
+                    "the update did not reach a terminal state within {}s; it continues in the background — watch `./r system source-status` or the web UI",
+                    timeout.as_secs()
+                )));
+            }
+            thread::sleep(Duration::from_millis(500));
+        }
     }
 
     pub fn run_helper(

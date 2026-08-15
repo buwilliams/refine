@@ -321,6 +321,44 @@ impl FileSourcePromotionService {
     }
 
     pub(crate) fn refresh_update_check_after_promotion(&self) -> RefineResult<()> {
+        self.refresh_cached_snapshot()
+    }
+
+    /// Run one forced remote inspection through the shared supervised worker
+    /// and block until it settles, returning the refreshed cached status.
+    /// Concurrent callers (including web-initiated checks) coalesce on the
+    /// same worker by construction, so this never races a second fetch.
+    pub fn refresh_cached_check_blocking(
+        &self,
+        timeout: Duration,
+    ) -> RefineResult<CachedSourcePromotionStatus> {
+        self.request_update_check(true)?;
+        let deadline = std::time::Instant::now() + timeout;
+        loop {
+            let status = self.inspect_cached()?;
+            if !status.check.in_flight {
+                if let Some(failure) = status.check.failure.as_ref() {
+                    return Err(RefineError::Degraded(format!(
+                        "the source update check failed: {failure}"
+                    )));
+                }
+                return Ok(status);
+            }
+            if std::time::Instant::now() >= deadline {
+                return Err(RefineError::Degraded(format!(
+                    "the source update check did not settle within {}s; retry or inspect it with `./r system source-status`",
+                    timeout.as_secs()
+                )));
+            }
+            thread::sleep(Duration::from_millis(250));
+        }
+    }
+
+    /// Re-inspect the local checkout (no fetch) and persist it as the fresh
+    /// cached snapshot, so readers of the cache immediately see the tree as it
+    /// is now (used after a promotion and after queue-time normalization such
+    /// as stashing dirty work).
+    pub(crate) fn refresh_cached_snapshot(&self) -> RefineResult<()> {
         let source = self.inspect(false)?;
         let _guard = self.acquire_update_check_lock()?;
         let mut state = self.read_update_check_state()?;
@@ -803,6 +841,61 @@ mod tests {
         let correlated = restarted.correlated_processes(&operation_id).unwrap();
         assert_eq!(correlated.len(), 1);
         let _ = FileProcessSupervisor::new(&runtime).signal(&correlated[0].id, "terminate");
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn blocking_check_surfaces_a_worker_that_dies_without_publishing() {
+        let root = std::env::temp_dir().join(format!(
+            "refine-source-check-blocking-failure-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let checkout = root.join("checkout");
+        let runtime = root.join("run/8080");
+        fs::create_dir_all(checkout.join("bin")).unwrap();
+        let worker = checkout.join("bin/refine");
+        fs::write(&worker, "#!/bin/sh\nexit 0\n").unwrap();
+        let mut permissions = fs::metadata(&worker).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&worker, permissions).unwrap();
+        let service = FileSourcePromotionService::new(&checkout, &runtime, 8080);
+
+        let error = service
+            .refresh_cached_check_blocking(Duration::from_secs(30))
+            .unwrap_err();
+        assert!(
+            error.to_string().contains("source update check failed"),
+            "{error}"
+        );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn blocking_check_times_out_while_the_worker_is_still_running() {
+        let root = std::env::temp_dir().join(format!(
+            "refine-source-check-blocking-timeout-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let checkout = root.join("checkout");
+        let runtime = root.join("run/8080");
+        fs::create_dir_all(checkout.join("bin")).unwrap();
+        let worker = checkout.join("bin/refine");
+        fs::write(&worker, "#!/bin/sh\nsleep 5\n").unwrap();
+        let mut permissions = fs::metadata(&worker).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&worker, permissions).unwrap();
+        let service = FileSourcePromotionService::new(&checkout, &runtime, 8080);
+
+        let error = service
+            .refresh_cached_check_blocking(Duration::from_secs(1))
+            .unwrap_err();
+        assert!(error.to_string().contains("did not settle"), "{error}");
+        let state = service.read_update_check_state().unwrap();
+        if let Some(process_id) = state.process_id {
+            let _ = FileProcessSupervisor::new(&runtime).signal(&process_id, "terminate");
+        }
         let _ = fs::remove_dir_all(root);
     }
 }

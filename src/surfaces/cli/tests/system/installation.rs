@@ -82,3 +82,38 @@ fn system_update_no_longer_accepts_metadata_version_argument() {
 
     Cli::try_parse_from(["refine", "system", "update", "--runtime-root", "run"]).unwrap();
 }
+
+#[test]
+fn system_update_accepts_rescue_and_deprecated_confirmation_flags() {
+    let parsed = Cli::try_parse_from([
+        "refine",
+        "system",
+        "update",
+        "--no-rescue",
+        "--provider",
+        "claude",
+        "--port",
+        "9090",
+    ])
+    .unwrap();
+    let Commands::System {
+        action:
+            SystemAction::Update {
+                yes,
+                provider,
+                no_rescue,
+                port,
+                ..
+            },
+    } = parsed.command
+    else {
+        panic!("expected a system update command");
+    };
+    assert!(!yes);
+    assert!(no_rescue);
+    assert_eq!(provider.as_deref(), Some("claude"));
+    assert_eq!(port, 9090);
+
+    // `--yes` stays accepted (hidden) so existing scripts keep working.
+    Cli::try_parse_from(["refine", "system", "update", "--yes"]).unwrap();
+}

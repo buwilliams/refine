@@ -136,17 +136,19 @@ fn source_update_status_integration_drives_browser_states_across_reconnect() {
         .unwrap()
         .to_string();
 
-    fs::write(target_root.join("dirty.txt"), "leave untouched\n").unwrap();
+    // A dirty checkout no longer blocks the affordance: queueing an update
+    // stashes and reports uncommitted work automatically.
+    fs::write(target_root.join("dirty.txt"), "stashed at queue time\n").unwrap();
     let dirty_check = server.handle_source_status_for_checkout(true, target_root.clone());
     let dirty_operation = dirty_check.body["source_check"]["operation_id"]
         .as_str()
         .unwrap();
     service.run_update_check(dirty_operation).unwrap();
-    let blocked = server.handle_source_status_for_checkout(false, target_root.clone());
-    assert_eq!(blocked.status, 200);
-    assert_eq!(blocked.body["source_update"]["visible"], true);
-    assert_eq!(blocked.body["source_update"]["enabled"], false);
-    assert_eq!(blocked.body["source_update"]["state"], "blocked");
+    let dirty = server.handle_source_status_for_checkout(false, target_root.clone());
+    assert_eq!(dirty.status, 200);
+    assert_eq!(dirty.body["source_update"]["visible"], true);
+    assert_eq!(dirty.body["source_update"]["enabled"], true);
+    assert_eq!(dirty.body["source_update"]["state"], "available");
     fs::remove_file(target_root.join("dirty.txt")).unwrap();
     let clean_check = server.handle_source_status_for_checkout(true, target_root.clone());
     let clean_operation = clean_check.body["source_check"]["operation_id"]
@@ -174,6 +176,7 @@ fn source_update_status_integration_drives_browser_states_across_reconnect() {
         registration_rollback_succeeded: None,
         observed_executable: None,
         rollback_evidence: None,
+        stashed_changes: None,
         agent_process_id: None,
         agent_worker_process_id: None,
         agent_provider: None,

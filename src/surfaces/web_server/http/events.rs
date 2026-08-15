@@ -463,7 +463,7 @@ impl LocalHttpDaemon {
         }
         if let Some(runtime_root) = &self.server.runtime_root {
             let mut source_update_published = false;
-            if let Ok(checkout) = crate::tools::host::deployed_update::discover_refine_checkout() {
+            if let Ok(checkout) = crate::tools::host::checkout::discover_refine_checkout() {
                 let service = crate::tools::host::source_promotion::FileSourcePromotionService::new(
                     checkout,
                     runtime_root,

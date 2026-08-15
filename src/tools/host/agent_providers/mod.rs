@@ -99,10 +99,12 @@ pub fn smoke_ai_env_lock() -> &'static Mutex<()> {
 mod activity;
 mod output_parser;
 mod prompt_transport;
+mod resolve;
 mod service;
 mod spec;
 
 pub use prompt_transport::{PromptArtifactLease, PromptTransportKind, PromptTransportMetadata};
+pub use resolve::resolve_agent_provider;
 pub use service::HostAgentProviderService;
 
 use activity::*;

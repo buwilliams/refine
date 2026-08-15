@@ -127,16 +127,29 @@ exact original registration and retains the journal.
 
 ## Update Refine
 
-`./r system update --yes` performs this section automatically: it stops the running daemons, delegates the update to the configured agent provider with this runbook as context, and restarts the daemons afterward. If you are the agent delegated by `./r system update`, the daemons are already stopped: do not run `./r system update` again and do not start, stop, or restart Refine; complete the steps below and report the exact blocker if one fails.
+`./r system update` is the one-command update for a Git source checkout, and it queues the same restart-safe source promotion as the web UI's Controls > Management > Update Refine control — updating is handled in one place regardless of which surface starts it. The command:
 
-1. When updating manually (not delegated by `./r system update`), stop the running daemons first:
+- starts the daemon through its systemd/launchd service when one is registered (or directly otherwise) if it is not already running,
+- fetches the configured upstream through the shared cached update-check worker,
+- exits successfully without touching anything when the checkout is already current,
+- stashes uncommitted local changes automatically (`git stash push --include-untracked`), reports the stash reference, and never reapplies the stash itself,
+- builds the candidate release binary in an isolated worktree before any daemon stops,
+- hot-swaps `bin/refine`, fast-forwards the checkout, restarts through the service manager, and verifies the daemon's identity and health,
+- rolls back with recorded evidence when a step fails, and
+- escalates blockers deterministic logic cannot clear — a diverged checkout or a failed operation — to the configured agent provider once, then retries once (`--no-rescue` disables this).
+
+Progress is streamed as it happens and the final JSON report includes the operation record, any stash reference, and recovery guidance. Failed or interrupted updates started from the web UI stay retryable from the same Update control.
+
+The steps below remain for **gitless published installations** (a checkout without a usable `.git` directory), where `./r system update` fails closed and points here.
+
+1. Stop the running daemons first:
 
 ```bash
 cd <refine-checkout>
 ./r system stop --port <port>
 ```
 
-2. Bring the checkout up to the latest published release. If the checkout is a git repository that is ahead of the latest release (a development checkout), leave the working tree alone and skip to the build step. Otherwise fetch the latest release and copy it over the checkout without a `.git` directory:
+2. Fetch the latest release and copy it over the checkout without a `.git` directory:
 
 ```bash
 latest="$(
@@ -158,7 +171,7 @@ cd <refine-checkout>
 ./r system build
 ```
 
-4. When updating manually, restart Refine and verify it is healthy:
+4. Restart Refine and verify it is healthy:
 
 ```bash
 ./r system start --port <port>
@@ -215,7 +228,7 @@ Runtime lifecycle commands:
 ./r system stop --port <port>
 ./r system restart --port <port>
 ./r system repair --port <port>
-./r system update --yes
+./r system update
 ```
 
 Use `--runtime-root run` only as compatibility syntax for this checkout's

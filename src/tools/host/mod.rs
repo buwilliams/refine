@@ -1,7 +1,6 @@
 pub mod agent_providers;
 pub mod checkout;
 pub mod daemon_lifecycle;
-pub mod deployed_update;
 pub mod fleet;
 pub mod git_sync;
 pub mod git_worktrees;
@@ -13,4 +12,5 @@ pub mod quality;
 pub mod release;
 pub mod source_promotion;
 pub mod state_sync_health;
+pub mod system_update;
 pub mod target_apps;

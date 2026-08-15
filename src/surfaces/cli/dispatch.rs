@@ -70,16 +70,12 @@ use crate::surfaces::web_server::{
     API_CONTRACT_VERSION, API_GROUPS, InProcessWebServer, LocalHttpDaemon,
 };
 use crate::tools::host::agent_providers::{
-    AgentProviderService, HostAgentProviderService, ProviderInvocation,
+    AgentProviderService, HostAgentProviderService, ProviderInvocation, resolve_agent_provider,
 };
-use crate::tools::host::checkout::RefineCheckoutPaths;
+use crate::tools::host::checkout::{RefineCheckoutPaths, discover_refine_checkout};
 use crate::tools::host::daemon_lifecycle::{
     DaemonLifecycleAction, FileHostDaemonLifecycleService, execute_daemon_lifecycle,
     uninstall_daemon_installation,
-};
-use crate::tools::host::deployed_update::{
-    DeployedUpdateOptions, FileDeployedUpdateHost, discover_refine_checkout,
-    resolve_agent_provider, run_deployed_update,
 };
 use crate::tools::host::fleet::{
     FLEET_RUNBOOK_PATH, FileFleetService, FleetService, NodeRemoteUpdate, fleet_manage_prompt,
@@ -90,6 +86,7 @@ use crate::tools::host::node_init::{WorkerInitOptions, initialize_worker};
 use crate::tools::host::project_layout::prepare_refine_dir;
 use crate::tools::host::release::{FileReleaseService, ReleaseBump};
 use crate::tools::host::source_promotion::FileSourcePromotionService;
+use crate::tools::host::system_update::{SystemUpdateOptions, run_system_update};
 use crate::tools::observability::activity::{ActivityQuery, ActivityService, FileActivityService};
 use crate::tools::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
 use crate::tools::observability::processes::FileProcessStatusService;

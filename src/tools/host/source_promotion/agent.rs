@@ -90,25 +90,46 @@ impl FileSourcePromotionService {
                 self.port
             ))
         })?;
-        let snapshot = self.inspect_cached()?.source;
-        validate_source_update(&snapshot)?;
+        let mut snapshot = self.inspect_cached()?.source;
+        // Intent is validated before normalization: a checkout with no real,
+        // fast-forwardable update is never touched, so a dirty diverged tree
+        // reaches the operator (or a rescue Agent) exactly as it was found.
+        validate_update_intent(&snapshot)?;
+        let stashed_changes = self.stash_dirty_tree()?;
+        let with_stash_context = |error: RefineError| match &stashed_changes {
+            Some(reference) => append_error_context(
+                error,
+                &format!("local changes were preserved in stash {reference} and are not reapplied automatically"),
+            ),
+            None => error,
+        };
+        if stashed_changes.is_some() {
+            self.refresh_cached_snapshot().map_err(with_stash_context)?;
+            snapshot = self.inspect_cached().map_err(with_stash_context)?.source;
+        }
+        validate_source_update(&snapshot).map_err(with_stash_context)?;
         let supervisor = FileProcessSupervisor::new(&self.port_runtime_root);
-        let prior_paused = supervisor.pause_state()?.workflow_paused;
+        let prior_paused = supervisor
+            .pause_state()
+            .map_err(with_stash_context)?
+            .workflow_paused;
         let provider = provider.trim();
         if provider.is_empty() {
-            return Err(RefineError::InvalidInput(
+            return Err(with_stash_context(RefineError::InvalidInput(
                 "a configured installed Agent provider is required".to_string(),
-            ));
+            )));
         }
-        let (registry_operation, created) = self.register_exclusive_operation(
-            "maintenance:source-upgrade",
-            json!({
-                "kind": "source_upgrade_agent",
-                "checkout": snapshot.checkout_path,
-                "provider": provider,
-                "restart_recovery": "capability"
-            }),
-        )?;
+        let (registry_operation, created) = self
+            .register_exclusive_operation(
+                "maintenance:source-upgrade",
+                json!({
+                    "kind": "source_upgrade_agent",
+                    "checkout": snapshot.checkout_path,
+                    "provider": provider,
+                    "restart_recovery": "capability"
+                }),
+            )
+            .map_err(with_stash_context)?;
         if !created {
             return self.reconcile_interrupted_agent()?.ok_or_else(|| {
                 RefineError::Conflict(format!(
@@ -120,12 +141,20 @@ impl FileSourcePromotionService {
         let mut operation = SourcePromotionOperation::queued(&snapshot);
         operation.id = registry_operation.id;
         operation.stage = "agent_queued".to_string();
-        operation.message = "Refine upgrade Agent queued".to_string();
+        operation.message = match &stashed_changes {
+            Some(reference) => format!(
+                "Refine update Agent queued; local changes preserved in stash {reference} (not reapplied automatically)"
+            ),
+            None => "Refine update Agent queued".to_string(),
+        };
+        operation.stashed_changes = stashed_changes.clone();
         operation.pre_upgrade_workflow_paused = Some(prior_paused);
         operation.agent_provider = Some(provider.to_string());
-        let context_path = self.write_agent_context(&operation)?;
+        let context_path = self
+            .write_agent_context(&operation)
+            .map_err(with_stash_context)?;
         operation.agent_context_path = Some(context_path.display().to_string());
-        self.save_operation(&operation)?;
+        self.save_operation(&operation).map_err(with_stash_context)?;
 
         if failpoint.after_reservation() {
             return Err(RefineError::Degraded(
@@ -175,7 +204,7 @@ impl FileSourcePromotionService {
         if latest.stage == "agent_queued" {
             latest.status = "running".to_string();
             latest.stage = "agent_running".to_string();
-            latest.message = format!("Installed {provider} upgrade Agent is choosing its plan");
+            latest.message = format!("Installed {provider} update Agent is choosing its plan");
         }
         self.save_operation(&latest)?;
         Ok(latest)
@@ -310,7 +339,7 @@ impl FileSourcePromotionService {
         }
         operation.status = "failed".to_string();
         operation.stage = "restore_workflow_admission".to_string();
-        operation.message = "Refine upgrade requires workflow-admission recovery".to_string();
+        operation.message = "Refine update requires workflow-admission recovery".to_string();
         operation.error = Some(format!(
             "Primary outcome: {}; workflow-admission restoration failed: {error}",
             operation.primary_outcome.as_deref().unwrap_or("unknown")
@@ -336,7 +365,7 @@ impl FileSourcePromotionService {
     ) -> RefineResult<()> {
         operation.status = "failed".to_string();
         operation.stage = stage.to_string();
-        operation.message = format!("Refine upgrade failed during {stage}");
+        operation.message = format!("Refine update failed during {stage}");
         operation.error = Some(error.to_string());
         operation.recovery = Some(recovery.to_string());
         operation.updated_at = now_timestamp();
@@ -415,7 +444,7 @@ impl FileSourcePromotionService {
             if operation.agent_process_id.as_deref() != Some(processes[0].id.as_str()) {
                 operation.agent_process_id = Some(processes[0].id.clone());
                 operation.status = "running".to_string();
-                operation.message = "Adopted the installed upgrade Agent after restart".to_string();
+                operation.message = "Adopted the installed update Agent after restart".to_string();
                 operation.updated_at = now_timestamp();
                 self.save_operation(&operation)?;
             }
@@ -466,12 +495,12 @@ impl FileSourcePromotionService {
         operation.status = "interrupted".to_string();
         operation.stage = "agent_interrupted".to_string();
         operation.message =
-            "Refine upgrade Agent was interrupted before restart-safe handoff".to_string();
+            "Refine update Agent was interrupted before restart-safe handoff".to_string();
         operation.error = Some(format!(
             "{interruption}; no restart-safe promotion handoff is active"
         ));
         operation.recovery = Some(
-            "Preserved work and workflow admission were reconciled; retry the upgrade".to_string(),
+            "Preserved work and workflow admission were reconciled; retry the update".to_string(),
         );
         operation.updated_at = now_timestamp();
         self.save_operation(&operation)?;

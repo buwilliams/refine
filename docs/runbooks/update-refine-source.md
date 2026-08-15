@@ -1,4 +1,4 @@
-# Upgrade Refine Source
+# Update Refine from Source
 
 Outcome: a running Refine source checkout advances to its latest configured
 upstream commit only after the candidate builds, then restarts and reports
@@ -8,13 +8,19 @@ healthy. Published-release updates remain unchanged.
 
 - The invoked `bin/refine` belongs to the same source checkout being inspected.
 - The controller checkout is on a branch with a reachable configured remote.
-- The controller checkout has no staged, unstaged, or untracked changes.
 - The fetched commit is a fast-forward descendant of the current commit.
-- The installed upgrade Agent can pause new workflow admission and observe or
+- The installed update Agent can pause new workflow admission and observe or
   safely reconcile preserved active work on the selected port.
 
-Do not stash, reset, merge, or discard work to satisfy these checks. Resolve a
-dirty or divergent checkout explicitly before retrying.
+Uncommitted staged, unstaged, or untracked changes are not a blocker: queueing
+an update preserves them automatically in a named git stash
+(`refine-update-<timestamp>`), reports the stash reference in the operation
+record and UI, and never reapplies the stash itself. The stash is created only
+after a real fast-forward update is confirmed, so a checkout with nothing to do
+is never touched. Local commits that diverge from the upstream still block
+promotion; `./r system update` can escalate divergence to the configured agent
+provider once, while the granular `system source-promote` path stays strict and
+performs no stashing at all.
 
 This workflow is unavailable for a gitless published product home. Use the
 published-release update workflow there; do not add Git metadata or infer a
@@ -29,18 +35,27 @@ once per hour by default; duplicate manual clicks and clients share one
 supervised fetch.
 
 1. Use the enabled main-navigation refresh icon, or open **Node → Refine (dev)**
-   and find **Upgrade** for the detailed status.
+   and find **Update** for the detailed status.
 2. In the detailed view, select **Check for source updates**. Confirm the checkout, current commit,
    upstream remote/branch, and available commit.
 3. If the panel reports a blocker, resolve it without overwriting work and
    check again.
-4. Select **Upgrade Refine** once. This authorizes the installed maintenance
-   Agent; there is no confirmation dialog.
+4. Select **Update Refine** once. This authorizes the installed maintenance
+   Agent; there is no confirmation dialog. A failed or interrupted operation
+   re-enables the control for a manual retry.
 5. Keep the page open or return to it later. The panel reconnects and polls the
    durable operation state through the daemon restart.
 6. Require the final message `Latest source promoted and Refine is healthy`.
 
 ## CLI Parity
+
+Run the complete one-command update (queues the same operation as the UI
+control, waits for the terminal state, streams progress, and escalates
+blockers to the configured agent provider once):
+
+```sh
+./r system update --port 8082 --runtime-root run
+```
 
 Inspect without fetching:
 

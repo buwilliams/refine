@@ -36,10 +36,11 @@ function renderSettingsReleasesTab(releases = {}) {
 function renderSourcePromotionSection() {
   return `
     <section class="settings-section" data-testid="source-upgrade-section">
-      <h3>Upgrade</h3>
+      <h3>Update</h3>
       <p class="muted small" style="margin-top:0">
         Check and promote the configured upstream source separately from published release updates.
-        The upgrade Agent preserves workflow admission intent, drains managed work, builds before shutdown, and uses the shared restart-safe promotion and rollback authority.
+        The update Agent preserves workflow admission intent, drains managed work, builds before shutdown, and uses the shared restart-safe promotion and rollback authority.
+        Uncommitted local changes are stashed automatically and reported; they are never reapplied automatically.
       </p>
       <div id="source-promotion-status" aria-live="polite" aria-busy="true">
         <p class="muted">Loading source checkout…</p>
@@ -49,7 +50,7 @@ function renderSourcePromotionSection() {
           Check for source updates
         </button>
         <button type="button" id="source-promotion-promote" data-testid="source-promotion-promote" disabled>
-          Upgrade Refine
+          Update Refine
         </button>
       </div>
     </section>`;
@@ -65,8 +66,9 @@ function sourcePromotionActiveOperation(source = {}) {
 }
 
 function sourcePromotionBlockers(source = {}) {
+  // A dirty checkout is not a blocker: queueing an update stashes and reports
+  // uncommitted work automatically.
   const blockers = [];
-  if (!source.clean) blockers.push("checkout has uncommitted changes");
   if (!source.fast_forward) blockers.push("upstream is not a fast-forward");
   if (!source.update_available) blockers.push("already at the fetched source commit");
   const operation = sourcePromotionActiveOperation(source);
@@ -75,7 +77,7 @@ function sourcePromotionBlockers(source = {}) {
 }
 
 function sourcePromotionIsReady(source = {}) {
-  return !!source.clean && !!source.fast_forward && !!source.update_available
+  return !!source.fast_forward && !!source.update_available
     && !sourcePromotionActiveOperation(source);
 }
 
@@ -97,13 +99,14 @@ function renderSourcePromotionStatus(source = {}, check = _sourceUpdateCheckSnap
         ${htmlEscape(operation.message || operation.stage || operation.status)}
         ${operation.error ? ` — ${htmlEscape(operation.error)}` : ""}
       </p>
+      ${operation.stashed_changes ? `<p class="muted small" data-testid="source-promotion-stash">Local changes preserved in stash ${htmlEscape(operation.stashed_changes)} (not reapplied automatically)</p>` : ""}
       ${operation.recovery ? `<p class="muted small" data-testid="source-promotion-recovery">Recovery: ${htmlEscape(operation.recovery)}</p>` : ""}
     ` : ""}
     <p class="muted small" data-testid="source-promotion-readiness">
       ${blockers.length
         ? `Promotion unavailable: ${htmlEscape(blockers.join("; "))}`
         : (source.update_available
-          ? `Ready for the upgrade Agent. ${htmlEscape((source.active_work || []).length
+          ? `Ready for the update Agent. ${htmlEscape((source.active_work || []).length
             ? "It will pause admission and wait for preserved managed work to settle."
             : "The runtime is already settled.")}`
           : "Refine is current at the last fetched source identity.")}
@@ -173,12 +176,12 @@ function applySourceUpdateNavStatus(result = {}) {
   button.dataset.updateAvailable = sourceUpdate.update_available ? "true" : "false";
   button.dataset.state = sourceUpdate.state || "unavailable";
   button.title = sourceUpdate.title || "Refine source update status is unavailable";
-  const upgradeAction = sourceUpdate.state === "available"
+  const updateAction = sourceUpdate.state === "available"
     || (["failed", "interrupted"].includes(sourceUpdate.state) && sourceUpdate.update_available);
-  updateSourceUpdateNavAction(button, upgradeAction
-    ? "Upgrade Refine"
+  updateSourceUpdateNavAction(button, updateAction
+    ? "Update Refine"
     : (["updating", "queued", "running"].includes(sourceUpdate.state)
-      ? "Upgrading Refine"
+      ? "Updating Refine"
       : "Check for updates"));
   updateSourceUpdateNavLabel(button, button.title);
   button.setAttribute("aria-label", button.title);
@@ -226,7 +229,7 @@ function handleSourceUpdateCheckSseEvent(payload = {}) {
   const title = active?.message || check.failure || (check.in_flight
     ? "Checking the configured Refine upstream"
     : (sourceReady
-      ? `Upgrade running Refine to ${shortSourceCommit(_sourceUpdateNavSnapshot.available_commit)}`
+      ? `Update running Refine to ${shortSourceCommit(_sourceUpdateNavSnapshot.available_commit)}`
       : (sourceBlocked
         ? `Refine source update unavailable: ${sourcePromotionBlockers(_sourceUpdateNavSnapshot).join("; ")}`
         : `Refine is current; last successful check: ${check.last_successful_check_at || "never"}`)));
@@ -329,8 +332,8 @@ async function promoteSourceFromNav() {
     button.title = result.operation?.message || "Source promotion queued";
     updateSourceUpdateNavLabel(button, button.title);
     button.setAttribute("aria-label", button.title);
-    updateSourceUpdateNavAction(button, "Upgrading Refine");
-    toast("Refine upgrade Agent queued; this page will reconnect after restart", "info");
+    updateSourceUpdateNavAction(button, "Updating Refine");
+    toast("Refine update Agent queued; this page will reconnect after restart", "info");
   } catch (error) {
     toast(error.message || "Source promotion could not start", "error");
     await refreshSourceUpdateNav();
@@ -363,7 +366,7 @@ function bindSourcePromotionControls() {
       current.source.operation = result.operation;
       applySourcePromotionStatus(current.source);
       applySourceUpdateNavStatus(current);
-      toast("Refine upgrade Agent queued; this page will reconnect after restart", "info");
+      toast("Refine update Agent queued; this page will reconnect after restart", "info");
     } catch (error) {
       toast(error.message || "Source promotion could not start", "error");
       await refreshSourcePromotionStatus();

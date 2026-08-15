@@ -558,3 +558,88 @@ fn interrupted_upgrade_agent_reconciles_pause_state_and_stays_retryable() {
 
     fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn queueing_an_update_stashes_dirty_work_and_records_the_reference_durably() {
+    let repo = initialize_promotion_repository("source-upgrade-auto-stash");
+    let runtime = repo.root.join("run/8080");
+    let port = spawn_single_http_probe();
+    let service = FileSourcePromotionService::new(&repo.checkout, &runtime, port);
+    persist_cached_source(&service, &repo);
+    fs::write(repo.checkout.join("fixture.txt"), "uncommitted local edit\n").unwrap();
+    fs::write(repo.checkout.join("scratch.txt"), "untracked local work\n").unwrap();
+
+    let error = service
+        .queue_agent_with_failpoint(
+            "smoke-ai",
+            Path::new("/mock/refine"),
+            AgentLaunchFailpoint::AfterReservation,
+        )
+        .unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("after source-upgrade reservation")
+    );
+
+    assert!(
+        git_text(&repo.checkout, &["status", "--porcelain"])
+            .unwrap()
+            .is_empty(),
+        "the tree must be clean after the automatic stash"
+    );
+    let stash_list = git_text(&repo.checkout, &["stash", "list"]).unwrap();
+    assert!(stash_list.contains("refine-update-"), "{stash_list}");
+
+    let operation = service.load_operation().unwrap().unwrap();
+    let reference = operation.stashed_changes.as_deref().unwrap();
+    assert!(reference.contains("refine-update-"), "{reference}");
+    assert!(
+        operation.message.contains("preserved in stash"),
+        "{}",
+        operation.message
+    );
+
+    let cached = service.inspect_cached().unwrap();
+    assert!(
+        cached.source.clean,
+        "the cached snapshot must reflect the stashed (clean) tree"
+    );
+
+    fs::remove_dir_all(repo.root).unwrap();
+}
+
+#[test]
+fn queueing_never_stashes_when_the_checkout_diverged_from_upstream() {
+    let repo = initialize_promotion_repository("source-upgrade-diverged-dirty");
+    // Diverge: a local commit that upstream does not contain.
+    fs::write(repo.checkout.join("local.txt"), "local divergent commit\n").unwrap();
+    git_ok(&repo.checkout, &["add", "local.txt"]).unwrap();
+    git_ok(
+        &repo.checkout,
+        &["commit", "--quiet", "-m", "local divergence"],
+    )
+    .unwrap();
+    let runtime = repo.root.join("run/8080");
+    let port = spawn_single_http_probe();
+    let service = FileSourcePromotionService::new(&repo.checkout, &runtime, port);
+    persist_cached_source(&service, &repo);
+    fs::write(repo.checkout.join("fixture.txt"), "uncommitted local edit\n").unwrap();
+
+    let error = service
+        .queue_agent_with("smoke-ai", Path::new("/mock/refine"))
+        .unwrap_err();
+    assert!(error.to_string().contains("diverged"), "{error}");
+
+    let status = git_text(&repo.checkout, &["status", "--porcelain"]).unwrap();
+    assert!(
+        status.contains("fixture.txt"),
+        "the dirty diverged tree must be left untouched: {status}"
+    );
+    assert!(
+        git_text(&repo.checkout, &["stash", "list"]).unwrap().is_empty(),
+        "no stash may be created for a diverged checkout"
+    );
+
+    fs::remove_dir_all(repo.root).unwrap();
+}

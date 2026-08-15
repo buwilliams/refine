@@ -138,7 +138,7 @@ impl FileSourcePromotionService {
         self.restore_workflow_admission(&mut operation)?;
         operation.status = "cancelled".to_string();
         operation.stage = "cancelled".to_string();
-        operation.message = "Source upgrade cancelled after helper ownership settled".to_string();
+        operation.message = "Source update cancelled after helper ownership settled".to_string();
         operation.error = None;
         operation.recovery = Some(
             "The exact pre-upgrade workflow-admission intent was restored; retry starts a new fenced attempt"
@@ -210,7 +210,7 @@ fn source_operation_from_handle(handle: &OperationHandle) -> SourcePromotionOper
         id: handle.id.clone(),
         status: "cancelling".to_string(),
         stage: "cancelling".to_string(),
-        message: "Source upgrade cancellation is reconciling".to_string(),
+        message: "Source update cancellation is reconciling".to_string(),
         checkout_path: handle
             .request
             .get("checkout")
@@ -231,6 +231,7 @@ fn source_operation_from_handle(handle: &OperationHandle) -> SourcePromotionOper
         registration_rollback_succeeded: None,
         observed_executable: None,
         rollback_evidence: None,
+        stashed_changes: None,
         agent_process_id: None,
         agent_worker_process_id: None,
         agent_provider: None,

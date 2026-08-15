@@ -44,17 +44,22 @@ pub enum SystemAction {
         #[arg(long, default_value = env!("CARGO_PKG_VERSION"))]
         version: String,
     },
-    /// Self-update Refine to the latest available version.
+    /// Update Refine to the latest fetched source commit using the same
+    /// restart-safe promotion the web Update control queues; uncommitted
+    /// changes are stashed and reported, never reapplied automatically.
     Update {
-        /// Skip the confirmation prompt.
-        #[arg(long)]
+        /// Deprecated: updates run without confirmation.
+        #[arg(long, hide = true)]
         yes: bool,
-        /// Agent provider that performs the update. Defaults to the target
-        /// app's configured provider, then the first installed provider CLI
-        /// in alphabetical order.
+        /// Agent provider that orchestrates the update and rescues failures.
+        /// Defaults to the target app's configured provider, then the first
+        /// installed provider CLI in alphabetical order.
         #[arg(long)]
         provider: Option<String>,
-        /// Port whose checkout-local runtime owns the update Agent artifacts.
+        /// Skip the one-shot agent rescue of blockers and failures.
+        #[arg(long)]
+        no_rescue: bool,
+        /// Port whose checkout-local runtime owns the update operation.
         #[arg(long, default_value_t = 8082)]
         port: u16,
         /// Runtime directory where Refine keeps daemon state.

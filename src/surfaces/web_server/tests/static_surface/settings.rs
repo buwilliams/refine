@@ -35,7 +35,9 @@ fn static_runtime_settings_expose_state_sync_controls() {
     ));
     assert!(!runtime.contains(r#"data-testid="source-upgrade-section""#));
     assert!(releases.contains(r#"data-testid="source-upgrade-section""#));
-    assert!(releases.contains("<h3>Upgrade</h3>"));
+    assert!(releases.contains("<h3>Update</h3>"));
+    assert!(!releases.contains("checkout has uncommitted changes"));
+    assert!(releases.contains(r#"data-testid="source-promotion-stash""#));
     assert!(!releases.contains("Dogfood source"));
     assert!(releases.contains(r#"data-testid="source-promotion-check""#));
     assert!(releases.contains(r#"data-testid="source-promotion-promote""#));
@@ -58,7 +60,7 @@ fn static_main_nav_exposes_refine_source_update_affordance() {
     assert!(releases.contains("button.disabled = sourceUpdate.enabled !== true"));
     assert!(releases.contains(r#"fetchRemote ? "/api/system/source/check""#));
     assert!(releases.contains(r#"api("POST", "/api/system/source/promote", {})"#));
-    assert!(releases.contains("Upgrade Refine"));
+    assert!(releases.contains("Update Refine"));
     assert!(releases.contains("source_check"));
     assert!(!releases.contains("window.confirm("));
     assert!(!releases.contains("hasAttachedProject()"));

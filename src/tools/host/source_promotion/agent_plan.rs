@@ -55,7 +55,7 @@ impl FileSourcePromotionService {
                     .set_workflow_paused(true)?;
                 operation.status = "running".to_string();
                 operation.stage = "admission_paused".to_string();
-                operation.message = "Upgrade Agent paused new workflow claims".to_string();
+                operation.message = "Update Agent paused new workflow claims".to_string();
                 json!({"workflow_admission_paused": paused.workflow_paused})
             }
             "observe-work" => {
@@ -68,7 +68,7 @@ impl FileSourcePromotionService {
                     operation.message = "Preserved managed work is settled".to_string();
                 } else {
                     operation.stage = "observing_work".to_string();
-                    operation.message = "Upgrade Agent is waiting for preserved work".to_string();
+                    operation.message = "Update Agent is waiting for preserved work".to_string();
                 }
                 json!({
                     "settled": snapshot.active_work.is_empty(),
@@ -125,7 +125,7 @@ impl FileSourcePromotionService {
                     || snapshot.available_commit != operation.to_commit
                 {
                     return Err(RefineError::Conflict(
-                        "source identities changed after authorization; check for updates and start a new upgrade"
+                        "source identities changed after authorization; check for updates and queue the update again"
                             .to_string(),
                     ));
                 }
@@ -157,7 +157,7 @@ impl FileSourcePromotionService {
                 operation.status = "running".to_string();
                 operation.stage = "handoff_selected".to_string();
                 operation.message =
-                    "Upgrade Agent selected restart-safe source promotion; reserving an attempt"
+                    "Update Agent selected restart-safe source promotion; reserving an attempt"
                         .to_string();
                 operation.updated_at = now_timestamp();
                 self.record_agent_decision(&mut operation, action, json!({"selected": true}))?;
