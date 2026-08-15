@@ -218,13 +218,13 @@ function drawDashboard(d, opts = {}) {
   // away — the container is gone, so just bail silently.
   if (!dash) return;
   renderInto(dash, `
-    ${renderDashboardStateSyncHealth(d)}
     ${renderWorkflowVisualization({
       counts,
       statuses: orderedStatuses,
       hrefForStatus: (s) => goalsHash({ status: s, node: scope }),
       className: "dashboard-status-grid",
     })}
+    ${renderDashboardStateSyncHealth(d)}
 
     ${showReviewPanel ? `
     <details class="filter-shell dashboard-collapsible-shell" id="reviews-for-reporter-card" data-testid="dashboard-review-panel"${reviewsShellOpen ? " open" : ""}>

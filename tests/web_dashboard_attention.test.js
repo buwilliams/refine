@@ -64,6 +64,22 @@ test("degraded state sync labels aggregate counts and exposes freshness metadata
   assert.match(html, /Stale since.*2026-08-14T12:15:00Z/);
 });
 
+test("dashboard state sync health renders below the workflow status grid", () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, "../src/surfaces/web/static/js/features/dashboard.js"),
+    "utf8",
+  );
+  const dashboardTemplate = source.slice(
+    source.indexOf("renderInto(dash, `"),
+    source.indexOf("`, () => {", source.indexOf("renderInto(dash, `")),
+  );
+
+  assert.ok(
+    dashboardTemplate.indexOf("renderWorkflowVisualization")
+      < dashboardTemplate.indexOf("renderDashboardStateSyncHealth"),
+  );
+});
+
 test("browser SSE reconciles state sync surfaces from authoritative endpoints", () => {
   const common = fs.readFileSync(
     path.join(__dirname, "../src/surfaces/web/static/js/common.js"),
