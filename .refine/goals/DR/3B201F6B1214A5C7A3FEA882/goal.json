@@ -673,11 +673,11 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T17:56:10Z",
+      "updated": "2026-08-15T18:44:51Z",
       "workflow_attempt_authority": {
-        "claimed_at": "2026-08-15T17:48:15Z",
+        "claimed_at": "2026-08-15T18:44:51Z",
         "round_idx": 1,
-        "workflow_revision": 15
+        "workflow_revision": 27
       },
       "workflow_reconciliation": null,
       "workflow_recovery": null
@@ -685,6 +685,6 @@
   ],
   "status": "implement",
   "target_branch": "main",
-  "updated": "2026-08-15T17:56:10Z",
-  "workflow_revision": 27
+  "updated": "2026-08-15T18:44:54Z",
+  "workflow_revision": 29
 }
