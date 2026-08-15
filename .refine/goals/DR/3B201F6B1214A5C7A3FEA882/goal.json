@@ -10,7 +10,7 @@
   "node_id": "default",
   "notes": [],
   "priority": "low",
-  "reporter": "buddy.williams@insurity.com",
+  "reporter": "Buddy Williams",
   "rounds": [
     {
       "agent_context": {
@@ -84,12 +84,12 @@
         "version": 1,
         "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
       },
-      "assignee": "buddy.williams@insurity.com",
+      "assignee": "Buddy Williams",
       "constitution_state": "unclassified",
       "created": "2026-08-15T17:38:28Z",
-      "failure_at": "",
-      "failure_category": "",
-      "failure_message": "",
+      "failure_at": "2026-08-15T17:47:53Z",
+      "failure_category": "plan",
+      "failure_message": "agent returned no valid structured implementation plan JSON",
       "governance_candidate_commit": "",
       "governance_checked_at": "",
       "governance_details": "",
@@ -158,6 +158,22 @@
           },
           "started_at": "2026-08-15T17:41:28Z"
         },
+        "failure": {
+          "category": "invalid_output",
+          "failed_at": "2026-08-15T17:47:53Z",
+          "git_after": {
+            "branch": "refine/DR3B201F6B1214A5C7A3FEA882/round-1",
+            "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR3B201F6B1214A5C7A3FEA882/round-1",
+            "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+            "status_porcelain": []
+          },
+          "message": "agent returned no valid structured implementation plan JSON",
+          "phase": "revise"
+        },
         "phase": "revise",
         "phase_started_at": "2026-08-15T17:44:52Z",
         "proposal": {
@@ -213,8 +229,8 @@
         },
         "schema_version": 2,
         "started_at": "2026-08-15T17:38:31Z",
-        "state": "in_progress",
-        "updated_at": "2026-08-15T17:44:52Z"
+        "state": "failed",
+        "updated_at": "2026-08-15T17:47:53Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -226,9 +242,9 @@
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
-      "reporter": "buddy.williams@insurity.com",
+      "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T17:44:52Z",
+      "updated": "2026-08-15T17:47:53Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T17:38:30Z",
         "round_idx": 0,
@@ -238,8 +254,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-08-15T17:44:52Z",
-  "workflow_revision": 11
+  "updated": "2026-08-15T17:47:53Z",
+  "workflow_revision": 14
 }
