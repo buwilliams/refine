@@ -1660,8 +1660,65 @@
           },
           "started_at": "2026-08-15T20:01:37Z"
         },
-        "phase": "revise",
-        "phase_started_at": "2026-08-15T20:05:33Z",
+        "final_plan": {
+          "completed_at": "2026-08-15T20:07:22Z",
+          "git_after": {
+            "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-3",
+            "head_commit": "d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-3",
+            "head_commit": "d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Three-way compare current main, the Round 2 base, and candidate 404761736282119b272595ae63a09808492b4f77, then selectively reapply the complete relevant behavior without blindly merging or modifying either retained Round worktree or unrelated current-main changes.",
+                "id": "P1"
+              },
+              {
+                "description": "Preserve the candidate's cohesive bounded planning and Quality output repair, versioned exact-candidate proof validation and clean-checkout regeneration, idempotent passed-proof reconciliation, serialized candidate refresh and replacement gates, shared recovery budget, and affected intent contracts while reconciling them with current main.",
+                "id": "P2"
+              },
+              {
+                "description": "Add a pre-launch restart-recovery path that, under the Goal mutation lock and exact originating Round and workflow-revision authority, validates an already-persisted failed isolated Quality proof or terminal operation for the same goal, candidate, source candidate, and regeneration operation and idempotently settles it without invoking a provider or resolver.",
+                "id": "P3"
+              },
+              {
+                "description": "Make the first newly returned quality.ok == false result enter the same fenced idempotent settlement immediately, atomically retaining its exact candidate and source commits, operation ID, isolated scope, timestamp, failed results, diagnostics, provider attempts, and explicit already-merged Quality failure category before returning terminal Failed with no approval, Review transition, resolver call, or later evaluation.",
+                "id": "P4"
+              },
+              {
+                "description": "Add behavior-level fail-then-pass or invocation-count regressions, including interruption after failed-proof persistence but before Goal settlement, proving exactly one Quality run, durable reuse of the first failed artifact, authority-safe terminal settlement, no approval or Review evidence, and no rerun during restart or repeated handling.",
+                "id": "P5"
+              },
+              {
+                "description": "Update only the affected Quality-agent and workflow intent pages to document that exact failed already-merged regeneration evidence is restart-recoverable, terminal, and never replaceable by a later evaluation.",
+                "id": "P6"
+              },
+              {
+                "description": "Produce the exact Round 3 handoff by rerunning the failed Quality command, every named focused suite, cargo check, scoped rustfmt and Clippy, and the broad suite with unchanged baseline exclusions reported separately, while fingerprinting both retained worktrees before and after and confirming the Round 3 diff is clean and reviewable.",
+                "id": "P7"
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "P3-P5 define pre-launch recovery and idempotent fenced settlement for an exact persisted failed proof or terminal operation, cover the new-result path, and test the crash window plus repeated handling so the first failure cannot be replaced."
+              },
+              {
+                "criticism_id": "C2",
+                "resolution": "P1 and P7 require before-and-after identity and dirtiness fingerprints for both retained worktrees, the failed command and all requested focused and broad checks, separate baseline reporting, and a clean Round 3 handoff."
+              }
+            ],
+            "summary": "Selectively recover candidate 404761736282119b272595ae63a09808492b4f77's complete infrastructure-reliability behavior onto current main while preserving newer main behavior and both retained Round worktrees unchanged, then close the already-merged reconciliation gap with a restart-safe first-result protocol: an exact failed isolated Quality artifact or terminal operation is recognized and settled under the originating Round and workflow revision before any provider launch, and a newly returned failure is retained and settled immediately without resolver use or regeneration. Existing passed-proof, output-repair, candidate-refresh, authority-fencing, and bounded-recovery behavior remains intact."
+          },
+          "started_at": "2026-08-15T20:05:33Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-15T20:07:23Z",
         "proposal": {
           "completed_at": "2026-08-15T20:01:37Z",
           "git_after": {
@@ -1708,7 +1765,7 @@
         "schema_version": 2,
         "started_at": "2026-08-15T19:58:08Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T20:05:33Z"
+        "updated_at": "2026-08-15T20:07:23Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -1722,7 +1779,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T20:05:33Z",
+      "updated": "2026-08-15T20:07:23Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T19:58:07Z",
         "round_idx": 2,
@@ -1732,8 +1789,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-08-15T20:05:33Z",
-  "workflow_revision": 49
+  "updated": "2026-08-15T20:07:23Z",
+  "workflow_revision": 52
 }
