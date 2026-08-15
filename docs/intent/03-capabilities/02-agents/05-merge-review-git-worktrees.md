@@ -22,9 +22,10 @@ This capability should connect workflow with the user's source repository:
 - todo Goals remain state-only regardless of queue size; an implementation
   worktree is created only after scheduler capacity is acquired and the Goal is
   durably in Plan;
-- Governance should serialize exact candidate integration after Quality passes;
+- Governance should acquire the integrated-target lease before final target revalidation and retain it through any candidate refresh, replacement gates, publication, integration, and settlement;
 - Governance should merge and push the isolated candidate exactly once before Review;
-- an integrated current-Round candidate may be reconciled to Review when exact passed Quality and Governance evidence still names that candidate and repository-coordinated observations prove it remains an ancestor of the local target and, when required, the published target. Unrelated descendant commits on a shared target are valid and both observed target snapshots remain inspectable;
+- ordinary target advancement may refresh only a clean candidate whose recorded base resolves, is its ancestor, whose target descends from that base, and whose delta is linear and unambiguous. Old and replacement identities and gate evidence remain inspectable, and replacement Quality and Governance run before integration. Conflict or ambiguity aborts without moving or deleting the original candidate and queues one fenced `integration` automatic-retry Round with target and conflict evidence, using the same monotonic attempt count and configured budget as Quality and Governance;
+- an integrated current-Round candidate may be reconciled to Review when candidate-bound passed Governance and retained, fully normalized, or regenerated isolated Quality proof names that candidate and repository-coordinated observations prove it remains an ancestor of the local target and, when required, the published target. Unrelated descendant commits on a shared target are valid and both observed target snapshots remain inspectable;
 - review should preserve human or agent judgment over the integrated result;
 - approval should mark the reviewed integration accepted without merging or pushing again;
 - failed or conflicted merges should create recoverable evidence;

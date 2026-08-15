@@ -286,6 +286,25 @@ impl FileGitWorktreeService {
             .collect())
     }
 
+    /// Prove that a base-to-candidate delta contains no merge commits.
+    ///
+    /// A linear range can be replayed by rebase without choosing an implicit merge mainline.
+    pub fn commit_range_is_linear(&self, base: &str, candidate: &str) -> RefineResult<bool> {
+        validate_commitish(base)?;
+        validate_commitish(candidate)?;
+        let range = format!("{base}..{candidate}");
+        let output = stdout(self.git_output(&["rev-list", "--merges", "--count", &range])?)?;
+        output
+            .trim()
+            .parse::<usize>()
+            .map(|count| count == 0)
+            .map_err(|error| {
+                RefineError::Serialization(format!(
+                    "Git returned an invalid merge count for {range}: {error}"
+                ))
+            })
+    }
+
     /// Return the paths changed by `commit` relative to the merge base with
     /// `base`. Keeping this query in the Git capability lets workflow policy
     /// classify the committed candidate without bypassing the shared command

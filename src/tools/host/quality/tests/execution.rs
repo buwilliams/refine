@@ -1,4 +1,5 @@
 use super::*;
+use crate::model::workflow::GoalStatus;
 
 #[test]
 fn quality_operation_settles_parsing_failure_and_persists_the_same_goal_evidence() {
@@ -19,6 +20,24 @@ fn quality_operation_settles_parsing_failure_and_persists_the_same_goal_evidence
         .pop()
         .unwrap();
     assert_eq!(operation.state, OperationState::Failed);
+    let (logs, _, _) = FileOperationRegistry::new(&fixture.runtime_root)
+        .page_logs(&operation.id, 50, 0)
+        .unwrap();
+    let attempts = logs
+        .iter()
+        .filter_map(|entry| {
+            entry
+                .details
+                .as_ref()
+                .and_then(|details| details.get("provider_attempt"))
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(attempts.len(), 3);
+    assert!(
+        attempts
+            .iter()
+            .all(|attempt| { attempt["raw_output"] == "not json" && attempt["accepted"] == false })
+    );
     assert!(
         operation.error.unwrap()["message"]
             .as_str()
@@ -28,7 +47,10 @@ fn quality_operation_settles_parsing_failure_and_persists_the_same_goal_evidence
     let detail = FileWorkItemService::new(&fixture.refine_dir)
         .show_goal_detail("GOAL1")
         .unwrap();
-    assert_eq!(detail["rounds"][0]["quality_state"], "failed");
+    assert_eq!(
+        detail["rounds"][0]["quality_state"],
+        "output_contract_fault"
+    );
     assert!(
         detail["rounds"][0]["quality_message"]
             .as_str()
@@ -36,6 +58,156 @@ fn quality_operation_settles_parsing_failure_and_persists_the_same_goal_evidence
             .contains("required JSON evaluation")
     );
     restore_smoke_ai(previous);
+    fs::remove_dir_all(fixture.temp_root).unwrap();
+}
+
+#[test]
+fn quality_repairs_one_invalid_response_and_retains_both_attempts() {
+    let fixture = goal_quality_fixture(
+        "quality-output-repair",
+        "if test ! -e \"$0.attempted\"; then : > \"$0.attempted\"; printf 'not json\\n'; else printf '%s\\n' '{\"summary\":\"repaired\",\"results\":[{\"test\":\"Outcome works\",\"status\":\"passed\",\"evidence\":\"repaired plan\",\"command\":\"printf ok\"}]}'; fi",
+    );
+    let _guard = smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
+    unsafe { std::env::set_var("REFINE_SMOKE_AI_PATH", &fixture.smoke_ai) };
+
+    let operation = fixture
+        .runner()
+        .run_goal_checks("GOAL1", "smoke-ai", Default::default())
+        .unwrap();
+    assert!(operation.result.ok, "{:#?}", operation.result);
+    assert_eq!(operation.result.provider_attempts.len(), 2);
+    assert!(!operation.result.provider_attempts[0].accepted);
+    assert_eq!(operation.result.provider_attempts[0].raw_output, "not json");
+    assert!(operation.result.provider_attempts[1].accepted);
+
+    let detail = FileWorkItemService::new(&fixture.refine_dir)
+        .show_goal_detail("GOAL1")
+        .unwrap();
+    let quality = &detail["rounds"][0]["quality_details"];
+    assert_eq!(quality["provider_attempts"].as_array().unwrap().len(), 2);
+    assert_eq!(quality["quality_proof"]["goal_id"], "GOAL1");
+    assert_eq!(quality["quality_proof"]["round_idx"], 0);
+    assert_eq!(quality["quality_proof"]["state"], "passed");
+
+    restore_smoke_ai(previous);
+    fs::remove_dir_all(fixture.temp_root).unwrap();
+}
+
+#[test]
+fn quality_cancellation_during_repair_prevents_further_attempts() {
+    let fixture = goal_quality_fixture(
+        "quality-output-repair-cancel",
+        "if test ! -e \"$0.attempted\"; then : > \"$0.attempted\"; printf 'not json\\n'; else exec sleep 30; fi",
+    );
+    let _guard = smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
+    unsafe { std::env::set_var("REFINE_SMOKE_AI_PATH", &fixture.smoke_ai) };
+
+    let operation = fixture
+        .runner()
+        .start_goal_checks("GOAL1", "smoke-ai", Default::default())
+        .unwrap();
+    let registry = FileOperationRegistry::new(&fixture.runtime_root);
+    for _ in 0..100 {
+        let (logs, _, _) = registry.page_logs(&operation.id, 50, 0).unwrap();
+        if logs.iter().any(|entry| {
+            entry
+                .details
+                .as_ref()
+                .and_then(|details| details.get("provider_attempt"))
+                .is_some()
+        }) {
+            break;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    wait_for_operation_process(&fixture.runtime_root, &operation.id);
+    registry
+        .cancel_supervised(&operation.id, &|| Ok(()))
+        .unwrap();
+    wait_for_operation_state(
+        &fixture.runtime_root,
+        &operation.id,
+        OperationState::Cancelled,
+    );
+    let (logs, _, _) = registry.page_logs(&operation.id, 50, 0).unwrap();
+    assert_eq!(
+        logs.iter()
+            .filter(|entry| {
+                entry
+                    .details
+                    .as_ref()
+                    .and_then(|details| details.get("provider_attempt"))
+                    .is_some()
+            })
+            .count(),
+        1
+    );
+    let detail = FileWorkItemService::new(&fixture.refine_dir)
+        .show_goal_detail("GOAL1")
+        .unwrap();
+    assert_eq!(detail["rounds"][0]["quality_state"], "cancelled");
+
+    restore_smoke_ai(previous);
+    fs::remove_dir_all(fixture.temp_root).unwrap();
+}
+
+#[test]
+fn workflow_quality_authority_loss_prevents_provider_launch() {
+    let fixture = goal_quality_fixture(
+        "quality-workflow-authority-fence",
+        "printf launched > provider-launched; exit 99",
+    );
+    let work_items = FileWorkItemService::new(&fixture.refine_dir);
+    work_items
+        .transition_goal_status("GOAL1", GoalStatus::Todo)
+        .unwrap();
+    work_items
+        .advance_automated_goal_status("GOAL1", GoalStatus::Plan)
+        .unwrap();
+    work_items
+        .advance_automated_goal_status("GOAL1", GoalStatus::Implement)
+        .unwrap();
+    work_items
+        .advance_automated_goal_status("GOAL1", GoalStatus::Quality)
+        .unwrap();
+    let (round_idx, workflow_revision, authored_request) =
+        work_items.authored_goal_commitment("GOAL1").unwrap();
+    work_items
+        .claim_workflow_attempt(
+            "GOAL1",
+            GoalStatus::Quality,
+            round_idx,
+            workflow_revision,
+            &authored_request,
+        )
+        .unwrap();
+    let mut metadata = crate::process::subprocess::workflow_subprocess_metadata(
+        "GOAL1",
+        "quality",
+        "WorkflowQuality",
+        Some(round_idx),
+    );
+    metadata.insert("workflow_revision".to_string(), json!(workflow_revision));
+    let runner = fixture.runner();
+    let (operation, request) = runner
+        .register_goal_checks("GOAL1", "smoke-ai", metadata)
+        .unwrap();
+    work_items.cancel_goal_summary("GOAL1").unwrap();
+
+    let error = runner.run_registered(&operation.id, request).unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("no longer authorizes quality work")
+    );
+    assert!(!fixture.candidate_root.join("provider-launched").exists());
+
     fs::remove_dir_all(fixture.temp_root).unwrap();
 }
 
@@ -652,7 +824,7 @@ fn integrated_target_scopes_do_not_require_the_retired_candidate_worktree() {
         assert_eq!(
             operation.operation.request["evaluation_scope"],
             if reconciliation {
-                "integrated_target_reconciliation"
+                "isolated_candidate"
             } else {
                 "integrated_target"
             }

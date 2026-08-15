@@ -119,6 +119,54 @@ impl FileGovernanceIntegrationService {
         expected_remote: &str,
         settlement: impl FnOnce(&RoundIntegration) -> RefineResult<T>,
     ) -> RefineResult<(RoundIntegration, T)> {
+        self.integrate_workflow_candidate_with_repository_lease(
+            goal_id,
+            round_idx,
+            node_id,
+            expected_branch,
+            expected_candidate,
+            expected_remote,
+            false,
+            settlement,
+        )
+    }
+
+    /// Complete integration while the caller retains the repository workflow lease.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn integrate_workflow_candidate_and_settle_under_repository_lease<T>(
+        &self,
+        goal_id: &str,
+        round_idx: usize,
+        node_id: &str,
+        expected_branch: &str,
+        expected_candidate: &str,
+        expected_remote: &str,
+        settlement: impl FnOnce(&RoundIntegration) -> RefineResult<T>,
+    ) -> RefineResult<(RoundIntegration, T)> {
+        self.integrate_workflow_candidate_with_repository_lease(
+            goal_id,
+            round_idx,
+            node_id,
+            expected_branch,
+            expected_candidate,
+            expected_remote,
+            true,
+            settlement,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn integrate_workflow_candidate_with_repository_lease<T>(
+        &self,
+        goal_id: &str,
+        round_idx: usize,
+        node_id: &str,
+        expected_branch: &str,
+        expected_candidate: &str,
+        expected_remote: &str,
+        repository_lease_held: bool,
+        settlement: impl FnOnce(&RoundIntegration) -> RefineResult<T>,
+    ) -> RefineResult<(RoundIntegration, T)> {
         let target_root = match &self.target_root {
             Some(target_root) => target_root.clone(),
             None => target_root(&self.refine_dir)?,
@@ -136,7 +184,7 @@ impl FileGovernanceIntegrationService {
         let operations = FileOperationRegistry::new(&self.runtime_root);
         let mut operation_id = None;
         let mut settlement = Some(settlement);
-        let result = with_repository_git_lock(&target_root, || {
+        let mut integrate = || {
             let detail = work_items.show_goal_detail(goal_id)?;
             if let Some(existing) = detail
                 .get("rounds")
@@ -184,7 +232,12 @@ impl FileGovernanceIntegrationService {
                 },
             )?;
             Ok((integration, transitioned))
-        });
+        };
+        let result = if repository_lease_held {
+            integrate()
+        } else {
+            with_repository_git_lock(&target_root, integrate)
+        };
         match result {
             Ok(settled) => Ok(settled),
             Err(error) => {
@@ -283,8 +336,7 @@ impl FileGovernanceIntegrationService {
                 // normally already proves publication; a network fetch inside
                 // this request — while holding the repository lock — is only
                 // worth its latency when that local evidence is insufficient.
-                let remote_ref =
-                    format!("{}/{}", integration.remote, integration.target_branch);
+                let remote_ref = format!("{}/{}", integration.remote, integration.target_branch);
                 let published_locally = match git.resolve_commit(&remote_ref) {
                     Ok(published) => git.commit_is_ancestor(&candidate_commit, &published)?,
                     Err(_) => false,

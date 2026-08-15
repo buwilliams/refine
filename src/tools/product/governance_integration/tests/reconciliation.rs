@@ -126,9 +126,11 @@ impl ReconciliationFixture {
             "quality_candidate_commit": self.candidate_commit,
             "quality_checked_at": "2026-08-15T00:01:00Z",
             "quality_details": {
+                "operation_id": "quality-operation-1",
                 "candidate_commit": self.candidate_commit,
                 "source_candidate_commit": self.candidate_commit,
-                "evaluation_scope": "isolated_candidate"
+                "evaluation_scope": "isolated_candidate",
+                "results": []
             },
             "rule_state": "passed",
             "meta_rule_state": "passed",
@@ -200,6 +202,7 @@ fn already_merged_resolution_allows_shared_target_descendants_and_is_concurrentl
         repeated.evidence["published_target_commit"],
         fixture.descendant_target
     );
+    assert_eq!(repeated.evidence["quality_proof_mode"], "normalized");
 }
 
 #[test]
@@ -226,13 +229,122 @@ fn candidate_reachability_without_current_round_integration_stays_on_isolated_qu
 }
 
 #[test]
-fn mismatched_or_missing_exact_gate_evidence_settles_failed_once() {
+fn missing_quality_proof_is_regenerated_for_the_exact_candidate() {
+    let fixture = ReconciliationFixture::new();
+    fixture.create_goal(
+        "GOAL-QUALITY-MISMATCH",
+        json!({"quality_candidate_commit": "wrong"}),
+        true,
+    );
+    let resolution = fixture
+        .service()
+        .resolve_already_merged_goal("GOAL-QUALITY-MISMATCH")
+        .unwrap();
+    assert_eq!(
+        resolution.disposition,
+        AlreadyMergedResolutionDisposition::Resolved
+    );
+    assert_eq!(resolution.goal.goal.status, GoalStatus::Review);
+    assert_eq!(resolution.evidence["quality_proof_mode"], "regenerated");
+    assert_eq!(
+        resolution.evidence["quality_proof"]["checked_candidate_commit"],
+        fixture.candidate_commit
+    );
+    assert_eq!(
+        resolution.evidence["quality_checkout"]["candidate_commit"],
+        fixture.candidate_commit
+    );
+}
+
+#[test]
+fn mismatched_nested_quality_proof_is_regenerated_instead_of_accepted() {
+    let fixture = ReconciliationFixture::new();
+    let goal_id = "GOAL-QUALITY-PROOF-MISMATCH";
+    fixture.create_goal(
+        goal_id,
+        json!({
+            "quality_details": {
+                "operation_id": "quality-operation-1",
+                "candidate_commit": fixture.candidate_commit,
+                "source_candidate_commit": fixture.candidate_commit,
+                "evaluation_scope": "isolated_candidate",
+                "results": [],
+                "quality_proof": {
+                    "schema_version": 1,
+                    "goal_id": goal_id,
+                    "round_idx": 0,
+                    "evaluation_scope": "isolated_candidate",
+                    "operation_id": "different-operation",
+                    "checked_candidate_commit": fixture.candidate_commit,
+                    "source_candidate_commit": fixture.candidate_commit,
+                    "state": "passed",
+                    "checked_at": "2026-08-15T00:01:00Z",
+                    "results": []
+                }
+            }
+        }),
+        true,
+    );
+
+    let resolution = fixture
+        .service()
+        .resolve_already_merged_goal(goal_id)
+        .unwrap();
+    assert_eq!(
+        resolution.disposition,
+        AlreadyMergedResolutionDisposition::Resolved
+    );
+    assert_eq!(resolution.evidence["quality_proof_mode"], "regenerated");
+    assert_ne!(
+        resolution.evidence["quality_proof"]["operation_id"],
+        "different-operation"
+    );
+}
+
+#[test]
+fn quality_regeneration_rejects_a_mismatched_managed_checkout() {
+    let fixture = ReconciliationFixture::new();
+    let goal_id = "GOAL-QUALITY-CHECKOUT-MISMATCH";
+    fixture.create_goal(goal_id, json!({"quality_candidate_commit": "wrong"}), true);
+    let short_candidate = fixture
+        .candidate_commit
+        .chars()
+        .take(12)
+        .collect::<String>();
+    let reconciliation_branch =
+        format!("refine/reconciliation/{goal_id}/round-1/{short_candidate}");
+    git(
+        &fixture.repo,
+        &["branch", &reconciliation_branch, &fixture.base_commit],
+    )
+    .unwrap();
+
+    let resolution = fixture
+        .service()
+        .resolve_already_merged_goal(goal_id)
+        .unwrap();
+    assert_eq!(
+        resolution.disposition,
+        AlreadyMergedResolutionDisposition::Failed
+    );
+    assert_eq!(resolution.goal.goal.status, GoalStatus::Failed);
+    assert!(
+        resolution.evidence["error"]
+            .as_str()
+            .unwrap()
+            .contains("the branch was not moved")
+    );
+    assert!(resolution.evidence["quality_proof"].is_null());
+    assert_eq!(
+        git_stdout(&fixture.repo, &["rev-parse", &reconciliation_branch]),
+        fixture.base_commit
+    );
+}
+
+#[test]
+fn mismatched_or_missing_non_quality_gate_evidence_settles_failed_once() {
     let fixture = ReconciliationFixture::new();
     for (goal_id, patch) in [
-        (
-            "GOAL-QUALITY-MISMATCH",
-            json!({"quality_candidate_commit": "wrong"}),
-        ),
         (
             "GOAL-GOVERNANCE-MISSING",
             json!({"governance_candidate_commit": ""}),

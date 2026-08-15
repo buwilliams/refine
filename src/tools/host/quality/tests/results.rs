@@ -12,6 +12,8 @@ fn failed_quality_result(
         results,
         diagnostics,
         candidate_commit: "candidate".to_string(),
+        checked_at: None,
+        provider_attempts: Vec::new(),
     }
 }
 
@@ -602,7 +604,11 @@ fn quality_uses_one_non_default_node_for_result_and_error_persistence() {
             "printf '%s\\n' '{\"ok\":true,\"results\":[{\"test\":\"Outcome works\",\"status\":\"passed\",\"evidence\":\"planned\",\"command\":\"printf ok\"}]}'",
             "passed",
         ),
-        ("error", "printf '%s\\n' 'not-json'", "failed"),
+        (
+            "error",
+            "printf '%s\\n' 'not-json'",
+            "output_contract_fault",
+        ),
     ] {
         let fixture =
             goal_quality_fixture(&format!("quality-non-default-node-{case}"), provider_body);

@@ -34,6 +34,7 @@ pub(super) fn run_observational_phase(
     phase: &str,
     prompt: String,
 ) -> RefineResult<PlanningPhaseRun> {
+    ctx.revalidate_authority(GoalStatus::Plan)?;
     let git = FileGitWorktreeService::with_runtime_root(agent_cwd, ctx.runtime_root);
     let git_before = git.implementation_planning_observation()?;
     let started_at = now_timestamp();
@@ -102,6 +103,9 @@ pub(super) fn run_observational_phase(
         |_| Ok(()),
     );
     let git_after = git.implementation_planning_observation()?;
+    // A provider may finish after cancellation, node transfer, Undo, or a replacement Round.
+    // Observe its checkout for audit purposes, but never persist or repair a superseded result.
+    ctx.revalidate_authority(GoalStatus::Plan)?;
     if git_after != git_before {
         let error = RefineError::Conflict(format!(
             "implementation {phase} phase changed the worktree; changes were retained"

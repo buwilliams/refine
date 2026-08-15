@@ -35,6 +35,7 @@ Current implementation details that matter to intent:
 - product, constitution, and automatic-Round-limit patches are independent of the rule collection and preserve omitted fields;
 - every rule has a stable id and the collection has a `rules_revision`; browser, CLI, and compatibility list writers submit the revision they observed, receive the authoritative normalized readback, and refresh rather than replay stale rules after a conflict;
 - generated rules are adopted through the same revision-fenced persistence path as manually edited rules, so generation cannot overwrite a concurrent rule change.
+- post-Quality integration takes the repository workflow lease before final target revalidation and retains it through any provable candidate refresh, replacement Quality and Governance, publication, integration, and evidence settlement. Governance always judges the exact candidate that the lease will integrate; a replacement commit invalidates and reruns the prior gates.
 
 ## Future Direction
 

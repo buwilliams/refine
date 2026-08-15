@@ -25,7 +25,9 @@ Each worker receives the Goal, Round, selected context, and semantic instruction
 
 Two nodes may briefly believe work is available because synchronization is delayed. Durable state convergence decides the outcome. In the clear reassignment-versus-start race, an automated start by the previously authoritative node wins over a concurrent queued reassignment. Ambiguous lifecycle conflicts remain visible for resolution rather than being hidden by timestamps or local runtime records.
 
-Stop and Cancel have different meanings. Stop targets a local process and conditionally requeues an unchanged Goal. Cancel writes terminal synchronized Goal intent and then attempts to stop matching local processes. Governance has an explicit point of no return: cancellation before Git integration blocks it; cancellation after integration begins does not trigger rollback, and exact integration evidence is still recorded.
+Stop and Cancel have different meanings. Stop targets a local process and conditionally requeues an unchanged Goal. Cancel writes terminal synchronized Goal intent and then attempts to stop matching local processes. Governance rereads Round, claim-time workflow revision, node, status, and cancellation authority before candidate refresh, replacement Quality, replacement Governance, publication, integration, and settlement. Cancellation before the leased integration boundary blocks further work; once publication or integration has begun it does not trigger an unsafe rollback, and exact integration evidence is still recorded.
+
+Bounded structured-output repair inherits the same ownership rule. Planning and Quality reread the originating Round, workflow revision, node, status, and process cancellation state before accepting a provider response or launching another diagnostic repair, so a late response from superseded work remains observable but cannot mutate the replacement Round.
 
 Retired execution-coordination and cancellation-journal files are one-way cleanup inputs. They are removed during recovery and never imported into the new authority model.
 

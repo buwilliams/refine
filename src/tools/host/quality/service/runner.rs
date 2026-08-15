@@ -107,7 +107,7 @@ impl QualityOperationRunner {
         &self,
         goal_id: &str,
         provider: &str,
-        process_metadata: Map<String, Value>,
+        mut process_metadata: Map<String, Value>,
         expected_node_id: Option<&str>,
     ) -> RefineResult<(OperationHandle, QualityCheckRequest)> {
         let goal_id = goal_id.trim();
@@ -153,6 +153,13 @@ impl QualityOperationRunner {
                     round_idx + 1
                 ))
             })?;
+        verify_quality_workflow_authority(
+            &work_items,
+            goal_id,
+            node_id,
+            round_idx,
+            &process_metadata,
+        )?;
         let reconciliation = round
             .get("workflow_reconciliation")
             .and_then(Value::as_object)
@@ -164,7 +171,72 @@ impl QualityOperationRunner {
             });
         let post_build =
             round.get("workflow_quality_timing").and_then(Value::as_str) == Some("post_build");
-        let (cwd, evaluated_commit, evaluation_scope) = if post_build || reconciliation.is_some() {
+        let (cwd, evaluated_commit, evaluation_scope, evaluation_branch) = if let Some(
+            reconciliation,
+        ) = reconciliation
+        {
+            let integration = round
+                .get("workflow_integration")
+                .and_then(Value::as_object)
+                .ok_or_else(|| {
+                    RefineError::Conflict(format!(
+                        "Goal {goal_id} cannot regenerate isolated Quality without Governance integration evidence"
+                    ))
+                })?;
+            let integrated_candidate = integration
+                .get("candidate_commit")
+                .and_then(Value::as_str)
+                .ok_or_else(|| {
+                    RefineError::Conflict(format!(
+                        "Goal {goal_id} integration evidence has no candidate commit"
+                    ))
+                })?;
+            if integrated_candidate != source_candidate_commit {
+                return Err(RefineError::Conflict(format!(
+                    "Goal {goal_id} integrated candidate changed from {integrated_candidate} to {source_candidate_commit}"
+                )));
+            }
+            let short_candidate = source_candidate_commit.chars().take(12).collect::<String>();
+            let branch = format!(
+                "refine/reconciliation/{goal_id}/round-{}/{short_candidate}",
+                round_idx + 1
+            );
+            let git =
+                FileGitWorktreeService::with_runtime_root(&self.target_root, &self.runtime_root);
+            let checkout_target = git
+                .git_path("refine-worktrees")?
+                .join(branch.replace('/', "-"));
+            let cwd = with_repository_git_lock(&self.target_root, || {
+                verify_quality_workflow_authority(
+                    &work_items,
+                    goal_id,
+                    node_id,
+                    round_idx,
+                    &process_metadata,
+                )?;
+                git.ensure_worktree_at_commit(&branch, &checkout_target, &source_candidate_commit)
+                    .map(PathBuf::from)
+            })?;
+            let mut reconciliation = Value::Object(reconciliation.clone());
+            reconciliation["quality_checkout"] = json!({
+                "branch": branch,
+                "path": cwd.display().to_string(),
+                "candidate_commit": source_candidate_commit,
+                "materialized_at": now_timestamp()
+            });
+            work_items.update_goal_round_evaluation_summary(
+                goal_id,
+                round_idx,
+                &json!({"workflow_reconciliation": reconciliation}),
+            )?;
+            process_metadata.insert("quality_proof_mode".to_string(), json!("regenerated"));
+            (
+                cwd,
+                source_candidate_commit.clone(),
+                "isolated_candidate",
+                branch,
+            )
+        } else if post_build {
             let integration = round
                 .get("workflow_integration")
                 .and_then(Value::as_object)
@@ -186,55 +258,28 @@ impl QualityOperationRunner {
                     "Goal {goal_id} legacy integrated Quality candidate changed from {integrated_candidate} to {source_candidate_commit}"
                 )));
             }
-            let (target_commit, evaluation_scope) = if reconciliation.is_some() {
-                let git = FileGitWorktreeService::with_runtime_root(
-                    &self.target_root,
-                    &self.runtime_root,
-                );
-                let target_branch = integration
-                    .get("target_branch")
-                    .and_then(Value::as_str)
-                    .map(str::trim)
-                    .filter(|value| !value.is_empty())
-                    .ok_or_else(|| {
-                        RefineError::Conflict(format!(
-                            "Goal {goal_id} integration evidence has no target branch"
-                        ))
-                    })?;
-                let head = git.head_ref()?;
-                if head.branch.as_deref() != Some(target_branch) {
-                    return Err(RefineError::Conflict(format!(
-                        "Goal {goal_id} already-merged reconciliation requires target worktree {} to be on branch {target_branch}, found {}",
-                        self.target_root.display(),
-                        head.branch.as_deref().unwrap_or("<detached>")
-                    )));
-                }
-                let target_commit = head.commit.ok_or_else(|| {
+            let target_commit = integration
+                .get("target_commit")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .ok_or_else(|| {
                     RefineError::Conflict(format!(
-                        "Goal {goal_id} target branch {target_branch} has no commit"
+                        "Goal {goal_id} integration evidence has no target commit"
                     ))
-                })?;
-                if !git.commit_is_ancestor(integrated_candidate, &target_commit)? {
-                    return Err(RefineError::Conflict(format!(
-                        "Goal {goal_id} candidate {integrated_candidate} is no longer present in target branch {target_branch}"
-                    )));
-                }
-                (target_commit, "integrated_target_reconciliation")
-            } else {
-                let target_commit = integration
-                    .get("target_commit")
-                    .and_then(Value::as_str)
-                    .map(str::trim)
-                    .filter(|value| !value.is_empty())
-                    .ok_or_else(|| {
-                        RefineError::Conflict(format!(
-                            "Goal {goal_id} integration evidence has no target commit"
-                        ))
-                    })?
-                    .to_string();
-                (target_commit, "integrated_target")
-            };
-            (self.target_root.clone(), target_commit, evaluation_scope)
+                })?
+                .to_string();
+            let target_branch = integration
+                .get("target_branch")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string();
+            (
+                self.target_root.clone(),
+                target_commit,
+                "integrated_target",
+                target_branch,
+            )
         } else {
             let branch = summary.goal.branch_name.as_deref().ok_or_else(|| {
                 RefineError::Conflict(format!(
@@ -265,7 +310,12 @@ impl QualityOperationRunner {
                     },
                 ))
             })?;
-            (cwd, source_candidate_commit.clone(), "isolated_candidate")
+            (
+                cwd,
+                source_candidate_commit.clone(),
+                "isolated_candidate",
+                branch.to_string(),
+            )
         };
         let request = QualityCheckRequest {
             owner_id: goal_id.to_string(),
@@ -280,7 +330,7 @@ impl QualityOperationRunner {
                 QualityIdentityCommitment::isolated(
                     goal_id,
                     round_idx,
-                    summary.goal.branch_name.as_deref().unwrap_or_default(),
+                    &evaluation_branch,
                     &cwd,
                     &source_candidate_commit,
                 )
@@ -313,6 +363,13 @@ impl QualityOperationRunner {
             }),
             process_metadata,
         };
+        verify_quality_workflow_authority(
+            &work_items,
+            goal_id,
+            node_id,
+            round_idx,
+            &request.process_metadata,
+        )?;
         if let Some(commitment) = request.identity_commitment.as_ref() {
             validate_quality_identity(
                 &self.refine_dir,
@@ -336,6 +393,8 @@ impl QualityOperationRunner {
                 "source_candidate_commit": source_candidate_commit,
                 "evaluation_scope": evaluation_scope,
                 "identity_commitment": &request.identity_commitment,
+                "workflow_revision": request.process_metadata.get("workflow_revision"),
+                "quality_proof_mode": request.process_metadata.get("quality_proof_mode"),
                 "target_root": self.target_root.display().to_string(),
                 "refine_dir": self.refine_dir.display().to_string(),
                 "defer_cancellation_terminal": true
@@ -379,6 +438,10 @@ impl QualityOperationRunner {
         request.process_metadata.insert(
             "candidate_commit".to_string(),
             json!(&request.candidate_commit),
+        );
+        request.process_metadata.insert(
+            "runtime_root".to_string(),
+            json!(self.runtime_root.display().to_string()),
         );
         let registry = FileOperationRegistry::new(&self.runtime_root);
         let service = FileQualityService::with_runtime_root(&self.refine_dir, &self.runtime_root);
@@ -429,7 +492,10 @@ impl QualityOperationRunner {
             return Err(error);
         }
         match execution {
-            Ok(result) => {
+            Ok(mut result) => {
+                // Persist one timestamp in both the Goal proof and terminal operation so a
+                // restart can recover the exact first evaluation without inventing new evidence.
+                result.checked_at = Some(now_timestamp());
                 let operation_message = if result.ok {
                     "Quality checks passed"
                 } else {
@@ -470,7 +536,10 @@ impl QualityOperationRunner {
                     }
                     _ => {}
                 }
-                if let Err(error) = self.record_result(&request, &result, operation_id) {
+                if let Err(error) = service
+                    .ensure_operation_active(&request, "result settlement")
+                    .and_then(|_| self.record_result(&request, &result, operation_id))
+                {
                     self.record_persistence_failure(operation_id, &request, &error);
                     return Err(error);
                 }
@@ -500,6 +569,7 @@ impl QualityOperationRunner {
             }
             Err(error) => {
                 let harness_fault = is_quality_harness_fault(&error);
+                let output_contract_fault = is_quality_output_contract_fault(&error);
                 let summary = quality_error_summary(&error);
                 registry.append_log(
                     operation_id,
@@ -509,7 +579,13 @@ impl QualityOperationRunner {
                         &summary,
                         Some(json!({
                             "error": error.to_string(),
-                            "error_kind": if harness_fault { "harness_fault" } else { "evaluation_error" }
+                            "error_kind": if harness_fault {
+                                "harness_fault"
+                            } else if output_contract_fault {
+                                "output_contract_fault"
+                            } else {
+                                "evaluation_error"
+                            }
                         })),
                     ),
                 )?;
@@ -539,6 +615,8 @@ impl QualityOperationRunner {
                     json!({
                         "code": if harness_fault {
                             "quality_command_harness_fault"
+                        } else if output_contract_fault {
+                            "quality_output_contract_repair_exhausted"
                         } else {
                             "quality_evaluation_failed"
                         },
@@ -581,4 +659,34 @@ impl QualityOperationRunner {
         )?;
         Ok(())
     }
+}
+
+fn verify_quality_workflow_authority(
+    work_items: &FileWorkItemService,
+    goal_id: &str,
+    node_id: &str,
+    round_idx: usize,
+    metadata: &Map<String, Value>,
+) -> RefineResult<()> {
+    let Some(workflow_revision) = metadata.get("workflow_revision").and_then(Value::as_u64) else {
+        return Ok(());
+    };
+    let status = metadata
+        .get("workflow_state")
+        .and_then(Value::as_str)
+        .and_then(GoalStatus::parse_wire)
+        .ok_or_else(|| {
+            RefineError::Degraded(
+                "Quality workflow registration is missing its authority status".to_string(),
+            )
+        })?;
+    work_items.verify_workflow_attempt(
+        goal_id,
+        WorkflowAttemptAuthority {
+            round_idx,
+            workflow_revision,
+        },
+        status,
+        node_id,
+    )
 }

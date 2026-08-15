@@ -156,6 +156,19 @@ pub struct ImplementationPlanningFailure {
     pub git_after: Option<PlanningGitObservation>,
 }
 
+/// One invalid structured response retained before a bounded diagnostic repair invocation.
+///
+/// Keeping this evidence on the Round makes provider/output-contract failures inspectable even
+/// when a later repair succeeds. `attempt` is one-based within the current planning phase.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct ImplementationPlanningOutputAttempt {
+    pub phase: ImplementationPlanPhase,
+    pub attempt: usize,
+    pub raw_output: String,
+    pub diagnostics: String,
+    pub recorded_at: Timestamp,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ImplementationPlan {
     pub schema_version: u32,
@@ -177,4 +190,6 @@ pub struct ImplementationPlan {
     pub implementation: Option<ImplementationAgentEvidence>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub failure: Option<ImplementationPlanningFailure>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub invalid_output_attempts: Vec<ImplementationPlanningOutputAttempt>,
 }

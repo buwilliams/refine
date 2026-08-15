@@ -61,6 +61,7 @@ impl ObservedExecution {
 }
 
 const QUALITY_COMMAND_HARNESS_FAULT_PREFIX: &str = "Quality command harness fault:";
+const QUALITY_OUTPUT_CONTRACT_FAULT_PREFIX: &str = "Quality output contract fault:";
 
 pub(super) fn quality_command_harness_fault(
     command: &str,
@@ -79,6 +80,59 @@ pub(crate) fn is_quality_harness_fault(error: &RefineError) -> bool {
         RefineError::Degraded(message)
             if message.starts_with(QUALITY_COMMAND_HARNESS_FAULT_PREFIX)
     )
+}
+
+pub(crate) fn is_quality_output_contract_fault(error: &RefineError) -> bool {
+    matches!(
+        error,
+        RefineError::Serialization(message)
+            if message.starts_with(QUALITY_OUTPUT_CONTRACT_FAULT_PREFIX)
+    )
+}
+
+pub(super) fn exhausted_quality_output_contract(
+    error: &RefineError,
+    attempts: usize,
+) -> RefineError {
+    RefineError::Serialization(format!(
+        "{QUALITY_OUTPUT_CONTRACT_FAULT_PREFIX} exhausted {attempts} structured response attempt(s): {error}"
+    ))
+}
+
+pub(super) fn record_quality_provider_attempt(
+    request: &QualityCheckRequest,
+    attempt: &QualityProviderAttempt,
+) -> RefineResult<()> {
+    let Some(operation_id) = request
+        .process_metadata
+        .get("operation_id")
+        .and_then(Value::as_str)
+    else {
+        // Direct trait callers have no durable operation. Their returned result still carries
+        // the full attempt history; workflow calls always take the durable path below.
+        return Ok(());
+    };
+    let Some(runtime_root) = request
+        .process_metadata
+        .get("runtime_root")
+        .and_then(Value::as_str)
+    else {
+        return Ok(());
+    };
+    FileOperationRegistry::new(runtime_root).append_log(
+        operation_id,
+        quality_operation_log(
+            &request.owner_id,
+            if attempt.accepted { "info" } else { "warning" },
+            if attempt.accepted {
+                "Quality provider response satisfied the structured output contract"
+            } else {
+                "Quality provider response required structured output repair"
+            },
+            Some(json!({"provider_attempt": attempt})),
+        ),
+    )?;
+    Ok(())
 }
 
 pub(crate) fn parse_quality_provider_output(
@@ -193,6 +247,8 @@ pub(crate) fn parse_quality_provider_output(
         results,
         diagnostics,
         candidate_commit: String::new(),
+        checked_at: None,
+        provider_attempts: Vec::new(),
     })
 }
 

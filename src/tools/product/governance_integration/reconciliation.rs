@@ -1,6 +1,8 @@
 use serde_json::{Value, json};
 
 use super::*;
+use crate::tools::host::agent_providers::resolve_agent_provider;
+use crate::tools::host::quality::{FileQualityService, QualityOperationRunner};
 use crate::tools::product::work_items::{
     AlreadyMergedInspection, AlreadyMergedResolutionSnapshot, AlreadyMergedSettlement,
     AlreadyMergedSettlementDecision, WorkflowAttemptAuthority,
@@ -69,7 +71,7 @@ impl FileGovernanceIntegrationService {
             &self.runtime_root,
             self.runtime_root.join("cache"),
         );
-        let snapshot = match work_items.inspect_already_merged_resolution(goal_id)? {
+        let mut snapshot = match work_items.inspect_already_merged_resolution(goal_id)? {
             AlreadyMergedInspection::AlreadyResolved(goal, evidence) => {
                 return Ok(AlreadyMergedResolution {
                     disposition: AlreadyMergedResolutionDisposition::AlreadyResolved,
@@ -90,6 +92,56 @@ impl FileGovernanceIntegrationService {
             return Err(RefineError::Conflict(format!(
                 "Goal {goal_id} already-merged resolver was superseded before repository inspection"
             )));
+        }
+
+        if snapshot.quality_proof.is_none() && snapshot.non_quality_gate_failure.is_none() {
+            work_items.prepare_already_merged_quality_regeneration(goal_id, &snapshot)?;
+            let settings = FileQualityService::new(&self.refine_dir).load_settings()?;
+            let provider = if settings.configured {
+                resolve_agent_provider(&self.runtime_root, None)?
+            } else {
+                "not-required".to_string()
+            };
+            let runner =
+                QualityOperationRunner::new(&self.refine_dir, &self.runtime_root, &target_root);
+            let mut metadata = workflow_subprocess_metadata(
+                goal_id,
+                "quality",
+                "AlreadyMergedQualityRegeneration",
+                Some(snapshot.authority.round_idx),
+            );
+            metadata.insert(
+                "workflow_revision".to_string(),
+                json!(snapshot.authority.workflow_revision),
+            );
+            let regeneration = runner.run_goal_checks(goal_id, &provider, metadata);
+            snapshot = match work_items.inspect_already_merged_resolution(goal_id)? {
+                AlreadyMergedInspection::Eligible(snapshot) => snapshot,
+                AlreadyMergedInspection::AlreadyResolved(goal, evidence) => {
+                    return Ok(AlreadyMergedResolution {
+                        disposition: AlreadyMergedResolutionDisposition::AlreadyResolved,
+                        goal,
+                        evidence,
+                    });
+                }
+                AlreadyMergedInspection::AlreadyFailed(goal, evidence) => {
+                    return Ok(AlreadyMergedResolution {
+                        disposition: AlreadyMergedResolutionDisposition::AlreadyFailed,
+                        goal,
+                        evidence,
+                    });
+                }
+            };
+            if expected_authority.is_some_and(|authority| authority != snapshot.authority) {
+                return Err(RefineError::Conflict(format!(
+                    "Goal {goal_id} already-merged resolver was superseded during Quality regeneration"
+                )));
+            }
+            if let Err(error) = regeneration {
+                snapshot.gate_failure = Some(format!(
+                    "Exact-candidate Quality proof regeneration failed: {error}"
+                ));
+            }
         }
 
         with_repository_git_lock(&target_root, || {
@@ -203,6 +255,9 @@ fn resolution_evidence(
         "local_target_commit": observation.local_target_commit,
         "published_target_commit": observation.published_target_commit,
         "gate_evidence": snapshot.gate_evidence,
+        "quality_proof": snapshot.quality_proof,
+        "quality_proof_mode": snapshot.quality_proof_mode,
+        "quality_checkout": snapshot.quality_checkout,
         "error": snapshot.gate_failure.as_ref().or(observation.error.as_ref()),
         "observed_at": Utc::now().to_rfc3339()
     })

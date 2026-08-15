@@ -8,6 +8,34 @@ pub(crate) struct WorkflowAttemptAuthority {
 }
 
 impl FileWorkItemService {
+    pub(crate) fn verify_workflow_attempt(
+        &self,
+        goal_id: &str,
+        authority: WorkflowAttemptAuthority,
+        expected_status: GoalStatus,
+        expected_node_id: &str,
+    ) -> RefineResult<()> {
+        let _goal_lock = self.acquire_goal_mutation_lock(goal_id)?;
+        let current = self.show_goal_summary(goal_id)?;
+        self.ensure_goal_owned(&current)?;
+        let (_, value) = self.read_goal_value_unchecked_locked(&current)?;
+        let object = value.as_object().ok_or_else(|| {
+            RefineError::Serialization(format!("Goal {goal_id} is not a JSON object"))
+        })?;
+        let status = goal_status(object);
+        let node = object
+            .get("node_id")
+            .and_then(Value::as_str)
+            .unwrap_or("default");
+        if status != expected_status || node != expected_node_id {
+            return Err(RefineError::Conflict(format!(
+                "Goal {goal_id} no longer authorizes {} work on node {expected_node_id}",
+                expected_status.as_str()
+            )));
+        }
+        require_current_attempt(goal_id, object, authority)
+    }
+
     pub(crate) fn claim_workflow_attempt(
         &self,
         goal_id: &str,

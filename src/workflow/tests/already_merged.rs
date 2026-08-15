@@ -134,6 +134,14 @@ fn workflow_admits_current_round_integration_from_todo_and_stops_resuming() {
         detail["rounds"][0]["workflow_reconciliation"]["published_target_commit"],
         published_target
     );
+    assert_eq!(
+        detail["rounds"][0]["workflow_reconciliation"]["quality_proof_mode"],
+        "regenerated"
+    );
+    assert_eq!(
+        detail["rounds"][0]["workflow_reconciliation"]["quality_proof"]["checked_candidate_commit"],
+        candidate
+    );
     assert!(workflow.execute_work().unwrap().is_empty());
     fs::remove_dir_all(temp_root).unwrap();
 }

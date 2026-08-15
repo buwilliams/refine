@@ -1,5 +1,8 @@
 use super::*;
 
+#[cfg(unix)]
+mod already_merged_quality_failure;
+
 #[test]
 fn goal_agent_context_pins_governance_and_only_enabled_guidance() {
     let context = goal_agent_context(
@@ -130,4 +133,13 @@ fn code_path_detection_fails_safe_for_unlisted_languages() {
     assert!(is_code_path("config/toolchain.toml"));
     assert!(!is_code_path("docs/architecture.md"));
     assert!(!is_code_path("website/diagram.png"));
+}
+
+#[test]
+fn exhausted_quality_output_repair_keeps_a_distinct_workflow_failure_category() {
+    let error = RefineError::Serialization(
+        "Quality output contract fault: exhausted 3 structured response attempts".to_string(),
+    );
+
+    assert_eq!(quality_failure_category(&error), "quality_output_contract");
 }

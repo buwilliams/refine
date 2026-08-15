@@ -1,7 +1,9 @@
 mod already_merged;
+mod candidate_refresh;
 mod execution_ownership;
 mod failure_settlement;
 mod governance;
+mod planning_repair;
 mod quality_recovery;
 
 use super::*;

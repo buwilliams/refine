@@ -5,8 +5,10 @@ use crate::model::workflow::GoalStatus;
 use crate::model::{JsonObject, Timestamp};
 
 mod implementation_plan;
+mod quality_proof;
 
 pub use implementation_plan::*;
+pub use quality_proof::*;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 #[serde(rename_all = "lowercase")]

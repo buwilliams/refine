@@ -31,6 +31,8 @@ When a Goal is failed:
 - If the Goal blocks ordered Feature work, that blockage should be visible.
 - Failed state should be a decision point, not an evidence sink.
 
+Structured-output failures identify the exhausted phase and retain every raw invalid response and diagnostic rather than presenting a provider or harness fault as an implementation defect. Integration races with provable or conflicted candidate deltas normally produce a fenced recovery Round instead of Failed; when the shared automatic-retry budget is already spent, the source Round retains the original identities, handoff, gates, target and conflict observations, and an explicit `integration_retry_exhausted` outcome. Failed remains appropriate when exact proof regeneration is unavailable, output repair or the bounded recovery lineage is exhausted, authority is lost, or required evidence cannot be established safely.
+
 ## Future Direction
 
 Future failed behavior should support automated diagnosis, recovery planning, dependency-aware rerouting, and agent handoff. The goal is not to avoid all failure; it is to make failure a productive workflow state.

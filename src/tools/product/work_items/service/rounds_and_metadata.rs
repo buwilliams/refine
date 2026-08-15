@@ -520,6 +520,7 @@ impl FileWorkItemService {
             "workflow_git_remote",
             "workflow_integration",
             "workflow_reconciliation",
+            "workflow_candidate_refresh",
             "workflow_recovery",
             "failure_category",
             "failure_message",

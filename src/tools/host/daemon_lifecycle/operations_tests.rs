@@ -6,6 +6,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use crate::process::supervisor::lifecycle::DaemonLifecycleEvidence;
 use crate::process::supervisor::lifecycle::DaemonRuntimeService;
+use crate::tools::host::checkout::test_fixture::SyntheticSourceProduct;
 
 #[derive(Default)]
 struct RecordingLauncher {
@@ -31,17 +32,15 @@ impl RestartSafeHandoffLauncher for RecordingLauncher {
 
 #[test]
 fn source_lifecycle_handoff_inherits_debug_executable_without_installed_binary() {
-    let checkout = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .canonicalize()
-        .unwrap();
-    let runtime_root = checkout.join("run");
-    let test_executable = std::env::current_exe().unwrap();
+    let checkout = SyntheticSourceProduct::new("source-lifecycle-executable");
+    let runtime_root = checkout.runtime_root();
+    let test_executable = checkout.debug_executable();
 
     let selected =
         operations::lifecycle_executable_for_invocation(&runtime_root, &test_executable).unwrap();
 
     assert_eq!(selected, test_executable.canonicalize().unwrap());
-    assert_ne!(selected, checkout.join("bin/refine"));
+    assert_ne!(selected, checkout.installed_executable());
 }
 
 #[test]
