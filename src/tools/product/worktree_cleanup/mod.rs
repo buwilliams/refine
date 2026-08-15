@@ -18,6 +18,8 @@ use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitLinkedWorktre
 use crate::tools::host::project_layout::refine_dir_for_target_root;
 use crate::tools::product::work_items::FileWorkItemService;
 
+mod branch_retirement;
+
 #[derive(Clone, Copy, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
 pub struct WorktreeCleanupOptions {
     #[serde(default)]
@@ -79,9 +81,21 @@ pub struct WorktreeBranchCleanupEntry {
     pub goal_id: Option<String>,
     pub goal_status: Option<String>,
     pub eligible: bool,
+    #[serde(default)]
+    pub local_present: bool,
+    #[serde(default)]
+    pub remote_present: bool,
+    #[serde(default)]
+    pub local_eligible: bool,
+    #[serde(default)]
+    pub remote_eligible: bool,
     pub local_branch_deleted: bool,
     pub remote_branch_deleted: bool,
     pub reason: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub local_reason: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub remote_reason: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
 }
@@ -113,13 +127,6 @@ impl FileWorktreeCleanupService {
             .into_iter()
             .map(|summary| (summary.goal.id.clone(), summary.goal))
             .collect::<BTreeMap<_, _>>();
-        let goal_details = goals
-            .iter()
-            .map(|(goal_id, goal)| {
-                read_goal_record(&refine_dir, &goal.json_path)
-                    .map(|detail| (goal_id.clone(), detail))
-            })
-            .collect::<RefineResult<BTreeMap<_, _>>>()?;
         let settings =
             FileSettingsService::with_active_root(&refine_dir, &self.runtime_root).load()?;
         let configured_generated_paths = configured_generated_paths(&settings);
@@ -177,39 +184,17 @@ impl FileWorktreeCleanupService {
                         }
                     }
                 }
-                if entry.removed
-                    && let (Some(goal_id), Some(branch)) =
-                        (entry.goal_id.as_deref(), entry.branch.as_deref())
-                {
-                    match goal_details.get(goal_id).map_or_else(
-                        || {
-                            Err(RefineError::NotFound(format!(
-                                "Goal {goal_id} disappeared during worktree cleanup"
-                            )))
-                        },
-                        |goal| retire_integrated_branch(&git, branch, goal),
-                    ) {
-                        Ok(outcome) => {
-                            entry.local_branch_deleted = outcome.local_deleted;
-                            entry.remote_branch_deleted = outcome.remote_deleted;
-                            entry.branch_cleanup_reason = Some(outcome.reason);
-                        }
-                        Err(error) => {
-                            entry.branch_cleanup_reason = Some("branch_cleanup_failed".to_string());
-                            entry.error = Some(error.to_string());
-                        }
-                    }
-                }
             }
             entries.push(entry);
         }
-        let branch_entries = self.cleanup_orphaned_integrated_branches(
+        let branch_entries = branch_retirement::cleanup_goal_round_branches(
             &git,
             &goals,
-            &goal_details,
             &active_ownership,
             now,
             options,
+            setting_value(&settings, "git_remote", "origin"),
+            setting_value(&settings, "merge_target_branch", "main"),
         )?;
 
         let inspected = entries.len();
@@ -306,99 +291,10 @@ impl FileWorktreeCleanupService {
         }
         Ok(goal_ids)
     }
-
-    fn cleanup_orphaned_integrated_branches(
-        &self,
-        git: &FileGitWorktreeService,
-        goals: &BTreeMap<String, crate::model::goal::GoalIndexProjection>,
-        goal_details: &BTreeMap<String, Value>,
-        active_ownership: &ActiveWorktreeOwnership,
-        now: DateTime<Utc>,
-        options: WorktreeCleanupOptions,
-    ) -> RefineResult<Vec<WorktreeBranchCleanupEntry>> {
-        let checked_out = git
-            .list_linked_worktrees()?
-            .into_iter()
-            .filter_map(|worktree| worktree.branch)
-            .collect::<BTreeSet<_>>();
-        let mut entries = Vec::new();
-        for branch in git.list_refine_owned_branches()? {
-            if checked_out.contains(&branch) {
-                continue;
-            }
-            let matching_goals = matching_goals_for_branch(&branch, goals);
-            let mut entry = WorktreeBranchCleanupEntry {
-                branch: branch.clone(),
-                goal_id: None,
-                goal_status: None,
-                eligible: false,
-                local_branch_deleted: false,
-                remote_branch_deleted: false,
-                reason: "goal_not_found".to_string(),
-                error: None,
-            };
-            if matching_goals.len() != 1 {
-                entry.reason = if matching_goals.is_empty() {
-                    "goal_not_found"
-                } else {
-                    "ambiguous_goal"
-                }
-                .to_string();
-                entries.push(entry);
-                continue;
-            }
-            let goal = matching_goals[0];
-            entry.goal_id = Some(goal.id.clone());
-            entry.goal_status = Some(goal.status.as_str().to_string());
-            if active_ownership.goal_ids.contains(&goal.id) {
-                entry.reason = "active_owner".to_string();
-                entries.push(entry);
-                continue;
-            }
-            if goal_is_too_recent(&goal.updated, now, options.older_than_seconds) {
-                entry.reason = "retention_window".to_string();
-                entries.push(entry);
-                continue;
-            }
-            let goal_detail = goal_details.get(&goal.id).ok_or_else(|| {
-                RefineError::NotFound(format!(
-                    "Goal {} disappeared during branch cleanup",
-                    goal.id
-                ))
-            })?;
-            match integrated_branch_plan(git, &branch, goal_detail) {
-                Ok(IntegratedBranchPlan::Preserved(reason)) => entry.reason = reason,
-                Ok(plan @ IntegratedBranchPlan::Eligible { .. }) => {
-                    entry.eligible = true;
-                    entry.reason = "integrated_branch_eligible".to_string();
-                    if options.apply {
-                        match execute_branch_retirement(git, plan) {
-                            Ok(outcome) => {
-                                entry.local_branch_deleted = outcome.local_deleted;
-                                entry.remote_branch_deleted = outcome.remote_deleted;
-                                entry.reason = outcome.reason;
-                                entry.eligible = entry.local_branch_deleted;
-                            }
-                            Err(error) => {
-                                entry.reason = "branch_cleanup_failed".to_string();
-                                entry.error = Some(error.to_string());
-                            }
-                        }
-                    }
-                }
-                Err(error) => {
-                    entry.reason = "branch_inspection_failed".to_string();
-                    entry.error = Some(error.to_string());
-                }
-            }
-            entries.push(entry);
-        }
-        Ok(entries)
-    }
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
-struct ActiveWorktreeOwnership {
+pub(super) struct ActiveWorktreeOwnership {
     paths: Vec<PathBuf>,
     goal_ids: BTreeSet<String>,
 }
@@ -493,135 +389,6 @@ fn classify_worktree(
     entry
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct BranchCleanupOutcome {
-    local_deleted: bool,
-    remote_deleted: bool,
-    reason: String,
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-enum IntegratedBranchPlan {
-    Eligible {
-        branch: String,
-        branch_commit: String,
-        target_branch: String,
-        remote: Option<String>,
-    },
-    Preserved(String),
-}
-
-fn retire_integrated_branch(
-    git: &FileGitWorktreeService,
-    branch: &str,
-    goal: &Value,
-) -> RefineResult<BranchCleanupOutcome> {
-    let plan = integrated_branch_plan(git, branch, goal)?;
-    match plan {
-        IntegratedBranchPlan::Eligible { .. } => execute_branch_retirement(git, plan),
-        IntegratedBranchPlan::Preserved(reason) => Ok(branch_cleanup_preserved(&reason)),
-    }
-}
-
-fn integrated_branch_plan(
-    git: &FileGitWorktreeService,
-    branch: &str,
-    goal: &Value,
-) -> RefineResult<IntegratedBranchPlan> {
-    if !branch.starts_with("refine/") {
-        return Ok(IntegratedBranchPlan::Preserved(
-            "branch_not_refine_owned".to_string(),
-        ));
-    }
-    let branch_commit = match git.resolve_commit(branch) {
-        Ok(commit) => commit,
-        Err(_) => {
-            return Ok(IntegratedBranchPlan::Preserved(
-                "local_branch_missing".to_string(),
-            ));
-        }
-    };
-    let Some(integration) = matching_integration(goal, &branch_commit) else {
-        return Ok(IntegratedBranchPlan::Preserved(
-            "candidate_not_integrated".to_string(),
-        ));
-    };
-    let Some(target_branch) = integration
-        .get("target_branch")
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-    else {
-        return Ok(IntegratedBranchPlan::Preserved(
-            "integration_target_missing".to_string(),
-        ));
-    };
-    let target_commit = match git.resolve_commit(target_branch) {
-        Ok(commit) => commit,
-        Err(_) => {
-            return Ok(IntegratedBranchPlan::Preserved(
-                "integration_target_missing".to_string(),
-            ));
-        }
-    };
-    if !git.commit_is_ancestor(&branch_commit, &target_commit)? {
-        return Ok(IntegratedBranchPlan::Preserved(
-            "candidate_not_in_local_target".to_string(),
-        ));
-    }
-    let remote = integration
-        .get("remote")
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(str::to_string);
-    Ok(IntegratedBranchPlan::Eligible {
-        branch: branch.to_string(),
-        branch_commit,
-        target_branch: target_branch.to_string(),
-        remote,
-    })
-}
-
-fn execute_branch_retirement(
-    git: &FileGitWorktreeService,
-    plan: IntegratedBranchPlan,
-) -> RefineResult<BranchCleanupOutcome> {
-    let IntegratedBranchPlan::Eligible {
-        branch,
-        branch_commit,
-        target_branch,
-        remote,
-    } = plan
-    else {
-        return Err(RefineError::InvalidInput(
-            "integrated branch retirement requires an eligible plan".to_string(),
-        ));
-    };
-    let mut remote_deleted = false;
-    if let Some(remote) = remote.as_deref()
-        && git.remote_exists(remote)?
-        && let Some(remote_commit) = git.remote_branch_commit(remote, &branch)?
-    {
-        if remote_commit != branch_commit {
-            return Ok(branch_cleanup_preserved("remote_branch_advanced"));
-        }
-        git.fetch_branch(remote, &target_branch)?;
-        let remote_target = git.resolve_commit("FETCH_HEAD")?;
-        if !git.commit_is_ancestor(&branch_commit, &remote_target)? {
-            return Ok(branch_cleanup_preserved("candidate_not_in_remote_target"));
-        }
-        git.delete_remote_branch_if_matches(remote, &branch, &branch_commit)?;
-        remote_deleted = true;
-    }
-    git.delete_branch_if_matches(&branch, &branch_commit)?;
-    Ok(BranchCleanupOutcome {
-        local_deleted: true,
-        remote_deleted,
-        reason: "integrated_branch_retired".to_string(),
-    })
-}
-
 fn matching_goals_for_branch<'a>(
     branch: &str,
     goals: &'a BTreeMap<String, crate::model::goal::GoalIndexProjection>,
@@ -635,38 +402,17 @@ fn matching_goals_for_branch<'a>(
         .collect()
 }
 
-fn matching_integration<'a>(goal: &'a Value, branch_commit: &str) -> Option<&'a Value> {
-    goal.get("rounds")
-        .and_then(Value::as_array)?
-        .iter()
-        .filter_map(|round| round.get("workflow_integration"))
-        .find(|integration| {
-            integration.get("candidate_commit").and_then(Value::as_str) == Some(branch_commit)
-        })
-}
-
-fn branch_cleanup_preserved(reason: &str) -> BranchCleanupOutcome {
-    BranchCleanupOutcome {
-        local_deleted: false,
-        remote_deleted: false,
-        reason: reason.to_string(),
-    }
-}
-
-fn read_goal_record(refine_dir: &Path, relative_path: &str) -> RefineResult<Value> {
-    let path = refine_dir.join(relative_path);
-    let bytes = fs::read(&path).map_err(|error| {
-        RefineError::Io(format!(
-            "failed to read Goal record {} during worktree cleanup: {error}",
-            path.display()
-        ))
-    })?;
-    serde_json::from_slice(&bytes).map_err(|error| {
-        RefineError::Serialization(format!(
-            "failed to parse Goal record {} during worktree cleanup: {error}",
-            path.display()
-        ))
-    })
+fn setting_value<'a>(
+    settings: &'a serde_json::Map<String, Value>,
+    key: &str,
+    fallback: &'a str,
+) -> &'a str {
+    settings
+        .get(key)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(fallback)
 }
 
 fn configured_generated_paths(settings: &serde_json::Map<String, Value>) -> Vec<PathBuf> {

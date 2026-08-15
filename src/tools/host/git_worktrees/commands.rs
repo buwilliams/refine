@@ -125,6 +125,7 @@ impl FileGitWorktreeService {
         )?;
         Ok(HostCommandOutput {
             success: output.success(),
+            exit_code: output.process.exit_code,
             stdout: output.stdout.into_bytes(),
             stderr: output.stderr.into_bytes(),
         })
@@ -166,6 +167,7 @@ impl FileGitWorktreeService {
             .map_err(|error| RefineError::Io(format!("failed to read Git output: {error}")))?;
         Ok(HostCommandOutput {
             success: output.status.success(),
+            exit_code: output.status.code(),
             stdout: output.stdout,
             stderr: output.stderr,
         })

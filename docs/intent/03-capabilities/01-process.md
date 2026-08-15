@@ -61,7 +61,7 @@ replaces the stable `<product-home>/bin/refine` atomically; daemon registration
 continues to name that stable path while the existing attempt-fenced handoff
 proves restart and rollback identity.
 
-Worktree cleanup is separate from Stop. It may hibernate a clean inactive worktree when no live local process or operation uses it, while dirty, ambiguous, standalone, and state worktrees remain protected. Candidate branches retain their own exact-SHA integration safeguards.
+Worktree cleanup is separate from Stop and cancellation; neither process action deletes evidence. Retention-delayed maintenance may hibernate a clean inactive worktree when no live local process or operation uses it, while dirty, ambiguous, standalone, and state worktrees remain protected. The same maintenance pass may retire a done, cancelled, or deleted Goal's local and configured-remote round-ref names only after proving their exact tips reachable from the exact remote merge-target snapshot. Candidate and target movement fails closed, checked-out branches retain their local ref, and Goal, Round, process, and target-history evidence remains inspectable.
 
 `workflow_paused` is the canonical shared automation gate. Pausing blocks new Goal admission and lets automatic Git sync and inactive-worktree cleanup quiesce at safe repository-operation boundaries. Already active Goal executions continue unless their Agents are stopped separately. The daemon, API, and runner supervision remain available; quiesced repository workers settle normally instead of being treated as failed or permanently terminated. Resuming makes admission and those workers eligible to run again.
 
