@@ -1,6 +1,6 @@
 {
   "base_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
-  "branch_name": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-1",
+  "branch_name": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-2",
   "candidate_commit": null,
   "created": "2026-08-15T17:44:01Z",
   "feature_id": null,
@@ -311,10 +311,334 @@
       },
       "workflow_reconciliation": null,
       "workflow_recovery": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-15T18:58:49Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Recover the original Goal after the Round 1 implementation attempt failed solely because the pre-fix Refine daemon deleted its Goal Agent command channel. Preserve the retained dirty Round 1 worktree at /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR6626D11FDB6F9A57F6EA4B0F-round-1 as audit evidence: do not clean, reset, delete, or blindly merge it. Start from current main, which already contains 4519b5ff Preserve Goal Agent command channels during handoff. Compare current main with the retained Round 1 changes, selectively reapply and reconcile the complete relevant behavior for the original Goal, preserve unrelated current-main behavior, then implement and verify the governed plan with exact evidence.",
+          "reporter": "Buddy Williams",
+          "round": 2
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "DR6626D11FDB6F9A57F6EA4B0F",
+          "name": "Refine Bug Report �X Goal failures are dominated by harness/infra faults, not implementation defects",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "Buddy Williams",
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+                "context_digest": "1a126a4d7f00187879bb4b984eb8734195ed81c8969916373548e3206d166e3b",
+                "context_version": 1,
+                "goal_id": "DR6626D11FDB6F9A57F6EA4B0F",
+                "implementation_branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-1",
+                "round_idx": 0,
+                "target_branch": "main"
+              },
+              "criticism": {
+                "completed_at": "2026-08-15T17:50:28Z",
+                "git_after": {
+                  "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-1",
+                  "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-1",
+                  "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "findings": [
+                    {
+                      "checklist_item_ids": [
+                        "P4",
+                        "P5"
+                      ],
+                      "description": "The plan never defines which durable Quality artifact is compatible or how it remains bound to the exact current-Round candidate, so it could either keep rejecting the reported cases when evidence is absent or unsafely accept a later shared-target result by ancestry.",
+                      "id": "C1",
+                      "material": true,
+                      "recommendation": "Specify the admissible artifact fields and exact identity relation; preserve or recover candidate-bound passed evidence, and require a new exact-candidate Quality run when that proof cannot be reconstructed."
+                    },
+                    {
+                      "checklist_item_ids": [
+                        "P6",
+                        "P7"
+                      ],
+                      "description": "The repository raises stale_candidate when the recorded base is not an ancestor of the candidate, which is a provenance mismatch rather than ordinary target-tip advancement; treating every such case as an out-of-date candidate and rebasing can hide a wrong base or replay the wrong delta.",
+                      "id": "C2",
+                      "material": true,
+                      "recommendation": "Classify target advancement separately from base/candidate provenance failure, auto-rebase only when the original candidate delta is provable, and route ambiguous provenance or conflicts to a fresh fenced recovery Round with the original evidence retained."
+                    },
+                    {
+                      "checklist_item_ids": [
+                        "P8"
+                      ],
+                      "description": "P8 omits the merge-review Git/worktree and execution-ownership intent pages even though P6-P7 change serialized lease scope, candidate identity replacement, handoff retention, cancellation boundaries, and conflict recovery.",
+                      "id": "C3",
+                      "material": true,
+                      "recommendation": "Add those affected intent pages and document when the lease begins, how old and replacement candidate identities remain auditable, and which authority and cancellation fences govern gate reruns and recovery."
+                    }
+                  ],
+                  "summary": "The plan is directionally sound but needs tighter evidence, recovery, and documentation boundaries."
+                },
+                "started_at": "2026-08-15T17:47:37Z"
+              },
+              "failure": {
+                "category": "provider",
+                "failed_at": "2026-08-15T18:39:41Z",
+                "message": "failed to read Goal Agent command channel /home/buddy/projects/refine/run/8082/processes/goal-agent-7b5eff1d-5538-4305-9f74-b5a1c0ca5576.commands.jsonl: No such file or directory (os error 2)",
+                "phase": "implement"
+              },
+              "final_plan": {
+                "completed_at": "2026-08-15T17:54:01Z",
+                "git_after": {
+                  "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-1",
+                  "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-1",
+                  "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Add a cohesive structured-output repair capability for proposal, criticism, and revision that records each raw invalid attempt, returns its parse or validation diagnostics to a bounded follow-up invocation, and resumes from the last valid phase artifact before failing as an output-contract fault.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Apply the same bounded diagnostic repair policy to unreadable Quality evaluations while preserving every attempted response and keeping exhausted provider or contract faults distinct from valid failed implementation findings.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Retain the current 20,000-character planning-summary boundary and the Goal Agent session ownership rule that creates command and transcript artifacts before launch and keeps them available through reader and settlement completion.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Introduce a durable Quality proof shape bound to goal ID, zero-based Round, evaluation scope, operation ID, checked candidate commit, source candidate commit, passed state, timestamp, and recorded results, and normalize legacy Round fields only when they reconstruct that complete exact-candidate identity.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Extend already-merged reconciliation to require the current Round's exact integration identity and candidate-bound passed Governance evidence, accept a normalized isolated Quality proof for that same candidate, or materialize a clean managed checkout of the exact candidate and run isolated Quality again when such proof cannot be reconstructed, never deriving approval from ancestry or a shared-target descendant.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Settle an eligible already-merged Goal atomically and idempotently from Quality to Review under repository observation and originating Round plus workflow-revision fences, recording whether Quality proof was retained, normalized, or regenerated and leaving failed or unavailable proof explicit.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Classify ordinary target advancement separately from provenance failure by permitting refresh only when the recorded base resolves, is an ancestor of the exact candidate, the clean candidate branch still names that commit, the target descends from that base, and the original base-to-candidate delta is unambiguous.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Acquire the integrated-target workflow lease before final target revalidation and retain it through a clean rebase of a provable delta, atomic persistence of old and replacement base and candidate identities, exact replacement-candidate Quality and Governance reruns, merge or push, and evidence settlement, with Round, workflow-revision, node, status, and cancellation authority reread before each consequential boundary.",
+                      "id": "P8"
+                    },
+                    {
+                      "description": "Abort and clean any conflicted refresh without moving or deleting the original candidate, then atomically queue one fresh fenced recovery Round for conflicts or ambiguous provenance with the original base, candidate, branch, handoff, gate evidence, target snapshot, and conflict details retained.",
+                      "id": "P9"
+                    },
+                    {
+                      "description": "Update the affected Planning, Quality, Governance, Failed, merge-review Git/worktree, execution-ownership, and workflow consistency intent pages to describe bounded output repair, exact Quality proof regeneration, lease start and duration, candidate replacement audit history, and the authority and cancellation rules for gate reruns and recovery.",
+                      "id": "P10"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "C1",
+                      "resolution": "P4-P6 now define the admissible durable Quality fields and exact current-Round candidate relationship, allow legacy normalization only when that binding is complete, and require a new isolated exact-candidate Quality run when it is not."
+                    },
+                    {
+                      "criticism_id": "C2",
+                      "resolution": "P7-P9 now separate target-tip advancement from a base and candidate provenance mismatch, permit rebasing only for a provable original delta, and retain ambiguous or conflicted work in a fresh authority-fenced recovery Round."
+                    },
+                    {
+                      "criticism_id": "C3",
+                      "resolution": "P8 and P10 now define the integrated-target lease boundary, preserve old and replacement candidate identities, apply Round, workflow-revision, node, status, and cancellation fences, and include the merge-review Git/worktree and execution-ownership intent pages."
+                    }
+                  ],
+                  "summary": "Make the remaining infrastructure-dominated failures recoverable without weakening exact-candidate approval: invalid planning and Quality responses will receive bounded diagnostic repair attempts, already-integrated work will use only reconstructable current-Round Quality proof or a new isolated run of the exact candidate, and shared-target movement will be handled inside serialized integration ownership by refreshing only provable candidate deltas and rerunning the gates for any replacement commit. Preserve the relaxed planning-summary contract, Goal Agent artifact-handoff safeguards, durable old and replacement identities, and explicit recovery when provenance or conflicts are ambiguous."
+                },
+                "started_at": "2026-08-15T17:50:29Z"
+              },
+              "phase": "implement",
+              "phase_started_at": "2026-08-15T17:54:01Z",
+              "proposal": {
+                "completed_at": "2026-08-15T17:47:37Z",
+                "git_after": {
+                  "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-1",
+                  "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-1",
+                  "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Add a bounded structured-output repair loop that returns precise schema or validation diagnostics to planning agents, preserves every invalid attempt, and resumes from the last valid proposal or criticism before declaring the phase failed.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Apply the same bounded contract-repair policy to unreadable Quality evaluations while keeping real implementation findings distinct from provider, parsing, and infrastructure faults.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Preserve the current relaxed summary contract and artifact-handoff ownership semantics, with regression scenarios covering formerly oversized plans and reaper-versus-settlement command-channel races.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Define a backward-compatible already-merged evidence classifier that accepts an exact current-Round integration identity plus candidate-bound passed Governance and durable compatible Quality evidence, but never treats ancestry by itself as approval.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Settle eligible already-merged Goals atomically and idempotently to Review under repository and Goal authority fences while recording which durable evidence justified reconciliation and retaining ambiguous cases as explicit failures.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "At the serialized integration boundary, revalidate the target and cleanly rebase an out-of-date candidate onto its latest tip, then persist the new base and candidate identities and rerun candidate-bound Quality and Governance before integration.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Abort conflicted rebases without losing the original branch or evidence and queue a fresh actionable recovery Round instead of terminally failing stale-base or merge-conflict cases.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Update the affected Plan, Quality, Governance, Failed, and consistency intent pages to document bounded output repair, compatible reconciliation evidence, and serialized shared-target recovery without weakening exact-candidate authority.",
+                      "id": "P8"
+                    }
+                  ],
+                  "summary": "Build on the relaxed planning-summary limit and Goal Agent artifact-handoff safeguards already present on current main by making structured planning and Quality outputs repairable before a Round fails, allowing already-integrated candidates to recover from compatible durable gate evidence without trusting reachability alone, and refreshing candidates safely when a serialized shared target advances. The workflow will preserve exact Round, candidate, authority, and audit boundaries while converting recoverable formatting, stale-base, and merge-conflict conditions into bounded correction or explicit recovery instead of terminal harness failures."
+                },
+                "started_at": "2026-08-15T17:44:02Z"
+              },
+              "schema_version": 2,
+              "started_at": "2026-08-15T17:44:02Z",
+              "state": "failed",
+              "updated_at": "2026-08-15T18:39:41Z"
+            },
+            "prompt": "From: Buddy Williams <buddy.williams@insurity.com>\nSubject: Refine Bug Report �X Goal failures are dominated by harness/infra faults, not implementation defects\n\nBody:\n# Refine Bug Report �X Goal failures are dominated by harness/infra faults, not implementation defects\r\n\r\n  **Reporter:** Buddy Williams (node `bo2lnxnevo03-buddy` / BO2LNXNEVO03)\r\n  **Refine version:** 4.2.0\r\n  **Date:** 2026-08-15\r\n  **Target app:** ProSuite / ClaimsXPress, branch `insurity-claims`\r\n  **Fleet:** 5 nodes sharing one target repo, integrating into one shared branch/checkout\r\n\r\n  ---\r\n\r\n  ## Summary\r\n\r\n  Of the current failed Goals, **~96% of failing rounds are caused by the Refine harness itself** (plan-stage output-contract rejections, an IPC/process-lifecycle race, and\r\n  a reconciliation false-negative) �X **not** by the implementation being wrong. Because retries re-enter the same infrastructural failure, these Goals never recover, which\r\n  is why the queue *looks* like it is \"mostly failing.\"\r\n\r\n  Concrete counts on this node:\r\n\r\n  | Status | Count |\r\n  |---|---|\r\n  | done | 6 |\r\n  | **failed** | **28** |\r\n  | todo | 75 |\r\n  | review | 11 |\r\n  | plan (in-flight) | 3 |\r\n\r\n  **All 28 failures are on a single node** (`bo2lnxnevo03-buddy`). The `default` node has **788 done / 0 failed**; other active nodes (`bo2lnxnevo02-ethan`: 16 done / 0\r\n  failed) also have zero failures. The failing Goals were retried repeatedly, producing **55 failing rounds across the 28 Goals** (up to 6 rounds on one Goal).\r\n\r\n  ## Failure distribution (55 failing rounds, 28 Goals)\r\n\r\n  | # | Category / message | Rounds | Goals | Nature |\r\n  |---|---|---|---|---|\r\n  | A1 | `plan`: *implementation plan summary must be concise (at most 600 characters, observed N)* | 17 | 16 | Harness output-contract |\r\n  | A2 | `plan`: *agent returned no valid structured implementation plan JSON* | 12 | 10 | Harness output-contract |\r\n  | A3 | `plan`: *failed to read Goal Agent command channel �K/goal-agent-<uuid>.commands.jsonl: No such file or directory (os error 2)* | 8 | 8 | IPC / process lifecycle |\r\n  | B | `already_merged_reconciliation_unsafe`: *lacks durable passed isolated Quality evidence for exact candidate <sha>* | 12 | 12 | Reconciliation false-negative |\r\n  | C1 | `stale_candidate`: *recorded base �K is not its ancestor* | 3 | 3 | Shared-branch integration race |\r\n  | C2 | `merge`: *candidate integration failed �K CONFLICT (content) �K* | 1 | 1 | Shared-branch integration race |\r\n  | D1 | `governance`: real finding (Auth0 default-on-error fallback) | 1 | 1 | **Legitimate** signal |\r\n  | D2 | `quality`: *Quality agent did not return the required JSON evaluation* | 1 | 1 | Harness output-contract |\r\n\r\n  **Only 1 of 55 failing rounds (D1) is a legitimate \"the code is wrong\" signal.** Everything else is the harness rejecting or losing otherwise-good work.\r\n\r\n  ---\r\n\r\n  ## Cluster A �X Plan stage output contract is too brittle (37/55 rounds)\r\n\r\n  The plan stage runs a `proposal �� criticism �� revise` loop (`implementation_plan.schema_version: 2`). Three independent failure modes discard fully-formed plans:\r\n\r\n  ### A1 �X 600-character summary cap (17 rounds / 16 Goals)\r\n  failure_category: plan\r\n  failure_message: implementation plan summary must be concise (at most 600 characters, observed 1228)\r\n\r\n  The plan itself is complete (populated `checklist`, `findings`); it is hard-rejected **solely because the summary text exceeds 600 chars**. For non-trivial bugfixes the\r\n  agent routinely writes 1000�V1300 char summaries, so this cap fails the Goal on formatting, not substance. A hard cap on a free-text summary should not be a terminal\r\n  failure �X truncate, warn, or ask the agent to shorten in-loop instead of failing the round.\r\n\r\n  ### A2 �X Revise phase emits unparseable JSON (12 rounds / 10 Goals)\r\n  failure_category: plan\r\n  failure_message: agent returned no valid structured implementation plan JSON\r\n  implementation_plan.state: failed   phase: revise   failure.category: invalid_output\r\n  For an affected Goal (`00000SZ65QQQ0H85WQZGN80016`), **`proposal.result.checklist` and `criticism.result.findings` are both fully populated with substantive analysis** �X\r\n  the proposal and criticism phases produced valid structured JSON. The loop then fails at the **revise** phase because that step's output didn't parse. A single\r\n  non-conforming emit at the end throws away a complete, correct plan. The revise step needs a parse-retry / repair path rather than a terminal fail.\r\n\r\n  ### A3 �X Goal-agent command channel missing (8 rounds / 8 Goals)\r\n  failure_category: plan\r\n  failure_message: failed to read Goal Agent command channel\r\n    /insurity/refine/run/8082/processes/goal-agent-<uuid>.commands.jsonl: No such file or directory (os error 2)\r\n  The daemon tries to read a per-process command-channel file that does not exist. The referenced `goal-agent-<uuid>.stdout.log` is **also gone** from `run/8082/processes/`.\r\n  This looks like a process-lifecycle / cleanup race: the command channel is expected but the agent process either never created it or a cleanup step removed it before the\r\n  reader ran. This one is node-local runtime state (not a model-output problem) and points at daemon IPC ordering.\r\n\r\n  ---\r\n\r\n  ## Cluster B �X Reconciliation marks already-merged work as FAILED (12 rounds / 12 Goals)\r\n\r\n  failure_category: already_merged_reconciliation_unsafe\r\n  failure_message: Goal <id> lacks durable passed isolated Quality evidence for exact candidate <sha>\r\n  quality_state: failed        governance verdict: passed\r\n\r\n  **Verified in git �X the work actually shipped:**\r\n\r\n  | Goal | Candidate | In repo? | Reachable? |\r\n  |---|---|---|---|\r\n  | �KPDN70RNF67WN80003 | `5509b5a�K` | yes | **ancestor of HEAD** |\r\n  | �KPEVXJHDYJ2RN80004 | `5b1611c�K` | yes | **ancestor of HEAD** |\r\n  | �KPH7Y21AMD5CN80006 | `64d72f6�K` | yes | **ancestor of HEAD** |\r\n  | �KPR9S009BPSMN8000C | `a66b18a�K` | yes | **ancestor of HEAD** |\r\n\r\n  Each candidate is a real commit (`Implement <goal> round 1`) already merged into the branch and reachable from HEAD. Governance passed. Yet the Goal is **failed** because\r\n  reconciliation can't find *durable, isolated* Quality evidence tied to that **exact candidate SHA**.\r\n\r\n  In this fleet, multiple nodes/Goals integrate their post-build result into one shared branch/checkout, so the isolated-Quality evidence for a specific candidate isn't\r\n  retained by the time reconciliation runs. The result is a **false-negative**: merged, governance-passed code is labeled `failed`. This both (a) blocks the Goal from ever\r\n  reaching `done` on retry (the code is already in �X nothing new to do) and (b) corrupts delivery metrics and the SOC 2 evidence trail. Reconciliation should recognize a\r\n  candidate that is already an ancestor of the integration branch and reconcile from the existing passed evidence rather than requiring isolated per-SHA Quality that the\r\n  shared-branch model has already discarded.\r\n\r\n  ---\r\n\r\n  ## Cluster C �X Shared-branch integration races (4 rounds)\r\n\r\n  - **C1 `stale_candidate` (3):** `Candidate <sha> is stale: recorded base <sha> is not its ancestor` �X the base branch advanced (another node's merge) between the candidate\r\n  commit and integration, invalidating the recorded base. Notably one such Goal had **already passed governance and Quality** before being failed on the stale base.\r\n  - **C2 `merge` conflict (1):** `CONFLICT (content): Merge conflict in �K/batch-reserve-approval.component.ts` �X two Goals edited the same file concurrently and integration\r\n  had no rebase/replan path, so the round failed outright.\r\n\r\n  Both are consequences of many Goals racing into one shared branch with no auto-rebase/serialization at the integration boundary.\r\n\r\n  ---\r\n\r\n  ## Impact\r\n\r\n  1. **Perceived \"mostly failing\" queue** is driven by ~96% harness/infra faults; retries deterministically re-hit the same fault, so Goals never self-heal.\r\n  2. **Shipped work is mislabeled `failed` (Cluster B)** �X false delivery signal and lost audit/SOC 2 evidence for code that is actually merged.\r\n  3. **Substantive plans are discarded on formatting/parse technicalities (A1/A2)** �X wasted agent time and repeated retries.\r\n  4. Failures are **concentrated on one node**, suggesting node-local daemon/run-state contributes (esp. A3), on top of the general contract brittleness.\r\n\r\n  ## Requested fixes / questions for Refine devs\r\n  - **A1:** Don't fail the round on summary length. Truncate + warn, or feed the length constraint back into the loop for a shorten pass.\r\n  - **A2:** Add a parse-repair / bounded retry for the `revise` emit before failing; don't discard a valid proposal+criticism because the final emit didn't parse.\r\n  - **A3:** Investigate the command-channel lifecycle race in `run/<port>/processes/` �X why is `goal-agent-<uuid>.commands.jsonl` (and its stdout.log) absent when the daemon\r\n  reads it? Is cleanup racing the reader, or is the child failing to create the channel?\r\n  - **B:** Make reconciliation treat \"candidate is already an ancestor of the integration branch, governance passed\" as reconcilable from existing evidence instead of\r\n  demanding isolated per-SHA Quality that the shared-branch model has already dropped.\r\n  - **C:** Add auto-rebase / serialization at the integration boundary so a base advancing under a candidate (C1) or two Goals touching one file (C2) triggers a\r\n  replan/rebase rather than a terminal failure.\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nBuddy Williams\r\nBuddy.Williams@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
+            "reporter": "Buddy Williams",
+            "round": 1
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-08-15T18:58:48Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_candidate_commit": "",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "guidance_decision": null,
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+          "context_digest": "acd9057ed56db8f928eda20866d9d3590d98ec455e08634a833f7685ab9bd438",
+          "context_version": 1,
+          "goal_id": "DR6626D11FDB6F9A57F6EA4B0F",
+          "implementation_branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-2",
+          "round_idx": 1,
+          "target_branch": "main"
+        },
+        "phase": "plan",
+        "phase_started_at": "2026-08-15T18:58:49Z",
+        "schema_version": 2,
+        "started_at": "2026-08-15T18:58:49Z",
+        "state": "in_progress",
+        "updated_at": "2026-08-15T18:58:49Z"
+      },
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Recover the original Goal after the Round 1 implementation attempt failed solely because the pre-fix Refine daemon deleted its Goal Agent command channel. Preserve the retained dirty Round 1 worktree at /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR6626D11FDB6F9A57F6EA4B0F-round-1 as audit evidence: do not clean, reset, delete, or blindly merge it. Start from current main, which already contains 4519b5ff Preserve Goal Agent command channels during handoff. Compare current main with the retained Round 1 changes, selectively reapply and reconcile the complete relevant behavior for the original Goal, preserve unrelated current-main behavior, then implement and verify the governed plan with exact evidence.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-08-15T18:58:49Z",
+      "workflow_attempt_authority": {
+        "claimed_at": "2026-08-15T18:58:48Z",
+        "round_idx": 1,
+        "workflow_revision": 18
+      },
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
     }
   ],
-  "status": "failed",
+  "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-15T18:39:41Z",
-  "workflow_revision": 17
+  "updated": "2026-08-15T18:58:49Z",
+  "workflow_revision": 23
 }
