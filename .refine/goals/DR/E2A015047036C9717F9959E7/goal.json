@@ -106,8 +106,25 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-08-15T23:39:04Z",
+        "criticism": {
+          "completed_at": "2026-08-15T23:41:05Z",
+          "git_after": {
+            "branch": "refine/DRE2A015047036C9717F9959E7/round-1",
+            "head_commit": "6d284fb82c3a8bb999558fcebb3c7f0cfe9eb083",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRE2A015047036C9717F9959E7/round-1",
+            "head_commit": "6d284fb82c3a8bb999558fcebb3c7f0cfe9eb083",
+            "status_porcelain": []
+          },
+          "result": {
+            "summary": "The plan adequately addresses the live revise-stage structured-plan failure without weakening semantic validation."
+          },
+          "started_at": "2026-08-15T23:39:04Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-08-15T23:41:05Z",
         "proposal": {
           "completed_at": "2026-08-15T23:39:04Z",
           "git_after": {
@@ -158,7 +175,7 @@
         "schema_version": 2,
         "started_at": "2026-08-15T23:35:38Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T23:39:04Z"
+        "updated_at": "2026-08-15T23:41:05Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -172,7 +189,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T23:39:04Z",
+      "updated": "2026-08-15T23:41:05Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T23:35:38Z",
         "round_idx": 0,
@@ -184,6 +201,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-15T23:39:04Z",
-  "workflow_revision": 9
+  "updated": "2026-08-15T23:41:05Z",
+  "workflow_revision": 11
 }
