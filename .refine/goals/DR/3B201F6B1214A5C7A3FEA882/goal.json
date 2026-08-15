@@ -490,8 +490,44 @@
           "round_idx": 1,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-08-15T17:52:58Z",
+        "criticism": {
+          "completed_at": "2026-08-15T17:54:58Z",
+          "git_after": {
+            "branch": "refine/DR3B201F6B1214A5C7A3FEA882/round-2",
+            "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR3B201F6B1214A5C7A3FEA882/round-2",
+            "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P1",
+                  "P2",
+                  "P3",
+                  "P4",
+                  "P5",
+                  "P6",
+                  "P7",
+                  "P8",
+                  "P9"
+                ],
+                "description": "The checklist defines several new correctness-critical contracts but contains no verification item, so implementation could be declared complete without proving complete first-pass and push-retry reports, atomic report persistence, stale and fabricated decision rejection, remote and live-write races, interruption-safe manifest resumption, schema-safe Goal merges, health attempt ordering, or terminal daemon-routed CLI outcomes.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Add a focused verification item covering those contracts, including the applicable non-external CLI/API latency check and explicit assertions that failed or interrupted recovery never establishes an unowned baseline."
+              }
+            ],
+            "summary": "Add explicit verification coverage for the recovery, health, merge, and terminal CLI contracts."
+          },
+          "started_at": "2026-08-15T17:52:58Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-08-15T17:54:58Z",
         "proposal": {
           "completed_at": "2026-08-15T17:52:58Z",
           "git_after": {
@@ -554,7 +590,7 @@
         "schema_version": 2,
         "started_at": "2026-08-15T17:48:16Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T17:52:58Z"
+        "updated_at": "2026-08-15T17:54:58Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -568,7 +604,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T17:52:58Z",
+      "updated": "2026-08-15T17:54:58Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T17:48:15Z",
         "round_idx": 1,
@@ -580,6 +616,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-15T17:52:58Z",
-  "workflow_revision": 22
+  "updated": "2026-08-15T17:54:58Z",
+  "workflow_revision": 24
 }
