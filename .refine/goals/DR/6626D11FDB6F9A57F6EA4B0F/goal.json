@@ -1,7 +1,7 @@
 {
   "base_commit": "d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f",
   "branch_name": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-4",
-  "candidate_commit": null,
+  "candidate_commit": "3c548e4eb371abbc40ca1d1c53c738a079bfa17e",
   "created": "2026-08-15T17:44:01Z",
   "feature_id": null,
   "feature_order": null,
@@ -2828,7 +2828,28 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-15T21:39:39Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f",
@@ -2839,6 +2860,7 @@
           "round_idx": 3,
           "target_branch": "main"
         },
+        "completed_at": "2026-08-15T21:39:38Z",
         "criticism": {
           "completed_at": "2026-08-15T21:24:04Z",
           "git_after": {
@@ -2930,6 +2952,76 @@
           },
           "started_at": "2026-08-15T21:24:04Z"
         },
+        "implementation": {
+          "completed_at": "2026-08-15T21:39:38Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Compared Round 4 base d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f directly with candidate 68d2c526a7199e2018dac9a1be3baa98ba2052b6 and restored the reviewed delta by docs/model/prompts, host tools, product tools, and workflow components. A final blob-hash audit proved all 54 candidate paths match the candidate exactly; no merge, reset, cleanup, commit, push, or retained-worktree mutation occurred.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Restored the cohesive bounded planning and Quality structured-output repair implementation, durable invalid attempts, diagnostics, provider receipts, and authority checks exactly from the accepted candidate. Focused planning repair passed 1/1 and Quality execution passed 15/15, including cancellation and authority-loss boundaries.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Restored versioned exact-candidate Quality proof, exact identity normalization, isolated clean-checkout regeneration, and already-merged reconciliation without ancestry-derived approval. Governance reconciliation passed 9/9 and the already-merged workflow suite passed 1/1.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Preserved candidate 68d2c526's restart-safe terminal settlement for the first failed already-merged Quality result, including original operation/candidate/source identity, isolated scope, timestamp, results, diagnostics, and provider attempts. Workflow behavior tests passed 10/10, including new failure short-circuiting, persisted restart recovery, and superseded-authority rejection with no resolver, second evaluation, approval, or Review transition.",
+                "id": "P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Restored serialized integration-lease refresh, exact clean linear-delta checks, replacement gates, evidence-retaining conflict/ambiguity recovery, shared retry counting, and explicit exhaustion. Candidate-refresh tests passed 6/6.",
+                "id": "P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added src/tools/host/checkout/test_fixture.rs as a focused cfg(test) SyntheticSourceProduct fixture. It creates a source checkout shape, run root, and fake target/debug/refine under one canonical temporary product home. Both source_worker_inherits_debug_executable_without_installed_binary and source_lifecycle_handoff_inherits_debug_executable_without_installed_binary now use it and each passed individually and in the broad suite.",
+                "id": "P6",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Left RefineCheckoutPaths::require_owned_executable and all production ownership logic unchanged; checkout.rs has only a cfg(test) fixture-module declaration. Existing one_runtime_accepts_the_owning_debug_or_installed_executable_only foreign-home rejection coverage passed 1/1.",
+                "id": "P7",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Restored exactly the candidate's ten affected intent pages for bounded repair, exact Quality proof recovery and terminal failure, integration lease/retry behavior, merge-review worktree auditability, and execution ownership. No unrelated intent or runbook page was changed.",
+                "id": "P8",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Verification used the Round 4 checkout's real local target directory with CARGO_TARGET_DIR unset. Scoped rustfmt, git diff --check, cargo check, focused suites, baseline-adjusted strict Clippy, and the broad library suite passed. The two deterministic baseline tests were reproduced individually and their input files are untouched. Round 1 retained its exact known dirty fingerprints and Rounds 2 and 3 remained exactly clean with unchanged HEAD and fingerprints.",
+                "id": "P9",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "sha256sum prompt.md && wc -c prompt.md: 14cbd8235553bf8b8c851fc7ea48ed0a20a7e3c7ed0d7f766f3c96c13ab7f72f and 103823 bytes; read lines 1-1441 in ordered chunks through EOF.",
+              "Candidate blob audit over git diff --name-only d8a6285c..68d2c526: exit 0; all 54 restored candidate paths match 68d2c526 exactly. Changed-path audit: 58 total; only four extra fixture paths: src/process/runner/tests.rs, src/tools/host/checkout.rs, src/tools/host/checkout/test_fixture.rs, and src/tools/host/daemon_lifecycle/operations_tests.rs.",
+              "cargo test --lib process::runner::tests::source_worker_inherits_debug_executable_without_installed_binary -- --exact --test-threads=1: 1 passed, 0 failed.",
+              "cargo test --lib tools::host::daemon_lifecycle::operations_tests::source_lifecycle_handoff_inherits_debug_executable_without_installed_binary -- --exact --test-threads=1: 1 passed, 0 failed.",
+              "cargo test --lib tools::host::checkout::tests::one_runtime_accepts_the_owning_debug_or_installed_executable_only -- --exact --test-threads=1: 1 passed, 0 failed.",
+              "rustfmt --edition 2024 --config skip_children=true --check over all changed/untracked Rust files: exit 0; git diff --check: exit 0; git diff --cached --quiet: exit 0.",
+              "cargo check --all-targets: exit 0.",
+              "Focused suites with --test-threads=1: planning_repair 1 passed; Quality execution 15 passed; governance reconciliation 9 passed; candidate refresh 6 passed; already merged 1 passed; workflow behaviors 10 passed; no failures.",
+              "cargo clippy --all-targets -- -D warnings: exit 101 only for four unchanged warnings in untouched files: two needless_pub_self in project_projection/store.rs, one unnecessary_sort_by in background_loops.rs, and one items_after_test_module in cli/dispatch/config.rs.",
+              "git diff --quiet over the three Clippy baseline files followed by cargo clippy --all-targets -- -A clippy::needless_pub_self -A clippy::unnecessary_sort_by -A clippy::items_after_test_module -D warnings: exit 0.",
+              "cargo test --lib -- --skip prompts::tests::agent_prompts_keep_only_task_specific_contracts --skip surfaces::cli::catalog::tests::operational_runbooks_use_current_cli_and_layout_contracts --test-threads=1: 878 passed, 0 failed, 6 ignored, 2 filtered; both inheritance regressions passed in this checkout-local broad run.",
+              "The two filtered baseline tests were run individually: each exited 101 with its established untouched-file failure (implementation_planning/plan.md 95-word policy; docs/runbooks/install.md unknown refine system update command). git diff --quiet confirms both inputs are untouched.",
+              "Checkout target audit: target is a non-symlink resolving to /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR6626D11FDB6F9A57F6EA4B0F-round-4/target and CARGO_TARGET_DIR is unset.",
+              "Retained audit verification: Round 1 HEAD 4519b5ff, status baf90127, binary diff f36d5f6f, empty index e3b0c442, untracked d384db8a; Round 2 HEAD 40476173 and all four fingerprints e3b0c442; Round 3 HEAD 68d2c526 and all four fingerprints e3b0c442. Before/after values are identical."
+            ]
+          },
+          "report": "Selectively restored candidate 68d2c526's complete infrastructure-reliability implementation and intent coverage onto the Round 4 base, preserved fail-closed first-result already-merged Quality settlement, and replaced both checkout-dependent inheritance tests with one deterministic synthetic source-product fixture. All requested focused and broad checks passed with only confirmed unchanged baseline exclusions; all retained Round audit evidence is unchanged.",
+          "started_at": "2026-08-15T21:25:27Z"
+        },
         "phase": "implement",
         "phase_started_at": "2026-08-15T21:25:27Z",
         "proposal": {
@@ -2985,11 +3077,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-08-15T21:19:08Z",
-        "state": "in_progress",
-        "updated_at": "2026-08-15T21:25:27Z"
+        "state": "completed",
+        "updated_at": "2026-08-15T21:39:38Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Selectively restored candidate 68d2c526's complete infrastructure-reliability implementation and intent coverage onto the Round 4 base, preserved fail-closed first-result already-merged Quality settlement, and replaced both checkout-dependent inheritance tests with one deterministic synthetic source-product fixture. All requested focused and broad checks passed with only confirmed unchanged baseline exclusions; all retained Round audit evidence is unchanged.",
+      "implementation_reported_at": "2026-08-15T21:39:39Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -3000,7 +3092,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T21:25:27Z",
+      "updated": "2026-08-15T21:39:39Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T21:19:08Z",
         "round_idx": 3,
@@ -3010,8 +3102,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-15T21:25:27Z",
-  "workflow_revision": 76
+  "updated": "2026-08-15T21:39:39Z",
+  "workflow_revision": 81
 }
