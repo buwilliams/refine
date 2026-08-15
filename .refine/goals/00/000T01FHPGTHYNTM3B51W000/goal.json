@@ -815,8 +815,73 @@
           },
           "started_at": "2026-08-15T16:25:23Z"
         },
-        "phase": "revise",
-        "phase_started_at": "2026-08-15T16:27:40Z",
+        "final_plan": {
+          "completed_at": "2026-08-15T16:29:15Z",
+          "git_after": {
+            "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-2",
+            "head_commit": "0e0de3d43fe9284156e9f951dc8c981c1f996fd7",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-2",
+            "head_commit": "0e0de3d43fe9284156e9f951dc8c981c1f996fd7",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Selectively reapply the reviewed original-base-to-candidate semantic delta onto Round 2 while preserving unrelated current-main behavior and leaving the Round 1 branch, worktree, commits, logs, failed attempts, and Quality evidence unchanged.",
+                "id": "P1"
+              },
+              {
+                "description": "Restore the dedicated missing-baseline domain failure and optional typed state-sync recovery kind, including conditional settlement so success, generic failure, unconfigured state, and unrelated failure episodes cannot be misclassified or cleared.",
+                "id": "P2"
+              },
+              {
+                "description": "Restore daemon-owned git_busy and stale_preview recovery conflict classifications through the existing preview and apply API contract while preserving unchanged-complete-preview fencing and generic handling for unrelated conflicts.",
+                "id": "P3"
+              },
+              {
+                "description": "Restore the cohesive Dashboard recovery controller so it fetches previews only for authoritative typed eligibility and invalidates recovery state across target, node, route, scope, eligibility, preview identity, and late-response context changes.",
+                "id": "P4"
+              },
+              {
+                "description": "Restore neutral rendering of target and repository identities, configured remote, heads, snapshots, evidence identity, bounded conflict details, all comparison counts, and the consequences of live or remote authority without inference, recommendation, or preselection.",
+                "id": "P5"
+              },
+              {
+                "description": "Restore the separate explicit authority choice and exact-preview confirmation gate, with renewed confirmation after Git-busy rejection and mandatory preview, authority, and confirmation refresh after stale-preview rejection.",
+                "id": "P6"
+              },
+              {
+                "description": "Restore successful recovery reconciliation so authoritative state-sync health is settled and refreshed while the Dashboard retains the cleared error, baseline, resulting heads, audit ref, manifest, evidence identity, counts, authority, and detail.",
+                "id": "P7"
+              },
+              {
+                "description": "Carry forward the focused Rust daemon and API regressions plus browser regressions for eligibility, complete rendering, deliberate confirmation, busy and stale fencing, rejection without mutation, context races, successful evidence retention, and health clearing.",
+                "id": "P8"
+              },
+              {
+                "description": "Carry forward only the affected Dashboard intent, API intent, and existing missing-baseline fleet runbook updates that document typed eligibility, conflict reasons, explicit authority boundaries, refresh and retry semantics, and retained audit evidence.",
+                "id": "P9"
+              },
+              {
+                "description": "Prove that the recovered current-main delta preserves the complete reviewed base-to-candidate behavior without unrelated drift, then run the focused deterministic suites and targeted formatting and cumulative diff checks while reporting unrelated baseline failures and unavailable-browser skips separately.",
+                "id": "P10"
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "P10 adds the requested recovery-fidelity comparison, focused deterministic execution, targeted formatting and cumulative diff checks, and separate reporting for baseline failures and browser skips."
+              }
+            ],
+            "summary": "Recover the complete Quality-reviewed missing-baseline dashboard recovery behavior from the retained Round 1 candidate onto the clean current-main Round 2 branch by selectively replaying the original-base-to-candidate semantic delta, preserving unrelated current-main workflow and updater behavior and all historical evidence; the recovered result will retain daemon-owned eligibility and mutation boundaries, typed conflict fencing, deliberate unselected authority confirmation, durable audit evidence, focused regressions, and only the affected intent and runbook contracts, with explicit proof that the current-main result matches the reviewed behavior without unrelated drift."
+          },
+          "started_at": "2026-08-15T16:27:40Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-15T16:29:16Z",
         "proposal": {
           "completed_at": "2026-08-15T16:25:23Z",
           "git_after": {
@@ -875,7 +940,7 @@
         "schema_version": 2,
         "started_at": "2026-08-15T16:23:52Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T16:27:40Z"
+        "updated_at": "2026-08-15T16:29:16Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -889,7 +954,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T16:27:40Z",
+      "updated": "2026-08-15T16:29:16Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T16:23:51Z",
         "round_idx": 1,
@@ -899,8 +964,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-08-15T16:27:40Z",
-  "workflow_revision": 43
+  "updated": "2026-08-15T16:29:16Z",
+  "workflow_revision": 46
 }
