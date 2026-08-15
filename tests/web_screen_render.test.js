@@ -909,6 +909,15 @@ test("Agent terminal refits from visible geometry after minimize and fullscreen"
       cols: fullscreen.cols,
       rows: fullscreen.rows,
     });
+
+    const exitedFullscreen = await terminalGeometry("fullscreen");
+    assert.ok(exitedFullscreen.rows < fullscreen.rows);
+    assert.equal(exitedFullscreen.backendCols, exitedFullscreen.cols);
+    assert.equal(exitedFullscreen.backendRows, exitedFullscreen.rows);
+    assert.deepEqual(backendSizes.at(-1), {
+      cols: exitedFullscreen.cols,
+      rows: exitedFullscreen.rows,
+    });
     assert.deepEqual(app.pageErrors, []);
   } finally {
     await app.close();

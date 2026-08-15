@@ -1319,6 +1319,16 @@ test("terminal retains valid geometry while hidden and refits after layout trans
   assert.ok(fullscreenSize.rows > restoredSize.rows);
   assert.equal(fullscreenBackend.body.cols, fullscreenSize.cols);
   assert.equal(fullscreenBackend.body.rows, fullscreenSize.rows);
+
+  browser.runtime.setOutputSize(900, 340);
+  browser.runtime.toggleToolbarFullscreen();
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  const exitedFullscreenSize = sizes.at(-1);
+  const exitedFullscreenBackend = requests.filter((request) => request.path.endsWith("/resize")).at(-1);
+  assert.ok(exitedFullscreenSize.cols < fullscreenSize.cols);
+  assert.ok(exitedFullscreenSize.rows < fullscreenSize.rows);
+  assert.equal(exitedFullscreenBackend.body.cols, exitedFullscreenSize.cols);
+  assert.equal(exitedFullscreenBackend.body.rows, exitedFullscreenSize.rows);
 });
 
 test("terminal resize falls back when xterm renderer dimensions are unavailable", async () => {
