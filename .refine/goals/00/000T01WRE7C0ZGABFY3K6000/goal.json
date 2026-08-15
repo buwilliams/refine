@@ -106,12 +106,43 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-08-15T22:43:47Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-08-15T22:45:03Z",
+        "proposal": {
+          "completed_at": "2026-08-15T22:45:02Z",
+          "git_after": {
+            "branch": "refine/00000T01WRE7C0ZGABFY3K6000/round-1",
+            "head_commit": "0b561bcd40255af2d9b651175903f64326700433",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T01WRE7C0ZGABFY3K6000/round-1",
+            "head_commit": "0b561bcd40255af2d9b651175903f64326700433",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Update the static Controls menu Node link to target `#/node/processes` without changing the adjacent context controls or Node selector behavior.",
+                "id": "P1"
+              },
+              {
+                "description": "Extend the focused static navigation contract to pin the Controls Node entry to the processes route and prevent it from drifting back to another Node tab.",
+                "id": "P2"
+              },
+              {
+                "description": "Adjust the affected browser navigation intent text to record Processes as the stable destination of the Controls Node management entry.",
+                "id": "P3"
+              }
+            ],
+            "summary": "Change the Controls menu's Node management entry to open the existing Node Processes surface at `/#/node/processes`, so users land directly on the local runtime work that the entry is intended to expose while preserving the current Node selector and menu structure."
+          },
+          "started_at": "2026-08-15T22:43:47Z"
+        },
         "schema_version": 2,
         "started_at": "2026-08-15T22:43:47Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T22:43:47Z"
+        "updated_at": "2026-08-15T22:45:03Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -125,7 +156,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T22:43:47Z",
+      "updated": "2026-08-15T22:45:03Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T22:43:46Z",
         "round_idx": 0,
@@ -137,6 +168,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-15T22:43:47Z",
-  "workflow_revision": 7
+  "updated": "2026-08-15T22:45:03Z",
+  "workflow_revision": 9
 }
