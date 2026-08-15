@@ -2839,8 +2839,38 @@
           "round_idx": 3,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-08-15T21:21:36Z",
+        "criticism": {
+          "completed_at": "2026-08-15T21:24:04Z",
+          "git_after": {
+            "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-4",
+            "head_commit": "d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-4",
+            "head_commit": "d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P1",
+                  "P6",
+                  "P7"
+                ],
+                "description": "The checklist has no item requiring the Latest Round's exact verification and clean handoff: individual reruns of both failing inheritance tests, every named focused suite, all-target check, scoped rustfmt, strict Clippy with unchanged warnings separated, broad library verification from this checkout's own non-symlinked target directory, and before-and-after proof that all retained Round worktrees remain unchanged.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Add a final checklist item that records those exact commands and outcomes, confirms no external CARGO_TARGET_DIR or target symlink crosses product homes, fingerprints every retained audit worktree before and after, separates confirmed baseline failures, and proves the Round 4 worktree is clean and reviewable."
+              }
+            ],
+            "summary": "Add an explicit verification and audit-handoff item before implementation."
+          },
+          "started_at": "2026-08-15T21:21:36Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-08-15T21:24:04Z",
         "proposal": {
           "completed_at": "2026-08-15T21:21:36Z",
           "git_after": {
@@ -2895,7 +2925,7 @@
         "schema_version": 2,
         "started_at": "2026-08-15T21:19:08Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T21:21:36Z"
+        "updated_at": "2026-08-15T21:24:04Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -2909,7 +2939,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T21:21:36Z",
+      "updated": "2026-08-15T21:24:04Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T21:19:08Z",
         "round_idx": 3,
@@ -2921,6 +2951,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-15T21:21:36Z",
-  "workflow_revision": 71
+  "updated": "2026-08-15T21:24:04Z",
+  "workflow_revision": 73
 }
