@@ -1620,12 +1620,55 @@
           "round_idx": 2,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-08-15T19:58:08Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-08-15T20:01:37Z",
+        "proposal": {
+          "completed_at": "2026-08-15T20:01:37Z",
+          "git_after": {
+            "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-3",
+            "head_commit": "d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-3",
+            "head_commit": "d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Three-way compare current main, the Round 2 base, and candidate 404761736282119b272595ae63a09808492b4f77, then selectively reapply the complete relevant Round 2 behavior without modifying either retained worktree or regressing current-main changes.",
+                "id": "P1"
+              },
+              {
+                "description": "Preserve the candidate's cohesive bounded planning and Quality output repair, versioned exact-candidate proof, safe already-merged regeneration, serialized candidate refresh, replacement-gate authority fencing, shared recovery budget, and related intent contracts while reconciling them with current main.",
+                "id": "P2"
+              },
+              {
+                "description": "Add an idempotent work-item settlement path that, under the Goal mutation lock and exact originating Round and workflow-revision authority, validates and atomically records the first failed regenerated Quality proof with its candidate and source commits, operation ID, isolated scope, timestamp, results, diagnostics, provider attempts, and a dedicated already-merged Quality failure category.",
+                "id": "P3"
+              },
+              {
+                "description": "Change resolve_already_merged_quality to short-circuit immediately on quality.ok == false through the direct fenced failure settlement and return terminal Failed before invoking FileGovernanceIntegrationService, while retaining the existing resolver path only for an accepted passed proof and recognizing an already-settled failure without another Quality launch.",
+                "id": "P4"
+              },
+              {
+                "description": "Add behavior-level fail-then-pass or invocation-count coverage proving exactly one Quality run, durable retention of the first failed artifact, no Review or approval evidence, terminal fail-closed settlement, and no rerun when the workflow handles the Goal again, alongside focused lower-level authority and idempotence coverage.",
+                "id": "P5"
+              },
+              {
+                "description": "Update only the affected Quality-agent and workflow intent pages to state that a valid failed already-merged regeneration is retained as terminal candidate-bound evidence and cannot be replaced by a later evaluation.",
+                "id": "P6"
+              }
+            ],
+            "summary": "Selectively recover candidate 40476173's complete infrastructure-reliability behavior onto current main while preserving newer main behavior and both retained Round worktrees unchanged, then close the remaining already-merged reconciliation gap by treating the first valid failed exact-candidate Quality evaluation as terminal under the originating Round and workflow revision. The failed proof and all provider evidence will be retained atomically, the resolver and any second evaluation will be bypassed, and the existing passed-proof, repair, refresh, and bounded-recovery paths will remain intact."
+          },
+          "started_at": "2026-08-15T19:58:08Z"
+        },
         "schema_version": 2,
         "started_at": "2026-08-15T19:58:08Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T19:58:08Z"
+        "updated_at": "2026-08-15T20:01:37Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -1639,7 +1682,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T19:58:08Z",
+      "updated": "2026-08-15T20:01:37Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T19:58:07Z",
         "round_idx": 2,
@@ -1651,6 +1694,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-15T19:58:08Z",
-  "workflow_revision": 45
+  "updated": "2026-08-15T20:01:37Z",
+  "workflow_revision": 47
 }
