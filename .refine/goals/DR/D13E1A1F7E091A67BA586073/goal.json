@@ -1,0 +1,407 @@
+{
+  "base_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+  "branch_name": "refine/DRD13E1A1F7E091A67BA586073/round-1",
+  "candidate_commit": "a6c45738f281b2cf4139885a51b6aca46c9d4c7e",
+  "created": "2026-08-15T09:18:40Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "DRD13E1A1F7E091A67BA586073",
+  "name": "Bug: Refine state-sync failure silently drifts nodes; dashboard counts diverge with no user-visible indicator",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "buddy.williams@insurity.com",
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-15T09:18:42Z",
+        "current_round": {
+          "assignee": "buddy.williams@insurity.com",
+          "prompt": "From: Buddy Williams <buddy.williams@insurity.com>\nSubject: Bug: Refine state-sync failure silently drifts nodes; dashboard counts diverge with no user-visible indicator\n\nBody:\nBug: Refine state-sync failure silently drifts nodes; dashboard counts diverge with no user-visible indicator\r\n\r\n  Summary\r\n\r\n  When a Refine daemon's git fetch origin fails (e.g. missing/expired credentials for the refine/state remote), state sync stops but the daemon keeps serving /dashboard, /nodes, and /work/goals\r\n  from its stale local store. Nothing in the UI indicates the divergence. Users who compare per-node backlog cards against the \"All\" dashboard number see arithmetic that doesn't add up �X because\r\n  each node's card is sourced from its own daemon while \"All\" is sourced from just one, and the daemons no longer agree on the underlying state.\r\n\r\n  Environment\r\n\r\n  - Refine version: 4.2.0 (per refine system status)\r\n  - API contract: 2\r\n  - Deployment: fleet of Linux dev boxes each running their own daemon on port 8082, sharing state via a refine/state branch on https://github.com/Insurity-Dev/ProSuite.git\r\n  - Daemons observed: BO2LNXNEVO04 (QA) (node id default) and BO2LNXNEVO03 (Buddy) (node id bo2lnxnevo03-buddy)\r\n  - Credential helper: store, backed by ~/.git-credentials\r\n\r\n  Steps to reproduce\r\n\r\n  1. Start two Refine daemons that sync via origin/refine/state over HTTPS.\r\n  2. Remove or expire the github.com credential in ~/.git-credentials (in our case the file was rewritten and lost the GitHub entry on 2026-08-14 04:00 EDT).\r\n  3. Continue creating/transitioning Goals on both daemons.\r\n  4. Open the dashboard in a browser and compare:\r\n    - The per-node card counts (from /nodes on each daemon)\r\n    - The \"All\" total (from /dashboard?node=all on the daemon the browser is connected to)\r\n\r\n  Expected behavior\r\n\r\n  - Sync failures are surfaced prominently �X a banner on the dashboard, a needs_attention entry, or a health indicator on each node card.\r\n  - If sync has failed for more than N minutes, the dashboard should refuse to display stale aggregate counts, or clearly label them \"stale since <timestamp>\".\r\n  - The counts across nodes should reconcile (per-node backlogs sum to the \"All\" total from any daemon in the fleet).\r\n\r\n  Actual behavior\r\n\r\n  - Sync silently fails; last successful state-sync commit on refine/state at 2026-08-13 20:07 EDT. No banner, no dashboard warning, no needs_attention entry, no active_node_diagnostics �X the\r\n  daemon just keeps serving stale counts.\r\n  - Nothing in the daemon activity log (refine log query state, refine log query sync, or the state/sync/push/fetch categories) mentions the ongoing failure. The failure is only visible if a user\r\n  (a) manually clicks Sync or (b) hits POST /project/sync directly, at which point the returned operation object contains:\r\n  {\r\n    \"state\": \"Failed\",\r\n    \"error\": {\r\n      \"code\": \"project_sync_failed\",\r\n      \"message\": \"git fetch --prune origin failed: fatal: could not read Username for 'https://github.com': terminal prompts disabled\"\r\n    }\r\n  }\r\n  - Because each node's card is sourced from its own daemon (each daemon reports its own view authoritatively), and \"All\" comes from just one daemon's local total, the numbers stop reconciling.\r\n  Concrete snapshot from 2026-08-15 ~08:47 UTC:\r\n\r\n  | Query                                                      | QA daemon | Buddy daemon |\r\n  |------------------------------------------------------------|-----------|--------------|\r\n  | /nodes �� counts[\"default\"].backlog (QA node)               | 95        | 0            |\r\n  | /nodes �� counts[\"bo2lnxnevo03-buddy\"].backlog (Buddy node) | 73        | 109          |\r\n  | /nodes �� counts[\"bo2lnx-kxion\"].backlog                    | (absent)  | 6            |\r\n  | /dashboard?node=all �� counts.backlog                       | 168       | 115          |\r\n\r\n  - UI observation: QA card = 95, Buddy card = 109, \"All\" = 115. 95 + 109 �� 115 because the 95 QA backlog goals only exist on QA's daemon (Buddy sees 0), and the 6 kxion backlog goals only exist\r\n  on Buddy's daemon.\r\n\r\n  Impact\r\n\r\n  - Users lose trust in the counts. In our case a user (Buddy) noticed the arithmetic mismatch and had to file a bug to find out sync was broken. Without that noticing, both daemons would have\r\n  continued drifting indefinitely.\r\n  - Goals created on one node never reach other nodes' workflow runners. Anyone who queues work on a node other than where the goal was authored will silently sit idle.\r\n  - Approvals / status transitions taken on one node are invisible to another �X an approver could re-approve work that was already approved elsewhere, or a \"done\" goal could be re-implemented on\r\n  the other node.\r\n  - Reporting numbers (dashboard, assignee_stats, \"counts\" in support bundles) become per-daemon opinions, not facts.\r\n\r\n  Root cause (from code inspection)\r\n\r\n  - src/tools/host/git_sync/service.rs:sync_locked runs git fetch against origin before reconciling the local store with the remote refine/state branch (line 113). If fetch fails, the function\r\n  returns an error and no reconciliation happens. There is no fallback path that surfaces the persistent-failure state to the UI.\r\n  - The dashboard summary in src/tools/product/project_projection/query.rs:dashboard_summary (line 35) computes all_node_counts from self.goals.values() �X i.e., whatever this daemon has in its\r\n  local projection. It has no notion of \"the fleet's authoritative total,\" so a lagged daemon happily reports its stale view as all_node_counts.\r\n  - handle_dashboard in src/surfaces/web_server/project_routes/dashboard.rs populates needs_attention only from failed_count (line 87�V92) and runner_reachable/workflow_paused �X nothing about sync\r\n  freshness.\r\n  - The audit trail at .git/refine-audit.jsonl records only git_path / worktree / worktree_remove actions; there is no sync_failed or fetch_failed action being emitted for the automatic git-sync\r\n  worker path.\r\n\r\n  Suggested fix\r\n\r\n  Any of these would independently resolve the \"silent divergence\" class of bug �X ideally all three:\r\n  1. Surface sync freshness on the dashboard. Add a \"state-sync last succeeded at <timestamp>\" field to /dashboard and populate needs_attention with a warning if the last successful sync is older\r\n  than some threshold (e.g., state_sync_debounce_seconds * 10, or a settable stale-sync threshold).\r\n  2. Log automatic sync failures to the activity log. The daemon's git-sync worker (refine system runner-worker --kind git-sync) currently only records failures if a user manually triggers POST\r\n  /project/sync. Every failed automatic attempt should record a sync_failed activity entry with the underlying git error, visible via refine log query.\r\n  3. Fail loudly per-node in /nodes. Each node record should include a health field indicating whether that daemon's own sync is healthy, and the UI should render an error state on the card if\r\n  not.\r\n\r\n  Optional bonus: detect when the count arithmetic can't be reconciled (sum(per-node backlog) != all_node_counts.backlog) and surface that as a diagnostic �X that's a definitive tell that this\r\n  daemon has partial knowledge.\r\n\r\n  Workaround\r\n\r\n  On each affected daemon host:\r\n  # Restore GitHub credential:\r\n  echo \"https://<user>:<PAT>@github.com\" >> ~/.git-credentials\r\n  chmod 600 ~/.git-credentials\r\n\r\n  # Trigger a resync:\r\n  curl -sX POST http://localhost:8082/project/sync\r\n  Confirm success by checking that the returned operation reaches state: \"Succeeded\" and that refine/state HEAD advances in the state worktree at <repo>/.git/refine-state-worktree.\r\n\r\n  Evidence attachments (for the ticket body)\r\n\r\n  - Manual sync failure payload (both daemons, identical): {\"code\":\"project_sync_failed\",\"message\":\"git fetch --prune origin failed: fatal: could not read Username for 'https://github.com':\r\n  terminal prompts disabled\"}\r\n  - Last successful state-sync commit on QA: 91738db751 Sync Refine state: 1 goal at 2026-08-13 20:07:50 -0400\r\n  - ~/.git-credentials mtime on QA: 2026-08-14 04:00, contents scope: dev.azure.com only\r\n  - Daemon uptime since restart on QA: active (running) since Fri 2026-08-14 08:49:34 EDT �X has never successfully synced during this run\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nBuddy Williams\r\nBuddy.Williams@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
+          "reporter": "buddy.williams@insurity.com",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "buddy.williams@insurity.com",
+          "id": "DRD13E1A1F7E091A67BA586073",
+          "name": "Bug: Refine state-sync failure silently drifts nodes; dashboard counts diverge with no user-visible indicator",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "buddy.williams@insurity.com"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "assignee": "buddy.williams@insurity.com",
+      "constitution_state": "passed",
+      "created": "2026-08-15T09:18:40Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "2026-08-15T10:06:46Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRD13E1A1F7E091A67BA586073-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "guidance_checked": 2,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "No governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRD13E1A1F7E091A67BA586073-round-1"
+      },
+      "governance_message": "No governance rule violations found.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-15T09:47:14Z",
+        "skipped": []
+      },
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+          "context_digest": "81ddec3bf46ef338a495436d3c60125b1f4ecb049a63e16f6b0c8f284de7009a",
+          "context_version": 1,
+          "goal_id": "DRD13E1A1F7E091A67BA586073",
+          "implementation_branch": "refine/DRD13E1A1F7E091A67BA586073/round-1",
+          "round_idx": 0,
+          "target_branch": "main"
+        },
+        "completed_at": "2026-08-15T09:47:14Z",
+        "criticism": {
+          "completed_at": "2026-08-15T09:24:33Z",
+          "git_after": {
+            "branch": "refine/DRD13E1A1F7E091A67BA586073/round-1",
+            "head_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRD13E1A1F7E091A67BA586073/round-1",
+            "head_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P2"
+                ],
+                "description": "Appending a shared activity entry for every automatic failure is unsafe: the worker retries failed remote fetches every two seconds, logs/activity.jsonl is synchronized durable state, and concurrent outage entries from multiple nodes become a conflicting non-Goal path that can prevent convergence after credentials are restored.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Record redacted failure episodes on transitions with bounded repeats and a recovery event, using runtime-local activity projected into log queries or a tested stable-ID append-only merge before placing the evidence in synchronized activity."
+              },
+              {
+                "checklist_item_ids": [
+                  "P1",
+                  "P4",
+                  "P5"
+                ],
+                "description": "The plan adds runtime-local health and read contracts but no event or timer path for health transitions; current dashboard and node views refresh from SSE, so an open page can miss a failure, stale-threshold crossing, or recovery until an unrelated event or reload.",
+                "id": "C2",
+                "material": true,
+                "recommendation": "Add an explicit state-sync-health SSE/revision contract and refresh affected surfaces on failure, staleness, and recovery transitions, including the time-based stale boundary."
+              }
+            ],
+            "summary": "Revise failure evidence ownership and live health notification before implementation."
+          },
+          "started_at": "2026-08-15T09:20:56Z"
+        },
+        "final_plan": {
+          "completed_at": "2026-08-15T09:27:14Z",
+          "git_after": {
+            "branch": "refine/DRD13E1A1F7E091A67BA586073/round-1",
+            "head_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRD13E1A1F7E091A67BA586073/round-1",
+            "head_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Add a validated node setting for the state-sync stale threshold whose default exceeds the normal remote-fetch cadence and make the Git-sync schedule expose that threshold.",
+                "id": "P1"
+              },
+              {
+                "description": "Create a cohesive runtime-local state-sync health service that atomically binds health to the active target and node, records attempts, last successful reconciliation, failure episodes, redacted errors, and a monotonic revision, and treats lock deferrals, intentional pauses, and an unconfigured remote as neutral rather than failed.",
+                "id": "P2"
+              },
+              {
+                "description": "Route automatic and manual Git-sync outcomes through the health service, clear an outage only after successful reconciliation, and project one node-local failure-transition entry, bounded reminders, and one recovery entry into existing activity and log queries without synchronizing those records on refine/state.",
+                "id": "P3"
+              },
+              {
+                "description": "Add a typed state-sync-health SSE contract whose time-aware fingerprint changes on failure, stale-threshold crossing, and recovery, and have browser SSE and reconnect reconciliation refresh dashboard, node, and log surfaces from their authoritative read endpoints.",
+                "id": "P4"
+              },
+              {
+                "description": "Extend the dashboard contract and browser view with last-attempt, last-success, failure, and stale-since metadata, add prominent needs_attention state for failed or stale sync, and label locally projected all-node counts non-authoritative while health is degraded.",
+                "id": "P5"
+              },
+              {
+                "description": "Extend the nodes contract and browser node presentation so the serving daemon reports sync health for its active node and reports other nodes as unknown unless local evidence exists, without changing existing fleet bootstrap health semantics.",
+                "id": "P6"
+              },
+              {
+                "description": "Update the affected fleet, activity-and-evidence, dashboard, settings, and API intent contracts to document node-local sync health, transition-based outage evidence, SSE freshness updates, and the non-authoritative boundary for stale aggregates.",
+                "id": "P7"
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "Replace synchronized per-retry activity writes with node-local failure episodes, bounded reminders, and recovery records that are merged into normal log queries, preventing two-second retry storms and cross-node state conflicts."
+              },
+              {
+                "criticism_id": "C2",
+                "resolution": "Include derived sync health in a typed SSE fingerprint that evaluates the wall-clock stale boundary and refreshes affected surfaces on failure, staleness, recovery, initial connection, and reconnect."
+              }
+            ],
+            "summary": "Refine will maintain node-local state-sync health and outage evidence, expose freshness through daemon read contracts and SSE, and visibly downgrade stale dashboard aggregates so credential or fetch failures cannot leave fleet counts looking authoritative while nodes drift."
+          },
+          "started_at": "2026-08-15T09:24:33Z"
+        },
+        "implementation": {
+          "completed_at": "2026-08-15T09:47:14Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Added validated state_sync_stale_threshold_seconds setting (1..86400), default 900 seconds versus the normal 300-second remote-fetch cadence, exposed through GitSyncSchedule and runtime Settings UI.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added cohesive FileStateSyncHealthService with locked atomic replacement, canonical target/node binding, attempts, successes, failure episodes, redacted errors, neutral deferred/unconfigured outcomes, pause-aware derived health, and revision continuity across rebinds.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Automatic git-sync and manual project-sync now record shared health outcomes; activity emits one local-only state_sync failure transition, reminders no more often than every 30 minutes, and one recovery transition, while logs remain excluded from refine/state.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added typed state_sync_health SSE state and semantic fingerprint over status, success, failure, stale boundary, and error; browser handlers reconcile Dashboard, Logs, and Node/Settings surfaces and existing onopen logic handles initial/reconnect reads.",
+                "id": "P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Dashboard API and UI expose status, attempt/success/failure/stale timestamps, redacted error, stale threshold, prominent failed/stale needs_attention, and explicit local-projection/non-authoritative aggregate labeling while degraded.",
+                "id": "P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Nodes API and Settings Nodes table expose state_sync_health for the serving daemon's active node and explicit unknown/node_local_evidence_unavailable for other nodes without modifying existing fleet bootstrap health.",
+                "id": "P6",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated fleet, activity/evidence, Dashboard, Settings, and API intent pages with node-local health, outage evidence, SSE freshness, and aggregate authority contracts.",
+                "id": "P7",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "cargo check --lib -> passed",
+              "cargo test --lib -> 797 passed, 0 failed, 6 ignored",
+              "node --test tests/*.test.js -> 189 passed, 0 failed, 26 skipped because Playwright Chromium is unavailable",
+              "cargo test --lib state_sync_health -- --nocapture -> 6 passed, 0 failed",
+              "cargo test --lib surfaces::web_server::tests::project_runtime::dashboard_marks_failed_state_sync_counts_non_authoritative -- --exact -> 1 passed, 0 failed",
+              "cargo test --lib process::supervisor::config::tests::file_settings_service_lists_defaults_and_persists_updates -- --exact -> 1 passed, 0 failed",
+              "cargo test --lib surfaces::web_server::tests::static_surface::settings::static_runtime_settings_expose_state_sync_controls -- --exact -> 1 passed, 0 failed",
+              "rustfmt --edition 2024 --check on changed leaf Rust files and git diff --check -> passed",
+              "cargo clippy --lib -- -D warnings -> failed only on pre-existing untouched needless_pub_self findings at src/tools/product/project_projection/store.rs:46 and :54"
+            ]
+          },
+          "report": "Implemented node-local state-sync health with a validated 900-second default stale threshold, atomic target/node-bound attempt and outage records, redacted transition-based activity evidence with bounded reminders and recovery, automatic/manual sync routing, time-aware typed SSE refresh, degraded dashboard aggregate labeling and attention, active-node-only /nodes health, browser presentation, intent documentation, and focused coverage. Exact verification: cargo check --lib passed; cargo test --lib passed 797 tests with 6 ignored; node --test tests/*.test.js passed 189 tests with 26 Chromium-unavailable skips; cargo test --lib state_sync_health -- --nocapture passed 6 targeted tests; exact dashboard and settings tests passed 1 each; rustfmt --edition 2024 --check on changed leaf Rust files plus git diff --check passed. cargo clippy --lib -- -D warnings reached only two pre-existing needless_pub_self errors in untouched src/tools/product/project_projection/store.rs:46 and :54.",
+          "started_at": "2026-08-15T09:27:14Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-15T09:27:14Z",
+        "proposal": {
+          "completed_at": "2026-08-15T09:20:56Z",
+          "git_after": {
+            "branch": "refine/DRD13E1A1F7E091A67BA586073/round-1",
+            "head_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRD13E1A1F7E091A67BA586073/round-1",
+            "head_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Add a cohesive state-sync health service that atomically tracks the current target, last attempt, last success, latest sanitized failure, and configured stale threshold without treating lock deferrals, intentional pauses, or an unconfigured remote as sync failures.",
+                "id": "P1"
+              },
+              {
+                "description": "Route automatic and manual Git-sync outcomes through the health service, append a searchable sync_failed activity entry for every failed automatic attempt with the underlying Git error, and clear the active failure only after a real successful reconciliation.",
+                "id": "P2"
+              },
+              {
+                "description": "Add a node-runtime setting for the stale-sync threshold with a safe default longer than the normal remote-fetch cadence and expose it through the existing Settings contract.",
+                "id": "P3"
+              },
+              {
+                "description": "Extend the dashboard response with sync health and stale-since metadata, add a prominent needs_attention banner for failed or stale sync, and label aggregate counts as stale rather than presenting the daemon's local projection as fleet-authoritative.",
+                "id": "P4"
+              },
+              {
+                "description": "Extend the nodes response and browser node presentation with the serving daemon's sync health on its active node while leaving other nodes unknown unless their own daemon supplied evidence, preserving existing fleet bootstrap health semantics.",
+                "id": "P5"
+              },
+              {
+                "description": "Update only the affected Fleet, Activity and Evidence, Dashboard, and API intent pages to document symmetric-sync health, failure visibility, and the non-authoritative boundary for stale aggregate counts.",
+                "id": "P6"
+              }
+            ],
+            "summary": "Refine will persist each daemon's state-sync freshness and failures as runtime-local health, record automatic sync failures in the shared activity trail, and expose that health through dashboard and node contracts so locally computed fleet counts are clearly marked non-authoritative when synchronization is stale instead of silently appearing consistent."
+          },
+          "started_at": "2026-08-15T09:18:42Z"
+        },
+        "schema_version": 2,
+        "started_at": "2026-08-15T09:18:42Z",
+        "state": "completed",
+        "updated_at": "2026-08-15T09:47:14Z"
+      },
+      "implementation_report": "Implemented node-local state-sync health with a validated 900-second default stale threshold, atomic target/node-bound attempt and outage records, redacted transition-based activity evidence with bounded reminders and recovery, automatic/manual sync routing, time-aware typed SSE refresh, degraded dashboard aggregate labeling and attention, active-node-only /nodes health, browser presentation, intent documentation, and focused coverage. Exact verification: cargo check --lib passed; cargo test --lib passed 797 tests with 6 ignored; node --test tests/*.test.js passed 189 tests with 26 Chromium-unavailable skips; cargo test --lib state_sync_health -- --nocapture passed 6 targeted tests; exact dashboard and settings tests passed 1 each; rustfmt --edition 2024 --check on changed leaf Rust files plus git diff --check passed. cargo clippy --lib -- -D warnings reached only two pre-existing needless_pub_self errors in untouched src/tools/product/project_projection/store.rs:46 and :54.",
+      "implementation_reported_at": "2026-08-15T09:47:14Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "From: Buddy Williams <buddy.williams@insurity.com>\nSubject: Bug: Refine state-sync failure silently drifts nodes; dashboard counts diverge with no user-visible indicator\n\nBody:\nBug: Refine state-sync failure silently drifts nodes; dashboard counts diverge with no user-visible indicator\r\n\r\n  Summary\r\n\r\n  When a Refine daemon's git fetch origin fails (e.g. missing/expired credentials for the refine/state remote), state sync stops but the daemon keeps serving /dashboard, /nodes, and /work/goals\r\n  from its stale local store. Nothing in the UI indicates the divergence. Users who compare per-node backlog cards against the \"All\" dashboard number see arithmetic that doesn't add up �X because\r\n  each node's card is sourced from its own daemon while \"All\" is sourced from just one, and the daemons no longer agree on the underlying state.\r\n\r\n  Environment\r\n\r\n  - Refine version: 4.2.0 (per refine system status)\r\n  - API contract: 2\r\n  - Deployment: fleet of Linux dev boxes each running their own daemon on port 8082, sharing state via a refine/state branch on https://github.com/Insurity-Dev/ProSuite.git\r\n  - Daemons observed: BO2LNXNEVO04 (QA) (node id default) and BO2LNXNEVO03 (Buddy) (node id bo2lnxnevo03-buddy)\r\n  - Credential helper: store, backed by ~/.git-credentials\r\n\r\n  Steps to reproduce\r\n\r\n  1. Start two Refine daemons that sync via origin/refine/state over HTTPS.\r\n  2. Remove or expire the github.com credential in ~/.git-credentials (in our case the file was rewritten and lost the GitHub entry on 2026-08-14 04:00 EDT).\r\n  3. Continue creating/transitioning Goals on both daemons.\r\n  4. Open the dashboard in a browser and compare:\r\n    - The per-node card counts (from /nodes on each daemon)\r\n    - The \"All\" total (from /dashboard?node=all on the daemon the browser is connected to)\r\n\r\n  Expected behavior\r\n\r\n  - Sync failures are surfaced prominently �X a banner on the dashboard, a needs_attention entry, or a health indicator on each node card.\r\n  - If sync has failed for more than N minutes, the dashboard should refuse to display stale aggregate counts, or clearly label them \"stale since <timestamp>\".\r\n  - The counts across nodes should reconcile (per-node backlogs sum to the \"All\" total from any daemon in the fleet).\r\n\r\n  Actual behavior\r\n\r\n  - Sync silently fails; last successful state-sync commit on refine/state at 2026-08-13 20:07 EDT. No banner, no dashboard warning, no needs_attention entry, no active_node_diagnostics �X the\r\n  daemon just keeps serving stale counts.\r\n  - Nothing in the daemon activity log (refine log query state, refine log query sync, or the state/sync/push/fetch categories) mentions the ongoing failure. The failure is only visible if a user\r\n  (a) manually clicks Sync or (b) hits POST /project/sync directly, at which point the returned operation object contains:\r\n  {\r\n    \"state\": \"Failed\",\r\n    \"error\": {\r\n      \"code\": \"project_sync_failed\",\r\n      \"message\": \"git fetch --prune origin failed: fatal: could not read Username for 'https://github.com': terminal prompts disabled\"\r\n    }\r\n  }\r\n  - Because each node's card is sourced from its own daemon (each daemon reports its own view authoritatively), and \"All\" comes from just one daemon's local total, the numbers stop reconciling.\r\n  Concrete snapshot from 2026-08-15 ~08:47 UTC:\r\n\r\n  | Query                                                      | QA daemon | Buddy daemon |\r\n  |------------------------------------------------------------|-----------|--------------|\r\n  | /nodes �� counts[\"default\"].backlog (QA node)               | 95        | 0            |\r\n  | /nodes �� counts[\"bo2lnxnevo03-buddy\"].backlog (Buddy node) | 73        | 109          |\r\n  | /nodes �� counts[\"bo2lnx-kxion\"].backlog                    | (absent)  | 6            |\r\n  | /dashboard?node=all �� counts.backlog                       | 168       | 115          |\r\n\r\n  - UI observation: QA card = 95, Buddy card = 109, \"All\" = 115. 95 + 109 �� 115 because the 95 QA backlog goals only exist on QA's daemon (Buddy sees 0), and the 6 kxion backlog goals only exist\r\n  on Buddy's daemon.\r\n\r\n  Impact\r\n\r\n  - Users lose trust in the counts. In our case a user (Buddy) noticed the arithmetic mismatch and had to file a bug to find out sync was broken. Without that noticing, both daemons would have\r\n  continued drifting indefinitely.\r\n  - Goals created on one node never reach other nodes' workflow runners. Anyone who queues work on a node other than where the goal was authored will silently sit idle.\r\n  - Approvals / status transitions taken on one node are invisible to another �X an approver could re-approve work that was already approved elsewhere, or a \"done\" goal could be re-implemented on\r\n  the other node.\r\n  - Reporting numbers (dashboard, assignee_stats, \"counts\" in support bundles) become per-daemon opinions, not facts.\r\n\r\n  Root cause (from code inspection)\r\n\r\n  - src/tools/host/git_sync/service.rs:sync_locked runs git fetch against origin before reconciling the local store with the remote refine/state branch (line 113). If fetch fails, the function\r\n  returns an error and no reconciliation happens. There is no fallback path that surfaces the persistent-failure state to the UI.\r\n  - The dashboard summary in src/tools/product/project_projection/query.rs:dashboard_summary (line 35) computes all_node_counts from self.goals.values() �X i.e., whatever this daemon has in its\r\n  local projection. It has no notion of \"the fleet's authoritative total,\" so a lagged daemon happily reports its stale view as all_node_counts.\r\n  - handle_dashboard in src/surfaces/web_server/project_routes/dashboard.rs populates needs_attention only from failed_count (line 87�V92) and runner_reachable/workflow_paused �X nothing about sync\r\n  freshness.\r\n  - The audit trail at .git/refine-audit.jsonl records only git_path / worktree / worktree_remove actions; there is no sync_failed or fetch_failed action being emitted for the automatic git-sync\r\n  worker path.\r\n\r\n  Suggested fix\r\n\r\n  Any of these would independently resolve the \"silent divergence\" class of bug �X ideally all three:\r\n  1. Surface sync freshness on the dashboard. Add a \"state-sync last succeeded at <timestamp>\" field to /dashboard and populate needs_attention with a warning if the last successful sync is older\r\n  than some threshold (e.g., state_sync_debounce_seconds * 10, or a settable stale-sync threshold).\r\n  2. Log automatic sync failures to the activity log. The daemon's git-sync worker (refine system runner-worker --kind git-sync) currently only records failures if a user manually triggers POST\r\n  /project/sync. Every failed automatic attempt should record a sync_failed activity entry with the underlying git error, visible via refine log query.\r\n  3. Fail loudly per-node in /nodes. Each node record should include a health field indicating whether that daemon's own sync is healthy, and the UI should render an error state on the card if\r\n  not.\r\n\r\n  Optional bonus: detect when the count arithmetic can't be reconciled (sum(per-node backlog) != all_node_counts.backlog) and surface that as a diagnostic �X that's a definitive tell that this\r\n  daemon has partial knowledge.\r\n\r\n  Workaround\r\n\r\n  On each affected daemon host:\r\n  # Restore GitHub credential:\r\n  echo \"https://<user>:<PAT>@github.com\" >> ~/.git-credentials\r\n  chmod 600 ~/.git-credentials\r\n\r\n  # Trigger a resync:\r\n  curl -sX POST http://localhost:8082/project/sync\r\n  Confirm success by checking that the returned operation reaches state: \"Succeeded\" and that refine/state HEAD advances in the state worktree at <repo>/.git/refine-state-worktree.\r\n\r\n  Evidence attachments (for the ticket body)\r\n\r\n  - Manual sync failure payload (both daemons, identical): {\"code\":\"project_sync_failed\",\"message\":\"git fetch --prune origin failed: fatal: could not read Username for 'https://github.com':\r\n  terminal prompts disabled\"}\r\n  - Last successful state-sync commit on QA: 91738db751 Sync Refine state: 1 goal at 2026-08-13 20:07:50 -0400\r\n  - ~/.git-credentials mtime on QA: 2026-08-14 04:00, contents scope: dev.azure.com only\r\n  - Daemon uptime since restart on QA: active (running) since Fri 2026-08-14 08:49:34 EDT �X has never successfully synced during this run\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nBuddy Williams\r\nBuddy.Williams@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
+      "quality_agent_report": "Quality corrected the candidate's state-sync health lock open semantics, hardened and bounded credential redaction, split the health service into cohesive persistence, redaction, and test modules, and added focused schedule, neutral-outcome, redaction, and wall-clock SSE stale-transition coverage. Final verification: cargo check --lib passed; cargo test --lib passed 802 tests with 6 ignored; node --test tests/*.test.js passed 189 tests with 26 explicit Chromium-unavailable skips; focused state-sync, schedule, and SSE tests passed; changed-leaf rustfmt and diff checks passed. Strict Clippy has only three pre-existing diagnostics in untouched files, and passes when those existing lint classes are allowed.",
+      "quality_candidate_commit": "a6c45738f281b2cf4139885a51b6aca46c9d4c7e",
+      "quality_checked_at": "2026-08-15T10:04:59Z",
+      "quality_details": {
+        "candidate_commit": "a6c45738f281b2cf4139885a51b6aca46c9d4c7e",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRD13E1A1F7E091A67BA586073-round-1",
+        "diagnostics": [
+          "{\"ok\":true,\"summary\":\"Passed. Shared state-sync health behavior, intent contracts, and affected surfaces are coherent. Browser E2E remains unexecuted because Chromium is unavailable.\",\"results\":[{\"test\":\"The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\",\"status\":\"passed\",\"evidence\":\"Exit 0. Rust: 802 passed, 0 failed, 6 ignored. JavaScript: 189 passed, 0 failed, 26 explicit Chromium-unavailable skips. Diff check passed and worktree remained clean.\",\"command\":\"bash -lc 'set -o pipefail; cargo test --lib && node --test tests/*.test.js && git diff --check 7556a231c381db58b7dc435b514cfb7c13d60d23..HEAD && test -z \\\"$(git status --porcelain)\\\"'\"}]}",
+          "Observed supervised process proc-1786788261173-1084-705 exited 0. stdout: cs (1.117282ms)\n✔ every shared table cell wraps content that cannot break normally (1.937205ms)\n✔ every web table opts into the shared overflow-safe table styles (6.836889ms)\n✔ every terminal profile installs the shared copy and paste behavior (136.843047ms)\n✔ Ctrl+Enter inserts a TUI newline without submitting ordinary Enter (26.749136ms)\n✔ Ctrl+Z cannot suspend Agent terminals and subsequent input remains usable (27.17812ms)\n✔ Ctrl+Z retains shell Terminal job-control semantics (26.894759ms)\n✔ Ctrl+C without a selection keeps terminal SIGINT semantics (27.193341ms)\n✔ Ctrl+V uses terminal-native framing for single-line and multiline text (51.732243ms)\n✔ native paste is sent exactly once instead of being reprocessed by xterm (27.60319ms)\n✔ clipboard failures are visible and unavailable APIs do not claim browser handling (80.898195ms)\n✔ an asynchronous paste cannot cross into a replacement managed session (28.49284ms)\n✔ clipboard text buffered before replacement cannot cross managed sessions (26.980833ms)\n✔ clipboard shortcuts remain untouched when focus is outside a terminal (26.791728ms)\n✔ theme initializes from the system preference and exposes an accessible toggle (3.458216ms)\n✔ theme toggle switches modes, persists the choice, and announces the change (1.408171ms)\n✔ system theme changes remain live until the user stores a preference (0.702292ms)\n✔ API callers can render an expected degraded status without recording Activity (4.149401ms)\n✔ identical UI errors are persisted at most once per cooldown (1.746724ms)\n✔ passive source-status reads opt out of Activity error recording (0.559757ms)\n✔ no selector literal in the web UI contains an empty call (20.338802ms)\n✔ no rendered test id in the web UI contains an empty call (7.914389ms)\n✔ dom-morph.js is loaded before the screens that use it (0.573706ms)\n✔ Reporter onboarding loads before router and init (0.208066ms)\nℹ tests 215\nℹ suites 0\nℹ pass 189\nℹ fail 0\nℹ cancelled 0\nℹ skipped 26\nℹ todo 0\nℹ duration_ms 4424.84032 stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)"
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "1a004dea7a743c11",
+        "results": [
+          {
+            "command": "bash -lc 'set -o pipefail; cargo test --lib && node --test tests/*.test.js && git diff --check 7556a231c381db58b7dc435b514cfb7c13d60d23..HEAD && test -z \"$(git status --porcelain)\"'",
+            "evidence": "Observed supervised process proc-1786788261173-1084-705 exited 0. stdout: cs (1.117282ms)\n✔ every shared table cell wraps content that cannot break normally (1.937205ms)\n✔ every web table opts into the shared overflow-safe table styles (6.836889ms)\n✔ every terminal profile installs the shared copy and paste behavior (136.843047ms)\n✔ Ctrl+Enter inserts a TUI newline without submitting ordinary Enter (26.749136ms)\n✔ Ctrl+Z cannot suspend Agent terminals and subsequent input remains usable (27.17812ms)\n✔ Ctrl+Z retains shell Terminal job-control semantics (26.894759ms)\n✔ Ctrl+C without a selection keeps terminal SIGINT semantics (27.193341ms)\n✔ Ctrl+V uses terminal-native framing for single-line and multiline text (51.732243ms)\n✔ native paste is sent exactly once instead of being reprocessed by xterm (27.60319ms)\n✔ clipboard failures are visible and unavailable APIs do not claim browser handling (80.898195ms)\n✔ an asynchronous paste cannot cross into a replacement managed session (28.49284ms)\n✔ clipboard text buffered before replacement cannot cross managed sessions (26.980833ms)\n✔ clipboard shortcuts remain untouched when focus is outside a terminal (26.791728ms)\n✔ theme initializes from the system preference and exposes an accessible toggle (3.458216ms)\n✔ theme toggle switches modes, persists the choice, and announces the change (1.408171ms)\n✔ system theme changes remain live until the user stores a preference (0.702292ms)\n✔ API callers can render an expected degraded status without recording Activity (4.149401ms)\n✔ identical UI errors are persisted at most once per cooldown (1.746724ms)\n✔ passive source-status reads opt out of Activity error recording (0.559757ms)\n✔ no selector literal in the web UI contains an empty call (20.338802ms)\n✔ no rendered test id in the web UI contains an empty call (7.914389ms)\n✔ dom-morph.js is loaded before the screens that use it (0.573706ms)\n✔ Reporter onboarding loads before router and init (0.208066ms)\nℹ tests 215\nℹ suites 0\nℹ pass 189\nℹ fail 0\nℹ cancelled 0\nℹ skipped 26\nℹ todo 0\nℹ duration_ms 4424.84032 stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e) Agent report: Exit 0. Rust: 802 passed, 0 failed, 6 ignored. JavaScript: 189 passed, 0 failed, 26 explicit Chromium-unavailable skips. Diff check passed and worktree remained clean.",
+            "exit_code": 0,
+            "process_id": "proc-1786788261173-1084-705",
+            "status": "passed",
+            "test": "The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks."
+          }
+        ],
+        "source_candidate_commit": "a6c45738f281b2cf4139885a51b6aca46c9d4c7e"
+      },
+      "quality_message": "All Quality tests passed with observed supervised evidence.",
+      "quality_state": "passed",
+      "reporter": "buddy.williams@insurity.com",
+      "rule_state": "passed",
+      "updated": "2026-08-15T10:06:49Z",
+      "workflow_attempt_authority": null,
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "a6c45738f281b2cf4139885a51b6aca46c9d4c7e",
+        "integrated_at": "2026-08-15T10:06:49.792336866+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n docs/intent/02-foundation/04-fleet.md              |   3 +\n .../02-agents/06-activity-evidence.md              |   2 +\n docs/intent/04-surfaces/03-browser/05-dashboard.md |   3 +\n docs/intent/04-surfaces/03-browser/12-settings.md  |   2 +\n docs/intent/04-surfaces/04-api.md                  |   2 +\n src/process/runner.rs                              |   7 +\n src/process/runner/git_sync.rs                     |  32 +-\n src/process/runner/project_sync.rs                 |  13 +-\n src/process/runner/schedule.rs                     |  15 +-\n src/process/runner/state_sync_health.rs            | 111 +++++++\n src/process/runner/tests.rs                        |  82 +++++\n src/process/supervisor/config/settings_codec.rs    |   3 +\n src/process/supervisor/config/tests.rs             |  16 +\n src/surfaces/web/static/css/dashboard.css          |  28 ++\n src/surfaces/web/static/js/common.js               |   8 +\n src/surfaces/web/static/js/features/dashboard.js   |  28 ++\n .../web/static/js/features/settings_nodes.js       |   7 +-\n .../web/static/js/features/settings_runtime.js     |  20 +-\n src/surfaces/web_server/http.rs                    |   1 +\n src/surfaces/web_server/http/events.rs             |  41 ++-\n src/surfaces/web_server/project_routes.rs          |  18 ++\n .../web_server/project_routes/dashboard.rs         |  17 +-\n .../web_server/project_routes/nodes_fleet.rs       |  36 ++-\n src/surfaces/web_server/runtime.rs                 |  28 ++\n .../web_server/tests/http_transport/events.rs      |  82 +++++\n src/surfaces/web_server/tests/nodes_fleet.rs       |  37 +++\n src/surfaces/web_server/tests/project_runtime.rs   |  50 ++-\n .../web_server/tests/static_surface/settings.rs    |   4 +\n src/tools/host/git_sync/mod.rs                     |   4 +\n src/tools/host/git_sync/service.rs                 |   1 +\n src/tools/host/mod.rs                              |   1 +\n src/tools/host/state_sync_health.rs                | 360 +++++++++++++++++++++\n src/tools/host/state_sync_health/redaction.rs      |  88 +++++\n src/tools/host/state_sync_health/tests.rs          | 158 +++++++++\n tests/web_dashboard_attention.test.js              |  36 +++\n 35 files changed, 1332 insertions(+), 12 deletions(-)\n create mode 100644 src/process/runner/state_sync_health.rs\n create mode 100644 src/tools/host/state_sync_health.rs\n create mode 100644 src/tools/host/state_sync_health/redaction.rs\n create mode 100644 src/tools/host/state_sync_health/tests.rs",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "5a45deaef2e43f1a40d7aaab695439272fd50c4b"
+      },
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    }
+  ],
+  "status": "done",
+  "target_branch": "main",
+  "updated": "2026-08-15T10:07:19Z",
+  "workflow_revision": 28
+}

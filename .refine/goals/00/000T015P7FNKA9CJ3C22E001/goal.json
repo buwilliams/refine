@@ -1,0 +1,315 @@
+{
+  "base_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+  "branch_name": "refine/00000T015P7FNKA9CJ3C22E001/round-1",
+  "candidate_commit": "1077627408735cc9126ffece43358b0e33819537",
+  "created": "2026-08-15T09:17:26Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000T015P7FNKA9CJ3C22E001",
+  "name": "Minimizing/maximizing/hiding the web UI toolbar agent causes the rendered text i",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-15T09:17:27Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Minimizing/maximizing/hiding the web UI toolbar agent causes the rendered text in a maximized window to appear very narrow and not take up the full width of the TTY area. The terminal layout should be responsive according to the area provided for it.",
+          "reporter": "Buddy Williams",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000T015P7FNKA9CJ3C22E001",
+          "name": "Minimizing/maximizing/hiding the web UI toolbar agent causes the rendered text i",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-08-15T09:17:26Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "2026-08-15T09:41:14Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T015P7FNKA9CJ3C22E001-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "guidance_checked": 2,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "No governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T015P7FNKA9CJ3C22E001-round-1"
+      },
+      "governance_message": "No governance rule violations found.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-15T09:31:54Z",
+        "skipped": []
+      },
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+          "context_digest": "fb2365c43d264a2846e000c2e1b1f9b15c4e0e0567a057c28225bccb1647b047",
+          "context_version": 1,
+          "goal_id": "00000T015P7FNKA9CJ3C22E001",
+          "implementation_branch": "refine/00000T015P7FNKA9CJ3C22E001/round-1",
+          "round_idx": 0,
+          "target_branch": "main"
+        },
+        "completed_at": "2026-08-15T09:31:54Z",
+        "criticism": {
+          "completed_at": "2026-08-15T09:20:43Z",
+          "git_after": {
+            "branch": "refine/00000T015P7FNKA9CJ3C22E001/round-1",
+            "head_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T015P7FNKA9CJ3C22E001/round-1",
+            "head_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+            "status_porcelain": []
+          },
+          "result": {
+            "summary": "The proposed plan is complete and aligned with the shared responsive terminal lifecycle."
+          },
+          "started_at": "2026-08-15T09:19:25Z"
+        },
+        "final_plan": {
+          "completed_at": "2026-08-15T09:22:19Z",
+          "git_after": {
+            "branch": "refine/00000T015P7FNKA9CJ3C22E001/round-1",
+            "head_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T015P7FNKA9CJ3C22E001/round-1",
+            "head_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Update the shared toolbar terminal sizing path to retain the last valid geometry when its host is hidden or has no measurable area and trigger a fresh fit when the dock is restored, resized, or moved into or out of fullscreen.",
+                "id": "P1"
+              },
+              {
+                "description": "Use each valid visible measurement as the single source for resizing both the xterm renderer and its managed PTY so Agent terminal content reflows consistently across the full available rows and columns.",
+                "id": "P2"
+              }
+            ],
+            "summary": "Make the shared toolbar terminal sizing lifecycle ignore hidden or unmeasurable layouts and refit from the real visible area after minimize, restore, resize, and fullscreen transitions, so both the browser terminal and its Agent TUI use the full width available instead of retaining transient narrow dimensions."
+          },
+          "started_at": "2026-08-15T09:20:43Z"
+        },
+        "implementation": {
+          "completed_at": "2026-08-15T09:31:54Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "terminalSize now rejects closed, disconnected, zero-content, and no-client-rect hosts; existing xterm geometry is left untouched, renderer creation is deferred until measurable, retained lastCols/lastRows seed session startup, and redraw/ResizeObserver/drag-complete scheduling refits after restore, resize, and fullscreen transitions.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "resizeTerminalRenderer derives one valid visible size, applies that exact cols/rows pair to xterm, and only after renderer success schedules the same pair for the managed PTY resize API; VM and Chromium regressions assert renderer/backend equality.",
+                "id": "P2",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "node --check src/surfaces/web/static/js/features/toolbar.js && node --check tests/web_supervisor_toolbar.test.js && node --check tests/web_screen_render.test.js — passed with exit 0",
+              "node --test tests/web_supervisor_toolbar.test.js — 37 passed, 0 failed",
+              "NODE_PATH=/home/buddy/projects/refine/node_modules node --test --test-name-pattern='Agent terminal refits from visible geometry' tests/web_screen_render.test.js — 1 passed, 0 failed",
+              "web_unit_tests=(); while IFS= read -r test_file; do web_unit_tests+=(\"$test_file\"); done < <(find tests -maxdepth 1 -name 'web_*.test.js' ! -name 'web_screen_render.test.js' -print | sort); node --test \"${web_unit_tests[@]}\" — 188 passed, 0 failed",
+              "NODE_PATH=/home/buddy/projects/refine/node_modules node --test tests/web_screen_render.test.js — 23 passed, 4 failed; the responsive sizing regression passed; failures were Controls Node selector visibility timeout, existing ANSI rendered-text assertion, missing node/performance marker, and stale source-upgrade copy assertion",
+              "git diff --check — passed with exit 0"
+            ]
+          },
+          "report": "Updated the shared Toolbar terminal sizing lifecycle to reject hidden, disconnected, and zero-area measurements; defer renderer creation until measurable; retain the last valid startup geometry; and refit after redraw, restore, output resize, drag completion, and fullscreen transitions. A valid measurement now resizes xterm first and sends the same columns and rows to the managed PTY. Updated Toolbar intent documentation and added VM plus real-Chromium regressions. Exact verification: 188/188 non-browser web tests passed; focused Chromium responsive sizing passed; full Chromium render suite was 23/27 with the new sizing test passing and four existing unrelated assertions failing (hidden Node selector, ANSI rendering text, missing performance marker, and stale source-upgrade copy).",
+          "started_at": "2026-08-15T09:22:19Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-15T09:22:19Z",
+        "proposal": {
+          "completed_at": "2026-08-15T09:19:25Z",
+          "git_after": {
+            "branch": "refine/00000T015P7FNKA9CJ3C22E001/round-1",
+            "head_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T015P7FNKA9CJ3C22E001/round-1",
+            "head_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Update the shared toolbar terminal resize path to preserve the last valid dimensions while the terminal host is hidden and schedule a fresh visible-layout fit after collapse, restore, fullscreen, and related redraw transitions.",
+                "id": "P1"
+              },
+              {
+                "description": "Keep frontend xterm geometry and backend PTY resize requests synchronized only from valid rendered dimensions so native Agent TUIs receive the actual responsive column and row counts.",
+                "id": "P2"
+              },
+              {
+                "description": "Add focused toolbar lifecycle and browser regression coverage for an Agent terminal moving through minimized, restored, and fullscreen states without narrowing its rendered text.",
+                "id": "P3"
+              }
+            ],
+            "summary": "Make the shared toolbar terminal sizing lifecycle distinguish hidden or unmeasurable layouts from real available space, then refit both xterm and the managed PTY when an Agent terminal becomes visible or changes between normal and fullscreen layouts so rendered content uses the full terminal width instead of remaining constrained to a transient minimum size."
+          },
+          "started_at": "2026-08-15T09:17:27Z"
+        },
+        "schema_version": 2,
+        "started_at": "2026-08-15T09:17:27Z",
+        "state": "completed",
+        "updated_at": "2026-08-15T09:31:54Z"
+      },
+      "implementation_report": "Updated the shared Toolbar terminal sizing lifecycle to reject hidden, disconnected, and zero-area measurements; defer renderer creation until measurable; retain the last valid startup geometry; and refit after redraw, restore, output resize, drag completion, and fullscreen transitions. A valid measurement now resizes xterm first and sends the same columns and rows to the managed PTY. Updated Toolbar intent documentation and added VM plus real-Chromium regressions. Exact verification: 188/188 non-browser web tests passed; focused Chromium responsive sizing passed; full Chromium render suite was 23/27 with the new sizing test passing and four existing unrelated assertions failing (hidden Node selector, ANSI rendering text, missing performance marker, and stale source-upgrade copy).",
+      "implementation_reported_at": "2026-08-15T09:31:54Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Minimizing/maximizing/hiding the web UI toolbar agent causes the rendered text in a maximized window to appear very narrow and not take up the full width of the TTY area. The terminal layout should be responsive according to the area provided for it.",
+      "quality_agent_report": "Quality accepted the responsive terminal sizing implementation and added VM plus real-Chromium assertions for exiting fullscreen. Exact verification: 188/188 non-browser web tests passed; focused VM responsive sizing passed 1/1; focused Chromium responsive sizing passed 1/1; the full Chromium-backed web run passed 211/215 with the responsive test passing, and all four unrelated failures reproduced unchanged on parent commit 7556a231; syntax and diff checks passed.",
+      "quality_candidate_commit": "1077627408735cc9126ffece43358b0e33819537",
+      "quality_checked_at": "2026-08-15T09:40:08Z",
+      "quality_details": {
+        "candidate_commit": "1077627408735cc9126ffece43358b0e33819537",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T015P7FNKA9CJ3C22E001-round-1",
+        "diagnostics": [
+          "{\"ok\":true,\"summary\":\"Candidate satisfies the Goal and toolbar intent contract; focused deterministic checks passed. Remaining uncertainty: no live-daemon PTY integration was exercised, but real Chromium verified renderer/backend resize synchronization.\",\"results\":[{\"test\":\"The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\",\"status\":\"passed\",\"evidence\":\"Exit 0. Review confirmed the shared Toolbar terminal path ignores hidden/zero-area geometry, retains valid dimensions, and refits xterm and managed PTY consistently after restore, resize, and fullscreen transitions. All 188 non-browser web regressions passed; the real-Chromium minimize/restore/fullscreen regression passed 1/1 with 0 skipped; syntax, diff hygiene, and clean-worktree checks passed.\",\"command\":\"bash -lc 'set -euo pipefail\\nquality_tmp=$(mktemp -d)\\ntrap '\\\\''rm -rf -- \\\"$quality_tmp\\\"'\\\\'' EXIT\\nnode --check src/surfaces/web/static/js/features/toolbar.js\\nnode --check tests/web_supervisor_toolbar.test.js\\nnode --check tests/web_screen_render.test.js\\nmapfile -t web_unit_tests < <(find tests -maxdepth 1 -name '\\\\''web_*.test.js'\\\\'' ! -name '\\\\''web_screen_render.test.js'\\\\'' -print | sort)\\nnode --test \\\"${web_unit_tests[@]}\\\" | tee \\\"$quality_tmp/web-unit.tap\\\"\\ngrep -Eq '\\\\''pass 188$'\\\\'' \\\"$quality_tmp/web-unit.tap\\\"\\ngrep -Eq '\\\\''fail 0$'\\\\'' \\\"$quality_tmp/web-unit.tap\\\"\\ngrep -Eq '\\\\''skipped 0$'\\\\'' \\\"$quality_tmp/web-unit.tap\\\"\\nNODE_PATH=/home/buddy/projects/refine/node_modules node --test --test-name-pattern='\\\\''^Agent terminal refits from visible geometry after minimize and fullscreen$'\\\\'' tests/web_screen_render.test.js | tee \\\"$quality_tmp/browser.tap\\\"\\ngrep -Eq '\\\\''pass 1$'\\\\'' \\\"$quality_tmp/browser.tap\\\"\\ngrep -Eq '\\\\''fail 0$'\\\\'' \\\"$quality_tmp/browser.tap\\\"\\ngrep -Eq '\\\\''skipped 0$'\\\\'' \\\"$quality_tmp/browser.tap\\\"\\ngit diff --check 7556a231c381db58b7dc435b514cfb7c13d60d23..HEAD\\ntest -z \\\"$(git status --porcelain=v1)\\\"'\"}]}",
+          "Observed supervised process proc-1786786800072-1084-469 exited 0. stdout: rofile installs the shared copy and paste behavior (140.363771ms)\n✔ Ctrl+Enter inserts a TUI newline without submitting ordinary Enter (27.719552ms)\n✔ Ctrl+Z cannot suspend Agent terminals and subsequent input remains usable (27.333481ms)\n✔ Ctrl+Z retains shell Terminal job-control semantics (26.956231ms)\n✔ Ctrl+C without a selection keeps terminal SIGINT semantics (27.584401ms)\n✔ Ctrl+V uses terminal-native framing for single-line and multiline text (52.081356ms)\n✔ native paste is sent exactly once instead of being reprocessed by xterm (27.549635ms)\n✔ clipboard failures are visible and unavailable APIs do not claim browser handling (79.661879ms)\n✔ an asynchronous paste cannot cross into a replacement managed session (26.371713ms)\n✔ clipboard text buffered before replacement cannot cross managed sessions (27.555287ms)\n✔ clipboard shortcuts remain untouched when focus is outside a terminal (28.014944ms)\n✔ theme initializes from the system preference and exposes an accessible toggle (2.496953ms)\n✔ theme toggle switches modes, persists the choice, and announces the change (0.809399ms)\n✔ system theme changes remain live until the user stores a preference (0.84557ms)\n✔ API callers can render an expected degraded status without recording Activity (3.597817ms)\n✔ identical UI errors are persisted at most once per cooldown (1.185871ms)\n✔ passive source-status reads opt out of Activity error recording (0.480705ms)\n✔ no selector literal in the web UI contains an empty call (21.492139ms)\n✔ no rendered test id in the web UI contains an empty call (8.597507ms)\n✔ dom-morph.js is loaded before the screens that use it (0.51579ms)\n✔ Reporter onboarding loads before router and init (0.185138ms)\nℹ tests 188\nℹ suites 0\nℹ pass 188\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 4437.914414\n✔ Agent terminal refits from visible geometry after minimize and fullscreen (1265.799205ms)\nℹ tests 1\nℹ suites 0\nℹ pass 1\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 1612.865376"
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "1a004c89bac43cc",
+        "results": [
+          {
+            "command": "bash -lc 'set -euo pipefail\nquality_tmp=$(mktemp -d)\ntrap '\\''rm -rf -- \"$quality_tmp\"'\\'' EXIT\nnode --check src/surfaces/web/static/js/features/toolbar.js\nnode --check tests/web_supervisor_toolbar.test.js\nnode --check tests/web_screen_render.test.js\nmapfile -t web_unit_tests < <(find tests -maxdepth 1 -name '\\''web_*.test.js'\\'' ! -name '\\''web_screen_render.test.js'\\'' -print | sort)\nnode --test \"${web_unit_tests[@]}\" | tee \"$quality_tmp/web-unit.tap\"\ngrep -Eq '\\''pass 188$'\\'' \"$quality_tmp/web-unit.tap\"\ngrep -Eq '\\''fail 0$'\\'' \"$quality_tmp/web-unit.tap\"\ngrep -Eq '\\''skipped 0$'\\'' \"$quality_tmp/web-unit.tap\"\nNODE_PATH=/home/buddy/projects/refine/node_modules node --test --test-name-pattern='\\''^Agent terminal refits from visible geometry after minimize and fullscreen$'\\'' tests/web_screen_render.test.js | tee \"$quality_tmp/browser.tap\"\ngrep -Eq '\\''pass 1$'\\'' \"$quality_tmp/browser.tap\"\ngrep -Eq '\\''fail 0$'\\'' \"$quality_tmp/browser.tap\"\ngrep -Eq '\\''skipped 0$'\\'' \"$quality_tmp/browser.tap\"\ngit diff --check 7556a231c381db58b7dc435b514cfb7c13d60d23..HEAD\ntest -z \"$(git status --porcelain=v1)\"'",
+            "evidence": "Observed supervised process proc-1786786800072-1084-469 exited 0. stdout: rofile installs the shared copy and paste behavior (140.363771ms)\n✔ Ctrl+Enter inserts a TUI newline without submitting ordinary Enter (27.719552ms)\n✔ Ctrl+Z cannot suspend Agent terminals and subsequent input remains usable (27.333481ms)\n✔ Ctrl+Z retains shell Terminal job-control semantics (26.956231ms)\n✔ Ctrl+C without a selection keeps terminal SIGINT semantics (27.584401ms)\n✔ Ctrl+V uses terminal-native framing for single-line and multiline text (52.081356ms)\n✔ native paste is sent exactly once instead of being reprocessed by xterm (27.549635ms)\n✔ clipboard failures are visible and unavailable APIs do not claim browser handling (79.661879ms)\n✔ an asynchronous paste cannot cross into a replacement managed session (26.371713ms)\n✔ clipboard text buffered before replacement cannot cross managed sessions (27.555287ms)\n✔ clipboard shortcuts remain untouched when focus is outside a terminal (28.014944ms)\n✔ theme initializes from the system preference and exposes an accessible toggle (2.496953ms)\n✔ theme toggle switches modes, persists the choice, and announces the change (0.809399ms)\n✔ system theme changes remain live until the user stores a preference (0.84557ms)\n✔ API callers can render an expected degraded status without recording Activity (3.597817ms)\n✔ identical UI errors are persisted at most once per cooldown (1.185871ms)\n✔ passive source-status reads opt out of Activity error recording (0.480705ms)\n✔ no selector literal in the web UI contains an empty call (21.492139ms)\n✔ no rendered test id in the web UI contains an empty call (8.597507ms)\n✔ dom-morph.js is loaded before the screens that use it (0.51579ms)\n✔ Reporter onboarding loads before router and init (0.185138ms)\nℹ tests 188\nℹ suites 0\nℹ pass 188\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 4437.914414\n✔ Agent terminal refits from visible geometry after minimize and fullscreen (1265.799205ms)\nℹ tests 1\nℹ suites 0\nℹ pass 1\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 1612.865376 Agent report: Exit 0. Review confirmed the shared Toolbar terminal path ignores hidden/zero-area geometry, retains valid dimensions, and refits xterm and managed PTY consistently after restore, resize, and fullscreen transitions. All 188 non-browser web regressions passed; the real-Chromium minimize/restore/fullscreen regression passed 1/1 with 0 skipped; syntax, diff hygiene, and clean-worktree checks passed.",
+            "exit_code": 0,
+            "process_id": "proc-1786786800072-1084-469",
+            "status": "passed",
+            "test": "The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks."
+          }
+        ],
+        "source_candidate_commit": "1077627408735cc9126ffece43358b0e33819537"
+      },
+      "quality_message": "All Quality tests passed with observed supervised evidence.",
+      "quality_state": "passed",
+      "reporter": "Buddy Williams",
+      "rule_state": "passed",
+      "updated": "2026-08-15T09:41:17Z",
+      "workflow_attempt_authority": null,
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "1077627408735cc9126ffece43358b0e33819537",
+        "integrated_at": "2026-08-15T09:41:17.813575208+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Auto-merging docs/intent/04-surfaces/03-browser/15-toolbar.md\nAuto-merging src/surfaces/web/static/js/features/toolbar.js\nAuto-merging tests/web_screen_render.test.js\nAuto-merging tests/web_supervisor_toolbar.test.js\nMerge made by the 'ort' strategy.\n docs/intent/04-surfaces/03-browser/15-toolbar.md |  4 +-\n src/surfaces/web/static/js/features/toolbar.js   | 42 +++++++++--\n tests/web_screen_render.test.js                  | 96 ++++++++++++++++++++++++\n tests/web_supervisor_toolbar.test.js             | 86 ++++++++++++++++++++-\n 4 files changed, 217 insertions(+), 11 deletions(-)",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "619c52af57ec065c0b3806f37dd02b59da2e7a07"
+      },
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    }
+  ],
+  "status": "done",
+  "target_branch": "main",
+  "updated": "2026-08-15T09:44:40Z",
+  "workflow_revision": 28
+}

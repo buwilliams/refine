@@ -1,0 +1,1007 @@
+{
+  "base_commit": "619c52af57ec065c0b3806f37dd02b59da2e7a07",
+  "branch_name": "refine/DRC5BF9454399F4F38E8990540/round-2",
+  "candidate_commit": "95b5d7e0d0312feb0be326cf6aab5016c67eb2b7",
+  "created": "2026-08-15T09:05:52Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "DRC5BF9454399F4F38E8990540",
+  "name": "Bug Report: Refine leaks refine/* branches on origin �X cleanup-worktrees can never prune them",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "buddy.williams@insurity.com",
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-15T09:05:53Z",
+        "current_round": {
+          "assignee": "buddy.williams@insurity.com",
+          "prompt": "From: Buddy Williams <buddy.williams@insurity.com>\nSubject: Bug Report: Refine leaks refine/* branches on origin �X cleanup-worktrees can never prune them\n\nBody:\nBug Report: Refine leaks refine/* branches on origin �X cleanup-worktrees can never prune them\r\n\r\n  Component: refine �X worktree_cleanup (src/tools/product/worktree_cleanup/mod.rs)\r\n  Version observed: refine 4.2.0 (checkout HEAD 7556a231, /insurity/refine)\r\n  Target app: ProSuite (/insurity/ProSuite), node bo2lnxnevo03-buddy, merge_target_branch = insurity-claims\r\n  Severity: Medium (no data loss; unbounded remote-branch growth, operational noise, misleading cleanup output)\r\n\r\n  Summary\r\n\r\n  Origin has accumulated 90 refine/* refs (89 goal round-branches + refine/state) that grow without bound. refine project cleanup-worktrees reports 0 eligible on every run and never deletes a\r\n  remote branch, even for goals whose work is fully merged into insurity-claims. The remote-branch retirement logic has three structural gaps that make large classes of branches permanently\r\n  un-prunable.\r\n\r\n  Observed vs. expected\r\n\r\n  Observed (refine project cleanup-worktrees, dry-run):\r\n  worktrees:  inspected 57, eligible 0, preserved 57\r\n  branches:   inspected 79, eligible 0, remote_branches_deleted 0\r\n  reasons:    candidate_not_integrated 75, goal_not_found 4\r\n  Origin round-branches by current goal status: failed 26, backlog 23, review 15, quality 11, done 7, cancelled 1, no-goal-record 6. Local refine/* branches: 138; linked worktrees: 60.\r\n\r\n  Expected: branches whose commits are provably contained in the configured merge target (insurity-claims) and whose goals are terminal (done / cancelled / record-deleted) should be retired from\r\n  origin; the tool should report a non-zero eligible set here.\r\n\r\n  Root cause (code-level)\r\n\r\n  The only path that deletes a remote branch is execute_branch_retirement �� delete_remote_branch_if_matches (worktree_cleanup/mod.rs:614), reachable only when integrated_branch_plan returns\r\n  Eligible. That gate (matching_integration, lines 638�V646) requires the branch's local tip to exactly equal a workflow_integration.candidate_commit recorded on one of the goal's rounds. Three\r\n  consequences:\r\n\r\n  1. Origin-only strays are invisible. cleanup_orphaned_integrated_branches iterates git.list_refine_owned_branches() �X local branches only. Once the local branch/worktree is gone (e.g. the goal\r\n  record was deleted), the pushed origin branch is never revisited. �� Goal 00000SZP9NZ81GEQ11ZYWMC000 has 6 origin-only branches (round-2�K7), all merged into insurity-claims HEAD, no local\r\n  branch, no worktree �X permanently stranded, not even inspected.\r\n  2. Checked-out integrated branches are skipped. Line 326 if checked_out.contains(&branch) { continue; }. 60 worktrees pin their branches; an integrated goal whose worktree is never torn down\r\n  (e.g. refine/00000SZ65RCHM0033AZCN8001Q/round-1, tip == recorded candidate aa4b91cb, ancestor of insurity-claims) keeps its origin branch forever, because branch retirement is only a\r\n  side-effect of worktree removal �X which is --apply-only and clean-only.\r\n  3. No prune path for non-integrated or superseded rounds. failed/backlog/review/quality/cancelled goals (76 branches) have no workflow_integration, and superseded earlier rounds (e.g. a goal\r\n  with round-1�Kround-9 where only the final round integrated) never match a candidate commit. goal_not_found branches are also explicitly held (Preserved) rather than retired even when merged.\r\n  These live on origin indefinitely.\r\n\r\n  Reproduction\r\n\r\n  1. Run several goals to integration on a project whose merge_target_branch is a shared branch (insurity-claims), leaving worktrees in place; delete/supersede some goals.\r\n  2. refine project cleanup-worktrees �� branch_eligible: 0, remote_branches_deleted: 0.\r\n  3. git branch -r | grep refine/ �� branches persist even for merged, terminal goals.\r\n\r\n  Verified-safe cleanup inventory (no work lost �X tips already in insurity-claims HEAD)\r\n\r\n  - 6 �X refine/00000SZP9NZ81GEQ11ZYWMC000/round-{2..7} (goal record deleted; all merged)\r\n  - 5 �X done goals merged into HEAD: �KRCHM�K/round-1, �KRDR0�K/round-1, �KS9K�K/round-1, �KSH07�K/round-1, �KEH3C�K/round-1\r\n  - = 11 branches safe to delete from origin.\r\n  - Do NOT touch: refine/state; the 76 in-flight branches; and 2 done branches not yet in HEAD (�KSMQP�K/round-1, �KRPMC�K/round-1) �X origin holds the only copy.\r\n\r\n  Note on the \"control-state syncing removed\" premise\r\n\r\n  In this deployed 4.2.0 checkout, control-state sync is fully present and wired (REFINE_STATE_BRANCH = \"refine/state\", GIT_SYNC_RUNNER, FileGitSyncService), and origin/refine/state was last\r\n  updated 2026-08-13 (91738db, \"Sync Refine state: 1 goal\"). So either this checkout predates the removal you're referring to, or the removal lives in a version not yet deployed here �X worth\r\n  reconciling. Relevant either way: if state sync is retired, refine/state on origin becomes an orphaned branch with no janitor, so the removal should ship with a migration that deletes it �X and,\r\n  critically, removing state sync does not address the round-branch leak above, which is a separate worktree_cleanup defect.\r\n\r\n  Suggested fixes\r\n\r\n  - Add a remote-first pass: retire an origin/refine/* branch when its goal record is absent (or terminal) and its tip is an ancestor of the configured merge target on the remote �X verifiable\r\n  without a local branch.\r\n  - Decouple branch retirement from worktree removal; retire the origin branch for checked-out-but-integrated branches.\r\n  - Add explicit prune handling for cancelled goals and superseded (non-final) rounds.\r\n  - Make goal_not_found + merged-into-target eligible (keeping the ancestor safety check) instead of blanket-preserve.\r\n  - If state sync is being retired, add a migration step that deletes origin/refine/state.\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nBuddy Williams\r\nBuddy.Williams@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
+          "reporter": "buddy.williams@insurity.com",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "buddy.williams@insurity.com",
+          "id": "DRC5BF9454399F4F38E8990540",
+          "name": "Bug Report: Refine leaks refine/* branches on origin �X cleanup-worktrees can never prune them",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "buddy.williams@insurity.com"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "assignee": "buddy.williams@insurity.com",
+      "constitution_state": "unclassified",
+      "created": "2026-08-15T09:05:52Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-15T09:33:01Z",
+        "skipped": []
+      },
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+          "context_digest": "be8747084f06e335b3ccffb2aef77fece54af1cc0c02a8c45906c92cdda8aaad",
+          "context_version": 1,
+          "goal_id": "DRC5BF9454399F4F38E8990540",
+          "implementation_branch": "refine/DRC5BF9454399F4F38E8990540/round-1",
+          "round_idx": 0,
+          "target_branch": "main"
+        },
+        "completed_at": "2026-08-15T09:33:01Z",
+        "criticism": {
+          "completed_at": "2026-08-15T09:10:10Z",
+          "git_after": {
+            "branch": "refine/DRC5BF9454399F4F38E8990540/round-1",
+            "head_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRC5BF9454399F4F38E8990540/round-1",
+            "head_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P1",
+                  "P4"
+                ],
+                "description": "The plan snapshots the remote merge target and exact-fences only the branch being retired, so a concurrent non-fast-forward rewrite of the target after ancestry inspection can leave an origin-only tip unreachable when deletion succeeds.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Require the apply path to fail closed unless the inspected target ref is protected or revalidated as part of the compare-and-delete operation, and cover a concurrent target-rewrite race."
+              },
+              {
+                "checklist_item_ids": [
+                  "P3",
+                  "P6"
+                ],
+                "description": "Making cancelled Goal refs automatically eligible conflicts with the Cancelled intent contract that branches remain inspectable and are never silently deleted, but P6 names only merge/worktree/process intent updates.",
+                "id": "C2",
+                "material": true,
+                "recommendation": "Explicitly reconcile docs/intent/03-capabilities/03-workflow/10-cancelled.md with retention-delayed, ancestry-proven upstream retirement and state what durable evidence remains inspectable."
+              }
+            ],
+            "summary": "The plan needs an atomic remote-target safety fence and an explicit cancelled-state intent update before implementation."
+          },
+          "started_at": "2026-08-15T09:07:54Z"
+        },
+        "final_plan": {
+          "completed_at": "2026-08-15T09:12:04Z",
+          "git_after": {
+            "branch": "refine/DRC5BF9454399F4F38E8990540/round-1",
+            "head_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRC5BF9454399F4F38E8990540/round-1",
+            "head_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Extend the cohesive Git worktree capability with exact configured-remote inventory for unambiguous refine/<goal>/round-N refs and a fail-closed atomic compare-and-delete operation conditioned on both the inspected branch tip and inspected merge-target tip.",
+                "id": "P1"
+              },
+              {
+                "description": "Refactor branch-retirement policy into an independent pass over the deduplicated union of local and remote Goal round refs, using the configured git_remote and merge_target_branch rather than requiring a matching workflow_integration candidate.",
+                "id": "P2"
+              },
+              {
+                "description": "Make only done, cancelled, or absent Goal refs eligible after the applicable retention delay and remote-target ancestry proof, while preserving failed and other active statuses, active ownership, malformed or ambiguous refs, non-ancestor tips, inspection failures, and refine/state.",
+                "id": "P3"
+              },
+              {
+                "description": "Retire upstream and local refs independently so a safe checked-out branch can lose only its upstream ref, with every deletion exact-SHA fenced and any candidate advancement, merge-target change, or unsupported atomic transaction reported as preserved.",
+                "id": "P4"
+              },
+              {
+                "description": "Keep dry-run and apply reporting accurate for remote-only, checked-out, and superseded candidates with per-side outcomes and no double counting between worktree hibernation and branch retirement.",
+                "id": "P5"
+              },
+              {
+                "description": "Update the merge/worktree, process, and cancelled intent pages to state that cancellation itself never deletes evidence, while retention-delayed maintenance may retire ancestry-proven ref names because Goal, Round, process, and target-reachable commit evidence remains inspectable.",
+                "id": "P6"
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "P1 and P4 require deletion to be atomically conditional on the exact inspected candidate and merge-target tips and to fail closed on target movement or unsupported transactions."
+              },
+              {
+                "criticism_id": "C2",
+                "resolution": "P3 and P6 limit cancelled-ref retirement to retention-delayed, ancestry-proven maintenance and explicitly preserve durable Goal, Round, process, and target-history evidence."
+              }
+            ],
+            "summary": "Refine's cleanup capability will independently inspect exact Goal round refs on the configured remote and locally, then retire only refs for done, cancelled, or deleted Goals whose tips remain contained in the exact configured remote merge-target snapshot, so safe origin-only, checked-out, and superseded refs stop accumulating without exposing in-flight work, unique commits, cancelled-attempt evidence, or refine/state to deletion races."
+          },
+          "started_at": "2026-08-15T09:10:10Z"
+        },
+        "implementation": {
+          "completed_at": "2026-08-15T09:33:01Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Added one-advertisement configured-remote Refine ref inventory, exact commit fetching without tracking refs, and atomic compare-and-delete fenced by both candidate and merge-target SHAs; tests preserve refs when either snapshot moves.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Moved branch policy into cohesive branch_retirement.rs and inspect the deduplicated union of local and configured-remote refs using git_remote and merge_target_branch settings without workflow_integration matching.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Eligibility is limited to done, cancelled, or absent Goals after retention and remote-target ancestry proof; tests preserve backlog/failed, active ownership, malformed/ambiguous refs, non-ancestors, and refine/state.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Local and remote sides have independent eligibility/deletion; checked-out local refs are retained while safe upstream refs retire, all deletions use exact-SHA fences, and candidate/target movement or unsupported atomic deletion fails closed.",
+                "id": "P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Branch reports now expose local/remote presence, eligibility, reasons, and deletion outcomes; tests cover dry-run/apply remote-only, checked-out, superseded, and combined local/upstream retirement without double counting.",
+                "id": "P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated merge/worktree, process, and cancelled intent pages to distinguish non-destructive cancellation from retention-delayed ancestry-proven ref-name retirement while retaining durable evidence.",
+                "id": "P6",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "rustfmt --edition 2024 --check src/tools/host/git_worktrees/mod.rs src/tools/host/git_worktrees/integration.rs src/tools/product/worktree_cleanup/mod.rs src/tools/product/worktree_cleanup/branch_retirement.rs src/tools/product/worktree_cleanup/tests.rs -> exit 0",
+              "cargo test --lib tools::product::worktree_cleanup:: -- --nocapture -> 17 passed, 0 failed",
+              "cargo test --lib -> 798 passed, 0 failed, 6 ignored",
+              "cargo check --all-targets -> exit 0",
+              "cargo clippy --lib -> exit 0 with 3 unrelated pre-existing warnings",
+              "cargo clippy --lib -- -D warnings -> exit 101 only for pre-existing needless_pub_self warnings in src/tools/product/project_projection/store.rs and unnecessary_sort_by in src/surfaces/web_server/http/background_loops.rs",
+              "git diff --check -> exit 0"
+            ]
+          },
+          "report": "Implemented remote-first Goal round-ref retirement over the local/remote union, configured-remote and merge-target authority, done/cancelled/deleted plus retention and ancestry policy, exact candidate and target fencing for atomic upstream deletion, independent checked-out local/upstream outcomes, accurate per-side reporting, focused safety coverage, and the three accepted intent updates. Verification: focused cleanup tests passed 17/17; full library suite passed 798 with 6 ignored; all targets compiled; owned Rust files are formatted; diff check passed. Non-blocking baseline note: strict Clippy with -D warnings stops on three unrelated pre-existing warnings, while ordinary cargo clippy --lib completes with those warnings.",
+          "started_at": "2026-08-15T09:12:05Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-15T09:12:05Z",
+        "proposal": {
+          "completed_at": "2026-08-15T09:07:53Z",
+          "git_after": {
+            "branch": "refine/DRC5BF9454399F4F38E8990540/round-1",
+            "head_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRC5BF9454399F4F38E8990540/round-1",
+            "head_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Extend the Git worktree capability with a cohesive remote-ref inventory that returns exact refine-owned branch tips from the configured remote and supports a single authoritative remote merge-target snapshot.",
+                "id": "P1"
+              },
+              {
+                "description": "Refactor branch retirement out of the worktree-removal path into an independent pass over the union of local and remote Goal round refs, using the configured git_remote and merge_target_branch rather than per-round integration records.",
+                "id": "P2"
+              },
+              {
+                "description": "Classify only unambiguous Goal round refs as eligible when the Goal is done, cancelled, or absent and the relevant exact tip is an ancestor of the remote target, while preserving active or in-flight Goals, retention-window Goals, malformed or ambiguous refs, non-ancestor tips, and refine/state.",
+                "id": "P3"
+              },
+              {
+                "description": "Retire local and remote refs independently under exact-SHA fences so checked-out branches retain their local ref while a safe upstream ref can be deleted, and concurrent advancement or inspection failure produces a preserved result with an explicit report reason.",
+                "id": "P4"
+              },
+              {
+                "description": "Keep dry-run and apply reports accurate for remote-only and checked-out candidates, including eligibility and per-side deletion counts without double-counting branches encountered during worktree hibernation.",
+                "id": "P5"
+              },
+              {
+                "description": "Update the affected merge, worktree, and process intent text to document terminal-or-missing Goal gating, remote-target ancestry, independent upstream retirement, and protection of recoverable and control-state refs.",
+                "id": "P6"
+              }
+            ],
+            "summary": "Refine's cleanup capability will inspect both local and configured-upstream Goal round branches independently of worktree removal, then retire only exact branch tips that belong to done, cancelled, or deleted Goals and are already contained in the configured remote merge target, so origin-only, checked-out, and superseded safe refs stop accumulating without risking in-flight work, unique commits, or the refine/state branch."
+          },
+          "started_at": "2026-08-15T09:05:53Z"
+        },
+        "schema_version": 2,
+        "started_at": "2026-08-15T09:05:53Z",
+        "state": "completed",
+        "updated_at": "2026-08-15T09:33:01Z"
+      },
+      "implementation_report": "Implemented remote-first Goal round-ref retirement over the local/remote union, configured-remote and merge-target authority, done/cancelled/deleted plus retention and ancestry policy, exact candidate and target fencing for atomic upstream deletion, independent checked-out local/upstream outcomes, accurate per-side reporting, focused safety coverage, and the three accepted intent updates. Verification: focused cleanup tests passed 17/17; full library suite passed 798 with 6 ignored; all targets compiled; owned Rust files are formatted; diff check passed. Non-blocking baseline note: strict Clippy with -D warnings stops on three unrelated pre-existing warnings, while ordinary cargo clippy --lib completes with those warnings.",
+      "implementation_reported_at": "2026-08-15T09:33:01Z",
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "From: Buddy Williams <buddy.williams@insurity.com>\nSubject: Bug Report: Refine leaks refine/* branches on origin �X cleanup-worktrees can never prune them\n\nBody:\nBug Report: Refine leaks refine/* branches on origin �X cleanup-worktrees can never prune them\r\n\r\n  Component: refine �X worktree_cleanup (src/tools/product/worktree_cleanup/mod.rs)\r\n  Version observed: refine 4.2.0 (checkout HEAD 7556a231, /insurity/refine)\r\n  Target app: ProSuite (/insurity/ProSuite), node bo2lnxnevo03-buddy, merge_target_branch = insurity-claims\r\n  Severity: Medium (no data loss; unbounded remote-branch growth, operational noise, misleading cleanup output)\r\n\r\n  Summary\r\n\r\n  Origin has accumulated 90 refine/* refs (89 goal round-branches + refine/state) that grow without bound. refine project cleanup-worktrees reports 0 eligible on every run and never deletes a\r\n  remote branch, even for goals whose work is fully merged into insurity-claims. The remote-branch retirement logic has three structural gaps that make large classes of branches permanently\r\n  un-prunable.\r\n\r\n  Observed vs. expected\r\n\r\n  Observed (refine project cleanup-worktrees, dry-run):\r\n  worktrees:  inspected 57, eligible 0, preserved 57\r\n  branches:   inspected 79, eligible 0, remote_branches_deleted 0\r\n  reasons:    candidate_not_integrated 75, goal_not_found 4\r\n  Origin round-branches by current goal status: failed 26, backlog 23, review 15, quality 11, done 7, cancelled 1, no-goal-record 6. Local refine/* branches: 138; linked worktrees: 60.\r\n\r\n  Expected: branches whose commits are provably contained in the configured merge target (insurity-claims) and whose goals are terminal (done / cancelled / record-deleted) should be retired from\r\n  origin; the tool should report a non-zero eligible set here.\r\n\r\n  Root cause (code-level)\r\n\r\n  The only path that deletes a remote branch is execute_branch_retirement �� delete_remote_branch_if_matches (worktree_cleanup/mod.rs:614), reachable only when integrated_branch_plan returns\r\n  Eligible. That gate (matching_integration, lines 638�V646) requires the branch's local tip to exactly equal a workflow_integration.candidate_commit recorded on one of the goal's rounds. Three\r\n  consequences:\r\n\r\n  1. Origin-only strays are invisible. cleanup_orphaned_integrated_branches iterates git.list_refine_owned_branches() �X local branches only. Once the local branch/worktree is gone (e.g. the goal\r\n  record was deleted), the pushed origin branch is never revisited. �� Goal 00000SZP9NZ81GEQ11ZYWMC000 has 6 origin-only branches (round-2�K7), all merged into insurity-claims HEAD, no local\r\n  branch, no worktree �X permanently stranded, not even inspected.\r\n  2. Checked-out integrated branches are skipped. Line 326 if checked_out.contains(&branch) { continue; }. 60 worktrees pin their branches; an integrated goal whose worktree is never torn down\r\n  (e.g. refine/00000SZ65RCHM0033AZCN8001Q/round-1, tip == recorded candidate aa4b91cb, ancestor of insurity-claims) keeps its origin branch forever, because branch retirement is only a\r\n  side-effect of worktree removal �X which is --apply-only and clean-only.\r\n  3. No prune path for non-integrated or superseded rounds. failed/backlog/review/quality/cancelled goals (76 branches) have no workflow_integration, and superseded earlier rounds (e.g. a goal\r\n  with round-1�Kround-9 where only the final round integrated) never match a candidate commit. goal_not_found branches are also explicitly held (Preserved) rather than retired even when merged.\r\n  These live on origin indefinitely.\r\n\r\n  Reproduction\r\n\r\n  1. Run several goals to integration on a project whose merge_target_branch is a shared branch (insurity-claims), leaving worktrees in place; delete/supersede some goals.\r\n  2. refine project cleanup-worktrees �� branch_eligible: 0, remote_branches_deleted: 0.\r\n  3. git branch -r | grep refine/ �� branches persist even for merged, terminal goals.\r\n\r\n  Verified-safe cleanup inventory (no work lost �X tips already in insurity-claims HEAD)\r\n\r\n  - 6 �X refine/00000SZP9NZ81GEQ11ZYWMC000/round-{2..7} (goal record deleted; all merged)\r\n  - 5 �X done goals merged into HEAD: �KRCHM�K/round-1, �KRDR0�K/round-1, �KS9K�K/round-1, �KSH07�K/round-1, �KEH3C�K/round-1\r\n  - = 11 branches safe to delete from origin.\r\n  - Do NOT touch: refine/state; the 76 in-flight branches; and 2 done branches not yet in HEAD (�KSMQP�K/round-1, �KRPMC�K/round-1) �X origin holds the only copy.\r\n\r\n  Note on the \"control-state syncing removed\" premise\r\n\r\n  In this deployed 4.2.0 checkout, control-state sync is fully present and wired (REFINE_STATE_BRANCH = \"refine/state\", GIT_SYNC_RUNNER, FileGitSyncService), and origin/refine/state was last\r\n  updated 2026-08-13 (91738db, \"Sync Refine state: 1 goal\"). So either this checkout predates the removal you're referring to, or the removal lives in a version not yet deployed here �X worth\r\n  reconciling. Relevant either way: if state sync is retired, refine/state on origin becomes an orphaned branch with no janitor, so the removal should ship with a migration that deletes it �X and,\r\n  critically, removing state sync does not address the round-branch leak above, which is a separate worktree_cleanup defect.\r\n\r\n  Suggested fixes\r\n\r\n  - Add a remote-first pass: retire an origin/refine/* branch when its goal record is absent (or terminal) and its tip is an ancestor of the configured merge target on the remote �X verifiable\r\n  without a local branch.\r\n  - Decouple branch retirement from worktree removal; retire the origin branch for checked-out-but-integrated branches.\r\n  - Add explicit prune handling for cancelled goals and superseded (non-final) rounds.\r\n  - Make goal_not_found + merged-into-target eligible (keeping the ancestor safety check) instead of blanket-preserve.\r\n  - If state sync is being retired, add a migration step that deletes origin/refine/state.\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nBuddy Williams\r\nBuddy.Williams@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
+      "quality_agent_report": "Quality reviewed the accepted implementation, corrected Git ancestry inspection so exit 1 remains a negative result while actual command failures fail closed, and added focused ancestry-error and atomic-unsupported preservation tests. The remote-first configured-authority retirement policy, independent exact-SHA ref outcomes, reporting, and intent updates remain aligned with P1-P6. Verification: cleanup suite 18 passed; two new exact tests passed; full library suite 800 passed and 6 ignored; all targets compiled; ordinary Clippy completed with only three unrelated pre-existing warnings; strict Clippy remains blocked by those same three baseline warnings; owned Rust formatting and diff checks passed.",
+      "quality_candidate_commit": "9b287bcbca976eb6739d92b867a955018e72d6cd",
+      "quality_checked_at": "2026-08-15T09:42:47Z",
+      "quality_details": {
+        "candidate_commit": "9b287bcbca976eb6739d92b867a955018e72d6cd",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRC5BF9454399F4F38E8990540-round-1",
+        "diagnostics": [
+          "{\"ok\":false,\"summary\":\"The supervised command exited 1 during the formatting check.\",\"results\":[{\"test\":\"The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\",\"status\":\"failed\",\"evidence\":\"Exit 1. Cleanup tests passed 18/18, the ancestry failure-path test passed 1/1, and all targets compiled. cargo fmt --all -- --check then found formatting differences in unrelated existing files, so the remaining chained checks did not execute.\",\"command\":\"set -o pipefail; cargo test --lib tools::product::worktree_cleanup -- --test-threads=1 && cargo test --lib tools::host::git_worktrees::tests::integration::commit_is_ancestor_distinguishes_negative_results_from_inspection_failures -- --exact --test-threads=1 && cargo check --all-targets && cargo fmt --all -- --check && git diff --check 7556a231c381db58b7dc435b514cfb7c13d60d23..HEAD && test \\\"$(git diff --name-only 7556a231c381db58b7dc435b514cfb7c13d60d23..HEAD -- docs/intent/03-capabilities/01-process.md docs/intent/03-capabilities/02-agents/05-merge-review-git-worktrees.md docs/intent/03-capabilities/03-workflow/10-cancelled.md | wc -l)\\\" -eq 3 && echo 'QUALITY_PREDICATE_PASS: cleanup 18/18; ancestry failure-path 1/1; all targets compile; formatting, diff, and 3 relevant intent pages verified'\"}]}",
+          "Observed supervised process proc-1786786962620-1084-551 exited 1. stdout: hed)?,\n                     Err(_) => false,\nDiff in /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRC5BF9454399F4F38E8990540-round-1/src/tools/product/project_projection/store/projection_store.rs:154:\n     let mut goals_by_feature: BTreeMap<&str, Vec<&GoalIndexProjection>> = BTreeMap::new();\n     for goal in goals.values() {\n         if let Some(feature_id) = goal.goal.feature_id.as_deref() {\n\u001b[31m-            goals_by_feature.entry(feature_id).or_default().push(&goal.goal);\n\u001b(B\u001b[m\u001b[32m+            goals_by_feature\n\u001b(B\u001b[m\u001b[32m+                .entry(feature_id)\n\u001b(B\u001b[m\u001b[32m+                .or_default()\n\u001b(B\u001b[m\u001b[32m+                .push(&goal.goal);\n\u001b(B\u001b[m         }\n     }\n     let mut features = BTreeMap::new();\nDiff in /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRC5BF9454399F4F38E8990540-round-1/src/tools/product/project_projection/store/projection_store.rs:195:\n /// — sixteen of eighteen megabytes on a mature project — and was re-serialized\n /// on every persist and re-cloned on every SSE rebuild. Complete history stays\n /// on disk in the activity log and sidecars.\n\u001b[31m-pub(super) fn cap_projected_activity(\n\u001b(B\u001b[m\u001b[31m-    activity: &mut BTreeMap<String, ActivitySummaryProjection>,\n\u001b(B\u001b[m\u001b[31m-) {\n\u001b(B\u001b[m\u001b[32m+pub(super) fn cap_projected_activity(activity: &mut BTreeMap<String, ActivitySummaryProjection>) {\n\u001b(B\u001b[m     if activity.len() <= PROJECTED_ACTIVITY_LIMIT {\n         return;\n     }\nDiff in /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRC5BF9454399F4F38E8990540-round-1/tests/production_binary_install.rs:237:\n         .unwrap();\n     assert!(rebuild.status.success());\n     assert!(\n\u001b[31m-        String::from_utf8_lossy(&rebuild.stdout).contains(\"production binary is already up to date\")\n\u001b(B\u001b[m\u001b[32m+        String::from_utf8_lossy(&rebuild.stdout)\n\u001b(B\u001b[m\u001b[32m+            .contains(\"production binary is already up to date\")\n\u001b(B\u001b[m     );\n     assert!(cargo_log.exists(), \"system build always runs the build\"); stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.14s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.13s"
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "1a004cac94f43cd",
+        "results": [
+          {
+            "command": "set -o pipefail; cargo test --lib tools::product::worktree_cleanup -- --test-threads=1 && cargo test --lib tools::host::git_worktrees::tests::integration::commit_is_ancestor_distinguishes_negative_results_from_inspection_failures -- --exact --test-threads=1 && cargo check --all-targets && cargo fmt --all -- --check && git diff --check 7556a231c381db58b7dc435b514cfb7c13d60d23..HEAD && test \"$(git diff --name-only 7556a231c381db58b7dc435b514cfb7c13d60d23..HEAD -- docs/intent/03-capabilities/01-process.md docs/intent/03-capabilities/02-agents/05-merge-review-git-worktrees.md docs/intent/03-capabilities/03-workflow/10-cancelled.md | wc -l)\" -eq 3 && echo 'QUALITY_PREDICATE_PASS: cleanup 18/18; ancestry failure-path 1/1; all targets compile; formatting, diff, and 3 relevant intent pages verified'",
+            "evidence": "Observed supervised process proc-1786786962620-1084-551 exited 1. stdout: hed)?,\n                     Err(_) => false,\nDiff in /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRC5BF9454399F4F38E8990540-round-1/src/tools/product/project_projection/store/projection_store.rs:154:\n     let mut goals_by_feature: BTreeMap<&str, Vec<&GoalIndexProjection>> = BTreeMap::new();\n     for goal in goals.values() {\n         if let Some(feature_id) = goal.goal.feature_id.as_deref() {\n\u001b[31m-            goals_by_feature.entry(feature_id).or_default().push(&goal.goal);\n\u001b(B\u001b[m\u001b[32m+            goals_by_feature\n\u001b(B\u001b[m\u001b[32m+                .entry(feature_id)\n\u001b(B\u001b[m\u001b[32m+                .or_default()\n\u001b(B\u001b[m\u001b[32m+                .push(&goal.goal);\n\u001b(B\u001b[m         }\n     }\n     let mut features = BTreeMap::new();\nDiff in /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRC5BF9454399F4F38E8990540-round-1/src/tools/product/project_projection/store/projection_store.rs:195:\n /// — sixteen of eighteen megabytes on a mature project — and was re-serialized\n /// on every persist and re-cloned on every SSE rebuild. Complete history stays\n /// on disk in the activity log and sidecars.\n\u001b[31m-pub(super) fn cap_projected_activity(\n\u001b(B\u001b[m\u001b[31m-    activity: &mut BTreeMap<String, ActivitySummaryProjection>,\n\u001b(B\u001b[m\u001b[31m-) {\n\u001b(B\u001b[m\u001b[32m+pub(super) fn cap_projected_activity(activity: &mut BTreeMap<String, ActivitySummaryProjection>) {\n\u001b(B\u001b[m     if activity.len() <= PROJECTED_ACTIVITY_LIMIT {\n         return;\n     }\nDiff in /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRC5BF9454399F4F38E8990540-round-1/tests/production_binary_install.rs:237:\n         .unwrap();\n     assert!(rebuild.status.success());\n     assert!(\n\u001b[31m-        String::from_utf8_lossy(&rebuild.stdout).contains(\"production binary is already up to date\")\n\u001b(B\u001b[m\u001b[32m+        String::from_utf8_lossy(&rebuild.stdout)\n\u001b(B\u001b[m\u001b[32m+            .contains(\"production binary is already up to date\")\n\u001b(B\u001b[m     );\n     assert!(cargo_log.exists(), \"system build always runs the build\"); stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.14s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.13s Agent report: Exit 1. Cleanup tests passed 18/18, the ancestry failure-path test passed 1/1, and all targets compiled. cargo fmt --all -- --check then found formatting differences in unrelated existing files, so the remaining chained checks did not execute.",
+            "exit_code": 1,
+            "process_id": "proc-1786786962620-1084-551",
+            "status": "failed",
+            "test": "The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks."
+          }
+        ],
+        "source_candidate_commit": "9b287bcbca976eb6739d92b867a955018e72d6cd"
+      },
+      "quality_message": "Quality failed: “The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across aff…” — supervised command exited with code 1.",
+      "quality_recovery_analysis": "No implementation defect is evidenced. Candidate 9b287bcb passes the 18 cleanup tests, focused ancestry test, full library suite, and all-target compilation; its changed Rust files also pass rustfmt individually, while git diff --check and the three intent-page checks pass. Quality failed only because cargo fmt --all -- --check examined pre-existing unformatted files outside the candidate diff; the cited projection_store.rs and production_binary_install.rs are unchanged from base 7556a231. The required correction is to scope formatting verification to Rust files changed by the candidate, not to alter unrelated baseline files.",
+      "quality_recovery_attempt": 1,
+      "quality_recovery_checked_at": "2026-08-15T09:44:38Z",
+      "quality_recovery_details": {
+        "candidate_commit": "9b287bcbca976eb6739d92b867a955018e72d6cd",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRC5BF9454399F4F38E8990540-round-1",
+        "phase": "quality_recovery",
+        "provider": "codex",
+        "raw_output": "{\"recovery_analysis\":\"No implementation defect is evidenced. Candidate 9b287bcb passes the 18 cleanup tests, focused ancestry test, full library suite, and all-target compilation; its changed Rust files also pass rustfmt individually, while git diff --check and the three intent-page checks pass. Quality failed only because cargo fmt --all -- --check examined pre-existing unformatted files outside the candidate diff; the cited projection_store.rs and production_binary_install.rs are unchanged from base 7556a231. The required correction is to scope formatting verification to Rust files changed by the candidate, not to alter unrelated baseline files.\",\"recovery_round_prompt\":\"Carry forward the complete implementation and Quality correction represented by candidate 9b287bcbca976eb6739d92b867a955018e72d6cd relative to base 7556a231c381db58b7dc435b514cfb7c13d60d23. Preserve its remote-first configured-authority branch retirement, terminal-or-missing Goal and retention gates, remote-target ancestry proof, atomic exact-SHA branch/target fencing, independent local/upstream outcomes, fail-closed Git ancestry handling, focused regressions, reporting, and three intent updates. No product-code correction is currently indicated. Do not format or otherwise modify unrelated baseline files merely to satisfy workspace-wide rustfmt. Verify with cargo test --lib tools::product::worktree_cleanup -- --test-threads=1; the exact commit_is_ancestor_distinguishes_negative_results_from_inspection_failures test; cargo test --lib; cargo check --all-targets; git diff --check against the Round base; and rustfmt --edition 2024 --check applied only to Rust files changed from that base. Confirm exactly the three affected intent pages remain changed. Report cargo fmt --all -- --check as an inapplicable baseline failure unless the unrelated formatting debt has independently been fixed.\"}",
+        "verdict": {
+          "recovery_analysis": "No implementation defect is evidenced. Candidate 9b287bcb passes the 18 cleanup tests, focused ancestry test, full library suite, and all-target compilation; its changed Rust files also pass rustfmt individually, while git diff --check and the three intent-page checks pass. Quality failed only because cargo fmt --all -- --check examined pre-existing unformatted files outside the candidate diff; the cited projection_store.rs and production_binary_install.rs are unchanged from base 7556a231. The required correction is to scope formatting verification to Rust files changed by the candidate, not to alter unrelated baseline files.",
+          "recovery_round_prompt": "Carry forward the complete implementation and Quality correction represented by candidate 9b287bcbca976eb6739d92b867a955018e72d6cd relative to base 7556a231c381db58b7dc435b514cfb7c13d60d23. Preserve its remote-first configured-authority branch retirement, terminal-or-missing Goal and retention gates, remote-target ancestry proof, atomic exact-SHA branch/target fencing, independent local/upstream outcomes, fail-closed Git ancestry handling, focused regressions, reporting, and three intent updates. No product-code correction is currently indicated. Do not format or otherwise modify unrelated baseline files merely to satisfy workspace-wide rustfmt. Verify with cargo test --lib tools::product::worktree_cleanup -- --test-threads=1; the exact commit_is_ancestor_distinguishes_negative_results_from_inspection_failures test; cargo test --lib; cargo check --all-targets; git diff --check against the Round base; and rustfmt --edition 2024 --check applied only to Rust files changed from that base. Confirm exactly the three affected intent pages remain changed. Report cargo fmt --all -- --check as an inapplicable baseline failure unless the unrelated formatting debt has independently been fixed."
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRC5BF9454399F4F38E8990540-round-1"
+      },
+      "quality_recovery_round_prompt": "Carry forward the complete implementation and Quality correction represented by candidate 9b287bcbca976eb6739d92b867a955018e72d6cd relative to base 7556a231c381db58b7dc435b514cfb7c13d60d23. Preserve its remote-first configured-authority branch retirement, terminal-or-missing Goal and retention gates, remote-target ancestry proof, atomic exact-SHA branch/target fencing, independent local/upstream outcomes, fail-closed Git ancestry handling, focused regressions, reporting, and three intent updates. No product-code correction is currently indicated. Do not format or otherwise modify unrelated baseline files merely to satisfy workspace-wide rustfmt. Verify with cargo test --lib tools::product::worktree_cleanup -- --test-threads=1; the exact commit_is_ancestor_distinguishes_negative_results_from_inspection_failures test; cargo test --lib; cargo check --all-targets; git diff --check against the Round base; and rustfmt --edition 2024 --check applied only to Rust files changed from that base. Confirm exactly the three affected intent pages remain changed. Report cargo fmt --all -- --check as an inapplicable baseline failure unless the unrelated formatting debt has independently been fixed.",
+      "quality_state": "failed",
+      "reporter": "buddy.williams@insurity.com",
+      "rule_state": "unclassified",
+      "updated": "2026-08-15T09:44:38Z",
+      "workflow_attempt_authority": {
+        "claimed_at": "2026-08-15T09:05:53Z",
+        "round_idx": 0,
+        "workflow_revision": 2
+      },
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-15T09:44:38Z",
+        "current_round": {
+          "assignee": "Refine",
+          "prompt": "Carry forward the complete implementation and Quality correction represented by candidate 9b287bcbca976eb6739d92b867a955018e72d6cd relative to base 7556a231c381db58b7dc435b514cfb7c13d60d23. Preserve its remote-first configured-authority branch retirement, terminal-or-missing Goal and retention gates, remote-target ancestry proof, atomic exact-SHA branch/target fencing, independent local/upstream outcomes, fail-closed Git ancestry handling, focused regressions, reporting, and three intent updates. No product-code correction is currently indicated. Do not format or otherwise modify unrelated baseline files merely to satisfy workspace-wide rustfmt. Verify with cargo test --lib tools::product::worktree_cleanup -- --test-threads=1; the exact commit_is_ancestor_distinguishes_negative_results_from_inspection_failures test; cargo test --lib; cargo check --all-targets; git diff --check against the Round base; and rustfmt --edition 2024 --check applied only to Rust files changed from that base. Confirm exactly the three affected intent pages remain changed. Report cargo fmt --all -- --check as an inapplicable baseline failure unless the unrelated formatting debt has independently been fixed.",
+          "reporter": "Refine",
+          "round": 2
+        },
+        "goal": {
+          "assignee": "Refine",
+          "id": "DRC5BF9454399F4F38E8990540",
+          "name": "Bug Report: Refine leaks refine/* branches on origin �X cleanup-worktrees can never prune them",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "buddy.williams@insurity.com"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "buddy.williams@insurity.com",
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "id": "guidance-1",
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                },
+                {
+                  "enabled": true,
+                  "id": "guidance-2",
+                  "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+                  "name": "Cohesive code files",
+                  "rule": "Apply whenever an agent adds or changes code files in any language."
+                }
+              ],
+              "code_files_changed": true,
+              "context_version": 1,
+              "recorded_at": "2026-08-15T09:33:01Z",
+              "skipped": []
+            },
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+                "context_digest": "be8747084f06e335b3ccffb2aef77fece54af1cc0c02a8c45906c92cdda8aaad",
+                "context_version": 1,
+                "goal_id": "DRC5BF9454399F4F38E8990540",
+                "implementation_branch": "refine/DRC5BF9454399F4F38E8990540/round-1",
+                "round_idx": 0,
+                "target_branch": "main"
+              },
+              "completed_at": "2026-08-15T09:33:01Z",
+              "criticism": {
+                "completed_at": "2026-08-15T09:10:10Z",
+                "git_after": {
+                  "branch": "refine/DRC5BF9454399F4F38E8990540/round-1",
+                  "head_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DRC5BF9454399F4F38E8990540/round-1",
+                  "head_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "findings": [
+                    {
+                      "checklist_item_ids": [
+                        "P1",
+                        "P4"
+                      ],
+                      "description": "The plan snapshots the remote merge target and exact-fences only the branch being retired, so a concurrent non-fast-forward rewrite of the target after ancestry inspection can leave an origin-only tip unreachable when deletion succeeds.",
+                      "id": "C1",
+                      "material": true,
+                      "recommendation": "Require the apply path to fail closed unless the inspected target ref is protected or revalidated as part of the compare-and-delete operation, and cover a concurrent target-rewrite race."
+                    },
+                    {
+                      "checklist_item_ids": [
+                        "P3",
+                        "P6"
+                      ],
+                      "description": "Making cancelled Goal refs automatically eligible conflicts with the Cancelled intent contract that branches remain inspectable and are never silently deleted, but P6 names only merge/worktree/process intent updates.",
+                      "id": "C2",
+                      "material": true,
+                      "recommendation": "Explicitly reconcile docs/intent/03-capabilities/03-workflow/10-cancelled.md with retention-delayed, ancestry-proven upstream retirement and state what durable evidence remains inspectable."
+                    }
+                  ],
+                  "summary": "The plan needs an atomic remote-target safety fence and an explicit cancelled-state intent update before implementation."
+                },
+                "started_at": "2026-08-15T09:07:54Z"
+              },
+              "final_plan": {
+                "completed_at": "2026-08-15T09:12:04Z",
+                "git_after": {
+                  "branch": "refine/DRC5BF9454399F4F38E8990540/round-1",
+                  "head_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DRC5BF9454399F4F38E8990540/round-1",
+                  "head_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Extend the cohesive Git worktree capability with exact configured-remote inventory for unambiguous refine/<goal>/round-N refs and a fail-closed atomic compare-and-delete operation conditioned on both the inspected branch tip and inspected merge-target tip.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Refactor branch-retirement policy into an independent pass over the deduplicated union of local and remote Goal round refs, using the configured git_remote and merge_target_branch rather than requiring a matching workflow_integration candidate.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Make only done, cancelled, or absent Goal refs eligible after the applicable retention delay and remote-target ancestry proof, while preserving failed and other active statuses, active ownership, malformed or ambiguous refs, non-ancestor tips, inspection failures, and refine/state.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Retire upstream and local refs independently so a safe checked-out branch can lose only its upstream ref, with every deletion exact-SHA fenced and any candidate advancement, merge-target change, or unsupported atomic transaction reported as preserved.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Keep dry-run and apply reporting accurate for remote-only, checked-out, and superseded candidates with per-side outcomes and no double counting between worktree hibernation and branch retirement.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Update the merge/worktree, process, and cancelled intent pages to state that cancellation itself never deletes evidence, while retention-delayed maintenance may retire ancestry-proven ref names because Goal, Round, process, and target-reachable commit evidence remains inspectable.",
+                      "id": "P6"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "C1",
+                      "resolution": "P1 and P4 require deletion to be atomically conditional on the exact inspected candidate and merge-target tips and to fail closed on target movement or unsupported transactions."
+                    },
+                    {
+                      "criticism_id": "C2",
+                      "resolution": "P3 and P6 limit cancelled-ref retirement to retention-delayed, ancestry-proven maintenance and explicitly preserve durable Goal, Round, process, and target-history evidence."
+                    }
+                  ],
+                  "summary": "Refine's cleanup capability will independently inspect exact Goal round refs on the configured remote and locally, then retire only refs for done, cancelled, or deleted Goals whose tips remain contained in the exact configured remote merge-target snapshot, so safe origin-only, checked-out, and superseded refs stop accumulating without exposing in-flight work, unique commits, cancelled-attempt evidence, or refine/state to deletion races."
+                },
+                "started_at": "2026-08-15T09:10:10Z"
+              },
+              "implementation": {
+                "completed_at": "2026-08-15T09:33:01Z",
+                "execution": {
+                  "checklist": [
+                    {
+                      "evidence": "Added one-advertisement configured-remote Refine ref inventory, exact commit fetching without tracking refs, and atomic compare-and-delete fenced by both candidate and merge-target SHAs; tests preserve refs when either snapshot moves.",
+                      "id": "P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Moved branch policy into cohesive branch_retirement.rs and inspect the deduplicated union of local and configured-remote refs using git_remote and merge_target_branch settings without workflow_integration matching.",
+                      "id": "P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Eligibility is limited to done, cancelled, or absent Goals after retention and remote-target ancestry proof; tests preserve backlog/failed, active ownership, malformed/ambiguous refs, non-ancestors, and refine/state.",
+                      "id": "P3",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Local and remote sides have independent eligibility/deletion; checked-out local refs are retained while safe upstream refs retire, all deletions use exact-SHA fences, and candidate/target movement or unsupported atomic deletion fails closed.",
+                      "id": "P4",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Branch reports now expose local/remote presence, eligibility, reasons, and deletion outcomes; tests cover dry-run/apply remote-only, checked-out, superseded, and combined local/upstream retirement without double counting.",
+                      "id": "P5",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Updated merge/worktree, process, and cancelled intent pages to distinguish non-destructive cancellation from retention-delayed ancestry-proven ref-name retirement while retaining durable evidence.",
+                      "id": "P6",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "rustfmt --edition 2024 --check src/tools/host/git_worktrees/mod.rs src/tools/host/git_worktrees/integration.rs src/tools/product/worktree_cleanup/mod.rs src/tools/product/worktree_cleanup/branch_retirement.rs src/tools/product/worktree_cleanup/tests.rs -> exit 0",
+                    "cargo test --lib tools::product::worktree_cleanup:: -- --nocapture -> 17 passed, 0 failed",
+                    "cargo test --lib -> 798 passed, 0 failed, 6 ignored",
+                    "cargo check --all-targets -> exit 0",
+                    "cargo clippy --lib -> exit 0 with 3 unrelated pre-existing warnings",
+                    "cargo clippy --lib -- -D warnings -> exit 101 only for pre-existing needless_pub_self warnings in src/tools/product/project_projection/store.rs and unnecessary_sort_by in src/surfaces/web_server/http/background_loops.rs",
+                    "git diff --check -> exit 0"
+                  ]
+                },
+                "report": "Implemented remote-first Goal round-ref retirement over the local/remote union, configured-remote and merge-target authority, done/cancelled/deleted plus retention and ancestry policy, exact candidate and target fencing for atomic upstream deletion, independent checked-out local/upstream outcomes, accurate per-side reporting, focused safety coverage, and the three accepted intent updates. Verification: focused cleanup tests passed 17/17; full library suite passed 798 with 6 ignored; all targets compiled; owned Rust files are formatted; diff check passed. Non-blocking baseline note: strict Clippy with -D warnings stops on three unrelated pre-existing warnings, while ordinary cargo clippy --lib completes with those warnings.",
+                "started_at": "2026-08-15T09:12:05Z"
+              },
+              "phase": "implement",
+              "phase_started_at": "2026-08-15T09:12:05Z",
+              "proposal": {
+                "completed_at": "2026-08-15T09:07:53Z",
+                "git_after": {
+                  "branch": "refine/DRC5BF9454399F4F38E8990540/round-1",
+                  "head_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DRC5BF9454399F4F38E8990540/round-1",
+                  "head_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Extend the Git worktree capability with a cohesive remote-ref inventory that returns exact refine-owned branch tips from the configured remote and supports a single authoritative remote merge-target snapshot.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Refactor branch retirement out of the worktree-removal path into an independent pass over the union of local and remote Goal round refs, using the configured git_remote and merge_target_branch rather than per-round integration records.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Classify only unambiguous Goal round refs as eligible when the Goal is done, cancelled, or absent and the relevant exact tip is an ancestor of the remote target, while preserving active or in-flight Goals, retention-window Goals, malformed or ambiguous refs, non-ancestor tips, and refine/state.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Retire local and remote refs independently under exact-SHA fences so checked-out branches retain their local ref while a safe upstream ref can be deleted, and concurrent advancement or inspection failure produces a preserved result with an explicit report reason.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Keep dry-run and apply reports accurate for remote-only and checked-out candidates, including eligibility and per-side deletion counts without double-counting branches encountered during worktree hibernation.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Update the affected merge, worktree, and process intent text to document terminal-or-missing Goal gating, remote-target ancestry, independent upstream retirement, and protection of recoverable and control-state refs.",
+                      "id": "P6"
+                    }
+                  ],
+                  "summary": "Refine's cleanup capability will inspect both local and configured-upstream Goal round branches independently of worktree removal, then retire only exact branch tips that belong to done, cancelled, or deleted Goals and are already contained in the configured remote merge target, so origin-only, checked-out, and superseded safe refs stop accumulating without risking in-flight work, unique commits, or the refine/state branch."
+                },
+                "started_at": "2026-08-15T09:05:53Z"
+              },
+              "schema_version": 2,
+              "started_at": "2026-08-15T09:05:53Z",
+              "state": "completed",
+              "updated_at": "2026-08-15T09:33:01Z"
+            },
+            "implementation_report": "Implemented remote-first Goal round-ref retirement over the local/remote union, configured-remote and merge-target authority, done/cancelled/deleted plus retention and ancestry policy, exact candidate and target fencing for atomic upstream deletion, independent checked-out local/upstream outcomes, accurate per-side reporting, focused safety coverage, and the three accepted intent updates. Verification: focused cleanup tests passed 17/17; full library suite passed 798 with 6 ignored; all targets compiled; owned Rust files are formatted; diff check passed. Non-blocking baseline note: strict Clippy with -D warnings stops on three unrelated pre-existing warnings, while ordinary cargo clippy --lib completes with those warnings.",
+            "implementation_reported_at": "2026-08-15T09:33:01Z",
+            "prompt": "From: Buddy Williams <buddy.williams@insurity.com>\nSubject: Bug Report: Refine leaks refine/* branches on origin �X cleanup-worktrees can never prune them\n\nBody:\nBug Report: Refine leaks refine/* branches on origin �X cleanup-worktrees can never prune them\r\n\r\n  Component: refine �X worktree_cleanup (src/tools/product/worktree_cleanup/mod.rs)\r\n  Version observed: refine 4.2.0 (checkout HEAD 7556a231, /insurity/refine)\r\n  Target app: ProSuite (/insurity/ProSuite), node bo2lnxnevo03-buddy, merge_target_branch = insurity-claims\r\n  Severity: Medium (no data loss; unbounded remote-branch growth, operational noise, misleading cleanup output)\r\n\r\n  Summary\r\n\r\n  Origin has accumulated 90 refine/* refs (89 goal round-branches + refine/state) that grow without bound. refine project cleanup-worktrees reports 0 eligible on every run and never deletes a\r\n  remote branch, even for goals whose work is fully merged into insurity-claims. The remote-branch retirement logic has three structural gaps that make large classes of branches permanently\r\n  un-prunable.\r\n\r\n  Observed vs. expected\r\n\r\n  Observed (refine project cleanup-worktrees, dry-run):\r\n  worktrees:  inspected 57, eligible 0, preserved 57\r\n  branches:   inspected 79, eligible 0, remote_branches_deleted 0\r\n  reasons:    candidate_not_integrated 75, goal_not_found 4\r\n  Origin round-branches by current goal status: failed 26, backlog 23, review 15, quality 11, done 7, cancelled 1, no-goal-record 6. Local refine/* branches: 138; linked worktrees: 60.\r\n\r\n  Expected: branches whose commits are provably contained in the configured merge target (insurity-claims) and whose goals are terminal (done / cancelled / record-deleted) should be retired from\r\n  origin; the tool should report a non-zero eligible set here.\r\n\r\n  Root cause (code-level)\r\n\r\n  The only path that deletes a remote branch is execute_branch_retirement �� delete_remote_branch_if_matches (worktree_cleanup/mod.rs:614), reachable only when integrated_branch_plan returns\r\n  Eligible. That gate (matching_integration, lines 638�V646) requires the branch's local tip to exactly equal a workflow_integration.candidate_commit recorded on one of the goal's rounds. Three\r\n  consequences:\r\n\r\n  1. Origin-only strays are invisible. cleanup_orphaned_integrated_branches iterates git.list_refine_owned_branches() �X local branches only. Once the local branch/worktree is gone (e.g. the goal\r\n  record was deleted), the pushed origin branch is never revisited. �� Goal 00000SZP9NZ81GEQ11ZYWMC000 has 6 origin-only branches (round-2�K7), all merged into insurity-claims HEAD, no local\r\n  branch, no worktree �X permanently stranded, not even inspected.\r\n  2. Checked-out integrated branches are skipped. Line 326 if checked_out.contains(&branch) { continue; }. 60 worktrees pin their branches; an integrated goal whose worktree is never torn down\r\n  (e.g. refine/00000SZ65RCHM0033AZCN8001Q/round-1, tip == recorded candidate aa4b91cb, ancestor of insurity-claims) keeps its origin branch forever, because branch retirement is only a\r\n  side-effect of worktree removal �X which is --apply-only and clean-only.\r\n  3. No prune path for non-integrated or superseded rounds. failed/backlog/review/quality/cancelled goals (76 branches) have no workflow_integration, and superseded earlier rounds (e.g. a goal\r\n  with round-1�Kround-9 where only the final round integrated) never match a candidate commit. goal_not_found branches are also explicitly held (Preserved) rather than retired even when merged.\r\n  These live on origin indefinitely.\r\n\r\n  Reproduction\r\n\r\n  1. Run several goals to integration on a project whose merge_target_branch is a shared branch (insurity-claims), leaving worktrees in place; delete/supersede some goals.\r\n  2. refine project cleanup-worktrees �� branch_eligible: 0, remote_branches_deleted: 0.\r\n  3. git branch -r | grep refine/ �� branches persist even for merged, terminal goals.\r\n\r\n  Verified-safe cleanup inventory (no work lost �X tips already in insurity-claims HEAD)\r\n\r\n  - 6 �X refine/00000SZP9NZ81GEQ11ZYWMC000/round-{2..7} (goal record deleted; all merged)\r\n  - 5 �X done goals merged into HEAD: �KRCHM�K/round-1, �KRDR0�K/round-1, �KS9K�K/round-1, �KSH07�K/round-1, �KEH3C�K/round-1\r\n  - = 11 branches safe to delete from origin.\r\n  - Do NOT touch: refine/state; the 76 in-flight branches; and 2 done branches not yet in HEAD (�KSMQP�K/round-1, �KRPMC�K/round-1) �X origin holds the only copy.\r\n\r\n  Note on the \"control-state syncing removed\" premise\r\n\r\n  In this deployed 4.2.0 checkout, control-state sync is fully present and wired (REFINE_STATE_BRANCH = \"refine/state\", GIT_SYNC_RUNNER, FileGitSyncService), and origin/refine/state was last\r\n  updated 2026-08-13 (91738db, \"Sync Refine state: 1 goal\"). So either this checkout predates the removal you're referring to, or the removal lives in a version not yet deployed here �X worth\r\n  reconciling. Relevant either way: if state sync is retired, refine/state on origin becomes an orphaned branch with no janitor, so the removal should ship with a migration that deletes it �X and,\r\n  critically, removing state sync does not address the round-branch leak above, which is a separate worktree_cleanup defect.\r\n\r\n  Suggested fixes\r\n\r\n  - Add a remote-first pass: retire an origin/refine/* branch when its goal record is absent (or terminal) and its tip is an ancestor of the configured merge target on the remote �X verifiable\r\n  without a local branch.\r\n  - Decouple branch retirement from worktree removal; retire the origin branch for checked-out-but-integrated branches.\r\n  - Add explicit prune handling for cancelled goals and superseded (non-final) rounds.\r\n  - Make goal_not_found + merged-into-target eligible (keeping the ancestor safety check) instead of blanket-preserve.\r\n  - If state sync is being retired, add a migration step that deletes origin/refine/state.\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nBuddy Williams\r\nBuddy.Williams@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
+            "quality_checked_at": "2026-08-15T09:42:47Z",
+            "quality_details": {
+              "candidate_commit": "9b287bcbca976eb6739d92b867a955018e72d6cd",
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRC5BF9454399F4F38E8990540-round-1",
+              "diagnostics": [
+                "{\"ok\":false,\"summary\":\"The supervised command exited 1 during the formatting check.\",\"results\":[{\"test\":\"The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\",\"status\":\"failed\",\"evidence\":\"Exit 1. Cleanup tests passed 18/18, the ancestry failure-path test passed 1/1, and all targets compiled. cargo fmt --all -- --check then found formatting differences in unrelated existing files, so the remaining chained checks did not execute.\",\"command\":\"set -o pipefail; cargo test --lib tools::product::worktree_cleanup -- --test-threads=1 && cargo test --lib tools::host::git_worktrees::tests::integration::commit_is_ancestor_distinguishes_negative_results_from_inspection_failures -- --exact --test-threads=1 && cargo check --all-targets && cargo fmt --all -- --check && git diff --check 7556a231c381db58b7dc435b514cfb7c13d60d23..HEAD && test \\\"$(git diff --name-only 7556a231c381db58b7dc435b514cfb7c13d60d23..HEAD -- docs/intent/03-capabilities/01-process.md docs/intent/03-capabilities/02-agents/05-merge-review-git-worktrees.md docs/intent/03-capabilities/03-workflow/10-cancelled.md | wc -l)\\\" -eq 3 && echo 'QUALITY_PREDICATE_PASS: cleanup 18/18; ancestry failure-path 1/1; all targets compile; formatting, diff, and 3 relevant intent pages verified'\"}]}",
+                "Observed supervised process proc-1786786962620-1084-551 exited 1. stdout: hed)?,\n                     Err(_) => false,\nDiff in /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRC5BF9454399F4F38E8990540-round-1/src/tools/product/project_projection/store/projection_store.rs:154:\n     let mut goals_by_feature: BTreeMap<&str, Vec<&GoalIndexProjection>> = BTreeMap::new();\n     for goal in goals.values() {\n         if let Some(feature_id) = goal.goal.feature_id.as_deref() {\n\u001b[31m-            goals_by_feature.entry(feature_id).or_default().push(&goal.goal);\n\u001b(B\u001b[m\u001b[32m+            goals_by_feature\n\u001b(B\u001b[m\u001b[32m+                .entry(feature_id)\n\u001b(B\u001b[m\u001b[32m+                .or_default()\n\u001b(B\u001b[m\u001b[32m+                .push(&goal.goal);\n\u001b(B\u001b[m         }\n     }\n     let mut features = BTreeMap::new();\nDiff in /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRC5BF9454399F4F38E8990540-round-1/src/tools/product/project_projection/store/projection_store.rs:195:\n /// — sixteen of eighteen megabytes on a mature project — and was re-serialized\n /// on every persist and re-cloned on every SSE rebuild. Complete history stays\n /// on disk in the activity log and sidecars.\n\u001b[31m-pub(super) fn cap_projected_activity(\n\u001b(B\u001b[m\u001b[31m-    activity: &mut BTreeMap<String, ActivitySummaryProjection>,\n\u001b(B\u001b[m\u001b[31m-) {\n\u001b(B\u001b[m\u001b[32m+pub(super) fn cap_projected_activity(activity: &mut BTreeMap<String, ActivitySummaryProjection>) {\n\u001b(B\u001b[m     if activity.len() <= PROJECTED_ACTIVITY_LIMIT {\n         return;\n     }\nDiff in /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRC5BF9454399F4F38E8990540-round-1/tests/production_binary_install.rs:237:\n         .unwrap();\n     assert!(rebuild.status.success());\n     assert!(\n\u001b[31m-        String::from_utf8_lossy(&rebuild.stdout).contains(\"production binary is already up to date\")\n\u001b(B\u001b[m\u001b[32m+        String::from_utf8_lossy(&rebuild.stdout)\n\u001b(B\u001b[m\u001b[32m+            .contains(\"production binary is already up to date\")\n\u001b(B\u001b[m     );\n     assert!(cargo_log.exists(), \"system build always runs the build\"); stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.14s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.13s"
+              ],
+              "evaluation_scope": "isolated_candidate",
+              "operation_id": "1a004cac94f43cd",
+              "results": [
+                {
+                  "command": "set -o pipefail; cargo test --lib tools::product::worktree_cleanup -- --test-threads=1 && cargo test --lib tools::host::git_worktrees::tests::integration::commit_is_ancestor_distinguishes_negative_results_from_inspection_failures -- --exact --test-threads=1 && cargo check --all-targets && cargo fmt --all -- --check && git diff --check 7556a231c381db58b7dc435b514cfb7c13d60d23..HEAD && test \"$(git diff --name-only 7556a231c381db58b7dc435b514cfb7c13d60d23..HEAD -- docs/intent/03-capabilities/01-process.md docs/intent/03-capabilities/02-agents/05-merge-review-git-worktrees.md docs/intent/03-capabilities/03-workflow/10-cancelled.md | wc -l)\" -eq 3 && echo 'QUALITY_PREDICATE_PASS: cleanup 18/18; ancestry failure-path 1/1; all targets compile; formatting, diff, and 3 relevant intent pages verified'",
+                  "evidence": "Observed supervised process proc-1786786962620-1084-551 exited 1. stdout: hed)?,\n                     Err(_) => false,\nDiff in /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRC5BF9454399F4F38E8990540-round-1/src/tools/product/project_projection/store/projection_store.rs:154:\n     let mut goals_by_feature: BTreeMap<&str, Vec<&GoalIndexProjection>> = BTreeMap::new();\n     for goal in goals.values() {\n         if let Some(feature_id) = goal.goal.feature_id.as_deref() {\n\u001b[31m-            goals_by_feature.entry(feature_id).or_default().push(&goal.goal);\n\u001b(B\u001b[m\u001b[32m+            goals_by_feature\n\u001b(B\u001b[m\u001b[32m+                .entry(feature_id)\n\u001b(B\u001b[m\u001b[32m+                .or_default()\n\u001b(B\u001b[m\u001b[32m+                .push(&goal.goal);\n\u001b(B\u001b[m         }\n     }\n     let mut features = BTreeMap::new();\nDiff in /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRC5BF9454399F4F38E8990540-round-1/src/tools/product/project_projection/store/projection_store.rs:195:\n /// — sixteen of eighteen megabytes on a mature project — and was re-serialized\n /// on every persist and re-cloned on every SSE rebuild. Complete history stays\n /// on disk in the activity log and sidecars.\n\u001b[31m-pub(super) fn cap_projected_activity(\n\u001b(B\u001b[m\u001b[31m-    activity: &mut BTreeMap<String, ActivitySummaryProjection>,\n\u001b(B\u001b[m\u001b[31m-) {\n\u001b(B\u001b[m\u001b[32m+pub(super) fn cap_projected_activity(activity: &mut BTreeMap<String, ActivitySummaryProjection>) {\n\u001b(B\u001b[m     if activity.len() <= PROJECTED_ACTIVITY_LIMIT {\n         return;\n     }\nDiff in /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRC5BF9454399F4F38E8990540-round-1/tests/production_binary_install.rs:237:\n         .unwrap();\n     assert!(rebuild.status.success());\n     assert!(\n\u001b[31m-        String::from_utf8_lossy(&rebuild.stdout).contains(\"production binary is already up to date\")\n\u001b(B\u001b[m\u001b[32m+        String::from_utf8_lossy(&rebuild.stdout)\n\u001b(B\u001b[m\u001b[32m+            .contains(\"production binary is already up to date\")\n\u001b(B\u001b[m     );\n     assert!(cargo_log.exists(), \"system build always runs the build\"); stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.14s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.13s Agent report: Exit 1. Cleanup tests passed 18/18, the ancestry failure-path test passed 1/1, and all targets compiled. cargo fmt --all -- --check then found formatting differences in unrelated existing files, so the remaining chained checks did not execute.",
+                  "exit_code": 1,
+                  "process_id": "proc-1786786962620-1084-551",
+                  "status": "failed",
+                  "test": "The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks."
+                }
+              ],
+              "source_candidate_commit": "9b287bcbca976eb6739d92b867a955018e72d6cd"
+            },
+            "quality_message": "Quality failed: “The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across aff…” — supervised command exited with code 1.",
+            "quality_state": "failed",
+            "reporter": "buddy.williams@insurity.com",
+            "round": 1
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "assignee": "Refine",
+      "automatic_retry": {
+        "attempt": 1,
+        "generated_at": "2026-08-15T09:44:38Z",
+        "kind": "quality",
+        "source_round": 1
+      },
+      "constitution_state": "passed",
+      "created": "2026-08-15T09:44:38Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "2026-08-15T10:03:31Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRC5BF9454399F4F38E8990540-round-2",
+        "failed_actions": [],
+        "governance_configured": true,
+        "guidance_checked": 2,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found in committed Round 2.\",\"violations\":[]}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "No governance rule violations found in committed Round 2.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRC5BF9454399F4F38E8990540-round-2"
+      },
+      "governance_message": "No governance rule violations found in committed Round 2.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-15T09:52:38Z",
+        "skipped": []
+      },
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "619c52af57ec065c0b3806f37dd02b59da2e7a07",
+          "context_digest": "37ae0cfd8b24f918e8fc1b8aa084f86b58b20910561054ff106cf3d633a0d2b2",
+          "context_version": 1,
+          "goal_id": "DRC5BF9454399F4F38E8990540",
+          "implementation_branch": "refine/DRC5BF9454399F4F38E8990540/round-2",
+          "round_idx": 1,
+          "target_branch": "main"
+        },
+        "completed_at": "2026-08-15T09:52:38Z",
+        "criticism": {
+          "completed_at": "2026-08-15T09:46:54Z",
+          "git_after": {
+            "branch": "refine/DRC5BF9454399F4F38E8990540/round-2",
+            "head_commit": "619c52af57ec065c0b3806f37dd02b59da2e7a07",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRC5BF9454399F4F38E8990540/round-2",
+            "head_commit": "619c52af57ec065c0b3806f37dd02b59da2e7a07",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P4",
+                  "P5"
+                ],
+                "description": "The checklist promises focused regressions and intent scope but omits several verification requirements from the authoritative Round request: cargo test --lib, cargo check --all-targets, base-relative git diff --check, rustfmt --edition 2024 --check limited to Rust files changed from the Round base, and explicit treatment of cargo fmt --all -- --check as unrelated baseline debt.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Add a verification checklist item naming every required command, confirming exactly the three intent pages, and recording the still-present workspace-wide rustfmt failure without modifying unrelated files."
+              }
+            ],
+            "summary": "Add the Round-mandated scoped verification and baseline-formatting disposition to the carry-forward plan."
+          },
+          "started_at": "2026-08-15T09:45:29Z"
+        },
+        "final_plan": {
+          "completed_at": "2026-08-15T09:47:37Z",
+          "git_after": {
+            "branch": "refine/DRC5BF9454399F4F38E8990540/round-2",
+            "head_commit": "619c52af57ec065c0b3806f37dd02b59da2e7a07",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRC5BF9454399F4F38E8990540/round-2",
+            "head_commit": "619c52af57ec065c0b3806f37dd02b59da2e7a07",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Replay only candidate 9b287bcb's changes relative to 7556a231 onto the current Round 2 base, resolving overlaps to preserve both the candidate behavior and unrelated newer mainline changes.",
+                "id": "P1"
+              },
+              {
+                "description": "Preserve the cohesive Git capability for configured-remote ref inventory, exact commit inspection, fail-closed ancestry results, and atomic deletion fenced by the inspected branch and merge-target SHAs.",
+                "id": "P2"
+              },
+              {
+                "description": "Preserve the independent local-and-upstream retirement pass over deduplicated Goal round refs with terminal-or-missing Goal, retention, configured-target ancestry, ownership, and malformed-or-control-ref safety gates.",
+                "id": "P3"
+              },
+              {
+                "description": "Carry forward per-side reporting and focused regressions for remote-only, checked-out, superseded, moved-ref, moved-target, and ancestry-inspection failure cases without coupling upstream retirement to worktree removal.",
+                "id": "P4"
+              },
+              {
+                "description": "Retain changes to exactly the process, merge-review Git worktrees, and cancelled intent pages, including the distinction between non-destructive cancellation and delayed ancestry-proven ref-name retirement, while leaving unrelated baseline files untouched.",
+                "id": "P5"
+              },
+              {
+                "description": "Validate with the two mandated focused tests, cargo test --lib, cargo check --all-targets, base-relative git diff --check, and rustfmt --edition 2024 --check only for base-changed Rust files; confirm exactly the three affected intent pages and record any unchanged cargo fmt --all -- --check failure as inapplicable baseline debt without formatting unrelated files.",
+                "id": "P6"
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "P6 names every Round-mandated validation, confirms the exact intent-page scope, and explicitly treats unchanged workspace-wide rustfmt failures as unrelated baseline debt."
+              }
+            ],
+            "summary": "Carry the complete branch-cleanup implementation and Quality correction from candidate 9b287bcb onto the current Round 2 base so Refine can safely retire ancestry-proven terminal or missing Goal refs from the configured remote without losing inspectable evidence, while preserving intervening mainline work and leaving unrelated baseline formatting debt untouched."
+          },
+          "started_at": "2026-08-15T09:46:54Z"
+        },
+        "implementation": {
+          "completed_at": "2026-08-15T09:52:38Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Replayed implementation commit f0118bab and Quality commit 9b287bcb with --no-commit onto clean Round 2 base 619c52af. No candidate-owned path overlapped newer mainline work; a staged tree comparison against 9b287bcb reported CANDIDATE_DELTA_MATCH: exact.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Preserved the candidate's cohesive Git capability across commands.rs, integration.rs, mod.rs, and integration tests: configured-remote inventory, exact commit fetch/inspection, negative-vs-error ancestry handling, and atomic deletion fenced by exact branch and target SHAs.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Preserved branch_retirement.rs and its independent deduplicated local/remote Goal round-ref pass, with done/cancelled/missing Goal, retention, configured-target ancestry, active ownership, malformed/ambiguous ref, checked-out local, and refine/state safety gates.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Preserved per-side cleanup reporting and regressions for remote-only, checked-out, superseded, moved-branch, moved-target, unsupported atomic deletion, active ownership, malformed/state refs, and ancestry inspection failure without coupling upstream retirement to worktree removal.",
+                "id": "P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Retained changes to exactly docs/intent/03-capabilities/01-process.md, docs/intent/03-capabilities/02-agents/05-merge-review-git-worktrees.md, and docs/intent/03-capabilities/03-workflow/10-cancelled.md. No unrelated baseline file was changed; cancellation remains non-destructive while retention-delayed ancestry-proven ref-name retirement preserves durable evidence.",
+                "id": "P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "All Round-mandated focused tests, full library tests, all-target compile, Round-base diff check, seven-file targeted rustfmt check, and three-page intent-scope check passed. Workspace-wide cargo fmt was run read-only, failed only on unrelated baseline formatting debt, and was correctly treated as inapplicable.",
+                "id": "P6",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "git add <10 candidate-owned paths> && git diff --cached --exit-code 9b287bcbca976eb6739d92b867a955018e72d6cd -- <10 candidate-owned paths> -> exit 0; CANDIDATE_DELTA_MATCH: exact; index then restored to unstaged state",
+              "cargo test --lib tools::product::worktree_cleanup -- --test-threads=1 -> exit 0; 18 passed, 0 failed, 0 ignored, 789 filtered out",
+              "cargo test --lib tools::host::git_worktrees::tests::integration::commit_is_ancestor_distinguishes_negative_results_from_inspection_failures -- --exact --test-threads=1 -> exit 0; 1 passed, 0 failed, 806 filtered out",
+              "cargo test --lib -> exit 0; 801 passed, 0 failed, 6 ignored",
+              "cargo check --all-targets -> exit 0",
+              "git diff --check 619c52af57ec065c0b3806f37dd02b59da2e7a07 -> exit 0",
+              "rustfmt --edition 2024 --check src/tools/host/git_worktrees/commands.rs src/tools/host/git_worktrees/integration.rs src/tools/host/git_worktrees/mod.rs src/tools/host/git_worktrees/tests/integration.rs src/tools/product/worktree_cleanup/branch_retirement.rs src/tools/product/worktree_cleanup/mod.rs src/tools/product/worktree_cleanup/tests.rs -> exit 0",
+              "git diff --name-only 619c52af57ec065c0b3806f37dd02b59da2e7a07 -- docs/intent plus exact three-path assertions -> exit 0; exactly process.md, merge-review-git-worktrees.md, and cancelled.md",
+              "cargo fmt --all -- --check -> exit 1; inapplicable baseline failure limited to unrelated files such as src/surfaces/cli/dispatch/features.rs, src/surfaces/web_server/project_routes.rs, src/tools/product/project_projection/store/projection_store.rs, and tests/production_binary_install.rs; no files modified",
+              "git worktree list --porcelain classification -> total=40, state=1, goal_round=33, other=6; confirms the many worktrees are Goal Round candidates, not duplicated refine/state worktrees"
+            ]
+          },
+          "report": "Carried the exact candidate 9b287bcb delta onto Round 2 base 619c52af without overlap or unrelated edits. Preserved configured-remote inventory, exact commit inspection, fail-closed ancestry, atomic candidate/target fencing, independent local/upstream retirement and reporting, terminal-or-missing Goal and retention policy, focused regressions, and exactly the three accepted intent updates. Verification passed: cleanup 18/18, exact ancestry failure-path 1/1, full library 801 passed with 6 ignored, all targets compiled, Round-base diff check and targeted rustfmt passed, and intent scope is exactly three pages. cargo fmt --all -- --check remains an inapplicable exit-1 baseline failure on unrelated files and no such file was modified.",
+          "started_at": "2026-08-15T09:47:37Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-15T09:47:37Z",
+        "proposal": {
+          "completed_at": "2026-08-15T09:45:29Z",
+          "git_after": {
+            "branch": "refine/DRC5BF9454399F4F38E8990540/round-2",
+            "head_commit": "619c52af57ec065c0b3806f37dd02b59da2e7a07",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRC5BF9454399F4F38E8990540/round-2",
+            "head_commit": "619c52af57ec065c0b3806f37dd02b59da2e7a07",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Replay only candidate 9b287bcb's changes relative to 7556a231 onto the current Round 2 base, resolving any overlap in favor of both the candidate behavior and unrelated newer mainline changes.",
+                "id": "P1"
+              },
+              {
+                "description": "Preserve the cohesive Git capability for configured-remote ref inventory, exact commit inspection, fail-closed ancestry results, and atomic deletion fenced by the inspected branch and merge-target SHAs.",
+                "id": "P2"
+              },
+              {
+                "description": "Preserve the independent local-and-upstream retirement pass over deduplicated Goal round refs with terminal-or-missing Goal, retention, configured-target ancestry, ownership, and malformed-or-control-ref safety gates.",
+                "id": "P3"
+              },
+              {
+                "description": "Carry forward per-side reporting and focused regressions for remote-only, checked-out, superseded, moved-ref, moved-target, and ancestry-inspection failure cases without coupling upstream retirement to worktree removal.",
+                "id": "P4"
+              },
+              {
+                "description": "Retain changes to exactly the process, merge-review Git worktrees, and cancelled intent pages, including the distinction between non-destructive cancellation and delayed ancestry-proven ref-name retirement, while leaving unrelated baseline files untouched.",
+                "id": "P5"
+              }
+            ],
+            "summary": "Carry the complete branch-cleanup implementation and Quality correction from candidate 9b287bcb onto the newer Round 2 base so Refine can safely retire ancestry-proven terminal or missing Goal refs from the configured remote without losing inspectable evidence, while preserving intervening mainline work and avoiding unrelated formatting changes."
+          },
+          "started_at": "2026-08-15T09:44:38Z"
+        },
+        "schema_version": 2,
+        "started_at": "2026-08-15T09:44:38Z",
+        "state": "completed",
+        "updated_at": "2026-08-15T09:52:38Z"
+      },
+      "implementation_report": "Carried the exact candidate 9b287bcb delta onto Round 2 base 619c52af without overlap or unrelated edits. Preserved configured-remote inventory, exact commit inspection, fail-closed ancestry, atomic candidate/target fencing, independent local/upstream retirement and reporting, terminal-or-missing Goal and retention policy, focused regressions, and exactly the three accepted intent updates. Verification passed: cleanup 18/18, exact ancestry failure-path 1/1, full library 801 passed with 6 ignored, all targets compiled, Round-base diff check and targeted rustfmt passed, and intent scope is exactly three pages. cargo fmt --all -- --check remains an inapplicable exit-1 baseline failure on unrelated files and no such file was modified.",
+      "implementation_reported_at": "2026-08-15T09:52:38Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Carry forward the complete implementation and Quality correction represented by candidate 9b287bcbca976eb6739d92b867a955018e72d6cd relative to base 7556a231c381db58b7dc435b514cfb7c13d60d23. Preserve its remote-first configured-authority branch retirement, terminal-or-missing Goal and retention gates, remote-target ancestry proof, atomic exact-SHA branch/target fencing, independent local/upstream outcomes, fail-closed Git ancestry handling, focused regressions, reporting, and three intent updates. No product-code correction is currently indicated. Do not format or otherwise modify unrelated baseline files merely to satisfy workspace-wide rustfmt. Verify with cargo test --lib tools::product::worktree_cleanup -- --test-threads=1; the exact commit_is_ancestor_distinguishes_negative_results_from_inspection_failures test; cargo test --lib; cargo check --all-targets; git diff --check against the Round base; and rustfmt --edition 2024 --check applied only to Rust files changed from that base. Confirm exactly the three affected intent pages remain changed. Report cargo fmt --all -- --check as an inapplicable baseline failure unless the unrelated formatting debt has independently been fixed.",
+      "quality_agent_report": "Quality corrected active-ownership fencing so a missing Goal with an active operation cannot lose its remote-only round ref, added the focused regression, and verified the complete carried branch-retirement implementation. Exact verification: cleanup 19/19; exact ancestry failure-path 1/1; full library 802 passed with 6 ignored; all targets compiled; Round-base diff, changed-Rust rustfmt, and exact three-page intent scope passed; workspace-wide cargo fmt remains an inapplicable exit-1 baseline failure only in unrelated files.",
+      "quality_candidate_commit": "95b5d7e0d0312feb0be326cf6aab5016c67eb2b7",
+      "quality_checked_at": "2026-08-15T10:01:08Z",
+      "quality_details": {
+        "candidate_commit": "95b5d7e0d0312feb0be326cf6aab5016c67eb2b7",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRC5BF9454399F4F38E8990540-round-2",
+        "diagnostics": [
+          "{\"ok\":true,\"summary\":\"Candidate satisfies the Goal and relevant intent contracts; all focused and full deterministic checks passed.\",\"results\":[{\"test\":\"The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\",\"status\":\"passed\",\"evidence\":\"Exit 0 with QUALITY_PREDICATE_PASS. Cleanup tests: 19 passed; ancestry failure-path: 1 passed; full library: 802 passed, 0 failed, 6 ignored; all targets compiled; diff and targeted rustfmt checks passed; exactly 3 relevant intent pages changed; worktree remained clean. Remaining uncertainty: remote behavior was exercised with local Git fixtures, not a production hosting provider.\",\"command\":\"bash -lc 'set -euo pipefail\\nbase=619c52af57ec065c0b3806f37dd02b59da2e7a07\\ncargo test --lib tools::product::worktree_cleanup -- --test-threads=1\\ncargo test --lib tools::host::git_worktrees::tests::integration::commit_is_ancestor_distinguishes_negative_results_from_inspection_failures -- --exact --test-threads=1\\ncargo test --lib\\ncargo check --all-targets\\ngit diff --check \\\"$base\\\"\\nmapfile -t rust_files < <(git diff --name-only \\\"$base\\\" -- \\\"*.rs\\\")\\nrustfmt --edition 2024 --check \\\"${rust_files[@]}\\\"\\nactual_docs=$(git diff --name-only \\\"$base\\\" -- docs/intent)\\nexpected_docs=$(printf \\\"%s\\\\n\\\" docs/intent/03-capabilities/01-process.md docs/intent/03-capabilities/02-agents/05-merge-review-git-worktrees.md docs/intent/03-capabilities/03-workflow/10-cancelled.md)\\ntest \\\"$actual_docs\\\" = \\\"$expected_docs\\\"\\ntest -z \\\"$(git status --porcelain)\\\"\\nprintf \\\"QUALITY_PREDICATE_PASS base=%s cleanup=19 ancestry_failure=1 lib=802 check=all-targets intent_pages=3 worktree=clean\\\\n\\\" \\\"$base\\\"'\"}]}",
+          "Observed supervised process proc-1786788033224-1084-611 exited 0. stdout: tive_goals::tests::resident_size_tracks_live_work_rather_than_project_size ... ok\ntest workflow::tests::execution_ownership::zero_round_backlog_is_ineligible_while_valid_sibling_promotes ... ok\ntest workflow::tests::execution_ownership::restart_recovery_preserves_goal_state_and_removes_retired_execution_files ... ok\ntest tools::product::worktree_cleanup::tests::cleanup_retires_exact_integrated_candidate_refs_locally_and_upstream ... ok\ntest workflow::tests::execution_ownership::cleanup_observes_candidate_handoff_through_governance_integration ... ok\ntest workflow::tests::failure_settlement::authoritative_failure_atomically_fails_goal_and_its_originating_round ... ok\ntest tools::product::worktree_cleanup::tests::cleanup_retires_ancestry_proven_superseded_round_refs ... ok\ntest workflow::tests::execution_ownership::restart_recovery_preserves_active_zero_round_goal_and_recovers_valid_sibling ... ok\ntest workflow::tests::failure_settlement::bulk_todo_reclaim_with_new_round_supersedes_old_failure ... ok\ntest workflow::tests::failure_settlement::undo_reclaim_of_cancelled_goal_supersedes_old_same_round_failure ... ok\ntest workflow::tests::execution_ownership::backlog_promotion_changes_only_goal_state_and_does_not_create_worktrees ... ok\ntest workflow::tests::governance::file_automation_fails_after_the_governance_recovery_budget_is_exhausted ... ok\ntest workflow::tests::quality_recovery::file_automation_fails_after_the_shared_quality_recovery_budget_is_exhausted ... ok\ntest surfaces::web_server::tests::activity_exports::source_update_status_integration_drives_browser_states_across_reconnect ... ok\ntest surfaces::web_server::tests::imports::failure_contract::synchronous_import_surfaces_injected_feature_rollback_failure ... ok\n\ntest result: ok. 802 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 30.77s\n\nQUALITY_PREDICATE_PASS base=619c52af57ec065c0b3806f37dd02b59da2e7a07 cleanup=19 ancestry_failure=1 lib=802 check=all-targets intent_pages=3 worktree=clean stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.08s"
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "1a004db59bf43c10",
+        "results": [
+          {
+            "command": "bash -lc 'set -euo pipefail\nbase=619c52af57ec065c0b3806f37dd02b59da2e7a07\ncargo test --lib tools::product::worktree_cleanup -- --test-threads=1\ncargo test --lib tools::host::git_worktrees::tests::integration::commit_is_ancestor_distinguishes_negative_results_from_inspection_failures -- --exact --test-threads=1\ncargo test --lib\ncargo check --all-targets\ngit diff --check \"$base\"\nmapfile -t rust_files < <(git diff --name-only \"$base\" -- \"*.rs\")\nrustfmt --edition 2024 --check \"${rust_files[@]}\"\nactual_docs=$(git diff --name-only \"$base\" -- docs/intent)\nexpected_docs=$(printf \"%s\\n\" docs/intent/03-capabilities/01-process.md docs/intent/03-capabilities/02-agents/05-merge-review-git-worktrees.md docs/intent/03-capabilities/03-workflow/10-cancelled.md)\ntest \"$actual_docs\" = \"$expected_docs\"\ntest -z \"$(git status --porcelain)\"\nprintf \"QUALITY_PREDICATE_PASS base=%s cleanup=19 ancestry_failure=1 lib=802 check=all-targets intent_pages=3 worktree=clean\\n\" \"$base\"'",
+            "evidence": "Observed supervised process proc-1786788033224-1084-611 exited 0. stdout: tive_goals::tests::resident_size_tracks_live_work_rather_than_project_size ... ok\ntest workflow::tests::execution_ownership::zero_round_backlog_is_ineligible_while_valid_sibling_promotes ... ok\ntest workflow::tests::execution_ownership::restart_recovery_preserves_goal_state_and_removes_retired_execution_files ... ok\ntest tools::product::worktree_cleanup::tests::cleanup_retires_exact_integrated_candidate_refs_locally_and_upstream ... ok\ntest workflow::tests::execution_ownership::cleanup_observes_candidate_handoff_through_governance_integration ... ok\ntest workflow::tests::failure_settlement::authoritative_failure_atomically_fails_goal_and_its_originating_round ... ok\ntest tools::product::worktree_cleanup::tests::cleanup_retires_ancestry_proven_superseded_round_refs ... ok\ntest workflow::tests::execution_ownership::restart_recovery_preserves_active_zero_round_goal_and_recovers_valid_sibling ... ok\ntest workflow::tests::failure_settlement::bulk_todo_reclaim_with_new_round_supersedes_old_failure ... ok\ntest workflow::tests::failure_settlement::undo_reclaim_of_cancelled_goal_supersedes_old_same_round_failure ... ok\ntest workflow::tests::execution_ownership::backlog_promotion_changes_only_goal_state_and_does_not_create_worktrees ... ok\ntest workflow::tests::governance::file_automation_fails_after_the_governance_recovery_budget_is_exhausted ... ok\ntest workflow::tests::quality_recovery::file_automation_fails_after_the_shared_quality_recovery_budget_is_exhausted ... ok\ntest surfaces::web_server::tests::activity_exports::source_update_status_integration_drives_browser_states_across_reconnect ... ok\ntest surfaces::web_server::tests::imports::failure_contract::synchronous_import_surfaces_injected_feature_rollback_failure ... ok\n\ntest result: ok. 802 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 30.77s\n\nQUALITY_PREDICATE_PASS base=619c52af57ec065c0b3806f37dd02b59da2e7a07 cleanup=19 ancestry_failure=1 lib=802 check=all-targets intent_pages=3 worktree=clean stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.08s Agent report: Exit 0 with QUALITY_PREDICATE_PASS. Cleanup tests: 19 passed; ancestry failure-path: 1 passed; full library: 802 passed, 0 failed, 6 ignored; all targets compiled; diff and targeted rustfmt checks passed; exactly 3 relevant intent pages changed; worktree remained clean. Remaining uncertainty: remote behavior was exercised with local Git fixtures, not a production hosting provider.",
+            "exit_code": 0,
+            "process_id": "proc-1786788033224-1084-611",
+            "status": "passed",
+            "test": "The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks."
+          }
+        ],
+        "source_candidate_commit": "95b5d7e0d0312feb0be326cf6aab5016c67eb2b7"
+      },
+      "quality_message": "All Quality tests passed with observed supervised evidence.",
+      "quality_state": "passed",
+      "reporter": "Refine",
+      "rule_state": "passed",
+      "updated": "2026-08-15T10:03:35Z",
+      "workflow_attempt_authority": null,
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "95b5d7e0d0312feb0be326cf6aab5016c67eb2b7",
+        "integrated_at": "2026-08-15T10:03:35.407920418+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n docs/intent/03-capabilities/01-process.md          |   2 +-\n .../02-agents/05-merge-review-git-worktrees.md     |  13 +-\n .../03-capabilities/03-workflow/10-cancelled.md    |   6 +-\n src/tools/host/git_worktrees/commands.rs           |   2 +\n src/tools/host/git_worktrees/integration.rs        | 192 ++++++-\n src/tools/host/git_worktrees/mod.rs                |  33 +-\n src/tools/host/git_worktrees/tests/integration.rs  |  25 +\n .../product/worktree_cleanup/branch_retirement.rs  | 496 ++++++++++++++++++\n src/tools/product/worktree_cleanup/mod.rs          | 312 ++---------\n src/tools/product/worktree_cleanup/tests.rs        | 573 ++++++++++++++++++---\n 10 files changed, 1289 insertions(+), 365 deletions(-)\n create mode 100644 src/tools/product/worktree_cleanup/branch_retirement.rs",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "a57600e79ba47bd7dfa497b54b8fad954891cfe3"
+      },
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    }
+  ],
+  "status": "done",
+  "target_branch": "main",
+  "updated": "2026-08-15T10:04:00Z",
+  "workflow_revision": 50
+}

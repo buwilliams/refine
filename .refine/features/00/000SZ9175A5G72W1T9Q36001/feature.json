@@ -1,0 +1,11 @@
+{
+  "assignee": "Buddy Williams",
+  "created": "2026-07-27T15:17:38Z",
+  "description": "Implement docs/spec/ontology-spec.md end to end: add optional durable Architecture intent and repository-derived Governance proposals; derive a fresh Round-scoped plan model and seam-aligned plan for each implementation attempt; execute pinned steps deterministically with focused context, checkpoints, recovery, and evidence; and add semantic Governance and Review feedback. Preserve prose Rules, existing Quality and workflow authority, no-Architecture and legacy one-shot behavior, and the prohibition on a durable ontology graph or new public workflow states. Begin with a pre-registered efficacy gate and broaden rollout only when its quality, cost, and failure-shape thresholds pass. Goals 2–9 are contingent on Goal 1. Do not move or start them until a human Review records that the pre-registered quality, cost, and failure-shape thresholds passed. If the gate fails, retain the evidence and one-shot default, leave the remaining Goals unstarted, and revise or stop the Feature rather than treating Feature order as permission to continue.",
+  "id": "00000SZ9175A5G72W1T9Q36001",
+  "name": "Ontology-driven implementation planning",
+  "node_id": "default",
+  "reporter": "Buddy Williams",
+  "updated": "2026-07-27T15:39:49Z",
+  "workflow_revision": 2
+}

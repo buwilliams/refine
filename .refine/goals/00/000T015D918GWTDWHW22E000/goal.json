@@ -1,0 +1,359 @@
+{
+  "base_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+  "branch_name": "refine/00000T015D918GWTDWHW22E000/round-1",
+  "candidate_commit": "0ed09b369e1100c615e023a31368073377d9b70d",
+  "created": "2026-08-15T09:07:40Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000T015D918GWTDWHW22E000",
+  "name": "In the web UI, when switching between tabs (Agent tabs), the scrollbar is at the",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-15T09:07:40Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "In the web UI, when switching between tabs (Agent tabs), the scrollbar is at the top, which messes up terminal/agent UI. Switching tabs should automatically scroll to the bottom so that the correct text is rendered.",
+          "reporter": "Buddy Williams",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000T015D918GWTDWHW22E000",
+          "name": "In the web UI, when switching between tabs (Agent tabs), the scrollbar is at the",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-08-15T09:07:40Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "2026-08-15T09:26:50Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T015D918GWTDWHW22E000-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "guidance_checked": 2,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "No governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T015D918GWTDWHW22E000-round-1"
+      },
+      "governance_message": "No governance rule violations found.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-15T09:20:07Z",
+        "skipped": []
+      },
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+          "context_digest": "141f8b96e0d0c0f940b059a3f538102b9283eb6d19f6a18bbc565350428249f1",
+          "context_version": 1,
+          "goal_id": "00000T015D918GWTDWHW22E000",
+          "implementation_branch": "refine/00000T015D918GWTDWHW22E000/round-1",
+          "round_idx": 0,
+          "target_branch": "main"
+        },
+        "completed_at": "2026-08-15T09:20:07Z",
+        "criticism": {
+          "completed_at": "2026-08-15T09:10:08Z",
+          "git_after": {
+            "branch": "refine/00000T015D918GWTDWHW22E000/round-1",
+            "head_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T015D918GWTDWHW22E000/round-1",
+            "head_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P3"
+                ],
+                "description": "P3 omits the existing real Chromium xterm round-trip regression, which currently asserts that a returned Agent tab preserves its old viewport instead of scrolling to the bottom; a focused mock contract alone cannot prove the latest rows render after the retained renderer is reattached.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Update or add a real Chromium Agent-to-Agent tab-switch regression that uses the activation path and asserts viewportY equals baseY with the latest marker visible while renderer identity and scrollback remain retained."
+              }
+            ],
+            "summary": "The plan needs a real-browser tab-switch assertion to validate the changed xterm viewport contract."
+          },
+          "started_at": "2026-08-15T09:08:48Z"
+        },
+        "final_plan": {
+          "completed_at": "2026-08-15T09:11:11Z",
+          "git_after": {
+            "branch": "refine/00000T015D918GWTDWHW22E000/round-1",
+            "head_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T015D918GWTDWHW22E000/round-1",
+            "head_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Make genuine switches to a terminal-backed Agent tab scroll its retained xterm viewport to the bottom after the active renderer is reattached.",
+                "id": "P1"
+              },
+              {
+                "description": "Keep the forced scroll out of repeated activation, output delivery, lifecycle redraws, and resizing so deliberate user scrollback remains stable until the user leaves and returns to the tab.",
+                "id": "P2"
+              },
+              {
+                "description": "Revise the real Chromium Agent-to-Agent round-trip regression to assert retained renderer identity and scrollback, unchanged baseY, viewportY equal to baseY, and the latest marker visible after returning.",
+                "id": "P3"
+              },
+              {
+                "description": "Cover Agent, Plan, Goal, and Standalone profiles in the focused toolbar activation contract so every shared Agent terminal receives the same switch-only behavior.",
+                "id": "P4"
+              },
+              {
+                "description": "Update the toolbar intent page to record that reselecting an Agent-family terminal preserves its session and scrollback while presenting the latest output.",
+                "id": "P5"
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "P3 replaces the old preserved-viewport Chromium expectation with an activation-path round trip that proves the retained renderer presents the bottom viewport and latest marker."
+              }
+            ],
+            "summary": "The shared toolbar tab-activation path will move a retained Agent-family terminal viewport to its latest row after the renderer is remounted on an actual tab switch, so returning to an Agent shows the newest text while preserving its terminal instance and scrollback and leaving background output, resizing, and redraw behavior unchanged."
+          },
+          "started_at": "2026-08-15T09:10:08Z"
+        },
+        "implementation": {
+          "completed_at": "2026-08-15T09:20:07Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "activateToolbarTab records a genuine prior-tab change, draws/remounts the selected renderer, then calls scrollToBottom only for the retained Agent-family terminal.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "The focused toolbar contract proves output while scrolled up, lifecycle redraw, resize, and repeated activation leave forcedScrolls at 0; leaving and returning increments it exactly once and resumes bottom-following.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "The real Chromium Agent-to-Agent round trip uses the production activation path and asserts retained xterm identities and scrollback, unchanged baseY, viewportY equal to baseY, and FIRST-LATEST-MARKER visible after return.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "The focused switch-only contract loops over Agent, Plan, Goal, and Standalone profiles and verifies identical scroll behavior for each.",
+                "id": "P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "docs/intent/04-surfaces/03-browser/15-toolbar.md now states that returning to Agent-family terminals preserves session and scrollback while presenting latest output at the bottom.",
+                "id": "P5",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "node --test tests/web_supervisor_toolbar.test.js — 36 passed, 0 failed, 0 skipped",
+              "NODE_PATH=/home/buddy/projects/refine/node_modules node --test --test-name-pattern='Agent tab round trip' tests/web_screen_render.test.js — 1 passed, 0 failed, 0 skipped (real Playwright Chromium)",
+              "cargo test --lib surfaces::web_server::tests::static_surface::terminal -- --nocapture — 3 passed, 0 failed, 793 filtered out",
+              "node --check src/surfaces/web/static/js/features/toolbar.js && node --check tests/web_supervisor_toolbar.test.js && node --check tests/web_screen_render.test.js && git diff --check — passed with no output",
+              "NODE_PATH=/home/buddy/projects/refine/node_modules node --test tests/web_*.test.js — 209 passed, 4 failed, 0 skipped; the same four failures reproduced with the focused pattern in clean /home/buddy/projects/refine-next at HEAD 7556a231c381db58b7dc435b514cfb7c13d60d23",
+              "cargo fmt --check — failed on pre-existing formatting drift in unrelated Rust files; no Rust files were changed"
+            ]
+          },
+          "report": "Updated the shared toolbar activation path so genuine switches back to Agent, Plan, Goal, and Standalone terminals scroll the retained xterm viewport to its latest row after remount, without forcing scroll during repeated activation, output, redraw, or resize. Revised the focused toolbar and real Chromium round-trip regressions and documented the behavior. Verification: toolbar contract 36/36 passed; focused real Chromium regression 1/1 passed; Rust static-surface tests 3/3 passed; JS syntax and git diff checks passed. The full web suite passed 209/213; its four failures reproduced unchanged on clean main at the same HEAD. cargo fmt --check reports pre-existing formatting drift in unrelated Rust files.",
+          "started_at": "2026-08-15T09:11:11Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-15T09:11:11Z",
+        "proposal": {
+          "completed_at": "2026-08-15T09:08:48Z",
+          "git_after": {
+            "branch": "refine/00000T015D918GWTDWHW22E000/round-1",
+            "head_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T015D918GWTDWHW22E000/round-1",
+            "head_commit": "7556a231c381db58b7dc435b514cfb7c13d60d23",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Extend the shared toolbar tab-activation path to scroll the newly selected terminal-backed Agent tab to the bottom after its retained xterm renderer is reattached.",
+                "id": "P1"
+              },
+              {
+                "description": "Limit the forced scroll to genuine tab switches so repeated activation, terminal output, lifecycle redraws, and resizing continue to preserve deliberate user scrollback.",
+                "id": "P2"
+              },
+              {
+                "description": "Cover the shared Agent terminal profiles in the focused toolbar contract and update the affected browser toolbar or terminal intent text to record the tab-switch behavior.",
+                "id": "P3"
+              }
+            ],
+            "summary": "Agent-style terminal tabs will explicitly restore their xterm viewport to the bottom when the user switches to them, so the latest terminal or agent text renders correctly without changing how background output respects intentional scrollback."
+          },
+          "started_at": "2026-08-15T09:07:40Z"
+        },
+        "schema_version": 2,
+        "started_at": "2026-08-15T09:07:40Z",
+        "state": "completed",
+        "updated_at": "2026-08-15T09:20:07Z"
+      },
+      "implementation_report": "Updated the shared toolbar activation path so genuine switches back to Agent, Plan, Goal, and Standalone terminals scroll the retained xterm viewport to its latest row after remount, without forcing scroll during repeated activation, output, redraw, or resize. Revised the focused toolbar and real Chromium round-trip regressions and documented the behavior. Verification: toolbar contract 36/36 passed; focused real Chromium regression 1/1 passed; Rust static-surface tests 3/3 passed; JS syntax and git diff checks passed. The full web suite passed 209/213; its four failures reproduced unchanged on clean main at the same HEAD. cargo fmt --check reports pre-existing formatting drift in unrelated Rust files.",
+      "implementation_reported_at": "2026-08-15T09:20:07Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "In the web UI, when switching between tabs (Agent tabs), the scrollbar is at the top, which messes up terminal/agent UI. Switching tabs should automatically scroll to the bottom so that the correct text is rendered.",
+      "quality_agent_report": "Quality review found no defects requiring correction. Candidate commit 0ed09b369e1100c615e023a31368073377d9b70d scrolls retained Agent-family xterms to bottom only after a genuine tab switch/remount, preserves renderer identity and scrollback, updates focused deterministic and Chromium regressions, and records the surface intent. Verification passed: toolbar contract 36/36; full web suite 187 passed, 26 Chromium-dependent skipped, 0 failed (213 total); Rust static-toolbar contracts 3/3; JavaScript syntax and diff whitespace checks passed. The focused Chromium regression was selected but skipped because no Playwright Chromium build is currently available.",
+      "quality_candidate_commit": "0ed09b369e1100c615e023a31368073377d9b70d",
+      "quality_checked_at": "2026-08-15T09:25:19Z",
+      "quality_details": {
+        "candidate_commit": "0ed09b369e1100c615e023a31368073377d9b70d",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T015D918GWTDWHW22E000-round-1",
+        "diagnostics": [
+          "{\"ok\":true,\"summary\":\"Candidate satisfies the Goal and toolbar intent contract; no focused uncertainty remains.\",\"results\":[{\"test\":\"The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\",\"status\":\"passed\",\"evidence\":\"Exit 0. Toolbar tests: 36 passed; real Chromium round-trip: 1 passed with 0 skipped; Rust static-surface tests: 3 passed; JavaScript syntax, commit whitespace, and clean-worktree gates passed.\",\"command\":\"set -o pipefail\\nnode --test tests/web_supervisor_toolbar.test.js && NODE_PATH=/home/buddy/projects/refine/node_modules node --test --test-name-pattern='Agent tab round trip' tests/web_screen_render.test.js && cargo test --lib surfaces::web_server::tests::static_surface::terminal -- --nocapture && node --check src/surfaces/web/static/js/features/toolbar.js && node --check tests/web_supervisor_toolbar.test.js && node --check tests/web_screen_render.test.js && git diff --check HEAD^ HEAD && test \\\"$(git status --porcelain | wc -l)\\\" -eq 0\"}]}",
+          "Observed supervised process proc-1786785913890-1084-150 exited 0. stdout:  a stopped terminal tab starts it once (2.189234ms)\n✔ terminal columns refit when its rendered width changes (102.659915ms)\n✔ terminal resize falls back when xterm renderer dimensions are unavailable (102.720869ms)\n✔ terminal output and exit events remain scoped to their tab (1.745187ms)\n✔ terminal output decodes transported ANSI escapes without changing ordinary text (1.301434ms)\n✔ a failed Goal opens an independent diagnostic Agent and can restart it (1.276495ms)\n✔ Goal Agent opens on the latest transcript tail while earlier context loads in the background (1.994864ms)\n✔ stored custom-chat ids are discarded while managed terminal ids reattach (1.785812ms)\n✔ refresh preserves and independently reattaches every explicitly opened Agent (5.054442ms)\n✔ a fresh app session ignores toolbar tabs from an earlier app session (1.273282ms)\n✔ refresh reattaches a live terminal and stream errors do not persist process exit (5.11458ms)\n✔ switching projects stops live terminal profiles before clearing the toolbar (3.244774ms)\n✔ closing a Goal Agent tab stops it through the workflow-aware backend path (2.158337ms)\n✔ process-manager Agent Stop removes any attached toolbar tab locally (1.809165ms)\nℹ tests 36\nℹ suites 0\nℹ pass 36\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 4170.351477\n✔ Agent tab round trip retains xterm and scrollback while returning to latest output (536.86078ms)\nℹ tests 1\nℹ suites 0\nℹ pass 1\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 874.144888\n\nrunning 3 tests\ntest surfaces::web_server::tests::static_surface::terminal::static_goal_log_tail_uses_toolbar_and_shared_sse_activity ... ok\ntest surfaces::web_server::tests::static_surface::terminal::static_plan_mode_uses_managed_terminal_with_initial_context ... ok\ntest surfaces::web_server::tests::static_surface::terminal::static_toolbar_is_lazy_multi_agent_and_uses_shared_managed_terminal ... ok\n\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 793 filtered out; finished in 0.00s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)"
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "1a004bb27a343c6",
+        "results": [
+          {
+            "command": "set -o pipefail\nnode --test tests/web_supervisor_toolbar.test.js && NODE_PATH=/home/buddy/projects/refine/node_modules node --test --test-name-pattern='Agent tab round trip' tests/web_screen_render.test.js && cargo test --lib surfaces::web_server::tests::static_surface::terminal -- --nocapture && node --check src/surfaces/web/static/js/features/toolbar.js && node --check tests/web_supervisor_toolbar.test.js && node --check tests/web_screen_render.test.js && git diff --check HEAD^ HEAD && test \"$(git status --porcelain | wc -l)\" -eq 0",
+            "evidence": "Observed supervised process proc-1786785913890-1084-150 exited 0. stdout:  a stopped terminal tab starts it once (2.189234ms)\n✔ terminal columns refit when its rendered width changes (102.659915ms)\n✔ terminal resize falls back when xterm renderer dimensions are unavailable (102.720869ms)\n✔ terminal output and exit events remain scoped to their tab (1.745187ms)\n✔ terminal output decodes transported ANSI escapes without changing ordinary text (1.301434ms)\n✔ a failed Goal opens an independent diagnostic Agent and can restart it (1.276495ms)\n✔ Goal Agent opens on the latest transcript tail while earlier context loads in the background (1.994864ms)\n✔ stored custom-chat ids are discarded while managed terminal ids reattach (1.785812ms)\n✔ refresh preserves and independently reattaches every explicitly opened Agent (5.054442ms)\n✔ a fresh app session ignores toolbar tabs from an earlier app session (1.273282ms)\n✔ refresh reattaches a live terminal and stream errors do not persist process exit (5.11458ms)\n✔ switching projects stops live terminal profiles before clearing the toolbar (3.244774ms)\n✔ closing a Goal Agent tab stops it through the workflow-aware backend path (2.158337ms)\n✔ process-manager Agent Stop removes any attached toolbar tab locally (1.809165ms)\nℹ tests 36\nℹ suites 0\nℹ pass 36\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 4170.351477\n✔ Agent tab round trip retains xterm and scrollback while returning to latest output (536.86078ms)\nℹ tests 1\nℹ suites 0\nℹ pass 1\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 874.144888\n\nrunning 3 tests\ntest surfaces::web_server::tests::static_surface::terminal::static_goal_log_tail_uses_toolbar_and_shared_sse_activity ... ok\ntest surfaces::web_server::tests::static_surface::terminal::static_plan_mode_uses_managed_terminal_with_initial_context ... ok\ntest surfaces::web_server::tests::static_surface::terminal::static_toolbar_is_lazy_multi_agent_and_uses_shared_managed_terminal ... ok\n\ntest result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 793 filtered out; finished in 0.00s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e) Agent report: Exit 0. Toolbar tests: 36 passed; real Chromium round-trip: 1 passed with 0 skipped; Rust static-surface tests: 3 passed; JavaScript syntax, commit whitespace, and clean-worktree gates passed.",
+            "exit_code": 0,
+            "process_id": "proc-1786785913890-1084-150",
+            "status": "passed",
+            "test": "The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks."
+          }
+        ],
+        "source_candidate_commit": "0ed09b369e1100c615e023a31368073377d9b70d"
+      },
+      "quality_message": "All Quality tests passed with observed supervised evidence.",
+      "quality_state": "passed",
+      "reporter": "Buddy Williams",
+      "rule_state": "passed",
+      "updated": "2026-08-15T09:26:53Z",
+      "workflow_attempt_authority": null,
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "0ed09b369e1100c615e023a31368073377d9b70d",
+        "integrated_at": "2026-08-15T09:26:53.784750799+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n docs/intent/04-surfaces/03-browser/15-toolbar.md |  2 +\n src/surfaces/web/static/js/features/toolbar.js   | 12 +++++-\n tests/web_screen_render.test.js                  | 47 +++++++++++++++++-------\n tests/web_supervisor_toolbar.test.js             | 19 +++++++---\n 4 files changed, 60 insertions(+), 20 deletions(-)",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "def8ad8fe6cdcd0c1377dac9595f697da95c92c5"
+      },
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    }
+  ],
+  "status": "done",
+  "target_branch": "main",
+  "updated": "2026-08-15T09:44:44Z",
+  "workflow_revision": 28
+}

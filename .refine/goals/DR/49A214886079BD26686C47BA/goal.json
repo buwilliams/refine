@@ -1,0 +1,1350 @@
+{
+  "base_commit": "ed991b037d5287ae78b07a01c2260a9d4d46b2de",
+  "branch_name": "refine/DR49A214886079BD26686C47BA/round-4",
+  "candidate_commit": "e43bb949bef03a2611716c2b4db29d494f144be1",
+  "created": "2026-08-11T12:54:26Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "DR49A214886079BD26686C47BA",
+  "name": "Unify web active-node resolution",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "agent_context": null,
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-08-11T12:54:28Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "guidance_decision": null,
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Implement and verify this Goal.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-08-11T13:07:54Z",
+      "workflow_git_remote": "origin",
+      "workflow_quality_timing": "pre_merge",
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-11T12:54:32Z",
+        "current_round": {
+          "assignee": "Refine",
+          "prompt": "Implement and verify this Goal.",
+          "reporter": "Refine",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "buddy.williams@insurity.com",
+          "id": "DR49A214886079BD26686C47BA",
+          "name": "Unify web active-node resolution",
+          "node_id": "default",
+          "priority": "medium",
+          "reporter": "buddy.williams@insurity.com"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Run agents, Git, quality, lifecycle, and long work through the supervised process substrate, with explicit ownership, status, logs, cancellation, failures, and recovery. When activating a new Refine build requires replacing or restarting that supervisor, a restart-safe handoff may run outside it and independently complete the upgrade. The handoff must retain durable, operation-correlated ownership and state, visible progress and failures, and restart, rollback, and recovery reconciliation.",
+              "updated": "2026-08-06T20:32:30Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-08-11T12:54:28Z",
+      "failure_at": "2026-08-11T13:08:04Z",
+      "failure_category": "merge",
+      "failure_message": "Goal DR49A214886079BD26686C47BA round changed before Ready Merge integration",
+      "governance_checked_at": "2026-08-11T13:07:49Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR49A214886079BD26686C47BA-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 9,
+        "verdict": {
+          "message": "No governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR49A214886079BD26686C47BA-round-1"
+      },
+      "governance_message": "No governance rule violations found.",
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-11T13:06:12Z",
+        "skipped": []
+      },
+      "implementation_report": "Separated shared app-registry storage from port-scoped active-node selection so /api/project/status matches /api/nodes and new Goal ownership; added server, DOM, and Playwright regression coverage. Verification: cargo test passed (758 passed, 6 ignored); node --test tests/*.test.js passed (130 passed, 21 skipped because no Playwright Chromium build is available); focused --lib regression passed 1/1; project-registry tests passed 6/6; cargo fmt -- --check and git diff --check passed. One initial filtered cargo test exited 2 because tests/test_all.rs rejects ordinary name filters after the target lib test passed; the supported --lib rerun passed.",
+      "implementation_reported_at": "2026-08-11T13:06:10Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Fix the web UI page title and navigation node label so they resolve the active node from the same authoritative port-scoped runtime root used by node activation, /api/nodes, dashboard scoping, and goal ownership. Keep the project attachment registry at the base root if required, but ensure /api/project/status derives active_node and active_node_id from the port-root node registry rather than stale <base>/active-node.json. Add regression coverage for differing base-root and port-root selections, verifying that /api/project/status matches /api/nodes after activation and never reports the stale base-root node; verify the browser title and navigation label reflect the active node that owns newly created goals.",
+      "quality_checked_at": "2026-08-11T13:07:58Z",
+      "quality_details": {
+        "candidate_commit": "5e7723d39d18b385694db4e157e8742443681e11",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR49A214886079BD26686C47BA-round-1",
+        "diagnostics": [
+          "No Quality tests or migrated commands are configured; evaluation was a no-op."
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "19ff0efd97545a4",
+        "results": [],
+        "source_candidate_commit": "5e7723d39d18b385694db4e157e8742443681e11"
+      },
+      "quality_message": "No Quality tests configured.",
+      "quality_state": "passed",
+      "reporter": "Buddy Williams",
+      "rule_state": "passed",
+      "updated": "2026-08-11T13:08:05Z",
+      "workflow_quality_timing": null,
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-12T13:32:28Z",
+        "current_round": {
+          "assignee": "buddy.williams@insurity.com",
+          "prompt": "Recover the verified active-node candidate through a fresh round from current main while preserving the original Ready Merge failure, branch, commit 5e7723d39d18b385694db4e157e8742443681e11, logs, and round-ownership evidence. The prior candidate was not rejected for code quality: Governance passed, configured Quality was a no-op, recorded Rust and Node tests passed, and Ready Merge correctly failed closed because automation owned round index 0 while the durable Goal gained a second round during multi-step email authoring.\n\nReuse or replay the candidate change onto the new workflow-owned branch as appropriate. Preserve the shared app-registry root for attachment storage while using the port-scoped runtime root as the authoritative active-node selection for /api/project/status, /api/nodes, browser title/nav labeling, dashboard scoping, and new Goal ownership. Do not weaken, bypass, or special-case the Ready Merge round-count/revision fence, and do not directly merge the preserved candidate through its inconsistent record.\n\nRe-check the patch against current main and resolve only genuine drift. Run the focused server regression with differing stale base-root and active port-root selections, project-registry tests, DOM/static coverage, full relevant Rust and Node suites, formatting, and git diff --check. Run Playwright coverage when Chromium is available; otherwise report it as skipped. Confirm the new round remains the workflow-owned round through candidate creation and Ready Merge preparation. Do not approve, merge, rewrite prior history, delete retained evidence, or directly edit durable Goal state.",
+          "reporter": "buddy.williams@insurity.com",
+          "round": 3
+        },
+        "goal": {
+          "assignee": "buddy.williams@insurity.com",
+          "id": "DR49A214886079BD26686C47BA",
+          "name": "Unify web active-node resolution",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "buddy.williams@insurity.com"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "Refine",
+            "prompt": "Implement and verify this Goal.",
+            "reporter": "Refine",
+            "round": 1
+          },
+          {
+            "assignee": "buddy.williams@insurity.com",
+            "constitution_state": "passed",
+            "governance_checked_at": "2026-08-11T13:07:49Z",
+            "governance_details": {
+              "configured": true,
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR49A214886079BD26686C47BA-round-1",
+              "failed_actions": [],
+              "governance_configured": true,
+              "phase": "post_implementation",
+              "provider": "codex",
+              "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found.\",\"violations\":[]}",
+              "rules_checked": 9,
+              "verdict": {
+                "message": "No governance rule violations found.",
+                "status": "passed",
+                "violations": []
+              },
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR49A214886079BD26686C47BA-round-1"
+            },
+            "governance_message": "No governance rule violations found.",
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                },
+                {
+                  "enabled": true,
+                  "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+                  "name": "Cohesive code files",
+                  "rule": "Apply whenever an agent adds or changes code files in any language."
+                }
+              ],
+              "code_files_changed": true,
+              "context_version": 1,
+              "recorded_at": "2026-08-11T13:06:12Z",
+              "skipped": []
+            },
+            "implementation_report": "Separated shared app-registry storage from port-scoped active-node selection so /api/project/status matches /api/nodes and new Goal ownership; added server, DOM, and Playwright regression coverage. Verification: cargo test passed (758 passed, 6 ignored); node --test tests/*.test.js passed (130 passed, 21 skipped because no Playwright Chromium build is available); focused --lib regression passed 1/1; project-registry tests passed 6/6; cargo fmt -- --check and git diff --check passed. One initial filtered cargo test exited 2 because tests/test_all.rs rejects ordinary name filters after the target lib test passed; the supported --lib rerun passed.",
+            "implementation_reported_at": "2026-08-11T13:06:10Z",
+            "meta_rule_state": "passed",
+            "product_state": "passed",
+            "prompt": "Fix the web UI page title and navigation node label so they resolve the active node from the same authoritative port-scoped runtime root used by node activation, /api/nodes, dashboard scoping, and goal ownership. Keep the project attachment registry at the base root if required, but ensure /api/project/status derives active_node and active_node_id from the port-root node registry rather than stale <base>/active-node.json. Add regression coverage for differing base-root and port-root selections, verifying that /api/project/status matches /api/nodes after activation and never reports the stale base-root node; verify the browser title and navigation label reflect the active node that owns newly created goals.",
+            "quality_checked_at": "2026-08-11T13:07:58Z",
+            "quality_details": {
+              "candidate_commit": "5e7723d39d18b385694db4e157e8742443681e11",
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR49A214886079BD26686C47BA-round-1",
+              "diagnostics": [
+                "No Quality tests or migrated commands are configured; evaluation was a no-op."
+              ],
+              "evaluation_scope": "isolated_candidate",
+              "operation_id": "19ff0efd97545a4",
+              "results": [],
+              "source_candidate_commit": "5e7723d39d18b385694db4e157e8742443681e11"
+            },
+            "quality_message": "No Quality tests configured.",
+            "quality_state": "passed",
+            "reporter": "buddy.williams@insurity.com",
+            "round": 2,
+            "rule_state": "passed"
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-08-12T13:32:07Z",
+      "failure_at": "2026-08-12T13:45:03Z",
+      "failure_category": "implementation_planning",
+      "failure_message": "agent returned no valid structured implementation plan JSON",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "guidance_decision": null,
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+          "context_digest": "63715dea6aebd52698d2f33f4fc95105fb2738846fff7747434906ba6f7d3ce3",
+          "context_version": 1,
+          "goal_id": "DR49A214886079BD26686C47BA",
+          "implementation_branch": "refine/DR49A214886079BD26686C47BA/round-3",
+          "round_idx": 2,
+          "target_branch": "main"
+        },
+        "criticism": {
+          "completed_at": "2026-08-12T13:41:38Z",
+          "git_after": {
+            "branch": "refine/DR49A214886079BD26686C47BA/round-3",
+            "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR49A214886079BD26686C47BA/round-3",
+            "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P1",
+                  "P2"
+                ],
+                "description": "The proposed fixed five-file replay changes FileProjectRegistryService to carry two roots but runs only the existing project-registry tests, whose service uses one runtime root for both attachment storage and active-node selection. The server regression exercises status through web wiring, but it does not directly protect the shared capability's claimed attach, switch, clone, inspect, detach, and restart status behavior when registry_root and active_node_root differ. Current main has already moved project-registry tests into src/tools/product/project_registry/tests.rs, so treating the original five-file scope as an invariant omits the natural capability-boundary regression after drift.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Keep P1-P2 stable but revise their scope to allow the current-main project_registry/tests.rs file. Adapt or extend project_status_uses_authoritative_identity_across_attach_switch_and_restart to use a shared registry root with a stale selection plus a distinct active-node root, assert apps.json remains only at the registry root, and verify returned ProjectStatus identities across the relevant status-producing operations and restart. Continue to keep migration and supervised-process storage on runtime_root."
+              },
+              {
+                "checklist_item_ids": [
+                  "P3"
+                ],
+                "description": "P3 says it proves /api/dashboard?node=current is scoped to the port owner, but its listed evidence only checks active_node_id. That can pass even if the dashboard counts or rows are unfiltered or filtered using another identity. The planned fixture creates only the port-owned Goal after activation, so there is no differently owned Goal whose exclusion could demonstrate current-node scoping under the stale-base versus port-root split.",
+                "id": "C2",
+                "material": true,
+                "recommendation": "Within P3, create at least one non-port-owned Goal before port activation and one port-owned Goal afterward, then assert /api/dashboard?node=current reports port-owner and counts only the port-owned Goal while node=all includes both. Keep the stale base-root selection and also compare GET /api/project/status with GET /api/nodes."
+              },
+              {
+                "checklist_item_ids": [
+                  "P5"
+                ],
+                "description": "P5's pre-signal jq reads only static Goal fields, despite claiming a Goal/process ownership check, and its final verification requires evidence produced after Refine receives the implementation signal. Current workflow ordering records implementation evidence first, then Refine commits, sets candidate_commit, publishes, runs Quality, enters Ready Merge, and acquires the lane. The implementation agent therefore cannot honestly mark P5 completed based on candidate-creation and Ready Merge events that do not exist until after it exits. The live process record does contain goal_id, round_idx, phase, worktree branch/path, operation_id, and observational/implementation ownership metadata, but the plan does not require correlating it.",
+                "id": "C3",
+                "material": true,
+                "recommendation": "Keep P5 stable but divide its evidence by owner: require the implementation agent immediately before signaling to correlate the live goal-agent process metadata with the Goal's round_idx 2 plan binding, branch, worktree, base, status, and current round count. State separately that Refine's workflow must fail closed unless its post-signal commit, candidate publication, Quality, Ready Merge, and exclusive-lane logs remain attributed to round_idx 2 and the same workflow execution/claim context. Do not require the implementation agent's governed checklist evidence to claim those future workflow events."
+              }
+            ],
+            "summary": "The recovery approach and architecture are sound, but the plan needs three material verification corrections before implementation: test the new root split directly in the shared capability, prove dashboard filtering rather than only its active-node label, and separate agent-verifiable pre-handoff ownership from workflow-verifiable post-handoff candidate and Ready Merge evidence."
+          },
+          "started_at": "2026-08-12T13:37:19Z"
+        },
+        "failure": {
+          "category": "invalid_output",
+          "failed_at": "2026-08-12T13:45:01Z",
+          "git_after": {
+            "branch": "refine/DR49A214886079BD26686C47BA/round-3",
+            "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR49A214886079BD26686C47BA/round-3",
+            "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+            "status_porcelain": []
+          },
+          "message": "agent returned no valid structured implementation plan JSON",
+          "phase": "revise"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-08-12T13:41:39Z",
+        "proposal": {
+          "completed_at": "2026-08-12T13:37:17Z",
+          "git_after": {
+            "branch": "refine/DR49A214886079BD26686C47BA/round-3",
+            "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR49A214886079BD26686C47BA/round-3",
+            "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "affected_behavior": [
+                  "Round-3 recovery provenance and reviewability",
+                  "Current-main compatibility of the preserved candidate",
+                  "Ready Merge round-count and revision fencing remains unchanged",
+                  "Existing docs/intent contract remains the durable product context"
+                ],
+                "description": "Preserve the recovery and governance boundary while replaying only the prior candidate's behavior onto round 3: compare commit 5e7723d39d18b385694db4e157e8742443681e11 with current main, semantically apply its five-file capability/test patch, resolve the moved project_runtime test insertion point, and leave the old branch, commit, logs, durable Goal history, Ready Merge fence, and prior failure untouched. Do not edit docs/intent because the current Node, Target App, surface, nav, API, Dashboard, and Ready Merge intent already specifies runtime-local active-node authority, shared capability semantics, visible node context, and fail-closed integration.",
+                "governance_rationale": "Guidance 0 requires recovery through current main without bypassing Git/workflow authority and only affected intent updates; this is a conformance fix to already-current intent, so source replay is scoped to the original capability/surface files and no Ready Merge or durable-state code is changed. Guidance 1 requires reviewing file cohesion rather than splitting mechanically; the replay keeps capability ownership in project_registry, web wiring in runtime, focused server coverage in project_runtime, a small dedicated VM test, and browser-render coverage in the existing cohesive smoke suite.",
+                "id": "P1",
+                "verification": [
+                  "git diff --name-status main -- src/surfaces/web_server/runtime.rs src/surfaces/web_server/tests/project_runtime.rs src/tools/product/project_registry/mod.rs tests/web_active_node_label.test.js tests/web_screen_render.test.js shows the intended five-file scope",
+                  "git diff -- src/tools/product/merging/mod.rs docs/intent is empty",
+                  "git show -s --format=%H refs/heads/refine/DR49A214886079BD26686C47BA/round-1 and git show -s --format=%H refs/remotes/origin/refine/DR49A214886079BD26686C47BA/round-1 both return 5e7723d39d18b385694db4e157e8742443681e11",
+                  "git merge-base --is-ancestor 5e7723d39d18b385694db4e157e8742443681e11 main exits 1 before governed round-3 integration"
+                ]
+              },
+              {
+                "affected_behavior": [
+                  "FileProjectRegistryService attachment persistence",
+                  "Active Node identity returned by /api/project/status and related app/project status mutations",
+                  "Attach, switch, create, clone, detach, inspect, and restart status consistency",
+                  "Flat-file apps.json location remains the shared app-registry root"
+                ],
+                "description": "Restore the shared project-registry capability split in src/tools/product/project_registry: retain runtime_root as the durable shared app-registry, migration, and supervised-process root; add an active_node_root that defaults to runtime_root for compatibility and can be overridden; and use only active_node_root when every attached/detached ProjectStatus response resolves active Node identity. Keep flat-file formats and the public ProjectStatus contract unchanged.",
+                "governance_rationale": "The correction stays in the existing tools/product shared capability, preserves Rust flat-file persistence and API shape, adds no new architectural concept, and substitutes the authoritative root without extra I/O or a new cache. The project_registry module remains cohesive around app registration and ProjectStatus construction; its existing tests already live in a focused submodule.",
+                "id": "P2",
+                "verification": [
+                  "cargo test --lib tools::product::project_registry::tests -- --nocapture -> all project-registry tests pass",
+                  "Focused server regression asserts app_registry_root/apps.json exists and port_runtime_root/apps.json does not",
+                  "git diff verifies migration/process operations still use runtime_root while active_node_status receives active_node_root"
+                ]
+              },
+              {
+                "affected_behavior": [
+                  "/api/project/status active_node and active_node_id",
+                  "/api/nodes activation and readback consistency",
+                  "/api/dashboard current-Node scoping",
+                  "New Goal node ownership",
+                  "Shared app attachment registry location"
+                ],
+                "description": "Wire InProcessWebServer::project_registry_service to construct FileProjectRegistryService with the shared app_registry_runtime_root for attachments and the port-scoped runtime_root for active-node selection, falling back to the registry root only when no port root exists. Reintroduce the focused server regression in its current-main location with a stale base-root selection and a different port-root activation; explicitly compare GET /api/project/status with GET /api/nodes, assert GET /api/dashboard?node=current scopes to the port owner, reject the stale base identity, and prove POST /api/goals assigns the port-owner Node.",
+                "governance_rationale": "The web server remains a thin surface adapter over the existing project-registry and node-registry services; Node IDs remain authoritative ownership keys and display names remain labels. The focused regression exercises shared semantics at the API boundary without adding page-specific capability logic.",
+                "id": "P3",
+                "verification": [
+                  "cargo test --lib surfaces::web_server::tests::project_runtime::project_status_uses_the_port_scoped_node_that_owns_new_goals -- --exact -> 1 focused regression passes",
+                  "Regression evidence shows /api/project/status and /api/nodes both return port-owner/Port Owner, /api/dashboard?node=current reports active_node_id port-owner, stale-base/Stale Base Node is never reported, and the created Goal has node_id port-owner"
+                ]
+              },
+              {
+                "affected_behavior": [
+                  "Browser document title",
+                  "Top navigation active-node label and tooltip",
+                  "Goals table Node label",
+                  "Browser use of /api/project/status as authoritative shell context"
+                ],
+                "description": "Restore browser contract coverage without duplicating production logic: add the focused Node VM test proving authoritative project status drives the page title and nav label for the Node that owns a newly created Goal, and add the real-browser render regression to the established web_screen_render suite so title, topbar label, and Goals-table Node label agree. Production common.js already derives these labels from state.project, so change it only if current-main verification exposes genuine drift.",
+                "governance_rationale": "The browser remains a thin adapter over the API ProjectStatus contract. A small dedicated VM contract test is cohesive, while the Playwright case belongs in the existing intrinsically cohesive real-browser render smoke suite despite that suite's size; no arbitrary include shard or unrelated refactor is warranted.",
+                "id": "P4",
+                "verification": [
+                  "node --test tests/web_active_node_label.test.js -> focused non-browser DOM/static contract passes",
+                  "node --test tests/web_screen_render.test.js -> Playwright render cases pass when Chromium is found; otherwise cases are reported skipped with reason no Playwright chromium build is available",
+                  "Browser regression asserts document title Port Owner - refine, #active-node-label Port Owner, .goals-node-cell Port Owner, and no page errors"
+                ]
+              },
+              {
+                "affected_behavior": [
+                  "Full Rust and Node regression safety",
+                  "Formatting and patch hygiene",
+                  "Round-3 candidate attribution",
+                  "Ready Merge preparation ownership and stale-worker rejection",
+                  "Preservation of prior candidate and audit evidence"
+                ],
+                "description": "Run the complete relevant verification matrix, inspect the final patch, and preserve workflow ownership during handoff. Before signaling implementation completion, read back the Goal/process binding as round_idx 2 on round-3 and verify no fourth round or external revision change appeared. Let Refine create and publish the candidate; Ready Merge preparation must then record the new candidate, Quality timing/status, and integration-lane preparation against round_idx 2 before any Git integration. If that ownership readback changes, fail closed and preserve the work rather than weakening or bypassing the fence.",
+                "governance_rationale": "This supplies deterministic evidence for the shared capability and surfaces while honoring the workflow-owned commit/integration boundary. It preserves the Constitution's recoverable Git/process behavior, Governance and Quality evaluation, and manual Review boundary; the implementation agent does not commit, approve, merge, rewrite history, or mutate durable Goal state directly.",
+                "id": "P5",
+                "verification": [
+                  "cargo test -> default full relevant Rust unit suite exits 0 with exact passed/ignored counts reported",
+                  "node --test tests/*.test.js -> full Node suite exits 0 with exact passed/failed/skipped counts reported",
+                  "cargo fmt -- --check -> exit 0",
+                  "git diff --check -> exit 0",
+                  "git status --short --branch and git diff --stat -> reviewable round-3 branch with only owned files changed before workflow commit",
+                  "jq -e '.status == \"in-progress\" and (.rounds | length) == 3 and .branch_name == \"refine/DR49A214886079BD26686C47BA/round-3\" and .base_commit == \"64c01b1bc8eea27f2fb6772a8dd5bca68d93c842\" and .rounds[2].implementation_plan.binding.round_idx == 2' /home/buddy/projects/refine-next/.git/refine-live-state/goals/DR/49A214886079BD26686C47BA/goal.json -> true immediately before implementation signal",
+                  "After workflow candidate creation and Ready Merge preparation, jq/rg readback of goal.json and runtime Goal logs shows candidate_commit on round-3 and the commit, publish, Quality timing/status, ready-merge, and exclusive-lane events attributed to round_idx 2; absence or mismatched round attribution blocks integration",
+                  "git show -s 5e7723d39d18b385694db4e157e8742443681e11 and round-1 branch/remote/log readback still succeeds after round-3 candidate preparation"
+                ]
+              }
+            ],
+            "criticism_resolutions": [],
+            "summary": "Semantically replay the verified active-node candidate onto the clean round-3 branch at current main, resolving only the moved server-test insertion context. Keep shared app attachment storage at the app-registry root while making the port runtime root the single active-node selection authority used by project status and the already port-scoped nodes, dashboard, browser, and Goal-authoring paths. Preserve all prior evidence and the fail-closed Ready Merge fence, add current-main regression assertions including dashboard scoping, and hand the uncommitted verified patch back to workflow for governed candidate creation and integration."
+          },
+          "started_at": "2026-08-12T13:32:31Z"
+        },
+        "schema_version": 2,
+        "started_at": "2026-08-12T13:32:30Z",
+        "state": "failed",
+        "updated_at": "2026-08-12T13:45:01Z"
+      },
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Recover the verified active-node candidate through a fresh round from current main while preserving the original Ready Merge failure, branch, commit 5e7723d39d18b385694db4e157e8742443681e11, logs, and round-ownership evidence. The prior candidate was not rejected for code quality: Governance passed, configured Quality was a no-op, recorded Rust and Node tests passed, and Ready Merge correctly failed closed because automation owned round index 0 while the durable Goal gained a second round during multi-step email authoring.\n\nReuse or replay the candidate change onto the new workflow-owned branch as appropriate. Preserve the shared app-registry root for attachment storage while using the port-scoped runtime root as the authoritative active-node selection for /api/project/status, /api/nodes, browser title/nav labeling, dashboard scoping, and new Goal ownership. Do not weaken, bypass, or special-case the Ready Merge round-count/revision fence, and do not directly merge the preserved candidate through its inconsistent record.\n\nRe-check the patch against current main and resolve only genuine drift. Run the focused server regression with differing stale base-root and active port-root selections, project-registry tests, DOM/static coverage, full relevant Rust and Node suites, formatting, and git diff --check. Run Playwright coverage when Chromium is available; otherwise report it as skipped. Confirm the new round remains the workflow-owned round through candidate creation and Ready Merge preparation. Do not approve, merge, rewrite prior history, delete retained evidence, or directly edit durable Goal state.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-08-12T13:45:03Z",
+      "workflow_quality_timing": null,
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-12T17:40:09Z",
+        "current_round": {
+          "assignee": "buddy.williams@insurity.com",
+          "prompt": "Recover the Round 3 implementation-planning failure from current main while preserving its complete proposal, criticism, invalid revise output, clean worktree evidence, and all earlier Goal/Git history. Round 3 produced no candidate. Preserve verified candidate 5e7723d39d18b385694db4e157e8742443681e11 and the original Ready Merge round-ownership failure; do not weaken or bypass the round/revision fence.\n\nUse the accepted Round 3 architecture, explicitly resolve all three recorded criticism findings in a valid structured plan, then implement:\n- Keep shared attachment/app-registry persistence at the shared registry root, while active-node selection comes from the port-scoped runtime root. Extend the current-main shared capability tests in src/tools/product/project_registry/tests.rs (do not enforce an obsolete five-file limit) with distinct roots: stale shared-root selection plus authoritative port-root selection. Prove apps.json remains only at the registry root and attach, switch, clone, inspect, detach, status, and restart responses consistently use the active-node root while migration and supervised-process storage remain on the registry/runtime storage root.\n- In the web/API regression, create a differently owned Goal before port activation and a port-owned Goal afterward. Prove /api/project/status and /api/nodes agree on the port owner; /api/dashboard?node=current identifies the port owner and its counts/rows exclude the other Goal; node=all includes both; and new Goal ownership, browser title/nav label, and Goals table label use the port owner rather than the stale shared-root selection.\n- Divide evidence by owner. Immediately before implementation completion, the agent must correlate the live goal-agent process metadata—goal_id, round_idx 3, operation/execution identity, branch, worktree, phase—with the Goal plan binding, current round count 4, base, and status. Do not claim post-signal events. Separately, Refine must fail closed unless its later commit, candidate publication, Quality, Ready Merge, and exclusive-lane events remain attributed to this same round and workflow context.\n\nSemantically replay only the valid active-node behavior onto current main and resolve genuine drift. Keep browser and server surfaces thin, preserve the shared capability boundary and prior refs/logs, and do not edit Ready Merge fencing. Run focused shared-capability, project-runtime, dashboard filtering, DOM/static, and browser tests; full relevant Rust/Node suites; formatting; and git diff checks. Missing Playwright Chromium is a skip. Do not approve, merge, rewrite history, delete retained evidence, or directly edit durable Goal state.",
+          "reporter": "buddy.williams@insurity.com",
+          "round": 4
+        },
+        "goal": {
+          "assignee": "buddy.williams@insurity.com",
+          "id": "DR49A214886079BD26686C47BA",
+          "name": "Unify web active-node resolution",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "buddy.williams@insurity.com"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "Refine",
+            "prompt": "Implement and verify this Goal.",
+            "reporter": "Refine",
+            "round": 1
+          },
+          {
+            "assignee": "buddy.williams@insurity.com",
+            "constitution_state": "passed",
+            "governance_checked_at": "2026-08-11T13:07:49Z",
+            "governance_details": {
+              "configured": true,
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR49A214886079BD26686C47BA-round-1",
+              "failed_actions": [],
+              "governance_configured": true,
+              "phase": "post_implementation",
+              "provider": "codex",
+              "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found.\",\"violations\":[]}",
+              "rules_checked": 9,
+              "verdict": {
+                "message": "No governance rule violations found.",
+                "status": "passed",
+                "violations": []
+              },
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR49A214886079BD26686C47BA-round-1"
+            },
+            "governance_message": "No governance rule violations found.",
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                },
+                {
+                  "enabled": true,
+                  "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+                  "name": "Cohesive code files",
+                  "rule": "Apply whenever an agent adds or changes code files in any language."
+                }
+              ],
+              "code_files_changed": true,
+              "context_version": 1,
+              "recorded_at": "2026-08-11T13:06:12Z",
+              "skipped": []
+            },
+            "implementation_report": "Separated shared app-registry storage from port-scoped active-node selection so /api/project/status matches /api/nodes and new Goal ownership; added server, DOM, and Playwright regression coverage. Verification: cargo test passed (758 passed, 6 ignored); node --test tests/*.test.js passed (130 passed, 21 skipped because no Playwright Chromium build is available); focused --lib regression passed 1/1; project-registry tests passed 6/6; cargo fmt -- --check and git diff --check passed. One initial filtered cargo test exited 2 because tests/test_all.rs rejects ordinary name filters after the target lib test passed; the supported --lib rerun passed.",
+            "implementation_reported_at": "2026-08-11T13:06:10Z",
+            "meta_rule_state": "passed",
+            "product_state": "passed",
+            "prompt": "Fix the web UI page title and navigation node label so they resolve the active node from the same authoritative port-scoped runtime root used by node activation, /api/nodes, dashboard scoping, and goal ownership. Keep the project attachment registry at the base root if required, but ensure /api/project/status derives active_node and active_node_id from the port-root node registry rather than stale <base>/active-node.json. Add regression coverage for differing base-root and port-root selections, verifying that /api/project/status matches /api/nodes after activation and never reports the stale base-root node; verify the browser title and navigation label reflect the active node that owns newly created goals.",
+            "quality_checked_at": "2026-08-11T13:07:58Z",
+            "quality_details": {
+              "candidate_commit": "5e7723d39d18b385694db4e157e8742443681e11",
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR49A214886079BD26686C47BA-round-1",
+              "diagnostics": [
+                "No Quality tests or migrated commands are configured; evaluation was a no-op."
+              ],
+              "evaluation_scope": "isolated_candidate",
+              "operation_id": "19ff0efd97545a4",
+              "results": [],
+              "source_candidate_commit": "5e7723d39d18b385694db4e157e8742443681e11"
+            },
+            "quality_message": "No Quality tests configured.",
+            "quality_state": "passed",
+            "reporter": "buddy.williams@insurity.com",
+            "round": 2,
+            "rule_state": "passed"
+          },
+          {
+            "assignee": "buddy.williams@insurity.com",
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+                "context_digest": "63715dea6aebd52698d2f33f4fc95105fb2738846fff7747434906ba6f7d3ce3",
+                "context_version": 1,
+                "goal_id": "DR49A214886079BD26686C47BA",
+                "implementation_branch": "refine/DR49A214886079BD26686C47BA/round-3",
+                "round_idx": 2,
+                "target_branch": "main"
+              },
+              "criticism": {
+                "completed_at": "2026-08-12T13:41:38Z",
+                "git_after": {
+                  "branch": "refine/DR49A214886079BD26686C47BA/round-3",
+                  "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR49A214886079BD26686C47BA/round-3",
+                  "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "findings": [
+                    {
+                      "checklist_item_ids": [
+                        "P1",
+                        "P2"
+                      ],
+                      "description": "The proposed fixed five-file replay changes FileProjectRegistryService to carry two roots but runs only the existing project-registry tests, whose service uses one runtime root for both attachment storage and active-node selection. The server regression exercises status through web wiring, but it does not directly protect the shared capability's claimed attach, switch, clone, inspect, detach, and restart status behavior when registry_root and active_node_root differ. Current main has already moved project-registry tests into src/tools/product/project_registry/tests.rs, so treating the original five-file scope as an invariant omits the natural capability-boundary regression after drift.",
+                      "id": "C1",
+                      "material": true,
+                      "recommendation": "Keep P1-P2 stable but revise their scope to allow the current-main project_registry/tests.rs file. Adapt or extend project_status_uses_authoritative_identity_across_attach_switch_and_restart to use a shared registry root with a stale selection plus a distinct active-node root, assert apps.json remains only at the registry root, and verify returned ProjectStatus identities across the relevant status-producing operations and restart. Continue to keep migration and supervised-process storage on runtime_root."
+                    },
+                    {
+                      "checklist_item_ids": [
+                        "P3"
+                      ],
+                      "description": "P3 says it proves /api/dashboard?node=current is scoped to the port owner, but its listed evidence only checks active_node_id. That can pass even if the dashboard counts or rows are unfiltered or filtered using another identity. The planned fixture creates only the port-owned Goal after activation, so there is no differently owned Goal whose exclusion could demonstrate current-node scoping under the stale-base versus port-root split.",
+                      "id": "C2",
+                      "material": true,
+                      "recommendation": "Within P3, create at least one non-port-owned Goal before port activation and one port-owned Goal afterward, then assert /api/dashboard?node=current reports port-owner and counts only the port-owned Goal while node=all includes both. Keep the stale base-root selection and also compare GET /api/project/status with GET /api/nodes."
+                    },
+                    {
+                      "checklist_item_ids": [
+                        "P5"
+                      ],
+                      "description": "P5's pre-signal jq reads only static Goal fields, despite claiming a Goal/process ownership check, and its final verification requires evidence produced after Refine receives the implementation signal. Current workflow ordering records implementation evidence first, then Refine commits, sets candidate_commit, publishes, runs Quality, enters Ready Merge, and acquires the lane. The implementation agent therefore cannot honestly mark P5 completed based on candidate-creation and Ready Merge events that do not exist until after it exits. The live process record does contain goal_id, round_idx, phase, worktree branch/path, operation_id, and observational/implementation ownership metadata, but the plan does not require correlating it.",
+                      "id": "C3",
+                      "material": true,
+                      "recommendation": "Keep P5 stable but divide its evidence by owner: require the implementation agent immediately before signaling to correlate the live goal-agent process metadata with the Goal's round_idx 2 plan binding, branch, worktree, base, status, and current round count. State separately that Refine's workflow must fail closed unless its post-signal commit, candidate publication, Quality, Ready Merge, and exclusive-lane logs remain attributed to round_idx 2 and the same workflow execution/claim context. Do not require the implementation agent's governed checklist evidence to claim those future workflow events."
+                    }
+                  ],
+                  "summary": "The recovery approach and architecture are sound, but the plan needs three material verification corrections before implementation: test the new root split directly in the shared capability, prove dashboard filtering rather than only its active-node label, and separate agent-verifiable pre-handoff ownership from workflow-verifiable post-handoff candidate and Ready Merge evidence."
+                },
+                "started_at": "2026-08-12T13:37:19Z"
+              },
+              "failure": {
+                "category": "invalid_output",
+                "failed_at": "2026-08-12T13:45:01Z",
+                "git_after": {
+                  "branch": "refine/DR49A214886079BD26686C47BA/round-3",
+                  "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR49A214886079BD26686C47BA/round-3",
+                  "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+                  "status_porcelain": []
+                },
+                "message": "agent returned no valid structured implementation plan JSON",
+                "phase": "revise"
+              },
+              "phase": "revise",
+              "phase_started_at": "2026-08-12T13:41:39Z",
+              "proposal": {
+                "completed_at": "2026-08-12T13:37:17Z",
+                "git_after": {
+                  "branch": "refine/DR49A214886079BD26686C47BA/round-3",
+                  "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR49A214886079BD26686C47BA/round-3",
+                  "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "affected_behavior": [
+                        "Round-3 recovery provenance and reviewability",
+                        "Current-main compatibility of the preserved candidate",
+                        "Ready Merge round-count and revision fencing remains unchanged",
+                        "Existing docs/intent contract remains the durable product context"
+                      ],
+                      "description": "Preserve the recovery and governance boundary while replaying only the prior candidate's behavior onto round 3: compare commit 5e7723d39d18b385694db4e157e8742443681e11 with current main, semantically apply its five-file capability/test patch, resolve the moved project_runtime test insertion point, and leave the old branch, commit, logs, durable Goal history, Ready Merge fence, and prior failure untouched. Do not edit docs/intent because the current Node, Target App, surface, nav, API, Dashboard, and Ready Merge intent already specifies runtime-local active-node authority, shared capability semantics, visible node context, and fail-closed integration.",
+                      "governance_rationale": "Guidance 0 requires recovery through current main without bypassing Git/workflow authority and only affected intent updates; this is a conformance fix to already-current intent, so source replay is scoped to the original capability/surface files and no Ready Merge or durable-state code is changed. Guidance 1 requires reviewing file cohesion rather than splitting mechanically; the replay keeps capability ownership in project_registry, web wiring in runtime, focused server coverage in project_runtime, a small dedicated VM test, and browser-render coverage in the existing cohesive smoke suite.",
+                      "id": "P1",
+                      "verification": [
+                        "git diff --name-status main -- src/surfaces/web_server/runtime.rs src/surfaces/web_server/tests/project_runtime.rs src/tools/product/project_registry/mod.rs tests/web_active_node_label.test.js tests/web_screen_render.test.js shows the intended five-file scope",
+                        "git diff -- src/tools/product/merging/mod.rs docs/intent is empty",
+                        "git show -s --format=%H refs/heads/refine/DR49A214886079BD26686C47BA/round-1 and git show -s --format=%H refs/remotes/origin/refine/DR49A214886079BD26686C47BA/round-1 both return 5e7723d39d18b385694db4e157e8742443681e11",
+                        "git merge-base --is-ancestor 5e7723d39d18b385694db4e157e8742443681e11 main exits 1 before governed round-3 integration"
+                      ]
+                    },
+                    {
+                      "affected_behavior": [
+                        "FileProjectRegistryService attachment persistence",
+                        "Active Node identity returned by /api/project/status and related app/project status mutations",
+                        "Attach, switch, create, clone, detach, inspect, and restart status consistency",
+                        "Flat-file apps.json location remains the shared app-registry root"
+                      ],
+                      "description": "Restore the shared project-registry capability split in src/tools/product/project_registry: retain runtime_root as the durable shared app-registry, migration, and supervised-process root; add an active_node_root that defaults to runtime_root for compatibility and can be overridden; and use only active_node_root when every attached/detached ProjectStatus response resolves active Node identity. Keep flat-file formats and the public ProjectStatus contract unchanged.",
+                      "governance_rationale": "The correction stays in the existing tools/product shared capability, preserves Rust flat-file persistence and API shape, adds no new architectural concept, and substitutes the authoritative root without extra I/O or a new cache. The project_registry module remains cohesive around app registration and ProjectStatus construction; its existing tests already live in a focused submodule.",
+                      "id": "P2",
+                      "verification": [
+                        "cargo test --lib tools::product::project_registry::tests -- --nocapture -> all project-registry tests pass",
+                        "Focused server regression asserts app_registry_root/apps.json exists and port_runtime_root/apps.json does not",
+                        "git diff verifies migration/process operations still use runtime_root while active_node_status receives active_node_root"
+                      ]
+                    },
+                    {
+                      "affected_behavior": [
+                        "/api/project/status active_node and active_node_id",
+                        "/api/nodes activation and readback consistency",
+                        "/api/dashboard current-Node scoping",
+                        "New Goal node ownership",
+                        "Shared app attachment registry location"
+                      ],
+                      "description": "Wire InProcessWebServer::project_registry_service to construct FileProjectRegistryService with the shared app_registry_runtime_root for attachments and the port-scoped runtime_root for active-node selection, falling back to the registry root only when no port root exists. Reintroduce the focused server regression in its current-main location with a stale base-root selection and a different port-root activation; explicitly compare GET /api/project/status with GET /api/nodes, assert GET /api/dashboard?node=current scopes to the port owner, reject the stale base identity, and prove POST /api/goals assigns the port-owner Node.",
+                      "governance_rationale": "The web server remains a thin surface adapter over the existing project-registry and node-registry services; Node IDs remain authoritative ownership keys and display names remain labels. The focused regression exercises shared semantics at the API boundary without adding page-specific capability logic.",
+                      "id": "P3",
+                      "verification": [
+                        "cargo test --lib surfaces::web_server::tests::project_runtime::project_status_uses_the_port_scoped_node_that_owns_new_goals -- --exact -> 1 focused regression passes",
+                        "Regression evidence shows /api/project/status and /api/nodes both return port-owner/Port Owner, /api/dashboard?node=current reports active_node_id port-owner, stale-base/Stale Base Node is never reported, and the created Goal has node_id port-owner"
+                      ]
+                    },
+                    {
+                      "affected_behavior": [
+                        "Browser document title",
+                        "Top navigation active-node label and tooltip",
+                        "Goals table Node label",
+                        "Browser use of /api/project/status as authoritative shell context"
+                      ],
+                      "description": "Restore browser contract coverage without duplicating production logic: add the focused Node VM test proving authoritative project status drives the page title and nav label for the Node that owns a newly created Goal, and add the real-browser render regression to the established web_screen_render suite so title, topbar label, and Goals-table Node label agree. Production common.js already derives these labels from state.project, so change it only if current-main verification exposes genuine drift.",
+                      "governance_rationale": "The browser remains a thin adapter over the API ProjectStatus contract. A small dedicated VM contract test is cohesive, while the Playwright case belongs in the existing intrinsically cohesive real-browser render smoke suite despite that suite's size; no arbitrary include shard or unrelated refactor is warranted.",
+                      "id": "P4",
+                      "verification": [
+                        "node --test tests/web_active_node_label.test.js -> focused non-browser DOM/static contract passes",
+                        "node --test tests/web_screen_render.test.js -> Playwright render cases pass when Chromium is found; otherwise cases are reported skipped with reason no Playwright chromium build is available",
+                        "Browser regression asserts document title Port Owner - refine, #active-node-label Port Owner, .goals-node-cell Port Owner, and no page errors"
+                      ]
+                    },
+                    {
+                      "affected_behavior": [
+                        "Full Rust and Node regression safety",
+                        "Formatting and patch hygiene",
+                        "Round-3 candidate attribution",
+                        "Ready Merge preparation ownership and stale-worker rejection",
+                        "Preservation of prior candidate and audit evidence"
+                      ],
+                      "description": "Run the complete relevant verification matrix, inspect the final patch, and preserve workflow ownership during handoff. Before signaling implementation completion, read back the Goal/process binding as round_idx 2 on round-3 and verify no fourth round or external revision change appeared. Let Refine create and publish the candidate; Ready Merge preparation must then record the new candidate, Quality timing/status, and integration-lane preparation against round_idx 2 before any Git integration. If that ownership readback changes, fail closed and preserve the work rather than weakening or bypassing the fence.",
+                      "governance_rationale": "This supplies deterministic evidence for the shared capability and surfaces while honoring the workflow-owned commit/integration boundary. It preserves the Constitution's recoverable Git/process behavior, Governance and Quality evaluation, and manual Review boundary; the implementation agent does not commit, approve, merge, rewrite history, or mutate durable Goal state directly.",
+                      "id": "P5",
+                      "verification": [
+                        "cargo test -> default full relevant Rust unit suite exits 0 with exact passed/ignored counts reported",
+                        "node --test tests/*.test.js -> full Node suite exits 0 with exact passed/failed/skipped counts reported",
+                        "cargo fmt -- --check -> exit 0",
+                        "git diff --check -> exit 0",
+                        "git status --short --branch and git diff --stat -> reviewable round-3 branch with only owned files changed before workflow commit",
+                        "jq -e '.status == \"in-progress\" and (.rounds | length) == 3 and .branch_name == \"refine/DR49A214886079BD26686C47BA/round-3\" and .base_commit == \"64c01b1bc8eea27f2fb6772a8dd5bca68d93c842\" and .rounds[2].implementation_plan.binding.round_idx == 2' /home/buddy/projects/refine-next/.git/refine-live-state/goals/DR/49A214886079BD26686C47BA/goal.json -> true immediately before implementation signal",
+                        "After workflow candidate creation and Ready Merge preparation, jq/rg readback of goal.json and runtime Goal logs shows candidate_commit on round-3 and the commit, publish, Quality timing/status, ready-merge, and exclusive-lane events attributed to round_idx 2; absence or mismatched round attribution blocks integration",
+                        "git show -s 5e7723d39d18b385694db4e157e8742443681e11 and round-1 branch/remote/log readback still succeeds after round-3 candidate preparation"
+                      ]
+                    }
+                  ],
+                  "criticism_resolutions": [],
+                  "summary": "Semantically replay the verified active-node candidate onto the clean round-3 branch at current main, resolving only the moved server-test insertion context. Keep shared app attachment storage at the app-registry root while making the port runtime root the single active-node selection authority used by project status and the already port-scoped nodes, dashboard, browser, and Goal-authoring paths. Preserve all prior evidence and the fail-closed Ready Merge fence, add current-main regression assertions including dashboard scoping, and hand the uncommitted verified patch back to workflow for governed candidate creation and integration."
+                },
+                "started_at": "2026-08-12T13:32:31Z"
+              },
+              "schema_version": 2,
+              "started_at": "2026-08-12T13:32:30Z",
+              "state": "failed",
+              "updated_at": "2026-08-12T13:45:01Z"
+            },
+            "prompt": "Recover the verified active-node candidate through a fresh round from current main while preserving the original Ready Merge failure, branch, commit 5e7723d39d18b385694db4e157e8742443681e11, logs, and round-ownership evidence. The prior candidate was not rejected for code quality: Governance passed, configured Quality was a no-op, recorded Rust and Node tests passed, and Ready Merge correctly failed closed because automation owned round index 0 while the durable Goal gained a second round during multi-step email authoring.\n\nReuse or replay the candidate change onto the new workflow-owned branch as appropriate. Preserve the shared app-registry root for attachment storage while using the port-scoped runtime root as the authoritative active-node selection for /api/project/status, /api/nodes, browser title/nav labeling, dashboard scoping, and new Goal ownership. Do not weaken, bypass, or special-case the Ready Merge round-count/revision fence, and do not directly merge the preserved candidate through its inconsistent record.\n\nRe-check the patch against current main and resolve only genuine drift. Run the focused server regression with differing stale base-root and active port-root selections, project-registry tests, DOM/static coverage, full relevant Rust and Node suites, formatting, and git diff --check. Run Playwright coverage when Chromium is available; otherwise report it as skipped. Confirm the new round remains the workflow-owned round through candidate creation and Ready Merge preparation. Do not approve, merge, rewrite prior history, delete retained evidence, or directly edit durable Goal state.",
+            "reporter": "buddy.williams@insurity.com",
+            "round": 3
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-08-12T17:40:03Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "2026-08-12T18:03:52Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR49A214886079BD26686C47BA-round-4",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No actual governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "No actual governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR49A214886079BD26686C47BA-round-4"
+      },
+      "governance_message": "No actual governance rule violations found.",
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-12T18:02:23Z",
+        "skipped": []
+      },
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "ed991b037d5287ae78b07a01c2260a9d4d46b2de",
+          "context_digest": "c8bb3efd964e74c70c2da9b9e07a42e956344947f5132a5856fbd690be82c07b",
+          "context_version": 1,
+          "goal_id": "DR49A214886079BD26686C47BA",
+          "implementation_branch": "refine/DR49A214886079BD26686C47BA/round-4",
+          "round_idx": 3,
+          "target_branch": "main"
+        },
+        "completed_at": "2026-08-12T18:02:19Z",
+        "criticism": {
+          "completed_at": "2026-08-12T17:48:07Z",
+          "git_after": {
+            "branch": "refine/DR49A214886079BD26686C47BA/round-4",
+            "head_commit": "ed991b037d5287ae78b07a01c2260a9d4d46b2de",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR49A214886079BD26686C47BA/round-4",
+            "head_commit": "ed991b037d5287ae78b07a01c2260a9d4d46b2de",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [],
+            "summary": "No material findings. Repository inspection confirms the revised plan directly resolves all three Round 3 criticisms: P2 covers the distinct-root contract in the current shared-capability test module and preserves runtime-root storage ownership; P3 proves current/all filtering with differently owned Goals rather than checking only an active-node label; and P5 limits agent evidence to live pre-signal process and Round 4 binding correlation while leaving post-signal candidate, Quality, Ready Merge, and lane attribution to Refine. The six-file scope matches current-main drift, existing docs/intent already expresses the affected contracts, browser and server surfaces remain thin, and no Ready Merge fencing or durable Goal state mutation is proposed."
+          },
+          "started_at": "2026-08-12T17:45:04Z"
+        },
+        "final_plan": {
+          "completed_at": "2026-08-12T17:50:30Z",
+          "git_after": {
+            "branch": "refine/DR49A214886079BD26686C47BA/round-4",
+            "head_commit": "ed991b037d5287ae78b07a01c2260a9d4d46b2de",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR49A214886079BD26686C47BA/round-4",
+            "head_commit": "ed991b037d5287ae78b07a01c2260a9d4d46b2de",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "affected_behavior": [
+                  "Round 4 recovery provenance and reviewability",
+                  "Current-main compatibility of the preserved candidate",
+                  "Preservation of Round 1 and Round 3 Git/Goal/runtime evidence",
+                  "Unchanged Ready Merge round-count and revision fence",
+                  "Conformance to existing docs/intent contracts"
+                ],
+                "description": "Recover only the active-node candidate behavior from commit 5e7723d39d18b385694db4e157e8742443681e11 onto current main, resolving current-main drift rather than enforcing the obsolete five-file scope. Preserve the Round 1 candidate and local/remote branch, the Round 3 proposal, criticism, invalid revise failure, clean Git observations, durable Goal/runtime logs, and the original Ready Merge round-ownership failure. Do not change merging/Ready Merge code or docs/intent: the inspected Node, Target App, API, browser Nav/Dashboard, planning, and Ready Merge intent already states the contracts this conformance fix restores.",
+                "governance_rationale": "Guidance 0 requires the current Goal and docs/intent boundaries to remain authoritative and recoverable; this plan preserves prior history and the fail-closed workflow fence while changing only the existing shared capability and thin web/browser adapters. The behavior is already documented intent, so an intent edit would be changelog noise. Guidance 1 permits the current-main project_registry/tests.rs module and existing focused surface suites instead of an artificial five-file limit or unrelated structural refactor.",
+                "id": "P1",
+                "verification": [
+                  "git diff --name-status main -- src/tools/product/project_registry/mod.rs src/tools/product/project_registry/tests.rs src/surfaces/web_server/runtime.rs src/surfaces/web_server/tests/project_runtime.rs tests/web_active_node_label.test.js tests/web_screen_render.test.js shows only the intended capability, wiring, and regression files",
+                  "git diff -- src/tools/product/merging docs/intent is empty",
+                  "git show -s --format=%H refs/heads/refine/DR49A214886079BD26686C47BA/round-1 and git show -s --format=%H refs/remotes/origin/refine/DR49A214886079BD26686C47BA/round-1 both return 5e7723d39d18b385694db4e157e8742443681e11",
+                  "git show -s --format=%H refs/heads/refine/DR49A214886079BD26686C47BA/round-3 returns 64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+                  "git merge-base --is-ancestor 5e7723d39d18b385694db4e157e8742443681e11 main exits 1 before governed Round 4 integration",
+                  "jq readback of goal.json retains Round 3 implementation_plan.proposal, implementation_plan.criticism, implementation_plan.failure.category == invalid_output, and empty proposal/criticism status_porcelain observations"
+                ]
+              },
+              {
+                "affected_behavior": [
+                  "FileProjectRegistryService shared attachment persistence",
+                  "Active Node identity in all ProjectStatus responses",
+                  "Attach, switch, clone, inspect, detach, status, restart, and local-create consistency",
+                  "Flat-file apps.json location",
+                  "Project migration and supervised-process storage ownership"
+                ],
+                "description": "Restore the two-root contract in FileProjectRegistryService: runtime_root remains the durable apps.json, migration, and supervised-process storage root; active_node_root defaults to runtime_root for compatibility and may be overridden; every ProjectStatus-producing path resolves active identity through active_node_root. Extend src/tools/product/project_registry/tests.rs using distinct shared-registry and port-runtime roots, a stale shared-root selection, and authoritative port-root selections. Exercise status, attach, switch, clone, inspect, detach, and restart (plus local creation where useful), asserting each attached response reflects the authoritative port-root identity or its expected port-root project-mismatch diagnostic, detached status has no attached identity, and reattachment/restart recovers the port identity. Prove apps.json and supervised process artifacts exist only below runtime_root, project schema initialization remains correct, and the active-node root receives neither apps.json nor process storage.",
+                "governance_rationale": "The split belongs in the existing tools/product project-registry capability and preserves Rust flat files, public ProjectStatus shape, default constructor compatibility, and constant-time path selection without a new cache or architectural concept. Keeping tests in the already separated tests.rs module improves cohesion of the 677-line implementation module under Guidance 1; migration and subprocess ownership remain on runtime_root rather than leaking into the active-selection root.",
+                "id": "P2",
+                "verification": [
+                  "cargo test --lib tools::product::project_registry::tests -- --nocapture exits 0 with all shared project-registry tests passing",
+                  "The distinct-root regression asserts registry_root/apps.json exists, active_node_root/apps.json does not, registry_root/processes exists after supervised create/clone work, and active_node_root/processes does not exist",
+                  "The distinct-root regression asserts status, attach, switch, clone, inspect, detach, and restarted-service results never expose stale-base/Stale Base Node and use the port-root identity or expected port-root mismatch diagnostics",
+                  "git diff -- src/tools/product/project_registry/mod.rs confirms apps persistence, FileProjectMigrationService::with_runtime_root, and FileProcessSupervisor still receive runtime_root while only active_node_status receives active_node_root"
+                ]
+              },
+              {
+                "affected_behavior": [
+                  "/api/project/status active_node and active_node_id",
+                  "/api/nodes activation and GET readback consistency",
+                  "/api/dashboard current/all Node counts and statistic rows",
+                  "/api/goals current/all Node rows",
+                  "New Goal Node ownership",
+                  "Shared app attachment registry location"
+                ],
+                "description": "Wire InProcessWebServer::project_registry_service with app_registry_runtime_root as FileProjectRegistryService runtime_root and the port-scoped runtime_root as active_node_root, falling back to the registry root only when no port root exists. Add the current-main project_runtime regression with a stale shared-root active selection. Create one default/differently owned Goal before port activation, then create/rename/activate port-owner through /api/nodes and create a second Goal afterward. Compare GET /api/project/status with GET /api/nodes, reject the stale identity, and prove the second Goal is port-owned. Assert /api/dashboard?node=current reports port-owner and counts/stat rows only one port-owned Goal while node=all counts both; pair those assertions with /api/goals?node=current and node=all row IDs so the differently owned Goal is demonstrably excluded from current scope and included in all scope. Keep apps.json at the shared registry root only.",
+                "governance_rationale": "The server remains a thin surface adapter that composes existing project-registry, node-registry, projection, dashboard, and Goal-authoring capabilities. Node IDs remain authoritative ownership keys and display names remain labels. The regression proves the shared semantics at the API boundary without adding page-specific business logic or bypassing projection filtering.",
+                "id": "P3",
+                "verification": [
+                  "cargo test --lib surfaces::web_server::tests::project_runtime::project_status_uses_the_port_scoped_node_that_owns_and_filters_new_goals -- --exact exits 0 with 1 focused regression passed",
+                  "Focused assertions show GET /api/project/status and GET /api/nodes both return port-owner/Port Owner and neither reports stale-base/Stale Base Node",
+                  "Focused assertions show /api/dashboard?node=current has active_node_id port-owner, backlog/stat totals 1, and /api/dashboard?node=all totals 2",
+                  "Focused assertions show /api/goals?node=current returns only the port-owned Goal, /api/goals?node=all returns both Goal IDs, and the post-activation POST /api/goals response has node_id port-owner",
+                  "cargo test --lib surfaces::web_server::tests::goals::details::web_server_manages_nodes_and_transfers_goal_ownership -- --exact exits 0, retaining the existing dashboard current/all filtering baseline"
+                ]
+              },
+              {
+                "affected_behavior": [
+                  "Browser document title",
+                  "Top navigation active-node label and tooltip",
+                  "Goals table Node label",
+                  "Browser use of ProjectStatus as authoritative shell context",
+                  "Browser exclusion of stale shared-root identity"
+                ],
+                "description": "Restore browser contract coverage without duplicating production capability logic. Add the focused Node VM/static test showing authoritative project status for port-owner drives document.title and #active-node-label and agrees with a newly created Goal owner. Extend the established Playwright render suite with project-status and Goal-list fixtures that include the stale shared node but return the port-owned current Goal; assert the title, navigation label/tooltip, and .goals-node-cell all render Port Owner and never Stale Base Node. Keep common.js and goals-list.js unchanged unless verification exposes genuine current-main drift because they already consume the API ProjectStatus and Goal display contracts.",
+                "governance_rationale": "The browser stays a thin presentation of shared API state. The small VM contract test is cohesive and always runnable; the real-browser case belongs in the existing end-to-end render suite, which is intrinsically cohesive despite its size. No arbitrary production split or duplicate active-node resolution is introduced.",
+                "id": "P4",
+                "verification": [
+                  "node --test tests/web_active_node_label.test.js exits 0 with the focused non-browser title/navigation contract passing",
+                  "node --test tests/web_screen_render.test.js exits 0 with the Port Owner title, #active-node-label, title tooltip, and .goals-node-cell assertions passing when Playwright Chromium is available",
+                  "If Playwright Chromium is unavailable, node --test tests/web_screen_render.test.js exits 0 and reports the browser cases skipped with the explicit no-Playwright-Chromium reason; this is recorded as a skip, not a browser pass",
+                  "The browser regression records no page errors and asserts Stale Base Node is absent from title, navigation, and the current Goals table"
+                ]
+              },
+              {
+                "affected_behavior": [
+                  "Full Rust and Node regression safety",
+                  "Formatting and patch hygiene",
+                  "Round 4 implementation ownership and pre-signal provenance",
+                  "Post-signal candidate and Ready Merge fail-closed attribution",
+                  "Preservation of prior candidate and audit evidence"
+                ],
+                "description": "Run the full relevant verification matrix and inspect the final uncommitted patch. Immediately before writing the implementation completion signal, derive the live implementation Goal Agent process JSON from that signal path and correlate its parsed details: goal_id DR49A214886079BD26686C47BA, round_idx 3, implementation_phase implement, non-empty operation_id and session_id, round-4 branch/worktree, and workflow state in-progress. Correlate those facts with goal.json status in-progress, four rounds, Round 4 implementation_plan.binding (same Goal, round_idx 3, branch, base ed991b037d5287ae78b07a01c2260a9d4d46b2de), current HEAD/base, and retained Round 3 failure. Record the exact operation/session identity as observational provenance only. Do not claim future events: after the signal, Refine alone must create/publish the candidate, run configured Quality, prepare Ready Merge, and acquire the exclusive lane, and it must fail closed unless those events remain attributed to round_idx 3 and the same Round 4 binding/workflow claim context before any Git integration.",
+                "governance_rationale": "This separates evidence by its actual owner and preserves recoverable Git/process behavior, governance, Quality, and human Review boundaries. The implementation agent verifies its live process and accepted plan binding but does not commit, publish, approve, merge, mutate durable Goal state, weaken the fence, or assert workflow events that can only occur after it exits.",
+                "id": "P5",
+                "verification": [
+                  "cargo test exits 0; report exact passed, failed, and ignored counts",
+                  "node --test tests/*.test.js exits 0; report exact passed, failed, and skipped counts, with missing Chromium cases identified as skips",
+                  "cargo fmt -- --check exits 0",
+                  "git diff --check exits 0",
+                  "git status --short --branch and git diff --stat show a reviewable Round 4 branch with only owned files changed and no agent-created commit",
+                  "Immediately pre-signal, jq -e over the live implementation process JSON (details | fromjson) and goal.json proves matching goal_id, round_idx 3, implementation phase, branch, worktree, non-empty operation_id/session_id, status in-progress, round count 4, binding base ed991b037d5287ae78b07a01c2260a9d4d46b2de, and HEAD equal to that base; exact identity values are recorded in implementation evidence",
+                  "Immediately pre-signal, git show -s 5e7723d39d18b385694db4e157e8742443681e11 plus local/remote Round 1 and local Round 3 ref readback still succeeds, and goal/runtime log files remain present",
+                  "Post-signal commit, publication, Quality, Ready Merge, and exclusive-lane attribution are explicitly left for Refine to verify against round_idx 3 and the Round 4 workflow context; the implementation checklist claims none of those future events"
+                ]
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "P1 removes the obsolete five-file invariant, and P2 explicitly changes and extends current-main src/tools/product/project_registry/tests.rs with distinct registry and active-node roots. The capability regression covers status, attach, switch, clone, inspect, detach, restart, storage placement, migration call ownership, and supervised-process placement rather than relying only on web wiring."
+              },
+              {
+                "criticism_id": "C2",
+                "resolution": "P3 creates a differently owned Goal before activation and a port-owned Goal afterward, then proves current versus all scoping through dashboard backlog/stat totals and Goal-list row IDs in addition to active_node_id, while still comparing GET /api/project/status with GET /api/nodes under the stale-shared/port-root split."
+              },
+              {
+                "criticism_id": "C3",
+                "resolution": "P5 limits implementation-agent evidence to the immediate pre-signal correlation of live process operation/session metadata with the Round 4 Goal binding, branch, worktree, base, phase, status, and four-round count. It separately states Refine's post-signal fail-closed responsibility for candidate, publication, Quality, Ready Merge, and lane attribution and forbids the agent from claiming those future events."
+              }
+            ],
+            "summary": "Recover the verified active-node behavior on the clean Round 4 branch at current main without changing durable Goal state, prior refs/evidence, or Ready Merge fencing. Preserve shared app attachment persistence at the registry root, add a distinct port-runtime active-node root at the existing project-registry capability boundary, directly test every status-producing capability path under that split, prove API/dashboard/Goal ownership filtering with pre- and post-activation Goals, and cover browser title/navigation/table labels while keeping the surfaces thin. Complete implementation with full regression and hygiene checks, then record only the implementation agent's pre-signal ownership correlation; Refine remains responsible for fail-closed post-signal candidate, Quality, Ready Merge, and exclusive-lane attribution."
+          },
+          "started_at": "2026-08-12T17:48:09Z"
+        },
+        "implementation": {
+          "completed_at": "2026-08-12T18:02:19Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Recovered only active-node behavior onto Round 4. Six owned files are changed (five modified, one new test); src/tools/product/merging and docs/intent are unchanged. Local and remote Round 1 refs and candidate remain 5e7723d39d18b385694db4e157e8742443681e11; Round 3 remains 64c01b1bc8eea27f2fb6772a8dd5bca68d93c842; the candidate is not an ancestor of main. Goal readback retained the Round 3 proposal, criticism, invalid_output failure, and clean before/after observations; prior Quality and Ready Merge failure logs remain present, including the recorded round-changed failure.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "FileProjectRegistryService now defaults active_node_root to runtime_root and supports overriding it. status, attach/local-create, switch, inspect/clone, and detach status construction use active_node_root; apps persistence, FileProjectMigrationService, and FileProcessSupervisor still use runtime_root. The distinct-root capability regression covers stale shared selection, port identities, project-mismatch diagnostics, attach, status, switch, clone, inspect, detach, reattach, restart, schema initialization, and asserts apps.json/processes exist only under registry_root. Focused suite passed 6/6.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "InProcessWebServer keeps app_registry_runtime_root for project persistence and supplies the port runtime root for active selection. The focused regression creates OTHERGOAL on default before port activation and PORTGOAL on port-owner after activation; project status and nodes agree on port-owner/Port Owner; current Goals returns only PORTGOAL while all returns both IDs; current dashboard backlog/reporter totals are 1 and all totals are 2; stale-base/Stale Base Node is rejected. Focused regression passed 1/1 and the existing node transfer/current-all baseline passed 1/1.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added an always-runnable VM contract proving ProjectStatus port-owner drives the page title and navigation label and agrees with new Goal ownership; it passed 1/1. Added a Playwright fixture containing stale-base plus port-owner and assertions for title, navigation text/tooltip, Goals-table label, stale-label absence, and no page errors. No Playwright Chromium build was available: the focused browser command exited 0 with all 25 cases explicitly skipped, and browser execution is not claimed.",
+                "id": "P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Full and hygiene checks passed. Immediate pre-signal correlation proved running process goal_id DR49A214886079BD26686C47BA, round_idx 3, implementation_phase implement, workflow_state in-progress, operation_id 9b4f2064-1cb2-4fea-9c81-0dc5f93639da, session_id bcc91c2a-98bc-402f-8f52-230e19b44d4f, Round 4 branch/worktree, Goal status in-progress, exactly four rounds, matching plan binding, base and HEAD ed991b037d5287ae78b07a01c2260a9d4d46b2de, and retained Round 3 invalid_output failure. No agent commit was created. Post-signal candidate, Quality, Ready Merge, and lane events are explicitly left to Refine and are not claimed here.",
+                "id": "P5",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "cargo test --lib tools::product::project_registry::tests -- --nocapture -> exit 0; 6 passed, 0 failed, 0 ignored",
+              "cargo test --lib surfaces::web_server::tests::project_runtime::project_status_uses_the_port_scoped_node_that_owns_and_filters_new_goals -- --exact --nocapture -> final exit 0; 1 passed, 0 failed (initial run exited 101 because the fixture produced no assignee stat row; assertions were corrected to the actual reporter-stat contract and rerun passed)",
+              "cargo test --lib surfaces::web_server::tests::goals::details::web_server_manages_nodes_and_transfers_goal_ownership -- --exact --nocapture -> exit 0; 1 passed, 0 failed",
+              "node --test tests/web_active_node_label.test.js -> exit 0; 1 passed, 0 failed, 0 skipped",
+              "node --test tests/web_screen_render.test.js -> exit 0; 0 passed, 0 failed, 25 skipped with explicit reason no Playwright chromium build is available",
+              "cargo test -> exit 0; 706 passed, 0 failed, 6 ignored; binary target 0 tests",
+              "node --test tests/*.test.js -> exit 0; 160 passed, 0 failed, 25 skipped because no Playwright Chromium build is available; 185 total",
+              "cargo fmt -- --check -> exit 0",
+              "git diff --check -> exit 0",
+              "git diff -- src/tools/product/merging docs/intent -> empty",
+              "git status --short --branch -> Round 4 branch at uncommitted base with five modified owned files and new tests/web_active_node_label.test.js; no agent-created commit",
+              "pre-signal jq process/Goal correlation plus HEAD/ref/log checks -> exit 0; operation_id 9b4f2064-1cb2-4fea-9c81-0dc5f93639da, session_id bcc91c2a-98bc-402f-8f52-230e19b44d4f, round_idx 3, round count 4, HEAD/base ed991b037d5287ae78b07a01c2260a9d4d46b2de"
+            ]
+          },
+          "report": "Implemented the two-root project-registry contract and port-authoritative web identity with direct capability, API/dashboard filtering, VM, and browser regressions. Shared apps.json, migration, and supervised-process storage remain at runtime_root; all ProjectStatus active identity resolution uses active_node_root. Exact verification: cargo test passed 706 with 0 failed and 6 ignored; node --test tests/*.test.js passed 160 with 0 failed and 25 explicitly skipped because no Playwright Chromium build is available; focused capability 6/6, focused project-runtime 1/1, existing node filtering baseline 1/1, VM label 1/1; formatting and diff checks passed. Preserved candidate/ref/history evidence and correlated live Round 4 ownership immediately before this signal. Refine retains responsibility for post-signal commit, publication, Quality, Ready Merge, and exclusive-lane attribution and must fail closed on any round/workflow mismatch.",
+          "started_at": "2026-08-12T17:50:33Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-12T17:50:33Z",
+        "proposal": {
+          "completed_at": "2026-08-12T17:45:02Z",
+          "git_after": {
+            "branch": "refine/DR49A214886079BD26686C47BA/round-4",
+            "head_commit": "ed991b037d5287ae78b07a01c2260a9d4d46b2de",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR49A214886079BD26686C47BA/round-4",
+            "head_commit": "ed991b037d5287ae78b07a01c2260a9d4d46b2de",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "affected_behavior": [
+                  "Round 4 recovery provenance and reviewability",
+                  "Current-main compatibility of the preserved candidate",
+                  "Preservation of Round 1 and Round 3 Git/Goal/runtime evidence",
+                  "Unchanged Ready Merge round-count and revision fence",
+                  "Conformance to existing docs/intent contracts"
+                ],
+                "description": "Recover only the active-node candidate behavior from commit 5e7723d39d18b385694db4e157e8742443681e11 onto current main, resolving current-main drift rather than enforcing the obsolete five-file scope. Preserve the Round 1 candidate and local/remote branch, the Round 3 proposal, criticism, invalid revise failure, clean Git observations, durable Goal/runtime logs, and the original Ready Merge round-ownership failure. Do not change merging/Ready Merge code or docs/intent: the inspected Node, Target App, API, browser Nav/Dashboard, planning, and Ready Merge intent already states the contracts this conformance fix restores.",
+                "governance_rationale": "Guidance 0 requires the current Goal and docs/intent boundaries to remain authoritative and recoverable; this plan preserves prior history and the fail-closed workflow fence while changing only the existing shared capability and thin web/browser adapters. The behavior is already documented intent, so an intent edit would be changelog noise. Guidance 1 permits the current-main project_registry/tests.rs module and existing focused surface suites instead of an artificial five-file limit or unrelated structural refactor.",
+                "id": "P1",
+                "verification": [
+                  "git diff --name-status main -- src/tools/product/project_registry/mod.rs src/tools/product/project_registry/tests.rs src/surfaces/web_server/runtime.rs src/surfaces/web_server/tests/project_runtime.rs tests/web_active_node_label.test.js tests/web_screen_render.test.js shows only the intended capability, wiring, and regression files",
+                  "git diff -- src/tools/product/merging docs/intent is empty",
+                  "git show -s --format=%H refs/heads/refine/DR49A214886079BD26686C47BA/round-1 and git show -s --format=%H refs/remotes/origin/refine/DR49A214886079BD26686C47BA/round-1 both return 5e7723d39d18b385694db4e157e8742443681e11",
+                  "git show -s --format=%H refs/heads/refine/DR49A214886079BD26686C47BA/round-3 returns 64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+                  "git merge-base --is-ancestor 5e7723d39d18b385694db4e157e8742443681e11 main exits 1 before governed Round 4 integration",
+                  "jq readback of goal.json retains Round 3 implementation_plan.proposal, implementation_plan.criticism, implementation_plan.failure.category == invalid_output, and empty proposal/criticism status_porcelain observations"
+                ]
+              },
+              {
+                "affected_behavior": [
+                  "FileProjectRegistryService shared attachment persistence",
+                  "Active Node identity in all ProjectStatus responses",
+                  "Attach, switch, clone, inspect, detach, status, restart, and local-create consistency",
+                  "Flat-file apps.json location",
+                  "Project migration and supervised-process storage ownership"
+                ],
+                "description": "Restore the two-root contract in FileProjectRegistryService: runtime_root remains the durable apps.json, migration, and supervised-process storage root; active_node_root defaults to runtime_root for compatibility and may be overridden; every ProjectStatus-producing path resolves active identity through active_node_root. Extend src/tools/product/project_registry/tests.rs using distinct shared-registry and port-runtime roots, a stale shared-root selection, and authoritative port-root selections. Exercise status, attach, switch, clone, inspect, detach, and restart (plus local creation where useful), asserting each attached response reflects the authoritative port-root identity or its expected port-root project-mismatch diagnostic, detached status has no attached identity, and reattachment/restart recovers the port identity. Prove apps.json and supervised process artifacts exist only below runtime_root, project schema initialization remains correct, and the active-node root receives neither apps.json nor process storage.",
+                "governance_rationale": "The split belongs in the existing tools/product project-registry capability and preserves Rust flat files, public ProjectStatus shape, default constructor compatibility, and constant-time path selection without a new cache or architectural concept. Keeping tests in the already separated tests.rs module improves cohesion of the 677-line implementation module under Guidance 1; migration and subprocess ownership remain on runtime_root rather than leaking into the active-selection root.",
+                "id": "P2",
+                "verification": [
+                  "cargo test --lib tools::product::project_registry::tests -- --nocapture exits 0 with all shared project-registry tests passing",
+                  "The distinct-root regression asserts registry_root/apps.json exists, active_node_root/apps.json does not, registry_root/processes exists after supervised create/clone work, and active_node_root/processes does not exist",
+                  "The distinct-root regression asserts status, attach, switch, clone, inspect, detach, and restarted-service results never expose stale-base/Stale Base Node and use the port-root identity or expected port-root mismatch diagnostics",
+                  "git diff -- src/tools/product/project_registry/mod.rs confirms apps persistence, FileProjectMigrationService::with_runtime_root, and FileProcessSupervisor still receive runtime_root while only active_node_status receives active_node_root"
+                ]
+              },
+              {
+                "affected_behavior": [
+                  "/api/project/status active_node and active_node_id",
+                  "/api/nodes activation and GET readback consistency",
+                  "/api/dashboard current/all Node counts and statistic rows",
+                  "/api/goals current/all Node rows",
+                  "New Goal Node ownership",
+                  "Shared app attachment registry location"
+                ],
+                "description": "Wire InProcessWebServer::project_registry_service with app_registry_runtime_root as FileProjectRegistryService runtime_root and the port-scoped runtime_root as active_node_root, falling back to the registry root only when no port root exists. Add the current-main project_runtime regression with a stale shared-root active selection. Create one default/differently owned Goal before port activation, then create/rename/activate port-owner through /api/nodes and create a second Goal afterward. Compare GET /api/project/status with GET /api/nodes, reject the stale identity, and prove the second Goal is port-owned. Assert /api/dashboard?node=current reports port-owner and counts/stat rows only one port-owned Goal while node=all counts both; pair those assertions with /api/goals?node=current and node=all row IDs so the differently owned Goal is demonstrably excluded from current scope and included in all scope. Keep apps.json at the shared registry root only.",
+                "governance_rationale": "The server remains a thin surface adapter that composes existing project-registry, node-registry, projection, dashboard, and Goal-authoring capabilities. Node IDs remain authoritative ownership keys and display names remain labels. The regression proves the shared semantics at the API boundary without adding page-specific business logic or bypassing projection filtering.",
+                "id": "P3",
+                "verification": [
+                  "cargo test --lib surfaces::web_server::tests::project_runtime::project_status_uses_the_port_scoped_node_that_owns_and_filters_new_goals -- --exact exits 0 with 1 focused regression passed",
+                  "Focused assertions show GET /api/project/status and GET /api/nodes both return port-owner/Port Owner and neither reports stale-base/Stale Base Node",
+                  "Focused assertions show /api/dashboard?node=current has active_node_id port-owner, backlog/stat totals 1, and /api/dashboard?node=all totals 2",
+                  "Focused assertions show /api/goals?node=current returns only the port-owned Goal, /api/goals?node=all returns both Goal IDs, and the post-activation POST /api/goals response has node_id port-owner",
+                  "cargo test --lib surfaces::web_server::tests::goals::details::web_server_manages_nodes_and_transfers_goal_ownership -- --exact exits 0, retaining the existing dashboard current/all filtering baseline"
+                ]
+              },
+              {
+                "affected_behavior": [
+                  "Browser document title",
+                  "Top navigation active-node label and tooltip",
+                  "Goals table Node label",
+                  "Browser use of ProjectStatus as authoritative shell context",
+                  "Browser exclusion of stale shared-root identity"
+                ],
+                "description": "Restore browser contract coverage without duplicating production capability logic. Add the focused Node VM/static test showing authoritative project status for port-owner drives document.title and #active-node-label and agrees with a newly created Goal owner. Extend the established Playwright render suite with project-status and Goal-list fixtures that include the stale shared node but return the port-owned current Goal; assert the title, navigation label/tooltip, and .goals-node-cell all render Port Owner and never Stale Base Node. Keep common.js and goals-list.js unchanged unless verification exposes genuine current-main drift because they already consume the API ProjectStatus and Goal display contracts.",
+                "governance_rationale": "The browser stays a thin presentation of shared API state. The small VM contract test is cohesive and always runnable; the real-browser case belongs in the existing end-to-end render suite, which is intrinsically cohesive despite its size. No arbitrary production split or duplicate active-node resolution is introduced.",
+                "id": "P4",
+                "verification": [
+                  "node --test tests/web_active_node_label.test.js exits 0 with the focused non-browser title/navigation contract passing",
+                  "node --test tests/web_screen_render.test.js exits 0 with the Port Owner title, #active-node-label, title tooltip, and .goals-node-cell assertions passing when Playwright Chromium is available",
+                  "If Playwright Chromium is unavailable, node --test tests/web_screen_render.test.js exits 0 and reports the browser cases skipped with the explicit no-Playwright-Chromium reason; this is recorded as a skip, not a browser pass",
+                  "The browser regression records no page errors and asserts Stale Base Node is absent from title, navigation, and the current Goals table"
+                ]
+              },
+              {
+                "affected_behavior": [
+                  "Full Rust and Node regression safety",
+                  "Formatting and patch hygiene",
+                  "Round 4 implementation ownership and pre-signal provenance",
+                  "Post-signal candidate and Ready Merge fail-closed attribution",
+                  "Preservation of prior candidate and audit evidence"
+                ],
+                "description": "Run the full relevant verification matrix and inspect the final uncommitted patch. Immediately before writing the implementation completion signal, derive the live implementation Goal Agent process JSON from that signal path and correlate its parsed details: goal_id DR49A214886079BD26686C47BA, round_idx 3, implementation_phase implement, non-empty operation_id and session_id, round-4 branch/worktree, and workflow state in-progress. Correlate those facts with goal.json status in-progress, four rounds, Round 4 implementation_plan.binding (same Goal, round_idx 3, branch, base ed991b037d5287ae78b07a01c2260a9d4d46b2de), current HEAD/base, and retained Round 3 failure. Record the exact operation/session identity as observational provenance only. Do not claim future events: after the signal, Refine alone must create/publish the candidate, run configured Quality, prepare Ready Merge, and acquire the exclusive lane, and it must fail closed unless those events remain attributed to round_idx 3 and the same Round 4 binding/workflow claim context before any Git integration.",
+                "governance_rationale": "This separates evidence by its actual owner and preserves recoverable Git/process behavior, governance, Quality, and human Review boundaries. The implementation agent verifies its live process and accepted plan binding but does not commit, publish, approve, merge, mutate durable Goal state, weaken the fence, or assert workflow events that can only occur after it exits.",
+                "id": "P5",
+                "verification": [
+                  "cargo test exits 0; report exact passed, failed, and ignored counts",
+                  "node --test tests/*.test.js exits 0; report exact passed, failed, and skipped counts, with missing Chromium cases identified as skips",
+                  "cargo fmt -- --check exits 0",
+                  "git diff --check exits 0",
+                  "git status --short --branch and git diff --stat show a reviewable Round 4 branch with only owned files changed and no agent-created commit",
+                  "Immediately pre-signal, jq -e over the live implementation process JSON (details | fromjson) and goal.json proves matching goal_id, round_idx 3, implementation phase, branch, worktree, non-empty operation_id/session_id, status in-progress, round count 4, binding base ed991b037d5287ae78b07a01c2260a9d4d46b2de, and HEAD equal to that base; exact identity values are recorded in implementation evidence",
+                  "Immediately pre-signal, git show -s 5e7723d39d18b385694db4e157e8742443681e11 plus local/remote Round 1 and local Round 3 ref readback still succeeds, and goal/runtime log files remain present",
+                  "Post-signal commit, publication, Quality, Ready Merge, and exclusive-lane attribution are explicitly left for Refine to verify against round_idx 3 and the Round 4 workflow context; the implementation checklist claims none of those future events"
+                ]
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "P1 removes the obsolete five-file invariant, and P2 explicitly changes and extends current-main src/tools/product/project_registry/tests.rs with distinct registry and active-node roots. The capability regression covers status, attach, switch, clone, inspect, detach, restart, storage placement, migration call ownership, and supervised-process placement rather than relying only on web wiring."
+              },
+              {
+                "criticism_id": "C2",
+                "resolution": "P3 creates a differently owned Goal before activation and a port-owned Goal afterward, then proves current versus all scoping through dashboard backlog/stat totals and Goal-list row IDs in addition to active_node_id, while still comparing GET /api/project/status with GET /api/nodes under the stale-shared/port-root split."
+              },
+              {
+                "criticism_id": "C3",
+                "resolution": "P5 limits implementation-agent evidence to the immediate pre-signal correlation of live process operation/session metadata with the Round 4 Goal binding, branch, worktree, base, phase, status, and four-round count. It separately states Refine's post-signal fail-closed responsibility for candidate, publication, Quality, Ready Merge, and lane attribution and forbids the agent from claiming those future events."
+              }
+            ],
+            "summary": "Recover the verified active-node behavior on the clean Round 4 branch at current main without changing durable Goal state, prior refs/evidence, or Ready Merge fencing. Preserve shared app attachment persistence at the registry root, add a distinct port-runtime active-node root at the existing project-registry capability boundary, directly test every status-producing capability path under that split, prove API/dashboard/Goal ownership filtering with pre- and post-activation Goals, and cover browser title/navigation/table labels while keeping the surfaces thin. Complete implementation with full regression and hygiene checks, then record only the implementation agent's pre-signal ownership correlation; Refine remains responsible for fail-closed post-signal candidate, Quality, Ready Merge, and exclusive-lane attribution."
+          },
+          "started_at": "2026-08-12T17:40:11Z"
+        },
+        "schema_version": 2,
+        "started_at": "2026-08-12T17:40:11Z",
+        "state": "completed",
+        "updated_at": "2026-08-12T18:02:19Z"
+      },
+      "implementation_report": "Implemented the two-root project-registry contract and port-authoritative web identity with direct capability, API/dashboard filtering, VM, and browser regressions. Shared apps.json, migration, and supervised-process storage remain at runtime_root; all ProjectStatus active identity resolution uses active_node_root. Exact verification: cargo test passed 706 with 0 failed and 6 ignored; node --test tests/*.test.js passed 160 with 0 failed and 25 explicitly skipped because no Playwright Chromium build is available; focused capability 6/6, focused project-runtime 1/1, existing node filtering baseline 1/1, VM label 1/1; formatting and diff checks passed. Preserved candidate/ref/history evidence and correlated live Round 4 ownership immediately before this signal. Refine retains responsibility for post-signal commit, publication, Quality, Ready Merge, and exclusive-lane attribution and must fail closed on any round/workflow mismatch.",
+      "implementation_reported_at": "2026-08-12T18:02:21Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Recover the Round 3 implementation-planning failure from current main while preserving its complete proposal, criticism, invalid revise output, clean worktree evidence, and all earlier Goal/Git history. Round 3 produced no candidate. Preserve verified candidate 5e7723d39d18b385694db4e157e8742443681e11 and the original Ready Merge round-ownership failure; do not weaken or bypass the round/revision fence.\n\nUse the accepted Round 3 architecture, explicitly resolve all three recorded criticism findings in a valid structured plan, then implement:\n- Keep shared attachment/app-registry persistence at the shared registry root, while active-node selection comes from the port-scoped runtime root. Extend the current-main shared capability tests in src/tools/product/project_registry/tests.rs (do not enforce an obsolete five-file limit) with distinct roots: stale shared-root selection plus authoritative port-root selection. Prove apps.json remains only at the registry root and attach, switch, clone, inspect, detach, status, and restart responses consistently use the active-node root while migration and supervised-process storage remain on the registry/runtime storage root.\n- In the web/API regression, create a differently owned Goal before port activation and a port-owned Goal afterward. Prove /api/project/status and /api/nodes agree on the port owner; /api/dashboard?node=current identifies the port owner and its counts/rows exclude the other Goal; node=all includes both; and new Goal ownership, browser title/nav label, and Goals table label use the port owner rather than the stale shared-root selection.\n- Divide evidence by owner. Immediately before implementation completion, the agent must correlate the live goal-agent process metadata—goal_id, round_idx 3, operation/execution identity, branch, worktree, phase—with the Goal plan binding, current round count 4, base, and status. Do not claim post-signal events. Separately, Refine must fail closed unless its later commit, candidate publication, Quality, Ready Merge, and exclusive-lane events remain attributed to this same round and workflow context.\n\nSemantically replay only the valid active-node behavior onto current main and resolve genuine drift. Keep browser and server surfaces thin, preserve the shared capability boundary and prior refs/logs, and do not edit Ready Merge fencing. Run focused shared-capability, project-runtime, dashboard filtering, DOM/static, and browser tests; full relevant Rust/Node suites; formatting; and git diff checks. Missing Playwright Chromium is a skip. Do not approve, merge, rewrite history, delete retained evidence, or directly edit durable Goal state.",
+      "quality_checked_at": "2026-08-12T18:04:00Z",
+      "quality_details": {
+        "candidate_commit": "e43bb949bef03a2611716c2b4db29d494f144be1",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR49A214886079BD26686C47BA-round-4",
+        "diagnostics": [
+          "No Quality tests or migrated commands are configured; evaluation was a no-op."
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "19ff7253be3cfae86",
+        "results": [],
+        "source_candidate_commit": "e43bb949bef03a2611716c2b4db29d494f144be1"
+      },
+      "quality_message": "No Quality tests configured.",
+      "quality_state": "passed",
+      "reporter": "Buddy Williams",
+      "rule_state": "passed",
+      "updated": "2026-08-12T18:04:05Z",
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "e43bb949bef03a2611716c2b4db29d494f144be1",
+        "integrated_at": "2026-08-12T18:04:06.457963971+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n src/surfaces/web_server/runtime.rs               |   9 +-\n src/surfaces/web_server/tests/project_runtime.rs | 176 +++++++++++++++++++++++\n src/tools/product/project_registry/mod.rs        |  29 +++-\n src/tools/product/project_registry/tests.rs      | 151 +++++++++++++------\n tests/web_active_node_label.test.js              |  52 +++++++\n tests/web_screen_render.test.js                  |  66 +++++++++\n 6 files changed, 432 insertions(+), 51 deletions(-)\n create mode 100644 tests/web_active_node_label.test.js",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "47b9939d89e36296b89599e2abe495817e8cbf48"
+      },
+      "workflow_quality_timing": "pre_merge",
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    }
+  ],
+  "status": "done",
+  "target_branch": "main",
+  "updated": "2026-08-12T18:04:21Z",
+  "workflow_revision": 59
+}

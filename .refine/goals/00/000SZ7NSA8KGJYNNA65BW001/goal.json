@@ -1,0 +1,898 @@
+{
+  "base_commit": "8244f4aa452d7a5abc2d8a0fa3d7ba916a540e4c",
+  "branch_name": "refine/00000SZ7NSA8KGJYNNA65BW001/round-3",
+  "candidate_commit": "367758eb76955f04e85d837bef5c39c94300564a",
+  "created": "2026-07-26T13:59:33Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ7NSA8KGJYNNA65BW001",
+  "name": "Finish cohesive Rust module boundaries",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-07-26T14:12:34Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Complete the responsibility-based Rust modularization follow-up to Goal 00000SZ7FC7AJGZ49XT675R003. Work from the current integrated main baseline and keep the change behavior-neutral except for the explicitly requested Guidance-selection and test-reliability corrections below.\n\nReview evidence\n\nThe previous Goal materially improved the tree: the largest tracked Rust file fell from 9,025 to 998 lines, files above 1,000 lines fell from 32 to zero, and the roughly 500-line review-trigger inventory fell from 50 to 35. Current formatting and compilation pass. However, review found that several documented exceptions do not match the actual item families:\n\n- src/workflow/mod.rs is described as a public composition contract, but it still combines workflow-state persistence, settings parsing, round creation, retry-context hydration, branch/worktree construction, governance prompt construction and verdict parsing, and Goal-agent context/prompt helpers.\n- src/surfaces/web_server/work_routes.rs is described as a thin shared-codec parent, but it still combines import extraction and duplicate persistence, terminal prompt construction and standalone-worktree lifecycle, Feature response/reorder helpers, import cancellation/rollback helpers, and route composition.\n- src/tools/product/chat/mod.rs is described as a public session/queue contract and composition root, but it still combines prompt/context assembly, transcript projection, importable-artifact parsing, queue formatting, session validation/locking, identifiers, and atomic persistence helpers.\n- Extracted modules rely heavily on wildcard parent imports: 319 new use super::* declarations were added, including 187 non-test production files. The modules are real physical boundaries, but many dependencies remain implicit.\n- The live Cohesive code files Guidance entry is exact, enabled, and unique, yet the previous Goal's Round 2 guidance decision recorded it as skipped even though its Rule says it applies whenever an agent adds or changes code files. Persistence is proven, but consistent selection/application is not.\n- A current cargo test --all-targets run initially failed tools::product::process_control::tests::settlement::rollback_failed_after_goal_restore_replays_from_exact_restored_revision because the observed PID identity was unavailable. The unchanged test passed immediately in isolation and a second full run passed, including the repeated 526-test test_all run. Treat this as timing-sensitive test infrastructure to investigate without weakening production PID-identity fail-closed behavior.\n\nRequired work\n\n1. Re-read the remaining roughly 500-line exceptions from docs/rust-file-cohesion-audit.md. Finish the responsibility splits in workflow/mod.rs, work_routes.rs, and chat/mod.rs. Move cohesive implementation families into responsibility-named child modules while retaining narrow parent composition contracts, stable public paths, and one authoritative owner for each durable invariant.\n2. Reassess other remaining exceptions whose prose claims a parent is composition-only or thin. Correct either the physical boundary or the audit disposition based on the actual code. Do not use a mechanical line cap.\n3. In production modules created or materially changed by this follow-up, replace wildcard parent imports with explicit imports or a deliberately narrow shared interface. Do not perform noisy test-only import churn unless it clarifies a real ownership boundary.\n4. Investigate why Cohesive code files was skipped for a code-changing Round despite its unconditional Rule. Preserve explicit, auditable Guidance decisions, but ensure an applicable enabled rule cannot be silently omitted. Add focused coverage for the intended selection/application contract and verify the durable Guidance record remains unique, exact, and enabled.\n5. Reproduce and stabilize the process-control rollback replay test under repetition and concurrent suite execution. Fix test fixture identity/timing ownership rather than relaxing fail-closed production checks. If it cannot be reproduced after proportionate stress, record the exact stress command and evidence rather than adding arbitrary sleeps.\n6. Refresh docs/rust-file-cohesion-audit.md with the new inventory and accurate, item-family-specific dispositions. Keep exceptions reviewable and reopen them when new unrelated responsibility appears.\n\nConstraints\n\n- Preserve public module paths, serialization formats, CLI/API/MCP contracts, durable workflow and process state, cancellation/rollback ordering, audit evidence, confirmation boundaries, and behavior not explicitly changed above.\n- Use real named Rust modules. Do not create numbered chunks, line-range shards, include-only fragments, or generic misc/common dumping grounds.\n- Keep authoritative mutation, locking, fencing, identity checks, and settlement ordering explicit. Moving code must not create multiple writers or allow cleanup/publication before durable prerequisites.\n- Keep the work reviewable and distinguish structural moves from the narrow Guidance/test-reliability behavior fixes.\n\nAcceptance criteria\n\n- workflow/mod.rs, work_routes.rs, and chat/mod.rs are truthful narrow parents or have a concrete invariant-specific exception supported by their actual item families.\n- Production child modules touched by this work declare understandable dependencies; wildcard parent imports are not the default integration mechanism.\n- The remaining tracked Rust inventory above roughly 500 lines is measured and every exception in the audit is accurate and specific.\n- Exactly one enabled Cohesive code files Guidance entry remains durable and exact, and focused tests prove the intended applicable-Guidance selection/application behavior.\n- The rollback replay test passes repeated isolated and concurrent execution without weakening PID-identity safety.\n- Run and report git diff --check, cargo fmt --all --check, cargo check --all-targets, focused tests for every moved or behavior-adjusted responsibility, and cargo test --all-targets. Report initial failures, reruns, warnings, and final results exactly.\n\nLeave this Goal in the normal workflow. Do not approve it or cross the human Review boundary.",
+          "reporter": "Buddy Williams",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZ7NSA8KGJYNNA65BW001",
+          "name": "Finish cohesive Rust module boundaries",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-07-26T14:00:22Z",
+      "failure_at": "2026-07-26T14:56:00Z",
+      "failure_category": "governance",
+      "failure_message": "Import persistence remains surface-owned and diverges from the shared capability.",
+      "governance_checked_at": "2026-07-26T14:55:58Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ7NSA8KGJYNNA65BW001-round-1",
+        "failed_actions": [
+          {
+            "message": "src/surfaces/web_server/work_routes/import_contract.rs owns Goal creation, duplicate decisions, metadata mutation, Feature assignment, and rollback instead of remaining a thin adapter to a shared import capability.",
+            "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+            "rule_id": "rule-1"
+          },
+          {
+            "message": "ImportDraft persistence is implemented separately in FileImportService::persist and persist_import_draft_with_duplicate_decision, creating two authoritative implementations with different duplicate and failure semantics.",
+            "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+            "rule_id": "rule-2"
+          },
+          {
+            "message": "Import behavior is not one shared capability: daemon-backed UI/API/CLI paths use the web-route persistence implementation, while direct CLI imports use FileImportService::persist with different semantics.",
+            "rule": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+            "rule_id": "rule-8"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Import persistence remains surface-owned and diverges from the shared capability.\",\"violations\":[{\"rule_id\":\"rule-1\",\"rule\":\"Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.\",\"message\":\"src/surfaces/web_server/work_routes/import_contract.rs owns Goal creation, duplicate decisions, metadata mutation, Feature assignment, and rollback instead of remaining a thin adapter to a shared import capability.\"},{\"rule_id\":\"rule-2\",\"rule\":\"Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.\",\"message\":\"ImportDraft persistence is implemented separately in FileImportService::persist and persist_import_draft_with_duplicate_decision, creating two authoritative implementations with different duplicate and failure semantics.\"},{\"rule_id\":\"rule-8\",\"rule\":\"Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.\",\"message\":\"Import behavior is not one shared capability: daemon-backed UI/API/CLI paths use the web-route persistence implementation, while direct CLI imports use FileImportService::persist with different semantics.\"}]}",
+        "rules_checked": 9,
+        "verdict": {
+          "message": "Import persistence remains surface-owned and diverges from the shared capability.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "src/surfaces/web_server/work_routes/import_contract.rs owns Goal creation, duplicate decisions, metadata mutation, Feature assignment, and rollback instead of remaining a thin adapter to a shared import capability.",
+              "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "rule_id": "rule-1"
+            },
+            {
+              "message": "ImportDraft persistence is implemented separately in FileImportService::persist and persist_import_draft_with_duplicate_decision, creating two authoritative implementations with different duplicate and failure semantics.",
+              "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "rule_id": "rule-2"
+            },
+            {
+              "message": "Import behavior is not one shared capability: daemon-backed UI/API/CLI paths use the web-route persistence implementation, while direct CLI imports use FileImportService::persist with different semantics.",
+              "rule": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "rule_id": "rule-8"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ7NSA8KGJYNNA65BW001-round-1"
+      },
+      "governance_message": "Import persistence remains surface-owned and diverges from the shared capability.",
+      "governance_rule_actions": [
+        {
+          "message": "src/surfaces/web_server/work_routes/import_contract.rs owns Goal creation, duplicate decisions, metadata mutation, Feature assignment, and rollback instead of remaining a thin adapter to a shared import capability.",
+          "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+          "rule_id": "rule-1"
+        },
+        {
+          "message": "ImportDraft persistence is implemented separately in FileImportService::persist and persist_import_draft_with_duplicate_decision, creating two authoritative implementations with different duplicate and failure semantics.",
+          "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+          "rule_id": "rule-2"
+        },
+        {
+          "message": "Import behavior is not one shared capability: daemon-backed UI/API/CLI paths use the web-route persistence implementation, while direct CLI imports use FileImportService::persist with different semantics.",
+          "rule": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+          "rule_id": "rule-8"
+        }
+      ],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "context_version": 1,
+        "recorded_at": "2026-07-26T14:50:35Z",
+        "skipped": []
+      },
+      "implementation_report": "Split workflow, work_routes, and chat into responsibility-named modules with explicit production dependency catalogs; enforced applicable code Guidance from committed candidate paths; stabilized the rollback PID-exit race and test-owned process lifetime; refreshed the exact 33-file cohesion audit. Verification: git diff --check, cargo fmt --all --check, and cargo check --all-targets passed; focused workflow behavior 6/6, work routes 6/6, chat 14/14, workflow 39/39, process control 17/17, and Git changed-path 1/1 passed; rollback replay stress passed 16/16 at concurrency 4; final cargo test --all-targets passed both 530-test layers and both 0-test binary targets. Live Cohesive code files Guidance is unique, enabled, and exact (1/1). No final warnings.",
+      "implementation_reported_at": "2026-07-26T14:50:35Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Complete the responsibility-based Rust modularization follow-up to Goal 00000SZ7FC7AJGZ49XT675R003. Work from the current integrated main baseline and keep the change behavior-neutral except for the explicitly requested Guidance-selection and test-reliability corrections below.\n\nReview evidence\n\nThe previous Goal materially improved the tree: the largest tracked Rust file fell from 9,025 to 998 lines, files above 1,000 lines fell from 32 to zero, and the roughly 500-line review-trigger inventory fell from 50 to 35. Current formatting and compilation pass. However, review found that several documented exceptions do not match the actual item families:\n\n- src/workflow/mod.rs is described as a public composition contract, but it still combines workflow-state persistence, settings parsing, round creation, retry-context hydration, branch/worktree construction, governance prompt construction and verdict parsing, and Goal-agent context/prompt helpers.\n- src/surfaces/web_server/work_routes.rs is described as a thin shared-codec parent, but it still combines import extraction and duplicate persistence, terminal prompt construction and standalone-worktree lifecycle, Feature response/reorder helpers, import cancellation/rollback helpers, and route composition.\n- src/tools/product/chat/mod.rs is described as a public session/queue contract and composition root, but it still combines prompt/context assembly, transcript projection, importable-artifact parsing, queue formatting, session validation/locking, identifiers, and atomic persistence helpers.\n- Extracted modules rely heavily on wildcard parent imports: 319 new use super::* declarations were added, including 187 non-test production files. The modules are real physical boundaries, but many dependencies remain implicit.\n- The live Cohesive code files Guidance entry is exact, enabled, and unique, yet the previous Goal's Round 2 guidance decision recorded it as skipped even though its Rule says it applies whenever an agent adds or changes code files. Persistence is proven, but consistent selection/application is not.\n- A current cargo test --all-targets run initially failed tools::product::process_control::tests::settlement::rollback_failed_after_goal_restore_replays_from_exact_restored_revision because the observed PID identity was unavailable. The unchanged test passed immediately in isolation and a second full run passed, including the repeated 526-test test_all run. Treat this as timing-sensitive test infrastructure to investigate without weakening production PID-identity fail-closed behavior.\n\nRequired work\n\n1. Re-read the remaining roughly 500-line exceptions from docs/rust-file-cohesion-audit.md. Finish the responsibility splits in workflow/mod.rs, work_routes.rs, and chat/mod.rs. Move cohesive implementation families into responsibility-named child modules while retaining narrow parent composition contracts, stable public paths, and one authoritative owner for each durable invariant.\n2. Reassess other remaining exceptions whose prose claims a parent is composition-only or thin. Correct either the physical boundary or the audit disposition based on the actual code. Do not use a mechanical line cap.\n3. In production modules created or materially changed by this follow-up, replace wildcard parent imports with explicit imports or a deliberately narrow shared interface. Do not perform noisy test-only import churn unless it clarifies a real ownership boundary.\n4. Investigate why Cohesive code files was skipped for a code-changing Round despite its unconditional Rule. Preserve explicit, auditable Guidance decisions, but ensure an applicable enabled rule cannot be silently omitted. Add focused coverage for the intended selection/application contract and verify the durable Guidance record remains unique, exact, and enabled.\n5. Reproduce and stabilize the process-control rollback replay test under repetition and concurrent suite execution. Fix test fixture identity/timing ownership rather than relaxing fail-closed production checks. If it cannot be reproduced after proportionate stress, record the exact stress command and evidence rather than adding arbitrary sleeps.\n6. Refresh docs/rust-file-cohesion-audit.md with the new inventory and accurate, item-family-specific dispositions. Keep exceptions reviewable and reopen them when new unrelated responsibility appears.\n\nConstraints\n\n- Preserve public module paths, serialization formats, CLI/API/MCP contracts, durable workflow and process state, cancellation/rollback ordering, audit evidence, confirmation boundaries, and behavior not explicitly changed above.\n- Use real named Rust modules. Do not create numbered chunks, line-range shards, include-only fragments, or generic misc/common dumping grounds.\n- Keep authoritative mutation, locking, fencing, identity checks, and settlement ordering explicit. Moving code must not create multiple writers or allow cleanup/publication before durable prerequisites.\n- Keep the work reviewable and distinguish structural moves from the narrow Guidance/test-reliability behavior fixes.\n\nAcceptance criteria\n\n- workflow/mod.rs, work_routes.rs, and chat/mod.rs are truthful narrow parents or have a concrete invariant-specific exception supported by their actual item families.\n- Production child modules touched by this work declare understandable dependencies; wildcard parent imports are not the default integration mechanism.\n- The remaining tracked Rust inventory above roughly 500 lines is measured and every exception in the audit is accurate and specific.\n- Exactly one enabled Cohesive code files Guidance entry remains durable and exact, and focused tests prove the intended applicable-Guidance selection/application behavior.\n- The rollback replay test passes repeated isolated and concurrent execution without weakening PID-identity safety.\n- Run and report git diff --check, cargo fmt --all --check, cargo check --all-targets, focused tests for every moved or behavior-adjusted responsibility, and cargo test --all-targets. Report initial failures, reruns, warnings, and final results exactly.\n\nLeave this Goal in the normal workflow. Do not approve it or cross the human Review boundary.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "failed",
+      "updated": "2026-07-26T14:56:01Z",
+      "workflow_quality_timing": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-07-26T15:23:18Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Recover Goal 00000SZ7NSA8KGJYNNA65BW001 from its Round 1 Governance failure. Preserve the completed Round 1 modularization and test-reliability work, and remediate only the recorded import capability-boundary violations plus necessary compile/test adjustments.\n\nPreserved evidence\n\n- Round 1 base: 8244f4aa452d7a5abc2d8a0fa3d7ba916a540e4c.\n- Round 1 candidate: 4f61ab01818a2275db068040ea8cb794675ddd96 on refine/00000SZ7NSA8KGJYNNA65BW001/round-1.\n- The Round 1 worktree is clean. The candidate is not integrated into main, and current main/origin/main still equal the Round 1 base.\n- Round 1 reported git diff --check, cargo fmt --all --check, cargo check --all-targets, focused suites, rollback stress, and cargo test --all-targets passing. Governance, not implementation or tests, failed.\n- Do not delete, reset, rewrite, or otherwise disturb the Round 1 branch, worktree, commit, or durable failure evidence. Bring its changes forward into the new Round through ordinary auditable Git and preserve its successful workflow/chat/module-boundary, Guidance, PID-identity, test, and cohesion-audit work.\n\nExact Governance failure\n\nGovernance failed with: Import persistence remains surface-owned and diverges from the shared capability.\n\nRecorded violations:\n\n1. Rule 1: src/surfaces/web_server/work_routes/import_contract.rs owns Goal creation, duplicate decisions, metadata mutation, Feature assignment, and rollback instead of remaining a thin adapter to a shared import capability.\n2. Rule 2: ImportDraft persistence is implemented separately in FileImportService::persist and persist_import_draft_with_duplicate_decision, creating two authoritative implementations with different duplicate and failure semantics.\n3. Rule 8: daemon-backed UI/API/CLI paths use the web-route persistence implementation while direct CLI imports use FileImportService::persist, so import behavior is not one shared capability across surfaces.\n\nRequired remediation\n\n1. Establish one authoritative import-persistence implementation under crate::tools::product::imports in a responsibility-named module. It must own ImportDraft-to-Goal mutation semantics, duplicate-decision validation and execution, Goal round/reporter/assignee/priority updates, Feature validation/assignment, dependency ordering, created-Goal accounting, and rollback policy.\n2. Make FileImportService::persist, direct CLI imports, daemon-backed CLI imports, synchronous HTTP imports, and background HTTP imports delegate to that same product capability. Remove the separate surface-owned persist_import_draft_with_duplicate_decision algorithm rather than wrapping or copying it.\n3. Model progress and cancellation through a small surface-neutral capability contract or callbacks. The web adapter may translate FileOperationRegistry cancellation/progress into that contract, but the shared import capability must not depend on ApiRequest, ApiResponse, HTTP status codes, or web-route modules.\n4. Return a typed shared result that carries the information surfaces need, including created Goal IDs, Feature identity, duplicate-action counts/outcomes, and cancellation or failure evidence as appropriate. Keep HTTP/JSON response shaping, operation registration/finalization, projection refresh, and browser-specific status mapping in the web surface.\n5. Make failure and cancellation behavior explicit and consistent. Preserve the current externally observable API/CLI contracts and fail safely: no silently divergent duplicate handling, no orphaned partial Goal set after a cancellation path that promises rollback, and no rollback of pre-existing Goals or Features. Do not weaken work-item revision, ownership, or audit checks.\n6. Reassess import_destination_feature_id as part of the same boundary. Feature creation/lookup performed specifically for an import must use the shared import/work-item capability for authoritative mutation; the web surface may parse destination fields and render the Feature response.\n7. Keep src/surfaces/web_server/work_routes/import_contract.rs only if it becomes a genuinely thin transport/format adapter. Otherwise remove it and place remaining extraction/provider/response helpers in accurately named surface modules.\n\nFocused verification\n\n- Add shared capability tests for new Goal creation and metadata/round preservation; existing and newly created Feature destinations; dependency ordering; each supported duplicate decision (original, duplicate, move original to backlog, update original prompt, reporter, and priority); rejection of unknown decisions; failure accounting; and cancellation rollback.\n- Add parity evidence showing the same drafts and options produce the same durable import semantics through direct FileImportService/CLI and daemon-backed HTTP/CLI paths.\n- Preserve background operation progress/cancellation tests and prove the web adapter delegates persistence rather than reimplementing it.\n- Re-run the Round 1 focused workflow, chat, Guidance, process-control, and changed-path tests needed to prove the carried-forward candidate remains intact.\n\nFinal gates and reporting\n\nRun git diff --check, cargo fmt --all --check, cargo check --all-targets, focused import capability and surface tests, the relevant carried-forward focused tests, and cargo test --all-targets. Report every initial failure and rerun, exact counts, warnings, the final cohesion inventory, and the exact Governance result.\n\nPreserve public module paths, serialization formats, CLI/API/MCP contracts, durable state, confirmation boundaries, and all unrelated behavior. Do not create new duplicate machinery, force merge, rewrite history, approve the Goal, or cross the human Review boundary.",
+          "reporter": "Buddy Williams",
+          "round": 2
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZ7NSA8KGJYNNA65BW001",
+          "name": "Finish cohesive Rust module boundaries",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "Buddy Williams",
+            "constitution_state": "passed",
+            "governance_checked_at": "2026-07-26T14:55:58Z",
+            "governance_details": {
+              "configured": true,
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ7NSA8KGJYNNA65BW001-round-1",
+              "failed_actions": [
+                {
+                  "message": "src/surfaces/web_server/work_routes/import_contract.rs owns Goal creation, duplicate decisions, metadata mutation, Feature assignment, and rollback instead of remaining a thin adapter to a shared import capability.",
+                  "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+                  "rule_id": "rule-1"
+                },
+                {
+                  "message": "ImportDraft persistence is implemented separately in FileImportService::persist and persist_import_draft_with_duplicate_decision, creating two authoritative implementations with different duplicate and failure semantics.",
+                  "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+                  "rule_id": "rule-2"
+                },
+                {
+                  "message": "Import behavior is not one shared capability: daemon-backed UI/API/CLI paths use the web-route persistence implementation, while direct CLI imports use FileImportService::persist with different semantics.",
+                  "rule": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+                  "rule_id": "rule-8"
+                }
+              ],
+              "governance_configured": true,
+              "phase": "post_implementation",
+              "provider": "codex",
+              "raw_output": "{\"status\":\"failed\",\"message\":\"Import persistence remains surface-owned and diverges from the shared capability.\",\"violations\":[{\"rule_id\":\"rule-1\",\"rule\":\"Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.\",\"message\":\"src/surfaces/web_server/work_routes/import_contract.rs owns Goal creation, duplicate decisions, metadata mutation, Feature assignment, and rollback instead of remaining a thin adapter to a shared import capability.\"},{\"rule_id\":\"rule-2\",\"rule\":\"Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.\",\"message\":\"ImportDraft persistence is implemented separately in FileImportService::persist and persist_import_draft_with_duplicate_decision, creating two authoritative implementations with different duplicate and failure semantics.\"},{\"rule_id\":\"rule-8\",\"rule\":\"Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.\",\"message\":\"Import behavior is not one shared capability: daemon-backed UI/API/CLI paths use the web-route persistence implementation, while direct CLI imports use FileImportService::persist with different semantics.\"}]}",
+              "rules_checked": 9,
+              "verdict": {
+                "message": "Import persistence remains surface-owned and diverges from the shared capability.",
+                "status": "failed",
+                "violations": [
+                  {
+                    "message": "src/surfaces/web_server/work_routes/import_contract.rs owns Goal creation, duplicate decisions, metadata mutation, Feature assignment, and rollback instead of remaining a thin adapter to a shared import capability.",
+                    "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+                    "rule_id": "rule-1"
+                  },
+                  {
+                    "message": "ImportDraft persistence is implemented separately in FileImportService::persist and persist_import_draft_with_duplicate_decision, creating two authoritative implementations with different duplicate and failure semantics.",
+                    "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+                    "rule_id": "rule-2"
+                  },
+                  {
+                    "message": "Import behavior is not one shared capability: daemon-backed UI/API/CLI paths use the web-route persistence implementation, while direct CLI imports use FileImportService::persist with different semantics.",
+                    "rule": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+                    "rule_id": "rule-8"
+                  }
+                ]
+              },
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ7NSA8KGJYNNA65BW001-round-1"
+            },
+            "governance_message": "Import persistence remains surface-owned and diverges from the shared capability.",
+            "governance_rule_actions": [
+              {
+                "message": "src/surfaces/web_server/work_routes/import_contract.rs owns Goal creation, duplicate decisions, metadata mutation, Feature assignment, and rollback instead of remaining a thin adapter to a shared import capability.",
+                "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+                "rule_id": "rule-1"
+              },
+              {
+                "message": "ImportDraft persistence is implemented separately in FileImportService::persist and persist_import_draft_with_duplicate_decision, creating two authoritative implementations with different duplicate and failure semantics.",
+                "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+                "rule_id": "rule-2"
+              },
+              {
+                "message": "Import behavior is not one shared capability: daemon-backed UI/API/CLI paths use the web-route persistence implementation, while direct CLI imports use FileImportService::persist with different semantics.",
+                "rule": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+                "rule_id": "rule-8"
+              }
+            ],
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                },
+                {
+                  "enabled": true,
+                  "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+                  "name": "Cohesive code files",
+                  "rule": "Apply whenever an agent adds or changes code files in any language."
+                }
+              ],
+              "context_version": 1,
+              "recorded_at": "2026-07-26T14:50:35Z",
+              "skipped": []
+            },
+            "implementation_report": "Split workflow, work_routes, and chat into responsibility-named modules with explicit production dependency catalogs; enforced applicable code Guidance from committed candidate paths; stabilized the rollback PID-exit race and test-owned process lifetime; refreshed the exact 33-file cohesion audit. Verification: git diff --check, cargo fmt --all --check, and cargo check --all-targets passed; focused workflow behavior 6/6, work routes 6/6, chat 14/14, workflow 39/39, process control 17/17, and Git changed-path 1/1 passed; rollback replay stress passed 16/16 at concurrency 4; final cargo test --all-targets passed both 530-test layers and both 0-test binary targets. Live Cohesive code files Guidance is unique, enabled, and exact (1/1). No final warnings.",
+            "implementation_reported_at": "2026-07-26T14:50:35Z",
+            "meta_rule_state": "passed",
+            "product_state": "passed",
+            "prompt": "Complete the responsibility-based Rust modularization follow-up to Goal 00000SZ7FC7AJGZ49XT675R003. Work from the current integrated main baseline and keep the change behavior-neutral except for the explicitly requested Guidance-selection and test-reliability corrections below.\n\nReview evidence\n\nThe previous Goal materially improved the tree: the largest tracked Rust file fell from 9,025 to 998 lines, files above 1,000 lines fell from 32 to zero, and the roughly 500-line review-trigger inventory fell from 50 to 35. Current formatting and compilation pass. However, review found that several documented exceptions do not match the actual item families:\n\n- src/workflow/mod.rs is described as a public composition contract, but it still combines workflow-state persistence, settings parsing, round creation, retry-context hydration, branch/worktree construction, governance prompt construction and verdict parsing, and Goal-agent context/prompt helpers.\n- src/surfaces/web_server/work_routes.rs is described as a thin shared-codec parent, but it still combines import extraction and duplicate persistence, terminal prompt construction and standalone-worktree lifecycle, Feature response/reorder helpers, import cancellation/rollback helpers, and route composition.\n- src/tools/product/chat/mod.rs is described as a public session/queue contract and composition root, but it still combines prompt/context assembly, transcript projection, importable-artifact parsing, queue formatting, session validation/locking, identifiers, and atomic persistence helpers.\n- Extracted modules rely heavily on wildcard parent imports: 319 new use super::* declarations were added, including 187 non-test production files. The modules are real physical boundaries, but many dependencies remain implicit.\n- The live Cohesive code files Guidance entry is exact, enabled, and unique, yet the previous Goal's Round 2 guidance decision recorded it as skipped even though its Rule says it applies whenever an agent adds or changes code files. Persistence is proven, but consistent selection/application is not.\n- A current cargo test --all-targets run initially failed tools::product::process_control::tests::settlement::rollback_failed_after_goal_restore_replays_from_exact_restored_revision because the observed PID identity was unavailable. The unchanged test passed immediately in isolation and a second full run passed, including the repeated 526-test test_all run. Treat this as timing-sensitive test infrastructure to investigate without weakening production PID-identity fail-closed behavior.\n\nRequired work\n\n1. Re-read the remaining roughly 500-line exceptions from docs/rust-file-cohesion-audit.md. Finish the responsibility splits in workflow/mod.rs, work_routes.rs, and chat/mod.rs. Move cohesive implementation families into responsibility-named child modules while retaining narrow parent composition contracts, stable public paths, and one authoritative owner for each durable invariant.\n2. Reassess other remaining exceptions whose prose claims a parent is composition-only or thin. Correct either the physical boundary or the audit disposition based on the actual code. Do not use a mechanical line cap.\n3. In production modules created or materially changed by this follow-up, replace wildcard parent imports with explicit imports or a deliberately narrow shared interface. Do not perform noisy test-only import churn unless it clarifies a real ownership boundary.\n4. Investigate why Cohesive code files was skipped for a code-changing Round despite its unconditional Rule. Preserve explicit, auditable Guidance decisions, but ensure an applicable enabled rule cannot be silently omitted. Add focused coverage for the intended selection/application contract and verify the durable Guidance record remains unique, exact, and enabled.\n5. Reproduce and stabilize the process-control rollback replay test under repetition and concurrent suite execution. Fix test fixture identity/timing ownership rather than relaxing fail-closed production checks. If it cannot be reproduced after proportionate stress, record the exact stress command and evidence rather than adding arbitrary sleeps.\n6. Refresh docs/rust-file-cohesion-audit.md with the new inventory and accurate, item-family-specific dispositions. Keep exceptions reviewable and reopen them when new unrelated responsibility appears.\n\nConstraints\n\n- Preserve public module paths, serialization formats, CLI/API/MCP contracts, durable workflow and process state, cancellation/rollback ordering, audit evidence, confirmation boundaries, and behavior not explicitly changed above.\n- Use real named Rust modules. Do not create numbered chunks, line-range shards, include-only fragments, or generic misc/common dumping grounds.\n- Keep authoritative mutation, locking, fencing, identity checks, and settlement ordering explicit. Moving code must not create multiple writers or allow cleanup/publication before durable prerequisites.\n- Keep the work reviewable and distinguish structural moves from the narrow Guidance/test-reliability behavior fixes.\n\nAcceptance criteria\n\n- workflow/mod.rs, work_routes.rs, and chat/mod.rs are truthful narrow parents or have a concrete invariant-specific exception supported by their actual item families.\n- Production child modules touched by this work declare understandable dependencies; wildcard parent imports are not the default integration mechanism.\n- The remaining tracked Rust inventory above roughly 500 lines is measured and every exception in the audit is accurate and specific.\n- Exactly one enabled Cohesive code files Guidance entry remains durable and exact, and focused tests prove the intended applicable-Guidance selection/application behavior.\n- The rollback replay test passes repeated isolated and concurrent execution without weakening PID-identity safety.\n- Run and report git diff --check, cargo fmt --all --check, cargo check --all-targets, focused tests for every moved or behavior-adjusted responsibility, and cargo test --all-targets. Report initial failures, reruns, warnings, and final results exactly.\n\nLeave this Goal in the normal workflow. Do not approve it or cross the human Review boundary.",
+            "reporter": "Buddy Williams",
+            "round": 1,
+            "rule_state": "failed"
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-07-26T15:22:00Z",
+      "failure_at": "2026-07-26T15:47:26Z",
+      "failure_category": "governance",
+      "failure_message": "Failure reporting and cancellation recovery are not surfaced correctly.",
+      "governance_checked_at": "2026-07-26T15:47:24Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ7NSA8KGJYNNA65BW001-round-2",
+        "failed_actions": [
+          {
+            "message": "ImportPersistFailure.failed_index is zero-based, but the web client interprets the API failure index as one-based, causing failed imports after the first draft to display and retry the wrong draft.",
+            "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+            "rule_id": "rule-1"
+          },
+          {
+            "message": "Import rollback failures are captured by the shared capability but discarded by the web adapter; cancellation is still reported as successfully cancelled even when rollback leaves created Goals or Features behind, with no durable failure feedback or recovery evidence.",
+            "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+            "rule_id": "rule-4"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Failure reporting and cancellation recovery are not surfaced correctly.\",\"violations\":[{\"rule_id\":\"rule-1\",\"rule\":\"Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.\",\"message\":\"ImportPersistFailure.failed_index is zero-based, but the web client interprets the API failure index as one-based, causing failed imports after the first draft to display and retry the wrong draft.\"},{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"Import rollback failures are captured by the shared capability but discarded by the web adapter; cancellation is still reported as successfully cancelled even when rollback leaves created Goals or Features behind, with no durable failure feedback or recovery evidence.\"}]}",
+        "rules_checked": 9,
+        "verdict": {
+          "message": "Failure reporting and cancellation recovery are not surfaced correctly.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "ImportPersistFailure.failed_index is zero-based, but the web client interprets the API failure index as one-based, causing failed imports after the first draft to display and retry the wrong draft.",
+              "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "rule_id": "rule-1"
+            },
+            {
+              "message": "Import rollback failures are captured by the shared capability but discarded by the web adapter; cancellation is still reported as successfully cancelled even when rollback leaves created Goals or Features behind, with no durable failure feedback or recovery evidence.",
+              "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "rule_id": "rule-4"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ7NSA8KGJYNNA65BW001-round-2"
+      },
+      "governance_message": "Failure reporting and cancellation recovery are not surfaced correctly.",
+      "governance_rule_actions": [
+        {
+          "message": "ImportPersistFailure.failed_index is zero-based, but the web client interprets the API failure index as one-based, causing failed imports after the first draft to display and retry the wrong draft.",
+          "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+          "rule_id": "rule-1"
+        },
+        {
+          "message": "Import rollback failures are captured by the shared capability but discarded by the web adapter; cancellation is still reported as successfully cancelled even when rollback leaves created Goals or Features behind, with no durable failure feedback or recovery evidence.",
+          "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+          "rule_id": "rule-4"
+        }
+      ],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "context_version": 1,
+        "recorded_at": "2026-07-26T15:43:30Z",
+        "skipped": []
+      },
+      "implementation_report": "Carried preserved Round 1 commit 4f61ab01818a2275db068040ea8cb794675ddd96 into Round 2 as ordinary cherry-pick f1bac920 without modifying the clean Round 1 branch/worktree. Added the single authoritative import persistence capability in src/tools/product/imports/persistence.rs; it owns duplicate-decision validation/execution, Goal creation and round/reporter/assignee/priority mutation, existing/new Feature validation and creation, assignment and dependency ordering, typed created-Goal/Feature/duplicate outcomes, surface-neutral progress/cancellation, and created-record rollback evidence. FileImportService, direct CLI imports, daemon-backed CLI HTTP, synchronous HTTP, and background HTTP now delegate to it. Removed the surface-owned duplicate persistence and rollback algorithms; the web surface now only parses destination fields, adapts FileOperationRegistry progress/cancellation, promotes/refreshes projections, and shapes existing responses. Updated import intent and the cohesion audit; public ImportPersistResult wire keys remain created/goal_ids/feature_id. Initial failures: first cargo fmt --all --check reported 2 rustfmt layout diffs and stopped before compilation; after formatting, the first cargo check --all-targets failed with 4 lib errors/9 lib-test errors from removed parent imports plus 2 unused warnings; the next check passed with 2 warnings, which were removed, and the final check passed with no warnings. The first focused import run was 11/12 because unknown-decision validation correctly created no temp directory and test cleanup returned ENOENT; fixture cleanup was corrected and every rerun passed. Final verification: git diff --check passed; cargo fmt --all --check passed; cargo check --all-targets passed with no warnings; shared imports 12/12; web import/background/parity 7/7; work-route extraction 6/6; direct CLI import focused tests 1/1 and 1/1; carried Guidance/workflow behavior 6/6; chat 14/14; workflow 39/39; process control 17/17; Git changed-path 1/1; rollback replay stress 16/16 at concurrency 4. Final cargo test --all-targets passed 538/538 lib tests, 0/0 main tests, 538/538 test_all unit tests, and 0/0 test_all main tests. Cohesion inventory: 33 tracked Rust files at or above the roughly 500-line review trigger, 0 above 1,000, maximum 998 lines. Live Guidance is exactly the two enabled entries applied here. Governance exact current result: pending the workflow-owned post-implementation Governance run after candidate commit; it was not run, bypassed, approved, or crossed by this Goal Agent.",
+      "implementation_reported_at": "2026-07-26T15:43:31Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Recover Goal 00000SZ7NSA8KGJYNNA65BW001 from its Round 1 Governance failure. Preserve the completed Round 1 modularization and test-reliability work, and remediate only the recorded import capability-boundary violations plus necessary compile/test adjustments.\n\nPreserved evidence\n\n- Round 1 base: 8244f4aa452d7a5abc2d8a0fa3d7ba916a540e4c.\n- Round 1 candidate: 4f61ab01818a2275db068040ea8cb794675ddd96 on refine/00000SZ7NSA8KGJYNNA65BW001/round-1.\n- The Round 1 worktree is clean. The candidate is not integrated into main, and current main/origin/main still equal the Round 1 base.\n- Round 1 reported git diff --check, cargo fmt --all --check, cargo check --all-targets, focused suites, rollback stress, and cargo test --all-targets passing. Governance, not implementation or tests, failed.\n- Do not delete, reset, rewrite, or otherwise disturb the Round 1 branch, worktree, commit, or durable failure evidence. Bring its changes forward into the new Round through ordinary auditable Git and preserve its successful workflow/chat/module-boundary, Guidance, PID-identity, test, and cohesion-audit work.\n\nExact Governance failure\n\nGovernance failed with: Import persistence remains surface-owned and diverges from the shared capability.\n\nRecorded violations:\n\n1. Rule 1: src/surfaces/web_server/work_routes/import_contract.rs owns Goal creation, duplicate decisions, metadata mutation, Feature assignment, and rollback instead of remaining a thin adapter to a shared import capability.\n2. Rule 2: ImportDraft persistence is implemented separately in FileImportService::persist and persist_import_draft_with_duplicate_decision, creating two authoritative implementations with different duplicate and failure semantics.\n3. Rule 8: daemon-backed UI/API/CLI paths use the web-route persistence implementation while direct CLI imports use FileImportService::persist, so import behavior is not one shared capability across surfaces.\n\nRequired remediation\n\n1. Establish one authoritative import-persistence implementation under crate::tools::product::imports in a responsibility-named module. It must own ImportDraft-to-Goal mutation semantics, duplicate-decision validation and execution, Goal round/reporter/assignee/priority updates, Feature validation/assignment, dependency ordering, created-Goal accounting, and rollback policy.\n2. Make FileImportService::persist, direct CLI imports, daemon-backed CLI imports, synchronous HTTP imports, and background HTTP imports delegate to that same product capability. Remove the separate surface-owned persist_import_draft_with_duplicate_decision algorithm rather than wrapping or copying it.\n3. Model progress and cancellation through a small surface-neutral capability contract or callbacks. The web adapter may translate FileOperationRegistry cancellation/progress into that contract, but the shared import capability must not depend on ApiRequest, ApiResponse, HTTP status codes, or web-route modules.\n4. Return a typed shared result that carries the information surfaces need, including created Goal IDs, Feature identity, duplicate-action counts/outcomes, and cancellation or failure evidence as appropriate. Keep HTTP/JSON response shaping, operation registration/finalization, projection refresh, and browser-specific status mapping in the web surface.\n5. Make failure and cancellation behavior explicit and consistent. Preserve the current externally observable API/CLI contracts and fail safely: no silently divergent duplicate handling, no orphaned partial Goal set after a cancellation path that promises rollback, and no rollback of pre-existing Goals or Features. Do not weaken work-item revision, ownership, or audit checks.\n6. Reassess import_destination_feature_id as part of the same boundary. Feature creation/lookup performed specifically for an import must use the shared import/work-item capability for authoritative mutation; the web surface may parse destination fields and render the Feature response.\n7. Keep src/surfaces/web_server/work_routes/import_contract.rs only if it becomes a genuinely thin transport/format adapter. Otherwise remove it and place remaining extraction/provider/response helpers in accurately named surface modules.\n\nFocused verification\n\n- Add shared capability tests for new Goal creation and metadata/round preservation; existing and newly created Feature destinations; dependency ordering; each supported duplicate decision (original, duplicate, move original to backlog, update original prompt, reporter, and priority); rejection of unknown decisions; failure accounting; and cancellation rollback.\n- Add parity evidence showing the same drafts and options produce the same durable import semantics through direct FileImportService/CLI and daemon-backed HTTP/CLI paths.\n- Preserve background operation progress/cancellation tests and prove the web adapter delegates persistence rather than reimplementing it.\n- Re-run the Round 1 focused workflow, chat, Guidance, process-control, and changed-path tests needed to prove the carried-forward candidate remains intact.\n\nFinal gates and reporting\n\nRun git diff --check, cargo fmt --all --check, cargo check --all-targets, focused import capability and surface tests, the relevant carried-forward focused tests, and cargo test --all-targets. Report every initial failure and rerun, exact counts, warnings, the final cohesion inventory, and the exact Governance result.\n\nPreserve public module paths, serialization formats, CLI/API/MCP contracts, durable state, confirmation boundaries, and all unrelated behavior. Do not create new duplicate machinery, force merge, rewrite history, approve the Goal, or cross the human Review boundary.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "failed",
+      "updated": "2026-07-26T15:47:26Z",
+      "workflow_quality_timing": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-07-26T15:52:56Z",
+        "current_round": {
+          "assignee": "codex",
+          "prompt": "Recover the preserved clean Round 2 candidate e7dc22968bf57f5dfb79cafbd6470ba73c08fa68. Do not discard or reimplement the cohesive module-boundary and authoritative import-persistence work already present in that candidate. The new Governance failure is narrowly about public failure/cancellation semantics at the import persistence adapter.\n\nCorrect both confirmed violations:\n\n1. Index contract: ImportPersistFailure.failed_index is currently zero-based (the shared persistence test uses Some(1) for the second draft), while src/surfaces/web/static/js/features/goals-import-save.js treats API failures[].index as one-based via payload[(failure.index || 1) - 1]. The web adapter currently emits the internal value directly. Establish an explicit, unambiguous boundary contract and preserve browser behavior: API failures[].index must be one-based. Keep internal indexing zero-based only if it is named/typed clearly and convert exactly once at the web boundary. Add coverage for failures on the second and later drafts proving the API identifies the same draft the retry UI selects; include first-item behavior so fallback logic cannot mask index 0.\n\n2. Rollback/cancellation truth: the shared capability captures ImportRollbackEvidence.rollback_failures, but src/surfaces/web_server/work_routes/import_routes/persistence.rs discards it, including the cancellation branch that always returns {cancelled:true}. A cancellation or persistence failure with any rollback failure must not be reported as a successful clean cancellation. Surface durable, actionable partial-failure evidence through both synchronous HTTP and FileOperationRegistry/background-operation paths. Include a stable error code/kind, created IDs, successfully rolled-back IDs, unrecovered Goal/Feature IDs, rollback failures, and recovery guidance. The operation must finish in Failed/partial-failure state (not Cancelled or Completed) when cleanup is incomplete. A clean rollback may retain the existing cancellation result.\n\nAcceptance evidence must include injected Goal-deletion and Feature-deletion rollback failures, clean-cancellation behavior, synchronous response behavior, background terminal-state/error readback, and restart/durable readback where that registry promises durability. Assert that rollback failures are never silently dropped and that no response/operation claims successful cancellation while imported records remain. Run the full required formatting, Clippy, test, and governance gates, and report exact outcomes. Preserve all earlier Goal/Round evidence and candidate worktrees; do not force integration, rewrite history, approve, or bypass Review.",
+          "reporter": "codex",
+          "round": 3
+        },
+        "goal": {
+          "assignee": "codex",
+          "id": "00000SZ7NSA8KGJYNNA65BW001",
+          "name": "Finish cohesive Rust module boundaries",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "Buddy Williams",
+            "constitution_state": "passed",
+            "governance_checked_at": "2026-07-26T14:55:58Z",
+            "governance_details": {
+              "configured": true,
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ7NSA8KGJYNNA65BW001-round-1",
+              "failed_actions": [
+                {
+                  "message": "src/surfaces/web_server/work_routes/import_contract.rs owns Goal creation, duplicate decisions, metadata mutation, Feature assignment, and rollback instead of remaining a thin adapter to a shared import capability.",
+                  "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+                  "rule_id": "rule-1"
+                },
+                {
+                  "message": "ImportDraft persistence is implemented separately in FileImportService::persist and persist_import_draft_with_duplicate_decision, creating two authoritative implementations with different duplicate and failure semantics.",
+                  "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+                  "rule_id": "rule-2"
+                },
+                {
+                  "message": "Import behavior is not one shared capability: daemon-backed UI/API/CLI paths use the web-route persistence implementation, while direct CLI imports use FileImportService::persist with different semantics.",
+                  "rule": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+                  "rule_id": "rule-8"
+                }
+              ],
+              "governance_configured": true,
+              "phase": "post_implementation",
+              "provider": "codex",
+              "raw_output": "{\"status\":\"failed\",\"message\":\"Import persistence remains surface-owned and diverges from the shared capability.\",\"violations\":[{\"rule_id\":\"rule-1\",\"rule\":\"Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.\",\"message\":\"src/surfaces/web_server/work_routes/import_contract.rs owns Goal creation, duplicate decisions, metadata mutation, Feature assignment, and rollback instead of remaining a thin adapter to a shared import capability.\"},{\"rule_id\":\"rule-2\",\"rule\":\"Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.\",\"message\":\"ImportDraft persistence is implemented separately in FileImportService::persist and persist_import_draft_with_duplicate_decision, creating two authoritative implementations with different duplicate and failure semantics.\"},{\"rule_id\":\"rule-8\",\"rule\":\"Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.\",\"message\":\"Import behavior is not one shared capability: daemon-backed UI/API/CLI paths use the web-route persistence implementation, while direct CLI imports use FileImportService::persist with different semantics.\"}]}",
+              "rules_checked": 9,
+              "verdict": {
+                "message": "Import persistence remains surface-owned and diverges from the shared capability.",
+                "status": "failed",
+                "violations": [
+                  {
+                    "message": "src/surfaces/web_server/work_routes/import_contract.rs owns Goal creation, duplicate decisions, metadata mutation, Feature assignment, and rollback instead of remaining a thin adapter to a shared import capability.",
+                    "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+                    "rule_id": "rule-1"
+                  },
+                  {
+                    "message": "ImportDraft persistence is implemented separately in FileImportService::persist and persist_import_draft_with_duplicate_decision, creating two authoritative implementations with different duplicate and failure semantics.",
+                    "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+                    "rule_id": "rule-2"
+                  },
+                  {
+                    "message": "Import behavior is not one shared capability: daemon-backed UI/API/CLI paths use the web-route persistence implementation, while direct CLI imports use FileImportService::persist with different semantics.",
+                    "rule": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+                    "rule_id": "rule-8"
+                  }
+                ]
+              },
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ7NSA8KGJYNNA65BW001-round-1"
+            },
+            "governance_message": "Import persistence remains surface-owned and diverges from the shared capability.",
+            "governance_rule_actions": [
+              {
+                "message": "src/surfaces/web_server/work_routes/import_contract.rs owns Goal creation, duplicate decisions, metadata mutation, Feature assignment, and rollback instead of remaining a thin adapter to a shared import capability.",
+                "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+                "rule_id": "rule-1"
+              },
+              {
+                "message": "ImportDraft persistence is implemented separately in FileImportService::persist and persist_import_draft_with_duplicate_decision, creating two authoritative implementations with different duplicate and failure semantics.",
+                "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+                "rule_id": "rule-2"
+              },
+              {
+                "message": "Import behavior is not one shared capability: daemon-backed UI/API/CLI paths use the web-route persistence implementation, while direct CLI imports use FileImportService::persist with different semantics.",
+                "rule": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+                "rule_id": "rule-8"
+              }
+            ],
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                },
+                {
+                  "enabled": true,
+                  "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+                  "name": "Cohesive code files",
+                  "rule": "Apply whenever an agent adds or changes code files in any language."
+                }
+              ],
+              "context_version": 1,
+              "recorded_at": "2026-07-26T14:50:35Z",
+              "skipped": []
+            },
+            "implementation_report": "Split workflow, work_routes, and chat into responsibility-named modules with explicit production dependency catalogs; enforced applicable code Guidance from committed candidate paths; stabilized the rollback PID-exit race and test-owned process lifetime; refreshed the exact 33-file cohesion audit. Verification: git diff --check, cargo fmt --all --check, and cargo check --all-targets passed; focused workflow behavior 6/6, work routes 6/6, chat 14/14, workflow 39/39, process control 17/17, and Git changed-path 1/1 passed; rollback replay stress passed 16/16 at concurrency 4; final cargo test --all-targets passed both 530-test layers and both 0-test binary targets. Live Cohesive code files Guidance is unique, enabled, and exact (1/1). No final warnings.",
+            "implementation_reported_at": "2026-07-26T14:50:35Z",
+            "meta_rule_state": "passed",
+            "product_state": "passed",
+            "prompt": "Complete the responsibility-based Rust modularization follow-up to Goal 00000SZ7FC7AJGZ49XT675R003. Work from the current integrated main baseline and keep the change behavior-neutral except for the explicitly requested Guidance-selection and test-reliability corrections below.\n\nReview evidence\n\nThe previous Goal materially improved the tree: the largest tracked Rust file fell from 9,025 to 998 lines, files above 1,000 lines fell from 32 to zero, and the roughly 500-line review-trigger inventory fell from 50 to 35. Current formatting and compilation pass. However, review found that several documented exceptions do not match the actual item families:\n\n- src/workflow/mod.rs is described as a public composition contract, but it still combines workflow-state persistence, settings parsing, round creation, retry-context hydration, branch/worktree construction, governance prompt construction and verdict parsing, and Goal-agent context/prompt helpers.\n- src/surfaces/web_server/work_routes.rs is described as a thin shared-codec parent, but it still combines import extraction and duplicate persistence, terminal prompt construction and standalone-worktree lifecycle, Feature response/reorder helpers, import cancellation/rollback helpers, and route composition.\n- src/tools/product/chat/mod.rs is described as a public session/queue contract and composition root, but it still combines prompt/context assembly, transcript projection, importable-artifact parsing, queue formatting, session validation/locking, identifiers, and atomic persistence helpers.\n- Extracted modules rely heavily on wildcard parent imports: 319 new use super::* declarations were added, including 187 non-test production files. The modules are real physical boundaries, but many dependencies remain implicit.\n- The live Cohesive code files Guidance entry is exact, enabled, and unique, yet the previous Goal's Round 2 guidance decision recorded it as skipped even though its Rule says it applies whenever an agent adds or changes code files. Persistence is proven, but consistent selection/application is not.\n- A current cargo test --all-targets run initially failed tools::product::process_control::tests::settlement::rollback_failed_after_goal_restore_replays_from_exact_restored_revision because the observed PID identity was unavailable. The unchanged test passed immediately in isolation and a second full run passed, including the repeated 526-test test_all run. Treat this as timing-sensitive test infrastructure to investigate without weakening production PID-identity fail-closed behavior.\n\nRequired work\n\n1. Re-read the remaining roughly 500-line exceptions from docs/rust-file-cohesion-audit.md. Finish the responsibility splits in workflow/mod.rs, work_routes.rs, and chat/mod.rs. Move cohesive implementation families into responsibility-named child modules while retaining narrow parent composition contracts, stable public paths, and one authoritative owner for each durable invariant.\n2. Reassess other remaining exceptions whose prose claims a parent is composition-only or thin. Correct either the physical boundary or the audit disposition based on the actual code. Do not use a mechanical line cap.\n3. In production modules created or materially changed by this follow-up, replace wildcard parent imports with explicit imports or a deliberately narrow shared interface. Do not perform noisy test-only import churn unless it clarifies a real ownership boundary.\n4. Investigate why Cohesive code files was skipped for a code-changing Round despite its unconditional Rule. Preserve explicit, auditable Guidance decisions, but ensure an applicable enabled rule cannot be silently omitted. Add focused coverage for the intended selection/application contract and verify the durable Guidance record remains unique, exact, and enabled.\n5. Reproduce and stabilize the process-control rollback replay test under repetition and concurrent suite execution. Fix test fixture identity/timing ownership rather than relaxing fail-closed production checks. If it cannot be reproduced after proportionate stress, record the exact stress command and evidence rather than adding arbitrary sleeps.\n6. Refresh docs/rust-file-cohesion-audit.md with the new inventory and accurate, item-family-specific dispositions. Keep exceptions reviewable and reopen them when new unrelated responsibility appears.\n\nConstraints\n\n- Preserve public module paths, serialization formats, CLI/API/MCP contracts, durable workflow and process state, cancellation/rollback ordering, audit evidence, confirmation boundaries, and behavior not explicitly changed above.\n- Use real named Rust modules. Do not create numbered chunks, line-range shards, include-only fragments, or generic misc/common dumping grounds.\n- Keep authoritative mutation, locking, fencing, identity checks, and settlement ordering explicit. Moving code must not create multiple writers or allow cleanup/publication before durable prerequisites.\n- Keep the work reviewable and distinguish structural moves from the narrow Guidance/test-reliability behavior fixes.\n\nAcceptance criteria\n\n- workflow/mod.rs, work_routes.rs, and chat/mod.rs are truthful narrow parents or have a concrete invariant-specific exception supported by their actual item families.\n- Production child modules touched by this work declare understandable dependencies; wildcard parent imports are not the default integration mechanism.\n- The remaining tracked Rust inventory above roughly 500 lines is measured and every exception in the audit is accurate and specific.\n- Exactly one enabled Cohesive code files Guidance entry remains durable and exact, and focused tests prove the intended applicable-Guidance selection/application behavior.\n- The rollback replay test passes repeated isolated and concurrent execution without weakening PID-identity safety.\n- Run and report git diff --check, cargo fmt --all --check, cargo check --all-targets, focused tests for every moved or behavior-adjusted responsibility, and cargo test --all-targets. Report initial failures, reruns, warnings, and final results exactly.\n\nLeave this Goal in the normal workflow. Do not approve it or cross the human Review boundary.",
+            "reporter": "Buddy Williams",
+            "round": 1,
+            "rule_state": "failed"
+          },
+          {
+            "assignee": "Buddy Williams",
+            "constitution_state": "passed",
+            "governance_checked_at": "2026-07-26T15:47:24Z",
+            "governance_details": {
+              "configured": true,
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ7NSA8KGJYNNA65BW001-round-2",
+              "failed_actions": [
+                {
+                  "message": "ImportPersistFailure.failed_index is zero-based, but the web client interprets the API failure index as one-based, causing failed imports after the first draft to display and retry the wrong draft.",
+                  "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+                  "rule_id": "rule-1"
+                },
+                {
+                  "message": "Import rollback failures are captured by the shared capability but discarded by the web adapter; cancellation is still reported as successfully cancelled even when rollback leaves created Goals or Features behind, with no durable failure feedback or recovery evidence.",
+                  "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+                  "rule_id": "rule-4"
+                }
+              ],
+              "governance_configured": true,
+              "phase": "post_implementation",
+              "provider": "codex",
+              "raw_output": "{\"status\":\"failed\",\"message\":\"Failure reporting and cancellation recovery are not surfaced correctly.\",\"violations\":[{\"rule_id\":\"rule-1\",\"rule\":\"Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.\",\"message\":\"ImportPersistFailure.failed_index is zero-based, but the web client interprets the API failure index as one-based, causing failed imports after the first draft to display and retry the wrong draft.\"},{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"Import rollback failures are captured by the shared capability but discarded by the web adapter; cancellation is still reported as successfully cancelled even when rollback leaves created Goals or Features behind, with no durable failure feedback or recovery evidence.\"}]}",
+              "rules_checked": 9,
+              "verdict": {
+                "message": "Failure reporting and cancellation recovery are not surfaced correctly.",
+                "status": "failed",
+                "violations": [
+                  {
+                    "message": "ImportPersistFailure.failed_index is zero-based, but the web client interprets the API failure index as one-based, causing failed imports after the first draft to display and retry the wrong draft.",
+                    "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+                    "rule_id": "rule-1"
+                  },
+                  {
+                    "message": "Import rollback failures are captured by the shared capability but discarded by the web adapter; cancellation is still reported as successfully cancelled even when rollback leaves created Goals or Features behind, with no durable failure feedback or recovery evidence.",
+                    "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+                    "rule_id": "rule-4"
+                  }
+                ]
+              },
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ7NSA8KGJYNNA65BW001-round-2"
+            },
+            "governance_message": "Failure reporting and cancellation recovery are not surfaced correctly.",
+            "governance_rule_actions": [
+              {
+                "message": "ImportPersistFailure.failed_index is zero-based, but the web client interprets the API failure index as one-based, causing failed imports after the first draft to display and retry the wrong draft.",
+                "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+                "rule_id": "rule-1"
+              },
+              {
+                "message": "Import rollback failures are captured by the shared capability but discarded by the web adapter; cancellation is still reported as successfully cancelled even when rollback leaves created Goals or Features behind, with no durable failure feedback or recovery evidence.",
+                "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+                "rule_id": "rule-4"
+              }
+            ],
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                },
+                {
+                  "enabled": true,
+                  "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+                  "name": "Cohesive code files",
+                  "rule": "Apply whenever an agent adds or changes code files in any language."
+                }
+              ],
+              "context_version": 1,
+              "recorded_at": "2026-07-26T15:43:30Z",
+              "skipped": []
+            },
+            "implementation_report": "Carried preserved Round 1 commit 4f61ab01818a2275db068040ea8cb794675ddd96 into Round 2 as ordinary cherry-pick f1bac920 without modifying the clean Round 1 branch/worktree. Added the single authoritative import persistence capability in src/tools/product/imports/persistence.rs; it owns duplicate-decision validation/execution, Goal creation and round/reporter/assignee/priority mutation, existing/new Feature validation and creation, assignment and dependency ordering, typed created-Goal/Feature/duplicate outcomes, surface-neutral progress/cancellation, and created-record rollback evidence. FileImportService, direct CLI imports, daemon-backed CLI HTTP, synchronous HTTP, and background HTTP now delegate to it. Removed the surface-owned duplicate persistence and rollback algorithms; the web surface now only parses destination fields, adapts FileOperationRegistry progress/cancellation, promotes/refreshes projections, and shapes existing responses. Updated import intent and the cohesion audit; public ImportPersistResult wire keys remain created/goal_ids/feature_id. Initial failures: first cargo fmt --all --check reported 2 rustfmt layout diffs and stopped before compilation; after formatting, the first cargo check --all-targets failed with 4 lib errors/9 lib-test errors from removed parent imports plus 2 unused warnings; the next check passed with 2 warnings, which were removed, and the final check passed with no warnings. The first focused import run was 11/12 because unknown-decision validation correctly created no temp directory and test cleanup returned ENOENT; fixture cleanup was corrected and every rerun passed. Final verification: git diff --check passed; cargo fmt --all --check passed; cargo check --all-targets passed with no warnings; shared imports 12/12; web import/background/parity 7/7; work-route extraction 6/6; direct CLI import focused tests 1/1 and 1/1; carried Guidance/workflow behavior 6/6; chat 14/14; workflow 39/39; process control 17/17; Git changed-path 1/1; rollback replay stress 16/16 at concurrency 4. Final cargo test --all-targets passed 538/538 lib tests, 0/0 main tests, 538/538 test_all unit tests, and 0/0 test_all main tests. Cohesion inventory: 33 tracked Rust files at or above the roughly 500-line review trigger, 0 above 1,000, maximum 998 lines. Live Guidance is exactly the two enabled entries applied here. Governance exact current result: pending the workflow-owned post-implementation Governance run after candidate commit; it was not run, bypassed, approved, or crossed by this Goal Agent.",
+            "implementation_reported_at": "2026-07-26T15:43:31Z",
+            "meta_rule_state": "passed",
+            "product_state": "passed",
+            "prompt": "Recover Goal 00000SZ7NSA8KGJYNNA65BW001 from its Round 1 Governance failure. Preserve the completed Round 1 modularization and test-reliability work, and remediate only the recorded import capability-boundary violations plus necessary compile/test adjustments.\n\nPreserved evidence\n\n- Round 1 base: 8244f4aa452d7a5abc2d8a0fa3d7ba916a540e4c.\n- Round 1 candidate: 4f61ab01818a2275db068040ea8cb794675ddd96 on refine/00000SZ7NSA8KGJYNNA65BW001/round-1.\n- The Round 1 worktree is clean. The candidate is not integrated into main, and current main/origin/main still equal the Round 1 base.\n- Round 1 reported git diff --check, cargo fmt --all --check, cargo check --all-targets, focused suites, rollback stress, and cargo test --all-targets passing. Governance, not implementation or tests, failed.\n- Do not delete, reset, rewrite, or otherwise disturb the Round 1 branch, worktree, commit, or durable failure evidence. Bring its changes forward into the new Round through ordinary auditable Git and preserve its successful workflow/chat/module-boundary, Guidance, PID-identity, test, and cohesion-audit work.\n\nExact Governance failure\n\nGovernance failed with: Import persistence remains surface-owned and diverges from the shared capability.\n\nRecorded violations:\n\n1. Rule 1: src/surfaces/web_server/work_routes/import_contract.rs owns Goal creation, duplicate decisions, metadata mutation, Feature assignment, and rollback instead of remaining a thin adapter to a shared import capability.\n2. Rule 2: ImportDraft persistence is implemented separately in FileImportService::persist and persist_import_draft_with_duplicate_decision, creating two authoritative implementations with different duplicate and failure semantics.\n3. Rule 8: daemon-backed UI/API/CLI paths use the web-route persistence implementation while direct CLI imports use FileImportService::persist, so import behavior is not one shared capability across surfaces.\n\nRequired remediation\n\n1. Establish one authoritative import-persistence implementation under crate::tools::product::imports in a responsibility-named module. It must own ImportDraft-to-Goal mutation semantics, duplicate-decision validation and execution, Goal round/reporter/assignee/priority updates, Feature validation/assignment, dependency ordering, created-Goal accounting, and rollback policy.\n2. Make FileImportService::persist, direct CLI imports, daemon-backed CLI imports, synchronous HTTP imports, and background HTTP imports delegate to that same product capability. Remove the separate surface-owned persist_import_draft_with_duplicate_decision algorithm rather than wrapping or copying it.\n3. Model progress and cancellation through a small surface-neutral capability contract or callbacks. The web adapter may translate FileOperationRegistry cancellation/progress into that contract, but the shared import capability must not depend on ApiRequest, ApiResponse, HTTP status codes, or web-route modules.\n4. Return a typed shared result that carries the information surfaces need, including created Goal IDs, Feature identity, duplicate-action counts/outcomes, and cancellation or failure evidence as appropriate. Keep HTTP/JSON response shaping, operation registration/finalization, projection refresh, and browser-specific status mapping in the web surface.\n5. Make failure and cancellation behavior explicit and consistent. Preserve the current externally observable API/CLI contracts and fail safely: no silently divergent duplicate handling, no orphaned partial Goal set after a cancellation path that promises rollback, and no rollback of pre-existing Goals or Features. Do not weaken work-item revision, ownership, or audit checks.\n6. Reassess import_destination_feature_id as part of the same boundary. Feature creation/lookup performed specifically for an import must use the shared import/work-item capability for authoritative mutation; the web surface may parse destination fields and render the Feature response.\n7. Keep src/surfaces/web_server/work_routes/import_contract.rs only if it becomes a genuinely thin transport/format adapter. Otherwise remove it and place remaining extraction/provider/response helpers in accurately named surface modules.\n\nFocused verification\n\n- Add shared capability tests for new Goal creation and metadata/round preservation; existing and newly created Feature destinations; dependency ordering; each supported duplicate decision (original, duplicate, move original to backlog, update original prompt, reporter, and priority); rejection of unknown decisions; failure accounting; and cancellation rollback.\n- Add parity evidence showing the same drafts and options produce the same durable import semantics through direct FileImportService/CLI and daemon-backed HTTP/CLI paths.\n- Preserve background operation progress/cancellation tests and prove the web adapter delegates persistence rather than reimplementing it.\n- Re-run the Round 1 focused workflow, chat, Guidance, process-control, and changed-path tests needed to prove the carried-forward candidate remains intact.\n\nFinal gates and reporting\n\nRun git diff --check, cargo fmt --all --check, cargo check --all-targets, focused import capability and surface tests, the relevant carried-forward focused tests, and cargo test --all-targets. Report every initial failure and rerun, exact counts, warnings, the final cohesion inventory, and the exact Governance result.\n\nPreserve public module paths, serialization formats, CLI/API/MCP contracts, durable state, confirmation boundaries, and all unrelated behavior. Do not create new duplicate machinery, force merge, rewrite history, approve the Goal, or cross the human Review boundary.",
+            "reporter": "Buddy Williams",
+            "round": 2,
+            "rule_state": "failed"
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-07-26T15:52:31Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "2026-07-26T16:20:07Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ7NSA8KGJYNNA65BW001-round-3",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 9,
+        "verdict": {
+          "message": "No governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ7NSA8KGJYNNA65BW001-round-3"
+      },
+      "governance_message": "No governance rule violations found.",
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "context_version": 1,
+        "recorded_at": "2026-07-26T16:16:20Z",
+        "skipped": []
+      },
+      "implementation_report": "Recovered preserved Round 2 candidate e7dc22968bf57f5dfb79cafbd6470ba73c08fa68 by ordinary auditable cherry-picks of its Round 1 and Round 2 ancestry; both earlier worktrees remain clean and Round 2 remains exactly at e7dc2296. Renamed the internal failure location to failed_draft_index_zero_based and convert it exactly once at the web boundary so public failures[].index is always one-based; browser selection now validates and subtracts that one-based index. Added durable import_rollback_incomplete/partial_failure evidence with created, rolled-back, and unrecovered Goal/Feature IDs, exact rollback failures, and recovery guidance. Background import cancellation is now deferred: clean rollback settles Cancelled, while incomplete rollback settles Failed with error and result evidence that survives API readback and FileOperationRegistry reconstruction. Added injected Goal-deletion and Feature-deletion rollback tests, first/second/third draft index parity, synchronous partial-failure response, clean cancellation, background terminal/error/API readback, durable restart readback, registry settlement, and static browser contract coverage in responsibility-named test modules. Updated import intent; cohesion inventory remains 33 tracked Rust files at or above 500 lines, 0 above 1,000, maximum 998. Initial cargo fmt --all --check failed only on rustfmt layout and passed after formatting. Initial cargo check --all-targets passed with one test-only unused-variable warning; the warning was removed and final check passed without warnings. One attempted combined focused Cargo invocation failed before running tests because Cargo accepts only one test filter; separate reruns passed. Focused shared persistence: 9/9. Focused web import: 9/9. Registry partial settlement: 1/1. Static import contract: 1/1. Governance engine: 5/5. git diff --check passed. cargo fmt --all --check passed. cargo check --all-targets passed. cargo clippy --all-targets passed with the preserved candidate's 14 library warnings and 20 lib-test warnings (14 duplicated). The stricter exploratory cargo clippy --all-targets -- -D warnings initially failed on 21 pre-existing/carried lint findings; the rollback helper finding was removed by this Round, while the public ImportPersistFailure result-large-error warnings and unrelated baseline findings remain. cargo test --all-targets passed both 544/544 test layers and both 0/0 binary targets. ./r governance --help confirmed there is no direct governance CLI subcommand; the configured post-implementation provider Governance verdict remains pending the workflow-owned candidate commit and was not bypassed, approved, or run across Review.",
+      "implementation_reported_at": "2026-07-26T16:16:21Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Recover the preserved clean Round 2 candidate e7dc22968bf57f5dfb79cafbd6470ba73c08fa68. Do not discard or reimplement the cohesive module-boundary and authoritative import-persistence work already present in that candidate. The new Governance failure is narrowly about public failure/cancellation semantics at the import persistence adapter.\n\nCorrect both confirmed violations:\n\n1. Index contract: ImportPersistFailure.failed_index is currently zero-based (the shared persistence test uses Some(1) for the second draft), while src/surfaces/web/static/js/features/goals-import-save.js treats API failures[].index as one-based via payload[(failure.index || 1) - 1]. The web adapter currently emits the internal value directly. Establish an explicit, unambiguous boundary contract and preserve browser behavior: API failures[].index must be one-based. Keep internal indexing zero-based only if it is named/typed clearly and convert exactly once at the web boundary. Add coverage for failures on the second and later drafts proving the API identifies the same draft the retry UI selects; include first-item behavior so fallback logic cannot mask index 0.\n\n2. Rollback/cancellation truth: the shared capability captures ImportRollbackEvidence.rollback_failures, but src/surfaces/web_server/work_routes/import_routes/persistence.rs discards it, including the cancellation branch that always returns {cancelled:true}. A cancellation or persistence failure with any rollback failure must not be reported as a successful clean cancellation. Surface durable, actionable partial-failure evidence through both synchronous HTTP and FileOperationRegistry/background-operation paths. Include a stable error code/kind, created IDs, successfully rolled-back IDs, unrecovered Goal/Feature IDs, rollback failures, and recovery guidance. The operation must finish in Failed/partial-failure state (not Cancelled or Completed) when cleanup is incomplete. A clean rollback may retain the existing cancellation result.\n\nAcceptance evidence must include injected Goal-deletion and Feature-deletion rollback failures, clean-cancellation behavior, synchronous response behavior, background terminal-state/error readback, and restart/durable readback where that registry promises durability. Assert that rollback failures are never silently dropped and that no response/operation claims successful cancellation while imported records remain. Run the full required formatting, Clippy, test, and governance gates, and report exact outcomes. Preserve all earlier Goal/Round evidence and candidate worktrees; do not force integration, rewrite history, approve, or bypass Review.",
+      "quality_checked_at": "2026-07-26T16:20:12Z",
+      "quality_details": {
+        "candidate_commit": "367758eb76955f04e85d837bef5c39c94300564a",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ7NSA8KGJYNNA65BW001-round-3",
+        "diagnostics": [
+          "No Quality tests or migrated commands are configured; evaluation was a no-op."
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "19f9f3a18211f8afd6",
+        "results": [],
+        "source_candidate_commit": "367758eb76955f04e85d837bef5c39c94300564a"
+      },
+      "quality_message": "No Quality tests configured.",
+      "quality_state": "passed",
+      "reporter": "codex",
+      "rule_state": "passed",
+      "updated": "2026-07-28T16:40:29Z",
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "367758eb76955f04e85d837bef5c39c94300564a",
+        "integrated_at": "2026-07-26T16:20:17.537106589+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n .../02-agents/01-tools/01-import.md                |  15 +-\n docs/rust-file-cohesion-audit.md                   |  78 ++-\n src/process/subprocess/registry.rs                 |   7 +\n src/process/supervisor/operations/completion.rs    |  49 ++\n src/process/supervisor/operations/tests.rs         |  41 ++\n .../web/static/js/features/goals-import-save.js    |   5 +-\n src/surfaces/web_server/support/imports.rs         |  50 +-\n src/surfaces/web_server/tests/imports.rs           |   4 +-\n .../web_server/tests/imports/failure_contract.rs   | 286 ++++++++++\n src/surfaces/web_server/tests/imports_parity.rs    | 122 ++++\n src/surfaces/web_server/tests/mod.rs               |   1 +\n .../web_server/tests/static_surface/navigation.rs  |   4 +\n src/surfaces/web_server/work_routes.rs             | 596 +-------------------\n .../web_server/work_routes/activity_routes.rs      |  10 +-\n .../web_server/work_routes/feature_contract.rs     | 133 +++++\n .../web_server/work_routes/feature_routes.rs       |   9 +-\n .../web_server/work_routes/file_terminal_routes.rs |  11 +-\n src/surfaces/web_server/work_routes/goal_routes.rs |  10 +-\n .../web_server/work_routes/import_contract.rs      | 149 +++++\n .../web_server/work_routes/import_routes.rs        |  11 +-\n .../work_routes/import_routes/persistence.rs       | 439 +++++++--------\n .../web_server/work_routes/terminal_profiles.rs    | 213 +++++++\n src/surfaces/web_server/work_routes/tests.rs       |   3 +-\n src/tools/host/git_worktrees/integration.rs        |  17 +\n src/tools/host/git_worktrees/tests/integration.rs  |  20 +\n src/tools/product/chat/mod.rs                      | 464 +---------------\n src/tools/product/chat/operation_support.rs        |  40 ++\n src/tools/product/chat/prompt_context.rs           | 138 +++++\n src/tools/product/chat/provider_turns.rs           |  19 +-\n src/tools/product/chat/queue.rs                    |  15 +-\n src/tools/product/chat/queue_messages.rs           |  24 +\n src/tools/product/chat/service_adapter.rs          |   7 +-\n src/tools/product/chat/session_foundation.rs       | 101 ++++\n src/tools/product/chat/sessions.rs                 |  17 +-\n src/tools/product/chat/standalone.rs               |  19 +-\n src/tools/product/chat/standalone_naming.rs        |  14 +\n src/tools/product/chat/tests/mod.rs                |   9 +-\n src/tools/product/chat/transcript.rs               | 138 +++++\n src/tools/product/imports/csv.rs                   |   5 -\n src/tools/product/imports/drafts.rs                |   1 +\n src/tools/product/imports/mod.rs                   |  71 +--\n src/tools/product/imports/persistence.rs           | 487 ++++++++++++++++\n src/tools/product/imports/persistence_tests.rs     | 370 +++++++++++++\n .../imports/persistence_tests/rollback_failures.rs | 158 ++++++\n src/tools/product/imports/tests.rs                 |   1 +\n src/tools/product/process_control/tests/mod.rs     |  17 +-\n src/workflow/automation.rs                         |  13 +-\n src/workflow/behaviors/mod.rs                      |  81 ++-\n src/workflow/behaviors/tests.rs                    |  66 ++-\n src/workflow/execution.rs                          |  21 +-\n src/workflow/execution_context.rs                  | 146 +++++\n src/workflow/goal_agent_context.rs                 | 102 ++++\n src/workflow/governance.rs                         | 268 +++++++++\n src/workflow/mod.rs                                | 616 +--------------------\n src/workflow/policy.rs                             |  29 +-\n src/workflow/ready_merge.rs                        |   5 +-\n src/workflow/settings.rs                           |  41 ++\n src/workflow/state.rs                              |  17 +-\n src/workflow/state_persistence.rs                  |  53 ++\n src/workflow/tests/mod.rs                          |   9 +\n 60 files changed, 3904 insertions(+), 1961 deletions(-)\n create mode 100644 src/surfaces/web_server/tests/imports/failure_contract.rs\n create mode 100644 src/surfaces/web_server/tests/imports_parity.rs\n create mode 100644 src/surfaces/web_server/work_routes/feature_contract.rs\n create mode 100644 src/surfaces/web_server/work_routes/import_contract.rs\n create mode 100644 src/surfaces/web_server/work_routes/terminal_profiles.rs\n create mode 100644 src/tools/product/chat/operation_support.rs\n create mode 100644 src/tools/product/chat/prompt_context.rs\n create mode 100644 src/tools/product/chat/queue_messages.rs\n create mode 100644 src/tools/product/chat/session_foundation.rs\n create mode 100644 src/tools/product/chat/standalone_naming.rs\n create mode 100644 src/tools/product/chat/transcript.rs\n create mode 100644 src/tools/product/imports/persistence.rs\n create mode 100644 src/tools/product/imports/persistence_tests.rs\n create mode 100644 src/tools/product/imports/persistence_tests/rollback_failures.rs\n create mode 100644 src/workflow/execution_context.rs\n create mode 100644 src/workflow/goal_agent_context.rs\n create mode 100644 src/workflow/governance.rs\n create mode 100644 src/workflow/settings.rs\n create mode 100644 src/workflow/state_persistence.rs",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "52936b9944c1f804b0a98f8310341ba31d857d16"
+      },
+      "workflow_quality_timing": "pre_merge"
+    }
+  ],
+  "status": "done",
+  "target_branch": "main",
+  "updated": "2026-07-28T16:40:41Z",
+  "workflow_revision": 46
+}

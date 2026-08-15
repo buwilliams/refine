@@ -1,0 +1,922 @@
+{
+  "base_commit": "40778e7e82ac7cd330f20e578b0c517edc6aab60",
+  "branch_name": "refine/00000SZZXZQMG2MX8N7R1RJ001/round-2",
+  "candidate_commit": "877dea9528ed5071d4118135c98889ab3dd322d6",
+  "created": "2026-08-14T10:09:43Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZZXZQMG2MX8N7R1RJ001",
+  "name": "Clean up deprecated or outdated refine CLI commands and subcommands. Update any",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-14T10:09:44Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Clean up deprecated or outdated refine CLI commands and subcommands. Update any CLI help docs.",
+          "reporter": "Buddy Williams",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZZXZQMG2MX8N7R1RJ001",
+          "name": "Clean up deprecated or outdated refine CLI commands and subcommands. Update any",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-08-14T10:09:43Z",
+      "failure_at": "2026-08-14T10:46:46Z",
+      "failure_category": "governance_integration",
+      "failure_message": "candidate integration failed: Auto-merging src/surfaces/cli/actions/system.rs\nCONFLICT (content): Merge conflict in src/surfaces/cli/actions/system.rs\nAuto-merging src/surfaces/cli/dispatch.rs\nCONFLICT (content): Merge conflict in src/surfaces/cli/dispatch.rs\nAuto-merging src/surfaces/cli/dispatch/system.rs\nAutomatic merge failed; fix conflicts and then commit the result.",
+      "governance_checked_at": "2026-08-14T10:46:43Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZZXZQMG2MX8N7R1RJ001-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "guidance_checked": 2,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "No governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZZXZQMG2MX8N7R1RJ001-round-1"
+      },
+      "governance_message": "No governance rule violations found.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-14T10:36:00Z",
+        "skipped": []
+      },
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "8f0700affd519b27a566351ae8f2136e1dbb4870",
+          "context_digest": "ea5b8537f88121f78ada8ec84f3d923b0f67be5ccd221e829379528c70327bcd",
+          "context_version": 1,
+          "goal_id": "00000SZZXZQMG2MX8N7R1RJ001",
+          "implementation_branch": "refine/00000SZZXZQMG2MX8N7R1RJ001/round-1",
+          "round_idx": 0,
+          "target_branch": "main"
+        },
+        "completed_at": "2026-08-14T10:36:00Z",
+        "criticism": {
+          "completed_at": "2026-08-14T10:13:04Z",
+          "git_after": {
+            "branch": "refine/00000SZZXZQMG2MX8N7R1RJ001/round-1",
+            "head_commit": "8f0700affd519b27a566351ae8f2136e1dbb4870",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000SZZXZQMG2MX8N7R1RJ001/round-1",
+            "head_commit": "8f0700affd519b27a566351ae8f2136e1dbb4870",
+            "status_porcelain": []
+          },
+          "result": {
+            "summary": "The proposed plan is complete, coherent, and appropriately scoped for the CLI cleanup."
+          },
+          "started_at": "2026-08-14T10:11:33Z"
+        },
+        "final_plan": {
+          "completed_at": "2026-08-14T10:13:55Z",
+          "git_after": {
+            "branch": "refine/00000SZZXZQMG2MX8N7R1RJ001/round-1",
+            "head_commit": "8f0700affd519b27a566351ae8f2136e1dbb4870",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000SZZXZQMG2MX8N7R1RJ001/round-1",
+            "head_commit": "8f0700affd519b27a566351ae8f2136e1dbb4870",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Classify the current Clap command tree against dispatcher routes, launcher behavior, and live internal call sites to distinguish obsolete aliases and unusable entries from required hidden worker commands.",
+                "id": "P1"
+              },
+              {
+                "description": "Remove obsolete command variants and their dispatch branches without adding replacement compatibility layers or changing the shared capabilities behind supported commands.",
+                "id": "P2"
+              },
+              {
+                "description": "Align command descriptions, interactive help, and the machine-readable command catalog so internal machinery remains hidden and every advertised command has a supported invocation path.",
+                "id": "P3"
+              },
+              {
+                "description": "Update only the affected CLI intent and operator-facing help or runbook examples to remove retired syntax and name the current supported alternatives.",
+                "id": "P4"
+              }
+            ],
+            "summary": "Refine's CLI will expose only commands that users and agents can meaningfully invoke, removing obsolete compatibility paths while preserving required hidden worker entry points and launcher-owned operations so interactive help, machine-readable discovery, and CLI documentation consistently describe the supported surface."
+          },
+          "started_at": "2026-08-14T10:13:05Z"
+        },
+        "implementation": {
+          "completed_at": "2026-08-14T10:36:00Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Classified the Clap tree against dispatch and live callers: goal verify duplicated goal approve; production-binary system build/clean only returned launcher guidance while r implements both operations; source-promote-helper, source-upgrade-capability, source-check-worker, daemon-lifecycle-helper, and runner-worker have live process/tool call sites and remain parseable hidden commands.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Removed GoalAction::Verify and SystemAction::Build/Clean plus their target-root and dispatch match arms, without changing the shared Goal approval API/capability or launcher implementation.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Changed refine commands to recursively omit hidden Clap subcommands, corrected catalog/help descriptions, added regression coverage that retired/launcher-only commands do not parse and required hidden workers still parse, and verified actual help and JSON catalog output.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated only docs/intent/04-surfaces/02-cli.md and affected runbook pages to identify goal approve as the supported acceptance command and ./r system build/clean as launcher-owned operations with direct launcher help.",
+                "id": "P4",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "cargo test --lib surfaces::cli::catalog::tests -- --test-threads=1 => 5 passed, 0 failed",
+              "cargo test --lib surfaces::cli::tests::parsing -- --test-threads=1 => 9 passed, 0 failed",
+              "cargo run --manifest-path xtask/Cargo.toml -- test-cli => cli_surface_suite passed (1 passed, 0 failed)",
+              "cargo test --test production_binary_install -- --test-threads=1 => 6 passed, 0 failed",
+              "cargo test --lib -- --test-threads=1 => 786 passed, 0 failed, 6 ignored",
+              "Executable readback using target/debug/refine goal --help, target/debug/refine system --help, target/debug/refine commands piped to jq, and ./r system build/clean --help => PASS: help and catalog expose only supported operator commands; launcher help owns build/clean",
+              "git diff --cached --check before commit and git diff --check before handoff => exit 0",
+              "cargo clippy --all-targets -- -D warnings => deviated: failed only on four pre-existing out-of-scope lints in untouched src/tools/product/project_projection/store.rs, src/surfaces/web_server/http/background_loops.rs, and src/surfaces/cli/dispatch/config.rs",
+              "git status --short --branch after commit => clean branch refine/00000SZZXZQMG2MX8N7R1RJ001/round-1 at ec4dff96"
+            ]
+          },
+          "report": "Committed ec4dff96 (Clean up obsolete CLI commands): removed the obsolete hidden goal verify alias and production-binary system build/clean stubs, kept required worker entry points invocable but excluded them from help/catalog discovery, and aligned CLI intent and operator runbooks. Verification passed for focused catalog/parsing tests, canonical daemon-backed CLI tests, launcher/install tests, the full library suite, executable help/catalog readback, and diff hygiene. Strict Clippy was also run and stopped only on four pre-existing lints in untouched files.",
+          "started_at": "2026-08-14T10:29:38Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-14T10:29:38Z",
+        "proposal": {
+          "completed_at": "2026-08-14T10:11:33Z",
+          "git_after": {
+            "branch": "refine/00000SZZXZQMG2MX8N7R1RJ001/round-1",
+            "head_commit": "8f0700affd519b27a566351ae8f2136e1dbb4870",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000SZZXZQMG2MX8N7R1RJ001/round-1",
+            "head_commit": "8f0700affd519b27a566351ae8f2136e1dbb4870",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Classify the current Clap command tree against dispatcher routes, launcher behavior, and live internal call sites so deprecated aliases and unusable entries are separated from required hidden worker commands.",
+                "id": "P1"
+              },
+              {
+                "description": "Remove the obsolete command variants and their dispatch branches without introducing replacement compatibility layers or changing the underlying shared capabilities.",
+                "id": "P2"
+              },
+              {
+                "description": "Align help text and the machine-readable command catalog so internal hidden machinery stays undiscoverable and every advertised command has a supported invocation path.",
+                "id": "P3"
+              },
+              {
+                "description": "Update only the affected CLI intent and operator-facing help or runbook examples, including retired-syntax contract coverage, to name the current commands and their supported alternatives.",
+                "id": "P4"
+              }
+            ],
+            "summary": "Refine's CLI will expose only the commands users and agents can meaningfully run, removing obsolete compatibility paths while retaining live internal worker entry points and launcher-owned operations, so interactive help, machine-readable discovery, and durable CLI intent all describe the same supported surface."
+          },
+          "started_at": "2026-08-14T10:09:44Z"
+        },
+        "schema_version": 2,
+        "started_at": "2026-08-14T10:09:44Z",
+        "state": "completed",
+        "updated_at": "2026-08-14T10:36:00Z"
+      },
+      "implementation_report": "Committed ec4dff96 (Clean up obsolete CLI commands): removed the obsolete hidden goal verify alias and production-binary system build/clean stubs, kept required worker entry points invocable but excluded them from help/catalog discovery, and aligned CLI intent and operator runbooks. Verification passed for focused catalog/parsing tests, canonical daemon-backed CLI tests, launcher/install tests, the full library suite, executable help/catalog readback, and diff hygiene. Strict Clippy was also run and stopped only on four pre-existing lints in untouched files.",
+      "implementation_reported_at": "2026-08-14T10:36:00Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Clean up deprecated or outdated refine CLI commands and subcommands. Update any CLI help docs.",
+      "quality_agent_report": "Quality corrected the remaining stale install-runbook claim that the command catalog contains every CLI command and added regression coverage for that supported-user-facing boundary. The candidate now consistently removes goal verify and production-binary system build/clean, preserves all five hidden worker entry points, and documents launcher-owned build/clean. Focused, launcher/install, daemon-backed CLI, and full library verification passed; repository-wide formatting and strict Clippy remain blocked only by untouched baseline findings documented in verification.",
+      "quality_candidate_commit": "4be832a18ec76357991eb2e493183bbbcf61bbcb",
+      "quality_checked_at": "2026-08-14T10:45:46Z",
+      "quality_details": {
+        "candidate_commit": "4be832a18ec76357991eb2e493183bbbcf61bbcb",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZZXZQMG2MX8N7R1RJ001-round-1",
+        "diagnostics": [
+          "{\"ok\":true,\"summary\":\"Candidate satisfies the Goal and relevant CLI intent/runbook contracts; all focused regression and daemon-backed checks passed with no remaining observed failure.\",\"results\":[{\"test\":\"The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\",\"status\":\"passed\",\"evidence\":\"Exit 0. git diff --check was silent; seven exact focused tests passed, covering catalog/help visibility, runbook contracts, retired commands, hidden workers, Goal approval, and launcher-owned build/clean; daemon-backed cli_surface_suite also passed (1 passed, 0 failed).\",\"command\":\"bash -lc 'set -euo pipefail\\nbase=8f0700affd519b27a566351ae8f2136e1dbb4870\\ngit diff --check \\\"$base\\\"..HEAD\\ncargo test --lib surfaces::cli::catalog::tests::catalog_and_interactive_help_only_advertise_supported_commands -- --exact --test-threads=1\\ncargo test --lib surfaces::cli::catalog::tests::operational_runbooks_use_current_cli_and_layout_contracts -- --exact --test-threads=1\\ncargo test --lib surfaces::cli::tests::parsing::retired_and_launcher_only_commands_are_not_binary_subcommands -- --exact --test-threads=1\\ncargo test --lib surfaces::cli::tests::parsing::required_hidden_worker_commands_remain_parseable -- --exact --test-threads=1\\ncargo test --lib surfaces::cli::tests::goals::lifecycle::goal_approve_and_undo_use_shared_file_work_item_service -- --exact --test-threads=1\\ncargo test --test production_binary_install wrapper_system_build_and_clean_manage_the_production_binary -- --exact --test-threads=1\\ncargo test --test production_binary_install install_runbook_uses_system_install_as_the_complete_build_and_registration_boundary -- --exact --test-threads=1\\ncargo run --manifest-path xtask/Cargo.toml -- test-cli\\n'\"}]}",
+          "Observed supervised process proc-1786704322594-2164341-115 exited 0. stdout: running 1 test\ntest surfaces::cli::catalog::tests::catalog_and_interactive_help_only_advertise_supported_commands ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 791 filtered out; finished in 0.01s\n\n\nrunning 1 test\ntest surfaces::cli::catalog::tests::operational_runbooks_use_current_cli_and_layout_contracts ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 791 filtered out; finished in 0.01s\n\n\nrunning 1 test\ntest surfaces::cli::tests::parsing::retired_and_launcher_only_commands_are_not_binary_subcommands ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 791 filtered out; finished in 0.00s\n\n\nrunning 1 test\ntest surfaces::cli::tests::parsing::required_hidden_worker_commands_remain_parseable ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 791 filtered out; finished in 0.00s\n\n\nrunning 1 test\ntest surfaces::cli::tests::goals::lifecycle::goal_approve_and_undo_use_shared_file_work_item_service ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 791 filtered out; finished in 0.21s\n\n\nrunning 1 test\ntest wrapper_system_build_and_clean_manage_the_production_binary ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.03s\n\n\nrunning 1 test\ntest install_runbook_uses_system_install_as_the_complete_build_and_registration_boundary ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s\n\n\nrunning 1 test\ntest cli_surface_suite ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.75s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running tests/production_binary_install.rs (target/debug/deps/production_binary_install-261b0521868f6397)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s\n     Running tests/production_binary_install.rs (target/debug/deps/production_binary_install-261b0521868f6397)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running `xtask/target/debug/refine-xtask test-cli`\n==> build smoke-ai fixture\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.00s\n==> run CLI surface tests\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running tests/cli_surface.rs (target/debug/deps/cli_surface-a83cdaf5e852ddf8)"
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "19fffdd9e622106753",
+        "results": [
+          {
+            "command": "bash -lc 'set -euo pipefail\nbase=8f0700affd519b27a566351ae8f2136e1dbb4870\ngit diff --check \"$base\"..HEAD\ncargo test --lib surfaces::cli::catalog::tests::catalog_and_interactive_help_only_advertise_supported_commands -- --exact --test-threads=1\ncargo test --lib surfaces::cli::catalog::tests::operational_runbooks_use_current_cli_and_layout_contracts -- --exact --test-threads=1\ncargo test --lib surfaces::cli::tests::parsing::retired_and_launcher_only_commands_are_not_binary_subcommands -- --exact --test-threads=1\ncargo test --lib surfaces::cli::tests::parsing::required_hidden_worker_commands_remain_parseable -- --exact --test-threads=1\ncargo test --lib surfaces::cli::tests::goals::lifecycle::goal_approve_and_undo_use_shared_file_work_item_service -- --exact --test-threads=1\ncargo test --test production_binary_install wrapper_system_build_and_clean_manage_the_production_binary -- --exact --test-threads=1\ncargo test --test production_binary_install install_runbook_uses_system_install_as_the_complete_build_and_registration_boundary -- --exact --test-threads=1\ncargo run --manifest-path xtask/Cargo.toml -- test-cli\n'",
+            "evidence": "Observed supervised process proc-1786704322594-2164341-115 exited 0. stdout: running 1 test\ntest surfaces::cli::catalog::tests::catalog_and_interactive_help_only_advertise_supported_commands ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 791 filtered out; finished in 0.01s\n\n\nrunning 1 test\ntest surfaces::cli::catalog::tests::operational_runbooks_use_current_cli_and_layout_contracts ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 791 filtered out; finished in 0.01s\n\n\nrunning 1 test\ntest surfaces::cli::tests::parsing::retired_and_launcher_only_commands_are_not_binary_subcommands ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 791 filtered out; finished in 0.00s\n\n\nrunning 1 test\ntest surfaces::cli::tests::parsing::required_hidden_worker_commands_remain_parseable ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 791 filtered out; finished in 0.00s\n\n\nrunning 1 test\ntest surfaces::cli::tests::goals::lifecycle::goal_approve_and_undo_use_shared_file_work_item_service ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 791 filtered out; finished in 0.21s\n\n\nrunning 1 test\ntest wrapper_system_build_and_clean_manage_the_production_binary ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.03s\n\n\nrunning 1 test\ntest install_runbook_uses_system_install_as_the_complete_build_and_registration_boundary ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s\n\n\nrunning 1 test\ntest cli_surface_suite ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.75s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running tests/production_binary_install.rs (target/debug/deps/production_binary_install-261b0521868f6397)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s\n     Running tests/production_binary_install.rs (target/debug/deps/production_binary_install-261b0521868f6397)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running `xtask/target/debug/refine-xtask test-cli`\n==> build smoke-ai fixture\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.00s\n==> run CLI surface tests\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running tests/cli_surface.rs (target/debug/deps/cli_surface-a83cdaf5e852ddf8) Agent report: Exit 0. git diff --check was silent; seven exact focused tests passed, covering catalog/help visibility, runbook contracts, retired commands, hidden workers, Goal approval, and launcher-owned build/clean; daemon-backed cli_surface_suite also passed (1 passed, 0 failed).",
+            "exit_code": 0,
+            "process_id": "proc-1786704322594-2164341-115",
+            "status": "passed",
+            "test": "The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks."
+          }
+        ],
+        "source_candidate_commit": "4be832a18ec76357991eb2e493183bbbcf61bbcb"
+      },
+      "quality_message": "All Quality tests passed with observed supervised evidence.",
+      "quality_state": "passed",
+      "reporter": "Buddy Williams",
+      "rule_state": "passed",
+      "updated": "2026-08-14T10:46:46Z",
+      "workflow_attempt_authority": {
+        "claimed_at": "2026-08-14T10:29:38Z",
+        "round_idx": 0,
+        "workflow_revision": 16
+      },
+      "workflow_git_remote": "origin",
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-14T11:07:12Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Recover Round 1 after Governance integration failed against current main 40778e7e82ac7cd330f20e578b0c517edc6aab60. Preserve the reviewed candidate 4be832a18ec76357991eb2e493183bbbcf61bbcb behavior: remove the deprecated goal verify alias and production-binary system build and system clean commands; keep launcher-owned ./r system build and ./r system clean documented; keep all five required hidden worker entry points parseable but excluded from help and catalog discovery; and keep CLI intent and runbooks aligned. Reconcile the overlapping current-main performance work by retaining SystemAction::Performance and its dispatch while removing only Build and Clean in src/surfaces/cli/actions/system.rs, src/surfaces/cli/dispatch.rs, and src/surfaces/cli/dispatch/system.rs. Start from the fresh target-branch base and reapply the candidate intent instead of blindly merging the stale candidate. Preserve the Round 1 branch, worktree, commits, logs, and failure evidence. Run focused catalog, parsing, Goal approval, launcher/install, daemon-backed CLI, and library verification; prove the resulting candidate integrates cleanly with the then-current target branch and report exact evidence.",
+          "reporter": "Buddy Williams",
+          "round": 2
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZZXZQMG2MX8N7R1RJ001",
+          "name": "Clean up deprecated or outdated refine CLI commands and subcommands. Update any",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "Buddy Williams",
+            "constitution_state": "passed",
+            "governance_checked_at": "2026-08-14T10:46:43Z",
+            "governance_details": {
+              "configured": true,
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZZXZQMG2MX8N7R1RJ001-round-1",
+              "failed_actions": [],
+              "governance_configured": true,
+              "guidance_checked": 2,
+              "phase": "post_implementation",
+              "provider": "codex",
+              "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found.\",\"violations\":[]}",
+              "rules_checked": 4,
+              "verdict": {
+                "message": "No governance rule violations found.",
+                "status": "passed",
+                "violations": []
+              },
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZZXZQMG2MX8N7R1RJ001-round-1"
+            },
+            "governance_message": "No governance rule violations found.",
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "id": "guidance-1",
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                },
+                {
+                  "enabled": true,
+                  "id": "guidance-2",
+                  "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+                  "name": "Cohesive code files",
+                  "rule": "Apply whenever an agent adds or changes code files in any language."
+                }
+              ],
+              "code_files_changed": true,
+              "context_version": 1,
+              "recorded_at": "2026-08-14T10:36:00Z",
+              "skipped": []
+            },
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "8f0700affd519b27a566351ae8f2136e1dbb4870",
+                "context_digest": "ea5b8537f88121f78ada8ec84f3d923b0f67be5ccd221e829379528c70327bcd",
+                "context_version": 1,
+                "goal_id": "00000SZZXZQMG2MX8N7R1RJ001",
+                "implementation_branch": "refine/00000SZZXZQMG2MX8N7R1RJ001/round-1",
+                "round_idx": 0,
+                "target_branch": "main"
+              },
+              "completed_at": "2026-08-14T10:36:00Z",
+              "criticism": {
+                "completed_at": "2026-08-14T10:13:04Z",
+                "git_after": {
+                  "branch": "refine/00000SZZXZQMG2MX8N7R1RJ001/round-1",
+                  "head_commit": "8f0700affd519b27a566351ae8f2136e1dbb4870",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/00000SZZXZQMG2MX8N7R1RJ001/round-1",
+                  "head_commit": "8f0700affd519b27a566351ae8f2136e1dbb4870",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "summary": "The proposed plan is complete, coherent, and appropriately scoped for the CLI cleanup."
+                },
+                "started_at": "2026-08-14T10:11:33Z"
+              },
+              "final_plan": {
+                "completed_at": "2026-08-14T10:13:55Z",
+                "git_after": {
+                  "branch": "refine/00000SZZXZQMG2MX8N7R1RJ001/round-1",
+                  "head_commit": "8f0700affd519b27a566351ae8f2136e1dbb4870",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/00000SZZXZQMG2MX8N7R1RJ001/round-1",
+                  "head_commit": "8f0700affd519b27a566351ae8f2136e1dbb4870",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Classify the current Clap command tree against dispatcher routes, launcher behavior, and live internal call sites to distinguish obsolete aliases and unusable entries from required hidden worker commands.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Remove obsolete command variants and their dispatch branches without adding replacement compatibility layers or changing the shared capabilities behind supported commands.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Align command descriptions, interactive help, and the machine-readable command catalog so internal machinery remains hidden and every advertised command has a supported invocation path.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Update only the affected CLI intent and operator-facing help or runbook examples to remove retired syntax and name the current supported alternatives.",
+                      "id": "P4"
+                    }
+                  ],
+                  "summary": "Refine's CLI will expose only commands that users and agents can meaningfully invoke, removing obsolete compatibility paths while preserving required hidden worker entry points and launcher-owned operations so interactive help, machine-readable discovery, and CLI documentation consistently describe the supported surface."
+                },
+                "started_at": "2026-08-14T10:13:05Z"
+              },
+              "implementation": {
+                "completed_at": "2026-08-14T10:36:00Z",
+                "execution": {
+                  "checklist": [
+                    {
+                      "evidence": "Classified the Clap tree against dispatch and live callers: goal verify duplicated goal approve; production-binary system build/clean only returned launcher guidance while r implements both operations; source-promote-helper, source-upgrade-capability, source-check-worker, daemon-lifecycle-helper, and runner-worker have live process/tool call sites and remain parseable hidden commands.",
+                      "id": "P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Removed GoalAction::Verify and SystemAction::Build/Clean plus their target-root and dispatch match arms, without changing the shared Goal approval API/capability or launcher implementation.",
+                      "id": "P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Changed refine commands to recursively omit hidden Clap subcommands, corrected catalog/help descriptions, added regression coverage that retired/launcher-only commands do not parse and required hidden workers still parse, and verified actual help and JSON catalog output.",
+                      "id": "P3",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Updated only docs/intent/04-surfaces/02-cli.md and affected runbook pages to identify goal approve as the supported acceptance command and ./r system build/clean as launcher-owned operations with direct launcher help.",
+                      "id": "P4",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "cargo test --lib surfaces::cli::catalog::tests -- --test-threads=1 => 5 passed, 0 failed",
+                    "cargo test --lib surfaces::cli::tests::parsing -- --test-threads=1 => 9 passed, 0 failed",
+                    "cargo run --manifest-path xtask/Cargo.toml -- test-cli => cli_surface_suite passed (1 passed, 0 failed)",
+                    "cargo test --test production_binary_install -- --test-threads=1 => 6 passed, 0 failed",
+                    "cargo test --lib -- --test-threads=1 => 786 passed, 0 failed, 6 ignored",
+                    "Executable readback using target/debug/refine goal --help, target/debug/refine system --help, target/debug/refine commands piped to jq, and ./r system build/clean --help => PASS: help and catalog expose only supported operator commands; launcher help owns build/clean",
+                    "git diff --cached --check before commit and git diff --check before handoff => exit 0",
+                    "cargo clippy --all-targets -- -D warnings => deviated: failed only on four pre-existing out-of-scope lints in untouched src/tools/product/project_projection/store.rs, src/surfaces/web_server/http/background_loops.rs, and src/surfaces/cli/dispatch/config.rs",
+                    "git status --short --branch after commit => clean branch refine/00000SZZXZQMG2MX8N7R1RJ001/round-1 at ec4dff96"
+                  ]
+                },
+                "report": "Committed ec4dff96 (Clean up obsolete CLI commands): removed the obsolete hidden goal verify alias and production-binary system build/clean stubs, kept required worker entry points invocable but excluded them from help/catalog discovery, and aligned CLI intent and operator runbooks. Verification passed for focused catalog/parsing tests, canonical daemon-backed CLI tests, launcher/install tests, the full library suite, executable help/catalog readback, and diff hygiene. Strict Clippy was also run and stopped only on four pre-existing lints in untouched files.",
+                "started_at": "2026-08-14T10:29:38Z"
+              },
+              "phase": "implement",
+              "phase_started_at": "2026-08-14T10:29:38Z",
+              "proposal": {
+                "completed_at": "2026-08-14T10:11:33Z",
+                "git_after": {
+                  "branch": "refine/00000SZZXZQMG2MX8N7R1RJ001/round-1",
+                  "head_commit": "8f0700affd519b27a566351ae8f2136e1dbb4870",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/00000SZZXZQMG2MX8N7R1RJ001/round-1",
+                  "head_commit": "8f0700affd519b27a566351ae8f2136e1dbb4870",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Classify the current Clap command tree against dispatcher routes, launcher behavior, and live internal call sites so deprecated aliases and unusable entries are separated from required hidden worker commands.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Remove the obsolete command variants and their dispatch branches without introducing replacement compatibility layers or changing the underlying shared capabilities.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Align help text and the machine-readable command catalog so internal hidden machinery stays undiscoverable and every advertised command has a supported invocation path.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Update only the affected CLI intent and operator-facing help or runbook examples, including retired-syntax contract coverage, to name the current commands and their supported alternatives.",
+                      "id": "P4"
+                    }
+                  ],
+                  "summary": "Refine's CLI will expose only the commands users and agents can meaningfully run, removing obsolete compatibility paths while retaining live internal worker entry points and launcher-owned operations, so interactive help, machine-readable discovery, and durable CLI intent all describe the same supported surface."
+                },
+                "started_at": "2026-08-14T10:09:44Z"
+              },
+              "schema_version": 2,
+              "started_at": "2026-08-14T10:09:44Z",
+              "state": "completed",
+              "updated_at": "2026-08-14T10:36:00Z"
+            },
+            "implementation_report": "Committed ec4dff96 (Clean up obsolete CLI commands): removed the obsolete hidden goal verify alias and production-binary system build/clean stubs, kept required worker entry points invocable but excluded them from help/catalog discovery, and aligned CLI intent and operator runbooks. Verification passed for focused catalog/parsing tests, canonical daemon-backed CLI tests, launcher/install tests, the full library suite, executable help/catalog readback, and diff hygiene. Strict Clippy was also run and stopped only on four pre-existing lints in untouched files.",
+            "implementation_reported_at": "2026-08-14T10:36:00Z",
+            "meta_rule_state": "passed",
+            "product_state": "passed",
+            "prompt": "Clean up deprecated or outdated refine CLI commands and subcommands. Update any CLI help docs.",
+            "quality_checked_at": "2026-08-14T10:45:46Z",
+            "quality_details": {
+              "candidate_commit": "4be832a18ec76357991eb2e493183bbbcf61bbcb",
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZZXZQMG2MX8N7R1RJ001-round-1",
+              "diagnostics": [
+                "{\"ok\":true,\"summary\":\"Candidate satisfies the Goal and relevant CLI intent/runbook contracts; all focused regression and daemon-backed checks passed with no remaining observed failure.\",\"results\":[{\"test\":\"The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\",\"status\":\"passed\",\"evidence\":\"Exit 0. git diff --check was silent; seven exact focused tests passed, covering catalog/help visibility, runbook contracts, retired commands, hidden workers, Goal approval, and launcher-owned build/clean; daemon-backed cli_surface_suite also passed (1 passed, 0 failed).\",\"command\":\"bash -lc 'set -euo pipefail\\nbase=8f0700affd519b27a566351ae8f2136e1dbb4870\\ngit diff --check \\\"$base\\\"..HEAD\\ncargo test --lib surfaces::cli::catalog::tests::catalog_and_interactive_help_only_advertise_supported_commands -- --exact --test-threads=1\\ncargo test --lib surfaces::cli::catalog::tests::operational_runbooks_use_current_cli_and_layout_contracts -- --exact --test-threads=1\\ncargo test --lib surfaces::cli::tests::parsing::retired_and_launcher_only_commands_are_not_binary_subcommands -- --exact --test-threads=1\\ncargo test --lib surfaces::cli::tests::parsing::required_hidden_worker_commands_remain_parseable -- --exact --test-threads=1\\ncargo test --lib surfaces::cli::tests::goals::lifecycle::goal_approve_and_undo_use_shared_file_work_item_service -- --exact --test-threads=1\\ncargo test --test production_binary_install wrapper_system_build_and_clean_manage_the_production_binary -- --exact --test-threads=1\\ncargo test --test production_binary_install install_runbook_uses_system_install_as_the_complete_build_and_registration_boundary -- --exact --test-threads=1\\ncargo run --manifest-path xtask/Cargo.toml -- test-cli\\n'\"}]}",
+                "Observed supervised process proc-1786704322594-2164341-115 exited 0. stdout: running 1 test\ntest surfaces::cli::catalog::tests::catalog_and_interactive_help_only_advertise_supported_commands ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 791 filtered out; finished in 0.01s\n\n\nrunning 1 test\ntest surfaces::cli::catalog::tests::operational_runbooks_use_current_cli_and_layout_contracts ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 791 filtered out; finished in 0.01s\n\n\nrunning 1 test\ntest surfaces::cli::tests::parsing::retired_and_launcher_only_commands_are_not_binary_subcommands ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 791 filtered out; finished in 0.00s\n\n\nrunning 1 test\ntest surfaces::cli::tests::parsing::required_hidden_worker_commands_remain_parseable ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 791 filtered out; finished in 0.00s\n\n\nrunning 1 test\ntest surfaces::cli::tests::goals::lifecycle::goal_approve_and_undo_use_shared_file_work_item_service ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 791 filtered out; finished in 0.21s\n\n\nrunning 1 test\ntest wrapper_system_build_and_clean_manage_the_production_binary ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.03s\n\n\nrunning 1 test\ntest install_runbook_uses_system_install_as_the_complete_build_and_registration_boundary ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s\n\n\nrunning 1 test\ntest cli_surface_suite ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.75s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running tests/production_binary_install.rs (target/debug/deps/production_binary_install-261b0521868f6397)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s\n     Running tests/production_binary_install.rs (target/debug/deps/production_binary_install-261b0521868f6397)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running `xtask/target/debug/refine-xtask test-cli`\n==> build smoke-ai fixture\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.00s\n==> run CLI surface tests\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running tests/cli_surface.rs (target/debug/deps/cli_surface-a83cdaf5e852ddf8)"
+              ],
+              "evaluation_scope": "isolated_candidate",
+              "operation_id": "19fffdd9e622106753",
+              "results": [
+                {
+                  "command": "bash -lc 'set -euo pipefail\nbase=8f0700affd519b27a566351ae8f2136e1dbb4870\ngit diff --check \"$base\"..HEAD\ncargo test --lib surfaces::cli::catalog::tests::catalog_and_interactive_help_only_advertise_supported_commands -- --exact --test-threads=1\ncargo test --lib surfaces::cli::catalog::tests::operational_runbooks_use_current_cli_and_layout_contracts -- --exact --test-threads=1\ncargo test --lib surfaces::cli::tests::parsing::retired_and_launcher_only_commands_are_not_binary_subcommands -- --exact --test-threads=1\ncargo test --lib surfaces::cli::tests::parsing::required_hidden_worker_commands_remain_parseable -- --exact --test-threads=1\ncargo test --lib surfaces::cli::tests::goals::lifecycle::goal_approve_and_undo_use_shared_file_work_item_service -- --exact --test-threads=1\ncargo test --test production_binary_install wrapper_system_build_and_clean_manage_the_production_binary -- --exact --test-threads=1\ncargo test --test production_binary_install install_runbook_uses_system_install_as_the_complete_build_and_registration_boundary -- --exact --test-threads=1\ncargo run --manifest-path xtask/Cargo.toml -- test-cli\n'",
+                  "evidence": "Observed supervised process proc-1786704322594-2164341-115 exited 0. stdout: running 1 test\ntest surfaces::cli::catalog::tests::catalog_and_interactive_help_only_advertise_supported_commands ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 791 filtered out; finished in 0.01s\n\n\nrunning 1 test\ntest surfaces::cli::catalog::tests::operational_runbooks_use_current_cli_and_layout_contracts ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 791 filtered out; finished in 0.01s\n\n\nrunning 1 test\ntest surfaces::cli::tests::parsing::retired_and_launcher_only_commands_are_not_binary_subcommands ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 791 filtered out; finished in 0.00s\n\n\nrunning 1 test\ntest surfaces::cli::tests::parsing::required_hidden_worker_commands_remain_parseable ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 791 filtered out; finished in 0.00s\n\n\nrunning 1 test\ntest surfaces::cli::tests::goals::lifecycle::goal_approve_and_undo_use_shared_file_work_item_service ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 791 filtered out; finished in 0.21s\n\n\nrunning 1 test\ntest wrapper_system_build_and_clean_manage_the_production_binary ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.03s\n\n\nrunning 1 test\ntest install_runbook_uses_system_install_as_the_complete_build_and_registration_boundary ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.00s\n\n\nrunning 1 test\ntest cli_surface_suite ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 23.75s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running tests/production_binary_install.rs (target/debug/deps/production_binary_install-261b0521868f6397)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s\n     Running tests/production_binary_install.rs (target/debug/deps/production_binary_install-261b0521868f6397)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running `xtask/target/debug/refine-xtask test-cli`\n==> build smoke-ai fixture\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.00s\n==> run CLI surface tests\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running tests/cli_surface.rs (target/debug/deps/cli_surface-a83cdaf5e852ddf8) Agent report: Exit 0. git diff --check was silent; seven exact focused tests passed, covering catalog/help visibility, runbook contracts, retired commands, hidden workers, Goal approval, and launcher-owned build/clean; daemon-backed cli_surface_suite also passed (1 passed, 0 failed).",
+                  "exit_code": 0,
+                  "process_id": "proc-1786704322594-2164341-115",
+                  "status": "passed",
+                  "test": "The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks."
+                }
+              ],
+              "source_candidate_commit": "4be832a18ec76357991eb2e493183bbbcf61bbcb"
+            },
+            "quality_message": "All Quality tests passed with observed supervised evidence.",
+            "quality_state": "passed",
+            "reporter": "Buddy Williams",
+            "round": 1,
+            "rule_state": "passed"
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-08-14T11:07:11Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "2026-08-14T11:38:00Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZZXZQMG2MX8N7R1RJ001-round-2",
+        "failed_actions": [],
+        "governance_configured": true,
+        "guidance_checked": 2,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "No governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZZXZQMG2MX8N7R1RJ001-round-2"
+      },
+      "governance_message": "No governance rule violations found.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-14T11:20:27Z",
+        "skipped": []
+      },
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "40778e7e82ac7cd330f20e578b0c517edc6aab60",
+          "context_digest": "01f3f9c81c30cc27e31e58bf15fb66b48285f3c741f91c0efebc9a5fcc4cf233",
+          "context_version": 1,
+          "goal_id": "00000SZZXZQMG2MX8N7R1RJ001",
+          "implementation_branch": "refine/00000SZZXZQMG2MX8N7R1RJ001/round-2",
+          "round_idx": 1,
+          "target_branch": "main"
+        },
+        "completed_at": "2026-08-14T11:20:27Z",
+        "criticism": {
+          "completed_at": "2026-08-14T11:09:23Z",
+          "git_after": {
+            "branch": "refine/00000SZZXZQMG2MX8N7R1RJ001/round-2",
+            "head_commit": "40778e7e82ac7cd330f20e578b0c517edc6aab60",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000SZZXZQMG2MX8N7R1RJ001/round-2",
+            "head_commit": "40778e7e82ac7cd330f20e578b0c517edc6aab60",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P3",
+                  "P5"
+                ],
+                "description": "The checklist preserves focused contract coverage and target-branch ancestry but never explicitly runs the required catalog, parsing, Goal approval, launcher/install, daemon-backed CLI, and library verification or proves and reports clean integration with the then-current target SHA.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Add a verification item that runs and records those exact checks, confirms the candidate remains based on or cleanly integrates with the then-current target branch, and reports command, exit, and SHA evidence."
+              }
+            ],
+            "summary": "Add an explicit verification step so the recovered CLI behavior and clean current-main integration are evidenced, not merely planned."
+          },
+          "started_at": "2026-08-14T11:08:12Z"
+        },
+        "final_plan": {
+          "completed_at": "2026-08-14T11:10:24Z",
+          "git_after": {
+            "branch": "refine/00000SZZXZQMG2MX8N7R1RJ001/round-2",
+            "head_commit": "40778e7e82ac7cd330f20e578b0c517edc6aab60",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000SZZXZQMG2MX8N7R1RJ001/round-2",
+            "head_commit": "40778e7e82ac7cd330f20e578b0c517edc6aab60",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Reconstruct the reviewed Round 1 behavioral delta against its original base and selectively reapply that intent onto the Round 2 files without merging or altering the preserved Round 1 branch, worktree, commits, logs, or failure evidence.",
+                "id": "P1"
+              },
+              {
+                "description": "Remove GoalAction::Verify and production-binary SystemAction::Build and SystemAction::Clean with only their target-root and dispatch branches, while retaining SystemAction::Performance and its current-main dispatch behavior.",
+                "id": "P2"
+              },
+              {
+                "description": "Keep the five required hidden worker entry points parseable, exclude hidden commands recursively from help and machine-readable catalog discovery, and retain focused CLI contract coverage for retired commands, launcher ownership, Goal approval, and hidden workers.",
+                "id": "P3"
+              },
+              {
+                "description": "Align the affected CLI intent and runbooks with goal approve as the supported acceptance command and ./r system build and ./r system clean as launcher-owned operations, leaving unrelated documentation unchanged.",
+                "id": "P4"
+              },
+              {
+                "description": "Keep the recovered candidate as a scoped descendant of the current target branch and reconcile only this owned delta if the target advances before integration.",
+                "id": "P5"
+              },
+              {
+                "description": "Run the focused catalog, parsing, Goal approval, launcher/install, daemon-backed CLI, and library checks, then record their outcomes together with candidate, target, ancestry, and clean-integration SHA evidence.",
+                "id": "P6"
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "Added P6 to require every requested verification family and explicit command outcome and SHA evidence that the candidate is based on or cleanly integrates with the then-current target."
+              }
+            ],
+            "summary": "Reapply the reviewed CLI cleanup onto the fresh current-main base so deprecated production-binary commands disappear without losing the newly added Performance surface, required internal workers remain callable but undiscoverable, and operator documentation consistently directs build and clean work through the checkout launcher."
+          },
+          "started_at": "2026-08-14T11:09:23Z"
+        },
+        "implementation": {
+          "completed_at": "2026-08-14T11:20:27Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Reconstructed the reviewed 14-file delta with git diff 8f0700affd519b27a566351ae8f2136e1dbb4870..4be832a18ec76357991eb2e493183bbbcf61bbcb, selectively reapplied it on fresh base 40778e7e82ac7cd330f20e578b0c517edc6aab60, and left the Round 1 ref/worktree clean at 4be832a18ec76357991eb2e493183bbbcf61bbcb.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Removed GoalAction::Verify and only SystemAction::Build/Clean plus their explicit-target-root and dispatch arms. SystemAction::Performance, its explicit-target-root arm, daemon request path, table renderer, and current-main tests remain present.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Catalog recursion now excludes hidden Clap commands; regression tests prove goal verify and production-binary build/clean do not parse, while source-promote-helper, source-upgrade-capability, source-check-worker, daemon-lifecycle-helper, and runner-worker remain parseable and absent from help/catalog discovery. Goal approval, launcher ownership, and daemon CLI coverage passed.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated only docs/intent/04-surfaces/02-cli.md and the affected README, install, and semantic-release runbooks to name goal approve and launcher-owned ./r system build/clean, without unrelated documentation edits.",
+                "id": "P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Committed scoped candidate 5eb437dcc947ee3a98ca3db2dd419830478061b1 directly atop target 40778e7e82ac7cd330f20e578b0c517edc6aab60. Local main, origin/main, and live ls-remote origin main all remained at that target SHA.",
+                "id": "P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "All requested focused, launcher/install, daemon-backed CLI, and final library checks passed. git merge-base --is-ancestor succeeded; alternate-index read-tree/write-tree integration produced a63ae9b77d5eebc412d1cebd09751d057e47610f, exactly matching the candidate tree. Final branch and preserved Round 1 worktrees were clean.",
+                "id": "P6",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "cargo test --lib surfaces::cli::catalog::tests::catalog_and_interactive_help_only_advertise_supported_commands -- --exact --test-threads=1 => 1 passed, 0 failed",
+              "cargo test --lib surfaces::cli::catalog::tests::operational_runbooks_use_current_cli_and_layout_contracts -- --exact --test-threads=1 => 1 passed, 0 failed",
+              "cargo test --lib surfaces::cli::tests::parsing::retired_and_launcher_only_commands_are_not_binary_subcommands -- --exact --test-threads=1 => 1 passed, 0 failed",
+              "cargo test --lib surfaces::cli::tests::parsing::required_hidden_worker_commands_remain_parseable -- --exact --test-threads=1 => 1 passed, 0 failed",
+              "cargo test --lib surfaces::cli::tests::goals::lifecycle::goal_approve_and_undo_use_shared_file_work_item_service -- --exact --test-threads=1 => 1 passed, 0 failed",
+              "cargo test --test production_binary_install wrapper_system_build_and_clean_manage_the_production_binary -- --exact --test-threads=1 => 1 passed, 0 failed",
+              "cargo test --test production_binary_install install_runbook_uses_system_install_as_the_complete_build_and_registration_boundary -- --exact --test-threads=1 => 1 passed, 0 failed",
+              "cargo run --manifest-path xtask/Cargo.toml -- test-cli => cli_surface_suite passed, 1 passed, 0 failed",
+              "cargo test --lib -- --test-threads=1 (first run concurrent with xtask) => 787 passed, 1 failed, 6 ignored; only warmed_goal_create_post_completes_under_fifty_milliseconds_at_current_scale exceeded its timing threshold at 69.339144ms",
+              "cargo test --lib surfaces::web_server::tests::goals::creation::warmed_goal_create_post_completes_under_fifty_milliseconds_at_current_scale -- --exact --test-threads=1 --nocapture => 1 passed at 15.872283ms, 0 failed",
+              "cargo test --lib -- --test-threads=1 (uncontended rerun) => 788 passed, 0 failed, 6 ignored",
+              "target/debug/refine goal --help; target/debug/refine system --help; target/debug/refine commands with jq assertions; ./r system build --help; ./r system clean --help => PASS: verify/build/clean absent from production help/catalog, performance present, five workers hidden, launcher help owns build/clean",
+              "git diff --cached --check before commit; git diff --check 40778e7e82ac7cd330f20e578b0c517edc6aab60..5eb437dcc947ee3a98ca3db2dd419830478061b1 => exit 0 with no output",
+              "git ls-remote origin refs/heads/main; git merge-base --is-ancestor 40778e7e82ac7cd330f20e578b0c517edc6aab60 5eb437dcc947ee3a98ca3db2dd419830478061b1; alternate-index git read-tree -m plus git write-tree => remote target 40778e7e82ac7cd330f20e578b0c517edc6aab60, ancestry exit 0, merge tree a63ae9b77d5eebc412d1cebd09751d057e47610f equals candidate tree",
+              "git status --short --branch after commit => clean branch refine/00000SZZXZQMG2MX8N7R1RJ001/round-2 at 5eb437dcc947ee3a98ca3db2dd419830478061b1",
+              "cargo fmt --all -- --check => exit 1 on formatting drift already present in current-main files/lines outside the owned delta; no broad formatting rewrite was made, and both pre-commit and final diff checks passed",
+              "git merge-tree --write-tree 40778e7e82ac7cd330f20e578b0c517edc6aab60 5eb437dcc947ee3a98ca3db2dd419830478061b1 => unavailable in installed Git (fatal: unknown rev --write-tree); clean integration was instead proved with direct ancestry and alternate-index read-tree/write-tree equality"
+            ]
+          },
+          "report": "Committed 5eb437dcc947ee3a98ca3db2dd419830478061b1: selectively recovered the reviewed CLI cleanup on current main, retained SystemAction::Performance and its dispatch, removed only deprecated goal verify and production-binary system build/clean, kept five hidden workers parseable but undiscoverable, and aligned CLI intent/runbooks. Seven focused tests, daemon-backed CLI, executable readback, and an uncontended full library suite passed; the candidate is a clean direct descendant of unchanged remote main with an identical simulated integration tree.",
+          "started_at": "2026-08-14T11:10:24Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-14T11:10:24Z",
+        "proposal": {
+          "completed_at": "2026-08-14T11:08:12Z",
+          "git_after": {
+            "branch": "refine/00000SZZXZQMG2MX8N7R1RJ001/round-2",
+            "head_commit": "40778e7e82ac7cd330f20e578b0c517edc6aab60",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000SZZXZQMG2MX8N7R1RJ001/round-2",
+            "head_commit": "40778e7e82ac7cd330f20e578b0c517edc6aab60",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Reconstruct the reviewed Round 1 behavioral delta against its original base and selectively reapply that intent onto the Round 2 files without merging or altering the preserved Round 1 branch, worktree, commits, logs, or failure evidence.",
+                "id": "P1"
+              },
+              {
+                "description": "Remove GoalAction::Verify and production-binary SystemAction::Build and SystemAction::Clean with only their target-root and dispatch branches, while retaining SystemAction::Performance and its current-main dispatch behavior.",
+                "id": "P2"
+              },
+              {
+                "description": "Keep the five required hidden worker entry points parseable, exclude hidden commands recursively from help and machine-readable catalog discovery, and retain focused CLI contract coverage for retired commands, launcher ownership, Goal approval, and hidden workers.",
+                "id": "P3"
+              },
+              {
+                "description": "Align the affected CLI intent and runbooks with goal approve as the supported acceptance command and ./r system build and ./r system clean as launcher-owned operations, leaving unrelated documentation unchanged.",
+                "id": "P4"
+              },
+              {
+                "description": "Keep the recovered candidate as a scoped descendant of the current target branch and reconcile only this owned delta if the target advances before integration.",
+                "id": "P5"
+              }
+            ],
+            "summary": "Reapply the reviewed CLI cleanup onto the fresh current-main base so deprecated production-binary commands disappear without losing the newly added Performance surface, required internal workers remain callable but undiscoverable, and operator documentation consistently directs build and clean work through the checkout launcher."
+          },
+          "started_at": "2026-08-14T11:07:12Z"
+        },
+        "schema_version": 2,
+        "started_at": "2026-08-14T11:07:12Z",
+        "state": "completed",
+        "updated_at": "2026-08-14T11:20:27Z"
+      },
+      "implementation_report": "Committed 5eb437dcc947ee3a98ca3db2dd419830478061b1: selectively recovered the reviewed CLI cleanup on current main, retained SystemAction::Performance and its dispatch, removed only deprecated goal verify and production-binary system build/clean, kept five hidden workers parseable but undiscoverable, and aligned CLI intent/runbooks. Seven focused tests, daemon-backed CLI, executable readback, and an uncontended full library suite passed; the candidate is a clean direct descendant of unchanged remote main with an identical simulated integration tree.",
+      "implementation_reported_at": "2026-08-14T11:20:27Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Recover Round 1 after Governance integration failed against current main 40778e7e82ac7cd330f20e578b0c517edc6aab60. Preserve the reviewed candidate 4be832a18ec76357991eb2e493183bbbcf61bbcb behavior: remove the deprecated goal verify alias and production-binary system build and system clean commands; keep launcher-owned ./r system build and ./r system clean documented; keep all five required hidden worker entry points parseable but excluded from help and catalog discovery; and keep CLI intent and runbooks aligned. Reconcile the overlapping current-main performance work by retaining SystemAction::Performance and its dispatch while removing only Build and Clean in src/surfaces/cli/actions/system.rs, src/surfaces/cli/dispatch.rs, and src/surfaces/cli/dispatch/system.rs. Start from the fresh target-branch base and reapply the candidate intent instead of blindly merging the stale candidate. Preserve the Round 1 branch, worktree, commits, logs, and failure evidence. Run focused catalog, parsing, Goal approval, launcher/install, daemon-backed CLI, and library verification; prove the resulting candidate integrates cleanly with the then-current target branch and report exact evidence.",
+      "quality_agent_report": "Quality review preserved the recovered CLI cleanup and added focused regression coverage proving current-main SystemAction::Performance remains present in the catalog and parseable with its flags. No production-code or documentation correction was required. Focused catalog, parsing, Goal approval, launcher/install, daemon-backed CLI, executable readback, full library, diff hygiene, refreshed target ancestry, and fast-forward integration checks passed. Targeted rustfmt passed. Repository-wide rustfmt and strict Clippy remain deviated only on pre-existing untouched current-main formatting/lints and are reported exactly below.",
+      "quality_candidate_commit": "877dea9528ed5071d4118135c98889ab3dd322d6",
+      "quality_checked_at": "2026-08-14T11:36:42Z",
+      "quality_details": {
+        "candidate_commit": "877dea9528ed5071d4118135c98889ab3dd322d6",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZZXZQMG2MX8N7R1RJ001-round-2",
+        "diagnostics": [
+          "{\"ok\":true,\"summary\":\"Candidate satisfies the Goal and relevant CLI intent/runbook contracts; all focused, daemon-backed, and library regression checks passed.\",\"results\":[{\"test\":\"The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\",\"status\":\"passed\",\"evidence\":\"Exit 0. Target/main ancestry and diff hygiene checks passed silently; eight exact focused tests passed; daemon-backed cli_surface_suite passed; full library suite passed (789 passed, 0 failed, 6 ignored); final tracked worktree status was clean.\",\"command\":\"bash -lc 'set -euo pipefail\\nbase=40778e7e82ac7cd330f20e578b0c517edc6aab60\\ntest \\\"$(git rev-parse main)\\\" = \\\"$base\\\"\\ntest \\\"$(git rev-parse origin/main)\\\" = \\\"$base\\\"\\ngit merge-base --is-ancestor \\\"$base\\\" HEAD\\ngit diff --check \\\"$base\\\"..HEAD\\ncargo test --lib surfaces::cli::catalog::tests::catalog_and_interactive_help_only_advertise_supported_commands -- --exact --test-threads=1\\ncargo test --lib surfaces::cli::catalog::tests::operational_runbooks_use_current_cli_and_layout_contracts -- --exact --test-threads=1\\ncargo test --lib surfaces::cli::tests::parsing::retired_and_launcher_only_commands_are_not_binary_subcommands -- --exact --test-threads=1\\ncargo test --lib surfaces::cli::tests::parsing::required_hidden_worker_commands_remain_parseable -- --exact --test-threads=1\\ncargo test --lib surfaces::cli::tests::parsing::current_main_performance_command_remains_parseable -- --exact --test-threads=1\\ncargo test --lib surfaces::cli::tests::goals::lifecycle::goal_approve_and_undo_use_shared_file_work_item_service -- --exact --test-threads=1\\ncargo test --test production_binary_install wrapper_system_build_and_clean_manage_the_production_binary -- --exact --test-threads=1\\ncargo test --test production_binary_install install_runbook_uses_system_install_as_the_complete_build_and_registration_boundary -- --exact --test-threads=1\\ncargo run --manifest-path xtask/Cargo.toml -- test-cli\\ncargo test --lib -- --test-threads=1\\ntest -z \\\"$(git status --porcelain --untracked-files=no)\\\"\\n'\"}]}",
+          "Observed supervised process proc-1786707276664-2648772-37 exited 0. stdout:  ok\ntest workflow::reconciliation::tests::next_lane_quarantines_residue_owned_by_an_interrupted_goal ... ok\ntest workflow::tests::execution_ownership::backlog_promotion_changes_only_goal_state_and_does_not_create_worktrees ... ok\ntest workflow::tests::execution_ownership::cleanup_observes_candidate_handoff_through_governance_integration ... ok\ntest workflow::tests::execution_ownership::newer_round_handoff_supersedes_only_the_same_goal_candidate ... ok\ntest workflow::tests::execution_ownership::restart_recovery_preserves_active_zero_round_goal_and_recovers_valid_sibling ... ok\ntest workflow::tests::execution_ownership::restart_recovery_preserves_goal_state_and_removes_retired_execution_files ... ok\ntest workflow::tests::execution_ownership::zero_round_backlog_is_ineligible_while_valid_sibling_promotes ... ok\ntest workflow::tests::failure_settlement::authoritative_failure_atomically_fails_goal_and_its_originating_round ... ok\ntest workflow::tests::failure_settlement::bulk_todo_reclaim_with_new_round_supersedes_old_failure ... ok\ntest workflow::tests::failure_settlement::undo_reclaim_of_cancelled_goal_supersedes_old_same_round_failure ... ok\ntest workflow::tests::governance::file_automation_fails_after_the_governance_recovery_budget_is_exhausted ... ok\ntest workflow::tests::governance::governance_failing_verdict_records_the_parsed_violations ... ok\ntest workflow::tests::governance::governance_review_prose_with_code_braces_reads_the_verdict_not_the_first_brace ... ok\ntest workflow::tests::governance::governance_review_without_a_verdict_fails_closed_as_a_parse_error ... ok\ntest workflow::tests::governance::governance_verdict_survives_an_unclosed_brace_in_the_review_prose ... ok\ntest workflow::tests::quality_recovery::file_automation_fails_after_the_shared_quality_recovery_budget_is_exhausted ... ok\ntest workflow::tests::workflow_pass_reports_only_projection_mutations ... ok\n\ntest result: ok. 789 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 115.76s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running tests/production_binary_install.rs (target/debug/deps/production_binary_install-261b0521868f6397)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running tests/production_binary_install.rs (target/debug/deps/production_binary_install-261b0521868f6397)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running `xtask/target/debug/refine-xtask test-cli`\n==> build smoke-ai fixture\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.00s\n==> run CLI surface tests\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s\n     Running tests/cli_surface.rs (target/debug/deps/cli_surface-a83cdaf5e852ddf8)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)"
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "1a000092baa286ac41",
+        "results": [
+          {
+            "command": "bash -lc 'set -euo pipefail\nbase=40778e7e82ac7cd330f20e578b0c517edc6aab60\ntest \"$(git rev-parse main)\" = \"$base\"\ntest \"$(git rev-parse origin/main)\" = \"$base\"\ngit merge-base --is-ancestor \"$base\" HEAD\ngit diff --check \"$base\"..HEAD\ncargo test --lib surfaces::cli::catalog::tests::catalog_and_interactive_help_only_advertise_supported_commands -- --exact --test-threads=1\ncargo test --lib surfaces::cli::catalog::tests::operational_runbooks_use_current_cli_and_layout_contracts -- --exact --test-threads=1\ncargo test --lib surfaces::cli::tests::parsing::retired_and_launcher_only_commands_are_not_binary_subcommands -- --exact --test-threads=1\ncargo test --lib surfaces::cli::tests::parsing::required_hidden_worker_commands_remain_parseable -- --exact --test-threads=1\ncargo test --lib surfaces::cli::tests::parsing::current_main_performance_command_remains_parseable -- --exact --test-threads=1\ncargo test --lib surfaces::cli::tests::goals::lifecycle::goal_approve_and_undo_use_shared_file_work_item_service -- --exact --test-threads=1\ncargo test --test production_binary_install wrapper_system_build_and_clean_manage_the_production_binary -- --exact --test-threads=1\ncargo test --test production_binary_install install_runbook_uses_system_install_as_the_complete_build_and_registration_boundary -- --exact --test-threads=1\ncargo run --manifest-path xtask/Cargo.toml -- test-cli\ncargo test --lib -- --test-threads=1\ntest -z \"$(git status --porcelain --untracked-files=no)\"\n'",
+            "evidence": "Observed supervised process proc-1786707276664-2648772-37 exited 0. stdout:  ok\ntest workflow::reconciliation::tests::next_lane_quarantines_residue_owned_by_an_interrupted_goal ... ok\ntest workflow::tests::execution_ownership::backlog_promotion_changes_only_goal_state_and_does_not_create_worktrees ... ok\ntest workflow::tests::execution_ownership::cleanup_observes_candidate_handoff_through_governance_integration ... ok\ntest workflow::tests::execution_ownership::newer_round_handoff_supersedes_only_the_same_goal_candidate ... ok\ntest workflow::tests::execution_ownership::restart_recovery_preserves_active_zero_round_goal_and_recovers_valid_sibling ... ok\ntest workflow::tests::execution_ownership::restart_recovery_preserves_goal_state_and_removes_retired_execution_files ... ok\ntest workflow::tests::execution_ownership::zero_round_backlog_is_ineligible_while_valid_sibling_promotes ... ok\ntest workflow::tests::failure_settlement::authoritative_failure_atomically_fails_goal_and_its_originating_round ... ok\ntest workflow::tests::failure_settlement::bulk_todo_reclaim_with_new_round_supersedes_old_failure ... ok\ntest workflow::tests::failure_settlement::undo_reclaim_of_cancelled_goal_supersedes_old_same_round_failure ... ok\ntest workflow::tests::governance::file_automation_fails_after_the_governance_recovery_budget_is_exhausted ... ok\ntest workflow::tests::governance::governance_failing_verdict_records_the_parsed_violations ... ok\ntest workflow::tests::governance::governance_review_prose_with_code_braces_reads_the_verdict_not_the_first_brace ... ok\ntest workflow::tests::governance::governance_review_without_a_verdict_fails_closed_as_a_parse_error ... ok\ntest workflow::tests::governance::governance_verdict_survives_an_unclosed_brace_in_the_review_prose ... ok\ntest workflow::tests::quality_recovery::file_automation_fails_after_the_shared_quality_recovery_budget_is_exhausted ... ok\ntest workflow::tests::workflow_pass_reports_only_projection_mutations ... ok\n\ntest result: ok. 789 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 115.76s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running tests/production_binary_install.rs (target/debug/deps/production_binary_install-261b0521868f6397)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running tests/production_binary_install.rs (target/debug/deps/production_binary_install-261b0521868f6397)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running `xtask/target/debug/refine-xtask test-cli`\n==> build smoke-ai fixture\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.00s\n==> run CLI surface tests\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s\n     Running tests/cli_surface.rs (target/debug/deps/cli_surface-a83cdaf5e852ddf8)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e) Agent report: Exit 0. Target/main ancestry and diff hygiene checks passed silently; eight exact focused tests passed; daemon-backed cli_surface_suite passed; full library suite passed (789 passed, 0 failed, 6 ignored); final tracked worktree status was clean.",
+            "exit_code": 0,
+            "process_id": "proc-1786707276664-2648772-37",
+            "status": "passed",
+            "test": "The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks."
+          }
+        ],
+        "source_candidate_commit": "877dea9528ed5071d4118135c98889ab3dd322d6"
+      },
+      "quality_message": "All Quality tests passed with observed supervised evidence.",
+      "quality_state": "passed",
+      "reporter": "Buddy Williams",
+      "rule_state": "passed",
+      "updated": "2026-08-14T11:38:04Z",
+      "workflow_attempt_authority": null,
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "877dea9528ed5071d4118135c98889ab3dd322d6",
+        "integrated_at": "2026-08-14T11:38:04.484147957+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n docs/intent/04-surfaces/02-cli.md   |  11 ++--\n docs/runbooks/README.md             |  17 +++---\n docs/runbooks/install.md            |  14 ++++-\n docs/runbooks/semantic-release.md   |   6 ++\n src/surfaces/cli/actions.rs         |   4 +-\n src/surfaces/cli/actions/goals.rs   |   9 ---\n src/surfaces/cli/actions/system.rs  |   4 --\n src/surfaces/cli/catalog.rs         | 118 +++++++++++++++++++++++++++++++-----\n src/surfaces/cli/dispatch.rs        |   3 -\n src/surfaces/cli/dispatch/goals.rs  |   8 ---\n src/surfaces/cli/dispatch/system.rs |  10 ---\n src/surfaces/cli/tests/parsing.rs   | 115 +++++++++++++++++++++++++++++++++++\n tests/cli_surface.rs                |   2 +-\n tests/cli_surface/goals.rs          |  13 +---\n 14 files changed, 257 insertions(+), 77 deletions(-)",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "1ba2bfee9a48bf228a6cd08698a29bb9fd4cb546"
+      },
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    }
+  ],
+  "status": "done",
+  "target_branch": "main",
+  "updated": "2026-08-14T12:00:12Z",
+  "workflow_revision": 57
+}

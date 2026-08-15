@@ -52,13 +52,14 @@
       },
       "quality_message": "No Quality tests configured.",
       "quality_state": "passed",
-      "reporter": "Refine",
+      "reporter": "Buddy Williams",
       "rule_state": "passed",
-      "updated": "2026-07-23T18:24:40Z",
+      "updated": "2026-07-28T16:39:39Z",
       "workflow_quality_timing": "pre_merge"
     }
   ],
   "status": "done",
   "target_branch": "main",
-  "updated": "2026-07-23T18:25:00Z"
+  "updated": "2026-07-28T16:39:51Z",
+  "workflow_revision": 5
 }

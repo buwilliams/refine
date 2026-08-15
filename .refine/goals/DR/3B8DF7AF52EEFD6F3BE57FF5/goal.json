@@ -1,0 +1,793 @@
+{
+  "base_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+  "branch_name": "refine/DR3B8DF7AF52EEFD6F3BE57FF5/round-3",
+  "candidate_commit": "fd1b805a6773ee49cb510ea4c093926d364d11a6",
+  "created": "2026-08-11T12:52:15Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "DR3B8DF7AF52EEFD6F3BE57FF5",
+  "name": "Honor pause in background workers",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "agent_context": null,
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-08-11T12:52:17Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "guidance_decision": null,
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Implement and verify this Goal.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-08-11T12:52:17Z",
+      "workflow_quality_timing": null,
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-11T12:52:21Z",
+        "current_round": {
+          "assignee": "Refine",
+          "prompt": "Implement and verify this Goal.",
+          "reporter": "Refine",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "buddy.williams@insurity.com",
+          "id": "DR3B8DF7AF52EEFD6F3BE57FF5",
+          "name": "Honor pause in background workers",
+          "node_id": "default",
+          "priority": "high",
+          "reporter": "buddy.williams@insurity.com"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Run agents, Git, quality, lifecycle, and long work through the supervised process substrate, with explicit ownership, status, logs, cancellation, failures, and recovery. When activating a new Refine build requires replacing or restarting that supervisor, a restart-safe handoff may run outside it and independently complete the upgrade. The handoff must retain durable, operation-correlated ownership and state, visible progress and failures, and restart, rollback, and recovery reconciliation.",
+              "updated": "2026-08-06T20:32:30Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-08-11T12:52:17Z",
+      "failure_at": "2026-08-11T13:12:11Z",
+      "failure_category": "governance",
+      "failure_message": "Web pause controls misstate the expanded pause behavior.",
+      "governance_checked_at": "2026-08-11T13:12:11Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR3B8DF7AF52EEFD6F3BE57FF5-round-1",
+        "failed_actions": [
+          {
+            "message": "The CLI and Process documentation now state that pause stops Git sync and automatic worktree cleanup, but the web Processes surface and confirmation dialog still describe pause as only blocking new Goal admission while active work continues. The web surface therefore misrepresents the shared capability's consequential behavior.",
+            "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+            "rule_id": "rule-1"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Web pause controls misstate the expanded pause behavior.\",\"violations\":[{\"rule_id\":\"rule-1\",\"rule\":\"Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.\",\"message\":\"The CLI and Process documentation now state that pause stops Git sync and automatic worktree cleanup, but the web Processes surface and confirmation dialog still describe pause as only blocking new Goal admission while active work continues. The web surface therefore misrepresents the shared capability's consequential behavior.\"}]}",
+        "rules_checked": 9,
+        "verdict": {
+          "message": "Web pause controls misstate the expanded pause behavior.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "The CLI and Process documentation now state that pause stops Git sync and automatic worktree cleanup, but the web Processes surface and confirmation dialog still describe pause as only blocking new Goal admission while active work continues. The web surface therefore misrepresents the shared capability's consequential behavior.",
+              "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "rule_id": "rule-1"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR3B8DF7AF52EEFD6F3BE57FF5-round-1"
+      },
+      "governance_message": "Web pause controls misstate the expanded pause behavior.",
+      "governance_rule_actions": [
+        {
+          "message": "The CLI and Process documentation now state that pause stops Git sync and automatic worktree cleanup, but the web Processes surface and confirmation dialog still describe pause as only blocking new Goal admission while active work continues. The web surface therefore misrepresents the shared capability's consequential behavior.",
+          "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+          "rule_id": "rule-1"
+        }
+      ],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-11T13:09:52Z",
+        "skipped": []
+      },
+      "implementation_report": "Git-sync and worktree-cleanup supervision, worker entrypoints, and active loops now honor workflow_paused, quiesce at safe boundaries, and become launchable again after resume; CLI and Process intent documentation were updated, with the CLI reference regenerated. Verification: cargo test --lib process::runner::tests:: -- --test-threads=1 => 9 passed; cargo test --lib pause -- --test-threads=1 => 9 passed; final cargo test --lib --quiet -- --test-threads=1 => 759 passed, 0 failed, 6 ignored; cargo clippy --all-targets -- -D warnings => passed; cargo run --manifest-path xtask/Cargo.toml -- check-static-assets => 64 files present; cargo fmt --all -- --check and git diff --check => passed. An earlier full-suite attempt observed 758 passed, 1 unrelated warmed Goal-create 50 ms timing failure, and 6 ignored; that exact test passed alone in 0.23s and the final full rerun passed.",
+      "implementation_reported_at": "2026-08-11T13:09:50Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Update the worktree-cleanup and git-sync background workers to honor the daemon pause flag so they stop scanning worktrees while paused and resume safely when unpaused. Add regression coverage verifying that paused mode suppresses these background operations without making the reported pause status merely cosmetic.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "failed",
+      "updated": "2026-08-11T13:12:12Z",
+      "workflow_quality_timing": null,
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-12T13:32:23Z",
+        "current_round": {
+          "assignee": "buddy.williams@insurity.com",
+          "prompt": "Recover the verified background-worker pause candidate from current main while preserving prior Round 1/Round 2 evidence and candidate f306cbf9e8b520146e4f75a73e2e3592f9d4bc8f. Reuse or replay the implementation that makes Git-sync and worktree-cleanup runners honor workflow_paused and quiesce at safe boundaries; do not rewrite the retained candidate.\n\nResolve the recorded cross-surface semantics gap. Update the web Processes workflow-automation row, pause confirmation dialog, and in-product guide/help copy so they accurately state that pausing blocks new Goal admission and quiesces automatic Git sync and inactive-worktree cleanup at safe boundaries, while already active Goal executions continue unless separately stopped. Keep the UI a thin adapter over the shared pause capability and avoid implying that pause terminates running Agents or permanently stops runner processes. Ensure resume wording and observed state are consistent across CLI, web, process projections, and intent documentation.\n\nAdd focused static-web regressions that lock the status description, confirmation text, guide text, and pause/unpause action behavior to this contract, while retaining the runner lifecycle/quiescence/resume tests from the candidate. Run focused Rust pause/runner tests serially where shared host state requires it, relevant web Node tests, generated CLI-reference validation if affected, root formatting/checks, and git diff --check. Distinguish any environment-gated or unrelated baseline failure. Do not approve, merge, rewrite history, delete retained evidence, or directly edit durable Goal state.",
+          "reporter": "buddy.williams@insurity.com",
+          "round": 3
+        },
+        "goal": {
+          "assignee": "buddy.williams@insurity.com",
+          "id": "DR3B8DF7AF52EEFD6F3BE57FF5",
+          "name": "Honor pause in background workers",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "buddy.williams@insurity.com"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "Refine",
+            "prompt": "Implement and verify this Goal.",
+            "reporter": "Refine",
+            "round": 1
+          },
+          {
+            "assignee": "buddy.williams@insurity.com",
+            "constitution_state": "passed",
+            "governance_checked_at": "2026-08-11T13:12:11Z",
+            "governance_details": {
+              "configured": true,
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR3B8DF7AF52EEFD6F3BE57FF5-round-1",
+              "failed_actions": [
+                {
+                  "message": "The CLI and Process documentation now state that pause stops Git sync and automatic worktree cleanup, but the web Processes surface and confirmation dialog still describe pause as only blocking new Goal admission while active work continues. The web surface therefore misrepresents the shared capability's consequential behavior.",
+                  "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+                  "rule_id": "rule-1"
+                }
+              ],
+              "governance_configured": true,
+              "phase": "post_implementation",
+              "provider": "codex",
+              "raw_output": "{\"status\":\"failed\",\"message\":\"Web pause controls misstate the expanded pause behavior.\",\"violations\":[{\"rule_id\":\"rule-1\",\"rule\":\"Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.\",\"message\":\"The CLI and Process documentation now state that pause stops Git sync and automatic worktree cleanup, but the web Processes surface and confirmation dialog still describe pause as only blocking new Goal admission while active work continues. The web surface therefore misrepresents the shared capability's consequential behavior.\"}]}",
+              "rules_checked": 9,
+              "verdict": {
+                "message": "Web pause controls misstate the expanded pause behavior.",
+                "status": "failed",
+                "violations": [
+                  {
+                    "message": "The CLI and Process documentation now state that pause stops Git sync and automatic worktree cleanup, but the web Processes surface and confirmation dialog still describe pause as only blocking new Goal admission while active work continues. The web surface therefore misrepresents the shared capability's consequential behavior.",
+                    "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+                    "rule_id": "rule-1"
+                  }
+                ]
+              },
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR3B8DF7AF52EEFD6F3BE57FF5-round-1"
+            },
+            "governance_message": "Web pause controls misstate the expanded pause behavior.",
+            "governance_rule_actions": [
+              {
+                "message": "The CLI and Process documentation now state that pause stops Git sync and automatic worktree cleanup, but the web Processes surface and confirmation dialog still describe pause as only blocking new Goal admission while active work continues. The web surface therefore misrepresents the shared capability's consequential behavior.",
+                "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+                "rule_id": "rule-1"
+              }
+            ],
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                },
+                {
+                  "enabled": true,
+                  "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+                  "name": "Cohesive code files",
+                  "rule": "Apply whenever an agent adds or changes code files in any language."
+                }
+              ],
+              "code_files_changed": true,
+              "context_version": 1,
+              "recorded_at": "2026-08-11T13:09:52Z",
+              "skipped": []
+            },
+            "implementation_report": "Git-sync and worktree-cleanup supervision, worker entrypoints, and active loops now honor workflow_paused, quiesce at safe boundaries, and become launchable again after resume; CLI and Process intent documentation were updated, with the CLI reference regenerated. Verification: cargo test --lib process::runner::tests:: -- --test-threads=1 => 9 passed; cargo test --lib pause -- --test-threads=1 => 9 passed; final cargo test --lib --quiet -- --test-threads=1 => 759 passed, 0 failed, 6 ignored; cargo clippy --all-targets -- -D warnings => passed; cargo run --manifest-path xtask/Cargo.toml -- check-static-assets => 64 files present; cargo fmt --all -- --check and git diff --check => passed. An earlier full-suite attempt observed 758 passed, 1 unrelated warmed Goal-create 50 ms timing failure, and 6 ignored; that exact test passed alone in 0.23s and the final full rerun passed.",
+            "implementation_reported_at": "2026-08-11T13:09:50Z",
+            "meta_rule_state": "passed",
+            "product_state": "passed",
+            "prompt": "Update the worktree-cleanup and git-sync background workers to honor the daemon pause flag so they stop scanning worktrees while paused and resume safely when unpaused. Add regression coverage verifying that paused mode suppresses these background operations without making the reported pause status merely cosmetic.",
+            "reporter": "buddy.williams@insurity.com",
+            "round": 2,
+            "rule_state": "failed"
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-08-12T13:32:09Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "2026-08-12T14:10:37Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR3B8DF7AF52EEFD6F3BE57FF5-round-3",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "No governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR3B8DF7AF52EEFD6F3BE57FF5-round-3"
+      },
+      "governance_message": "No governance rule violations found.",
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-12T14:08:38Z",
+        "skipped": []
+      },
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+          "context_digest": "71d5d6a31ef6f9139be3db9ea1ddab32c6588e4a861deca8a2a58c8b8dce1fa6",
+          "context_version": 1,
+          "goal_id": "DR3B8DF7AF52EEFD6F3BE57FF5",
+          "implementation_branch": "refine/DR3B8DF7AF52EEFD6F3BE57FF5/round-3",
+          "round_idx": 2,
+          "target_branch": "main"
+        },
+        "completed_at": "2026-08-12T14:08:35Z",
+        "criticism": {
+          "completed_at": "2026-08-12T13:40:05Z",
+          "git_after": {
+            "branch": "refine/DR3B8DF7AF52EEFD6F3BE57FF5/round-3",
+            "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR3B8DF7AF52EEFD6F3BE57FF5/round-3",
+            "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P1"
+                ],
+                "description": "The retained tests do not establish the lifecycle outcome claimed by P1. paused_workflow_suppresses_background_repository_workers_until_resumed only calls set_workflow_paused(false) and asserts the flag is false; it never launches a worker after resume. running_background_repository_workers_quiesce_at_pause_boundaries uses an empty runtime/registry, so it proves loop exit but not that a paused worker avoids a real scan/sync/cleanup side effect or that work resumes afterward.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Retain those tests, then add deterministic instrumentation or fixtures that observe a repository-operation boundary: prove no scan/sync/cleanup occurs after pause, prove both workers settle successfully, clear the gate, run supervision/dispatch again, and prove each worker becomes live or performs its next eligible operation. Keep shared-host tests serial."
+              },
+              {
+                "checklist_item_ids": [
+                  "P1"
+                ],
+                "description": "The candidate's HTTP supervision uses a separate background_automation_paused check before ensure_background_worker. Pause can be set between those calls, causing ensure_background_worker to return the expected paused Conflict and the cleanup supervisor to report it as a failure. The Git-sync loop also treats every pause-state read error like a pause through matches!(..., Ok(false)), silently suppressing Git sync on corrupt or unreadable control state. P1 currently proposes replaying this behavior unchanged.",
+                "id": "C2",
+                "material": true,
+                "recommendation": "Make supervision consume a single explicit ensure outcome, or classify a paused Conflict as expected after re-reading the canonical gate. Distinguish Ok(true), Ok(false), and Err for Git sync and report genuine pause-state errors consistently. Add focused tests around pause-at-launch and unreadable/invalid pause state so expected pause is quiet but faults remain observable."
+              },
+              {
+                "checklist_item_ids": [
+                  "P2"
+                ],
+                "description": "P2 promises consistent observed process state but does not include src/tools/observability/processes.rs. Today runner_work_summary overwrites every synthetic runner row with paused whenever workflow_paused is true, including an already-running merger or plan extraction operation, while background_processes_stopped and agents_paused are emitted as true compatibility aliases even though active Goal agents continue and only selected repository workers quiesce. The existing route test reinforces this by asserting every runner_work row is paused.",
+                "id": "C3",
+                "material": true,
+                "recommendation": "Explicitly scope the projection work. Preserve legacy aliases only as documented compatibility fields, keep workflow_paused as canonical, and avoid replacing the observed status of an already-active operation with cosmetic paused state. Add projection tests for a live Agent/operation during pause, quiesced Git-sync and cleanup workers, and accurate state after resume."
+              },
+              {
+                "checklist_item_ids": [
+                  "P2",
+                  "P3"
+                ],
+                "description": "The proposed focused verification does not test what it claims. cargo test --lib web_server_serves_project_utility_upgrade_health_and_sse_routes selects the unrelated utility-route test at project.rs:4; the pause/active-Goal assertions are in web_server_lists_processes_and_updates_pause_controls at project.rs:368. Likewise the catalog test module has no workflow pause/resume description assertion, so cargo test --lib surfaces::cli::catalog::tests:: can pass while the CLI wording is wrong. Static source matching alone would also not execute the pause/unpause direction and payload decision.",
+                "id": "C4",
+                "material": true,
+                "recommendation": "Run the actual pause route test by its exact name, add a catalog assertion for the workflow pause and resume about strings (or inspect refine commands JSON explicitly), and extract a pure web pause-action model returning direction, confirmation copy, and {paused: boolean} payload so Node tests execute both pause and unpause paths before separately asserting delegation to /api/workflow/pause."
+              },
+              {
+                "checklist_item_ids": [
+                  "P4"
+                ],
+                "description": "P4 says it will preserve the retained Round 1 branch/worktree/reflog, but the Round 1 worktree path and its Git worktree metadata are already absent. The commit, branch ref, and reflog do exist. Its listed final git status and diff stat checks also do not prove that the retained branch ref stayed at the original SHA.",
+                "id": "C5",
+                "material": true,
+                "recommendation": "Record an initial evidence inventory instead of promising preservation of a nonexistent worktree. Capture the exact Round 1 ref SHA and reflog head before replay, repeat the reads after implementation, assert both still identify f306cbf9e8b520146e4f75a73e2e3592f9d4bc8f, and report the pre-existing worktree absence without attempting to recreate, delete, or rewrite retained evidence."
+              }
+            ],
+            "summary": "Revise the proposed plan before implementation. Preserve the clean replay strategy and cross-surface wording work, but add real worker resume evidence, make pause-aware supervision race-safe and observable, explicitly reconcile process projection truth, correct the focused verification commands, exercise pause action behavior through testable helpers, and inventory retained evidence accurately."
+          },
+          "started_at": "2026-08-12T13:35:45Z"
+        },
+        "final_plan": {
+          "completed_at": "2026-08-12T13:45:54Z",
+          "git_after": {
+            "branch": "refine/DR3B8DF7AF52EEFD6F3BE57FF5/round-3",
+            "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR3B8DF7AF52EEFD6F3BE57FF5/round-3",
+            "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "affected_behavior": [
+                  "Git-sync launch, dispatch, repository-operation boundary, cooperative quiescence, and post-resume work",
+                  "Automatic inactive-worktree-cleanup launch, dispatch, scan/cleanup boundary, cooperative quiescence, and post-resume work",
+                  "Race-safe HTTP daemon supervision and observable pause-control read failures"
+                ],
+                "description": "Replay the six clean-applying Rust implementation patches from retained commit f306cbf9e8b520146e4f75a73e2e3592f9d4bc8f without cherry-picking, amending, or moving that commit, then harden the recovered runner lifecycle. Keep workflow_paused as the sole gate for Git-sync and automatic inactive-worktree-cleanup launch, direct dispatch, and active-loop safe boundaries. Replace paused-as-Conflict and caller-side prechecks with an explicit ensure result such as Running versus Paused, so a pause between supervision checks is an expected quiet outcome and a child launched during the race immediately exits successfully at dispatch. Make every pause read distinguish unpaused, paused, and error; propagate or report corrupt/unreadable control state rather than treating it as pause. Adapt HTTP Git-sync and cleanup supervision to consume the single ensure result and report only real faults. Retain the candidate tests and add deterministic test seams at the actual scan/sync/cleanup boundary: block each worker before its consequential operation, set pause, release it, prove no operation occurred and both loops settled successfully, clear pause, supervise or dispatch again, and prove each worker reaches or performs its next eligible repository operation.",
+                "governance_rationale": "Guidance 0 applies because the shared Process capability must own admission and quiescence while daemon/API availability and active Goal execution remain separate. Guidance 1 applies by extending the existing runner, dispatch, and supervision responsibilities with small cohesive outcome/boundary helpers instead of adding a parallel pause subsystem; the large Processes JavaScript file will be reviewed for cohesion and only split if the new pure action model creates a genuinely separate responsibility.",
+                "id": "P1",
+                "verification": [
+                  "Observed before implementation: git diff f306cbf9e8b520146e4f75a73e2e3592f9d4bc8f^ f306cbf9e8b520146e4f75a73e2e3592f9d4bc8f -- src/process/runner.rs src/process/runner/dispatch.rs src/process/runner/git_sync.rs src/process/runner/worktree_cleanup.rs src/process/runner/tests.rs src/surfaces/web_server/http/background_loops.rs | git apply --check --verbose -> all six patches reported Checking patch with no error.",
+                  "cargo test --lib process::runner::tests:: -- --test-threads=1 -> report exact passed/failed/ignored counts, including retained launch/quiescence tests plus deterministic no-side-effect, successful-settlement, post-resume-operation, pause-at-ensure, and invalid-pause-state cases.",
+                  "cargo test --lib pause -- --test-threads=1 -> report exact serial pause-related counts and prove paused is an expected ensure outcome while corrupt or unreadable process-control state remains an error.",
+                  "Focused supervision classification tests -> paused outcomes produce no failure text; pause-state parsing/IO errors produce an observable supervision error for both Git-sync and worktree cleanup."
+                ]
+              },
+              {
+                "affected_behavior": [
+                  "Canonical and compatibility pause fields in process projections",
+                  "Observed active Agent and runner-operation status during pause and after resume",
+                  "Processes row, pause confirmation, unpause action, Guide copy, CLI descriptions, and affected intent documentation"
+                ],
+                "description": "Resolve the cross-surface semantics and projection gap. Update the Processes workflow-automation row, pause confirmation, unpause/resume wording, and in-product Guide so pause blocks new Goal admission and quiesces automatic Git sync and inactive-worktree cleanup at safe boundaries, while already active Goal executions continue unless stopped separately; resume makes admission and those workers eligible again and does not promise permanent processes or interrupt Agents. In src/tools/observability/processes.rs, keep workflow_paused canonical, retain paused, background_processes_stopped, and agents_paused only as explicitly documented wire-compatibility aliases derived from that gate, and stop blanket-replacing synthetic runner_work states with paused: live merger/plan-extraction operations and live Agent process rows must retain their observed running state, while quiesced Git-sync/cleanup workers are represented by their actual settled/absent process state. Update CLI pause/resume about text and focused catalog assertions, plus only the affected Process, Processes, and Guide intent pages. Current main has no docs/spec/cli-reference.md, so validate the live refine commands catalog and do not recreate the removed snapshot.",
+                "governance_rationale": "Guidance 0 directly requires CLI, API projection, browser, Guide, and intent pages to remain thin and semantically consistent over one Process capability. The projection must distinguish durable pause intent from observed local work rather than making pause cosmetic by relabeling active processes.",
+                "id": "P2",
+                "verification": [
+                  "cargo test --lib web_server_lists_processes_and_updates_pause_controls -- --test-threads=1 -> the actual pause route regression passes with canonical/alias fields, an in-progress Goal and live Agent still active during pause, affected repository workers quiesced, active operation rows not cosmetically paused, and accurate resumed state.",
+                  "cargo test --lib process_summary_preserves_active_work_during_workflow_pause -- --test-threads=1 -> focused projection fixture proves running Agent/merger/plan-extraction truth during pause and unchanged truthful state after resume.",
+                  "cargo test --lib catalog_describes_workflow_pause_and_resume_contract -- --test-threads=1 -> exact workflow pause/resume about strings include Goal admission, Git sync, inactive-worktree cleanup, active-execution continuity, and resume eligibility.",
+                  "./r commands | jq -r '.commands[] | select(.name == \"workflow\") | .subcommands[] | select(.name == \"pause\" or .name == \"resume\") | \"\\(.name): \\(.about)\"' -> print and report the exact two live catalog descriptions; no generated cli-reference snapshot is expected.",
+                  "rg -n 'pause|paused|resume|unpause|Git sync|worktree cleanup|active executions' src/surfaces/cli/actions/workflow.rs src/tools/observability/processes.rs src/surfaces/web/static/js/features/settings_processes.js src/surfaces/web/static/js/features/guide.js docs/intent/03-capabilities/01-process.md docs/intent/04-surfaces/03-browser/17-processes.md docs/intent/04-surfaces/03-browser/13-guide.md -> manual semantic-drift review finds no claim that pause only blocks admission, stops active Agents, or permanently terminates runners."
+                ]
+              },
+              {
+                "affected_behavior": [
+                  "Canonical pause-state precedence in the Processes browser adapter",
+                  "Paused/unpaused workflow-row descriptions and action direction",
+                  "Pause confirmation, Guide/help contract, and POST /api/workflow/pause payload behavior"
+                ],
+                "description": "Strengthen focused static-web coverage without moving capability logic into the browser. Extract a pure Processes pause-action model used by the real click handler to derive pause versus unpause direction, status/description text, confirmation content, busy/resume wording, and {paused: boolean} request payload from the canonical projected state. Give workflow_paused precedence over legacy aliases, with paused and split fields as compatibility fallbacks only. Extend tests/web_settings_processes.test.js to execute both action-model paths, assert paused and active workflow-row descriptions, the complete pause confirmation and Guide text, canonical precedence, button/action selection, and the exact request payload; separately assert that the bound handler delegates that model to POST /api/workflow/pause and refreshes observed state. Keep Guide source assertions focused on copy while executing the action decision through the pure helper.",
+                "governance_rationale": "The browser remains a thin adapter: the pure model formats projected state and the existing API payload, while the shared Process capability still decides and persists pause. Focused executable regressions prevent surface copy and action direction from drifting apart.",
+                "id": "P3",
+                "verification": [
+                  "node --test tests/web_settings_processes.test.js -> report exact pass/fail counts; tests execute pause and unpause action models and assert description, confirmation, Guide copy, canonical precedence, endpoint delegation, and payloads {paused:true} and {paused:false}.",
+                  "cargo run --manifest-path xtask/Cargo.toml -- test-browser -> all repository static browser JavaScript tests pass, with exact count/result reported.",
+                  "cargo run --manifest-path xtask/Cargo.toml -- check-static-assets -> static asset inventory passes, with exact reported file count."
+                ]
+              },
+              {
+                "affected_behavior": [
+                  "Repository-wide Rust and static-web regression safety",
+                  "Reviewable scoped recovery diff",
+                  "Exact preservation inventory for retained candidate commit, branch ref, and reflog"
+                ],
+                "description": "Run the root formatting, compilation, lint, full serialized Rust, browser/static-asset, and whitespace gates; inspect the final diff for only recovered runner behavior, truthful projection/surface wording, affected intent, and focused regressions. Preserve all evidence that exists without recreating or deleting evidence: before work, refs/heads/refine/DR3B8DF7AF52EEFD6F3BE57FF5/round-1 and its reflog head both equal f306cbf9e8b520146e4f75a73e2e3592f9d4bc8f, the commit object exists, and the Round 1 worktree is already absent. Repeat exact ref/object/reflog reads after implementation and report the pre-existing worktree absence; do not merge, approve, rewrite history, mutate durable Goal state, or create/delete retained worktrees. Separate environment-gated skips and unrelated baseline failures from changed-code failures.",
+                "governance_rationale": "Guidance 0 requires recoverable Git/process behavior and reviewable local evidence. Guidance 1 requires a final cohesion review of every changed code file. These gates preserve the workflow and Review boundary while proving the candidate ref was not rewritten.",
+                "id": "P4",
+                "verification": [
+                  "cargo fmt --all -- --check -> formatting passes.",
+                  "cargo check --all-targets -> all root targets compile.",
+                  "cargo clippy --all-targets -- -D warnings -> no Clippy warnings.",
+                  "cargo test --lib --quiet -- --test-threads=1 -> full serialized library suite passes; report exact passed, failed, and ignored counts and separately identify any reproducible baseline/environment failure.",
+                  "cargo run --manifest-path xtask/Cargo.toml -- test-browser && cargo run --manifest-path xtask/Cargo.toml -- check-static-assets -> browser suite and asset inventory pass with exact results.",
+                  "git diff --check -> no whitespace errors; git status --short and git diff --stat -> only intended uncommitted implementation files are present.",
+                  "git cat-file -e f306cbf9e8b520146e4f75a73e2e3592f9d4bc8f^{commit} && test \"$(git rev-parse refs/heads/refine/DR3B8DF7AF52EEFD6F3BE57FF5/round-1)\" = f306cbf9e8b520146e4f75a73e2e3592f9d4bc8f && test \"$(git reflog show --format='%H' refs/heads/refine/DR3B8DF7AF52EEFD6F3BE57FF5/round-1 -n 1)\" = f306cbf9e8b520146e4f75a73e2e3592f9d4bc8f -> retained object, branch ref, and reflog head are unchanged.",
+                  "git worktree list --porcelain | rg -q 'refine-DR3B8DF7AF52EEFD6F3BE57FF5-round-1' -> remains no match, explicitly reported as pre-existing absence rather than promised preservation."
+                ]
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "P1 retains the old lifecycle tests but no longer treats clearing a boolean as resume proof. It adds deterministic boundary instrumentation/fixtures for both real repository-worker operation paths, verifies pause prevents the consequential callback after the boundary is reached, verifies both loops settle successfully, then clears the gate and reruns supervision or dispatch until each worker performs its next eligible operation. Shared-host cases are serialized."
+              },
+              {
+                "criticism_id": "C2",
+                "resolution": "P1 replaces the caller precheck plus paused Conflict with one explicit ensure outcome consumed by both HTTP loops. A pause race is therefore quiet whether ensure observes Paused or launches a child that exits at dispatch, while corrupt/unreadable pause state propagates as an observable error. Focused classification and invalid-state tests lock both behaviors."
+              },
+              {
+                "criticism_id": "C3",
+                "resolution": "P2 explicitly includes src/tools/observability/processes.rs. workflow_paused remains canonical; legacy fields remain documented derived compatibility aliases. runner_work no longer blanket-overwrites live operation truth with paused, live Agent rows remain running, only the two supported repository workers quiesce, and pause/resume route plus focused projection fixtures assert the resulting state."
+              },
+              {
+                "criticism_id": "C4",
+                "resolution": "P2 names the correct web_server_lists_processes_and_updates_pause_controls test and adds a catalog assertion for workflow pause/resume about text. P3 extracts and executes a pure action model for both directions and payloads, then separately asserts handler delegation to POST /api/workflow/pause; static source matching is retained only for copy/integration facts such as the Guide entry."
+              },
+              {
+                "criticism_id": "C5",
+                "resolution": "P4 records the actual evidence inventory: the candidate object, Round 1 branch ref, and reflog head exist at f306cbf9e8b520146e4f75a73e2e3592f9d4bc8f, but the Round 1 worktree is already absent. Exact pre/post ref and reflog comparisons prove retained evidence was not moved; the plan neither promises nor attempts to recreate a missing worktree."
+              }
+            ],
+            "summary": "Recover the retained pause-aware runner implementation onto current main without changing the retained commit, then strengthen it so launch supervision has an explicit paused outcome, pause-state faults remain visible, both repository workers prove quiescence and real post-resume work at deterministic operation boundaries, process projections preserve active-operation truth, and CLI, Processes, confirmation, Guide, API projections, and intent documentation state one shared pause/resume contract. Preserve the stable P1-P4 checklist and the existing governance/review boundaries."
+          },
+          "started_at": "2026-08-12T13:40:08Z"
+        },
+        "implementation": {
+          "completed_at": "2026-08-12T14:08:35Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Replayed the six clean-applying Rust files from retained commit f306cbf9e8b520146e4f75a73e2e3592f9d4bc8f as an uncommitted working-tree patch, then replaced pause-as-Conflict and HTTP prechecks with BackgroundWorkerEnsure::Running/Paused. Dispatch and both active loops use workflow_paused; a second pre-launch check and dispatch check close the supervision race; corrupt pause state propagates. Deterministic hooks block both workers immediately before repository operations, prove pause suppresses the operation and settles both loops, then prove both perform an eligible operation after resume.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "workflow_paused is canonical and paused/background_processes_stopped/agents_paused are derived compatibility aliases. Active Agent, merger, and plan-extraction statuses remain running during pause; synthetic unrelated work remains idle. CLI pause/resume, Processes row, confirmation, Guide, Process intent, Processes intent, and Guide intent now state the shared admission/quiescence/active-execution contract. The removed docs/spec/cli-reference.md was not recreated.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added workflowPauseActionModel as a pure Processes adapter with canonical-state precedence. Tests execute pause and resume paths and lock status/description, confirmation, button/action direction, busy wording, exact {paused:true}/{paused:false} payloads, POST /api/workflow/pause delegation, observed-state refresh, and Guide copy.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "All root, focused Rust, CLI catalog, static-web, asset, formatting, lint, whitespace, and full serialized library gates passed. Final status contains only intended implementation/docs/tests plus cohesive test-hook and projection-test modules. The retained commit object, round-1 branch ref, and reflog head remain exact; no merge, approval, durable Goal edit, history rewrite, or retained-worktree creation/deletion occurred.",
+                "id": "P4",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "git diff f306cbf9e8b520146e4f75a73e2e3592f9d4bc8f^ f306cbf9e8b520146e4f75a73e2e3592f9d4bc8f -- src/process/runner.rs src/process/runner/dispatch.rs src/process/runner/git_sync.rs src/process/runner/worktree_cleanup.rs src/process/runner/tests.rs src/surfaces/web_server/http/background_loops.rs | git apply --check --verbose -> all six patches checked without error before replay",
+              "cargo test --lib process::runner::tests:: -- --test-threads=1 -> 11 passed, 0 failed, 0 ignored",
+              "cargo test --lib pause -- --test-threads=1 -> 11 passed, 0 failed, 0 ignored",
+              "cargo test --lib paused_workers_are_quiet_but_pause_state_faults_are_reported -- --test-threads=1 -> 1 passed, 0 failed",
+              "cargo test --lib web_server_lists_processes_and_updates_pause_controls -- --test-threads=1 -> 1 passed, 0 failed",
+              "cargo test --lib process_summary_preserves_active_work_during_workflow_pause -- --test-threads=1 -> 1 passed, 0 failed",
+              "cargo test --lib catalog_describes_workflow_pause_and_resume_contract -- --test-threads=1 -> 1 passed, 0 failed",
+              "node --test tests/web_settings_processes.test.js -> 8 passed, 0 failed, 0 skipped",
+              "cargo run --manifest-path xtask/Cargo.toml -- test-browser -> 157 total: 136 passed, 0 failed, 21 skipped because no Playwright Chromium build is available",
+              "cargo run --manifest-path xtask/Cargo.toml -- check-static-assets -> 64 files, static_assets_present true",
+              "./r commands | jq -r workflow pause/resume descriptions -> pause and resume both report Goal admission, automatic Git sync, inactive-worktree cleanup, and active-execution continuity; docs/spec/cli-reference.md remains absent",
+              "cargo fmt --all -- --check -> passed",
+              "cargo check --all-targets -> passed",
+              "cargo clippy --all-targets -- -D warnings -> passed",
+              "cargo test --lib --quiet -- --test-threads=1 -> 678 passed, 0 failed, 6 ignored, 0 filtered out",
+              "git diff --check -> passed with no whitespace errors",
+              "git cat-file/ref/refog preservation command -> retained candidate checks exit 0; object, refs/heads/refine/DR3B8DF7AF52EEFD6F3BE57FF5/round-1, and its reflog head all remain f306cbf9e8b520146e4f75a73e2e3592f9d4bc8f",
+              "git worktree list --porcelain | rg -q refine-DR3B8DF7AF52EEFD6F3BE57FF5-round-1 -> no match; reported as pre-existing absence"
+            ]
+          },
+          "report": "Recovered the retained pause-aware background-worker candidate without moving or rewriting f306cbf9e8b520146e4f75a73e2e3592f9d4bc8f; hardened supervision with explicit Running/Paused outcomes and observable pause-state faults; proved Git-sync and cleanup quiescence plus real post-resume operations; preserved active Agent and operation projection truth; aligned CLI, Processes, confirmation, Guide, and intent copy; and added executable web action regressions. Exact verification: runner tests 11 passed; pause tests 11 passed; focused route/projection/catalog tests passed; web settings tests 8 passed; browser suite 136 passed and 21 Chromium-gated skipped; 64 static assets present; cargo check and Clippy passed; full serialized Rust suite 678 passed, 0 failed, 6 ignored; formatting and git diff checks passed; retained object/ref/reflog remained f306cbf9e8b520146e4f75a73e2e3592f9d4bc8f and the Round 1 worktree remained pre-existing absent.",
+          "started_at": "2026-08-12T13:45:56Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-12T13:45:56Z",
+        "proposal": {
+          "completed_at": "2026-08-12T13:35:43Z",
+          "git_after": {
+            "branch": "refine/DR3B8DF7AF52EEFD6F3BE57FF5/round-3",
+            "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR3B8DF7AF52EEFD6F3BE57FF5/round-3",
+            "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "affected_behavior": [
+                  "Git-sync runner launch, dispatch, active-loop quiescence, and resume readiness",
+                  "Automatic inactive-worktree-cleanup runner launch, dispatch, active-loop quiescence, and resume readiness",
+                  "HTTP daemon supervision reporting while workflow automation is paused"
+                ],
+                "description": "Recover the six clean-applying Rust implementation hunks from retained commit f306cbf9e8b520146e4f75a73e2e3592f9d4bc8f without cherry-picking, rewriting, or otherwise changing that commit: make Git-sync and worktree-cleanup launch supervision consult workflow_paused, have direct dispatch exit successfully while paused, and have already-running loops cooperatively quiesce before repository scan/sync/cleanup boundaries so normal daemon supervision can relaunch them after resume. Retain and adapt the candidate's launch-suppression, quiescence, and resume-readiness tests.",
+                "governance_rationale": "Guidance 0 applies because workflow_paused is a shared Process capability and must remain the single admission/quiescence authority; the daemon and API stay available and active Goal executions are not terminated. Guidance 1 applies by keeping pause gating in the existing runner and supervision modules rather than introducing a parallel pause subsystem.",
+                "id": "P1",
+                "verification": [
+                  "git diff f306cbf9e8b520146e4f75a73e2e3592f9d4bc8f^ f306cbf9e8b520146e4f75a73e2e3592f9d4bc8f -- src/process/runner.rs src/process/runner/dispatch.rs src/process/runner/git_sync.rs src/process/runner/worktree_cleanup.rs src/process/runner/tests.rs src/surfaces/web_server/http/background_loops.rs | git apply --check --verbose -> all six candidate patches check cleanly against current main",
+                  "cargo test --lib process::runner::tests:: -- --test-threads=1 -> all focused runner lifecycle tests pass",
+                  "cargo test --lib pause -- --test-threads=1 -> all pause-related Rust tests pass serially"
+                ]
+              },
+              {
+                "affected_behavior": [
+                  "Web Processes status description for paused and active workflow automation",
+                  "Web pause confirmation and unpause action wording",
+                  "In-product Guide pause/help copy",
+                  "CLI workflow pause/resume descriptions and machine-readable command catalog",
+                  "Process capability and browser surface intent documentation"
+                ],
+                "description": "Resolve the Governance failure by updating the web Processes workflow-automation row, pause confirmation dialog, and in-product Guide entry to state the same contract: pause blocks new Goal admission and quiesces automatic Git sync and inactive-worktree cleanup at safe boundaries; already active Goal executions continue unless stopped separately. Make active/resume wording say those capabilities become eligible to run again without implying permanent runner termination or Agent interruption. Adapt the CLI pause/resume descriptions and affected Process, Processes-surface, and Guide intent pages to the same semantics; validate the current live CLI catalog because current main no longer keeps a generated docs/spec/cli-reference.md snapshot.",
+                "governance_rationale": "This directly resolves recorded rule-1 by keeping CLI, browser, process projections, Guide, and intent documentation as thin, semantically consistent adapters over the shared workflow_paused capability. It explicitly preserves the boundary between quiescing autonomous repository workers and separately stopping active Agents.",
+                "id": "P2",
+                "verification": [
+                  "cargo test --lib surfaces::cli::catalog::tests:: -- --test-threads=1 -> live CLI catalog and documented command contracts pass",
+                  "cargo test --lib web_server_serves_project_utility_upgrade_health_and_sse_routes -- --test-threads=1 -> pause/resume projection flags, management actions, and active-Goal continuity pass",
+                  "rg confirms no affected CLI, Processes, Guide, or intent copy claims pause only blocks Goal admission or terminates active Agents/runners"
+                ]
+              },
+              {
+                "affected_behavior": [
+                  "Static-web regression contract for Processes status copy",
+                  "Static-web regression contract for confirmation and Guide copy",
+                  "Pause/unpause button direction and /api/workflow/pause payload"
+                ],
+                "description": "Extend the focused static Processes test harness to assert canonical pause-state precedence, paused and unpaused workflow-row descriptions, pause/unpause action selection and POST payload behavior, the complete confirmation contract, and the Guide contract. Keep these tests scoped to exported pure rendering/action helpers and static source assertions so the browser remains a thin adapter and no duplicate pause state or business logic is introduced.",
+                "governance_rationale": "Focused surface tests prevent semantic drift while asserting that the web action continues to delegate to the existing shared API route and canonical projected pause state.",
+                "id": "P3",
+                "verification": [
+                  "node --test tests/web_settings_processes.test.js -> all focused Processes pause/status/copy/action tests pass",
+                  "cargo run --manifest-path xtask/Cargo.toml -- test-browser -> all static browser JavaScript tests pass",
+                  "cargo run --manifest-path xtask/Cargo.toml -- check-static-assets -> static asset inventory succeeds"
+                ]
+              },
+              {
+                "affected_behavior": [
+                  "Root Rust and web regression safety",
+                  "Reviewable scoped recovery evidence",
+                  "Preservation of prior candidate and workflow audit boundaries"
+                ],
+                "description": "Run repository-wide formatting, compilation/lint, serialized Rust regression, and whitespace gates after the focused checks. Inspect the final diff to ensure it contains only the recovered runner behavior, cross-surface wording/docs, and focused tests; preserve f306cbf9e8b520146e4f75a73e2e3592f9d4bc8f, its branch/worktree/reflog, and prior Round evidence unchanged, and report any environment-gated or unrelated baseline failure separately.",
+                "governance_rationale": "The final gates provide reviewable evidence for the shared capability and every affected surface without merging, approving, rewriting history, or directly mutating durable Goal state.",
+                "id": "P4",
+                "verification": [
+                  "cargo fmt --all -- --check -> formatting passes",
+                  "cargo check --all-targets -> root targets compile",
+                  "cargo clippy --all-targets -- -D warnings -> no Clippy warnings",
+                  "cargo test --lib --quiet -- --test-threads=1 -> full serialized library suite passes, with exact pass/fail/ignored counts reported",
+                  "git diff --check -> no whitespace errors",
+                  "git status --short and git diff --stat -> only intended uncommitted implementation files are present; retained candidate SHA and branch remain unchanged"
+                ]
+              }
+            ],
+            "criticism_resolutions": [],
+            "summary": "Replay only the retained candidate's pause-aware runner behavior onto current main, adapt its CLI and intent wording to the current repository, close the recorded web Processes and Guide semantics gap, and lock the shared pause/resume contract with focused Rust and static-web regressions while preserving the retained commit and all prior evidence."
+          },
+          "started_at": "2026-08-12T13:32:25Z"
+        },
+        "schema_version": 2,
+        "started_at": "2026-08-12T13:32:24Z",
+        "state": "completed",
+        "updated_at": "2026-08-12T14:08:35Z"
+      },
+      "implementation_report": "Recovered the retained pause-aware background-worker candidate without moving or rewriting f306cbf9e8b520146e4f75a73e2e3592f9d4bc8f; hardened supervision with explicit Running/Paused outcomes and observable pause-state faults; proved Git-sync and cleanup quiescence plus real post-resume operations; preserved active Agent and operation projection truth; aligned CLI, Processes, confirmation, Guide, and intent copy; and added executable web action regressions. Exact verification: runner tests 11 passed; pause tests 11 passed; focused route/projection/catalog tests passed; web settings tests 8 passed; browser suite 136 passed and 21 Chromium-gated skipped; 64 static assets present; cargo check and Clippy passed; full serialized Rust suite 678 passed, 0 failed, 6 ignored; formatting and git diff checks passed; retained object/ref/reflog remained f306cbf9e8b520146e4f75a73e2e3592f9d4bc8f and the Round 1 worktree remained pre-existing absent.",
+      "implementation_reported_at": "2026-08-12T14:08:36Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Recover the verified background-worker pause candidate from current main while preserving prior Round 1/Round 2 evidence and candidate f306cbf9e8b520146e4f75a73e2e3592f9d4bc8f. Reuse or replay the implementation that makes Git-sync and worktree-cleanup runners honor workflow_paused and quiesce at safe boundaries; do not rewrite the retained candidate.\n\nResolve the recorded cross-surface semantics gap. Update the web Processes workflow-automation row, pause confirmation dialog, and in-product guide/help copy so they accurately state that pausing blocks new Goal admission and quiesces automatic Git sync and inactive-worktree cleanup at safe boundaries, while already active Goal executions continue unless separately stopped. Keep the UI a thin adapter over the shared pause capability and avoid implying that pause terminates running Agents or permanently stops runner processes. Ensure resume wording and observed state are consistent across CLI, web, process projections, and intent documentation.\n\nAdd focused static-web regressions that lock the status description, confirmation text, guide text, and pause/unpause action behavior to this contract, while retaining the runner lifecycle/quiescence/resume tests from the candidate. Run focused Rust pause/runner tests serially where shared host state requires it, relevant web Node tests, generated CLI-reference validation if affected, root formatting/checks, and git diff --check. Distinguish any environment-gated or unrelated baseline failure. Do not approve, merge, rewrite history, delete retained evidence, or directly edit durable Goal state.",
+      "quality_checked_at": "2026-08-12T14:10:45Z",
+      "quality_details": {
+        "candidate_commit": "fd1b805a6773ee49cb510ea4c093926d364d11a6",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR3B8DF7AF52EEFD6F3BE57FF5-round-3",
+        "diagnostics": [
+          "No Quality tests or migrated commands are configured; evaluation was a no-op."
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "19ff64fb056cfae82",
+        "results": [],
+        "source_candidate_commit": "fd1b805a6773ee49cb510ea4c093926d364d11a6"
+      },
+      "quality_message": "No Quality tests configured.",
+      "quality_state": "passed",
+      "reporter": "Buddy Williams",
+      "rule_state": "passed",
+      "updated": "2026-08-12T14:10:51Z",
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "fd1b805a6773ee49cb510ea4c093926d364d11a6",
+        "integrated_at": "2026-08-12T14:10:50.702313013+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n docs/intent/03-capabilities/01-process.md          |   2 +\n docs/intent/04-surfaces/03-browser/13-guide.md     |   2 +\n docs/intent/04-surfaces/03-browser/17-processes.md |   2 +-\n src/process/runner.rs                              |  81 ++++++-\n src/process/runner/dispatch.rs                     |   5 +\n src/process/runner/git_sync.rs                     |  20 +-\n src/process/runner/test_hooks.rs                   |  37 +++\n src/process/runner/tests.rs                        | 265 +++++++++++++++++++++\n src/process/runner/worktree_cleanup.rs             |  20 +-\n src/surfaces/cli/actions/workflow.rs               |   4 +-\n src/surfaces/cli/catalog.rs                        |  35 +++\n src/surfaces/web/static/js/features/guide.js       |   8 +-\n .../web/static/js/features/settings_processes.js   |  49 +++-\n src/surfaces/web_server/http.rs                    |   6 +-\n src/surfaces/web_server/http/background_loops.rs   |  55 ++++-\n .../tests/operations_processes/events/project.rs   |  23 +-\n src/tools/observability/processes.rs               |  43 ++--\n src/tools/observability/processes/tests.rs         | 116 +++++++++\n tests/web_settings_processes.test.js               | 111 +++++++++\n 19 files changed, 810 insertions(+), 74 deletions(-)\n create mode 100644 src/process/runner/test_hooks.rs\n create mode 100644 src/tools/observability/processes/tests.rs",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "260ec0aab446bdaaad7b1fc18bfde1271bc1336c"
+      },
+      "workflow_quality_timing": "pre_merge",
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    }
+  ],
+  "status": "done",
+  "target_branch": "main",
+  "updated": "2026-08-12T14:11:15Z",
+  "workflow_revision": 42
+}

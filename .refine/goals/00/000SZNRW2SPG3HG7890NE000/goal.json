@@ -1,0 +1,1177 @@
+{
+  "base_commit": "7cea117ae9b0887a36a1ca45c1fdc07eb7c03213",
+  "branch_name": "refine/00000SZNRW2SPG3HG7890NE000/round-4",
+  "candidate_commit": "d189d769828d23c7cc1e7eb7b2726a2f51b0b781",
+  "created": "2026-08-06T12:46:10Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZNRW2SPG3HG7890NE000",
+  "name": "Isolate Quality test scratch work to prevent worktree collisions",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": null,
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-06T12:57:54Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Fix the Refine Quality harness so temporary Git worktree state from one Quality test cannot make another test, a retry, or a later round fail.\n\nProduction report (not reproducible from local data): during Quality evaluation of candidate d266c99b9f, the StyleCop gate ran \"git worktree add /tmp/cand d266c99b9f\". Test 1 had already run the identical command and the harness did not clean up /tmp/cand, so Git exited 1 with \"fatal: '/tmp/cand' already exists\". An independent agent rerun found the build clean, but the supervised non-zero exit correctly forced Refine to fail the Quality result. The same stale path was expected to trip round 4. Treat that sequence as reported provenance, not proof of a locally observed failure.\n\nInvestigate the post-implementation Quality planning and supervised-command lifecycle. Establish a collision-safe scratch-work contract for every Quality evaluation and test, including commands that need an isolated Git checkout. Scratch paths must be unique across tests, concurrent Goals, retries, and rounds, and harness-owned artifacts/worktrees must receive best-effort cleanup after success, command failure, cancellation, and harness errors. A retry after an interrupted or failed evaluation must not be permanently blocked by prior scratch state. Never delete, overwrite, or unregister an unrelated pre-existing user path or Git worktree.\n\nKeep the evidence boundary intact: observed command exit status remains authoritative, genuine test failures still fail Quality, and Refine must not reinterpret a non-zero result as passed merely because an independent rerun succeeds. If an agent proposes an unsafe shared fixed scratch path, prevent that plan from causing cross-test contamination through a clear, enforceable harness contract rather than project-specific StyleCop logic.\n\nAdd focused regression coverage for at least: two Quality tests requiring candidate worktrees in one evaluation; repeated evaluation or retry after stale/interrupted harness-owned state; cleanup following a failing command; concurrent evaluations without path collision; and preservation of unrelated pre-existing paths/worktrees. Update the concise Quality prompt or documentation contract if agents need an explicit scratch location or lifecycle rule. Run focused Quality tests plus repository formatting, strict Clippy, the complete unit suite, and release build; distinguish any unrelated baseline failures.",
+          "reporter": "Buddy Williams",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZNRW2SPG3HG7890NE000",
+          "name": "Isolate Quality test scratch work to prevent worktree collisions",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-08-06T12:46:32Z",
+      "failure_at": "2026-08-06T13:27:32Z",
+      "failure_category": "governance",
+      "failure_message": "Quality scratch isolation can be bypassed by an unsafe fixed worktree path.",
+      "governance_checked_at": "2026-08-06T13:27:30Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZNRW2SPG3HG7890NE000-round-1",
+        "failed_actions": [
+          {
+            "message": "The guard accepts any `git worktree add` command containing the text `REFINE_QUALITY_SCRATCH`, without verifying that the checkout argument is beneath that directory. For example, `echo \"$REFINE_QUALITY_SCRATCH\"; git worktree add /tmp/cand HEAD` bypasses rejection, creates shared collision-prone state, and escapes scratch cleanup.",
+            "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+            "rule_id": "rule-5"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Quality scratch isolation can be bypassed by an unsafe fixed worktree path.\",\"violations\":[{\"rule_id\":\"rule-5\",\"rule\":\"Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.\",\"message\":\"The guard accepts any `git worktree add` command containing the text `REFINE_QUALITY_SCRATCH`, without verifying that the checkout argument is beneath that directory. For example, `echo \\\"$REFINE_QUALITY_SCRATCH\\\"; git worktree add /tmp/cand HEAD` bypasses rejection, creates shared collision-prone state, and escapes scratch cleanup.\"}]}",
+        "rules_checked": 9,
+        "verdict": {
+          "message": "Quality scratch isolation can be bypassed by an unsafe fixed worktree path.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "The guard accepts any `git worktree add` command containing the text `REFINE_QUALITY_SCRATCH`, without verifying that the checkout argument is beneath that directory. For example, `echo \"$REFINE_QUALITY_SCRATCH\"; git worktree add /tmp/cand HEAD` bypasses rejection, creates shared collision-prone state, and escapes scratch cleanup.",
+              "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "rule_id": "rule-5"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZNRW2SPG3HG7890NE000-round-1"
+      },
+      "governance_message": "Quality scratch isolation can be bypassed by an unsafe fixed worktree path.",
+      "governance_rule_actions": [
+        {
+          "message": "The guard accepts any `git worktree add` command containing the text `REFINE_QUALITY_SCRATCH`, without verifying that the checkout argument is beneath that directory. For example, `echo \"$REFINE_QUALITY_SCRATCH\"; git worktree add /tmp/cand HEAD` bypasses rejection, creates shared collision-prone state, and escapes scratch cleanup.",
+          "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+          "rule_id": "rule-5"
+        }
+      ],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-06T13:25:31Z",
+        "skipped": []
+      },
+      "implementation_report": "Implemented unique per-evaluation and per-test REFINE_QUALITY_SCRATCH allocation, temp-environment injection, guarded Git worktree cleanup and terminal-operation reaping, unsafe fixed worktree-path rejection, the concise prompt and intent contract, and five focused regressions. Verification: scratch regressions 5 passed; all Quality tests 27 passed; prompt tests 6 passed; workflow QA failure path 1 passed; cargo fmt --all -- --check passed; cargo clippy --all-targets --all-features -- -D warnings passed; complete unit suite 723 passed, 6 ignored, 0 failed; cargo build --release --locked passed; git diff --check passed.",
+      "implementation_reported_at": "2026-08-06T13:25:29Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Fix the Refine Quality harness so temporary Git worktree state from one Quality test cannot make another test, a retry, or a later round fail.\n\nProduction report (not reproducible from local data): during Quality evaluation of candidate d266c99b9f, the StyleCop gate ran \"git worktree add /tmp/cand d266c99b9f\". Test 1 had already run the identical command and the harness did not clean up /tmp/cand, so Git exited 1 with \"fatal: '/tmp/cand' already exists\". An independent agent rerun found the build clean, but the supervised non-zero exit correctly forced Refine to fail the Quality result. The same stale path was expected to trip round 4. Treat that sequence as reported provenance, not proof of a locally observed failure.\n\nInvestigate the post-implementation Quality planning and supervised-command lifecycle. Establish a collision-safe scratch-work contract for every Quality evaluation and test, including commands that need an isolated Git checkout. Scratch paths must be unique across tests, concurrent Goals, retries, and rounds, and harness-owned artifacts/worktrees must receive best-effort cleanup after success, command failure, cancellation, and harness errors. A retry after an interrupted or failed evaluation must not be permanently blocked by prior scratch state. Never delete, overwrite, or unregister an unrelated pre-existing user path or Git worktree.\n\nKeep the evidence boundary intact: observed command exit status remains authoritative, genuine test failures still fail Quality, and Refine must not reinterpret a non-zero result as passed merely because an independent rerun succeeds. If an agent proposes an unsafe shared fixed scratch path, prevent that plan from causing cross-test contamination through a clear, enforceable harness contract rather than project-specific StyleCop logic.\n\nAdd focused regression coverage for at least: two Quality tests requiring candidate worktrees in one evaluation; repeated evaluation or retry after stale/interrupted harness-owned state; cleanup following a failing command; concurrent evaluations without path collision; and preservation of unrelated pre-existing paths/worktrees. Update the concise Quality prompt or documentation contract if agents need an explicit scratch location or lifecycle rule. Run focused Quality tests plus repository formatting, strict Clippy, the complete unit suite, and release build; distinguish any unrelated baseline failures.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "failed",
+      "updated": "2026-08-06T13:27:33Z",
+      "workflow_quality_timing": null,
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-06T13:36:23Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Recover the Round 1 Governance failure while preserving its failed candidate and evidence. Reimplement the Quality scratch-isolation change from current main as needed, but close the specific bypass: validation must inspect each actual git worktree add destination and must not accept an unsafe fixed path merely because REFINE_QUALITY_SCRATCH appears elsewhere in the shell command. The reported example echo \"$REFINE_QUALITY_SCRATCH\"; git worktree add /tmp/cand HEAD must be rejected before execution, and no shared or out-of-scratch checkout may escape harness cleanup. Keep unique per-evaluation and per-test scratch roots, best-effort cleanup on every terminal path, unrelated user path and worktree preservation, and authoritative non-zero command evidence. Add focused regressions for the exact bypass plus representative command chaining, quoting, and worktree-add option forms so enforcement is tied to the checkout destination rather than substring presence. Run focused Quality tests, formatting, strict Clippy, the complete unit suite, and the locked release build; distinguish unrelated baseline failures.",
+          "reporter": "Buddy Williams",
+          "round": 2
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZNRW2SPG3HG7890NE000",
+          "name": "Isolate Quality test scratch work to prevent worktree collisions",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "Buddy Williams",
+            "constitution_state": "passed",
+            "governance_checked_at": "2026-08-06T13:27:30Z",
+            "governance_details": {
+              "configured": true,
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZNRW2SPG3HG7890NE000-round-1",
+              "failed_actions": [
+                {
+                  "message": "The guard accepts any `git worktree add` command containing the text `REFINE_QUALITY_SCRATCH`, without verifying that the checkout argument is beneath that directory. For example, `echo \"$REFINE_QUALITY_SCRATCH\"; git worktree add /tmp/cand HEAD` bypasses rejection, creates shared collision-prone state, and escapes scratch cleanup.",
+                  "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+                  "rule_id": "rule-5"
+                }
+              ],
+              "governance_configured": true,
+              "phase": "post_implementation",
+              "provider": "codex",
+              "raw_output": "{\"status\":\"failed\",\"message\":\"Quality scratch isolation can be bypassed by an unsafe fixed worktree path.\",\"violations\":[{\"rule_id\":\"rule-5\",\"rule\":\"Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.\",\"message\":\"The guard accepts any `git worktree add` command containing the text `REFINE_QUALITY_SCRATCH`, without verifying that the checkout argument is beneath that directory. For example, `echo \\\"$REFINE_QUALITY_SCRATCH\\\"; git worktree add /tmp/cand HEAD` bypasses rejection, creates shared collision-prone state, and escapes scratch cleanup.\"}]}",
+              "rules_checked": 9,
+              "verdict": {
+                "message": "Quality scratch isolation can be bypassed by an unsafe fixed worktree path.",
+                "status": "failed",
+                "violations": [
+                  {
+                    "message": "The guard accepts any `git worktree add` command containing the text `REFINE_QUALITY_SCRATCH`, without verifying that the checkout argument is beneath that directory. For example, `echo \"$REFINE_QUALITY_SCRATCH\"; git worktree add /tmp/cand HEAD` bypasses rejection, creates shared collision-prone state, and escapes scratch cleanup.",
+                    "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+                    "rule_id": "rule-5"
+                  }
+                ]
+              },
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZNRW2SPG3HG7890NE000-round-1"
+            },
+            "governance_message": "Quality scratch isolation can be bypassed by an unsafe fixed worktree path.",
+            "governance_rule_actions": [
+              {
+                "message": "The guard accepts any `git worktree add` command containing the text `REFINE_QUALITY_SCRATCH`, without verifying that the checkout argument is beneath that directory. For example, `echo \"$REFINE_QUALITY_SCRATCH\"; git worktree add /tmp/cand HEAD` bypasses rejection, creates shared collision-prone state, and escapes scratch cleanup.",
+                "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+                "rule_id": "rule-5"
+              }
+            ],
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                },
+                {
+                  "enabled": true,
+                  "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+                  "name": "Cohesive code files",
+                  "rule": "Apply whenever an agent adds or changes code files in any language."
+                }
+              ],
+              "code_files_changed": true,
+              "context_version": 1,
+              "recorded_at": "2026-08-06T13:25:31Z",
+              "skipped": []
+            },
+            "implementation_report": "Implemented unique per-evaluation and per-test REFINE_QUALITY_SCRATCH allocation, temp-environment injection, guarded Git worktree cleanup and terminal-operation reaping, unsafe fixed worktree-path rejection, the concise prompt and intent contract, and five focused regressions. Verification: scratch regressions 5 passed; all Quality tests 27 passed; prompt tests 6 passed; workflow QA failure path 1 passed; cargo fmt --all -- --check passed; cargo clippy --all-targets --all-features -- -D warnings passed; complete unit suite 723 passed, 6 ignored, 0 failed; cargo build --release --locked passed; git diff --check passed.",
+            "implementation_reported_at": "2026-08-06T13:25:29Z",
+            "meta_rule_state": "passed",
+            "product_state": "passed",
+            "prompt": "Fix the Refine Quality harness so temporary Git worktree state from one Quality test cannot make another test, a retry, or a later round fail.\n\nProduction report (not reproducible from local data): during Quality evaluation of candidate d266c99b9f, the StyleCop gate ran \"git worktree add /tmp/cand d266c99b9f\". Test 1 had already run the identical command and the harness did not clean up /tmp/cand, so Git exited 1 with \"fatal: '/tmp/cand' already exists\". An independent agent rerun found the build clean, but the supervised non-zero exit correctly forced Refine to fail the Quality result. The same stale path was expected to trip round 4. Treat that sequence as reported provenance, not proof of a locally observed failure.\n\nInvestigate the post-implementation Quality planning and supervised-command lifecycle. Establish a collision-safe scratch-work contract for every Quality evaluation and test, including commands that need an isolated Git checkout. Scratch paths must be unique across tests, concurrent Goals, retries, and rounds, and harness-owned artifacts/worktrees must receive best-effort cleanup after success, command failure, cancellation, and harness errors. A retry after an interrupted or failed evaluation must not be permanently blocked by prior scratch state. Never delete, overwrite, or unregister an unrelated pre-existing user path or Git worktree.\n\nKeep the evidence boundary intact: observed command exit status remains authoritative, genuine test failures still fail Quality, and Refine must not reinterpret a non-zero result as passed merely because an independent rerun succeeds. If an agent proposes an unsafe shared fixed scratch path, prevent that plan from causing cross-test contamination through a clear, enforceable harness contract rather than project-specific StyleCop logic.\n\nAdd focused regression coverage for at least: two Quality tests requiring candidate worktrees in one evaluation; repeated evaluation or retry after stale/interrupted harness-owned state; cleanup following a failing command; concurrent evaluations without path collision; and preservation of unrelated pre-existing paths/worktrees. Update the concise Quality prompt or documentation contract if agents need an explicit scratch location or lifecycle rule. Run focused Quality tests plus repository formatting, strict Clippy, the complete unit suite, and release build; distinguish any unrelated baseline failures.",
+            "reporter": "Buddy Williams",
+            "round": 1,
+            "rule_state": "failed"
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-08-06T13:36:02Z",
+      "failure_at": "2026-08-06T13:54:25Z",
+      "failure_category": "governance",
+      "failure_message": "Quality scratch isolation remains bypassable through shell variable reassignment.",
+      "governance_checked_at": "2026-08-06T13:54:23Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZNRW2SPG3HG7890NE000-round-2",
+        "failed_actions": [
+          {
+            "message": "The validator accepts `$REFINE_QUALITY_SCRATCH/...` lexically but commands execute through a shell with unrestricted reassignment. `REFINE_QUALITY_SCRATCH=/tmp; git worktree add \"$REFINE_QUALITY_SCRATCH/cand\" HEAD` passes validation, creates `/tmp/cand`, and escapes owned-scratch cleanup, leaving collision-prone worktree state.",
+            "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+            "rule_id": "rule-5"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Quality scratch isolation remains bypassable through shell variable reassignment.\",\"violations\":[{\"rule_id\":\"rule-5\",\"rule\":\"Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.\",\"message\":\"The validator accepts `$REFINE_QUALITY_SCRATCH/...` lexically but commands execute through a shell with unrestricted reassignment. `REFINE_QUALITY_SCRATCH=/tmp; git worktree add \\\"$REFINE_QUALITY_SCRATCH/cand\\\" HEAD` passes validation, creates `/tmp/cand`, and escapes owned-scratch cleanup, leaving collision-prone worktree state.\"}]}",
+        "rules_checked": 9,
+        "verdict": {
+          "message": "Quality scratch isolation remains bypassable through shell variable reassignment.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "The validator accepts `$REFINE_QUALITY_SCRATCH/...` lexically but commands execute through a shell with unrestricted reassignment. `REFINE_QUALITY_SCRATCH=/tmp; git worktree add \"$REFINE_QUALITY_SCRATCH/cand\" HEAD` passes validation, creates `/tmp/cand`, and escapes owned-scratch cleanup, leaving collision-prone worktree state.",
+              "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "rule_id": "rule-5"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZNRW2SPG3HG7890NE000-round-2"
+      },
+      "governance_message": "Quality scratch isolation remains bypassable through shell variable reassignment.",
+      "governance_rule_actions": [
+        {
+          "message": "The validator accepts `$REFINE_QUALITY_SCRATCH/...` lexically but commands execute through a shell with unrestricted reassignment. `REFINE_QUALITY_SCRATCH=/tmp; git worktree add \"$REFINE_QUALITY_SCRATCH/cand\" HEAD` passes validation, creates `/tmp/cand`, and escapes owned-scratch cleanup, leaving collision-prone worktree state.",
+          "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+          "rule_id": "rule-5"
+        }
+      ],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-06T13:51:22Z",
+        "skipped": []
+      },
+      "implementation_report": "Recovered Round 1 scratch isolation from current main while preserving failed candidate 2b93ff43. Added unique marked per-evaluation and per-test scratch roots, injected REFINE_QUALITY_SCRATCH/TMPDIR/TMP/TEMP, best-effort owned worktree/artifact cleanup on all terminal paths and stale terminal-operation recovery, destination-aware pre-execution validation for every git worktree add, and concise prompt/intent/spec contracts. Exact bypass echo \"$REFINE_QUALITY_SCRATCH\"; git worktree add /tmp/cand HEAD is rejected without process launch. Regressions cover two worktree tests, retry/stale cleanup, failing-command cleanup with authoritative exit 1, concurrent evaluations, unrelated path/worktree preservation, exact bypass, chaining, quoting, traversal, and worktree option forms. Verification: cargo test tools::host::quality:: --lib: 38 passed, 0 failed; cargo fmt --all -- --check: passed; cargo clippy --all-targets --all-features -- -D warnings: passed; cargo test --lib -- --test-threads=1: 741 passed, 6 ignored, 0 failed; cargo build --release --locked: passed; git diff --cached --check: passed. An initial parallel full-suite run had one owned prompt-budget failure, fixed and verified in the clean full suite, plus two unrelated shared host-state failures that passed individually and in the serialized full suite.",
+      "implementation_reported_at": "2026-08-06T13:51:20Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Recover the Round 1 Governance failure while preserving its failed candidate and evidence. Reimplement the Quality scratch-isolation change from current main as needed, but close the specific bypass: validation must inspect each actual git worktree add destination and must not accept an unsafe fixed path merely because REFINE_QUALITY_SCRATCH appears elsewhere in the shell command. The reported example echo \"$REFINE_QUALITY_SCRATCH\"; git worktree add /tmp/cand HEAD must be rejected before execution, and no shared or out-of-scratch checkout may escape harness cleanup. Keep unique per-evaluation and per-test scratch roots, best-effort cleanup on every terminal path, unrelated user path and worktree preservation, and authoritative non-zero command evidence. Add focused regressions for the exact bypass plus representative command chaining, quoting, and worktree-add option forms so enforcement is tied to the checkout destination rather than substring presence. Run focused Quality tests, formatting, strict Clippy, the complete unit suite, and the locked release build; distinguish unrelated baseline failures.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "failed",
+      "updated": "2026-08-06T13:54:25Z",
+      "workflow_quality_timing": null,
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-06T14:11:07Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Recover the two failed Governance rounds while preserving candidates 2b93ff43e0b975119397618edae8b997e7363f45 and 875f06228de8a0231e6c4b96375969de35e9406a and all prior evidence.\n\nAdopt an explicit contractual, non-adversarial trust boundary for agent-authored Quality commands. Quality commands are supervised host commands, not untrusted programs confined by a filesystem sandbox. Refine must not claim that static inspection of arbitrary shell text can prove runtime path confinement. Remove the bespoke git worktree command parser, its adversarial bypass tests, and documentation or prompt claims that Refine enforces every runtime checkout destination. Do not replace it with additional shell parsing or a project-specific StyleCop rule.\n\nRecover the useful collision-safety lifecycle from the prior candidate as appropriate: allocate a unique marked scratch root per evaluation and a distinct scratch directory per test; inject REFINE_QUALITY_SCRATCH together with TMPDIR, TMP, and TEMP; tell the Quality agent that its candidate checkout is already isolated and contractually require any additional temporary artifacts or Git worktrees to live beneath the supplied scratch directory. Perform best-effort cleanup only for marker-verified harness-owned scratch and worktrees after success, command failure, cancellation, harness error, and terminal-operation recovery. Preserve unrelated, unmarked, active, or changed-marker paths and worktrees. Ensure concurrent evaluations, retries, tests, and rounds receive collision-free roots.\n\nKeep the evidence boundary intact: the observed supervised command exit and output remain authoritative, genuine failures remain failed, and an independent rerun cannot reinterpret a non-zero result as passed. Quality remains the documented mitigation and accountability layer rather than a permission or confinement system.\n\nRetain or add focused regressions for per-test and concurrent uniqueness, two cooperative worktree-using tests in one evaluation, retry after stale terminal harness-owned state, cleanup following a failing command, cancellation and harness-error cleanup where supported, preservation of unrelated paths and worktrees, prompt contract wording, and authoritative non-zero evidence. Remove tests whose only purpose is adversarial shell-parser enforcement. Update only affected Quality intent/spec documentation. Run focused Quality tests, cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, the complete unit suite, cargo build --release --locked, and git diff --check; distinguish unrelated baseline failures.",
+          "reporter": "Buddy Williams",
+          "round": 3
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZNRW2SPG3HG7890NE000",
+          "name": "Isolate Quality test scratch work to prevent worktree collisions",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "Buddy Williams",
+            "constitution_state": "passed",
+            "governance_checked_at": "2026-08-06T13:27:30Z",
+            "governance_details": {
+              "configured": true,
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZNRW2SPG3HG7890NE000-round-1",
+              "failed_actions": [
+                {
+                  "message": "The guard accepts any `git worktree add` command containing the text `REFINE_QUALITY_SCRATCH`, without verifying that the checkout argument is beneath that directory. For example, `echo \"$REFINE_QUALITY_SCRATCH\"; git worktree add /tmp/cand HEAD` bypasses rejection, creates shared collision-prone state, and escapes scratch cleanup.",
+                  "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+                  "rule_id": "rule-5"
+                }
+              ],
+              "governance_configured": true,
+              "phase": "post_implementation",
+              "provider": "codex",
+              "raw_output": "{\"status\":\"failed\",\"message\":\"Quality scratch isolation can be bypassed by an unsafe fixed worktree path.\",\"violations\":[{\"rule_id\":\"rule-5\",\"rule\":\"Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.\",\"message\":\"The guard accepts any `git worktree add` command containing the text `REFINE_QUALITY_SCRATCH`, without verifying that the checkout argument is beneath that directory. For example, `echo \\\"$REFINE_QUALITY_SCRATCH\\\"; git worktree add /tmp/cand HEAD` bypasses rejection, creates shared collision-prone state, and escapes scratch cleanup.\"}]}",
+              "rules_checked": 9,
+              "verdict": {
+                "message": "Quality scratch isolation can be bypassed by an unsafe fixed worktree path.",
+                "status": "failed",
+                "violations": [
+                  {
+                    "message": "The guard accepts any `git worktree add` command containing the text `REFINE_QUALITY_SCRATCH`, without verifying that the checkout argument is beneath that directory. For example, `echo \"$REFINE_QUALITY_SCRATCH\"; git worktree add /tmp/cand HEAD` bypasses rejection, creates shared collision-prone state, and escapes scratch cleanup.",
+                    "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+                    "rule_id": "rule-5"
+                  }
+                ]
+              },
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZNRW2SPG3HG7890NE000-round-1"
+            },
+            "governance_message": "Quality scratch isolation can be bypassed by an unsafe fixed worktree path.",
+            "governance_rule_actions": [
+              {
+                "message": "The guard accepts any `git worktree add` command containing the text `REFINE_QUALITY_SCRATCH`, without verifying that the checkout argument is beneath that directory. For example, `echo \"$REFINE_QUALITY_SCRATCH\"; git worktree add /tmp/cand HEAD` bypasses rejection, creates shared collision-prone state, and escapes scratch cleanup.",
+                "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+                "rule_id": "rule-5"
+              }
+            ],
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                },
+                {
+                  "enabled": true,
+                  "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+                  "name": "Cohesive code files",
+                  "rule": "Apply whenever an agent adds or changes code files in any language."
+                }
+              ],
+              "code_files_changed": true,
+              "context_version": 1,
+              "recorded_at": "2026-08-06T13:25:31Z",
+              "skipped": []
+            },
+            "implementation_report": "Implemented unique per-evaluation and per-test REFINE_QUALITY_SCRATCH allocation, temp-environment injection, guarded Git worktree cleanup and terminal-operation reaping, unsafe fixed worktree-path rejection, the concise prompt and intent contract, and five focused regressions. Verification: scratch regressions 5 passed; all Quality tests 27 passed; prompt tests 6 passed; workflow QA failure path 1 passed; cargo fmt --all -- --check passed; cargo clippy --all-targets --all-features -- -D warnings passed; complete unit suite 723 passed, 6 ignored, 0 failed; cargo build --release --locked passed; git diff --check passed.",
+            "implementation_reported_at": "2026-08-06T13:25:29Z",
+            "meta_rule_state": "passed",
+            "product_state": "passed",
+            "prompt": "Fix the Refine Quality harness so temporary Git worktree state from one Quality test cannot make another test, a retry, or a later round fail.\n\nProduction report (not reproducible from local data): during Quality evaluation of candidate d266c99b9f, the StyleCop gate ran \"git worktree add /tmp/cand d266c99b9f\". Test 1 had already run the identical command and the harness did not clean up /tmp/cand, so Git exited 1 with \"fatal: '/tmp/cand' already exists\". An independent agent rerun found the build clean, but the supervised non-zero exit correctly forced Refine to fail the Quality result. The same stale path was expected to trip round 4. Treat that sequence as reported provenance, not proof of a locally observed failure.\n\nInvestigate the post-implementation Quality planning and supervised-command lifecycle. Establish a collision-safe scratch-work contract for every Quality evaluation and test, including commands that need an isolated Git checkout. Scratch paths must be unique across tests, concurrent Goals, retries, and rounds, and harness-owned artifacts/worktrees must receive best-effort cleanup after success, command failure, cancellation, and harness errors. A retry after an interrupted or failed evaluation must not be permanently blocked by prior scratch state. Never delete, overwrite, or unregister an unrelated pre-existing user path or Git worktree.\n\nKeep the evidence boundary intact: observed command exit status remains authoritative, genuine test failures still fail Quality, and Refine must not reinterpret a non-zero result as passed merely because an independent rerun succeeds. If an agent proposes an unsafe shared fixed scratch path, prevent that plan from causing cross-test contamination through a clear, enforceable harness contract rather than project-specific StyleCop logic.\n\nAdd focused regression coverage for at least: two Quality tests requiring candidate worktrees in one evaluation; repeated evaluation or retry after stale/interrupted harness-owned state; cleanup following a failing command; concurrent evaluations without path collision; and preservation of unrelated pre-existing paths/worktrees. Update the concise Quality prompt or documentation contract if agents need an explicit scratch location or lifecycle rule. Run focused Quality tests plus repository formatting, strict Clippy, the complete unit suite, and release build; distinguish any unrelated baseline failures.",
+            "reporter": "Buddy Williams",
+            "round": 1,
+            "rule_state": "failed"
+          },
+          {
+            "assignee": "Buddy Williams",
+            "constitution_state": "passed",
+            "governance_checked_at": "2026-08-06T13:54:23Z",
+            "governance_details": {
+              "configured": true,
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZNRW2SPG3HG7890NE000-round-2",
+              "failed_actions": [
+                {
+                  "message": "The validator accepts `$REFINE_QUALITY_SCRATCH/...` lexically but commands execute through a shell with unrestricted reassignment. `REFINE_QUALITY_SCRATCH=/tmp; git worktree add \"$REFINE_QUALITY_SCRATCH/cand\" HEAD` passes validation, creates `/tmp/cand`, and escapes owned-scratch cleanup, leaving collision-prone worktree state.",
+                  "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+                  "rule_id": "rule-5"
+                }
+              ],
+              "governance_configured": true,
+              "phase": "post_implementation",
+              "provider": "codex",
+              "raw_output": "{\"status\":\"failed\",\"message\":\"Quality scratch isolation remains bypassable through shell variable reassignment.\",\"violations\":[{\"rule_id\":\"rule-5\",\"rule\":\"Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.\",\"message\":\"The validator accepts `$REFINE_QUALITY_SCRATCH/...` lexically but commands execute through a shell with unrestricted reassignment. `REFINE_QUALITY_SCRATCH=/tmp; git worktree add \\\"$REFINE_QUALITY_SCRATCH/cand\\\" HEAD` passes validation, creates `/tmp/cand`, and escapes owned-scratch cleanup, leaving collision-prone worktree state.\"}]}",
+              "rules_checked": 9,
+              "verdict": {
+                "message": "Quality scratch isolation remains bypassable through shell variable reassignment.",
+                "status": "failed",
+                "violations": [
+                  {
+                    "message": "The validator accepts `$REFINE_QUALITY_SCRATCH/...` lexically but commands execute through a shell with unrestricted reassignment. `REFINE_QUALITY_SCRATCH=/tmp; git worktree add \"$REFINE_QUALITY_SCRATCH/cand\" HEAD` passes validation, creates `/tmp/cand`, and escapes owned-scratch cleanup, leaving collision-prone worktree state.",
+                    "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+                    "rule_id": "rule-5"
+                  }
+                ]
+              },
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZNRW2SPG3HG7890NE000-round-2"
+            },
+            "governance_message": "Quality scratch isolation remains bypassable through shell variable reassignment.",
+            "governance_rule_actions": [
+              {
+                "message": "The validator accepts `$REFINE_QUALITY_SCRATCH/...` lexically but commands execute through a shell with unrestricted reassignment. `REFINE_QUALITY_SCRATCH=/tmp; git worktree add \"$REFINE_QUALITY_SCRATCH/cand\" HEAD` passes validation, creates `/tmp/cand`, and escapes owned-scratch cleanup, leaving collision-prone worktree state.",
+                "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+                "rule_id": "rule-5"
+              }
+            ],
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                },
+                {
+                  "enabled": true,
+                  "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+                  "name": "Cohesive code files",
+                  "rule": "Apply whenever an agent adds or changes code files in any language."
+                }
+              ],
+              "code_files_changed": true,
+              "context_version": 1,
+              "recorded_at": "2026-08-06T13:51:22Z",
+              "skipped": []
+            },
+            "implementation_report": "Recovered Round 1 scratch isolation from current main while preserving failed candidate 2b93ff43. Added unique marked per-evaluation and per-test scratch roots, injected REFINE_QUALITY_SCRATCH/TMPDIR/TMP/TEMP, best-effort owned worktree/artifact cleanup on all terminal paths and stale terminal-operation recovery, destination-aware pre-execution validation for every git worktree add, and concise prompt/intent/spec contracts. Exact bypass echo \"$REFINE_QUALITY_SCRATCH\"; git worktree add /tmp/cand HEAD is rejected without process launch. Regressions cover two worktree tests, retry/stale cleanup, failing-command cleanup with authoritative exit 1, concurrent evaluations, unrelated path/worktree preservation, exact bypass, chaining, quoting, traversal, and worktree option forms. Verification: cargo test tools::host::quality:: --lib: 38 passed, 0 failed; cargo fmt --all -- --check: passed; cargo clippy --all-targets --all-features -- -D warnings: passed; cargo test --lib -- --test-threads=1: 741 passed, 6 ignored, 0 failed; cargo build --release --locked: passed; git diff --cached --check: passed. An initial parallel full-suite run had one owned prompt-budget failure, fixed and verified in the clean full suite, plus two unrelated shared host-state failures that passed individually and in the serialized full suite.",
+            "implementation_reported_at": "2026-08-06T13:51:20Z",
+            "meta_rule_state": "passed",
+            "product_state": "passed",
+            "prompt": "Recover the Round 1 Governance failure while preserving its failed candidate and evidence. Reimplement the Quality scratch-isolation change from current main as needed, but close the specific bypass: validation must inspect each actual git worktree add destination and must not accept an unsafe fixed path merely because REFINE_QUALITY_SCRATCH appears elsewhere in the shell command. The reported example echo \"$REFINE_QUALITY_SCRATCH\"; git worktree add /tmp/cand HEAD must be rejected before execution, and no shared or out-of-scratch checkout may escape harness cleanup. Keep unique per-evaluation and per-test scratch roots, best-effort cleanup on every terminal path, unrelated user path and worktree preservation, and authoritative non-zero command evidence. Add focused regressions for the exact bypass plus representative command chaining, quoting, and worktree-add option forms so enforcement is tied to the checkout destination rather than substring presence. Run focused Quality tests, formatting, strict Clippy, the complete unit suite, and the locked release build; distinguish unrelated baseline failures.",
+            "reporter": "Buddy Williams",
+            "round": 2,
+            "rule_state": "failed"
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-08-06T14:10:56Z",
+      "failure_at": "2026-08-06T14:30:58Z",
+      "failure_category": "governance",
+      "failure_message": "Startup recovery can strand cancelled Quality scratch.",
+      "governance_checked_at": "2026-08-06T14:30:55Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZNRW2SPG3HG7890NE000-round-3",
+        "failed_actions": [
+          {
+            "message": "Daemon startup reaps terminal Quality scratch before recovering deferred Quality cancellations. A Cancelling operation is therefore skipped by the reaper, then becomes Cancelled afterward, leaving its scratch and linked worktrees until another evaluation or restart triggers cleanup.",
+            "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+            "rule_id": "rule-4"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Startup recovery can strand cancelled Quality scratch.\",\"violations\":[{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"Daemon startup reaps terminal Quality scratch before recovering deferred Quality cancellations. A Cancelling operation is therefore skipped by the reaper, then becomes Cancelled afterward, leaving its scratch and linked worktrees until another evaluation or restart triggers cleanup.\"}]}",
+        "rules_checked": 9,
+        "verdict": {
+          "message": "Startup recovery can strand cancelled Quality scratch.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "Daemon startup reaps terminal Quality scratch before recovering deferred Quality cancellations. A Cancelling operation is therefore skipped by the reaper, then becomes Cancelled afterward, leaving its scratch and linked worktrees until another evaluation or restart triggers cleanup.",
+              "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "rule_id": "rule-4"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZNRW2SPG3HG7890NE000-round-3"
+      },
+      "governance_message": "Startup recovery can strand cancelled Quality scratch.",
+      "governance_rule_actions": [
+        {
+          "message": "Daemon startup reaps terminal Quality scratch before recovering deferred Quality cancellations. A Cancelling operation is therefore skipped by the reaper, then becomes Cancelled afterward, leaving its scratch and linked worktrees until another evaluation or restart triggers cleanup.",
+          "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+          "rule_id": "rule-4"
+        }
+      ],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-06T14:26:13Z",
+        "skipped": []
+      },
+      "implementation_report": "Recovered collision-safe Quality scratch lifecycle without shell-text confinement parsing: unique marked evaluation roots and per-test directories, REFINE_QUALITY_SCRATCH/TMPDIR/TMP/TEMP injection, marker-verified worktree/artifact cleanup on success, failure, cancellation, harness error, retry, and startup recovery, plus preservation of unrelated, unmarked, active, and changed-marker state. Updated the concise prompt and affected Quality intent/spec to define trusted supervised host commands and the contractual non-adversarial scratch boundary; authoritative observed non-zero evidence remains failed. Added focused regressions for two worktree tests, per-test/concurrent uniqueness, stale retry, command failure exit 1, cancellation, harness error, startup recovery, preservation, marker changes, and prompt wording. Verification: cargo test tools::host::quality:: --lib -- --test-threads=1: 36 passed, 0 failed; cargo test prompts::tests:: --lib -- --test-threads=1: 7 passed, 0 failed; cargo fmt --all -- --check: passed; cargo clippy --all-targets --all-features -- -D warnings: passed; cargo test --lib -- --test-threads=1: 747 passed, 6 ignored, 0 failed; cargo build --release --locked: passed; git diff --check: passed. Retained candidate branches still resolve exactly to 2b93ff43e0b975119397618edae8b997e7363f45 and 875f06228de8a0231e6c4b96375969de35e9406a.",
+      "implementation_reported_at": "2026-08-06T14:26:12Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Recover the two failed Governance rounds while preserving candidates 2b93ff43e0b975119397618edae8b997e7363f45 and 875f06228de8a0231e6c4b96375969de35e9406a and all prior evidence.\n\nAdopt an explicit contractual, non-adversarial trust boundary for agent-authored Quality commands. Quality commands are supervised host commands, not untrusted programs confined by a filesystem sandbox. Refine must not claim that static inspection of arbitrary shell text can prove runtime path confinement. Remove the bespoke git worktree command parser, its adversarial bypass tests, and documentation or prompt claims that Refine enforces every runtime checkout destination. Do not replace it with additional shell parsing or a project-specific StyleCop rule.\n\nRecover the useful collision-safety lifecycle from the prior candidate as appropriate: allocate a unique marked scratch root per evaluation and a distinct scratch directory per test; inject REFINE_QUALITY_SCRATCH together with TMPDIR, TMP, and TEMP; tell the Quality agent that its candidate checkout is already isolated and contractually require any additional temporary artifacts or Git worktrees to live beneath the supplied scratch directory. Perform best-effort cleanup only for marker-verified harness-owned scratch and worktrees after success, command failure, cancellation, harness error, and terminal-operation recovery. Preserve unrelated, unmarked, active, or changed-marker paths and worktrees. Ensure concurrent evaluations, retries, tests, and rounds receive collision-free roots.\n\nKeep the evidence boundary intact: the observed supervised command exit and output remain authoritative, genuine failures remain failed, and an independent rerun cannot reinterpret a non-zero result as passed. Quality remains the documented mitigation and accountability layer rather than a permission or confinement system.\n\nRetain or add focused regressions for per-test and concurrent uniqueness, two cooperative worktree-using tests in one evaluation, retry after stale terminal harness-owned state, cleanup following a failing command, cancellation and harness-error cleanup where supported, preservation of unrelated paths and worktrees, prompt contract wording, and authoritative non-zero evidence. Remove tests whose only purpose is adversarial shell-parser enforcement. Update only affected Quality intent/spec documentation. Run focused Quality tests, cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, the complete unit suite, cargo build --release --locked, and git diff --check; distinguish unrelated baseline failures.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "failed",
+      "updated": "2026-08-06T14:30:58Z",
+      "workflow_quality_timing": null,
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-06T18:20:42Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Recover the Round 3 Governance failure while preserving candidates 2b93ff43e0b975119397618edae8b997e7363f45, 875f06228de8a0231e6c4b96375969de35e9406a, and 1410982b6005c462c0c4cd26339a8bec0d6c5d77 and all prior evidence. Use the Round 3 design as the baseline and reimplement it from current main as needed; do not revive the Round 1 or Round 2 shell-text parser.\n\nKeep the explicit contractual, non-adversarial trust boundary: Quality commands are supervised host commands, not untrusted programs confined by a filesystem sandbox. Preserve unique marked scratch per evaluation, distinct per-test directories, REFINE_QUALITY_SCRATCH plus TMPDIR/TMP/TEMP injection, marker-verified best-effort cleanup, unrelated path and worktree preservation, and authoritative observed command exit and output. Do not add project-specific StyleCop behavior or claim static confinement of arbitrary shell.\n\nFix the confirmed startup recovery ordering defect. Generic supervised-process recovery must first terminate or reconcile owned processes. Quality capability recovery must then settle deferred Quality cancellations and persist their evidence. Only after capability-specific terminal settlement may terminal scratch and linked worktrees be reaped. A deferred Quality operation that starts startup recovery in Cancelling and successfully settles to Cancelled must have its marker-verified scratch and linked worktrees cleaned during that same startup recovery pass, without waiting for another evaluation or daemon restart. If cancellation evidence cannot be persisted, keep the operation recoverably Cancelling and preserve its scratch for a later retry. Keep this sequencing behind one cohesive Quality recovery entry point so the web surface does not independently compose order-sensitive Quality recovery steps.\n\nClose the recovery ownership ambiguity without adversarial shell policing. Correlate restart cleanup with durable operation identity and the candidate path recorded by that operation, rather than treating a marker found inside the directory as independent proof of its own expected contents. A changed, inconsistent, unmarked, non-Quality, missing-operation, active, or unrelated path/worktree must be preserved. Prefer a deterministic evaluation root derived from the globally unique operation id, or an equivalently small durable ownership record, if that makes the ownership proof and retry behavior explicit. Do not delete or unregister anything unless both the fixed harness scratch scope and durable operation ownership agree.\n\nAdd an end-to-end regression that drives the actual startup recovery entry point from a deferred Cancelling Quality operation with real marked scratch and a linked Git worktree, then asserts Cancelled evidence, scratch removal, and worktree unregistration in one pass. Add the complementary persistence-failure and later-retry case, asserting the first pass preserves Cancelling scratch and the successful later pass settles and cleans it. Retain focused regressions for uniqueness, command failure, cancellation, harness error, concurrent evaluations, unrelated state preservation, marker changes, prompt wording, and authoritative non-zero evidence. Ensure the regression exercises production ordering rather than manually calling components in the desired order.\n\nUpdate only affected Quality intent/spec text if the recovery or ownership contract changes. Run focused Quality and startup-recovery tests, cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, the complete unit suite, cargo build --release --locked, and git diff --check; distinguish unrelated baseline failures. Do not merge, approve, rewrite history, delete prior branches, or directly edit durable Goal state.",
+          "reporter": "Buddy Williams",
+          "round": 4
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZNRW2SPG3HG7890NE000",
+          "name": "Isolate Quality test scratch work to prevent worktree collisions",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "Buddy Williams",
+            "constitution_state": "passed",
+            "governance_checked_at": "2026-08-06T13:27:30Z",
+            "governance_details": {
+              "configured": true,
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZNRW2SPG3HG7890NE000-round-1",
+              "failed_actions": [
+                {
+                  "message": "The guard accepts any `git worktree add` command containing the text `REFINE_QUALITY_SCRATCH`, without verifying that the checkout argument is beneath that directory. For example, `echo \"$REFINE_QUALITY_SCRATCH\"; git worktree add /tmp/cand HEAD` bypasses rejection, creates shared collision-prone state, and escapes scratch cleanup.",
+                  "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+                  "rule_id": "rule-5"
+                }
+              ],
+              "governance_configured": true,
+              "phase": "post_implementation",
+              "provider": "codex",
+              "raw_output": "{\"status\":\"failed\",\"message\":\"Quality scratch isolation can be bypassed by an unsafe fixed worktree path.\",\"violations\":[{\"rule_id\":\"rule-5\",\"rule\":\"Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.\",\"message\":\"The guard accepts any `git worktree add` command containing the text `REFINE_QUALITY_SCRATCH`, without verifying that the checkout argument is beneath that directory. For example, `echo \\\"$REFINE_QUALITY_SCRATCH\\\"; git worktree add /tmp/cand HEAD` bypasses rejection, creates shared collision-prone state, and escapes scratch cleanup.\"}]}",
+              "rules_checked": 9,
+              "verdict": {
+                "message": "Quality scratch isolation can be bypassed by an unsafe fixed worktree path.",
+                "status": "failed",
+                "violations": [
+                  {
+                    "message": "The guard accepts any `git worktree add` command containing the text `REFINE_QUALITY_SCRATCH`, without verifying that the checkout argument is beneath that directory. For example, `echo \"$REFINE_QUALITY_SCRATCH\"; git worktree add /tmp/cand HEAD` bypasses rejection, creates shared collision-prone state, and escapes scratch cleanup.",
+                    "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+                    "rule_id": "rule-5"
+                  }
+                ]
+              },
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZNRW2SPG3HG7890NE000-round-1"
+            },
+            "governance_message": "Quality scratch isolation can be bypassed by an unsafe fixed worktree path.",
+            "governance_rule_actions": [
+              {
+                "message": "The guard accepts any `git worktree add` command containing the text `REFINE_QUALITY_SCRATCH`, without verifying that the checkout argument is beneath that directory. For example, `echo \"$REFINE_QUALITY_SCRATCH\"; git worktree add /tmp/cand HEAD` bypasses rejection, creates shared collision-prone state, and escapes scratch cleanup.",
+                "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+                "rule_id": "rule-5"
+              }
+            ],
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                },
+                {
+                  "enabled": true,
+                  "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+                  "name": "Cohesive code files",
+                  "rule": "Apply whenever an agent adds or changes code files in any language."
+                }
+              ],
+              "code_files_changed": true,
+              "context_version": 1,
+              "recorded_at": "2026-08-06T13:25:31Z",
+              "skipped": []
+            },
+            "implementation_report": "Implemented unique per-evaluation and per-test REFINE_QUALITY_SCRATCH allocation, temp-environment injection, guarded Git worktree cleanup and terminal-operation reaping, unsafe fixed worktree-path rejection, the concise prompt and intent contract, and five focused regressions. Verification: scratch regressions 5 passed; all Quality tests 27 passed; prompt tests 6 passed; workflow QA failure path 1 passed; cargo fmt --all -- --check passed; cargo clippy --all-targets --all-features -- -D warnings passed; complete unit suite 723 passed, 6 ignored, 0 failed; cargo build --release --locked passed; git diff --check passed.",
+            "implementation_reported_at": "2026-08-06T13:25:29Z",
+            "meta_rule_state": "passed",
+            "product_state": "passed",
+            "prompt": "Fix the Refine Quality harness so temporary Git worktree state from one Quality test cannot make another test, a retry, or a later round fail.\n\nProduction report (not reproducible from local data): during Quality evaluation of candidate d266c99b9f, the StyleCop gate ran \"git worktree add /tmp/cand d266c99b9f\". Test 1 had already run the identical command and the harness did not clean up /tmp/cand, so Git exited 1 with \"fatal: '/tmp/cand' already exists\". An independent agent rerun found the build clean, but the supervised non-zero exit correctly forced Refine to fail the Quality result. The same stale path was expected to trip round 4. Treat that sequence as reported provenance, not proof of a locally observed failure.\n\nInvestigate the post-implementation Quality planning and supervised-command lifecycle. Establish a collision-safe scratch-work contract for every Quality evaluation and test, including commands that need an isolated Git checkout. Scratch paths must be unique across tests, concurrent Goals, retries, and rounds, and harness-owned artifacts/worktrees must receive best-effort cleanup after success, command failure, cancellation, and harness errors. A retry after an interrupted or failed evaluation must not be permanently blocked by prior scratch state. Never delete, overwrite, or unregister an unrelated pre-existing user path or Git worktree.\n\nKeep the evidence boundary intact: observed command exit status remains authoritative, genuine test failures still fail Quality, and Refine must not reinterpret a non-zero result as passed merely because an independent rerun succeeds. If an agent proposes an unsafe shared fixed scratch path, prevent that plan from causing cross-test contamination through a clear, enforceable harness contract rather than project-specific StyleCop logic.\n\nAdd focused regression coverage for at least: two Quality tests requiring candidate worktrees in one evaluation; repeated evaluation or retry after stale/interrupted harness-owned state; cleanup following a failing command; concurrent evaluations without path collision; and preservation of unrelated pre-existing paths/worktrees. Update the concise Quality prompt or documentation contract if agents need an explicit scratch location or lifecycle rule. Run focused Quality tests plus repository formatting, strict Clippy, the complete unit suite, and release build; distinguish any unrelated baseline failures.",
+            "reporter": "Buddy Williams",
+            "round": 1,
+            "rule_state": "failed"
+          },
+          {
+            "assignee": "Buddy Williams",
+            "constitution_state": "passed",
+            "governance_checked_at": "2026-08-06T13:54:23Z",
+            "governance_details": {
+              "configured": true,
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZNRW2SPG3HG7890NE000-round-2",
+              "failed_actions": [
+                {
+                  "message": "The validator accepts `$REFINE_QUALITY_SCRATCH/...` lexically but commands execute through a shell with unrestricted reassignment. `REFINE_QUALITY_SCRATCH=/tmp; git worktree add \"$REFINE_QUALITY_SCRATCH/cand\" HEAD` passes validation, creates `/tmp/cand`, and escapes owned-scratch cleanup, leaving collision-prone worktree state.",
+                  "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+                  "rule_id": "rule-5"
+                }
+              ],
+              "governance_configured": true,
+              "phase": "post_implementation",
+              "provider": "codex",
+              "raw_output": "{\"status\":\"failed\",\"message\":\"Quality scratch isolation remains bypassable through shell variable reassignment.\",\"violations\":[{\"rule_id\":\"rule-5\",\"rule\":\"Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.\",\"message\":\"The validator accepts `$REFINE_QUALITY_SCRATCH/...` lexically but commands execute through a shell with unrestricted reassignment. `REFINE_QUALITY_SCRATCH=/tmp; git worktree add \\\"$REFINE_QUALITY_SCRATCH/cand\\\" HEAD` passes validation, creates `/tmp/cand`, and escapes owned-scratch cleanup, leaving collision-prone worktree state.\"}]}",
+              "rules_checked": 9,
+              "verdict": {
+                "message": "Quality scratch isolation remains bypassable through shell variable reassignment.",
+                "status": "failed",
+                "violations": [
+                  {
+                    "message": "The validator accepts `$REFINE_QUALITY_SCRATCH/...` lexically but commands execute through a shell with unrestricted reassignment. `REFINE_QUALITY_SCRATCH=/tmp; git worktree add \"$REFINE_QUALITY_SCRATCH/cand\" HEAD` passes validation, creates `/tmp/cand`, and escapes owned-scratch cleanup, leaving collision-prone worktree state.",
+                    "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+                    "rule_id": "rule-5"
+                  }
+                ]
+              },
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZNRW2SPG3HG7890NE000-round-2"
+            },
+            "governance_message": "Quality scratch isolation remains bypassable through shell variable reassignment.",
+            "governance_rule_actions": [
+              {
+                "message": "The validator accepts `$REFINE_QUALITY_SCRATCH/...` lexically but commands execute through a shell with unrestricted reassignment. `REFINE_QUALITY_SCRATCH=/tmp; git worktree add \"$REFINE_QUALITY_SCRATCH/cand\" HEAD` passes validation, creates `/tmp/cand`, and escapes owned-scratch cleanup, leaving collision-prone worktree state.",
+                "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+                "rule_id": "rule-5"
+              }
+            ],
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                },
+                {
+                  "enabled": true,
+                  "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+                  "name": "Cohesive code files",
+                  "rule": "Apply whenever an agent adds or changes code files in any language."
+                }
+              ],
+              "code_files_changed": true,
+              "context_version": 1,
+              "recorded_at": "2026-08-06T13:51:22Z",
+              "skipped": []
+            },
+            "implementation_report": "Recovered Round 1 scratch isolation from current main while preserving failed candidate 2b93ff43. Added unique marked per-evaluation and per-test scratch roots, injected REFINE_QUALITY_SCRATCH/TMPDIR/TMP/TEMP, best-effort owned worktree/artifact cleanup on all terminal paths and stale terminal-operation recovery, destination-aware pre-execution validation for every git worktree add, and concise prompt/intent/spec contracts. Exact bypass echo \"$REFINE_QUALITY_SCRATCH\"; git worktree add /tmp/cand HEAD is rejected without process launch. Regressions cover two worktree tests, retry/stale cleanup, failing-command cleanup with authoritative exit 1, concurrent evaluations, unrelated path/worktree preservation, exact bypass, chaining, quoting, traversal, and worktree option forms. Verification: cargo test tools::host::quality:: --lib: 38 passed, 0 failed; cargo fmt --all -- --check: passed; cargo clippy --all-targets --all-features -- -D warnings: passed; cargo test --lib -- --test-threads=1: 741 passed, 6 ignored, 0 failed; cargo build --release --locked: passed; git diff --cached --check: passed. An initial parallel full-suite run had one owned prompt-budget failure, fixed and verified in the clean full suite, plus two unrelated shared host-state failures that passed individually and in the serialized full suite.",
+            "implementation_reported_at": "2026-08-06T13:51:20Z",
+            "meta_rule_state": "passed",
+            "product_state": "passed",
+            "prompt": "Recover the Round 1 Governance failure while preserving its failed candidate and evidence. Reimplement the Quality scratch-isolation change from current main as needed, but close the specific bypass: validation must inspect each actual git worktree add destination and must not accept an unsafe fixed path merely because REFINE_QUALITY_SCRATCH appears elsewhere in the shell command. The reported example echo \"$REFINE_QUALITY_SCRATCH\"; git worktree add /tmp/cand HEAD must be rejected before execution, and no shared or out-of-scratch checkout may escape harness cleanup. Keep unique per-evaluation and per-test scratch roots, best-effort cleanup on every terminal path, unrelated user path and worktree preservation, and authoritative non-zero command evidence. Add focused regressions for the exact bypass plus representative command chaining, quoting, and worktree-add option forms so enforcement is tied to the checkout destination rather than substring presence. Run focused Quality tests, formatting, strict Clippy, the complete unit suite, and the locked release build; distinguish unrelated baseline failures.",
+            "reporter": "Buddy Williams",
+            "round": 2,
+            "rule_state": "failed"
+          },
+          {
+            "assignee": "Buddy Williams",
+            "constitution_state": "passed",
+            "governance_checked_at": "2026-08-06T14:30:55Z",
+            "governance_details": {
+              "configured": true,
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZNRW2SPG3HG7890NE000-round-3",
+              "failed_actions": [
+                {
+                  "message": "Daemon startup reaps terminal Quality scratch before recovering deferred Quality cancellations. A Cancelling operation is therefore skipped by the reaper, then becomes Cancelled afterward, leaving its scratch and linked worktrees until another evaluation or restart triggers cleanup.",
+                  "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+                  "rule_id": "rule-4"
+                }
+              ],
+              "governance_configured": true,
+              "phase": "post_implementation",
+              "provider": "codex",
+              "raw_output": "{\"status\":\"failed\",\"message\":\"Startup recovery can strand cancelled Quality scratch.\",\"violations\":[{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"Daemon startup reaps terminal Quality scratch before recovering deferred Quality cancellations. A Cancelling operation is therefore skipped by the reaper, then becomes Cancelled afterward, leaving its scratch and linked worktrees until another evaluation or restart triggers cleanup.\"}]}",
+              "rules_checked": 9,
+              "verdict": {
+                "message": "Startup recovery can strand cancelled Quality scratch.",
+                "status": "failed",
+                "violations": [
+                  {
+                    "message": "Daemon startup reaps terminal Quality scratch before recovering deferred Quality cancellations. A Cancelling operation is therefore skipped by the reaper, then becomes Cancelled afterward, leaving its scratch and linked worktrees until another evaluation or restart triggers cleanup.",
+                    "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+                    "rule_id": "rule-4"
+                  }
+                ]
+              },
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZNRW2SPG3HG7890NE000-round-3"
+            },
+            "governance_message": "Startup recovery can strand cancelled Quality scratch.",
+            "governance_rule_actions": [
+              {
+                "message": "Daemon startup reaps terminal Quality scratch before recovering deferred Quality cancellations. A Cancelling operation is therefore skipped by the reaper, then becomes Cancelled afterward, leaving its scratch and linked worktrees until another evaluation or restart triggers cleanup.",
+                "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+                "rule_id": "rule-4"
+              }
+            ],
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                },
+                {
+                  "enabled": true,
+                  "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+                  "name": "Cohesive code files",
+                  "rule": "Apply whenever an agent adds or changes code files in any language."
+                }
+              ],
+              "code_files_changed": true,
+              "context_version": 1,
+              "recorded_at": "2026-08-06T14:26:13Z",
+              "skipped": []
+            },
+            "implementation_report": "Recovered collision-safe Quality scratch lifecycle without shell-text confinement parsing: unique marked evaluation roots and per-test directories, REFINE_QUALITY_SCRATCH/TMPDIR/TMP/TEMP injection, marker-verified worktree/artifact cleanup on success, failure, cancellation, harness error, retry, and startup recovery, plus preservation of unrelated, unmarked, active, and changed-marker state. Updated the concise prompt and affected Quality intent/spec to define trusted supervised host commands and the contractual non-adversarial scratch boundary; authoritative observed non-zero evidence remains failed. Added focused regressions for two worktree tests, per-test/concurrent uniqueness, stale retry, command failure exit 1, cancellation, harness error, startup recovery, preservation, marker changes, and prompt wording. Verification: cargo test tools::host::quality:: --lib -- --test-threads=1: 36 passed, 0 failed; cargo test prompts::tests:: --lib -- --test-threads=1: 7 passed, 0 failed; cargo fmt --all -- --check: passed; cargo clippy --all-targets --all-features -- -D warnings: passed; cargo test --lib -- --test-threads=1: 747 passed, 6 ignored, 0 failed; cargo build --release --locked: passed; git diff --check: passed. Retained candidate branches still resolve exactly to 2b93ff43e0b975119397618edae8b997e7363f45 and 875f06228de8a0231e6c4b96375969de35e9406a.",
+            "implementation_reported_at": "2026-08-06T14:26:12Z",
+            "meta_rule_state": "passed",
+            "product_state": "passed",
+            "prompt": "Recover the two failed Governance rounds while preserving candidates 2b93ff43e0b975119397618edae8b997e7363f45 and 875f06228de8a0231e6c4b96375969de35e9406a and all prior evidence.\n\nAdopt an explicit contractual, non-adversarial trust boundary for agent-authored Quality commands. Quality commands are supervised host commands, not untrusted programs confined by a filesystem sandbox. Refine must not claim that static inspection of arbitrary shell text can prove runtime path confinement. Remove the bespoke git worktree command parser, its adversarial bypass tests, and documentation or prompt claims that Refine enforces every runtime checkout destination. Do not replace it with additional shell parsing or a project-specific StyleCop rule.\n\nRecover the useful collision-safety lifecycle from the prior candidate as appropriate: allocate a unique marked scratch root per evaluation and a distinct scratch directory per test; inject REFINE_QUALITY_SCRATCH together with TMPDIR, TMP, and TEMP; tell the Quality agent that its candidate checkout is already isolated and contractually require any additional temporary artifacts or Git worktrees to live beneath the supplied scratch directory. Perform best-effort cleanup only for marker-verified harness-owned scratch and worktrees after success, command failure, cancellation, harness error, and terminal-operation recovery. Preserve unrelated, unmarked, active, or changed-marker paths and worktrees. Ensure concurrent evaluations, retries, tests, and rounds receive collision-free roots.\n\nKeep the evidence boundary intact: the observed supervised command exit and output remain authoritative, genuine failures remain failed, and an independent rerun cannot reinterpret a non-zero result as passed. Quality remains the documented mitigation and accountability layer rather than a permission or confinement system.\n\nRetain or add focused regressions for per-test and concurrent uniqueness, two cooperative worktree-using tests in one evaluation, retry after stale terminal harness-owned state, cleanup following a failing command, cancellation and harness-error cleanup where supported, preservation of unrelated paths and worktrees, prompt contract wording, and authoritative non-zero evidence. Remove tests whose only purpose is adversarial shell-parser enforcement. Update only affected Quality intent/spec documentation. Run focused Quality tests, cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, the complete unit suite, cargo build --release --locked, and git diff --check; distinguish unrelated baseline failures.",
+            "reporter": "Buddy Williams",
+            "round": 3,
+            "rule_state": "failed"
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-08-06T18:20:15Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "2026-08-06T18:43:18Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZNRW2SPG3HG7890NE000-round-4",
+        "failed_actions": [
+          {
+            "message": "`run_checks` cleans scratch before `run_registered` persists evidence and makes the operation terminal, while `cleanup_owned_scratch` never rejects Running or Cancelling operations. A cancellation evidence-persistence failure can therefore leave the operation recoverably Cancelling after its scratch and linked worktrees have already been deleted.",
+            "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+            "rule_id": "rule-4"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Quality scratch can be deleted before durable operation settlement.\",\"violations\":[{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"`run_checks` cleans scratch before `run_registered` persists evidence and makes the operation terminal, while `cleanup_owned_scratch` never rejects Running or Cancelling operations. A cancellation evidence-persistence failure can therefore leave the operation recoverably Cancelling after its scratch and linked worktrees have already been deleted.\"}]}",
+        "rules_checked": 9,
+        "verdict": {
+          "message": "Quality scratch can be deleted before durable operation settlement.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "`run_checks` cleans scratch before `run_registered` persists evidence and makes the operation terminal, while `cleanup_owned_scratch` never rejects Running or Cancelling operations. A cancellation evidence-persistence failure can therefore leave the operation recoverably Cancelling after its scratch and linked worktrees have already been deleted.",
+              "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "rule_id": "rule-4"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZNRW2SPG3HG7890NE000-round-4"
+      },
+      "governance_message": "Quality scratch can be deleted before durable operation settlement.",
+      "governance_rule_actions": [
+        {
+          "message": "`run_checks` cleans scratch before `run_registered` persists evidence and makes the operation terminal, while `cleanup_owned_scratch` never rejects Running or Cancelling operations. A cancellation evidence-persistence failure can therefore leave the operation recoverably Cancelling after its scratch and linked worktrees have already been deleted.",
+          "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+          "rule_id": "rule-4"
+        }
+      ],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-06T18:41:13Z",
+        "skipped": []
+      },
+      "implementation_report": "Recovered the Round 3 Quality scratch lifecycle and fixed startup recovery ordering behind one Quality entry point: supervised-process reconciliation, durable deferred-cancellation evidence settlement, then same-pass terminal scratch/worktree cleanup. Scratch roots are deterministic from operation IDs, and cleanup requires fixed scope, marker, durable Quality identity, and operation-recorded candidate path agreement; unrelated, active, changed, missing, non-Quality, and inconsistent ownership is preserved. Added end-to-end daemon startup regressions for same-pass cancellation cleanup and persistence-failure preservation/later retry, plus ownership regressions. Verification: Quality tests 37 passed; daemon startup tests 3 passed; prompt tests 7 passed; cargo fmt check passed; strict Clippy passed; full serialized unit suite 761 passed, 6 ignored, 0 failed; locked release build passed; git diff check passed. Prior candidate branches remain at 2b93ff43e0b975119397618edae8b997e7363f45, 875f06228de8a0231e6c4b96375969de35e9406a, and 1410982b6005c462c0c4cd26339a8bec0d6c5d77.",
+      "implementation_reported_at": "2026-08-06T18:41:11Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Recover the Round 3 Governance failure while preserving candidates 2b93ff43e0b975119397618edae8b997e7363f45, 875f06228de8a0231e6c4b96375969de35e9406a, and 1410982b6005c462c0c4cd26339a8bec0d6c5d77 and all prior evidence. Use the Round 3 design as the baseline and reimplement it from current main as needed; do not revive the Round 1 or Round 2 shell-text parser.\n\nKeep the explicit contractual, non-adversarial trust boundary: Quality commands are supervised host commands, not untrusted programs confined by a filesystem sandbox. Preserve unique marked scratch per evaluation, distinct per-test directories, REFINE_QUALITY_SCRATCH plus TMPDIR/TMP/TEMP injection, marker-verified best-effort cleanup, unrelated path and worktree preservation, and authoritative observed command exit and output. Do not add project-specific StyleCop behavior or claim static confinement of arbitrary shell.\n\nFix the confirmed startup recovery ordering defect. Generic supervised-process recovery must first terminate or reconcile owned processes. Quality capability recovery must then settle deferred Quality cancellations and persist their evidence. Only after capability-specific terminal settlement may terminal scratch and linked worktrees be reaped. A deferred Quality operation that starts startup recovery in Cancelling and successfully settles to Cancelled must have its marker-verified scratch and linked worktrees cleaned during that same startup recovery pass, without waiting for another evaluation or daemon restart. If cancellation evidence cannot be persisted, keep the operation recoverably Cancelling and preserve its scratch for a later retry. Keep this sequencing behind one cohesive Quality recovery entry point so the web surface does not independently compose order-sensitive Quality recovery steps.\n\nClose the recovery ownership ambiguity without adversarial shell policing. Correlate restart cleanup with durable operation identity and the candidate path recorded by that operation, rather than treating a marker found inside the directory as independent proof of its own expected contents. A changed, inconsistent, unmarked, non-Quality, missing-operation, active, or unrelated path/worktree must be preserved. Prefer a deterministic evaluation root derived from the globally unique operation id, or an equivalently small durable ownership record, if that makes the ownership proof and retry behavior explicit. Do not delete or unregister anything unless both the fixed harness scratch scope and durable operation ownership agree.\n\nAdd an end-to-end regression that drives the actual startup recovery entry point from a deferred Cancelling Quality operation with real marked scratch and a linked Git worktree, then asserts Cancelled evidence, scratch removal, and worktree unregistration in one pass. Add the complementary persistence-failure and later-retry case, asserting the first pass preserves Cancelling scratch and the successful later pass settles and cleans it. Retain focused regressions for uniqueness, command failure, cancellation, harness error, concurrent evaluations, unrelated state preservation, marker changes, prompt wording, and authoritative non-zero evidence. Ensure the regression exercises production ordering rather than manually calling components in the desired order.\n\nUpdate only affected Quality intent/spec text if the recovery or ownership contract changes. Run focused Quality and startup-recovery tests, cargo fmt --all -- --check, cargo clippy --all-targets --all-features -- -D warnings, the complete unit suite, cargo build --release --locked, and git diff --check; distinguish unrelated baseline failures. Do not merge, approve, rewrite history, delete prior branches, or directly edit durable Goal state.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "failed",
+      "updated": "2026-08-06T18:43:22Z",
+      "workflow_quality_timing": null,
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    }
+  ],
+  "status": "cancelled",
+  "target_branch": "main",
+  "updated": "2026-08-14T09:43:53Z",
+  "workflow_revision": 48
+}

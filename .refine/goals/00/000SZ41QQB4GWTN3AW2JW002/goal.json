@@ -10,10 +10,10 @@
   "node_id": "default",
   "notes": [],
   "priority": "low",
-  "reporter": "Refine Supervisor",
+  "reporter": "Buddy Williams",
   "rounds": [
     {
-      "assignee": "Refine",
+      "assignee": "Buddy Williams",
       "constitution_state": "passed",
       "created": "2026-07-23T18:23:19Z",
       "governance_checked_at": "2026-07-23T18:36:31Z",
@@ -54,11 +54,12 @@
       "quality_state": "passed",
       "reporter": "Refine Supervisor",
       "rule_state": "passed",
-      "updated": "2026-07-23T18:36:35Z",
+      "updated": "2026-07-28T16:39:46Z",
       "workflow_quality_timing": "pre_merge"
     }
   ],
   "status": "done",
   "target_branch": "main",
-  "updated": "2026-07-23T19:04:30Z"
+  "updated": "2026-07-28T16:39:58Z",
+  "workflow_revision": 4
 }

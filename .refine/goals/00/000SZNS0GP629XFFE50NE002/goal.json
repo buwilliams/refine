@@ -1,0 +1,211 @@
+{
+  "base_commit": "fd22cdbf54741de30e3f5c84fee4c95bdae5dc9b",
+  "branch_name": "refine/00000SZNS0GP629XFFE50NE002/round-1",
+  "candidate_commit": "623ed50b8e902ab9ec59351ea52c22fafe0f31d0",
+  "created": "2026-08-06T12:51:00Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZNS0GP629XFFE50NE002",
+  "name": "Report the authoritative active Node identity in project status",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Ethan Jacobson",
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-06T12:55:27Z",
+        "current_round": {
+          "assignee": "Ethan",
+          "prompt": "Fix Refine project status and Goal node labeling so stale metadata on the reserved default node cannot make a local active node appear to be a different production node.\n\nProduction report from Ethan (not reproducible from local state): refine project status returned display name \"BO2LNXNEVO04 (QA)\" for active node id \"default\". That label was stale on the default registry entry, making it appear that Goals active on Ethan's node belonged to QA. Local project status currently reports active node id and display name by combining the attached project's node registry with the runtime-local active-node selection. Investigate the durable-state and multi-node lifecycle that can leave a host-specific or stale label on the shared default entry.\n\nDefine and enforce an authoritative identity contract for active_node_id versus its human display label across CLI project status, node APIs, Goal projections, project attach/switch, daemon restart, shared-state synchronization, and legacy registry migration. A display label must never imply that a Goal is owned by QA or another host when its durable node assignment does not establish that. Preserve legitimate user-renamed and non-default nodes; do not blindly overwrite current registry data or collapse distinct nodes. If Refine cannot safely reconcile ambiguous legacy state, surface an explicit diagnostic and recovery action instead of silently presenting the stale label as current truth.\n\nAdd focused tests using a stale legacy default entry plus runtime-local active selection, multiple hosts/nodes sharing project state, legitimate node renames, attach/switch/restart behavior, Goal list/detail projections, and both daemon-backed and in-process CLI status paths. Include a safe migration or operator recovery path if existing state needs correction. Update the relevant node/project identity documentation contract. Run focused tests, formatting, strict Clippy, complete unit tests, and release build; separate unrelated baseline failures.",
+          "reporter": "Ethan",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Ethan",
+          "id": "00000SZNS0GP629XFFE50NE002",
+          "name": "Report the authoritative active Node identity in project status",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Ethan"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Ethan Jacobson",
+      "constitution_state": "passed",
+      "created": "2026-08-06T12:51:01Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "2026-08-06T13:27:05Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZNS0GP629XFFE50NE002-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 9,
+        "verdict": {
+          "message": "No governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZNS0GP629XFFE50NE002-round-1"
+      },
+      "governance_message": "No governance rule violations found.",
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-06T13:23:23Z",
+        "skipped": []
+      },
+      "implementation_report": "Implemented one authoritative Node identity resolver: durable node ids govern ownership; runtime selections are project-scoped and registry-validated; ambiguous legacy non-canonical labels on reserved default render as Default with raw metadata, diagnostics, and explicit rename recovery; explicit renames persist authority; project status, node/cluster APIs, dashboard, browser labels, and Goal list/detail projections now agree. Updated Node intent documentation and focused coverage for stale legacy default metadata, shared multi-host registries, legitimate renames, attach/switch/restart, legacy selection recovery, Goal projections, cluster/node APIs, and in-process plus daemon-backed CLI status. Verification: focused Rust suites passed (nodes 5, project registry 6, stale Goal projection 1, in-process CLI status 1, cluster 9); cargo fmt --all -- --check passed; cargo clippy --all-targets --all-features -- -D warnings passed; cargo test -- --unit passed 725 with 6 ignored platform/helper tests; node --test tests/*.test.js passed 99 with 16 Chromium-unavailable skips; cargo run --manifest-path xtask/Cargo.toml -- test-cli passed 1 daemon-backed CLI suite; cargo build --release passed; git diff --check passed.",
+      "implementation_reported_at": "2026-08-06T13:23:22Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Fix Refine project status and Goal node labeling so stale metadata on the reserved default node cannot make a local active node appear to be a different production node.\n\nProduction report from Ethan (not reproducible from local state): refine project status returned display name \"BO2LNXNEVO04 (QA)\" for active node id \"default\". That label was stale on the default registry entry, making it appear that Goals active on Ethan's node belonged to QA. Local project status currently reports active node id and display name by combining the attached project's node registry with the runtime-local active-node selection. Investigate the durable-state and multi-node lifecycle that can leave a host-specific or stale label on the shared default entry.\n\nDefine and enforce an authoritative identity contract for active_node_id versus its human display label across CLI project status, node APIs, Goal projections, project attach/switch, daemon restart, shared-state synchronization, and legacy registry migration. A display label must never imply that a Goal is owned by QA or another host when its durable node assignment does not establish that. Preserve legitimate user-renamed and non-default nodes; do not blindly overwrite current registry data or collapse distinct nodes. If Refine cannot safely reconcile ambiguous legacy state, surface an explicit diagnostic and recovery action instead of silently presenting the stale label as current truth.\n\nAdd focused tests using a stale legacy default entry plus runtime-local active selection, multiple hosts/nodes sharing project state, legitimate node renames, attach/switch/restart behavior, Goal list/detail projections, and both daemon-backed and in-process CLI status paths. Include a safe migration or operator recovery path if existing state needs correction. Update the relevant node/project identity documentation contract. Run focused tests, formatting, strict Clippy, complete unit tests, and release build; separate unrelated baseline failures.",
+      "quality_checked_at": "2026-08-06T13:27:11Z",
+      "quality_details": {
+        "candidate_commit": "623ed50b8e902ab9ec59351ea52c22fafe0f31d0",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZNS0GP629XFFE50NE002-round-1",
+        "diagnostics": [
+          "No Quality tests or migrated commands are configured; evaluation was a no-op."
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "19fd741a71c419f8",
+        "results": [],
+        "source_candidate_commit": "623ed50b8e902ab9ec59351ea52c22fafe0f31d0"
+      },
+      "quality_message": "No Quality tests configured.",
+      "quality_state": "passed",
+      "reporter": "Ethan",
+      "rule_state": "passed",
+      "updated": "2026-08-14T10:34:41Z",
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "623ed50b8e902ab9ec59351ea52c22fafe0f31d0",
+        "integrated_at": "2026-08-06T13:27:19.943199515+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Auto-merging src/surfaces/web/static/js/common.js\nMerge made by the 'ort' strategy.\n docs/intent/02-foundation/01-node.md               |   5 +\n src/model/node/mod.rs                              |  17 ++\n src/model/project/mod.rs                           |   3 +\n src/process/supervisor/config/mod.rs               |   3 +-\n src/surfaces/cli/tests/projects.rs                 |  51 +++++\n src/surfaces/web/static/js/common.js               |   3 +-\n src/surfaces/web/static/js/features/settings.js    |   3 +-\n .../web/static/js/features/settings_nodes.js       |  14 +-\n src/surfaces/web_server/project_routes.rs          |  21 +-\n .../web_server/project_routes/dashboard.rs         |  12 +-\n src/surfaces/web_server/support/status.rs          |   1 +\n src/surfaces/web_server/tests/goals/details.rs     | 102 ++++++++++\n src/surfaces/web_server/work_routes.rs             |  26 +--\n .../web_server/work_routes/goal_routes/queries.rs  |  32 ++-\n src/tools/host/cluster/mod.rs                      |  55 +++++-\n src/tools/host/cluster/remote.rs                   |   1 +\n src/tools/host/cluster/tests.rs                    |  48 +++++\n src/tools/host/quality/tests/execution.rs          |  12 +-\n src/tools/product/nodes/identity.rs                | 219 +++++++++++++++++++++\n src/tools/product/nodes/mod.rs                     |  85 +++-----\n src/tools/product/nodes/tests.rs                   | 134 +++++++++++++\n src/tools/product/project_registry/mod.rs          |  47 ++---\n src/tools/product/project_registry/tests.rs        |  65 ++++++\n .../work_items/service/goal_authoring/placement.rs |  16 +-\n .../work_items/service/goal_authoring/queries.rs   |  34 +++-\n src/tools/product/work_items/tests/goals.rs        |  17 +-\n tests/cli_surface.rs                               |   1 +\n tests/cli_surface/projects.rs                      |  49 +++++\n 28 files changed, 902 insertions(+), 174 deletions(-)\n create mode 100644 src/tools/product/nodes/identity.rs",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "d7ed609971b165bb8df3ed2e08bff5f443b92ea4"
+      },
+      "workflow_quality_timing": "pre_merge",
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    }
+  ],
+  "status": "done",
+  "target_branch": "main",
+  "updated": "2026-08-14T10:34:41Z",
+  "workflow_revision": 21
+}

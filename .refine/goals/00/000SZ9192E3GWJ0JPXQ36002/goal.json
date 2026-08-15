@@ -1,0 +1,408 @@
+{
+  "base_commit": "555d52d1b3bfae462071c3c2030c27a834feca09",
+  "branch_name": "refine/00000SZ9192E3GWJ0JPXQ36002/round-2",
+  "candidate_commit": null,
+  "created": "2026-07-27T15:19:43Z",
+  "feature_id": "00000SZ9175A5G72W1T9Q36001",
+  "feature_order": 1,
+  "id": "00000SZ9192E3GWJ0JPXQ36002",
+  "name": "Prove ontology-driven planning efficacy behind a rollout gate",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-07-27T15:53:15Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Implement Phase 0 of docs/spec/ontology-spec.md as a production-shaped, setting-controlled efficacy prototype, and record the evidence needed for a human go/no-go decision before later Goals in this Feature proceed.\n\nBehavior\n- Hand-author a compact Refine Architecture and a small plain-English rule set for the experiment; do not make proposal-generation quality part of this test.\n- Add the minimum typed schema-v1 plan model, implementation plan, and sequential step-execution path behind an explicit setting/feature gate, reusing the existing provider, managed native-session, isolated worktree, Workflow, Git, Governance, and Quality capabilities.\n- Pre-register an experiment comparing: current one-shot implementation; one-shot implementation with a freshly derived plan model as context; and two-stage model-plus-step execution. Use representative historical Goals, the same starting commit, model, provider configuration, authority, and budget, repeat conditions, and blind candidate reviewers to the condition.\n- Persist the experiment design, fixed thresholds, exact runs, provider invocations/token or budget data where available, candidate outcomes, and reviewer judgments as reviewable evidence. Preserve the setting-controlled one-shot path for comparison and rollback.\n\nConstraints and architecture\n- The prototype must preserve the design axiom: semantics are derived and judged stochastically, while schemas, pinning, sequencing, evidence obligations, checkpoints, and state transitions are enforced deterministically.\n- Do not create a durable ontology graph, new public Goal status, plan-as-Round model, concurrent same-worktree steps, provider authority to merge/approve/transition Goals, or a rule schema.\n- Fix quality, cost, and failure-shape thresholds before collecting results. Quality must materially and consistently reduce material defects or corrective Rounds; cost must stay within a predeclared maximum multiple; mid-plan failure must leave partial state no worse to review than a one-shot failure. Treat the plan-model-only arm as independently shippable if it captures most of the benefit.\n- If the gate fails, retain the evidence and the safe one-shot behavior; do not silently enable planned execution or rationalize thresholds after seeing results. Later Feature Goals require an explicit recorded gate decision.\n\nImplementation order\n1. Define the gated vertical slice and experiment fixtures without changing the default path.\n2. Record thresholds and protocol.\n3. Run repeated comparable trials and capture exact evidence.\n4. Produce the human-reviewable go/no-go result and rollback instructions.\n\nVerification\n- Prove the three arms use equivalent starting conditions and that the default remains one-shot when the gate is off.\n- Exercise a trivial one-step plan and a multi-step seam-aligned plan, including a mid-step failure with reviewable retained state.\n- Verify no new workflow status/Round semantics or automatic approval/merge authority appears.\n- Report exact quality, first-candidate acceptability, missed-impact, corrective-Round, failure-shape, elapsed-time, invocation, and available budget results; longer reports alone are not success.\n\nHuman Review gate\n- Human Review of this Goal is the go/no-go boundary for the rest of the Feature. The implementation agent records the measured outcome but has no authority to release later Goals.\n- Approve this Goal only when the pre-registered quality, cost, and failure-shape thresholds pass. A failed or inconclusive gate must retain its evidence, keep one-shot execution as the default, and leave Goals 2–9 unstarted while a new Round revises the experiment or the Feature is stopped.\n- Verify by durable Feature and Goal readback that no later ordered Goal was moved or started merely because the prototype or experiment process completed.",
+          "reporter": "Buddy Williams",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "feature_id": "00000SZ9175A5G72W1T9Q36001",
+          "feature_order": 1,
+          "id": "00000SZ9192E3GWJ0JPXQ36002",
+          "name": "Prove ontology-driven planning efficacy behind a rollout gate",
+          "node_id": "default",
+          "priority": "high",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-07-27T15:19:44Z",
+      "failure_at": "2026-07-27T16:18:19Z",
+      "failure_category": "governance",
+      "failure_message": "Durable plan state crosses the Foundation–Capability boundary.",
+      "governance_checked_at": "2026-07-27T16:18:16Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ9192E3GWJ0JPXQ36002-round-1",
+        "failed_actions": [
+          {
+            "message": "Authoritative schema-v1 plan and execution-evidence types are owned under src/workflow/ontology_planning, while the foundation exposes GoalRound.plan only as untyped serde_json::Value. Durable Round evidence belongs in the model/foundation; Workflow should own its orchestration.",
+            "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+            "rule_id": "rule-1"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Durable plan state crosses the Foundation–Capability boundary.\",\"violations\":[{\"rule_id\":\"rule-1\",\"rule\":\"Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.\",\"message\":\"Authoritative schema-v1 plan and execution-evidence types are owned under src/workflow/ontology_planning, while the foundation exposes GoalRound.plan only as untyped serde_json::Value. Durable Round evidence belongs in the model/foundation; Workflow should own its orchestration.\"}]}",
+        "rules_checked": 9,
+        "verdict": {
+          "message": "Durable plan state crosses the Foundation–Capability boundary.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "Authoritative schema-v1 plan and execution-evidence types are owned under src/workflow/ontology_planning, while the foundation exposes GoalRound.plan only as untyped serde_json::Value. Durable Round evidence belongs in the model/foundation; Workflow should own its orchestration.",
+              "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "rule_id": "rule-1"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ9192E3GWJ0JPXQ36002-round-1"
+      },
+      "governance_message": "Durable plan state crosses the Foundation–Capability boundary.",
+      "governance_rule_actions": [
+        {
+          "message": "Authoritative schema-v1 plan and execution-evidence types are owned under src/workflow/ontology_planning, while the foundation exposes GoalRound.plan only as untyped serde_json::Value. Durable Round evidence belongs in the model/foundation; Workflow should own its orchestration.",
+          "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+          "rule_id": "rule-1"
+        }
+      ],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-07-27T16:15:02Z",
+        "skipped": []
+      },
+      "implementation_report": "Implemented the setting-controlled Phase 0 vertical slice: one_shot remains the default, model_context derives a fresh read-only schema-v1 model, and planned validates and executes dependency-ready steps sequentially in fresh managed native sessions with isolated-worktree checkpoints and nullable Round plan evidence. Added hand-authored Architecture/Rules, fixed pre-registered thresholds, historical fixtures, rollback, and an honest inconclusive_no_go result: 0 of 18 blinded efficacy candidates collected, all quality/failure metrics unavailable, 0 experiment provider invocations, so planned rollout and later Feature Goals remain unauthorized. Durable post-implementation readback: Goal 1 in-progress at base 555d52d1 with no candidate; Goals 2-9 all todo with null base/candidate commits. Verification: cargo test passed 598/598; cargo check --all-targets passed; cargo fmt --all -- --check passed; 6/6 ontology schema/ordering/context/failure tests passed; default one-shot, multi-step checkpoint, and dirty mid-step retained-state integration tests each passed 1/1; experiment JSON/schema-consistency, jq parse, git diff --check, and later-Goal readback checks passed. cargo clippy --all-targets -- -D warnings remains a baseline failure with 25 diagnostics in unrelated existing files and none in the new ontology-planning modules.",
+      "implementation_reported_at": "2026-07-27T16:15:00Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Implement Phase 0 of docs/spec/ontology-spec.md as a production-shaped, setting-controlled efficacy prototype, and record the evidence needed for a human go/no-go decision before later Goals in this Feature proceed.\n\nBehavior\n- Hand-author a compact Refine Architecture and a small plain-English rule set for the experiment; do not make proposal-generation quality part of this test.\n- Add the minimum typed schema-v1 plan model, implementation plan, and sequential step-execution path behind an explicit setting/feature gate, reusing the existing provider, managed native-session, isolated worktree, Workflow, Git, Governance, and Quality capabilities.\n- Pre-register an experiment comparing: current one-shot implementation; one-shot implementation with a freshly derived plan model as context; and two-stage model-plus-step execution. Use representative historical Goals, the same starting commit, model, provider configuration, authority, and budget, repeat conditions, and blind candidate reviewers to the condition.\n- Persist the experiment design, fixed thresholds, exact runs, provider invocations/token or budget data where available, candidate outcomes, and reviewer judgments as reviewable evidence. Preserve the setting-controlled one-shot path for comparison and rollback.\n\nConstraints and architecture\n- The prototype must preserve the design axiom: semantics are derived and judged stochastically, while schemas, pinning, sequencing, evidence obligations, checkpoints, and state transitions are enforced deterministically.\n- Do not create a durable ontology graph, new public Goal status, plan-as-Round model, concurrent same-worktree steps, provider authority to merge/approve/transition Goals, or a rule schema.\n- Fix quality, cost, and failure-shape thresholds before collecting results. Quality must materially and consistently reduce material defects or corrective Rounds; cost must stay within a predeclared maximum multiple; mid-plan failure must leave partial state no worse to review than a one-shot failure. Treat the plan-model-only arm as independently shippable if it captures most of the benefit.\n- If the gate fails, retain the evidence and the safe one-shot behavior; do not silently enable planned execution or rationalize thresholds after seeing results. Later Feature Goals require an explicit recorded gate decision.\n\nImplementation order\n1. Define the gated vertical slice and experiment fixtures without changing the default path.\n2. Record thresholds and protocol.\n3. Run repeated comparable trials and capture exact evidence.\n4. Produce the human-reviewable go/no-go result and rollback instructions.\n\nVerification\n- Prove the three arms use equivalent starting conditions and that the default remains one-shot when the gate is off.\n- Exercise a trivial one-step plan and a multi-step seam-aligned plan, including a mid-step failure with reviewable retained state.\n- Verify no new workflow status/Round semantics or automatic approval/merge authority appears.\n- Report exact quality, first-candidate acceptability, missed-impact, corrective-Round, failure-shape, elapsed-time, invocation, and available budget results; longer reports alone are not success.\n\nHuman Review gate\n- Human Review of this Goal is the go/no-go boundary for the rest of the Feature. The implementation agent records the measured outcome but has no authority to release later Goals.\n- Approve this Goal only when the pre-registered quality, cost, and failure-shape thresholds pass. A failed or inconclusive gate must retain its evidence, keep one-shot execution as the default, and leave Goals 2–9 unstarted while a new Round revises the experiment or the Feature is stopped.\n- Verify by durable Feature and Goal readback that no later ordered Goal was moved or started merely because the prototype or experiment process completed.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "failed",
+      "updated": "2026-07-27T16:18:19Z",
+      "workflow_quality_timing": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-07-27T16:24:47Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Recover the Phase 0 ontology-planning Goal from the retained Round 1 candidate after its post-implementation Governance failure. Begin from current main `555d52d1b3bfae462071c3c2030c27a834feca09`. Treat retained candidate `732e54d17b6e928e43406f2222a36b28f027e2fa` and worktree `refine-00000SZ9192E3GWJ0JPXQ36002-round-1` as read-only evidence of useful prior work; preserve them and do not merge, cherry-pick wholesale, reset, or delete them.\n\nFailure to correct\n- Governance rejected Round 1 under rule-1 because authoritative schema-v1 plan and execution-evidence types live under `src/workflow/ontology_planning`, while Foundation exposes `GoalRound.plan` only as untyped `serde_json::Value`. Durable Round evidence belongs in the model/Foundation; Workflow should own orchestration.\n- Round 1 also recorded `0/18` efficacy candidates and zero experiment provider invocations. Its honest `inconclusive_no_go` is a safe rollout result, but it does not satisfy the original obligation to run repeated comparable trials. Passing engine tests or a written protocol is not efficacy evidence.\n\nRequired behavior and architecture\n- Recover the validated Phase 0 behavior from Round 1: setting-controlled `one_shot`, `model_context`, and sequential `planned` modes; one-shot remains the default; read-only fresh model derivation; seam-aligned validated plans; managed native step sessions; isolated-worktree checkpoints; nullable Round plan evidence; fixed thresholds; rollback; and no new public workflow state or provider merge/approval authority.\n- Move the canonical serializable plan-model, plan, step, status/outcome, checkpoint, discrepancy, and execution-evidence contracts into a cohesive responsibility-named model/Foundation module and make `GoalRound.plan` a typed optional contract. Preserve missing-plan compatibility for legacy Rounds and stable JSON schema-v1 wire behavior. The model may own structural schema validation; Workflow owns provider invocation, context assembly, readiness/sequencing, sessions, Git observation/checkpoints, state transitions, cancellation/recovery, and report assembly. Do not create duplicate schema authorities, circular ownership, or surface-specific types.\n- Keep Workflow-specific planning and executor code in the Workflow capability, importing the Foundation contracts through a narrow stable API. Preserve all enabled Guidance decisions and include their indexes/identities in `guidance_applied` where the completion contract requires them.\n- Execute the already pre-registered three-arm protocol against the three committed fixture commits, with two repeats per arm (18 candidates), using equivalent starting commit, resolved provider/model, configuration, authority, prompt context, time/token budget, Quality setup, and test environment. Record configuration digests before launch and invalidate rather than compare non-equivalent runs. Do not change locked thresholds after collecting data.\n- Generate opaque blinded review packets and retain the arm mapping separately. Never fabricate human judgments. If independent human review is still required after candidate collection, present the packets and exact pending decision at Review/needs-input; keep the gate no-go until actual judgments and all quality, cost, and failure-shape thresholds pass. If provider, budget, or another external prerequisite prevents collection, record the exact blocker and partial counts without reporting the experiment complete or the gate passed.\n- Do not activate Goals 2–9. Only a human-recorded passing gate may release them.\n\nImplementation order\n1. Re-establish the useful Round 1 vertical slice from current main with the corrected Foundation/Workflow boundary and typed Round evidence.\n2. Prove legacy serialization and one-shot compatibility before exercising planned execution.\n3. Run the fixed experiment in isolated, reproducible conditions and persist per-run evidence plus blinded review packets.\n4. Aggregate results strictly against the pre-registered thresholds and record pass, fail, or inconclusive without changing defaults.\n5. Run post-implementation Governance specifically against rule-1 and the remaining pinned Rules.\n\nVerification\n- Add focused ownership/serialization tests proving canonical durable types live in Foundation, `GoalRound.plan` round-trips typed evidence, missing plan still loads, and Workflow contains orchestration rather than a second durable schema.\n- Re-run the Round 1 ontology schema, ordering, focused-context, checkpoint, dirty-mid-step retention, default one-shot, and no-new-workflow-state tests.\n- Verify actual experiment run counts, fixture/start/config equivalence, immutable thresholds, provider invocation and available token/budget evidence, blind packet integrity, partial-failure retention, and the durable no-go default until human approval.\n- Run `cargo fmt --all -- --check`, `cargo check --all-targets`, focused tests, full unit tests, and strict Clippy. Report unrelated baseline Clippy diagnostics separately; do not hide changed-code failures.\n- Read back the Goal, Feature, Round plan evidence, candidate ancestry, and Goals 2–9 before claiming success. Preserve human Review, Governance, Quality, Ready Merge, and integration boundaries.",
+          "reporter": "Buddy Williams",
+          "round": 2
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "feature_id": "00000SZ9175A5G72W1T9Q36001",
+          "feature_order": 1,
+          "id": "00000SZ9192E3GWJ0JPXQ36002",
+          "name": "Prove ontology-driven planning efficacy behind a rollout gate",
+          "node_id": "default",
+          "priority": "high",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "Buddy Williams",
+            "constitution_state": "passed",
+            "governance_checked_at": "2026-07-27T16:18:16Z",
+            "governance_details": {
+              "configured": true,
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ9192E3GWJ0JPXQ36002-round-1",
+              "failed_actions": [
+                {
+                  "message": "Authoritative schema-v1 plan and execution-evidence types are owned under src/workflow/ontology_planning, while the foundation exposes GoalRound.plan only as untyped serde_json::Value. Durable Round evidence belongs in the model/foundation; Workflow should own its orchestration.",
+                  "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+                  "rule_id": "rule-1"
+                }
+              ],
+              "governance_configured": true,
+              "phase": "post_implementation",
+              "provider": "codex",
+              "raw_output": "{\"status\":\"failed\",\"message\":\"Durable plan state crosses the Foundation–Capability boundary.\",\"violations\":[{\"rule_id\":\"rule-1\",\"rule\":\"Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.\",\"message\":\"Authoritative schema-v1 plan and execution-evidence types are owned under src/workflow/ontology_planning, while the foundation exposes GoalRound.plan only as untyped serde_json::Value. Durable Round evidence belongs in the model/foundation; Workflow should own its orchestration.\"}]}",
+              "rules_checked": 9,
+              "verdict": {
+                "message": "Durable plan state crosses the Foundation–Capability boundary.",
+                "status": "failed",
+                "violations": [
+                  {
+                    "message": "Authoritative schema-v1 plan and execution-evidence types are owned under src/workflow/ontology_planning, while the foundation exposes GoalRound.plan only as untyped serde_json::Value. Durable Round evidence belongs in the model/foundation; Workflow should own its orchestration.",
+                    "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+                    "rule_id": "rule-1"
+                  }
+                ]
+              },
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ9192E3GWJ0JPXQ36002-round-1"
+            },
+            "governance_message": "Durable plan state crosses the Foundation–Capability boundary.",
+            "governance_rule_actions": [
+              {
+                "message": "Authoritative schema-v1 plan and execution-evidence types are owned under src/workflow/ontology_planning, while the foundation exposes GoalRound.plan only as untyped serde_json::Value. Durable Round evidence belongs in the model/foundation; Workflow should own its orchestration.",
+                "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+                "rule_id": "rule-1"
+              }
+            ],
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                },
+                {
+                  "enabled": true,
+                  "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+                  "name": "Cohesive code files",
+                  "rule": "Apply whenever an agent adds or changes code files in any language."
+                }
+              ],
+              "code_files_changed": true,
+              "context_version": 1,
+              "recorded_at": "2026-07-27T16:15:02Z",
+              "skipped": []
+            },
+            "implementation_report": "Implemented the setting-controlled Phase 0 vertical slice: one_shot remains the default, model_context derives a fresh read-only schema-v1 model, and planned validates and executes dependency-ready steps sequentially in fresh managed native sessions with isolated-worktree checkpoints and nullable Round plan evidence. Added hand-authored Architecture/Rules, fixed pre-registered thresholds, historical fixtures, rollback, and an honest inconclusive_no_go result: 0 of 18 blinded efficacy candidates collected, all quality/failure metrics unavailable, 0 experiment provider invocations, so planned rollout and later Feature Goals remain unauthorized. Durable post-implementation readback: Goal 1 in-progress at base 555d52d1 with no candidate; Goals 2-9 all todo with null base/candidate commits. Verification: cargo test passed 598/598; cargo check --all-targets passed; cargo fmt --all -- --check passed; 6/6 ontology schema/ordering/context/failure tests passed; default one-shot, multi-step checkpoint, and dirty mid-step retained-state integration tests each passed 1/1; experiment JSON/schema-consistency, jq parse, git diff --check, and later-Goal readback checks passed. cargo clippy --all-targets -- -D warnings remains a baseline failure with 25 diagnostics in unrelated existing files and none in the new ontology-planning modules.",
+            "implementation_reported_at": "2026-07-27T16:15:00Z",
+            "meta_rule_state": "passed",
+            "product_state": "passed",
+            "prompt": "Implement Phase 0 of docs/spec/ontology-spec.md as a production-shaped, setting-controlled efficacy prototype, and record the evidence needed for a human go/no-go decision before later Goals in this Feature proceed.\n\nBehavior\n- Hand-author a compact Refine Architecture and a small plain-English rule set for the experiment; do not make proposal-generation quality part of this test.\n- Add the minimum typed schema-v1 plan model, implementation plan, and sequential step-execution path behind an explicit setting/feature gate, reusing the existing provider, managed native-session, isolated worktree, Workflow, Git, Governance, and Quality capabilities.\n- Pre-register an experiment comparing: current one-shot implementation; one-shot implementation with a freshly derived plan model as context; and two-stage model-plus-step execution. Use representative historical Goals, the same starting commit, model, provider configuration, authority, and budget, repeat conditions, and blind candidate reviewers to the condition.\n- Persist the experiment design, fixed thresholds, exact runs, provider invocations/token or budget data where available, candidate outcomes, and reviewer judgments as reviewable evidence. Preserve the setting-controlled one-shot path for comparison and rollback.\n\nConstraints and architecture\n- The prototype must preserve the design axiom: semantics are derived and judged stochastically, while schemas, pinning, sequencing, evidence obligations, checkpoints, and state transitions are enforced deterministically.\n- Do not create a durable ontology graph, new public Goal status, plan-as-Round model, concurrent same-worktree steps, provider authority to merge/approve/transition Goals, or a rule schema.\n- Fix quality, cost, and failure-shape thresholds before collecting results. Quality must materially and consistently reduce material defects or corrective Rounds; cost must stay within a predeclared maximum multiple; mid-plan failure must leave partial state no worse to review than a one-shot failure. Treat the plan-model-only arm as independently shippable if it captures most of the benefit.\n- If the gate fails, retain the evidence and the safe one-shot behavior; do not silently enable planned execution or rationalize thresholds after seeing results. Later Feature Goals require an explicit recorded gate decision.\n\nImplementation order\n1. Define the gated vertical slice and experiment fixtures without changing the default path.\n2. Record thresholds and protocol.\n3. Run repeated comparable trials and capture exact evidence.\n4. Produce the human-reviewable go/no-go result and rollback instructions.\n\nVerification\n- Prove the three arms use equivalent starting conditions and that the default remains one-shot when the gate is off.\n- Exercise a trivial one-step plan and a multi-step seam-aligned plan, including a mid-step failure with reviewable retained state.\n- Verify no new workflow status/Round semantics or automatic approval/merge authority appears.\n- Report exact quality, first-candidate acceptability, missed-impact, corrective-Round, failure-shape, elapsed-time, invocation, and available budget results; longer reports alone are not success.\n\nHuman Review gate\n- Human Review of this Goal is the go/no-go boundary for the rest of the Feature. The implementation agent records the measured outcome but has no authority to release later Goals.\n- Approve this Goal only when the pre-registered quality, cost, and failure-shape thresholds pass. A failed or inconclusive gate must retain its evidence, keep one-shot execution as the default, and leave Goals 2–9 unstarted while a new Round revises the experiment or the Feature is stopped.\n- Verify by durable Feature and Goal readback that no later ordered Goal was moved or started merely because the prototype or experiment process completed.",
+            "reporter": "Buddy Williams",
+            "round": 1,
+            "rule_state": "failed"
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-27T16:22:18Z",
+      "failure_at": "2026-07-27T18:38:53Z",
+      "failure_category": "agent",
+      "failure_message": "failed to read Goal Agent command channel /home/buddy/projects/refine/run/8082/processes/goal-agent-858ba400-850c-4f53-8e29-ce0768e21ff3.commands.jsonl: No such file or directory (os error 2)",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "guidance_decision": null,
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Recover the Phase 0 ontology-planning Goal from the retained Round 1 candidate after its post-implementation Governance failure. Begin from current main `555d52d1b3bfae462071c3c2030c27a834feca09`. Treat retained candidate `732e54d17b6e928e43406f2222a36b28f027e2fa` and worktree `refine-00000SZ9192E3GWJ0JPXQ36002-round-1` as read-only evidence of useful prior work; preserve them and do not merge, cherry-pick wholesale, reset, or delete them.\n\nFailure to correct\n- Governance rejected Round 1 under rule-1 because authoritative schema-v1 plan and execution-evidence types live under `src/workflow/ontology_planning`, while Foundation exposes `GoalRound.plan` only as untyped `serde_json::Value`. Durable Round evidence belongs in the model/Foundation; Workflow should own orchestration.\n- Round 1 also recorded `0/18` efficacy candidates and zero experiment provider invocations. Its honest `inconclusive_no_go` is a safe rollout result, but it does not satisfy the original obligation to run repeated comparable trials. Passing engine tests or a written protocol is not efficacy evidence.\n\nRequired behavior and architecture\n- Recover the validated Phase 0 behavior from Round 1: setting-controlled `one_shot`, `model_context`, and sequential `planned` modes; one-shot remains the default; read-only fresh model derivation; seam-aligned validated plans; managed native step sessions; isolated-worktree checkpoints; nullable Round plan evidence; fixed thresholds; rollback; and no new public workflow state or provider merge/approval authority.\n- Move the canonical serializable plan-model, plan, step, status/outcome, checkpoint, discrepancy, and execution-evidence contracts into a cohesive responsibility-named model/Foundation module and make `GoalRound.plan` a typed optional contract. Preserve missing-plan compatibility for legacy Rounds and stable JSON schema-v1 wire behavior. The model may own structural schema validation; Workflow owns provider invocation, context assembly, readiness/sequencing, sessions, Git observation/checkpoints, state transitions, cancellation/recovery, and report assembly. Do not create duplicate schema authorities, circular ownership, or surface-specific types.\n- Keep Workflow-specific planning and executor code in the Workflow capability, importing the Foundation contracts through a narrow stable API. Preserve all enabled Guidance decisions and include their indexes/identities in `guidance_applied` where the completion contract requires them.\n- Execute the already pre-registered three-arm protocol against the three committed fixture commits, with two repeats per arm (18 candidates), using equivalent starting commit, resolved provider/model, configuration, authority, prompt context, time/token budget, Quality setup, and test environment. Record configuration digests before launch and invalidate rather than compare non-equivalent runs. Do not change locked thresholds after collecting data.\n- Generate opaque blinded review packets and retain the arm mapping separately. Never fabricate human judgments. If independent human review is still required after candidate collection, present the packets and exact pending decision at Review/needs-input; keep the gate no-go until actual judgments and all quality, cost, and failure-shape thresholds pass. If provider, budget, or another external prerequisite prevents collection, record the exact blocker and partial counts without reporting the experiment complete or the gate passed.\n- Do not activate Goals 2–9. Only a human-recorded passing gate may release them.\n\nImplementation order\n1. Re-establish the useful Round 1 vertical slice from current main with the corrected Foundation/Workflow boundary and typed Round evidence.\n2. Prove legacy serialization and one-shot compatibility before exercising planned execution.\n3. Run the fixed experiment in isolated, reproducible conditions and persist per-run evidence plus blinded review packets.\n4. Aggregate results strictly against the pre-registered thresholds and record pass, fail, or inconclusive without changing defaults.\n5. Run post-implementation Governance specifically against rule-1 and the remaining pinned Rules.\n\nVerification\n- Add focused ownership/serialization tests proving canonical durable types live in Foundation, `GoalRound.plan` round-trips typed evidence, missing plan still loads, and Workflow contains orchestration rather than a second durable schema.\n- Re-run the Round 1 ontology schema, ordering, focused-context, checkpoint, dirty-mid-step retention, default one-shot, and no-new-workflow-state tests.\n- Verify actual experiment run counts, fixture/start/config equivalence, immutable thresholds, provider invocation and available token/budget evidence, blind packet integrity, partial-failure retention, and the durable no-go default until human approval.\n- Run `cargo fmt --all -- --check`, `cargo check --all-targets`, focused tests, full unit tests, and strict Clippy. Report unrelated baseline Clippy diagnostics separately; do not hide changed-code failures.\n- Read back the Goal, Feature, Round plan evidence, candidate ancestry, and Goals 2–9 before claiming success. Preserve human Review, Governance, Quality, Ready Merge, and integration boundaries.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-28T16:41:09Z",
+      "workflow_quality_timing": null
+    }
+  ],
+  "status": "cancelled",
+  "target_branch": "main",
+  "updated": "2026-08-14T09:43:46Z",
+  "workflow_revision": 39
+}

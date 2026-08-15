@@ -1,0 +1,429 @@
+{
+  "base_commit": "4b2e352a2e3454de22a791ef2223b211d51fdaad",
+  "branch_name": "refine/00000SZ7EPGBE3J1NBBP75R000/round-2",
+  "candidate_commit": "ad683fbd747ee55904f85cc7a1f688ec73df0970",
+  "created": "2026-07-26T09:51:48Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ7EPGBE3J1NBBP75R000",
+  "name": "Create a new web UI toolbar tab called \"Todo List\". It should be a todo list wit",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-07-26T10:01:45Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Create a new web UI toolbar tab called \"Todo List\". It should be a todo list with a list selector, list name, add, edit, delete, done, and undo. It should persist in the target refine state for the selected Reporter. Keep the web UI layout consistent with the other tabs, but obviously know this todo list has a new UI for a todo list. Add a short label that explains that the data is saved for the Reporter and can be opened on other nodes.",
+          "reporter": "Buddy Williams",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZ7EPGBE3J1NBBP75R000",
+          "name": "Create a new web UI toolbar tab called \"Todo List\". It should be a todo list wit",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-07-26T09:51:48Z",
+      "failure_at": "2026-07-26T10:23:33Z",
+      "failure_category": "governance",
+      "failure_message": "Todo capability is missing from the CLI surface.",
+      "governance_checked_at": "2026-07-26T10:23:31Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ7EPGBE3J1NBBP75R000-round-1",
+        "failed_actions": [
+          {
+            "message": "The commit exposes Reporter todo lists through the web UI and API, with MCP access through the existing API passthrough, but adds no CLI command for listing or mutating the same capability.",
+            "rule": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+            "rule_id": "rule-8"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Todo capability is missing from the CLI surface.\",\"violations\":[{\"rule_id\":\"rule-8\",\"rule\":\"Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.\",\"message\":\"The commit exposes Reporter todo lists through the web UI and API, with MCP access through the existing API passthrough, but adds no CLI command for listing or mutating the same capability.\"}]}",
+        "rules_checked": 9,
+        "verdict": {
+          "message": "Todo capability is missing from the CLI surface.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "The commit exposes Reporter todo lists through the web UI and API, with MCP access through the existing API passthrough, but adds no CLI command for listing or mutating the same capability.",
+              "rule": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "rule_id": "rule-8"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ7EPGBE3J1NBBP75R000-round-1"
+      },
+      "governance_message": "Todo capability is missing from the CLI surface.",
+      "governance_rule_actions": [
+        {
+          "message": "The commit exposes Reporter todo lists through the web UI and API, with MCP access through the existing API passthrough, but adds no CLI command for listing or mutating the same capability.",
+          "rule": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+          "rule_id": "rule-8"
+        }
+      ],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          }
+        ],
+        "context_version": 1,
+        "recorded_at": "2026-07-26T10:19:32Z",
+        "skipped": []
+      },
+      "implementation_report": "Added a lazy Todo List toolbar tab and command-palette entry with Reporter selection, named-list selection/create/rename/delete, item add/edit/delete/done/undo, explicit refresh, responsive styling, and the requested cross-node persistence label. Added the shared locked atomic FileTodoService, Reporter-owned /api/todos routes, target-state API normalization/sync coverage, Reporter rename/merge reassignment, focused Rust/JS tests, and affected intent docs. Verification: cargo test --lib: 517 passed, 0 failed; node --test tests/*.test.js: 78 passed, 0 failed, 4 skipped because no Playwright Chromium build was available; affected command/toolbar rerun: 28 passed, 0 failed; changed Rust files rustfmt --check: passed; adjusted strict cargo clippy excluding 6 existing baseline lint classes: passed; git diff --check: passed. Repository-wide cargo fmt --check still reports only the pre-existing src/workflow/mod.rs:2002 line wrap; unadjusted cargo clippy --lib -- -D warnings still reports 10 pre-existing findings in subprocess, coordination, chat, merging, process_control, and work_items.",
+      "implementation_reported_at": "2026-07-26T10:19:33Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Create a new web UI toolbar tab called \"Todo List\". It should be a todo list with a list selector, list name, add, edit, delete, done, and undo. It should persist in the target refine state for the selected Reporter. Keep the web UI layout consistent with the other tabs, but obviously know this todo list has a new UI for a todo list. Add a short label that explains that the data is saved for the Reporter and can be opened on other nodes.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "failed",
+      "updated": "2026-07-26T10:23:33Z",
+      "workflow_quality_timing": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-07-26T10:38:01Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Recover the Round 1 Governance rejection without weakening or changing Governance rule 8. Preserve the existing Reporter-scoped Todo capability, durable todo-list state, toolbar UI, HTTP API, Reporter rename/merge behavior, cross-node persistence semantics, and prior candidate evidence. Fix only the recorded violation: the first-class Todo capability is missing from the CLI surface.\n\nAdd a thin, machine-usable Refine CLI Todo command family that exposes the same shared capability and semantics as the web/API surfaces. It must support listing Reporter-owned lists and items, creating/renaming/deleting lists, adding/editing/deleting items, marking items done, and undoing done state. Require explicit Reporter context and list/item identifiers where applicable, preserve the same validation and ownership rules, and return semantically consistent JSON suitable for agents. Route CLI behavior through the existing authoritative FileTodoService or daemon API path; do not duplicate persistence, validation, or business logic in dispatch code. Update the machine-readable CLI command catalog/help and add focused parsing, dispatch, and cross-surface parity coverage.\n\nReconcile Round 1 onto current main through this supported fresh Round. Keep CLI, API, web, and MCP capability ownership coherent; do not redesign the Todo UI or storage format, change Governance, force merge, rewrite history, approve, or merge. Keep unrelated cleanup out of scope.\n\nVerify focused Todo service/API/CLI tests, CLI surface and command-catalog tests, relevant toolbar tests, cargo test --lib, cargo check --all-targets, cargo fmt --all -- --check, relevant Node tests, and git diff --check. Report exact outcomes and clearly separate pre-existing formatting, Clippy, or browser-environment limitations.",
+          "reporter": "Buddy Williams",
+          "round": 2
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZ7EPGBE3J1NBBP75R000",
+          "name": "Create a new web UI toolbar tab called \"Todo List\". It should be a todo list wit",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "Buddy Williams",
+            "constitution_state": "passed",
+            "governance_checked_at": "2026-07-26T10:23:31Z",
+            "governance_details": {
+              "configured": true,
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ7EPGBE3J1NBBP75R000-round-1",
+              "failed_actions": [
+                {
+                  "message": "The commit exposes Reporter todo lists through the web UI and API, with MCP access through the existing API passthrough, but adds no CLI command for listing or mutating the same capability.",
+                  "rule": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+                  "rule_id": "rule-8"
+                }
+              ],
+              "governance_configured": true,
+              "phase": "post_implementation",
+              "provider": "codex",
+              "raw_output": "{\"status\":\"failed\",\"message\":\"Todo capability is missing from the CLI surface.\",\"violations\":[{\"rule_id\":\"rule-8\",\"rule\":\"Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.\",\"message\":\"The commit exposes Reporter todo lists through the web UI and API, with MCP access through the existing API passthrough, but adds no CLI command for listing or mutating the same capability.\"}]}",
+              "rules_checked": 9,
+              "verdict": {
+                "message": "Todo capability is missing from the CLI surface.",
+                "status": "failed",
+                "violations": [
+                  {
+                    "message": "The commit exposes Reporter todo lists through the web UI and API, with MCP access through the existing API passthrough, but adds no CLI command for listing or mutating the same capability.",
+                    "rule": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+                    "rule_id": "rule-8"
+                  }
+                ]
+              },
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ7EPGBE3J1NBBP75R000-round-1"
+            },
+            "governance_message": "Todo capability is missing from the CLI surface.",
+            "governance_rule_actions": [
+              {
+                "message": "The commit exposes Reporter todo lists through the web UI and API, with MCP access through the existing API passthrough, but adds no CLI command for listing or mutating the same capability.",
+                "rule": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+                "rule_id": "rule-8"
+              }
+            ],
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                }
+              ],
+              "context_version": 1,
+              "recorded_at": "2026-07-26T10:19:32Z",
+              "skipped": []
+            },
+            "implementation_report": "Added a lazy Todo List toolbar tab and command-palette entry with Reporter selection, named-list selection/create/rename/delete, item add/edit/delete/done/undo, explicit refresh, responsive styling, and the requested cross-node persistence label. Added the shared locked atomic FileTodoService, Reporter-owned /api/todos routes, target-state API normalization/sync coverage, Reporter rename/merge reassignment, focused Rust/JS tests, and affected intent docs. Verification: cargo test --lib: 517 passed, 0 failed; node --test tests/*.test.js: 78 passed, 0 failed, 4 skipped because no Playwright Chromium build was available; affected command/toolbar rerun: 28 passed, 0 failed; changed Rust files rustfmt --check: passed; adjusted strict cargo clippy excluding 6 existing baseline lint classes: passed; git diff --check: passed. Repository-wide cargo fmt --check still reports only the pre-existing src/workflow/mod.rs:2002 line wrap; unadjusted cargo clippy --lib -- -D warnings still reports 10 pre-existing findings in subprocess, coordination, chat, merging, process_control, and work_items.",
+            "implementation_reported_at": "2026-07-26T10:19:33Z",
+            "meta_rule_state": "passed",
+            "product_state": "passed",
+            "prompt": "Create a new web UI toolbar tab called \"Todo List\". It should be a todo list with a list selector, list name, add, edit, delete, done, and undo. It should persist in the target refine state for the selected Reporter. Keep the web UI layout consistent with the other tabs, but obviously know this todo list has a new UI for a todo list. Add a short label that explains that the data is saved for the Reporter and can be opened on other nodes.",
+            "reporter": "Buddy Williams",
+            "round": 1,
+            "rule_state": "failed"
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-07-26T10:37:50Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "2026-07-26T10:50:48Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ7EPGBE3J1NBBP75R000-round-2",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 9,
+        "verdict": {
+          "message": "No governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ7EPGBE3J1NBBP75R000-round-2"
+      },
+      "governance_message": "No governance rule violations found.",
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          }
+        ],
+        "context_version": 1,
+        "recorded_at": "2026-07-26T10:48:22Z",
+        "skipped": []
+      },
+      "implementation_report": "Reconciled Round 1 commit d642f58f onto current main as 6292a5a6, preserving the Reporter-scoped Todo service, durable state, toolbar/API/MCP behavior, Reporter reassignment, and intent docs. Added a thin `refine todo` family for list, create-list, rename-list, delete-list, add, edit, delete, done, and undo; every command requires `--reporter`, applicable list/item ids are required, normal dispatch uses the existing `/todos` daemon routes, test-only direct dispatch uses `FileTodoService`, and responses preserve the shared JSON shape. Regenerated the machine-readable/help-derived CLI reference and updated CLI intent. Added parser/required-argument tests, shared-service dispatch coverage, catalog coverage, and daemon-backed CLI/API exact-response parity across every mutation and Reporter isolation. Verification: focused Todo service tests 2 passed, 0 failed; focused Todo API test 1 passed, 0 failed; focused CLI/catalog suite 45 passed, 0 failed; daemon-backed CLI surface suite 1 passed, 0 failed; relevant toolbar/command Node tests 28 passed, 0 failed; full Node tests 79 passed, 0 failed, 4 skipped because no Playwright Chromium build was available; cargo test --lib 524 passed, 0 failed; cargo check --all-targets passed; changed Rust files rustfmt --check passed; git diff --check against current main passed; generated CLI reference drift test passed; manual `refine todo --help` and `refine commands` catalog inspection showed all 9 commands and required Reporter context. Repository-wide cargo fmt --all -- --check still fails only on the pre-existing src/workflow/mod.rs:2002 wrap, unchanged by this candidate. Unadjusted cargo clippy --lib -- -D warnings still fails on 11 pre-existing findings in subprocess, coordination, chat, merging, process_control, and work_items; strict Clippy passes when only those 7 existing lint classes are allowed. No Governance rule, Todo UI, or storage-format changes were made; no approve or merge was performed.",
+      "implementation_reported_at": "2026-07-26T10:48:22Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Recover the Round 1 Governance rejection without weakening or changing Governance rule 8. Preserve the existing Reporter-scoped Todo capability, durable todo-list state, toolbar UI, HTTP API, Reporter rename/merge behavior, cross-node persistence semantics, and prior candidate evidence. Fix only the recorded violation: the first-class Todo capability is missing from the CLI surface.\n\nAdd a thin, machine-usable Refine CLI Todo command family that exposes the same shared capability and semantics as the web/API surfaces. It must support listing Reporter-owned lists and items, creating/renaming/deleting lists, adding/editing/deleting items, marking items done, and undoing done state. Require explicit Reporter context and list/item identifiers where applicable, preserve the same validation and ownership rules, and return semantically consistent JSON suitable for agents. Route CLI behavior through the existing authoritative FileTodoService or daemon API path; do not duplicate persistence, validation, or business logic in dispatch code. Update the machine-readable CLI command catalog/help and add focused parsing, dispatch, and cross-surface parity coverage.\n\nReconcile Round 1 onto current main through this supported fresh Round. Keep CLI, API, web, and MCP capability ownership coherent; do not redesign the Todo UI or storage format, change Governance, force merge, rewrite history, approve, or merge. Keep unrelated cleanup out of scope.\n\nVerify focused Todo service/API/CLI tests, CLI surface and command-catalog tests, relevant toolbar tests, cargo test --lib, cargo check --all-targets, cargo fmt --all -- --check, relevant Node tests, and git diff --check. Report exact outcomes and clearly separate pre-existing formatting, Clippy, or browser-environment limitations.",
+      "quality_checked_at": "2026-07-26T10:50:53Z",
+      "quality_details": {
+        "candidate_commit": "ad683fbd747ee55904f85cc7a1f688ec73df0970",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ7EPGBE3J1NBBP75R000-round-2",
+        "diagnostics": [
+          "No Quality tests or migrated commands are configured; evaluation was a no-op."
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "19f9e0c9a6238ea56",
+        "results": [],
+        "source_candidate_commit": "ad683fbd747ee55904f85cc7a1f688ec73df0970"
+      },
+      "quality_message": "No Quality tests configured.",
+      "quality_state": "passed",
+      "reporter": "Buddy Williams",
+      "rule_state": "passed",
+      "updated": "2026-07-28T16:40:06Z",
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "ad683fbd747ee55904f85cc7a1f688ec73df0970",
+        "integrated_at": "2026-07-26T10:50:58.254757294+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Auto-merging src/surfaces/web_server/tests.rs\nMerge made by the 'ort' strategy.\n docs/intent/02-foundation/03-target-app.md         |   2 +\n docs/intent/04-surfaces/02-cli.md                  |   3 +-\n .../04-surfaces/03-browser-desktop/15-toolbar.md   |  12 +-\n docs/intent/04-surfaces/04-api.md                  |   2 +-\n docs/spec/cli-reference.md                         |  73 +++\n src/process/supervisor/config/mod.rs               |   4 +-\n src/surfaces/cli/actions.rs                        | 121 +++++\n src/surfaces/cli/catalog.rs                        |  43 ++\n src/surfaces/cli/dispatch.rs                       | 174 +++++++\n src/surfaces/cli/tests.rs                          | 184 +++++++\n src/surfaces/web/static/css/toolbar.css            | 121 +++++\n src/surfaces/web/static/js/commands.js             |   2 +\n src/surfaces/web/static/js/common.js               |   4 +\n src/surfaces/web/static/js/features/toolbar.js     | 347 +++++++++++++-\n src/surfaces/web_server/http.rs                    |   1 +\n src/surfaces/web_server/mod.rs                     |   4 +\n src/surfaces/web_server/project_routes.rs          | 136 ++++++\n src/surfaces/web_server/server.rs                  |  37 ++\n src/surfaces/web_server/support/http_state.rs      |   2 +\n src/surfaces/web_server/tests.rs                   | 110 +++++\n src/tools/product/mod.rs                           |   1 +\n src/tools/product/todos/mod.rs                     | 530 +++++++++++++++++++++\n tests/cli_surface.rs                               | 139 ++++++\n tests/web_command_palette.test.js                  |   3 +\n tests/web_supervisor_toolbar.test.js               | 119 ++++-\n 25 files changed, 2164 insertions(+), 10 deletions(-)\n create mode 100644 src/tools/product/todos/mod.rs",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "0149abb5d7df6dda52f2e8e6e7caf52fa315dcd7"
+      },
+      "workflow_quality_timing": "pre_merge"
+    }
+  ],
+  "status": "done",
+  "target_branch": "main",
+  "updated": "2026-07-28T16:40:18Z",
+  "workflow_revision": 34
+}

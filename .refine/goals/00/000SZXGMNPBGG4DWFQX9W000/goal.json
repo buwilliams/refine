@@ -1,0 +1,860 @@
+{
+  "base_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+  "branch_name": "refine/00000SZXGMNPBGG4DWFQX9W000/round-2",
+  "candidate_commit": "e34384e10a3f7b34cc2727205a509b5dffa56f58",
+  "created": "2026-08-12T13:06:18Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZXGMNPBGG4DWFQX9W000",
+  "name": "When a user loads the web UI and no reporter is selected, it would be helpful fo",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-12T13:06:23Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "When a user loads the web UI and no reporter is selected, it would be helpful for a model to ask who they are, select/create a reporter, and provide a gentle note that they can change the reporter anytime in the Controls > Reporter menu in the main nav.",
+          "reporter": "Buddy Williams",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZXGMNPBGG4DWFQX9W000",
+          "name": "When a user loads the web UI and no reporter is selected, it would be helpful fo",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-08-12T13:06:18Z",
+      "failure_at": "2026-08-12T13:17:28Z",
+      "failure_category": "implementation_planning",
+      "failure_message": "agent returned no valid structured implementation plan JSON",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "guidance_decision": null,
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+          "context_digest": "e8004a203f93efe11d7d3ddd40b7a8c44b6e8a5f39859ae8abab375e1105208e",
+          "context_version": 1,
+          "goal_id": "00000SZXGMNPBGG4DWFQX9W000",
+          "implementation_branch": "refine/00000SZXGMNPBGG4DWFQX9W000/round-1",
+          "round_idx": 0,
+          "target_branch": "main"
+        },
+        "criticism": {
+          "completed_at": "2026-08-12T13:13:13Z",
+          "git_after": {
+            "branch": "refine/00000SZXGMNPBGG4DWFQX9W000/round-1",
+            "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000SZXGMNPBGG4DWFQX9W000/round-1",
+            "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P1",
+                  "P3"
+                ],
+                "description": "The plan guards only concurrent duplicate onboarding prompts, not coexistence with another Refine modal. Bootstrap calls navigate before the delayed Reporter refresh; Goal detail, Feature detail/new, and Import routes can therefore already have a modal open when onboarding starts. These dialogs use document-level Escape/Enter handlers, so stacking can close or submit more than one dialog and breaks a single accessible focus context.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Add an explicit modal-coordination contract: defer onboarding while any other modal is active (or use a shared top-dialog manager), then re-check attached project and selected Reporter before opening. Specify labeled dialog controls, initial focus, focus containment/restoration, and topmost-only Escape/backdrop behavior. Test cold deep links to existing modal routes and prove only one dialog handles keyboard input."
+              },
+              {
+                "checklist_item_ids": [
+                  "P1",
+                  "P2",
+                  "P3"
+                ],
+                "description": "P2 invokes onboarding only after the one startup refreshReporters call succeeds, while init.js intentionally swallows an initial Reporter hydration failure. The existing SSE reporters_changed and project_updated paths can later hydrate Reporters, but the plan does not reconnect those successful refreshes to onboarding. A transient initial failure can therefore leave the user indefinitely unprompted with an empty, potentially unusable Controls selector until reload.",
+                "id": "C2",
+                "material": true,
+                "recommendation": "Make onboarding eligibility safely re-invocable after every relevant successful Reporter hydration, without polling, while retaining the open/in-flight guard and re-checking project/selection state. Add a deterministic test for initial GET failure followed by successful hydration and exactly one prompt."
+              },
+              {
+                "checklist_item_ids": [
+                  "P1",
+                  "P3"
+                ],
+                "description": "The plan and its evidence require POST /api/reporters followed by refreshReporters and only then setLastReporter. POST already returns the durably created Reporter, and FileReporterService creation is idempotent. If POST succeeds but the follow-up GET fails, that ordering leaves selection empty and presents a retryable creation failure even though durable state changed.",
+                "id": "C3",
+                "material": true,
+                "recommendation": "Treat creation and refresh as separate outcomes: after a successful POST, select the returned canonical Reporter immediately, close or advance onboarding, and attempt list refresh independently. If refresh fails, retain the valid selection and report only that the Reporter list refresh failed. Test POST success plus GET failure, persisted selection, and later reconciliation."
+              }
+            ],
+            "summary": "Retain the focused Reporter-onboarding module and thin startup hook, but revise the plan before implementation to coordinate with existing dialogs, make later successful Reporter hydration re-trigger the onboarding eligibility check, and preserve a Reporter that was durably created even if the follow-up list refresh fails. Extend deterministic and browser coverage for those recovery and interaction contracts."
+          },
+          "started_at": "2026-08-12T13:09:04Z"
+        },
+        "failure": {
+          "category": "invalid_output",
+          "failed_at": "2026-08-12T13:17:26Z",
+          "git_after": {
+            "branch": "refine/00000SZXGMNPBGG4DWFQX9W000/round-1",
+            "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000SZXGMNPBGG4DWFQX9W000/round-1",
+            "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+            "status_porcelain": []
+          },
+          "message": "agent returned no valid structured implementation plan JSON",
+          "phase": "revise"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-08-12T13:13:14Z",
+        "proposal": {
+          "completed_at": "2026-08-12T13:09:02Z",
+          "git_after": {
+            "branch": "refine/00000SZXGMNPBGG4DWFQX9W000/round-1",
+            "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000SZXGMNPBGG4DWFQX9W000/round-1",
+            "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "affected_behavior": [
+                  "Attached web UI cold load with no selected Reporter",
+                  "Selecting an existing Reporter",
+                  "Creating and selecting a new Reporter",
+                  "Reporter-scoped dashboard, Goal authoring, and Todo refresh through setLastReporter",
+                  "Dismissal and Reporter API failure recovery"
+                ],
+                "description": "Create a cohesive Reporter-onboarding browser controller that opens an accessible 'Who are you?' modal after Reporter hydration only for an attached project with no valid selected Reporter. Offer existing Reporter choices and a create-new path, use the existing POST /api/reporters, refreshReporters, and setLastReporter capabilities so downstream Reporter-scoped surfaces update normally, show the gentle Controls > Reporter note, prevent concurrent duplicate prompts, and leave selection empty on dismissal or recoverable API failure so the user can retry.",
+                "governance_rationale": "Guidance 0 applies because this changes a browser surface contract; the UI remains a thin adapter over the existing shared Reporter capability and browser-local selection rather than adding parallel persistence or an LLM capability. Guidance 1 applies by placing onboarding responsibility in a focused module instead of further expanding common.js.",
+                "id": "P1",
+                "verification": [
+                  "node --test tests/web_reporter_onboarding.test.js — all focused onboarding tests pass, including existing selection, creation request and persistence, detached or already-selected suppression, single-prompt guarding, dismissal, and API-error retry behavior",
+                  "Recorded focused-test API evidence shows creation uses POST /api/reporters followed by Reporter refresh and setLastReporter-backed localStorage selection"
+                ]
+              },
+              {
+                "affected_behavior": [
+                  "Static index script ordering",
+                  "Attached-project web bootstrap",
+                  "No-project and Reporter-load-failure startup",
+                  "Nav Reporter context documentation"
+                ],
+                "description": "Load the focused onboarding module before init.js, invoke it from the attached-project startup path only after refreshReporters succeeds, and update docs/intent/04-surfaces/03-browser/02-nav.md in its established format to document first-load Reporter orientation and the persistent Controls > Reporter escape hatch. Preserve normal bootstrap when no project is attached, Reporter hydration fails, or a valid browser-local Reporter already exists.",
+                "governance_rationale": "Guidance 0 requires the affected Nav intent contract to describe the new orientation behavior while retaining static-app and shared-capability boundaries. Guidance 1 requires the bootstrap hook to stay small and delegate the cohesive interaction to the onboarding module.",
+                "id": "P2",
+                "verification": [
+                  "node --check src/surfaces/web/static/js/features/reporter-onboarding.js && node --check src/surfaces/web/static/js/init.js — both scripts parse successfully",
+                  "node --test tests/web_ui_selectors.test.js — static selector and script-order contracts pass",
+                  "git diff --check — exits 0 with no whitespace errors"
+                ]
+              },
+              {
+                "affected_behavior": [
+                  "Reporter onboarding regression suite",
+                  "Real index.html bootstrap in Playwright",
+                  "Existing browser render-smoke isolation"
+                ],
+                "description": "Add regression coverage for the onboarding contract at both focused DOM/controller level and the genuine browser bootstrap. Seed a valid Reporter for unrelated render-smoke cases, then explicitly cold-load without localStorage to prove the modal text, Reporter choices, Controls > Reporter note, selection persistence, reload suppression, new-Reporter POST flow, and absence of uncaught page errors.",
+                "governance_rationale": "Guidance 0 is supported by evidence that the browser stays semantically consistent with the existing Reporter API. Guidance 1 is supported by testing the focused module through its public behavior rather than coupling unrelated feature tests to its internals.",
+                "id": "P3",
+                "verification": [
+                  "node --test tests/web_reporter_onboarding.test.js tests/web_screen_render.test.js — focused tests pass and real-browser onboarding assertions pass; if Chromium is unavailable, the browser cases report an explicit skip while focused coverage still passes",
+                  "node --test tests/web_*.test.js — the complete static-web regression suite passes, with any missing-Playwright-Chromium cases reported as skips rather than browser verification",
+                  "git status --short — shows only the planned owned implementation, intent, and test files"
+                ]
+              }
+            ],
+            "criticism_resolutions": [],
+            "summary": "Add a lightweight, accessible first-load Reporter onboarding modal to the existing vanilla-JavaScript browser shell. After an attached project's Reporter registry has loaded, ask who the user is only when no valid Reporter is selected; let them select an existing Reporter or create one through the existing Reporter API, persist the choice through the current browser-local selection path, and explain that it can be changed later under Controls > Reporter. Keep the behavior in a focused module, update only the affected Nav intent page, and cover selection, creation, suppression, recovery, and real bootstrap behavior."
+          },
+          "started_at": "2026-08-12T13:06:25Z"
+        },
+        "schema_version": 2,
+        "started_at": "2026-08-12T13:06:24Z",
+        "state": "failed",
+        "updated_at": "2026-08-12T13:17:26Z"
+      },
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "When a user loads the web UI and no reporter is selected, it would be helpful for a model to ask who they are, select/create a reporter, and provide a gentle note that they can change the reporter anytime in the Controls > Reporter menu in the main nav.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-08-12T13:17:28Z",
+      "workflow_quality_timing": null,
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-12T13:31:27Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Recover the failed Round 1 implementation-planning attempt without erasing its proposal, criticism, invalid revise output, clean branch, or logs. Round 1 produced no candidate commit. Use the recorded proposal and criticism as input, produce a valid structured implementation plan, then implement the Reporter onboarding behavior from current main.\n\nWhen an attached web UI has no valid selected Reporter, offer a gentle accessible \"Who are you?\" onboarding dialog that can select an existing Reporter or create one through the existing Reporter capability, and explain that the selection can always be changed under Controls > Reporter. Keep browser-local selection and shared Reporter APIs authoritative; do not add a parallel identity store or model-only state.\n\nClose all three recorded planning gaps:\n- Coordinate with every existing modal/deep-link flow so onboarding never stacks competing dialogs or document-level Escape/Enter handlers. Defer while another modal is active, re-check attached project and selected Reporter before opening, and provide correct dialog labeling, initial focus, focus containment/restoration, topmost-only Escape/backdrop behavior, and a safe re-trigger after the blocking modal closes.\n- Make eligibility idempotently re-evaluable after every relevant successful Reporter hydration, including an initial GET failure followed by later SSE or project-update hydration, without polling or duplicate prompts.\n- After POST /api/reporters succeeds, immediately select the returned canonical Reporter before any follow-up list refresh. A refresh failure must retain the durable selection, close or advance onboarding appropriately, and report only the refresh problem; later hydration reconciles the list.\n\nKeep the startup hook thin and the onboarding responsibility cohesive. Update only affected browser/Nav intent documentation. Add deterministic tests for cold deep links with an existing modal, keyboard/focus isolation, initial hydration failure then success with exactly one prompt, POST success plus GET failure with retained selection, existing selection suppression, dismissal/retry, and create/select flows. Add genuine-browser bootstrap coverage for modal copy, Controls > Reporter guidance, persisted selection, reload suppression, and absence of page errors; report missing Playwright Chromium as a skip, not browser verification. Run focused Node tests, the complete static-web suite, JS syntax checks, relevant Rust/API tests if changed, formatting, and git diff --check. Preserve audit boundaries; do not approve, merge, rewrite prior history, or directly edit durable Goal state.",
+          "reporter": "Buddy Williams",
+          "round": 2
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZXGMNPBGG4DWFQX9W000",
+          "name": "When a user loads the web UI and no reporter is selected, it would be helpful fo",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "Buddy Williams",
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+                "context_digest": "e8004a203f93efe11d7d3ddd40b7a8c44b6e8a5f39859ae8abab375e1105208e",
+                "context_version": 1,
+                "goal_id": "00000SZXGMNPBGG4DWFQX9W000",
+                "implementation_branch": "refine/00000SZXGMNPBGG4DWFQX9W000/round-1",
+                "round_idx": 0,
+                "target_branch": "main"
+              },
+              "criticism": {
+                "completed_at": "2026-08-12T13:13:13Z",
+                "git_after": {
+                  "branch": "refine/00000SZXGMNPBGG4DWFQX9W000/round-1",
+                  "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/00000SZXGMNPBGG4DWFQX9W000/round-1",
+                  "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "findings": [
+                    {
+                      "checklist_item_ids": [
+                        "P1",
+                        "P3"
+                      ],
+                      "description": "The plan guards only concurrent duplicate onboarding prompts, not coexistence with another Refine modal. Bootstrap calls navigate before the delayed Reporter refresh; Goal detail, Feature detail/new, and Import routes can therefore already have a modal open when onboarding starts. These dialogs use document-level Escape/Enter handlers, so stacking can close or submit more than one dialog and breaks a single accessible focus context.",
+                      "id": "C1",
+                      "material": true,
+                      "recommendation": "Add an explicit modal-coordination contract: defer onboarding while any other modal is active (or use a shared top-dialog manager), then re-check attached project and selected Reporter before opening. Specify labeled dialog controls, initial focus, focus containment/restoration, and topmost-only Escape/backdrop behavior. Test cold deep links to existing modal routes and prove only one dialog handles keyboard input."
+                    },
+                    {
+                      "checklist_item_ids": [
+                        "P1",
+                        "P2",
+                        "P3"
+                      ],
+                      "description": "P2 invokes onboarding only after the one startup refreshReporters call succeeds, while init.js intentionally swallows an initial Reporter hydration failure. The existing SSE reporters_changed and project_updated paths can later hydrate Reporters, but the plan does not reconnect those successful refreshes to onboarding. A transient initial failure can therefore leave the user indefinitely unprompted with an empty, potentially unusable Controls selector until reload.",
+                      "id": "C2",
+                      "material": true,
+                      "recommendation": "Make onboarding eligibility safely re-invocable after every relevant successful Reporter hydration, without polling, while retaining the open/in-flight guard and re-checking project/selection state. Add a deterministic test for initial GET failure followed by successful hydration and exactly one prompt."
+                    },
+                    {
+                      "checklist_item_ids": [
+                        "P1",
+                        "P3"
+                      ],
+                      "description": "The plan and its evidence require POST /api/reporters followed by refreshReporters and only then setLastReporter. POST already returns the durably created Reporter, and FileReporterService creation is idempotent. If POST succeeds but the follow-up GET fails, that ordering leaves selection empty and presents a retryable creation failure even though durable state changed.",
+                      "id": "C3",
+                      "material": true,
+                      "recommendation": "Treat creation and refresh as separate outcomes: after a successful POST, select the returned canonical Reporter immediately, close or advance onboarding, and attempt list refresh independently. If refresh fails, retain the valid selection and report only that the Reporter list refresh failed. Test POST success plus GET failure, persisted selection, and later reconciliation."
+                    }
+                  ],
+                  "summary": "Retain the focused Reporter-onboarding module and thin startup hook, but revise the plan before implementation to coordinate with existing dialogs, make later successful Reporter hydration re-trigger the onboarding eligibility check, and preserve a Reporter that was durably created even if the follow-up list refresh fails. Extend deterministic and browser coverage for those recovery and interaction contracts."
+                },
+                "started_at": "2026-08-12T13:09:04Z"
+              },
+              "failure": {
+                "category": "invalid_output",
+                "failed_at": "2026-08-12T13:17:26Z",
+                "git_after": {
+                  "branch": "refine/00000SZXGMNPBGG4DWFQX9W000/round-1",
+                  "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/00000SZXGMNPBGG4DWFQX9W000/round-1",
+                  "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+                  "status_porcelain": []
+                },
+                "message": "agent returned no valid structured implementation plan JSON",
+                "phase": "revise"
+              },
+              "phase": "revise",
+              "phase_started_at": "2026-08-12T13:13:14Z",
+              "proposal": {
+                "completed_at": "2026-08-12T13:09:02Z",
+                "git_after": {
+                  "branch": "refine/00000SZXGMNPBGG4DWFQX9W000/round-1",
+                  "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/00000SZXGMNPBGG4DWFQX9W000/round-1",
+                  "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "affected_behavior": [
+                        "Attached web UI cold load with no selected Reporter",
+                        "Selecting an existing Reporter",
+                        "Creating and selecting a new Reporter",
+                        "Reporter-scoped dashboard, Goal authoring, and Todo refresh through setLastReporter",
+                        "Dismissal and Reporter API failure recovery"
+                      ],
+                      "description": "Create a cohesive Reporter-onboarding browser controller that opens an accessible 'Who are you?' modal after Reporter hydration only for an attached project with no valid selected Reporter. Offer existing Reporter choices and a create-new path, use the existing POST /api/reporters, refreshReporters, and setLastReporter capabilities so downstream Reporter-scoped surfaces update normally, show the gentle Controls > Reporter note, prevent concurrent duplicate prompts, and leave selection empty on dismissal or recoverable API failure so the user can retry.",
+                      "governance_rationale": "Guidance 0 applies because this changes a browser surface contract; the UI remains a thin adapter over the existing shared Reporter capability and browser-local selection rather than adding parallel persistence or an LLM capability. Guidance 1 applies by placing onboarding responsibility in a focused module instead of further expanding common.js.",
+                      "id": "P1",
+                      "verification": [
+                        "node --test tests/web_reporter_onboarding.test.js — all focused onboarding tests pass, including existing selection, creation request and persistence, detached or already-selected suppression, single-prompt guarding, dismissal, and API-error retry behavior",
+                        "Recorded focused-test API evidence shows creation uses POST /api/reporters followed by Reporter refresh and setLastReporter-backed localStorage selection"
+                      ]
+                    },
+                    {
+                      "affected_behavior": [
+                        "Static index script ordering",
+                        "Attached-project web bootstrap",
+                        "No-project and Reporter-load-failure startup",
+                        "Nav Reporter context documentation"
+                      ],
+                      "description": "Load the focused onboarding module before init.js, invoke it from the attached-project startup path only after refreshReporters succeeds, and update docs/intent/04-surfaces/03-browser/02-nav.md in its established format to document first-load Reporter orientation and the persistent Controls > Reporter escape hatch. Preserve normal bootstrap when no project is attached, Reporter hydration fails, or a valid browser-local Reporter already exists.",
+                      "governance_rationale": "Guidance 0 requires the affected Nav intent contract to describe the new orientation behavior while retaining static-app and shared-capability boundaries. Guidance 1 requires the bootstrap hook to stay small and delegate the cohesive interaction to the onboarding module.",
+                      "id": "P2",
+                      "verification": [
+                        "node --check src/surfaces/web/static/js/features/reporter-onboarding.js && node --check src/surfaces/web/static/js/init.js — both scripts parse successfully",
+                        "node --test tests/web_ui_selectors.test.js — static selector and script-order contracts pass",
+                        "git diff --check — exits 0 with no whitespace errors"
+                      ]
+                    },
+                    {
+                      "affected_behavior": [
+                        "Reporter onboarding regression suite",
+                        "Real index.html bootstrap in Playwright",
+                        "Existing browser render-smoke isolation"
+                      ],
+                      "description": "Add regression coverage for the onboarding contract at both focused DOM/controller level and the genuine browser bootstrap. Seed a valid Reporter for unrelated render-smoke cases, then explicitly cold-load without localStorage to prove the modal text, Reporter choices, Controls > Reporter note, selection persistence, reload suppression, new-Reporter POST flow, and absence of uncaught page errors.",
+                      "governance_rationale": "Guidance 0 is supported by evidence that the browser stays semantically consistent with the existing Reporter API. Guidance 1 is supported by testing the focused module through its public behavior rather than coupling unrelated feature tests to its internals.",
+                      "id": "P3",
+                      "verification": [
+                        "node --test tests/web_reporter_onboarding.test.js tests/web_screen_render.test.js — focused tests pass and real-browser onboarding assertions pass; if Chromium is unavailable, the browser cases report an explicit skip while focused coverage still passes",
+                        "node --test tests/web_*.test.js — the complete static-web regression suite passes, with any missing-Playwright-Chromium cases reported as skips rather than browser verification",
+                        "git status --short — shows only the planned owned implementation, intent, and test files"
+                      ]
+                    }
+                  ],
+                  "criticism_resolutions": [],
+                  "summary": "Add a lightweight, accessible first-load Reporter onboarding modal to the existing vanilla-JavaScript browser shell. After an attached project's Reporter registry has loaded, ask who the user is only when no valid Reporter is selected; let them select an existing Reporter or create one through the existing Reporter API, persist the choice through the current browser-local selection path, and explain that it can be changed later under Controls > Reporter. Keep the behavior in a focused module, update only the affected Nav intent page, and cover selection, creation, suppression, recovery, and real bootstrap behavior."
+                },
+                "started_at": "2026-08-12T13:06:25Z"
+              },
+              "schema_version": 2,
+              "started_at": "2026-08-12T13:06:24Z",
+              "state": "failed",
+              "updated_at": "2026-08-12T13:17:26Z"
+            },
+            "prompt": "When a user loads the web UI and no reporter is selected, it would be helpful for a model to ask who they are, select/create a reporter, and provide a gentle note that they can change the reporter anytime in the Controls > Reporter menu in the main nav.",
+            "reporter": "Buddy Williams",
+            "round": 1
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-08-12T13:31:22Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "2026-08-12T14:01:44Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZXGMNPBGG4DWFQX9W000-round-2",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "No governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZXGMNPBGG4DWFQX9W000-round-2"
+      },
+      "governance_message": "No governance rule violations found.",
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-12T13:59:58Z",
+        "skipped": []
+      },
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+          "context_digest": "56b40f39a3e6cdeed5ceb3b4c6ffd78bbc9d9918a16eb8c6226bd3e8dd5750c0",
+          "context_version": 1,
+          "goal_id": "00000SZXGMNPBGG4DWFQX9W000",
+          "implementation_branch": "refine/00000SZXGMNPBGG4DWFQX9W000/round-2",
+          "round_idx": 1,
+          "target_branch": "main"
+        },
+        "completed_at": "2026-08-12T13:59:55Z",
+        "criticism": {
+          "completed_at": "2026-08-12T13:40:21Z",
+          "git_after": {
+            "branch": "refine/00000SZXGMNPBGG4DWFQX9W000/round-2",
+            "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000SZXGMNPBGG4DWFQX9W000/round-2",
+            "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P1",
+                  "P2",
+                  "P3"
+                ],
+                "description": "P2 explicitly calls setLastReporter before closing or advancing onboarding. In current main, setLastReporter calls navigate when the first Reporter is selected on goals_new, goals_import, or goals_detail. That allows route rendering and modal lifecycle work to begin while onboarding still owns its document key handler, focus trap, backdrop, and restoration target, undermining P1's no-stacking/topmost-only contract. The plan also does not distinguish a successful close from yielding to an asynchronously arriving blocker; restoring connected prior focus during a yield can steal focus from the new top dialog.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Define a reason-aware settlement order. On successful existing selection or POST creation, first retire onboarding and its observer/listeners without restoring focus into the underlay, then synchronously update the in-memory canonical Reporter and call setLastReporter, and only then perform GET reconciliation. On blocker yield, remove onboarding without ordinary dismissal state or focus restoration and let the blocker retain focus. Add a real goals/new or goals/import route test and an asynchronous Feature-detail blocker test proving one aria-modal dialog, one Escape/Enter consumer, and focus remaining in the top dialog throughout."
+              },
+              {
+                "checklist_item_ids": [
+                  "P2",
+                  "P3"
+                ],
+                "description": "The plan evaluates eligibility only after refreshReporters reconciles selection, but current main's applyProjectAttachResult calls refreshNodeScopedState({ selectReporterFallback: true }). reconcileLastReporter then silently calls setLastReporter with the first Reporter. The resulting attached UI appears to have a valid selection and suppresses onboarding even though the user never identified themselves, contrary to the stated no-valid-selected-Reporter contract and browser-local user choice authority.",
+                "id": "C2",
+                "material": true,
+                "recommendation": "Explicitly resolve the fallback interaction in P2: remove first-Reporter fallback from the attach path (or otherwise preserve the pre-reconciliation absence as onboarding eligibility without persisting an arbitrary identity). Add deterministic coverage for attaching or switching to a project with multiple Reporters and no stored valid selection, proving no Reporter is silently persisted and exactly one onboarding dialog is offered."
+              },
+              {
+                "checklist_item_ids": [
+                  "P1",
+                  "P2",
+                  "P3"
+                ],
+                "description": "The idempotent hydration trigger has no specified terminal state for an intentional dismissal. Because selection remains empty, every later successful reporters_changed, project_updated, or feature-triggered refresh can reopen the dialog, which is not a gentle dismissal and makes 'dismissal/retry' nondeterministic. The plan also specifies only POST success; it does not say how POST rejection retains the entered name, reenables submission, exposes an accessible error, and permits a safe retry without creating duplicate prompts or changing selection.",
+                "id": "C3",
+                "material": true,
+                "recommendation": "Separate deferred, dismissed, submitting, failed, and completed outcomes. Define a page-lifetime dismissal latch that suppresses automatic hydration reopen while leaving Controls > Reporter as the explicit retry path (or state another precise retry policy), without treating the latch as identity persistence. For POST failure, keep the same dialog and draft open, restore enabled controls/focus, announce an inline role=alert or live-region error, and leave state/localStorage unchanged. Test repeated hydrations after dismissal, explicit retry, POST rejection followed by success, single-request behavior, preserved input, and accessible error announcement."
+              }
+            ],
+            "summary": "The revised plan substantially addresses the three Round 1 criticisms, but it is not yet safe to implement as written. It finalizes Reporter selection before retiring onboarding even though setLastReporter can synchronously re-enter modal routes; it does not account for the existing project-attach fallback that silently chooses the first Reporter before eligibility is evaluated; and it leaves dismissal plus POST-failure retry behavior undefined under a deliberately repeatable hydration trigger. These gaps can still produce competing modal lifecycles, bypass onboarding, or turn a gentle prompt into repeated reopening."
+          },
+          "started_at": "2026-08-12T13:35:12Z"
+        },
+        "final_plan": {
+          "completed_at": "2026-08-12T13:47:23Z",
+          "git_after": {
+            "branch": "refine/00000SZXGMNPBGG4DWFQX9W000/round-2",
+            "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000SZXGMNPBGG4DWFQX9W000/round-2",
+            "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "affected_behavior": [
+                  "Attached web UI cold load with no valid selected Reporter",
+                  "Cold and asynchronously resolved Goal detail, Feature detail/new, Goal new, and Goal Import modal routes",
+                  "Coexistence with every existing .modal-backdrop utility, setup, command, and route dialog",
+                  "Dialog labeling, description, initial focus, Tab containment, focus restoration, Escape, backdrop, and Enter isolation",
+                  "Page-lifetime dismissal, hydration suppression after dismissal, Controls > Reporter explicit retry, and duplicate-prompt suppression",
+                  "src/surfaces/web/static/index.html script ordering and focused modal styling"
+                ],
+                "description": "Create src/surfaces/web/static/js/features/reporter-onboarding.js as the cohesive owner of Reporter onboarding, load it before router.js and init.js, and use existing modal styling with only focused CSS additions if needed. Implement a project-and-active-node-scoped page-lifetime state machine with idle, deferred, open, submitting, failed, dismissed, and completed outcomes. Before every open, re-check that the project is attached, no Reporter in state.reporters matches state.lastReporter, the current scope has not been dismissed or completed, and no other .modal-backdrop containing an aria-modal dialog exists. Observe document-body modal additions/removals with MutationObserver rather than polling: defer behind any already-open route, command, Guide/setup, or utility modal; if an asynchronous Goal/Feature/import modal appears after onboarding, immediately yield by removing onboarding and all of its handlers/observer participation without setting dismissal and without restoring underlay focus, then retry eligibility after the blocker is removed. Render one aria-labelledby and aria-describedby 'Who are you?' dialog with existing-Reporter buttons, an inline create form, and the Controls > Reporter guidance; establish deterministic initial focus, contain Tab and Shift+Tab among enabled controls, and restore connected prior focus only after ordinary user dismissal. Handle Escape and backdrop only when onboarding is the topmost modal, and do not add a document-level Enter handler. On dismissal, set the scope's in-memory page-lifetime dismissal latch so later hydrations cannot reopen automatically; the existing Controls > Reporter selector, including '+ Add new reporter...', remains the explicit retry and selection path without adding identity persistence.",
+                "governance_rationale": "Guidance 0 applies because this changes a browser surface contract: the controller remains a thin adapter over the shared Reporter capability and browser-local selection, preserves local inspectability, and adds no model-only or parallel identity store. Guidance 1 applies because eligibility, modal coordination, accessibility, and lifecycle settlement remain together in one focused module rather than expanding common.js or individual route modules with unrelated behavior.",
+                "id": "P1",
+                "verification": [
+                  "node --test tests/web_reporter_onboarding.test.js — passes deterministic cases for detached and valid-selection suppression; all-modal deferral; cold Goal detail, goals/new, goals/import, and asynchronous Feature-detail blockers; blocker-yield re-trigger; one aria-modal dialog; one Escape/Enter consumer; focus staying in the top dialog; initial focus; Tab and Shift+Tab containment; connected-focus restoration only on dismissal; repeated hydration suppression after dismissal; Controls > Reporter explicit retry; and exactly one onboarding instance",
+                  "node --check src/surfaces/web/static/js/features/reporter-onboarding.js && node --check src/surfaces/web/static/js/common.js && node --check src/surfaces/web/static/js/init.js — exits 0 for every changed JavaScript file",
+                  "node --test tests/web_ui_selectors.test.js — passes the static selector checks and reporter-onboarding-before-router/init script-order contract"
+                ]
+              },
+              {
+                "affected_behavior": [
+                  "Initial Reporter GET failure followed by reporters_changed or project_updated recovery with exactly one prompt",
+                  "All successful attached-project Reporter hydration paths",
+                  "Project attach and project/node switching with multiple Reporters and no valid stored selection",
+                  "Successful existing selection on goals/new, goals/import, and goals/detail without overlapping modal lifecycles",
+                  "Reporter creation through POST /api/reporters with immediate canonical in-memory and localStorage selection",
+                  "POST success followed by GET failure with retained selection and later reconciliation",
+                  "POST rejection followed by accessible same-dialog retry with preserved input and single-request behavior",
+                  "Reporter-scoped Dashboard, Goal authoring, Import, and Todo updates through setLastReporter"
+                ],
+                "description": "Make refreshReporters' successful state update, selection reconciliation, and dropdown population the single thin notification point for onboarding eligibility, so startup, reporters_changed, project_updated, settings, import, and feature/Goal refresh callers all reach the same idempotent controller path. Ensure attached project_updated events hydrate Reporters through that path on every route, allowing a failed initial GET to recover through a later SSE or project update without polling. Remove selectReporterFallback from applyProjectAttachResult, refreshNodeScopedState, and reconcileLastReporter so attaching or switching projects clears invalid prior selection but never persists the first Reporter as an invented identity; valid browser-local selections on ordinary startup remain selected. For an existing choice, first settle onboarding as completed and synchronously remove its DOM, focus trap, key listener, and modal observer without restoring underlay focus, then call setLastReporter so any resulting navigate() may safely open goals/new, goals/import, or goals/detail. For create, guard against duplicate submissions, keep the draft while POST /api/reporters is in flight, and on success use the same ordering: retire onboarding without focus restoration, merge the returned canonical Reporter into state.reporters and repopulate controls, call setLastReporter to persist refine_last_reporter and trigger normal downstream updates, then perform GET /api/reporters only as independent reconciliation. A reconciliation failure emits only a Reporter-list refresh warning and retains the canonical selection and completed onboarding; later hydration reconciles normally. A POST failure keeps the same dialog and name draft open, leaves state/localStorage unchanged, re-enables controls, announces an inline role=alert error, restores actionable focus, and permits exactly one subsequent retry request.",
+                "governance_rationale": "Guidance 0 applies because the existing shared Reporter POST/GET contracts and browser-local refine_last_reporter remain authoritative, while the attach path stops manufacturing an identity and all hydration recovery converges at the existing capability boundary. Guidance 1 applies because common.js, init.js, attach, and SSE receive only small projection/notification changes while onboarding interaction and state remain in the focused controller.",
+                "id": "P2",
+                "verification": [
+                  "node --test tests/web_reporter_onboarding.test.js — passes initial GET rejection followed separately by reporters_changed and project_updated success, concurrent hydration deduplication, attach/switch with multiple Reporters and no silent localStorage fallback, successful selection settlement before setLastReporter-driven route navigation, POST rejection then success with one request per submission and preserved draft/alert/focus, and POST-success/GET-failure retained canonical selection",
+                  "Focused request-order assertions record POST /api/reporters; onboarding DOM/listener retirement; canonical state.reporters incorporation and dropdown population; setLastReporter-backed refine_last_reporter persistence; route modal opening; and later GET /api/reporters reconciliation in that order",
+                  "git diff --name-only -- '*.rs' — returns no paths; no Rust/API implementation test is applicable because the existing /api/reporters capability is consumed unchanged"
+                ]
+              },
+              {
+                "affected_behavior": [
+                  "Nav Reporter context documentation",
+                  "Real index.html bootstrap with and without refine_last_reporter localStorage",
+                  "Who are you? copy and Controls > Reporter guidance",
+                  "Persisted existing/create selection and reload suppression",
+                  "Real-route modal ordering and focus/keyboard isolation",
+                  "Static-web regression isolation and explicit missing-Chromium reporting"
+                ],
+                "description": "Update docs/intent/04-surfaces/03-browser/02-nav.md in its established format to document gentle first-load Reporter orientation, user-chosen browser-local identity, and the permanent Controls > Reporter escape hatch. Add tests/web_reporter_onboarding.test.js using the established browser-DOM support, extending only the test helper capabilities needed for focus, keyboard, and MutationObserver evidence. Extend tests/web_screen_render.test.js by seeding refine_last_reporter for unrelated render-smoke cases and adding explicit unseeded genuine-bootstrap cases for modal copy, Controls > Reporter guidance, existing selection persistence, reload suppression, create flow, goals/new or goals/import settlement ordering, asynchronous Feature-detail modal isolation, and no uncaught page errors. Keep missing Playwright Chromium as an explicit skip, then run focused and complete static-web suites, syntax, formatting, whitespace, and owned-scope checks.",
+                "governance_rationale": "Guidance 0 requires only the affected Nav intent page to capture the changed orientation and selection contract while preserving shell and shared Reporter boundaries. Guidance 1 keeps state-machine assertions in one focused Reporter test and genuine bootstrap assertions in the established browser smoke suite, with no unrelated production refactor.",
+                "id": "P3",
+                "verification": [
+                  "node --test tests/web_reporter_onboarding.test.js tests/web_ui_selectors.test.js tests/web_screen_render.test.js — focused, script-order, and genuine-browser cases pass; if Playwright Chromium is absent, browser cases report SKIP and are not claimed as browser verification",
+                  "node --test tests/web_*.test.js — complete static-web regression suite passes with exact pass, fail, and skip totals reported",
+                  "cargo fmt --all -- --check — exits 0",
+                  "git diff --check — exits 0 with no whitespace errors",
+                  "git status --short — lists only the planned onboarding module, thin common/init/index wiring, focused styles if needed, Nav intent, test helper if needed, and onboarding/browser tests; no commit, branch change, prior-history rewrite, durable Goal-state edit, approval, or merge is performed"
+                ]
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "P1 and P2 define reason-aware settlement. Existing selection and POST success first mark completion and synchronously remove onboarding DOM, focus/key handlers, and observer participation without focus restoration; only then do they update the canonical in-memory projection and call setLastReporter, so its synchronous navigate() cannot overlap onboarding. Asynchronous blocker yield removes onboarding without dismissal/completion or focus restoration, allowing the new top dialog to retain focus and triggering eligibility only after it closes. P1/P3 require real goals/new or goals/import and asynchronous Feature-detail evidence for one aria-modal dialog, one keyboard consumer, and top-dialog focus throughout."
+              },
+              {
+                "criticism_id": "C2",
+                "resolution": "P2 explicitly removes the selectReporterFallback attach behavior rather than evaluating after an arbitrary first Reporter has been persisted. Attach or scope switch clears invalid selection, hydrates the real Reporter projection, and offers exactly one onboarding dialog when no user-chosen valid selection exists; deterministic multiple-Reporter tests prove no name is silently written to refine_last_reporter."
+              },
+              {
+                "criticism_id": "C3",
+                "resolution": "P1 defines a project-and-node-scoped page-lifetime dismissal latch that suppresses all later automatic hydration reopen while Controls > Reporter remains the explicit existing-selection/create retry path and no identity state is persisted. P2 defines submitting and failed outcomes: duplicate submission is guarded, POST rejection retains the same dialog and draft, leaves selection unchanged, re-enables controls, announces an inline role=alert, restores actionable focus, and supports a single-request retry followed by normal success. P1-P3 test repeated hydrations after dismissal, explicit Controls retry, and rejection-then-success behavior."
+              }
+            ],
+            "summary": "Add a cohesive, accessible Reporter-onboarding controller to the vanilla-JavaScript browser shell. Every successful attached-project Reporter hydration will idempotently evaluate onboarding without polling, while a scope-aware state machine coordinates with all existing modal backdrops and distinguishes deferred, dismissed, submitting, failed, and completed outcomes. Remove project attach's silent first-Reporter fallback so browser-local user choice remains authoritative. Existing Reporters are selected only after onboarding has retired its modal lifecycle; new Reporters are created through POST /api/reporters, with the returned canonical Reporter incorporated and selected before a separately recoverable GET reconciliation. Keep startup, attach, and SSE hooks thin, update only the Nav intent contract, and verify deterministic modal, focus, hydration, dismissal, creation-recovery, and genuine-browser behavior."
+          },
+          "started_at": "2026-08-12T13:40:23Z"
+        },
+        "implementation": {
+          "completed_at": "2026-08-12T13:59:55Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Added the 332-line focused reporter-onboarding.js controller, loaded before router/init, with project/node page-lifetime outcomes, generic aria-modal backdrop deferral and asynchronous yield/re-trigger, labeled/described dialog, deterministic focus, Tab containment, connected-focus restoration only on dismissal, topmost-only Escape/backdrop handling, no document Enter handler, dismissal suppression, inline creation errors, and focused modal CSS. Deterministic tests cover cold Goal/new/import/Feature and utility blockers, one-modal isolation, keyboard/focus behavior, dismissal, and duplicate prompt suppression.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Made successful refreshReporters projection/population the single onboarding notification point; project_updated now hydrates Reporters on every attached route and reporters_changed shares that path. Removed selectReporterFallback/selectFallback so attach and scope switches clear invalid identity without choosing the first Reporter. Existing and created selection retire onboarding before setLastReporter side effects. POST success merges and persists the canonical Reporter before independent GET reconciliation; GET failure retains selection and emits only a refresh warning, while POST failure preserves draft, alert, focus, and retryability. No Rust/API code changed.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated only the affected Nav intent page; extended the shared DOM test helper for Shift+Tab, stopImmediatePropagation, document querySelectorAll, and MutationObserver evidence; added web_reporter_onboarding.test.js and script-order coverage; seeded a valid Reporter for unrelated real-browser smoke cases; and added genuine-bootstrap existing-selection, create, reload-suppression, goals/new ordering, asynchronous Feature isolation, and page-error assertions. Browser cases explicitly report SKIP because Chromium is unavailable.",
+                "id": "P3",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "node --test tests/web_reporter_onboarding.test.js tests/web_ui_selectors.test.js tests/web_screen_render.test.js — exit 0; 49 tests, 25 passed, 0 failed, 24 skipped with 'no Playwright chromium build is available'",
+              "node --test tests/web_*.test.js — exit 0; 179 tests, 155 passed, 0 failed, 24 skipped with 'no Playwright chromium build is available'",
+              "node --check src/surfaces/web/static/js/features/reporter-onboarding.js && node --check src/surfaces/web/static/js/common.js && node --check src/surfaces/web/static/js/init.js && node --check tests/support/browser_dom.js && node --check tests/web_reporter_onboarding.test.js — exit 0",
+              "cargo fmt --all -- --check — exit 0",
+              "git diff --check — exit 0",
+              "test -z \"$(git diff --name-only -- '*.rs')\" — exit 0; no Rust paths changed, so no Rust/API implementation test applies",
+              "git status --short — only docs/intent/04-surfaces/03-browser/02-nav.md, src/surfaces/web/static/css/modals.css, src/surfaces/web/static/index.html, src/surfaces/web/static/js/common.js, src/surfaces/web/static/js/features/reporter-onboarding.js, tests/support/browser_dom.js, tests/web_reporter_onboarding.test.js, tests/web_screen_render.test.js, and tests/web_ui_selectors.test.js are modified/untracked"
+            ]
+          },
+          "report": "Implemented cohesive Reporter onboarding with accessible modal coordination, idempotent hydration recovery, user-authoritative project attach behavior, canonical POST-before-GET selection ordering, affected Nav intent, deterministic regression coverage, and genuine-browser cases. Exact verification: focused onboarding/UI/browser command reported 49 tests, 25 passed, 0 failed, 24 skipped because no Playwright Chromium build is available; complete static-web command reported 179 tests, 155 passed, 0 failed, 24 skipped for the same explicit reason; JavaScript syntax, cargo formatting, whitespace, no-Rust-diff, and owned-scope checks all exited 0.",
+          "started_at": "2026-08-12T13:47:25Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-12T13:47:25Z",
+        "proposal": {
+          "completed_at": "2026-08-12T13:35:10Z",
+          "git_after": {
+            "branch": "refine/00000SZXGMNPBGG4DWFQX9W000/round-2",
+            "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000SZXGMNPBGG4DWFQX9W000/round-2",
+            "head_commit": "64c01b1bc8eea27f2fb6772a8dd5bca68d93c842",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "affected_behavior": [
+                  "Attached web UI cold load with no valid selected Reporter",
+                  "Cold Goal detail, Feature detail/new, Goal new, and Goal Import deep links that already own or asynchronously open a modal",
+                  "Onboarding dialog labeling, initial focus, focus containment/restoration, Escape, and backdrop handling",
+                  "Existing Reporter selection, dismissal, retry, and duplicate-prompt suppression",
+                  "src/surfaces/web/static/index.html script ordering and shared modal coexistence"
+                ],
+                "description": "Create src/surfaces/web/static/js/features/reporter-onboarding.js as the cohesive owner of Reporter onboarding and load it before init.js. Implement an idempotent open/in-flight/deferred state machine that re-checks attached-project and valid-selection state immediately before opening. Defer whenever another modal backdrop/dialog exists, observe modal lifecycle changes without polling, yield if an asynchronous deep-link modal appears, and retry after the blocker closes without treating deferral as dismissal. Render a labeled and described Who are you? dialog with existing-Reporter choices, an inline create path, the gentle Controls > Reporter note, deterministic initial focus, Tab/Shift+Tab containment, connected-element focus restoration, and topmost-only Escape/backdrop dismissal. Selection and dismissal must remain browser-local through the existing state and setLastReporter path, with no identity persistence added.",
+                "governance_rationale": "Guidance 0 applies because this changes a browser surface contract: the controller remains a thin adapter over the shared Reporter capability and browser-local selection, preserves local inspectability, and does not create model-only identity state. Guidance 1 applies because onboarding eligibility, deferral, accessibility, and interaction lifecycle stay together in one focused module rather than expanding common.js or route modules with unrelated behavior.",
+                "id": "P1",
+                "verification": [
+                  "node --test tests/web_reporter_onboarding.test.js — deterministic controller tests pass for detached/already-selected suppression, cold deep-link modal deferral, asynchronous blocker arrival and close re-trigger, exactly one dialog, initial focus, Tab containment, focus restoration, topmost-only Escape/backdrop behavior, dismissal/retry, and existing selection",
+                  "node --check src/surfaces/web/static/js/features/reporter-onboarding.js && node --check src/surfaces/web/static/js/common.js && node --check src/surfaces/web/static/js/init.js — all changed JavaScript parses successfully",
+                  "node --test tests/web_ui_selectors.test.js — static selector and reporter-onboarding-before-init script-order contracts pass"
+                ]
+              },
+              {
+                "affected_behavior": [
+                  "Initial Reporter GET failure followed by successful reporters_changed or project_updated hydration",
+                  "All successful attached-project Reporter hydration paths",
+                  "Reporter creation through POST /api/reporters and immediate canonical selection",
+                  "POST success followed by GET failure with retained selection and later reconciliation",
+                  "Reporter-scoped Dashboard, Goal authoring, Import, and Todo updates through setLastReporter"
+                ],
+                "description": "Make successful Reporter hydration the single thin trigger for onboarding eligibility. After refreshReporters has updated state, reconciled an invalid stored Reporter, and repopulated controls, invoke the controller safely; keep failures non-fatal and ensure reporters_changed and attached project_updated reconciliation reach the same successful path so an initial GET failure can later produce exactly one prompt without polling. In the create flow, POST through /api/reporters, immediately incorporate the returned canonical Reporter into the in-memory projection and call setLastReporter before closing/advancing onboarding, then refresh the Reporter list as an independent reconciliation. If that GET fails, retain localStorage/state selection and the closed successful onboarding, and report only the list-refresh failure so a later hydration can reconcile it.",
+                "governance_rationale": "Guidance 0 applies because the existing shared Reporter API response and refresh endpoint remain authoritative while localStorage remains the sole browser selection store; success and recovery are wired at the capability boundary rather than duplicated in startup or SSE-specific state. Guidance 1 applies because common.js and init.js receive only small hydration notification hooks while the interaction remains owned by the focused onboarding module.",
+                "id": "P2",
+                "verification": [
+                  "node --test tests/web_reporter_onboarding.test.js — focused tests prove initial GET rejection followed by SSE/project-update success opens exactly once, concurrent successful hydrations do not duplicate the dialog, POST precedes setLastReporter and GET reconciliation, and POST-success/GET-failure retains the canonical localStorage selection while emitting only a refresh warning",
+                  "Focused request evidence records GET /api/reporters hydration, POST /api/reporters creation, immediate setLastReporter-backed refine_last_reporter persistence, and later GET /api/reporters reconciliation in the required order",
+                  "git diff --name-only -- '*.rs' — returns no paths; therefore no Rust/API implementation test is applicable because the existing /api/reporters contract is consumed unchanged"
+                ]
+              },
+              {
+                "affected_behavior": [
+                  "Nav Reporter context documentation",
+                  "Real index.html bootstrap with and without refine_last_reporter localStorage",
+                  "Who are you? copy and Controls > Reporter guidance",
+                  "Persisted selection and reload suppression",
+                  "Static-web regression isolation and missing-Chromium reporting"
+                ],
+                "description": "Update docs/intent/04-surfaces/03-browser/02-nav.md in its established format to document first-load Reporter orientation and the permanent Controls > Reporter escape hatch. Extend genuine Playwright bootstrap coverage by seeding a valid Reporter selection for unrelated render-smoke cases and adding explicit unseeded onboarding cases for copy, existing selection persistence, reload suppression, create flow, modal deep links, and uncaught page errors. Keep missing Chromium reported as an explicit skip, then run the focused and complete static-web regression suites plus syntax, formatting, whitespace, and owned-scope checks.",
+                "governance_rationale": "Guidance 0 requires the affected Nav intent page to capture the changed orientation behavior while preserving the shell and shared Reporter boundaries. Guidance 1 is satisfied by keeping bootstrap assertions in the established browser smoke suite and focused state-machine assertions in one Reporter-onboarding test file, without broad unrelated refactoring.",
+                "id": "P3",
+                "verification": [
+                  "node --test tests/web_reporter_onboarding.test.js tests/web_ui_selectors.test.js tests/web_screen_render.test.js — focused, script-order, and genuine-browser assertions pass; if Playwright Chromium is absent, browser cases explicitly report SKIP and are not claimed as browser verification",
+                  "node --test tests/web_*.test.js — the complete static-web regression suite passes with the exact pass/fail/skip totals reported",
+                  "cargo fmt --all -- --check — formatting check exits 0",
+                  "git diff --check — exits 0 with no whitespace errors",
+                  "git status --short — lists only the planned onboarding module, thin browser wiring, Nav intent, styles if required, and test files; no commit, branch change, prior-history rewrite, Goal-state edit, approval, or merge is performed"
+                ]
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "P1 replaces the one-time duplicate guard with explicit all-modal coordination: onboarding defers behind existing route or utility dialogs, yields to asynchronously arriving deep-link dialogs, re-checks project and Reporter state before every open, safely re-triggers after removal, and owns labeled focus-trapped topmost-only keyboard/backdrop behavior. P1 and P3 test cold modal routes plus keyboard and focus isolation."
+              },
+              {
+                "criticism_id": "C2",
+                "resolution": "P2 routes every successful Reporter hydration through one idempotent eligibility entry point, including reporters_changed and attached project_updated recovery after startup GET failure, without polling; open/in-flight/deferred guards and focused tests prove exactly one prompt."
+              },
+              {
+                "criticism_id": "C3",
+                "resolution": "P2 treats POST creation and GET reconciliation as separate outcomes: it selects and persists the POST-returned canonical Reporter immediately, closes successful onboarding, retains selection if refresh fails, reports only that refresh problem, and permits later hydration to reconcile the list."
+              }
+            ],
+            "summary": "Add a cohesive, accessible Reporter-onboarding controller to the existing vanilla-JavaScript browser shell. Successful Reporter hydration will idempotently ask an attached-project user with no valid browser-local Reporter who they are, while a modal-aware deferred state machine prevents overlap with every existing dialog and deep-link modal. Existing Reporters are selected through setLastReporter; new Reporters are created through POST /api/reporters, with the returned canonical Reporter selected before a separately recoverable list refresh. Keep startup and SSE hooks thin, update only the Nav intent contract, and verify deterministic recovery, focus/keyboard isolation, and genuine browser bootstrap behavior."
+          },
+          "started_at": "2026-08-12T13:31:29Z"
+        },
+        "schema_version": 2,
+        "started_at": "2026-08-12T13:31:28Z",
+        "state": "completed",
+        "updated_at": "2026-08-12T13:59:55Z"
+      },
+      "implementation_report": "Implemented cohesive Reporter onboarding with accessible modal coordination, idempotent hydration recovery, user-authoritative project attach behavior, canonical POST-before-GET selection ordering, affected Nav intent, deterministic regression coverage, and genuine-browser cases. Exact verification: focused onboarding/UI/browser command reported 49 tests, 25 passed, 0 failed, 24 skipped because no Playwright Chromium build is available; complete static-web command reported 179 tests, 155 passed, 0 failed, 24 skipped for the same explicit reason; JavaScript syntax, cargo formatting, whitespace, no-Rust-diff, and owned-scope checks all exited 0.",
+      "implementation_reported_at": "2026-08-12T13:59:56Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Recover the failed Round 1 implementation-planning attempt without erasing its proposal, criticism, invalid revise output, clean branch, or logs. Round 1 produced no candidate commit. Use the recorded proposal and criticism as input, produce a valid structured implementation plan, then implement the Reporter onboarding behavior from current main.\n\nWhen an attached web UI has no valid selected Reporter, offer a gentle accessible \"Who are you?\" onboarding dialog that can select an existing Reporter or create one through the existing Reporter capability, and explain that the selection can always be changed under Controls > Reporter. Keep browser-local selection and shared Reporter APIs authoritative; do not add a parallel identity store or model-only state.\n\nClose all three recorded planning gaps:\n- Coordinate with every existing modal/deep-link flow so onboarding never stacks competing dialogs or document-level Escape/Enter handlers. Defer while another modal is active, re-check attached project and selected Reporter before opening, and provide correct dialog labeling, initial focus, focus containment/restoration, topmost-only Escape/backdrop behavior, and a safe re-trigger after the blocking modal closes.\n- Make eligibility idempotently re-evaluable after every relevant successful Reporter hydration, including an initial GET failure followed by later SSE or project-update hydration, without polling or duplicate prompts.\n- After POST /api/reporters succeeds, immediately select the returned canonical Reporter before any follow-up list refresh. A refresh failure must retain the durable selection, close or advance onboarding appropriately, and report only the refresh problem; later hydration reconciles the list.\n\nKeep the startup hook thin and the onboarding responsibility cohesive. Update only affected browser/Nav intent documentation. Add deterministic tests for cold deep links with an existing modal, keyboard/focus isolation, initial hydration failure then success with exactly one prompt, POST success plus GET failure with retained selection, existing selection suppression, dismissal/retry, and create/select flows. Add genuine-browser bootstrap coverage for modal copy, Controls > Reporter guidance, persisted selection, reload suppression, and absence of page errors; report missing Playwright Chromium as a skip, not browser verification. Run focused Node tests, the complete static-web suite, JS syntax checks, relevant Rust/API tests if changed, formatting, and git diff --check. Preserve audit boundaries; do not approve, merge, rewrite prior history, or directly edit durable Goal state.",
+      "quality_checked_at": "2026-08-12T14:01:53Z",
+      "quality_details": {
+        "candidate_commit": "e34384e10a3f7b34cc2727205a509b5dffa56f58",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZXGMNPBGG4DWFQX9W000-round-2",
+        "diagnostics": [
+          "No Quality tests or migrated commands are configured; evaluation was a no-op."
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "19ff6479270cfae80",
+        "results": [],
+        "source_candidate_commit": "e34384e10a3f7b34cc2727205a509b5dffa56f58"
+      },
+      "quality_message": "No Quality tests configured.",
+      "quality_state": "passed",
+      "reporter": "Buddy Williams",
+      "rule_state": "passed",
+      "updated": "2026-08-12T14:02:00Z",
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "e34384e10a3f7b34cc2727205a509b5dffa56f58",
+        "integrated_at": "2026-08-12T14:01:59.909796712+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n docs/intent/04-surfaces/03-browser/02-nav.md       |   4 +\n src/surfaces/web/static/css/modals.css             |  31 ++\n src/surfaces/web/static/index.html                 |   1 +\n src/surfaces/web/static/js/common.js               |  49 ++-\n .../web/static/js/features/reporter-onboarding.js  | 332 ++++++++++++++++\n tests/support/browser_dom.js                       |  79 +++-\n tests/web_reporter_onboarding.test.js              | 441 +++++++++++++++++++++\n tests/web_screen_render.test.js                    | 115 +++++-\n tests/web_ui_selectors.test.js                     |  16 +\n 9 files changed, 1047 insertions(+), 21 deletions(-)\n create mode 100644 src/surfaces/web/static/js/features/reporter-onboarding.js\n create mode 100644 tests/web_reporter_onboarding.test.js",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "04b86745aa1cb3658cfa1b7a4b858a8cb2f42e6d"
+      },
+      "workflow_quality_timing": "pre_merge",
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    }
+  ],
+  "status": "done",
+  "target_branch": "main",
+  "updated": "2026-08-12T15:34:44Z",
+  "workflow_revision": 38
+}

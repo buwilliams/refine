@@ -1,0 +1,1054 @@
+{
+  "base_commit": "d32e7461ab0840babb8fe91cd0958f0b5b3cb32c",
+  "branch_name": "refine/00000SZZ4AFQ91NQ79JJRAM000/round-2",
+  "candidate_commit": "b82be38d1decbffe915f4a21dcc849aeb73b8985",
+  "created": "2026-08-13T19:12:42Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZZ4AFQ91NQ79JJRAM000",
+  "name": "Add complete daemon-routed config CLI",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": null,
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-13T19:15:48Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Implement the missing top-level refine config CLI command group for the active target app.\n\nBehavior and scope:\n- Make project configuration inspectable and mutable without curl or direct durable-state edits. Cover the configuration capabilities currently owned by GET/PATCH /api/settings, GET/PATCH /api/quality, GET/PATCH plus rule generation for /api/governance, and GET/PUT /api/guidance.\n- Provide discoverable, scriptable subcommands for reading all configuration or one domain; applying validated ordinary settings patches; configuring Quality business requirements, instructions, and plain-text tests; configuring Governance product, constitution, automatic-round limit, rules, and rule generation; and listing, adding, editing, enabling/disabling, and removing Guidance entries.\n- Support practical automation and multiline content through clear flags plus JSON and file or stdin input where appropriate. Emit stable pretty JSON on success and actionable structured errors on invalid input, missing active app, unreachable daemon, or server conflict. Mutations must return and display authoritative readback.\n- Route normal operations through the checkout-owned local daemon with the current API contract version and idempotency behavior. Reuse the same services and validation as browser/API settings. Never direct-edit .git/refine-live-state or create a second configuration model.\n- Preserve existing domain ownership: project attach/switch, workflow pause/resume, node and fleet management, Reporter/Todo lifecycle, and agent provider authentication remain in their established command groups. Document this boundary in help so config does not become an unstructured duplicate of every setting-related command.\n- Avoid client-side lost-update races for Guidance or Governance list mutations. If item-level mutations require backend capability changes, implement them under the existing repository coordination and durable-state authority with stable item identity or another explicit conflict-safe contract; preserve unrelated entries and audit failures.\n- Register the complete command tree in refine commands, handle explicit target-root test adapters consistently with other daemon-routed families, and keep CLI help concise and machine-discoverable.\n\nArchitecture and intent:\n- Follow the existing src/surfaces/cli action and dispatch organization, thin daemon transport, shared API/service ownership, JSON-first output, detached-safe behavior, and local-first state model.\n- Use the Goal plus relevant docs/intent pages for CLI, API, Settings, Guidance, Quality, Governance, and Target App. Update only affected intent documentation and any necessary command/runbook examples.\n\nVerification and evidence:\n- Add focused parsing, help, and command-catalog tests for every new subcommand and argument form.\n- Add daemon-routing integration coverage proving reads and writes use shared endpoints, include API version and idempotency headers, preserve unrelated fields/items, and read back the saved result.\n- Cover validation and failure paths: detached app, unreachable daemon, unknown settings, malformed JSON/file/stdin, invalid Quality or Governance values, missing Guidance entries, and concurrent or stale list mutation.\n- Verify existing browser/API behavior remains semantically unchanged. Run focused exact Rust tests, cargo fmt --all -- --check, cargo check --all-targets, relevant CLI/web-server suites, and git diff --check; report exact commands and results.",
+          "reporter": "Buddy Williams",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZZ4AFQ91NQ79JJRAM000",
+          "name": "Add complete daemon-routed config CLI",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-08-13T19:13:14Z",
+      "failure_at": "2026-08-13T20:08:55Z",
+      "failure_category": "quality_candidate_infrastructure",
+      "failure_message": "Quality failed: Quality candidate infrastructure fault for Goal 00000SZZ4AFQ91NQ79JJRAM000 during after supervised execution: the committed checkout is dirty; expected round 0, branch refine/00000SZZ4AFQ91NQ79JJRAM000/round-1, path /home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZZ4AFQ91NQ79JJRAM000-round-1, registered=true, commit 925326a844179848e00073f533597de7ddafba20; obs…",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-13T19:45:33Z",
+        "skipped": []
+      },
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "3c4185a7bf46151ae5b5cdbadb646b694390feb3",
+          "context_digest": "0b113d350e8d18d13b3a772dd55e427ef537aa0cfc0cba96045e21aa893be182",
+          "context_version": 1,
+          "goal_id": "00000SZZ4AFQ91NQ79JJRAM000",
+          "implementation_branch": "refine/00000SZZ4AFQ91NQ79JJRAM000/round-1",
+          "round_idx": 0,
+          "target_branch": "main"
+        },
+        "completed_at": "2026-08-13T19:45:28Z",
+        "criticism": {
+          "completed_at": "2026-08-13T19:20:35Z",
+          "git_after": {
+            "branch": "refine/00000SZZ4AFQ91NQ79JJRAM000/round-1",
+            "head_commit": "3c4185a7bf46151ae5b5cdbadb646b694390feb3",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000SZZ4AFQ91NQ79JJRAM000/round-1",
+            "head_commit": "3c4185a7bf46151ae5b5cdbadb646b694390feb3",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P4",
+                  "P5",
+                  "P6"
+                ],
+                "description": "The conflict-safe Guidance and Governance design does not include adapting the existing browser writers: Guidance rebuilds an edited item without preserving any identity and PUTs the entire list, while Governance autosave PATCHes the entire rules list without an expected revision. Leaving those compatibility routes unfenced still permits stale browser writes to erase concurrent CLI changes; making revisions mandatory without updating the browser instead breaks existing behavior.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Add browser and legacy-route work that preserves stable identities, carries an observed collection revision on every whole-list mutation, rejects stale writes with 409, refreshes after conflicts, and tests browser-versus-CLI races."
+              },
+              {
+                "checklist_item_ids": [
+                  "P1",
+                  "P2",
+                  "P3",
+                  "P4",
+                  "P5",
+                  "P6",
+                  "P7"
+                ],
+                "description": "No checklist item implements the requested verification: exhaustive parsing/help/catalog coverage, daemon-routing headers and readback, malformed input and detached/unreachable failures, preservation and stale-writer races, browser/API regression coverage, or the specified formatting, check, and suite commands.",
+                "id": "C2",
+                "material": true,
+                "recommendation": "Add a dedicated verification item enumerating the focused CLI, service, HTTP integration, concurrency, and browser compatibility tests plus every required cargo fmt, cargo check, relevant suite, exact-test, and git diff check command."
+              }
+            ],
+            "summary": "Revise the plan to make all list-writing surfaces revision-aware and to include the required focused and regression verification."
+          },
+          "started_at": "2026-08-13T19:18:39Z"
+        },
+        "final_plan": {
+          "completed_at": "2026-08-13T19:23:20Z",
+          "git_after": {
+            "branch": "refine/00000SZZ4AFQ91NQ79JJRAM000/round-1",
+            "head_commit": "3c4185a7bf46151ae5b5cdbadb646b694390feb3",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000SZZ4AFQ91NQ79JJRAM000/round-1",
+            "head_commit": "3c4185a7bf46151ae5b5cdbadb646b694390feb3",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Define a cohesive Config action hierarchy and dispatch boundary for all-domain and per-domain reads, Settings and Quality patches, Governance configuration and rule generation, and Guidance list, add, edit, enable, disable, and remove operations, with help that points project, workflow, node, fleet, Reporter, Todo, and agent-authentication concerns to their existing command groups.",
+                "id": "P1"
+              },
+              {
+                "description": "Add a shared config input decoder for scalar and multiline flags plus mutually exclusive inline JSON, file, or stdin payloads, rejecting absent, overlapping, unknown, malformed, and domain-invalid input before daemon transport.",
+                "id": "P2"
+              },
+              {
+                "description": "Register the complete Config tree in top-level dispatch and `refine commands`, route production requests through the checkout-owned daemon with the current API version and mutation idempotency contract, preserve the hidden explicit-target-root test adapter, and emit stable pretty JSON or structured detached, transport, validation, not-found, and conflict errors.",
+                "id": "P3"
+              },
+              {
+                "description": "Refactor Guidance persistence into cohesive codec and mutation responsibilities that compatibly migrate existing entries to stable identities and collection revisions, then perform locked compare-and-set item and whole-list writes that preserve unrelated entries and return authoritative normalized state.",
+                "id": "P4"
+              },
+              {
+                "description": "Extend Governance persistence under the existing durable authority with locked partial scalar updates, stable rule identities, an observed rules revision for every replacement or generated-rule adoption, and conflict-safe preservation of unrelated rules and fields.",
+                "id": "P5"
+              },
+              {
+                "description": "Expose Guidance item mutations and revision-fenced Guidance and Governance whole-list compatibility writes through the existing API capability groups, returning explicit not-found and stale-revision conflicts while retaining current GET, PATCH, PUT, and rule-generation workflows.",
+                "id": "P6"
+              },
+              {
+                "description": "Update browser Guidance editing and Governance autosave and generation to retain item identities, submit the observed collection revision on every list write, consume authoritative readback, and refresh visible state after a 409 instead of retrying stale content.",
+                "id": "P7"
+              },
+              {
+                "description": "Keep ordinary Settings and Quality updates as partial mutations through their current services, so shared unknown-setting and domain validation remains authoritative, omitted values stay unchanged, and CLI output reflects the saved readback.",
+                "id": "P8"
+              },
+              {
+                "description": "Update only the affected CLI, API, Settings, Guidance, Quality, Governance, and Target App intent pages and necessary examples to document daemon ownership, input and concurrency contracts, machine-readable readback, and the boundary with established command families.",
+                "id": "P9"
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "P4 through P7 now require stable identities and observed collection revisions for item and whole-list writes, update browser and compatibility writers to preserve those values, reject stale writes with 409, and refresh after conflicts."
+              },
+              {
+                "criticism_id": "C2",
+                "resolution": "The requested focused coverage and gate commands remain mandatory implementation-phase evidence, but the authoritative Revise contract excludes verification and commands from this compact implementation checklist."
+              }
+            ],
+            "summary": "Add a top-level `refine config` family that exposes Settings, Quality, Governance, and Guidance through the active checkout-owned daemon, with structured automation inputs, stable JSON readback, and shared validation, while strengthening Guidance and Governance collection contracts so CLI, browser, and compatibility writers cannot erase concurrent changes."
+          },
+          "started_at": "2026-08-13T19:20:39Z"
+        },
+        "implementation": {
+          "completed_at": "2026-08-13T19:45:28Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Added cohesive Config actions for all-domain/domain reads; Settings and Quality show/set; Governance show/set/generate-rules; and Guidance list/add/edit/enable/disable/remove. Top-level help explicitly keeps project, workflow, node, fleet, Reporter, Todo, and agent authentication in their existing groups.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added one shared object decoder for scalar and multiline flags plus exclusive inline JSON, file, or stdin sources. Empty, overlapping, malformed, non-object, unknown, and domain-invalid inputs are rejected before mutation; focused decoder and CLI tests cover the forms and failures.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Registered Config in dispatch, hidden target-root detection, help, and the machine-readable command catalog. Production calls use daemon_json with X-Refine-API-Version and Idempotency-Key, successful responses are pretty JSON, config failures are structured JSON, and daemon integration tests assert routes, headers, request body, and authoritative readback.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Guidance codec now migrates legacy arrays to a revisioned document with stable entry ids. The service separates codec and locked mutations, supports item add/edit/remove, fences observed revisions, preserves unrelated entries, writes atomically, and returns normalized authoritative collections.",
+                "id": "P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Governance load/save now run under the existing record lock, preserve omitted scalar fields and unrelated rules, assign stable rule ids, maintain rules_revision for replacements/generated adoption, reject unknown or invalid fields, and return authoritative normalized state.",
+                "id": "P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added POST /guidance and PATCH/DELETE /guidance/{id}; retained GET/PUT Guidance and GET/PATCH/generate Governance. Whole-list writes require the observed collection revision after migration, stale writes return 409, missing ids return 404, and API tests prove stale list writes preserve concurrent entries.",
+                "id": "P6",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Browser Guidance editing now uses stable item routes and observed revision. Governance autosave submits rules_revision, applies authoritative ids/metadata/readback, and generated rules use that same save path. Both surfaces force-refresh on 409 instead of replaying stale state.",
+                "id": "P7",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Settings still delegates partial patches to FileSettingsService and Quality to FileQualityService/QualitySettingsPatch. Omitted fields remain unchanged, unknown Quality fields are rejected, and direct adapter plus full API suites confirm authoritative saved readback and unchanged existing behavior.",
+                "id": "P8",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated only affected CLI, API, browser Settings, Guidance, Quality, Governance, and Target App intent pages with daemon ownership, input/readback, revision conflict, stable identity, and command-family boundary contracts.",
+                "id": "P9",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "cargo test --lib surfaces::cli::tests -- --nocapture: 60 passed, 0 failed",
+              "cargo test --lib surfaces::web_server::tests -- --nocapture: 137 passed, 0 failed",
+              "cargo test --lib process::supervisor::config::tests -- --nocapture: 10 passed, 0 failed",
+              "cargo test --lib surfaces::cli::dispatch::config::tests::input_decoder_handles_file_and_stdin_and_reports_malformed_sources -- --exact: 1 passed, 0 failed",
+              "cargo test --lib surfaces::cli::tests::config::config_rejects_unknown_malformed_and_overlapping_input_before_state_changes -- --exact: 1 passed, 0 failed",
+              "cargo test --lib surfaces::web_server::tests::quality_guidance::governance::web_server_manages_governance_guidance_and_reporters -- --exact: 1 passed, 0 failed",
+              "node --test tests/web_settings_dom_morph.test.js tests/web_settings_processes.test.js: 13 passed, 0 failed",
+              "cargo fmt --all -- --check: passed",
+              "cargo check --all-targets: passed",
+              "cargo run --quiet -- config --help: exit 0; complete concise config tree and ownership boundary shown",
+              "cargo run --quiet -- commands | jq '.commands[] | select(.name == \"config\") | [.subcommands[].name]': exit 0; show, settings, quality, governance, guidance",
+              "REFINE_DAEMON_PORT=9 cargo run --quiet -- config settings show: expected exit 1 with structured daemon_unavailable JSON",
+              "cargo run --quiet -- config quality set --json '{}' --file missing.json: expected exit 1 with structured invalid_input JSON",
+              "git diff --check: passed"
+            ]
+          },
+          "report": "Added the complete daemon-routed refine config command family, shared JSON/file/stdin decoding and structured errors, conflict-safe Guidance and Governance persistence/API/browser behavior, focused intent documentation, and passing CLI, web-server, browser fixture, format, all-target check, and diff verification.",
+          "started_at": "2026-08-13T19:23:25Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-13T19:23:25Z",
+        "proposal": {
+          "completed_at": "2026-08-13T19:18:36Z",
+          "git_after": {
+            "branch": "refine/00000SZZ4AFQ91NQ79JJRAM000/round-1",
+            "head_commit": "3c4185a7bf46151ae5b5cdbadb646b694390feb3",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000SZZ4AFQ91NQ79JJRAM000/round-1",
+            "head_commit": "3c4185a7bf46151ae5b5cdbadb646b694390feb3",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Define cohesive config action and dispatch modules with concise help and catalog entries for all-domain or single-domain reads, Settings patches, Quality updates, Governance updates and rule generation, and Guidance item lifecycle commands while explicitly excluding commands owned by other families.",
+                "id": "P1"
+              },
+              {
+                "description": "Add one config input decoder that combines clear scalar and multiline flags with mutually exclusive inline JSON, file, or stdin sources and rejects missing, overlapping, unknown, or malformed values before transport.",
+                "id": "P2"
+              },
+              {
+                "description": "Route production config operations only through the existing daemon transport with API-version and idempotency headers, aggregate domain reads into stable pretty JSON, map local and server failures to structured errors, and use authoritative post-mutation readback with the established hidden target-root test adapter.",
+                "id": "P3"
+              },
+              {
+                "description": "Evolve Guidance normalization compatibly to assign stable item identities and revision metadata, then add record-locked item mutations with expected-revision checks so add, edit, enable, disable, and remove preserve unrelated entries and reject stale writers.",
+                "id": "P4"
+              },
+              {
+                "description": "Extend Governance rule handling under the same durable authority with record locking, stable rule identities, revision-aware item changes, and conflict-safe adoption of generated rules while retaining product, constitution, and automatic-round-limit validation.",
+                "id": "P5"
+              },
+              {
+                "description": "Expose the new Guidance and Governance item operations through their existing API capability groups with explicit not-found and conflict responses, while keeping current browser GET/PATCH/PUT behavior semantically compatible and backed by the same services.",
+                "id": "P6"
+              },
+              {
+                "description": "Keep ordinary Settings and Quality mutations as partial patches through their current services so unknown settings and invalid Quality values fail consistently and omitted fields remain unchanged.",
+                "id": "P7"
+              },
+              {
+                "description": "Update only the affected CLI, API, Settings, Guidance, Quality, Governance, and Target App intent text and necessary examples to document daemon authority, machine-readable configuration workflows, concurrency behavior, and the boundary with established command groups.",
+                "id": "P8"
+              }
+            ],
+            "summary": "Add a top-level `refine config` command family that reads and updates Settings, Quality, Governance, and Guidance through the active checkout-owned daemon, using automation-friendly flags and JSON, file, or stdin input while preserving shared validation, authoritative readback, stable errors, and existing command ownership boundaries; extend only the existing Governance and Guidance authorities where conflict-safe item mutations require stable identity and revisions."
+          },
+          "started_at": "2026-08-13T19:15:52Z"
+        },
+        "schema_version": 2,
+        "started_at": "2026-08-13T19:15:50Z",
+        "state": "completed",
+        "updated_at": "2026-08-13T19:45:28Z"
+      },
+      "implementation_report": "Added the complete daemon-routed refine config command family, shared JSON/file/stdin decoding and structured errors, conflict-safe Guidance and Governance persistence/API/browser behavior, focused intent documentation, and passing CLI, web-server, browser fixture, format, all-target check, and diff verification.",
+      "implementation_reported_at": "2026-08-13T19:45:30Z",
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Implement the missing top-level refine config CLI command group for the active target app.\n\nBehavior and scope:\n- Make project configuration inspectable and mutable without curl or direct durable-state edits. Cover the configuration capabilities currently owned by GET/PATCH /api/settings, GET/PATCH /api/quality, GET/PATCH plus rule generation for /api/governance, and GET/PUT /api/guidance.\n- Provide discoverable, scriptable subcommands for reading all configuration or one domain; applying validated ordinary settings patches; configuring Quality business requirements, instructions, and plain-text tests; configuring Governance product, constitution, automatic-round limit, rules, and rule generation; and listing, adding, editing, enabling/disabling, and removing Guidance entries.\n- Support practical automation and multiline content through clear flags plus JSON and file or stdin input where appropriate. Emit stable pretty JSON on success and actionable structured errors on invalid input, missing active app, unreachable daemon, or server conflict. Mutations must return and display authoritative readback.\n- Route normal operations through the checkout-owned local daemon with the current API contract version and idempotency behavior. Reuse the same services and validation as browser/API settings. Never direct-edit .git/refine-live-state or create a second configuration model.\n- Preserve existing domain ownership: project attach/switch, workflow pause/resume, node and fleet management, Reporter/Todo lifecycle, and agent provider authentication remain in their established command groups. Document this boundary in help so config does not become an unstructured duplicate of every setting-related command.\n- Avoid client-side lost-update races for Guidance or Governance list mutations. If item-level mutations require backend capability changes, implement them under the existing repository coordination and durable-state authority with stable item identity or another explicit conflict-safe contract; preserve unrelated entries and audit failures.\n- Register the complete command tree in refine commands, handle explicit target-root test adapters consistently with other daemon-routed families, and keep CLI help concise and machine-discoverable.\n\nArchitecture and intent:\n- Follow the existing src/surfaces/cli action and dispatch organization, thin daemon transport, shared API/service ownership, JSON-first output, detached-safe behavior, and local-first state model.\n- Use the Goal plus relevant docs/intent pages for CLI, API, Settings, Guidance, Quality, Governance, and Target App. Update only affected intent documentation and any necessary command/runbook examples.\n\nVerification and evidence:\n- Add focused parsing, help, and command-catalog tests for every new subcommand and argument form.\n- Add daemon-routing integration coverage proving reads and writes use shared endpoints, include API version and idempotency headers, preserve unrelated fields/items, and read back the saved result.\n- Cover validation and failure paths: detached app, unreachable daemon, unknown settings, malformed JSON/file/stdin, invalid Quality or Governance values, missing Guidance entries, and concurrent or stale list mutation.\n- Verify existing browser/API behavior remains semantically unchanged. Run focused exact Rust tests, cargo fmt --all -- --check, cargo check --all-targets, relevant CLI/web-server suites, and git diff --check; report exact commands and results.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-08-13T20:08:56Z",
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-13T20:11:31Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Recover the retained Round 1 config CLI candidate after the Quality infrastructure failure, without discarding or rewriting any Round 1 evidence.\n\nRound 1 implementation commit e2a5dce686694aa4c98703eb47dfbf021923a482 and Quality correction commit 925326a844179848e00073f533597de7ddafba20 contain the completed daemon-routed config CLI work. The Quality agent reported full Rust, browser, CLI, format, check, and diff verification, but the post-execution candidate guard failed because the retained Round 1 worktree was dirty: xtask/Cargo.lock had gained the refine package dependency serde_path_to_error. Governance did not run, and the candidate is not integrated into main.\n\nUse the fresh Round 2 worktree based on current main. Inspect and recover the Round 1 implementation and Quality corrections by replaying or equivalently applying those exact commits, resolving current-main conflicts narrowly. Reconcile the xtask/Cargo.lock dependency delta intentionally: commit the authoritative lockfile update if it is required by the workspace dependency graph, or correct the responsible verification/build behavior if the delta is not authoritative. Do not clean, reset, delete, amend, or otherwise mutate the retained Round 1 branch or worktree. Preserve its candidate, dirty-state evidence, logs, and reflog.\n\nConfirm the recovered behavior still satisfies the original Goal, including complete config command/help/catalog coverage, shared daemon/API validation and authoritative readback, conflict-safe Guidance and Governance collection mutations, browser compatibility, and affected intent documentation. Avoid unrelated redesign or scope expansion.\n\nRun the recorded focused and full verification on the recovered candidate: exact config/service/web tests as relevant; cargo test --lib; cargo run --manifest-path xtask/Cargo.toml -- test-browser; cargo run --manifest-path xtask/Cargo.toml -- test-cli using an absolute fixture path where required; cargo check --all-targets; cargo fmt --all -- --check; and git diff --check. After every verification command, inspect repository state. Before handoff, commit every intentional generated artifact, confirm the Round 2 branch points at the reported candidate, and prove git status --porcelain is empty. Report exact commands, pass/fail/skip counts, any Chromium-unavailable skips, the lockfile disposition, final commit, branch, and clean-status readback. Do not approve, merge, push, or advance beyond the workflow-owned Quality, Governance, and human Review gates.",
+          "reporter": "Buddy Williams",
+          "round": 2
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZZ4AFQ91NQ79JJRAM000",
+          "name": "Add complete daemon-routed config CLI",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "Buddy Williams",
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                },
+                {
+                  "enabled": true,
+                  "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+                  "name": "Cohesive code files",
+                  "rule": "Apply whenever an agent adds or changes code files in any language."
+                }
+              ],
+              "code_files_changed": true,
+              "context_version": 1,
+              "recorded_at": "2026-08-13T19:45:33Z",
+              "skipped": []
+            },
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "3c4185a7bf46151ae5b5cdbadb646b694390feb3",
+                "context_digest": "0b113d350e8d18d13b3a772dd55e427ef537aa0cfc0cba96045e21aa893be182",
+                "context_version": 1,
+                "goal_id": "00000SZZ4AFQ91NQ79JJRAM000",
+                "implementation_branch": "refine/00000SZZ4AFQ91NQ79JJRAM000/round-1",
+                "round_idx": 0,
+                "target_branch": "main"
+              },
+              "completed_at": "2026-08-13T19:45:28Z",
+              "criticism": {
+                "completed_at": "2026-08-13T19:20:35Z",
+                "git_after": {
+                  "branch": "refine/00000SZZ4AFQ91NQ79JJRAM000/round-1",
+                  "head_commit": "3c4185a7bf46151ae5b5cdbadb646b694390feb3",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/00000SZZ4AFQ91NQ79JJRAM000/round-1",
+                  "head_commit": "3c4185a7bf46151ae5b5cdbadb646b694390feb3",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "findings": [
+                    {
+                      "checklist_item_ids": [
+                        "P4",
+                        "P5",
+                        "P6"
+                      ],
+                      "description": "The conflict-safe Guidance and Governance design does not include adapting the existing browser writers: Guidance rebuilds an edited item without preserving any identity and PUTs the entire list, while Governance autosave PATCHes the entire rules list without an expected revision. Leaving those compatibility routes unfenced still permits stale browser writes to erase concurrent CLI changes; making revisions mandatory without updating the browser instead breaks existing behavior.",
+                      "id": "C1",
+                      "material": true,
+                      "recommendation": "Add browser and legacy-route work that preserves stable identities, carries an observed collection revision on every whole-list mutation, rejects stale writes with 409, refreshes after conflicts, and tests browser-versus-CLI races."
+                    },
+                    {
+                      "checklist_item_ids": [
+                        "P1",
+                        "P2",
+                        "P3",
+                        "P4",
+                        "P5",
+                        "P6",
+                        "P7"
+                      ],
+                      "description": "No checklist item implements the requested verification: exhaustive parsing/help/catalog coverage, daemon-routing headers and readback, malformed input and detached/unreachable failures, preservation and stale-writer races, browser/API regression coverage, or the specified formatting, check, and suite commands.",
+                      "id": "C2",
+                      "material": true,
+                      "recommendation": "Add a dedicated verification item enumerating the focused CLI, service, HTTP integration, concurrency, and browser compatibility tests plus every required cargo fmt, cargo check, relevant suite, exact-test, and git diff check command."
+                    }
+                  ],
+                  "summary": "Revise the plan to make all list-writing surfaces revision-aware and to include the required focused and regression verification."
+                },
+                "started_at": "2026-08-13T19:18:39Z"
+              },
+              "final_plan": {
+                "completed_at": "2026-08-13T19:23:20Z",
+                "git_after": {
+                  "branch": "refine/00000SZZ4AFQ91NQ79JJRAM000/round-1",
+                  "head_commit": "3c4185a7bf46151ae5b5cdbadb646b694390feb3",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/00000SZZ4AFQ91NQ79JJRAM000/round-1",
+                  "head_commit": "3c4185a7bf46151ae5b5cdbadb646b694390feb3",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Define a cohesive Config action hierarchy and dispatch boundary for all-domain and per-domain reads, Settings and Quality patches, Governance configuration and rule generation, and Guidance list, add, edit, enable, disable, and remove operations, with help that points project, workflow, node, fleet, Reporter, Todo, and agent-authentication concerns to their existing command groups.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Add a shared config input decoder for scalar and multiline flags plus mutually exclusive inline JSON, file, or stdin payloads, rejecting absent, overlapping, unknown, malformed, and domain-invalid input before daemon transport.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Register the complete Config tree in top-level dispatch and `refine commands`, route production requests through the checkout-owned daemon with the current API version and mutation idempotency contract, preserve the hidden explicit-target-root test adapter, and emit stable pretty JSON or structured detached, transport, validation, not-found, and conflict errors.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Refactor Guidance persistence into cohesive codec and mutation responsibilities that compatibly migrate existing entries to stable identities and collection revisions, then perform locked compare-and-set item and whole-list writes that preserve unrelated entries and return authoritative normalized state.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Extend Governance persistence under the existing durable authority with locked partial scalar updates, stable rule identities, an observed rules revision for every replacement or generated-rule adoption, and conflict-safe preservation of unrelated rules and fields.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Expose Guidance item mutations and revision-fenced Guidance and Governance whole-list compatibility writes through the existing API capability groups, returning explicit not-found and stale-revision conflicts while retaining current GET, PATCH, PUT, and rule-generation workflows.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Update browser Guidance editing and Governance autosave and generation to retain item identities, submit the observed collection revision on every list write, consume authoritative readback, and refresh visible state after a 409 instead of retrying stale content.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Keep ordinary Settings and Quality updates as partial mutations through their current services, so shared unknown-setting and domain validation remains authoritative, omitted values stay unchanged, and CLI output reflects the saved readback.",
+                      "id": "P8"
+                    },
+                    {
+                      "description": "Update only the affected CLI, API, Settings, Guidance, Quality, Governance, and Target App intent pages and necessary examples to document daemon ownership, input and concurrency contracts, machine-readable readback, and the boundary with established command families.",
+                      "id": "P9"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "C1",
+                      "resolution": "P4 through P7 now require stable identities and observed collection revisions for item and whole-list writes, update browser and compatibility writers to preserve those values, reject stale writes with 409, and refresh after conflicts."
+                    },
+                    {
+                      "criticism_id": "C2",
+                      "resolution": "The requested focused coverage and gate commands remain mandatory implementation-phase evidence, but the authoritative Revise contract excludes verification and commands from this compact implementation checklist."
+                    }
+                  ],
+                  "summary": "Add a top-level `refine config` family that exposes Settings, Quality, Governance, and Guidance through the active checkout-owned daemon, with structured automation inputs, stable JSON readback, and shared validation, while strengthening Guidance and Governance collection contracts so CLI, browser, and compatibility writers cannot erase concurrent changes."
+                },
+                "started_at": "2026-08-13T19:20:39Z"
+              },
+              "implementation": {
+                "completed_at": "2026-08-13T19:45:28Z",
+                "execution": {
+                  "checklist": [
+                    {
+                      "evidence": "Added cohesive Config actions for all-domain/domain reads; Settings and Quality show/set; Governance show/set/generate-rules; and Guidance list/add/edit/enable/disable/remove. Top-level help explicitly keeps project, workflow, node, fleet, Reporter, Todo, and agent authentication in their existing groups.",
+                      "id": "P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added one shared object decoder for scalar and multiline flags plus exclusive inline JSON, file, or stdin sources. Empty, overlapping, malformed, non-object, unknown, and domain-invalid inputs are rejected before mutation; focused decoder and CLI tests cover the forms and failures.",
+                      "id": "P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Registered Config in dispatch, hidden target-root detection, help, and the machine-readable command catalog. Production calls use daemon_json with X-Refine-API-Version and Idempotency-Key, successful responses are pretty JSON, config failures are structured JSON, and daemon integration tests assert routes, headers, request body, and authoritative readback.",
+                      "id": "P3",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Guidance codec now migrates legacy arrays to a revisioned document with stable entry ids. The service separates codec and locked mutations, supports item add/edit/remove, fences observed revisions, preserves unrelated entries, writes atomically, and returns normalized authoritative collections.",
+                      "id": "P4",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Governance load/save now run under the existing record lock, preserve omitted scalar fields and unrelated rules, assign stable rule ids, maintain rules_revision for replacements/generated adoption, reject unknown or invalid fields, and return authoritative normalized state.",
+                      "id": "P5",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added POST /guidance and PATCH/DELETE /guidance/{id}; retained GET/PUT Guidance and GET/PATCH/generate Governance. Whole-list writes require the observed collection revision after migration, stale writes return 409, missing ids return 404, and API tests prove stale list writes preserve concurrent entries.",
+                      "id": "P6",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Browser Guidance editing now uses stable item routes and observed revision. Governance autosave submits rules_revision, applies authoritative ids/metadata/readback, and generated rules use that same save path. Both surfaces force-refresh on 409 instead of replaying stale state.",
+                      "id": "P7",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Settings still delegates partial patches to FileSettingsService and Quality to FileQualityService/QualitySettingsPatch. Omitted fields remain unchanged, unknown Quality fields are rejected, and direct adapter plus full API suites confirm authoritative saved readback and unchanged existing behavior.",
+                      "id": "P8",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Updated only affected CLI, API, browser Settings, Guidance, Quality, Governance, and Target App intent pages with daemon ownership, input/readback, revision conflict, stable identity, and command-family boundary contracts.",
+                      "id": "P9",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "cargo test --lib surfaces::cli::tests -- --nocapture: 60 passed, 0 failed",
+                    "cargo test --lib surfaces::web_server::tests -- --nocapture: 137 passed, 0 failed",
+                    "cargo test --lib process::supervisor::config::tests -- --nocapture: 10 passed, 0 failed",
+                    "cargo test --lib surfaces::cli::dispatch::config::tests::input_decoder_handles_file_and_stdin_and_reports_malformed_sources -- --exact: 1 passed, 0 failed",
+                    "cargo test --lib surfaces::cli::tests::config::config_rejects_unknown_malformed_and_overlapping_input_before_state_changes -- --exact: 1 passed, 0 failed",
+                    "cargo test --lib surfaces::web_server::tests::quality_guidance::governance::web_server_manages_governance_guidance_and_reporters -- --exact: 1 passed, 0 failed",
+                    "node --test tests/web_settings_dom_morph.test.js tests/web_settings_processes.test.js: 13 passed, 0 failed",
+                    "cargo fmt --all -- --check: passed",
+                    "cargo check --all-targets: passed",
+                    "cargo run --quiet -- config --help: exit 0; complete concise config tree and ownership boundary shown",
+                    "cargo run --quiet -- commands | jq '.commands[] | select(.name == \"config\") | [.subcommands[].name]': exit 0; show, settings, quality, governance, guidance",
+                    "REFINE_DAEMON_PORT=9 cargo run --quiet -- config settings show: expected exit 1 with structured daemon_unavailable JSON",
+                    "cargo run --quiet -- config quality set --json '{}' --file missing.json: expected exit 1 with structured invalid_input JSON",
+                    "git diff --check: passed"
+                  ]
+                },
+                "report": "Added the complete daemon-routed refine config command family, shared JSON/file/stdin decoding and structured errors, conflict-safe Guidance and Governance persistence/API/browser behavior, focused intent documentation, and passing CLI, web-server, browser fixture, format, all-target check, and diff verification.",
+                "started_at": "2026-08-13T19:23:25Z"
+              },
+              "phase": "implement",
+              "phase_started_at": "2026-08-13T19:23:25Z",
+              "proposal": {
+                "completed_at": "2026-08-13T19:18:36Z",
+                "git_after": {
+                  "branch": "refine/00000SZZ4AFQ91NQ79JJRAM000/round-1",
+                  "head_commit": "3c4185a7bf46151ae5b5cdbadb646b694390feb3",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/00000SZZ4AFQ91NQ79JJRAM000/round-1",
+                  "head_commit": "3c4185a7bf46151ae5b5cdbadb646b694390feb3",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Define cohesive config action and dispatch modules with concise help and catalog entries for all-domain or single-domain reads, Settings patches, Quality updates, Governance updates and rule generation, and Guidance item lifecycle commands while explicitly excluding commands owned by other families.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Add one config input decoder that combines clear scalar and multiline flags with mutually exclusive inline JSON, file, or stdin sources and rejects missing, overlapping, unknown, or malformed values before transport.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Route production config operations only through the existing daemon transport with API-version and idempotency headers, aggregate domain reads into stable pretty JSON, map local and server failures to structured errors, and use authoritative post-mutation readback with the established hidden target-root test adapter.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Evolve Guidance normalization compatibly to assign stable item identities and revision metadata, then add record-locked item mutations with expected-revision checks so add, edit, enable, disable, and remove preserve unrelated entries and reject stale writers.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Extend Governance rule handling under the same durable authority with record locking, stable rule identities, revision-aware item changes, and conflict-safe adoption of generated rules while retaining product, constitution, and automatic-round-limit validation.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Expose the new Guidance and Governance item operations through their existing API capability groups with explicit not-found and conflict responses, while keeping current browser GET/PATCH/PUT behavior semantically compatible and backed by the same services.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Keep ordinary Settings and Quality mutations as partial patches through their current services so unknown settings and invalid Quality values fail consistently and omitted fields remain unchanged.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Update only the affected CLI, API, Settings, Guidance, Quality, Governance, and Target App intent text and necessary examples to document daemon authority, machine-readable configuration workflows, concurrency behavior, and the boundary with established command groups.",
+                      "id": "P8"
+                    }
+                  ],
+                  "summary": "Add a top-level `refine config` command family that reads and updates Settings, Quality, Governance, and Guidance through the active checkout-owned daemon, using automation-friendly flags and JSON, file, or stdin input while preserving shared validation, authoritative readback, stable errors, and existing command ownership boundaries; extend only the existing Governance and Guidance authorities where conflict-safe item mutations require stable identity and revisions."
+                },
+                "started_at": "2026-08-13T19:15:52Z"
+              },
+              "schema_version": 2,
+              "started_at": "2026-08-13T19:15:50Z",
+              "state": "completed",
+              "updated_at": "2026-08-13T19:45:28Z"
+            },
+            "implementation_report": "Added the complete daemon-routed refine config command family, shared JSON/file/stdin decoding and structured errors, conflict-safe Guidance and Governance persistence/API/browser behavior, focused intent documentation, and passing CLI, web-server, browser fixture, format, all-target check, and diff verification.",
+            "implementation_reported_at": "2026-08-13T19:45:30Z",
+            "prompt": "Implement the missing top-level refine config CLI command group for the active target app.\n\nBehavior and scope:\n- Make project configuration inspectable and mutable without curl or direct durable-state edits. Cover the configuration capabilities currently owned by GET/PATCH /api/settings, GET/PATCH /api/quality, GET/PATCH plus rule generation for /api/governance, and GET/PUT /api/guidance.\n- Provide discoverable, scriptable subcommands for reading all configuration or one domain; applying validated ordinary settings patches; configuring Quality business requirements, instructions, and plain-text tests; configuring Governance product, constitution, automatic-round limit, rules, and rule generation; and listing, adding, editing, enabling/disabling, and removing Guidance entries.\n- Support practical automation and multiline content through clear flags plus JSON and file or stdin input where appropriate. Emit stable pretty JSON on success and actionable structured errors on invalid input, missing active app, unreachable daemon, or server conflict. Mutations must return and display authoritative readback.\n- Route normal operations through the checkout-owned local daemon with the current API contract version and idempotency behavior. Reuse the same services and validation as browser/API settings. Never direct-edit .git/refine-live-state or create a second configuration model.\n- Preserve existing domain ownership: project attach/switch, workflow pause/resume, node and fleet management, Reporter/Todo lifecycle, and agent provider authentication remain in their established command groups. Document this boundary in help so config does not become an unstructured duplicate of every setting-related command.\n- Avoid client-side lost-update races for Guidance or Governance list mutations. If item-level mutations require backend capability changes, implement them under the existing repository coordination and durable-state authority with stable item identity or another explicit conflict-safe contract; preserve unrelated entries and audit failures.\n- Register the complete command tree in refine commands, handle explicit target-root test adapters consistently with other daemon-routed families, and keep CLI help concise and machine-discoverable.\n\nArchitecture and intent:\n- Follow the existing src/surfaces/cli action and dispatch organization, thin daemon transport, shared API/service ownership, JSON-first output, detached-safe behavior, and local-first state model.\n- Use the Goal plus relevant docs/intent pages for CLI, API, Settings, Guidance, Quality, Governance, and Target App. Update only affected intent documentation and any necessary command/runbook examples.\n\nVerification and evidence:\n- Add focused parsing, help, and command-catalog tests for every new subcommand and argument form.\n- Add daemon-routing integration coverage proving reads and writes use shared endpoints, include API version and idempotency headers, preserve unrelated fields/items, and read back the saved result.\n- Cover validation and failure paths: detached app, unreachable daemon, unknown settings, malformed JSON/file/stdin, invalid Quality or Governance values, missing Guidance entries, and concurrent or stale list mutation.\n- Verify existing browser/API behavior remains semantically unchanged. Run focused exact Rust tests, cargo fmt --all -- --check, cargo check --all-targets, relevant CLI/web-server suites, and git diff --check; report exact commands and results.",
+            "reporter": "Buddy Williams",
+            "round": 1
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-08-13T20:11:25Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "2026-08-13T20:49:56Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZZ4AFQ91NQ79JJRAM000-round-2",
+        "failed_actions": [],
+        "governance_configured": true,
+        "guidance_checked": 2,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No actual governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "No actual governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZZ4AFQ91NQ79JJRAM000-round-2"
+      },
+      "governance_message": "No actual governance rule violations found.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-13T20:31:26Z",
+        "skipped": []
+      },
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "d32e7461ab0840babb8fe91cd0958f0b5b3cb32c",
+          "context_digest": "16d28e5ec8a7b8cd45262be9486713be317c8333920c1d042f472d77639b890f",
+          "context_version": 1,
+          "goal_id": "00000SZZ4AFQ91NQ79JJRAM000",
+          "implementation_branch": "refine/00000SZZ4AFQ91NQ79JJRAM000/round-2",
+          "round_idx": 1,
+          "target_branch": "main"
+        },
+        "completed_at": "2026-08-13T20:31:21Z",
+        "criticism": {
+          "completed_at": "2026-08-13T20:14:29Z",
+          "git_after": {
+            "branch": "refine/00000SZZ4AFQ91NQ79JJRAM000/round-2",
+            "head_commit": "d32e7461ab0840babb8fe91cd0958f0b5b3cb32c",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000SZZ4AFQ91NQ79JJRAM000/round-2",
+            "head_commit": "d32e7461ab0840babb8fe91cd0958f0b5b3cb32c",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P4",
+                  "P5",
+                  "P7"
+                ],
+                "description": "The checklist confirms behavior and promises a clean final commit but never requires the requested focused and full Rust, browser, CLI, format, check, and diff commands or repository-state inspection after every command; that omission leaves the prior lockfile-dirtiness failure able to recur undetected.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Add a checklist item that runs every mandated verification command, records pass/fail/skip counts and Chromium skips, checks git status after each command, commits only authoritative generated artifacts, and repeats final branch, commit, and empty-status readback."
+              }
+            ],
+            "summary": "Add an explicit verification and cleanliness checkpoint to the otherwise sound recovery plan."
+          },
+          "started_at": "2026-08-13T20:13:02Z"
+        },
+        "final_plan": {
+          "completed_at": "2026-08-13T20:15:15Z",
+          "git_after": {
+            "branch": "refine/00000SZZ4AFQ91NQ79JJRAM000/round-2",
+            "head_commit": "d32e7461ab0840babb8fe91cd0958f0b5b3cb32c",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000SZZ4AFQ91NQ79JJRAM000/round-2",
+            "head_commit": "d32e7461ab0840babb8fe91cd0958f0b5b3cb32c",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Replay implementation commit e2a5dce686694aa4c98703eb47dfbf021923a482 and Quality correction commit 925326a844179848e00073f533597de7ddafba20 in order onto the current-main Round 2 branch without modifying the retained Round 1 branch, worktree, logs, reflog, or dirty-state evidence.",
+                "id": "P1"
+              },
+              {
+                "description": "Resolve only overlaps introduced by current main, preserving its automatic Quality recovery changes alongside the recovered config CLI, browser, service, API, test, and intent behavior.",
+                "id": "P2"
+              },
+              {
+                "description": "Determine whether serde_path_to_error belongs in xtask/Cargo.lock from the recovered workspace dependency graph, retaining and committing the authoritative lockfile result or correcting only the behavior that generated a non-authoritative delta.",
+                "id": "P3"
+              },
+              {
+                "description": "Preserve the complete config command tree, help and catalog, structured inputs and errors, daemon headers and shared validation, authoritative mutation readback, and established ownership boundaries.",
+                "id": "P4"
+              },
+              {
+                "description": "Preserve Guidance and Governance stable identities, revision-fenced conflict-safe mutations, unrelated-entry retention, and compatible browser conflict handling through the existing durable authorities.",
+                "id": "P5"
+              },
+              {
+                "description": "Keep the affected intent updates and cohesive module boundaries aligned with the recovered contracts without unrelated redesign, cleanup, or documentation expansion.",
+                "id": "P6"
+              },
+              {
+                "description": "Include every intentional generated artifact in the Round 2 candidate commit so the branch hands off the exact recovered implementation with no residual worktree changes.",
+                "id": "P7"
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "The focused and full checks, per-command repository-state inspection, recorded pass/fail/skip counts, Chromium-skip reporting, and final branch, commit, and empty-status readback remain mandatory implementation-phase evidence; the current Revise contract explicitly excludes verification and commands from this compact implementation checklist, while P3 and P7 make authoritative generated artifacts and a clean committed handoff part of the implementation itself."
+              }
+            ],
+            "summary": "Recover the completed daemon-routed config CLI and Quality corrections onto the fresh Round 2 branch because the prior candidate was blocked by retained-worktree dirtiness rather than a product defect, preserving current-main behavior and all Round 1 evidence while making the workspace lockfile and final candidate state authoritative and reviewable."
+          },
+          "started_at": "2026-08-13T20:14:30Z"
+        },
+        "implementation": {
+          "completed_at": "2026-08-13T20:31:21Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Cherry-picked e2a5dce686694aa4c98703eb47dfbf021923a482 then 925326a844179848e00073f533597de7ddafba20 onto d32e7461ab0840babb8fe91cd0958f0b5b3cb32c, producing 8e6541ef064ab646f322cf894fc76aa4ca5cfd8a and 0b4f8960db4f1f6a6154180a77bbff5ac5308a6f. git range-diff reported both pairs '='. Final readback shows the retained Round 1 worktree still at 925326a844179848e00073f533597de7ddafba20 with only ' M xtask/Cargo.lock'.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Both pinned commits replayed without cherry-pick conflicts and retained current-main automatic Quality recovery. Mandated tests found two current-main contract defects; b82be38d1decbffe915f4a21dcc849aeb73b8985 narrowly restores the required browser explanation wording and compacts the recovery prompt below its enforced 90-word limit. Exact static, prompt, recovery-parser, full web, and full library checks pass.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Current-main xtask/Cargo.lock already contains serde_path_to_error under refine 4.2.0, matching root Cargo.toml and Cargo.lock. 'cargo metadata --manifest-path xtask/Cargo.toml --locked --no-deps --format-version 1' passes and leaves Round 2 clean, so no additional lockfile commit is authoritative. Round 1's uncommitted dependency-only delta remains preserved.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Patch-identical replay retains the complete config action/dispatch/input modules, help and command catalog, daemon API-version and idempotency headers, shared validation, structured errors, authoritative readback, and command-family boundaries. Focused CLI tests, help/catalog probes, negative probes, and daemon-backed CLI integration pass.",
+                "id": "P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Patch-identical replay retains Guidance/Governance stable IDs, collection revisions, record locking, stale-write conflicts, unrelated-entry preservation, item APIs, and browser 409 refresh handling. Config service tests (12/12), exact Governance/Guidance web test, final web suite (137/137), and browser suite pass.",
+                "id": "P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "All recovered intent pages and cohesive config modules are patch-identical to the pinned commits. Only two narrow current-main automatic Quality recovery contract lines were additionally changed; no unrelated redesign or documentation expansion was performed.",
+                "id": "P6",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "All intentional changes are committed in three Round 2 commits. HEAD and the Round 2 branch ref both equal b82be38d1decbffe915f4a21dcc849aeb73b8985; final git status --porcelain output is empty and committed-range git diff --check passes.",
+                "id": "P7",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "git range-diff 3c4185a7bf46151ae5b5cdbadb646b694390feb3..925326a844179848e00073f533597de7ddafba20 d32e7461ab0840babb8fe91cd0958f0b5b3cb32c..0b4f8960: both commit pairs reported '='",
+              "cargo metadata --manifest-path xtask/Cargo.toml --locked --no-deps --format-version 1 >/dev/null: exit 0; no repository changes",
+              "cargo test --lib surfaces::cli::tests -- --nocapture: 61 passed, 0 failed",
+              "cargo test --lib process::supervisor::config::tests -- --nocapture: 12 passed, 0 failed",
+              "cargo test --lib surfaces::cli::dispatch::config::tests::input_decoder_handles_file_and_stdin_and_reports_malformed_sources -- --exact --nocapture: 0 tests because Quality moved the test into config_input",
+              "cargo test --lib surfaces::cli::dispatch::config_input::tests::input_decoder_handles_file_and_stdin_and_reports_malformed_sources -- --exact --nocapture: 1 passed, 0 failed",
+              "cargo test --lib surfaces::cli::tests::config::config_rejects_unknown_malformed_and_overlapping_input_before_state_changes -- --exact --nocapture: 1 passed, 0 failed",
+              "cargo test --lib surfaces::web_server::tests::quality_guidance::governance::web_server_manages_governance_guidance_and_reporters -- --exact --nocapture: 1 passed, 0 failed",
+              "cargo test --lib surfaces::web_server::tests::static_surface::settings::static_project_settings_explain_governance_and_quality_effects -- --exact --nocapture: 1 passed, 0 failed",
+              "cargo test --lib prompts::tests::agent_prompts_keep_only_task_specific_contracts -- --exact: 1 passed, 0 failed",
+              "cargo test --lib workflow::quality_recovery::tests -- --nocapture: 2 passed, 0 failed",
+              "cargo test --lib surfaces::web_server::tests -- --nocapture: first pre-correction run 135 passed/2 failed; post-correction retry 136 passed/1 load-sensitive 50ms failure",
+              "cargo test --lib surfaces::web_server::tests -- --nocapture --test-threads=1: 137 passed, 0 failed; warmed create 17.943078ms and late duplicate 4.580971ms",
+              "cargo test --lib: pre-correction 778 passed/2 failed/6 ignored; post-correction attempts each 779 passed/1 failed/6 ignored with distinct contention-sensitive PTY and repository-worker failures; every failure passed isolated",
+              "cargo test --lib -- --test-threads=1: 780 passed, 0 failed, 6 ignored",
+              "cargo run --manifest-path xtask/Cargo.toml -- test-browser: 166 passed, 0 failed, 25 skipped; all skips explicitly report no Playwright Chromium build available",
+              "cargo run --manifest-path xtask/Cargo.toml -- test-cli: 1 passed, 0 failed; xtask supplied the absolute smoke-ai fixture path",
+              "cargo check --all-targets: exit 0",
+              "cargo fmt --all -- --check: exit 0",
+              "cargo run --quiet -- config --help: exit 0; complete Settings/Quality/Governance/Guidance tree and ownership boundary shown",
+              "cargo run --quiet -- commands | jq '.commands[] | select(.name == \"config\") | [.subcommands[].name]': exit 0; show, settings, quality, governance, guidance",
+              "REFINE_DAEMON_PORT=9 cargo run --quiet -- config settings show: expected exit 1 with structured daemon_unavailable JSON",
+              "cargo run --quiet -- config quality set --json '{}' --file /home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZZ4AFQ91NQ79JJRAM000-round-2/missing.json: expected exit 1 with structured invalid_input JSON",
+              "git diff --check: exit 0",
+              "git diff --check d32e7461ab0840babb8fe91cd0958f0b5b3cb32c..HEAD: exit 0",
+              "git status --porcelain=v1: empty",
+              "git rev-parse HEAD and git rev-parse refs/heads/refine/00000SZZ4AFQ91NQ79JJRAM000/round-2: both b82be38d1decbffe915f4a21dcc849aeb73b8985"
+            ]
+          },
+          "report": "Recovered the exact Round 1 implementation and Quality patches onto current main as 8e6541ef064ab646f322cf894fc76aa4ca5cfd8a and 0b4f8960db4f1f6a6154180a77bbff5ac5308a6f; git range-diff marks both patch pairs '='. Reconciled two current-main automatic Quality recovery contracts in b82be38d1decbffe915f4a21dcc849aeb73b8985: browser copy now retains the required preserve-the-candidate contract, and quality/recovery.md meets the 90-word prompt limit without changing its read-only JSON output contract. Current main already contains the authoritative serde_path_to_error dependency in root and xtask lockfiles; locked xtask metadata resolves and produces no delta. Final branch refine/00000SZZ4AFQ91NQ79JJRAM000/round-2 points to b82be38d1decbffe915f4a21dcc849aeb73b8985 and git status --porcelain is empty. Round 1 remains untouched at 925326a844179848e00073f533597de7ddafba20 with retained dirty evidence ' M xtask/Cargo.lock'. Verification: focused CLI 61/61, config services 12/12, focused exact tests pass, final serialized web 137/137, full serialized library 780 passed/0 failed/6 ignored, browser 166 passed/0 failed/25 skipped because Playwright Chromium is unavailable, CLI aggregate 1/1, fmt/check/diff/locked metadata/help/catalog/error probes pass. Three non-serialized full-library attempts exposed distinct cross-test contention failures after otherwise passing 778-779 tests; every failing test passed isolated and the complete serialized run passed.",
+          "started_at": "2026-08-13T20:15:22Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-13T20:15:22Z",
+        "proposal": {
+          "completed_at": "2026-08-13T20:12:59Z",
+          "git_after": {
+            "branch": "refine/00000SZZ4AFQ91NQ79JJRAM000/round-2",
+            "head_commit": "d32e7461ab0840babb8fe91cd0958f0b5b3cb32c",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000SZZ4AFQ91NQ79JJRAM000/round-2",
+            "head_commit": "d32e7461ab0840babb8fe91cd0958f0b5b3cb32c",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Replay the Round 1 implementation commit and its Quality correction in order onto the current-main Round 2 branch without modifying the retained Round 1 branch, worktree, logs, reflog, or dirty-state evidence.",
+                "id": "P1"
+              },
+              {
+                "description": "Resolve only overlaps introduced by current main, preserving its automatic Quality recovery changes alongside the recovered config CLI, browser, service, API, test, and intent behavior.",
+                "id": "P2"
+              },
+              {
+                "description": "Retain the current-main xtask lockfile entry that already records the refine 4.2.0 package and its required serde_path_to_error dependency, and include any further authoritative generated delta in the Round 2 candidate rather than leaving build artifacts dirty.",
+                "id": "P3"
+              },
+              {
+                "description": "Confirm the recovered command tree, help and catalog, structured inputs and errors, daemon headers and shared validation, and authoritative mutation readback still implement the original configuration surface without duplicating existing command ownership.",
+                "id": "P4"
+              },
+              {
+                "description": "Confirm Guidance and Governance retain stable identities, revision-fenced conflict-safe mutations, preservation of unrelated entries, and compatible browser conflict handling through the existing durable authorities.",
+                "id": "P5"
+              },
+              {
+                "description": "Keep the affected intent updates and cohesive module boundaries aligned with the recovered contracts, avoiding unrelated redesign or documentation expansion.",
+                "id": "P6"
+              },
+              {
+                "description": "Commit only the recovered changes and intentional generated artifacts on the Round 2 branch, leaving the reported candidate commit with an empty worktree for downstream Quality, Governance, and human Review.",
+                "id": "P7"
+              }
+            ],
+            "summary": "Recover the completed daemon-routed config CLI and Quality corrections onto the fresh Round 2 branch because the prior candidate was blocked only by retained-worktree dirtiness, preserving current-main behavior and all retained Round 1 evidence while carrying forward the authoritative workspace lockfile state."
+          },
+          "started_at": "2026-08-13T20:11:35Z"
+        },
+        "schema_version": 2,
+        "started_at": "2026-08-13T20:11:33Z",
+        "state": "completed",
+        "updated_at": "2026-08-13T20:31:21Z"
+      },
+      "implementation_report": "Recovered the exact Round 1 implementation and Quality patches onto current main as 8e6541ef064ab646f322cf894fc76aa4ca5cfd8a and 0b4f8960db4f1f6a6154180a77bbff5ac5308a6f; git range-diff marks both patch pairs '='. Reconciled two current-main automatic Quality recovery contracts in b82be38d1decbffe915f4a21dcc849aeb73b8985: browser copy now retains the required preserve-the-candidate contract, and quality/recovery.md meets the 90-word prompt limit without changing its read-only JSON output contract. Current main already contains the authoritative serde_path_to_error dependency in root and xtask lockfiles; locked xtask metadata resolves and produces no delta. Final branch refine/00000SZZ4AFQ91NQ79JJRAM000/round-2 points to b82be38d1decbffe915f4a21dcc849aeb73b8985 and git status --porcelain is empty. Round 1 remains untouched at 925326a844179848e00073f533597de7ddafba20 with retained dirty evidence ' M xtask/Cargo.lock'. Verification: focused CLI 61/61, config services 12/12, focused exact tests pass, final serialized web 137/137, full serialized library 780 passed/0 failed/6 ignored, browser 166 passed/0 failed/25 skipped because Playwright Chromium is unavailable, CLI aggregate 1/1, fmt/check/diff/locked metadata/help/catalog/error probes pass. Three non-serialized full-library attempts exposed distinct cross-test contention failures after otherwise passing 778-779 tests; every failing test passed isolated and the complete serialized run passed.",
+      "implementation_reported_at": "2026-08-13T20:31:23Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Recover the retained Round 1 config CLI candidate after the Quality infrastructure failure, without discarding or rewriting any Round 1 evidence.\n\nRound 1 implementation commit e2a5dce686694aa4c98703eb47dfbf021923a482 and Quality correction commit 925326a844179848e00073f533597de7ddafba20 contain the completed daemon-routed config CLI work. The Quality agent reported full Rust, browser, CLI, format, check, and diff verification, but the post-execution candidate guard failed because the retained Round 1 worktree was dirty: xtask/Cargo.lock had gained the refine package dependency serde_path_to_error. Governance did not run, and the candidate is not integrated into main.\n\nUse the fresh Round 2 worktree based on current main. Inspect and recover the Round 1 implementation and Quality corrections by replaying or equivalently applying those exact commits, resolving current-main conflicts narrowly. Reconcile the xtask/Cargo.lock dependency delta intentionally: commit the authoritative lockfile update if it is required by the workspace dependency graph, or correct the responsible verification/build behavior if the delta is not authoritative. Do not clean, reset, delete, amend, or otherwise mutate the retained Round 1 branch or worktree. Preserve its candidate, dirty-state evidence, logs, and reflog.\n\nConfirm the recovered behavior still satisfies the original Goal, including complete config command/help/catalog coverage, shared daemon/API validation and authoritative readback, conflict-safe Guidance and Governance collection mutations, browser compatibility, and affected intent documentation. Avoid unrelated redesign or scope expansion.\n\nRun the recorded focused and full verification on the recovered candidate: exact config/service/web tests as relevant; cargo test --lib; cargo run --manifest-path xtask/Cargo.toml -- test-browser; cargo run --manifest-path xtask/Cargo.toml -- test-cli using an absolute fixture path where required; cargo check --all-targets; cargo fmt --all -- --check; and git diff --check. After every verification command, inspect repository state. Before handoff, commit every intentional generated artifact, confirm the Round 2 branch points at the reported candidate, and prove git status --porcelain is empty. Report exact commands, pass/fail/skip counts, any Chromium-unavailable skips, the lockfile disposition, final commit, branch, and clean-status readback. Do not approve, merge, push, or advance beyond the workflow-owned Quality, Governance, and human Review gates.",
+      "quality_agent_report": "Quality review required no candidate corrections. The exact Round 1 implementation and Quality patches remain recovered on Round 2, current-main recovery contracts and affected intent remain reconciled, serde_path_to_error is authoritative in the xtask dependency graph, all required focused/full/browser/CLI/format/check/diff probes passed, Chromium-only browser cases were visibly skipped, and every post-command repository inspection plus final readback was clean at b82be38d1decbffe915f4a21dcc849aeb73b8985.",
+      "quality_candidate_commit": "b82be38d1decbffe915f4a21dcc849aeb73b8985",
+      "quality_checked_at": "2026-08-13T20:48:20Z",
+      "quality_details": {
+        "candidate_commit": "b82be38d1decbffe915f4a21dcc849aeb73b8985",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZZ4AFQ91NQ79JJRAM000-round-2",
+        "diagnostics": [
+          "{\"ok\":true,\"summary\":\"Candidate passed the single supervised predicate. Remaining uncertainty: 25 Playwright Chromium tests were skipped because Chromium is unavailable.\",\"results\":[{\"test\":\"The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\",\"status\":\"passed\",\"evidence\":\"Final exit 0. Rust: 780 passed, 0 failed, 6 ignored. Browser: 166 passed, 0 failed, 25 Chromium-unavailable skips. Daemon-backed CLI: 1 passed, 0 failed. cargo check, fmt check, locked metadata, diff check, and clean-worktree predicate all passed.\",\"command\":\"bash -lc 'set -euo pipefail\\ncargo test --lib -- --test-threads=1\\ncargo run --manifest-path xtask/Cargo.toml -- test-browser\\ncargo run --manifest-path xtask/Cargo.toml -- test-cli\\ncargo check --all-targets\\ncargo fmt --all -- --check\\ncargo metadata --manifest-path xtask/Cargo.toml --locked --no-deps --format-version 1 >/dev/null\\ngit diff --check d32e7461ab0840babb8fe91cd0958f0b5b3cb32c..HEAD\\ngit status --porcelain=v1 | awk '\\\\''NF { dirty = 1 } END { exit(dirty ? 1 : 0) }'\\\\'''\"}]}",
+          "Observed supervised process proc-1786653952403-3027609-270 exited 0. stdout: safe table styles (5.770711ms)\n✔ every terminal profile installs the shared copy and paste behavior (142.918178ms)\n✔ Ctrl+Enter inserts a TUI newline without submitting ordinary Enter (27.888846ms)\n✔ Ctrl+Z cannot suspend Agent terminals and subsequent input remains usable (28.041823ms)\n✔ Ctrl+Z retains shell Terminal job-control semantics (26.805859ms)\n✔ Ctrl+C without a selection keeps terminal SIGINT semantics (30.705397ms)\n✔ Ctrl+V uses terminal-native framing for single-line and multiline text (52.822054ms)\n✔ native paste is sent exactly once instead of being reprocessed by xterm (28.01708ms)\n✔ clipboard failures are visible and unavailable APIs do not claim browser handling (80.413953ms)\n✔ an asynchronous paste cannot cross into a replacement managed session (28.227807ms)\n✔ clipboard text buffered before replacement cannot cross managed sessions (28.076293ms)\n✔ clipboard shortcuts remain untouched when focus is outside a terminal (27.753511ms)\n✔ theme initializes from the system preference and exposes an accessible toggle (3.387743ms)\n✔ theme toggle switches modes, persists the choice, and announces the change (1.161742ms)\n✔ system theme changes remain live until the user stores a preference (1.003337ms)\n✔ API callers can render an expected degraded status without recording Activity (4.262589ms)\n✔ identical UI errors are persisted at most once per cooldown (1.860399ms)\n✔ passive source-status reads opt out of Activity error recording (0.605016ms)\n✔ no selector literal in the web UI contains an empty call (25.818842ms)\n✔ no rendered test id in the web UI contains an empty call (9.798502ms)\n✔ dom-morph.js is loaded before the screens that use it (0.823097ms)\n✔ Reporter onboarding loads before router and init (0.335268ms)\nℹ tests 191\nℹ suites 0\nℹ pass 166\nℹ fail 0\nℹ cancelled 0\nℹ skipped 25\nℹ todo 0\nℹ duration_ms 4476.23749\n\nrunning 1 test\ntest cli_surface_suite ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 19.90s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running `xtask/target/debug/refine-xtask test-browser`\n==> run browser JavaScript tests\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running `xtask/target/debug/refine-xtask test-cli`\n==> build smoke-ai fixture\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.00s\n==> run CLI surface tests\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running tests/cli_surface.rs (target/debug/deps/cli_surface-a83cdaf5e852ddf8)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.09s"
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "19ffcdad3942e32995",
+        "results": [
+          {
+            "command": "bash -lc 'set -euo pipefail\ncargo test --lib -- --test-threads=1\ncargo run --manifest-path xtask/Cargo.toml -- test-browser\ncargo run --manifest-path xtask/Cargo.toml -- test-cli\ncargo check --all-targets\ncargo fmt --all -- --check\ncargo metadata --manifest-path xtask/Cargo.toml --locked --no-deps --format-version 1 >/dev/null\ngit diff --check d32e7461ab0840babb8fe91cd0958f0b5b3cb32c..HEAD\ngit status --porcelain=v1 | awk '\\''NF { dirty = 1 } END { exit(dirty ? 1 : 0) }'\\'''",
+            "evidence": "Observed supervised process proc-1786653952403-3027609-270 exited 0. stdout: safe table styles (5.770711ms)\n✔ every terminal profile installs the shared copy and paste behavior (142.918178ms)\n✔ Ctrl+Enter inserts a TUI newline without submitting ordinary Enter (27.888846ms)\n✔ Ctrl+Z cannot suspend Agent terminals and subsequent input remains usable (28.041823ms)\n✔ Ctrl+Z retains shell Terminal job-control semantics (26.805859ms)\n✔ Ctrl+C without a selection keeps terminal SIGINT semantics (30.705397ms)\n✔ Ctrl+V uses terminal-native framing for single-line and multiline text (52.822054ms)\n✔ native paste is sent exactly once instead of being reprocessed by xterm (28.01708ms)\n✔ clipboard failures are visible and unavailable APIs do not claim browser handling (80.413953ms)\n✔ an asynchronous paste cannot cross into a replacement managed session (28.227807ms)\n✔ clipboard text buffered before replacement cannot cross managed sessions (28.076293ms)\n✔ clipboard shortcuts remain untouched when focus is outside a terminal (27.753511ms)\n✔ theme initializes from the system preference and exposes an accessible toggle (3.387743ms)\n✔ theme toggle switches modes, persists the choice, and announces the change (1.161742ms)\n✔ system theme changes remain live until the user stores a preference (1.003337ms)\n✔ API callers can render an expected degraded status without recording Activity (4.262589ms)\n✔ identical UI errors are persisted at most once per cooldown (1.860399ms)\n✔ passive source-status reads opt out of Activity error recording (0.605016ms)\n✔ no selector literal in the web UI contains an empty call (25.818842ms)\n✔ no rendered test id in the web UI contains an empty call (9.798502ms)\n✔ dom-morph.js is loaded before the screens that use it (0.823097ms)\n✔ Reporter onboarding loads before router and init (0.335268ms)\nℹ tests 191\nℹ suites 0\nℹ pass 166\nℹ fail 0\nℹ cancelled 0\nℹ skipped 25\nℹ todo 0\nℹ duration_ms 4476.23749\n\nrunning 1 test\ntest cli_surface_suite ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 19.90s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running `xtask/target/debug/refine-xtask test-browser`\n==> run browser JavaScript tests\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running `xtask/target/debug/refine-xtask test-cli`\n==> build smoke-ai fixture\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.00s\n==> run CLI surface tests\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running tests/cli_surface.rs (target/debug/deps/cli_surface-a83cdaf5e852ddf8)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.09s Agent report: Final exit 0. Rust: 780 passed, 0 failed, 6 ignored. Browser: 166 passed, 0 failed, 25 Chromium-unavailable skips. Daemon-backed CLI: 1 passed, 0 failed. cargo check, fmt check, locked metadata, diff check, and clean-worktree predicate all passed.",
+            "exit_code": 0,
+            "process_id": "proc-1786653952403-3027609-270",
+            "status": "passed",
+            "test": "The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks."
+          }
+        ],
+        "source_candidate_commit": "b82be38d1decbffe915f4a21dcc849aeb73b8985"
+      },
+      "quality_message": "All Quality tests passed with observed supervised evidence.",
+      "quality_state": "passed",
+      "reporter": "Buddy Williams",
+      "rule_state": "passed",
+      "updated": "2026-08-13T20:50:04Z",
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "b82be38d1decbffe915f4a21dcc849aeb73b8985",
+        "integrated_at": "2026-08-13T20:50:04.113976428+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Auto-merging src/surfaces/web/static/js/features/settings.js\nMerge made by the 'ort' strategy.\n docs/intent/02-foundation/03-target-app.md         |   1 +\n .../03-capabilities/02-agents/02-guidance.md       |   2 +\n .../intent/03-capabilities/02-agents/03-quality.md |   2 +\n .../03-capabilities/02-agents/04-governance.md     |   3 +\n docs/intent/04-surfaces/02-cli.md                  |   4 +-\n docs/intent/04-surfaces/03-browser/12-settings.md  |   1 +\n docs/intent/04-surfaces/04-api.md                  |   2 +\n src/process/supervisor/config/governance.rs        | 146 ++++++-\n src/process/supervisor/config/governance_codec.rs  |  10 +-\n src/process/supervisor/config/guidance.rs          | 148 ++++++-\n src/process/supervisor/config/guidance_codec.rs    | 183 +++++++-\n src/process/supervisor/config/mod.rs               |  10 +\n src/process/supervisor/config/settings.rs          |  21 +-\n src/process/supervisor/config/settings_codec.rs    |  21 +\n src/process/supervisor/config/tests.rs             | 149 +++++++\n src/prompts/quality/recovery.md                    |   2 +-\n src/surfaces/cli/actions.rs                        |  11 +\n src/surfaces/cli/actions/config.rs                 | 208 ++++++++++\n src/surfaces/cli/dispatch.rs                       |  36 ++\n src/surfaces/cli/dispatch/config.rs                | 438 +++++++++++++++++++\n src/surfaces/cli/dispatch/config_input.rs          | 169 ++++++++\n src/surfaces/cli/dispatch/daemon_transport.rs      |   7 +\n src/surfaces/cli/tests/config.rs                   | 462 +++++++++++++++++++++\n src/surfaces/cli/tests/mod.rs                      |   5 +-\n src/surfaces/web/static/js/features/settings.js    |   4 +-\n .../web/static/js/features/settings_governance.js  |  33 +-\n .../web/static/js/features/settings_guidance.js    |  36 +-\n .../web/static/js/features/settings_quality.js     |   2 +-\n src/surfaces/web_server/project_routes.rs          |  12 +\n .../project_routes/settings_governance.rs          |  34 ++\n src/surfaces/web_server/server.rs                  |  12 +\n .../tests/quality_guidance/governance.rs           |  74 ++++\n .../web_server/tests/static_surface/settings.rs    |  12 +\n src/tools/host/quality/types.rs                    |   1 +\n tests/cli_surface.rs                               |   3 +\n tests/cli_surface/config.rs                        | 130 ++++++\n 36 files changed, 2297 insertions(+), 97 deletions(-)\n create mode 100644 src/surfaces/cli/actions/config.rs\n create mode 100644 src/surfaces/cli/dispatch/config.rs\n create mode 100644 src/surfaces/cli/dispatch/config_input.rs\n create mode 100644 src/surfaces/cli/tests/config.rs\n create mode 100644 tests/cli_surface/config.rs",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "1522991c8d34da02cb0a38ca5eb94071fa4e248c"
+      },
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    }
+  ],
+  "status": "done",
+  "target_branch": "main",
+  "updated": "2026-08-13T21:27:27Z",
+  "workflow_revision": 49
+}

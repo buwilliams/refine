@@ -1,0 +1,209 @@
+{
+  "base_commit": "fc7c48c1476b81bfdcdecee76874bc8b8cf88db0",
+  "branch_name": "refine/00000SZ8SMFS50XSXY6M1V2002/round-1",
+  "candidate_commit": "0fd3abfed91a4b6859f3aa736bdbc32e6c76b9c4",
+  "created": "2026-07-27T10:52:34Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ8SMFS50XSXY6M1V2002",
+  "name": "Render Goal Agent context as a flat Markdown specification",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-07-27T11:08:10Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Replace the workflow Goal Agent initial-context JSON rendering with one human-readable Markdown specification template at src/prompts/spec.md. Use this shared template for every workflow-owned Goal Agent, independent of provider or the surface used to open or attach to that Goal Agent.\n\nIntent:\nGoal Agents should receive a clear, flat-ish Markdown specification composed from the pinned agent_context values. They should read ordinary prose and labeled Markdown sections, not a pretty-printed JSON object. Each piece of context must appear once, and the final substantive instruction must be the latest Goal Round.\n\nArchitecture and behavior:\n- Keep agent_context as the durable, versioned, pinned internal object. Preserve its current Round snapshot semantics and continue using the same pinned governance data for post-implementation governance evaluation. This Goal changes the agent-facing serialization, not the durable state contract.\n- Add src/prompts/spec.md as the authoritative embedded Markdown template for Goal Agent context. Register and render it through the shared prompt template capability rather than assembling ad hoc strings in a surface or provider adapter.\n- Replace serde_json pretty-printing of agent_context, goal, previous_rounds, and current_round in the Goal Agent launch prompt. Do not place a JSON object, JSON code block, JSON property dump, escaped JSON string, or duplicated structured representation in the prompt received by the agent.\n- Build one cohesive serializer or renderer that maps meaningful values from the pinned object into named Markdown substitutions. Preserve the underlying prose as readable text without JSON quoting or escaped newline sequences. Omit null, empty, and unclassified values as the current context selection does.\n- Preserve all meaningful context currently available to Goal Agents, but render every value no more than once. In particular, remove the current duplication where goal, previous_rounds, and current_round appear inside agent_context and then appear again as separate prompt sections.\n- Keep the serializer shared and authoritative. Goal Agent workflow code, PTY session code, web attachment, CLI attachment, and provider-specific launch paths must not define divergent context formats.\n\nThe rendered specification should follow this semantic order:\n1. Refine Context: the workflow-owned Agent role, isolated-worktree and lifecycle summary, review boundary, Goal identity, and any concise execution context the Agent needs.\n2. What: the product intent and Goal-level request or metadata needed to understand what is being changed.\n3. Why: the Constitution, notes, and other available rationale or protected intent.\n4. Rules: governance rules followed by enabled Guidance candidates and their applicability instructions. Present rules and candidates as readable numbered Markdown entries. Preserve stable zero-based Guidance candidate indexes because completion reporting depends on them.\n5. Previous Rounds: chronological, clearly separated Round sections containing meaningful prior prompts, implementation reports, Guidance decisions, governance outcomes or actions, and Quality evidence. Use readable labels and prose rather than field names serialized as JSON.\n6. Latest Round: the authoritative current Round, clearly labeled as the instruction to implement. State that it wins over conflicting earlier context. Put the latest Round request at the end of the rendered launch prompt as the final substantive instruction.\n\nTemplate composition constraints:\n- The complete initial Goal Agent prompt should contain the rendered spec exactly once.\n- Rework goal-agent.md and goal-agent-session.md composition as needed so protocol and completion-signal instructions are preserved without following, repeating, or obscuring the final latest-Round request. The latest Round must remain the final substantive work request.\n- Handle absent optional metadata, zero previous Rounds, multiple previous Rounds, multiline prose, Markdown within stored prompts, Unicode, nested governance or Quality details, and enabled Guidance deterministically and readably.\n- Avoid exposing implementation-only timestamps or field labels unless they materially help the Agent. Do not lose evidence that can affect implementation or recovery decisions.\n- Preserve provider behavior, Goal Agent autonomy, guidance_applied validation, completion signaling, worktree ownership, post-implementation Governance and Quality, and the human Review boundary.\n- Do not alter non-Goal provider prompts unless a shared composition change is strictly required for correctness.\n\nVerification:\n- Add focused unit tests for the exact rendered Markdown structure and section order.\n- Use unique sentinel text for Product, Constitution, each rule, Goal metadata or notes, enabled Guidance, previous Round prompts and outcomes, and latest Round. Assert that every sentinel is present exactly once and that disabled Guidance and raw logs remain absent.\n- Assert that agent-facing output contains no serialized agent_context JSON, no duplicated Goal or Round content, no JSON newline escaping, and no obsolete Pinned Goal Agent Context block.\n- Assert that Previous Rounds remain chronological, optional empty sections render cleanly, zero previous Rounds is readable, Guidance indexes remain stable, and the latest Round request is the final substantive content.\n- Cover multiline Markdown, quotes, braces, Unicode, and nested evidence values without falling back to JSON serialization.\n- Verify that every workflow-owned Goal Agent provider path receives the same spec renderer and that attachment surfaces do not create a second representation.\n- Update prompt-template registry tests and any affected Process, Agents, or Workflow intent documentation. Run focused workflow and agent-session tests, the full library test suite, formatting, and the relevant static or reference checks. Report exact results and retain the normal human Review boundary.",
+          "reporter": "Buddy Williams",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZ8SMFS50XSXY6M1V2002",
+          "name": "Render Goal Agent context as a flat Markdown specification",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-07-27T10:53:19Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "2026-07-27T11:32:08Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ8SMFS50XSXY6M1V2002-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 9,
+        "verdict": {
+          "message": "No governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ8SMFS50XSXY6M1V2002-round-1"
+      },
+      "governance_message": "No governance rule violations found.",
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-07-27T11:28:54Z",
+        "skipped": []
+      },
+      "implementation_report": "Replaced Goal Agent context JSON with the shared src/prompts/spec.md Markdown renderer; preserved pinned context and governance reuse; made the latest Round request the final substantive instruction; added exact structure, sentinel, provider-path, session, attachment, registry, and intent coverage. Verification: cargo test --lib -- --test-threads=1 passed 588/588; cargo test --lib process::agent_sessions::tests passed 8/8; cargo test --lib goal_agent_prompt passed 3/3; prompt registry tests passed 5/5; workflow behavior tests passed 6/6; cargo fmt --all -- --check passed; git diff --check passed. Strict cargo clippy --lib --bins --tests -- -D warnings remains blocked by 19 pre-existing warnings in unrelated files and reports none in the changed renderer, templates, tests, or docs.",
+      "implementation_reported_at": "2026-07-27T11:28:52Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Replace the workflow Goal Agent initial-context JSON rendering with one human-readable Markdown specification template at src/prompts/spec.md. Use this shared template for every workflow-owned Goal Agent, independent of provider or the surface used to open or attach to that Goal Agent.\n\nIntent:\nGoal Agents should receive a clear, flat-ish Markdown specification composed from the pinned agent_context values. They should read ordinary prose and labeled Markdown sections, not a pretty-printed JSON object. Each piece of context must appear once, and the final substantive instruction must be the latest Goal Round.\n\nArchitecture and behavior:\n- Keep agent_context as the durable, versioned, pinned internal object. Preserve its current Round snapshot semantics and continue using the same pinned governance data for post-implementation governance evaluation. This Goal changes the agent-facing serialization, not the durable state contract.\n- Add src/prompts/spec.md as the authoritative embedded Markdown template for Goal Agent context. Register and render it through the shared prompt template capability rather than assembling ad hoc strings in a surface or provider adapter.\n- Replace serde_json pretty-printing of agent_context, goal, previous_rounds, and current_round in the Goal Agent launch prompt. Do not place a JSON object, JSON code block, JSON property dump, escaped JSON string, or duplicated structured representation in the prompt received by the agent.\n- Build one cohesive serializer or renderer that maps meaningful values from the pinned object into named Markdown substitutions. Preserve the underlying prose as readable text without JSON quoting or escaped newline sequences. Omit null, empty, and unclassified values as the current context selection does.\n- Preserve all meaningful context currently available to Goal Agents, but render every value no more than once. In particular, remove the current duplication where goal, previous_rounds, and current_round appear inside agent_context and then appear again as separate prompt sections.\n- Keep the serializer shared and authoritative. Goal Agent workflow code, PTY session code, web attachment, CLI attachment, and provider-specific launch paths must not define divergent context formats.\n\nThe rendered specification should follow this semantic order:\n1. Refine Context: the workflow-owned Agent role, isolated-worktree and lifecycle summary, review boundary, Goal identity, and any concise execution context the Agent needs.\n2. What: the product intent and Goal-level request or metadata needed to understand what is being changed.\n3. Why: the Constitution, notes, and other available rationale or protected intent.\n4. Rules: governance rules followed by enabled Guidance candidates and their applicability instructions. Present rules and candidates as readable numbered Markdown entries. Preserve stable zero-based Guidance candidate indexes because completion reporting depends on them.\n5. Previous Rounds: chronological, clearly separated Round sections containing meaningful prior prompts, implementation reports, Guidance decisions, governance outcomes or actions, and Quality evidence. Use readable labels and prose rather than field names serialized as JSON.\n6. Latest Round: the authoritative current Round, clearly labeled as the instruction to implement. State that it wins over conflicting earlier context. Put the latest Round request at the end of the rendered launch prompt as the final substantive instruction.\n\nTemplate composition constraints:\n- The complete initial Goal Agent prompt should contain the rendered spec exactly once.\n- Rework goal-agent.md and goal-agent-session.md composition as needed so protocol and completion-signal instructions are preserved without following, repeating, or obscuring the final latest-Round request. The latest Round must remain the final substantive work request.\n- Handle absent optional metadata, zero previous Rounds, multiple previous Rounds, multiline prose, Markdown within stored prompts, Unicode, nested governance or Quality details, and enabled Guidance deterministically and readably.\n- Avoid exposing implementation-only timestamps or field labels unless they materially help the Agent. Do not lose evidence that can affect implementation or recovery decisions.\n- Preserve provider behavior, Goal Agent autonomy, guidance_applied validation, completion signaling, worktree ownership, post-implementation Governance and Quality, and the human Review boundary.\n- Do not alter non-Goal provider prompts unless a shared composition change is strictly required for correctness.\n\nVerification:\n- Add focused unit tests for the exact rendered Markdown structure and section order.\n- Use unique sentinel text for Product, Constitution, each rule, Goal metadata or notes, enabled Guidance, previous Round prompts and outcomes, and latest Round. Assert that every sentinel is present exactly once and that disabled Guidance and raw logs remain absent.\n- Assert that agent-facing output contains no serialized agent_context JSON, no duplicated Goal or Round content, no JSON newline escaping, and no obsolete Pinned Goal Agent Context block.\n- Assert that Previous Rounds remain chronological, optional empty sections render cleanly, zero previous Rounds is readable, Guidance indexes remain stable, and the latest Round request is the final substantive content.\n- Cover multiline Markdown, quotes, braces, Unicode, and nested evidence values without falling back to JSON serialization.\n- Verify that every workflow-owned Goal Agent provider path receives the same spec renderer and that attachment surfaces do not create a second representation.\n- Update prompt-template registry tests and any affected Process, Agents, or Workflow intent documentation. Run focused workflow and agent-session tests, the full library test suite, formatting, and the relevant static or reference checks. Report exact results and retain the normal human Review boundary.",
+      "quality_checked_at": "2026-07-27T11:32:16Z",
+      "quality_details": {
+        "candidate_commit": "0fd3abfed91a4b6859f3aa736bdbc32e6c76b9c4",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ8SMFS50XSXY6M1V2002-round-1",
+        "diagnostics": [
+          "No Quality tests or migrated commands are configured; evaluation was a no-op."
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "19fa358d91f26dbfe4",
+        "results": [],
+        "source_candidate_commit": "0fd3abfed91a4b6859f3aa736bdbc32e6c76b9c4"
+      },
+      "quality_message": "No Quality tests configured.",
+      "quality_state": "passed",
+      "reporter": "Buddy Williams",
+      "rule_state": "passed",
+      "updated": "2026-07-28T16:41:00Z",
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "0fd3abfed91a4b6859f3aa736bdbc32e6c76b9c4",
+        "integrated_at": "2026-07-27T11:32:24.650147184+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n .../03-capabilities/02-agents/10-goal-agents.md    |  15 +-\n .../03-capabilities/03-workflow/03-in-progress.md  |  14 +-\n src/process/agent_sessions/tests.rs                |  66 +++-\n src/prompts/goal-agent-session.md                  |  10 +-\n src/prompts/goal-agent.md                          |   7 +-\n src/prompts/mod.rs                                 |  18 +-\n src/prompts/spec.md                                |  33 ++\n src/workflow/goal_agent_context.rs                 |  57 ---\n src/workflow/goal_agent_spec.rs                    | 399 +++++++++++++++++++++\n src/workflow/goal_agent_spec/markdown.rs           | 176 +++++++++\n src/workflow/mod.rs                                |   4 +-\n src/workflow/tests/execution.rs                    | 253 ++++++++++---\n 12 files changed, 910 insertions(+), 142 deletions(-)\n create mode 100644 src/prompts/spec.md\n create mode 100644 src/workflow/goal_agent_spec.rs\n create mode 100644 src/workflow/goal_agent_spec/markdown.rs",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "99f6746b939157dcf517f5f671147ba0e11b19a0"
+      },
+      "workflow_quality_timing": "pre_merge"
+    }
+  ],
+  "status": "done",
+  "target_branch": "main",
+  "updated": "2026-07-28T16:41:08Z",
+  "workflow_revision": 23
+}

@@ -1,0 +1,445 @@
+{
+  "base_commit": "13ec207a1be1c2c7cb63fa8587cab1832027b20b",
+  "branch_name": "refine/00000SZZ1EFFT2EPG36KSVW002/round-2",
+  "candidate_commit": "5f79b94329cd4150ba5a46cf65844f6ed43361de",
+  "created": "2026-08-13T17:32:12Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZZ1EFFT2EPG36KSVW002",
+  "name": "When the workflow is paused, the UI shows the error, 'Refine cannot reach the ru",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-13T17:35:01Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "When the workflow is paused, the UI shows the error, 'Refine cannot reach the runtime worker. Re-check auth after restoring provider access.'. It should instead just say that the workflow is paused and it's not an error. Probably need to handle the case where the workflow is paused instead of showing an error. I like the label, but it shouldn't be an error and should say that the workflow is paused.",
+          "reporter": "Buddy Williams",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZZ1EFFT2EPG36KSVW002",
+          "name": "When the workflow is paused, the UI shows the error, 'Refine cannot reach the ru",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-08-13T17:32:12Z",
+      "failure_at": "2026-08-13T18:25:04Z",
+      "failure_category": "plan",
+      "failure_message": "Goal 00000SZZ1EFFT2EPG36KSVW002 round 1 implementation planning binding changed",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "guidance_decision": null,
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "407d8b7479a4e8abeeef3759edce92d21f2672b3",
+          "context_digest": "49a63050b50550db3dac28184fa4b58863b4a6940c7bfc466c4f7846da59bb9a",
+          "context_version": 1,
+          "goal_id": "00000SZZ1EFFT2EPG36KSVW002",
+          "implementation_branch": "refine/00000SZZ1EFFT2EPG36KSVW002/round-1",
+          "round_idx": 0,
+          "target_branch": "main"
+        },
+        "phase": "plan",
+        "phase_started_at": "2026-08-13T17:35:02Z",
+        "schema_version": 2,
+        "started_at": "2026-08-13T17:35:02Z",
+        "state": "in_progress",
+        "updated_at": "2026-08-13T17:35:02Z"
+      },
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "When the workflow is paused, the UI shows the error, 'Refine cannot reach the runtime worker. Re-check auth after restoring provider access.'. It should instead just say that the workflow is paused and it's not an error. Probably need to handle the case where the workflow is paused instead of showing an error. I like the label, but it shouldn't be an error and should say that the workflow is paused.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-08-13T18:25:05Z",
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-13T18:26:05Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "When the workflow is paused, the UI shows the error, 'Refine cannot reach the runtime worker. Re-check auth after restoring provider access.'. It should instead just say that the workflow is paused and it's not an error. Probably need to handle the case where the workflow is paused instead of showing an error. I like the label, but it shouldn't be an error and should say that the workflow is paused.",
+          "reporter": "Buddy Williams",
+          "round": 2
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZZ1EFFT2EPG36KSVW002",
+          "name": "When the workflow is paused, the UI shows the error, 'Refine cannot reach the ru",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "Buddy Williams",
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "407d8b7479a4e8abeeef3759edce92d21f2672b3",
+                "context_digest": "49a63050b50550db3dac28184fa4b58863b4a6940c7bfc466c4f7846da59bb9a",
+                "context_version": 1,
+                "goal_id": "00000SZZ1EFFT2EPG36KSVW002",
+                "implementation_branch": "refine/00000SZZ1EFFT2EPG36KSVW002/round-1",
+                "round_idx": 0,
+                "target_branch": "main"
+              },
+              "phase": "plan",
+              "phase_started_at": "2026-08-13T17:35:02Z",
+              "schema_version": 2,
+              "started_at": "2026-08-13T17:35:02Z",
+              "state": "in_progress",
+              "updated_at": "2026-08-13T17:35:02Z"
+            },
+            "prompt": "When the workflow is paused, the UI shows the error, 'Refine cannot reach the runtime worker. Re-check auth after restoring provider access.'. It should instead just say that the workflow is paused and it's not an error. Probably need to handle the case where the workflow is paused instead of showing an error. I like the label, but it shouldn't be an error and should say that the workflow is paused.",
+            "reporter": "Buddy Williams",
+            "round": 1
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-08-13T18:25:58Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "2026-08-13T18:43:40Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZZ1EFFT2EPG36KSVW002-round-2",
+        "failed_actions": [],
+        "governance_configured": true,
+        "guidance_checked": 2,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found.\",\"violations\":[],\"recovery_analysis\":\"\",\"recovery_round_prompt\":\"\"}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "No governance rule violations found.",
+          "recovery_analysis": "",
+          "recovery_round_prompt": "",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZZ1EFFT2EPG36KSVW002-round-2"
+      },
+      "governance_message": "No governance rule violations found.",
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-13T18:34:45Z",
+        "skipped": []
+      },
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "13ec207a1be1c2c7cb63fa8587cab1832027b20b",
+          "context_digest": "afae855943befb52c1e23d4835567fa6cddec5ddd4d19b40cc2a05220731457c",
+          "context_version": 1,
+          "goal_id": "00000SZZ1EFFT2EPG36KSVW002",
+          "implementation_branch": "refine/00000SZZ1EFFT2EPG36KSVW002/round-2",
+          "round_idx": 1,
+          "target_branch": "main"
+        },
+        "completed_at": "2026-08-13T18:34:39Z",
+        "criticism": {
+          "completed_at": "2026-08-13T18:28:30Z",
+          "git_after": {
+            "branch": "refine/00000SZZ1EFFT2EPG36KSVW002/round-2",
+            "head_commit": "13ec207a1be1c2c7cb63fa8587cab1832027b20b",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000SZZ1EFFT2EPG36KSVW002/round-2",
+            "head_commit": "13ec207a1be1c2c7cb63fa8587cab1832027b20b",
+            "status_porcelain": []
+          },
+          "result": {
+            "summary": "The proposed plan is complete and correctly scopes the paused-workflow dashboard behavior and regression coverage."
+          },
+          "started_at": "2026-08-13T18:27:19Z"
+        },
+        "final_plan": {
+          "completed_at": "2026-08-13T18:29:25Z",
+          "git_after": {
+            "branch": "refine/00000SZZ1EFFT2EPG36KSVW002/round-2",
+            "head_commit": "13ec207a1be1c2c7cb63fa8587cab1832027b20b",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000SZZ1EFFT2EPG36KSVW002/round-2",
+            "head_commit": "13ec207a1be1c2c7cb63fa8587cab1832027b20b",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Pass the existing canonical workflow pause flag from the runtime process summary into dashboard attention-item construction.",
+                "id": "P1"
+              },
+              {
+                "description": "Make dashboard attention emit an informational workflow-paused banner when paused and reserve the runtime-worker error banner for an unpaused unreachable worker.",
+                "id": "P2"
+              },
+              {
+                "description": "Extend focused dashboard regression coverage across paused and unpaused reachability states to lock in the new severity and preserve the genuine outage case.",
+                "id": "P3"
+              }
+            ],
+            "summary": "The dashboard will treat the canonical workflow pause state as an informational condition that takes precedence over runtime-worker reachability, so a paused workflow shows a neutral message that the workflow is paused without implying an error or prompting an auth re-check, while an unpaused and genuinely unreachable runtime still shows the existing failure guidance."
+          },
+          "started_at": "2026-08-13T18:28:34Z"
+        },
+        "implementation": {
+          "completed_at": "2026-08-13T18:34:39Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "src/surfaces/web_server/project_routes/dashboard.rs reads normalized workflow_paused from the runtime process summary and passes it to dashboard_attention_items; the endpoint regression sets canonical pause state through FileProcessSupervisor and observes the informational dashboard banner.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "src/surfaces/web_server/project_routes.rs emits an info-severity 'Workflow is paused.' banner whenever workflow_paused is true, before evaluating runner_reachable; only unpaused unreachable state emits the existing error banner and auth guidance.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "src/surfaces/web_server/tests/project_runtime.rs covers all four paused/unpaused and reachable/unreachable combinations, preserves the genuine outage assertion, and verifies canonical runtime pause state through GET /api/dashboard.",
+                "id": "P3",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "cargo test --lib surfaces::web_server::tests::project_runtime::web_server_structures_dashboard_attention_and_runtime_banner -- --exact — passed: 1 passed, 0 failed",
+              "cargo test --lib surfaces::web_server::tests::project_runtime::dashboard_distinguishes_workflow_pause_from_runtime_reachability -- --exact — passed: 1 passed, 0 failed",
+              "cargo test --lib surfaces::web_server::tests::project_runtime::dashboard_uses_canonical_runtime_workflow_pause_state -- --exact — passed: 1 passed, 0 failed",
+              "cargo test --lib surfaces::web_server::tests::project_runtime — passed: 8 passed, 0 failed",
+              "cargo fmt --all -- --check — passed (exit 0)",
+              "git diff --check — passed (exit 0)"
+            ]
+          },
+          "report": "Dashboard attention now gives canonical workflow pause state precedence over runtime reachability: paused workflows show the informational message 'Workflow is paused.', while unpaused unreachable workers retain the existing error and auth guidance. Added four-state and endpoint regression coverage, updated Dashboard intent, and all final verification passed.",
+          "started_at": "2026-08-13T18:29:33Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-13T18:29:33Z",
+        "proposal": {
+          "completed_at": "2026-08-13T18:27:15Z",
+          "git_after": {
+            "branch": "refine/00000SZZ1EFFT2EPG36KSVW002/round-2",
+            "head_commit": "13ec207a1be1c2c7cb63fa8587cab1832027b20b",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000SZZ1EFFT2EPG36KSVW002/round-2",
+            "head_commit": "13ec207a1be1c2c7cb63fa8587cab1832027b20b",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Pass the existing canonical workflow pause flag from the runtime process summary into dashboard attention-item construction.",
+                "id": "P1"
+              },
+              {
+                "description": "Make dashboard attention emit an informational workflow-paused banner when paused and reserve the runtime-worker error banner for an unpaused unreachable worker.",
+                "id": "P2"
+              },
+              {
+                "description": "Extend focused dashboard regression coverage across paused and unpaused reachability states to lock in the new severity and preserve the genuine outage case.",
+                "id": "P3"
+              }
+            ],
+            "summary": "The dashboard will treat the canonical workflow pause state as an informational condition that takes precedence over runtime-worker reachability, so a paused workflow shows a neutral message that the workflow is paused without implying an error or prompting an auth re-check, while an unpaused and genuinely unreachable runtime still shows the existing failure guidance."
+          },
+          "started_at": "2026-08-13T18:26:09Z"
+        },
+        "schema_version": 2,
+        "started_at": "2026-08-13T18:26:07Z",
+        "state": "completed",
+        "updated_at": "2026-08-13T18:34:39Z"
+      },
+      "implementation_report": "Dashboard attention now gives canonical workflow pause state precedence over runtime reachability: paused workflows show the informational message 'Workflow is paused.', while unpaused unreachable workers retain the existing error and auth guidance. Added four-state and endpoint regression coverage, updated Dashboard intent, and all final verification passed.",
+      "implementation_reported_at": "2026-08-13T18:34:42Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "When the workflow is paused, the UI shows the error, 'Refine cannot reach the runtime worker. Re-check auth after restoring provider access.'. It should instead just say that the workflow is paused and it's not an error. Probably need to handle the case where the workflow is paused instead of showing an error. I like the label, but it shouldn't be an error and should say that the workflow is paused.",
+      "quality_checked_at": "2026-08-13T18:41:46Z",
+      "quality_details": {
+        "candidate_commit": "5f79b94329cd4150ba5a46cf65844f6ed43361de",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZZ1EFFT2EPG36KSVW002-round-2",
+        "diagnostics": [
+          "No Quality tests or migrated commands are configured; evaluation was a no-op."
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "19ffc6e24971fc5278",
+        "results": [],
+        "source_candidate_commit": "5f79b94329cd4150ba5a46cf65844f6ed43361de"
+      },
+      "quality_message": "No Quality tests configured.",
+      "quality_state": "passed",
+      "reporter": "Buddy Williams",
+      "rule_state": "passed",
+      "updated": "2026-08-13T18:43:51Z",
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "5f79b94329cd4150ba5a46cf65844f6ed43361de",
+        "integrated_at": "2026-08-13T18:43:50.689955037+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n docs/intent/04-surfaces/03-browser/05-dashboard.md |  1 +\n src/surfaces/web_server/project_routes.rs          |  9 ++-\n .../web_server/project_routes/dashboard.rs         |  7 ++-\n src/surfaces/web_server/tests/project_runtime.rs   | 73 +++++++++++++++++++++-\n 4 files changed, 87 insertions(+), 3 deletions(-)",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "a3355c66ef42ddf8d3529f1d5882a200591ab037"
+      },
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    }
+  ],
+  "status": "done",
+  "target_branch": "main",
+  "updated": "2026-08-13T18:50:37Z",
+  "workflow_revision": 38
+}

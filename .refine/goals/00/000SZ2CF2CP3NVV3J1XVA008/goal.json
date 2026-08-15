@@ -136,7 +136,7 @@
       "updated": "2026-07-22T11:50:31Z"
     },
     {
-      "assignee": "Buddy",
+      "assignee": "Buddy Williams",
       "constitution_state": "passed",
       "created": "2026-07-22T11:51:23Z",
       "governance_checked_at": "2026-07-22T17:16:12Z",
@@ -174,10 +174,11 @@
       "quality_state": "passed",
       "reporter": "Buddy",
       "rule_state": "passed",
-      "updated": "2026-07-22T17:16:14Z"
+      "updated": "2026-07-28T16:38:40Z"
     }
   ],
   "status": "done",
   "target_branch": "main",
-  "updated": "2026-07-22T19:03:44Z"
+  "updated": "2026-07-28T16:38:55Z",
+  "workflow_revision": 4
 }

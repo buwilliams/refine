@@ -1,0 +1,707 @@
+{
+  "base_commit": "ccbef3d661903818a37795fe1f72fbba6138eeff",
+  "branch_name": "refine/00000SZ59QXMSGV335QP2BA001/round-3",
+  "candidate_commit": "d4f249a3cfd10fca40737067aea78fea4f1a89ef",
+  "created": "2026-07-24T17:41:38Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ59QXMSGV335QP2BA001",
+  "name": "Keep web live updates connected during process churn",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-07-24T17:45:11Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Fix the Web UI live-update disconnects and warning flaps by making the shared SSE transport resilient and bounded during managed-process churn.\n\nVerified live reproduction on port 8082:\n- A GET to /api/sse returned HTTP 200 but reached normal EOF after 7.889 seconds despite a 25-second client timeout, after sending 406,975 bytes. This proves the daemon closed the stream rather than the client timing out.\n- A later live stream ended with: event: error / data: {message: Process proc-1784914779045-3441909-41061 was not found}.\n- Another 17-second sample emitted 322 events and about 654 KB before the client timeout.\n- The daemon itself remained healthy and its workflow and git-sync runners remained running, so the global Live updates disconnected warning did not represent daemon loss.\n\nRoot cause:\n- LocalHttpDaemon::sse_response rebuilds server_sent_event_frames every 500 ms and closes the entire stream after any projection/frame-generation error.\n- recent_process_sse_events first calls FileProcessSupervisor::list, then calls supervisor.stream for each returned id. stream re-inspects the process record. A short-lived child can exit and have its process JSON and logs removed by the reaper between list and stream, turning ordinary process completion into RefineError::NotFound and terminating global SSE.\n- process_output payloads contain a new timestamp on every pass, while sse_frame_signature removes timestamps only for system_operation and operation_progress. Unchanged process tails therefore appear unique and are reread/retransmitted every 500 ms. The read path also loads each complete stdout/stderr file before trimming to 4,000 characters; current logs are multi-megabyte.\n- Browser onerror immediately shows Live updates disconnected. Reconnecting automatically. onopen resets the error timestamp, so repeated short disconnect/reconnect cycles can repeatedly warn even when durable state successfully reconciles.\n\nRequired behavior:\n1. Make process-output snapshotting race-safe. Ordinary disappearance of a process or its output artifacts after it was listed must be treated as a terminal/skipped snapshot, not as failure of the global event stream. Preserve actionable reporting for genuine persistent I/O, serialization, or projection failures.\n2. Keep /api/sse alive across recoverable component/frame errors. Do not use the reserved SSE error event in a way that is indistinguishable from transport failure; if an application diagnostic must be emitted, use a distinct typed event and do not close the stream for transient process churn.\n3. Deduplicate process_output by stable process identity and content, excluding presentation timestamps from signatures. Emit an initial/current snapshot and then only meaningful changes. Read bounded tails without rereading complete multi-megabyte logs every 500 ms.\n4. Preserve SSE as the sole live browser notification path. Keep authoritative one-shot reads for initial load and reconnect reconciliation; do not add polling fallback or make UI requests wait on process, Git, projection, or log work.\n5. Improve connection UX so brief automatically recovered transitions do not produce warning/success toast flaps. Show a connectivity warning only after a meaningful grace period or sustained disconnected state, clear it on reconnect, and emit a reconnected notice only if the user was actually shown a disconnect state.\n6. Add deterministic race coverage where a short-lived managed process is reaped between process listing and output capture while a real TCP SSE connection remains open. Prove no reserved error event or premature EOF, heartbeats continue, later state changes still arrive, and durable reconnect reconciliation remains correct.\n7. Add replay/load coverage proving unchanged process output is not resent on every 500 ms pass, changed output emits once, tail size and event counts remain bounded, and large logs are not fully reread. Add browser coverage for short versus sustained onerror and reconnect behavior.\n8. Retain existing project/status/runtime/operation/source/chat/Goal-log event behavior and active-operation visibility. Run focused SSE/process race tests, real-TCP longevity coverage, browser tests, all Rust tests, strict Clippy, formatting, static/CLI checks, and diff checks, reporting initial and final outcomes exactly.",
+          "reporter": "Buddy Williams",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZ59QXMSGV335QP2BA001",
+          "name": "Keep web live updates connected during process churn",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-07-24T17:41:57Z",
+      "governance_checked_at": "2026-07-24T18:02:11Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ59QXMSGV335QP2BA001-round-1",
+        "failed_actions": [
+          {
+            "message": "The web-server surface now implements process-log file access, tailing, truncation, and reaping-race semantics in http_state.rs; those behaviors belong in the shared Process capability.",
+            "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+            "rule_id": "rule-1"
+          },
+          {
+            "message": "bounded_process_output_snapshot directly reads ManagedProcess stdout/stderr paths and duplicates ProcessSupervisor::stream instead of extending and composing the authoritative Process capability.",
+            "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+            "rule_id": "rule-2"
+          },
+          {
+            "message": "Persistent projection and frame failures emit sse_diagnostic, but the browser registers no handler for that event and no durable activity is recorded; the UI can remain stale while appearing connected, without actionable failure feedback.",
+            "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+            "rule_id": "rule-4"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Process ownership is duplicated in the web surface, and persistent SSE failures are not user-visible.\",\"violations\":[{\"rule_id\":\"rule-1\",\"rule\":\"Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.\",\"message\":\"The web-server surface now implements process-log file access, tailing, truncation, and reaping-race semantics in http_state.rs; those behaviors belong in the shared Process capability.\"},{\"rule_id\":\"rule-2\",\"rule\":\"Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.\",\"message\":\"bounded_process_output_snapshot directly reads ManagedProcess stdout/stderr paths and duplicates ProcessSupervisor::stream instead of extending and composing the authoritative Process capability.\"},{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"Persistent projection and frame failures emit sse_diagnostic, but the browser registers no handler for that event and no durable activity is recorded; the UI can remain stale while appearing connected, without actionable failure feedback.\"}]}",
+        "rules_checked": 9,
+        "verdict": {
+          "message": "Process ownership is duplicated in the web surface, and persistent SSE failures are not user-visible.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "The web-server surface now implements process-log file access, tailing, truncation, and reaping-race semantics in http_state.rs; those behaviors belong in the shared Process capability.",
+              "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "rule_id": "rule-1"
+            },
+            {
+              "message": "bounded_process_output_snapshot directly reads ManagedProcess stdout/stderr paths and duplicates ProcessSupervisor::stream instead of extending and composing the authoritative Process capability.",
+              "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "rule_id": "rule-2"
+            },
+            {
+              "message": "Persistent projection and frame failures emit sse_diagnostic, but the browser registers no handler for that event and no durable activity is recorded; the UI can remain stale while appearing connected, without actionable failure feedback.",
+              "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "rule_id": "rule-4"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ59QXMSGV335QP2BA001-round-1"
+      },
+      "governance_message": "Process ownership is duplicated in the web surface, and persistent SSE failures are not user-visible.",
+      "governance_rule_actions": [
+        {
+          "message": "The web-server surface now implements process-log file access, tailing, truncation, and reaping-race semantics in http_state.rs; those behaviors belong in the shared Process capability.",
+          "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+          "rule_id": "rule-1"
+        },
+        {
+          "message": "bounded_process_output_snapshot directly reads ManagedProcess stdout/stderr paths and duplicates ProcessSupervisor::stream instead of extending and composing the authoritative Process capability.",
+          "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+          "rule_id": "rule-2"
+        },
+        {
+          "message": "Persistent projection and frame failures emit sse_diagnostic, but the browser registers no handler for that event and no durable activity is recorded; the UI can remain stale while appearing connected, without actionable failure feedback.",
+          "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+          "rule_id": "rule-4"
+        }
+      ],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          }
+        ],
+        "context_version": 1,
+        "recorded_at": "2026-07-24T18:00:37Z",
+        "skipped": []
+      },
+      "implementation_report": "Implemented race-safe bounded process-output snapshots from listed records (16,384-byte tail reads per stream, 4,000-character payload), missing-artifact skip semantics, stable per-process/content SSE deduplication without presentation timestamps, resilient typed sse_diagnostic recovery without reserved error events or stream closure, and a 5-second browser disconnect grace with warning removal and conditional reconnect notice. Added deterministic real-TCP reaping, heartbeat, later-update, reconnect-replay, projection-recovery, unchanged/changed-output count, large-log bound, and short/sustained browser coverage. Verification: focused SSE tests 23 passed/0 failed; focused browser tests 8 passed/0 failed; static/browser check 62 passed/0 failed; daemon-backed CLI 1 passed/0 failed; Rust run before final load test 495 unit + 10 integration + 0 doc passed; final Rust suite twice reached 495 passed/1 failed because unrelated workflow::tests::file_automation_replenishes_running_agents_when_concurrency_cap_increases read an empty quality/settings.json, while its isolated rerun passed 1/1; strict Clippy failed on 13 pre-existing warnings in untouched files (result_large_err x2, missing_const_for_thread_local, drop_non_drop x2, too_many_arguments x3, enum_variant_names, question_mark, if_same_then_else, ptr_arg, type_complexity); cargo fmt --check, git diff --check, and final worktree scope checks passed.",
+      "implementation_reported_at": "2026-07-24T18:00:38Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Fix the Web UI live-update disconnects and warning flaps by making the shared SSE transport resilient and bounded during managed-process churn.\n\nVerified live reproduction on port 8082:\n- A GET to /api/sse returned HTTP 200 but reached normal EOF after 7.889 seconds despite a 25-second client timeout, after sending 406,975 bytes. This proves the daemon closed the stream rather than the client timing out.\n- A later live stream ended with: event: error / data: {message: Process proc-1784914779045-3441909-41061 was not found}.\n- Another 17-second sample emitted 322 events and about 654 KB before the client timeout.\n- The daemon itself remained healthy and its workflow and git-sync runners remained running, so the global Live updates disconnected warning did not represent daemon loss.\n\nRoot cause:\n- LocalHttpDaemon::sse_response rebuilds server_sent_event_frames every 500 ms and closes the entire stream after any projection/frame-generation error.\n- recent_process_sse_events first calls FileProcessSupervisor::list, then calls supervisor.stream for each returned id. stream re-inspects the process record. A short-lived child can exit and have its process JSON and logs removed by the reaper between list and stream, turning ordinary process completion into RefineError::NotFound and terminating global SSE.\n- process_output payloads contain a new timestamp on every pass, while sse_frame_signature removes timestamps only for system_operation and operation_progress. Unchanged process tails therefore appear unique and are reread/retransmitted every 500 ms. The read path also loads each complete stdout/stderr file before trimming to 4,000 characters; current logs are multi-megabyte.\n- Browser onerror immediately shows Live updates disconnected. Reconnecting automatically. onopen resets the error timestamp, so repeated short disconnect/reconnect cycles can repeatedly warn even when durable state successfully reconciles.\n\nRequired behavior:\n1. Make process-output snapshotting race-safe. Ordinary disappearance of a process or its output artifacts after it was listed must be treated as a terminal/skipped snapshot, not as failure of the global event stream. Preserve actionable reporting for genuine persistent I/O, serialization, or projection failures.\n2. Keep /api/sse alive across recoverable component/frame errors. Do not use the reserved SSE error event in a way that is indistinguishable from transport failure; if an application diagnostic must be emitted, use a distinct typed event and do not close the stream for transient process churn.\n3. Deduplicate process_output by stable process identity and content, excluding presentation timestamps from signatures. Emit an initial/current snapshot and then only meaningful changes. Read bounded tails without rereading complete multi-megabyte logs every 500 ms.\n4. Preserve SSE as the sole live browser notification path. Keep authoritative one-shot reads for initial load and reconnect reconciliation; do not add polling fallback or make UI requests wait on process, Git, projection, or log work.\n5. Improve connection UX so brief automatically recovered transitions do not produce warning/success toast flaps. Show a connectivity warning only after a meaningful grace period or sustained disconnected state, clear it on reconnect, and emit a reconnected notice only if the user was actually shown a disconnect state.\n6. Add deterministic race coverage where a short-lived managed process is reaped between process listing and output capture while a real TCP SSE connection remains open. Prove no reserved error event or premature EOF, heartbeats continue, later state changes still arrive, and durable reconnect reconciliation remains correct.\n7. Add replay/load coverage proving unchanged process output is not resent on every 500 ms pass, changed output emits once, tail size and event counts remain bounded, and large logs are not fully reread. Add browser coverage for short versus sustained onerror and reconnect behavior.\n8. Retain existing project/status/runtime/operation/source/chat/Goal-log event behavior and active-operation visibility. Run focused SSE/process race tests, real-TCP longevity coverage, browser tests, all Rust tests, strict Clippy, formatting, static/CLI checks, and diff checks, reporting initial and final outcomes exactly.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "failed",
+      "updated": "2026-07-24T18:02:12Z",
+      "workflow_quality_timing": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-07-24T18:27:56Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Recover the Governance-rejected Round 1 candidate 4f757d3f24df7940271e1b8264ee83716d3b761d from current main e1dd93e1 while preserving the candidate, its worktree, all prior Goal evidence, and its verified SSE behavior. Reapply or rebase the existing candidate onto current main without discarding the newly merged Jira-export work. Fix only the three recorded Governance violations.\n\nThe prior implementation already established the desired behavioral baseline: race-safe process completion no longer closes global SSE, unchanged process output is deduplicated, log reads are bounded, application diagnostics do not use the reserved SSE error event, transient browser disconnects have a grace period, and focused real-TCP/browser coverage passed. Preserve that behavior and its tests unless a correction requires a narrowly justified adjustment.\n\nRequired corrections:\n1. Move ownership of bounded process-output capture, tail-file access, truncation, and reaping/disappearance semantics out of src/surfaces/web_server/support/http_state.rs and into the existing shared Process capability. Extend or compose FileProcessSupervisor/ProcessSupervisor or the established process observability capability so there is one authoritative implementation. The web server must remain a thin adapter that consumes a process snapshot/result and formats SSE; it must not directly open ManagedProcess stdout/stderr paths or duplicate ProcessSupervisor::stream.\n2. Define the shared Process capability result so ordinary terminal races are explicit and safe: a process or artifact disappearing after enumeration is a skipped/terminal snapshot rather than a global failure, while persistent permission, I/O, serialization, or identity problems remain actionable errors. Reuse this behavior wherever bounded process output is needed instead of creating a second surface-specific path.\n3. Make persistent SSE projection/frame failures user-visible and durable. The server may keep the stream open and emit a deduplicated typed sse_diagnostic for recoverable errors, but the browser must handle that event and show actionable degraded-live-update state; also record durable activity/system-operation evidence through an existing shared observability path so a stale UI cannot appear healthy and the failure remains inspectable after reconnect. Clear or resolve the visible condition when healthy frames resume, without warning/recovery toast flapping.\n4. Distinguish the original transient process-reaping NotFound from persistent projection failures. Ordinary process churn must not create durable error noise; repeated or non-transient failures must not be silently swallowed. Keep bounded retry/backoff behavior and avoid a 500 ms error or activity flood.\n5. Keep SSE as the sole live notification path. Do not add browser polling or synchronous process/log work to UI requests. Preserve authoritative one-shot reconciliation on initial connection and reconnect, operation visibility, heartbeats, later-event delivery, and the under-50-ms UI boundary.\n6. Refactor the Round 1 tests so bounded-tail, large-log, Unicode/truncation, missing-artifact, and reaping-race behavior exercise the shared Process capability directly. Retain real-TCP proof that short-lived process exit does not emit a reserved error or close the stream, unchanged output is emitted once, changed output emits once, heartbeats and later updates continue, and replay remains bounded. Add browser and durable-evidence coverage for persistent sse_diagnostic handling, deduplication, recovery/clear behavior, and short transient disconnects.\n7. Run focused Process capability, SSE race/longevity, projection-diagnostic, and browser tests; static/CLI checks; all Rust tests; strict Clippy; formatting; and diff checks. Report every initial and final failure exactly. Do not treat the known intermittent empty quality/settings.json test or pre-existing Clippy warnings as proof this change passed; rerun/isolate as appropriate and let independent Governance determine the final rule result.\n\nDo not force merge, rewrite or delete the Round 1 branch/worktree, bypass Governance or Quality, or directly edit durable Goal state. Leave the new candidate reviewable through the normal workflow.",
+          "reporter": "Buddy Williams",
+          "round": 2
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZ59QXMSGV335QP2BA001",
+          "name": "Keep web live updates connected during process churn",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "Buddy Williams",
+            "constitution_state": "passed",
+            "governance_checked_at": "2026-07-24T18:02:11Z",
+            "governance_details": {
+              "configured": true,
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ59QXMSGV335QP2BA001-round-1",
+              "failed_actions": [
+                {
+                  "message": "The web-server surface now implements process-log file access, tailing, truncation, and reaping-race semantics in http_state.rs; those behaviors belong in the shared Process capability.",
+                  "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+                  "rule_id": "rule-1"
+                },
+                {
+                  "message": "bounded_process_output_snapshot directly reads ManagedProcess stdout/stderr paths and duplicates ProcessSupervisor::stream instead of extending and composing the authoritative Process capability.",
+                  "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+                  "rule_id": "rule-2"
+                },
+                {
+                  "message": "Persistent projection and frame failures emit sse_diagnostic, but the browser registers no handler for that event and no durable activity is recorded; the UI can remain stale while appearing connected, without actionable failure feedback.",
+                  "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+                  "rule_id": "rule-4"
+                }
+              ],
+              "governance_configured": true,
+              "phase": "post_implementation",
+              "provider": "codex",
+              "raw_output": "{\"status\":\"failed\",\"message\":\"Process ownership is duplicated in the web surface, and persistent SSE failures are not user-visible.\",\"violations\":[{\"rule_id\":\"rule-1\",\"rule\":\"Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.\",\"message\":\"The web-server surface now implements process-log file access, tailing, truncation, and reaping-race semantics in http_state.rs; those behaviors belong in the shared Process capability.\"},{\"rule_id\":\"rule-2\",\"rule\":\"Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.\",\"message\":\"bounded_process_output_snapshot directly reads ManagedProcess stdout/stderr paths and duplicates ProcessSupervisor::stream instead of extending and composing the authoritative Process capability.\"},{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"Persistent projection and frame failures emit sse_diagnostic, but the browser registers no handler for that event and no durable activity is recorded; the UI can remain stale while appearing connected, without actionable failure feedback.\"}]}",
+              "rules_checked": 9,
+              "verdict": {
+                "message": "Process ownership is duplicated in the web surface, and persistent SSE failures are not user-visible.",
+                "status": "failed",
+                "violations": [
+                  {
+                    "message": "The web-server surface now implements process-log file access, tailing, truncation, and reaping-race semantics in http_state.rs; those behaviors belong in the shared Process capability.",
+                    "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+                    "rule_id": "rule-1"
+                  },
+                  {
+                    "message": "bounded_process_output_snapshot directly reads ManagedProcess stdout/stderr paths and duplicates ProcessSupervisor::stream instead of extending and composing the authoritative Process capability.",
+                    "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+                    "rule_id": "rule-2"
+                  },
+                  {
+                    "message": "Persistent projection and frame failures emit sse_diagnostic, but the browser registers no handler for that event and no durable activity is recorded; the UI can remain stale while appearing connected, without actionable failure feedback.",
+                    "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+                    "rule_id": "rule-4"
+                  }
+                ]
+              },
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ59QXMSGV335QP2BA001-round-1"
+            },
+            "governance_message": "Process ownership is duplicated in the web surface, and persistent SSE failures are not user-visible.",
+            "governance_rule_actions": [
+              {
+                "message": "The web-server surface now implements process-log file access, tailing, truncation, and reaping-race semantics in http_state.rs; those behaviors belong in the shared Process capability.",
+                "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+                "rule_id": "rule-1"
+              },
+              {
+                "message": "bounded_process_output_snapshot directly reads ManagedProcess stdout/stderr paths and duplicates ProcessSupervisor::stream instead of extending and composing the authoritative Process capability.",
+                "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+                "rule_id": "rule-2"
+              },
+              {
+                "message": "Persistent projection and frame failures emit sse_diagnostic, but the browser registers no handler for that event and no durable activity is recorded; the UI can remain stale while appearing connected, without actionable failure feedback.",
+                "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+                "rule_id": "rule-4"
+              }
+            ],
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                }
+              ],
+              "context_version": 1,
+              "recorded_at": "2026-07-24T18:00:37Z",
+              "skipped": []
+            },
+            "implementation_report": "Implemented race-safe bounded process-output snapshots from listed records (16,384-byte tail reads per stream, 4,000-character payload), missing-artifact skip semantics, stable per-process/content SSE deduplication without presentation timestamps, resilient typed sse_diagnostic recovery without reserved error events or stream closure, and a 5-second browser disconnect grace with warning removal and conditional reconnect notice. Added deterministic real-TCP reaping, heartbeat, later-update, reconnect-replay, projection-recovery, unchanged/changed-output count, large-log bound, and short/sustained browser coverage. Verification: focused SSE tests 23 passed/0 failed; focused browser tests 8 passed/0 failed; static/browser check 62 passed/0 failed; daemon-backed CLI 1 passed/0 failed; Rust run before final load test 495 unit + 10 integration + 0 doc passed; final Rust suite twice reached 495 passed/1 failed because unrelated workflow::tests::file_automation_replenishes_running_agents_when_concurrency_cap_increases read an empty quality/settings.json, while its isolated rerun passed 1/1; strict Clippy failed on 13 pre-existing warnings in untouched files (result_large_err x2, missing_const_for_thread_local, drop_non_drop x2, too_many_arguments x3, enum_variant_names, question_mark, if_same_then_else, ptr_arg, type_complexity); cargo fmt --check, git diff --check, and final worktree scope checks passed.",
+            "implementation_reported_at": "2026-07-24T18:00:38Z",
+            "meta_rule_state": "passed",
+            "product_state": "passed",
+            "prompt": "Fix the Web UI live-update disconnects and warning flaps by making the shared SSE transport resilient and bounded during managed-process churn.\n\nVerified live reproduction on port 8082:\n- A GET to /api/sse returned HTTP 200 but reached normal EOF after 7.889 seconds despite a 25-second client timeout, after sending 406,975 bytes. This proves the daemon closed the stream rather than the client timing out.\n- A later live stream ended with: event: error / data: {message: Process proc-1784914779045-3441909-41061 was not found}.\n- Another 17-second sample emitted 322 events and about 654 KB before the client timeout.\n- The daemon itself remained healthy and its workflow and git-sync runners remained running, so the global Live updates disconnected warning did not represent daemon loss.\n\nRoot cause:\n- LocalHttpDaemon::sse_response rebuilds server_sent_event_frames every 500 ms and closes the entire stream after any projection/frame-generation error.\n- recent_process_sse_events first calls FileProcessSupervisor::list, then calls supervisor.stream for each returned id. stream re-inspects the process record. A short-lived child can exit and have its process JSON and logs removed by the reaper between list and stream, turning ordinary process completion into RefineError::NotFound and terminating global SSE.\n- process_output payloads contain a new timestamp on every pass, while sse_frame_signature removes timestamps only for system_operation and operation_progress. Unchanged process tails therefore appear unique and are reread/retransmitted every 500 ms. The read path also loads each complete stdout/stderr file before trimming to 4,000 characters; current logs are multi-megabyte.\n- Browser onerror immediately shows Live updates disconnected. Reconnecting automatically. onopen resets the error timestamp, so repeated short disconnect/reconnect cycles can repeatedly warn even when durable state successfully reconciles.\n\nRequired behavior:\n1. Make process-output snapshotting race-safe. Ordinary disappearance of a process or its output artifacts after it was listed must be treated as a terminal/skipped snapshot, not as failure of the global event stream. Preserve actionable reporting for genuine persistent I/O, serialization, or projection failures.\n2. Keep /api/sse alive across recoverable component/frame errors. Do not use the reserved SSE error event in a way that is indistinguishable from transport failure; if an application diagnostic must be emitted, use a distinct typed event and do not close the stream for transient process churn.\n3. Deduplicate process_output by stable process identity and content, excluding presentation timestamps from signatures. Emit an initial/current snapshot and then only meaningful changes. Read bounded tails without rereading complete multi-megabyte logs every 500 ms.\n4. Preserve SSE as the sole live browser notification path. Keep authoritative one-shot reads for initial load and reconnect reconciliation; do not add polling fallback or make UI requests wait on process, Git, projection, or log work.\n5. Improve connection UX so brief automatically recovered transitions do not produce warning/success toast flaps. Show a connectivity warning only after a meaningful grace period or sustained disconnected state, clear it on reconnect, and emit a reconnected notice only if the user was actually shown a disconnect state.\n6. Add deterministic race coverage where a short-lived managed process is reaped between process listing and output capture while a real TCP SSE connection remains open. Prove no reserved error event or premature EOF, heartbeats continue, later state changes still arrive, and durable reconnect reconciliation remains correct.\n7. Add replay/load coverage proving unchanged process output is not resent on every 500 ms pass, changed output emits once, tail size and event counts remain bounded, and large logs are not fully reread. Add browser coverage for short versus sustained onerror and reconnect behavior.\n8. Retain existing project/status/runtime/operation/source/chat/Goal-log event behavior and active-operation visibility. Run focused SSE/process race tests, real-TCP longevity coverage, browser tests, all Rust tests, strict Clippy, formatting, static/CLI checks, and diff checks, reporting initial and final outcomes exactly.",
+            "reporter": "Buddy Williams",
+            "round": 1,
+            "rule_state": "failed"
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-24T18:27:08Z",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "guidance_decision": null,
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Recover the Governance-rejected Round 1 candidate 4f757d3f24df7940271e1b8264ee83716d3b761d from current main e1dd93e1 while preserving the candidate, its worktree, all prior Goal evidence, and its verified SSE behavior. Reapply or rebase the existing candidate onto current main without discarding the newly merged Jira-export work. Fix only the three recorded Governance violations.\n\nThe prior implementation already established the desired behavioral baseline: race-safe process completion no longer closes global SSE, unchanged process output is deduplicated, log reads are bounded, application diagnostics do not use the reserved SSE error event, transient browser disconnects have a grace period, and focused real-TCP/browser coverage passed. Preserve that behavior and its tests unless a correction requires a narrowly justified adjustment.\n\nRequired corrections:\n1. Move ownership of bounded process-output capture, tail-file access, truncation, and reaping/disappearance semantics out of src/surfaces/web_server/support/http_state.rs and into the existing shared Process capability. Extend or compose FileProcessSupervisor/ProcessSupervisor or the established process observability capability so there is one authoritative implementation. The web server must remain a thin adapter that consumes a process snapshot/result and formats SSE; it must not directly open ManagedProcess stdout/stderr paths or duplicate ProcessSupervisor::stream.\n2. Define the shared Process capability result so ordinary terminal races are explicit and safe: a process or artifact disappearing after enumeration is a skipped/terminal snapshot rather than a global failure, while persistent permission, I/O, serialization, or identity problems remain actionable errors. Reuse this behavior wherever bounded process output is needed instead of creating a second surface-specific path.\n3. Make persistent SSE projection/frame failures user-visible and durable. The server may keep the stream open and emit a deduplicated typed sse_diagnostic for recoverable errors, but the browser must handle that event and show actionable degraded-live-update state; also record durable activity/system-operation evidence through an existing shared observability path so a stale UI cannot appear healthy and the failure remains inspectable after reconnect. Clear or resolve the visible condition when healthy frames resume, without warning/recovery toast flapping.\n4. Distinguish the original transient process-reaping NotFound from persistent projection failures. Ordinary process churn must not create durable error noise; repeated or non-transient failures must not be silently swallowed. Keep bounded retry/backoff behavior and avoid a 500 ms error or activity flood.\n5. Keep SSE as the sole live notification path. Do not add browser polling or synchronous process/log work to UI requests. Preserve authoritative one-shot reconciliation on initial connection and reconnect, operation visibility, heartbeats, later-event delivery, and the under-50-ms UI boundary.\n6. Refactor the Round 1 tests so bounded-tail, large-log, Unicode/truncation, missing-artifact, and reaping-race behavior exercise the shared Process capability directly. Retain real-TCP proof that short-lived process exit does not emit a reserved error or close the stream, unchanged output is emitted once, changed output emits once, heartbeats and later updates continue, and replay remains bounded. Add browser and durable-evidence coverage for persistent sse_diagnostic handling, deduplication, recovery/clear behavior, and short transient disconnects.\n7. Run focused Process capability, SSE race/longevity, projection-diagnostic, and browser tests; static/CLI checks; all Rust tests; strict Clippy; formatting; and diff checks. Report every initial and final failure exactly. Do not treat the known intermittent empty quality/settings.json test or pre-existing Clippy warnings as proof this change passed; rerun/isolate as appropriate and let independent Governance determine the final rule result.\n\nDo not force merge, rewrite or delete the Round 1 branch/worktree, bypass Governance or Quality, or directly edit durable Goal state. Leave the new candidate reviewable through the normal workflow.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-24T18:27:56Z",
+      "workflow_quality_timing": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-07-26T10:00:38Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Recover Goal 00000SZ59QXMSGV335QP2BA001 from current main. Preserve all prior rounds, branches, dirty worktrees, candidates, failures, and provider or Governance evidence, but build a fresh candidate without rebasing, cherry-picking, or copying the existing Round 2 implementation by default.\n\nFix only the proven /api/sse disconnect caused by ordinary managed-process reaping. In the authoritative shared Process capability, make process enumeration and output observation treat a process record or output artifact disappearing after enumeration as a normal terminal or skipped observation. Preserve actionable errors for permission failures, persistent I/O failures, serialization failures, or identity conflicts. Keep the web server a thin adapter.\n\nEnsure this benign reaping race cannot emit the reserved SSE error event or close the global live-update stream. Add deterministic real-TCP coverage that reaps a managed process between enumeration and output capture, then proves there is no reserved error event or premature EOF and that a later SSE event still arrives.\n\nKeep the existing browser EventSource reconnect and one-shot durable reconciliation behavior unchanged. Do not add generic SSE retry or backoff machinery, durable SSE diagnostic activity, disconnect-toast UX changes, process-output replay or load optimization, browser polling, or broader Process refactoring unless failing evidence proves one is required for this narrow correctness fix. Report any remaining process-output volume, generic diagnostic, or warning-UX concern separately rather than expanding this round.\n\nRun the focused shared Process and SSE race tests, the real-TCP longevity regression, relevant browser/static tests if affected, cargo check, formatting, and diff checks. Report every initial and final failure exactly. Leave the result reviewable through normal Governance, Quality, and human Review. Do not approve, merge, force rewrite history, delete or clean prior worktrees, or directly edit durable Goal state.",
+          "reporter": "Buddy Williams",
+          "round": 3
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZ59QXMSGV335QP2BA001",
+          "name": "Keep web live updates connected during process churn",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "Buddy Williams",
+            "constitution_state": "passed",
+            "governance_checked_at": "2026-07-24T18:02:11Z",
+            "governance_details": {
+              "configured": true,
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ59QXMSGV335QP2BA001-round-1",
+              "failed_actions": [
+                {
+                  "message": "The web-server surface now implements process-log file access, tailing, truncation, and reaping-race semantics in http_state.rs; those behaviors belong in the shared Process capability.",
+                  "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+                  "rule_id": "rule-1"
+                },
+                {
+                  "message": "bounded_process_output_snapshot directly reads ManagedProcess stdout/stderr paths and duplicates ProcessSupervisor::stream instead of extending and composing the authoritative Process capability.",
+                  "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+                  "rule_id": "rule-2"
+                },
+                {
+                  "message": "Persistent projection and frame failures emit sse_diagnostic, but the browser registers no handler for that event and no durable activity is recorded; the UI can remain stale while appearing connected, without actionable failure feedback.",
+                  "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+                  "rule_id": "rule-4"
+                }
+              ],
+              "governance_configured": true,
+              "phase": "post_implementation",
+              "provider": "codex",
+              "raw_output": "{\"status\":\"failed\",\"message\":\"Process ownership is duplicated in the web surface, and persistent SSE failures are not user-visible.\",\"violations\":[{\"rule_id\":\"rule-1\",\"rule\":\"Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.\",\"message\":\"The web-server surface now implements process-log file access, tailing, truncation, and reaping-race semantics in http_state.rs; those behaviors belong in the shared Process capability.\"},{\"rule_id\":\"rule-2\",\"rule\":\"Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.\",\"message\":\"bounded_process_output_snapshot directly reads ManagedProcess stdout/stderr paths and duplicates ProcessSupervisor::stream instead of extending and composing the authoritative Process capability.\"},{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"Persistent projection and frame failures emit sse_diagnostic, but the browser registers no handler for that event and no durable activity is recorded; the UI can remain stale while appearing connected, without actionable failure feedback.\"}]}",
+              "rules_checked": 9,
+              "verdict": {
+                "message": "Process ownership is duplicated in the web surface, and persistent SSE failures are not user-visible.",
+                "status": "failed",
+                "violations": [
+                  {
+                    "message": "The web-server surface now implements process-log file access, tailing, truncation, and reaping-race semantics in http_state.rs; those behaviors belong in the shared Process capability.",
+                    "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+                    "rule_id": "rule-1"
+                  },
+                  {
+                    "message": "bounded_process_output_snapshot directly reads ManagedProcess stdout/stderr paths and duplicates ProcessSupervisor::stream instead of extending and composing the authoritative Process capability.",
+                    "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+                    "rule_id": "rule-2"
+                  },
+                  {
+                    "message": "Persistent projection and frame failures emit sse_diagnostic, but the browser registers no handler for that event and no durable activity is recorded; the UI can remain stale while appearing connected, without actionable failure feedback.",
+                    "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+                    "rule_id": "rule-4"
+                  }
+                ]
+              },
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ59QXMSGV335QP2BA001-round-1"
+            },
+            "governance_message": "Process ownership is duplicated in the web surface, and persistent SSE failures are not user-visible.",
+            "governance_rule_actions": [
+              {
+                "message": "The web-server surface now implements process-log file access, tailing, truncation, and reaping-race semantics in http_state.rs; those behaviors belong in the shared Process capability.",
+                "rule": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+                "rule_id": "rule-1"
+              },
+              {
+                "message": "bounded_process_output_snapshot directly reads ManagedProcess stdout/stderr paths and duplicates ProcessSupervisor::stream instead of extending and composing the authoritative Process capability.",
+                "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+                "rule_id": "rule-2"
+              },
+              {
+                "message": "Persistent projection and frame failures emit sse_diagnostic, but the browser registers no handler for that event and no durable activity is recorded; the UI can remain stale while appearing connected, without actionable failure feedback.",
+                "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+                "rule_id": "rule-4"
+              }
+            ],
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                }
+              ],
+              "context_version": 1,
+              "recorded_at": "2026-07-24T18:00:37Z",
+              "skipped": []
+            },
+            "implementation_report": "Implemented race-safe bounded process-output snapshots from listed records (16,384-byte tail reads per stream, 4,000-character payload), missing-artifact skip semantics, stable per-process/content SSE deduplication without presentation timestamps, resilient typed sse_diagnostic recovery without reserved error events or stream closure, and a 5-second browser disconnect grace with warning removal and conditional reconnect notice. Added deterministic real-TCP reaping, heartbeat, later-update, reconnect-replay, projection-recovery, unchanged/changed-output count, large-log bound, and short/sustained browser coverage. Verification: focused SSE tests 23 passed/0 failed; focused browser tests 8 passed/0 failed; static/browser check 62 passed/0 failed; daemon-backed CLI 1 passed/0 failed; Rust run before final load test 495 unit + 10 integration + 0 doc passed; final Rust suite twice reached 495 passed/1 failed because unrelated workflow::tests::file_automation_replenishes_running_agents_when_concurrency_cap_increases read an empty quality/settings.json, while its isolated rerun passed 1/1; strict Clippy failed on 13 pre-existing warnings in untouched files (result_large_err x2, missing_const_for_thread_local, drop_non_drop x2, too_many_arguments x3, enum_variant_names, question_mark, if_same_then_else, ptr_arg, type_complexity); cargo fmt --check, git diff --check, and final worktree scope checks passed.",
+            "implementation_reported_at": "2026-07-24T18:00:38Z",
+            "meta_rule_state": "passed",
+            "product_state": "passed",
+            "prompt": "Fix the Web UI live-update disconnects and warning flaps by making the shared SSE transport resilient and bounded during managed-process churn.\n\nVerified live reproduction on port 8082:\n- A GET to /api/sse returned HTTP 200 but reached normal EOF after 7.889 seconds despite a 25-second client timeout, after sending 406,975 bytes. This proves the daemon closed the stream rather than the client timing out.\n- A later live stream ended with: event: error / data: {message: Process proc-1784914779045-3441909-41061 was not found}.\n- Another 17-second sample emitted 322 events and about 654 KB before the client timeout.\n- The daemon itself remained healthy and its workflow and git-sync runners remained running, so the global Live updates disconnected warning did not represent daemon loss.\n\nRoot cause:\n- LocalHttpDaemon::sse_response rebuilds server_sent_event_frames every 500 ms and closes the entire stream after any projection/frame-generation error.\n- recent_process_sse_events first calls FileProcessSupervisor::list, then calls supervisor.stream for each returned id. stream re-inspects the process record. A short-lived child can exit and have its process JSON and logs removed by the reaper between list and stream, turning ordinary process completion into RefineError::NotFound and terminating global SSE.\n- process_output payloads contain a new timestamp on every pass, while sse_frame_signature removes timestamps only for system_operation and operation_progress. Unchanged process tails therefore appear unique and are reread/retransmitted every 500 ms. The read path also loads each complete stdout/stderr file before trimming to 4,000 characters; current logs are multi-megabyte.\n- Browser onerror immediately shows Live updates disconnected. Reconnecting automatically. onopen resets the error timestamp, so repeated short disconnect/reconnect cycles can repeatedly warn even when durable state successfully reconciles.\n\nRequired behavior:\n1. Make process-output snapshotting race-safe. Ordinary disappearance of a process or its output artifacts after it was listed must be treated as a terminal/skipped snapshot, not as failure of the global event stream. Preserve actionable reporting for genuine persistent I/O, serialization, or projection failures.\n2. Keep /api/sse alive across recoverable component/frame errors. Do not use the reserved SSE error event in a way that is indistinguishable from transport failure; if an application diagnostic must be emitted, use a distinct typed event and do not close the stream for transient process churn.\n3. Deduplicate process_output by stable process identity and content, excluding presentation timestamps from signatures. Emit an initial/current snapshot and then only meaningful changes. Read bounded tails without rereading complete multi-megabyte logs every 500 ms.\n4. Preserve SSE as the sole live browser notification path. Keep authoritative one-shot reads for initial load and reconnect reconciliation; do not add polling fallback or make UI requests wait on process, Git, projection, or log work.\n5. Improve connection UX so brief automatically recovered transitions do not produce warning/success toast flaps. Show a connectivity warning only after a meaningful grace period or sustained disconnected state, clear it on reconnect, and emit a reconnected notice only if the user was actually shown a disconnect state.\n6. Add deterministic race coverage where a short-lived managed process is reaped between process listing and output capture while a real TCP SSE connection remains open. Prove no reserved error event or premature EOF, heartbeats continue, later state changes still arrive, and durable reconnect reconciliation remains correct.\n7. Add replay/load coverage proving unchanged process output is not resent on every 500 ms pass, changed output emits once, tail size and event counts remain bounded, and large logs are not fully reread. Add browser coverage for short versus sustained onerror and reconnect behavior.\n8. Retain existing project/status/runtime/operation/source/chat/Goal-log event behavior and active-operation visibility. Run focused SSE/process race tests, real-TCP longevity coverage, browser tests, all Rust tests, strict Clippy, formatting, static/CLI checks, and diff checks, reporting initial and final outcomes exactly.",
+            "reporter": "Buddy Williams",
+            "round": 1,
+            "rule_state": "failed"
+          },
+          {
+            "assignee": "Buddy Williams",
+            "prompt": "Recover the Governance-rejected Round 1 candidate 4f757d3f24df7940271e1b8264ee83716d3b761d from current main e1dd93e1 while preserving the candidate, its worktree, all prior Goal evidence, and its verified SSE behavior. Reapply or rebase the existing candidate onto current main without discarding the newly merged Jira-export work. Fix only the three recorded Governance violations.\n\nThe prior implementation already established the desired behavioral baseline: race-safe process completion no longer closes global SSE, unchanged process output is deduplicated, log reads are bounded, application diagnostics do not use the reserved SSE error event, transient browser disconnects have a grace period, and focused real-TCP/browser coverage passed. Preserve that behavior and its tests unless a correction requires a narrowly justified adjustment.\n\nRequired corrections:\n1. Move ownership of bounded process-output capture, tail-file access, truncation, and reaping/disappearance semantics out of src/surfaces/web_server/support/http_state.rs and into the existing shared Process capability. Extend or compose FileProcessSupervisor/ProcessSupervisor or the established process observability capability so there is one authoritative implementation. The web server must remain a thin adapter that consumes a process snapshot/result and formats SSE; it must not directly open ManagedProcess stdout/stderr paths or duplicate ProcessSupervisor::stream.\n2. Define the shared Process capability result so ordinary terminal races are explicit and safe: a process or artifact disappearing after enumeration is a skipped/terminal snapshot rather than a global failure, while persistent permission, I/O, serialization, or identity problems remain actionable errors. Reuse this behavior wherever bounded process output is needed instead of creating a second surface-specific path.\n3. Make persistent SSE projection/frame failures user-visible and durable. The server may keep the stream open and emit a deduplicated typed sse_diagnostic for recoverable errors, but the browser must handle that event and show actionable degraded-live-update state; also record durable activity/system-operation evidence through an existing shared observability path so a stale UI cannot appear healthy and the failure remains inspectable after reconnect. Clear or resolve the visible condition when healthy frames resume, without warning/recovery toast flapping.\n4. Distinguish the original transient process-reaping NotFound from persistent projection failures. Ordinary process churn must not create durable error noise; repeated or non-transient failures must not be silently swallowed. Keep bounded retry/backoff behavior and avoid a 500 ms error or activity flood.\n5. Keep SSE as the sole live notification path. Do not add browser polling or synchronous process/log work to UI requests. Preserve authoritative one-shot reconciliation on initial connection and reconnect, operation visibility, heartbeats, later-event delivery, and the under-50-ms UI boundary.\n6. Refactor the Round 1 tests so bounded-tail, large-log, Unicode/truncation, missing-artifact, and reaping-race behavior exercise the shared Process capability directly. Retain real-TCP proof that short-lived process exit does not emit a reserved error or close the stream, unchanged output is emitted once, changed output emits once, heartbeats and later updates continue, and replay remains bounded. Add browser and durable-evidence coverage for persistent sse_diagnostic handling, deduplication, recovery/clear behavior, and short transient disconnects.\n7. Run focused Process capability, SSE race/longevity, projection-diagnostic, and browser tests; static/CLI checks; all Rust tests; strict Clippy; formatting; and diff checks. Report every initial and final failure exactly. Do not treat the known intermittent empty quality/settings.json test or pre-existing Clippy warnings as proof this change passed; rerun/isolate as appropriate and let independent Governance determine the final rule result.\n\nDo not force merge, rewrite or delete the Round 1 branch/worktree, bypass Governance or Quality, or directly edit durable Goal state. Leave the new candidate reviewable through the normal workflow.",
+            "reporter": "Buddy Williams",
+            "round": 2
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-07-26T09:58:25Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "2026-07-26T10:18:13Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ59QXMSGV335QP2BA001-round-3",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No actual governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 9,
+        "verdict": {
+          "message": "No actual governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ59QXMSGV335QP2BA001-round-3"
+      },
+      "governance_message": "No actual governance rule violations found.",
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          }
+        ],
+        "context_version": 1,
+        "recorded_at": "2026-07-26T10:15:41Z",
+        "skipped": []
+      },
+      "implementation_report": "Built a fresh Round 3 candidate from the current-main worktree base ccbef3d661903818a37795fe1f72fbba6138eeff. Added explicit Observed/Terminal output observation semantics to the shared ProcessSupervisor capability; a listed record or expected stdout/stderr artifact removed by ordinary reaping is now a terminal skipped observation, while non-NotFound I/O, record serialization, and enumerated identity changes remain actionable errors. Process enumeration also skips a record that disappears between directory enumeration and read. The web SSE adapter now consumes shared Process observations and skips Terminal results without opening process artifacts itself. Added shared-capability coverage for record/artifact reaping and I/O/serialization/identity errors, plus deterministic real-TCP coverage that blocks after enumeration, naturally reaps the managed process and its output, proves no reserved event: error or premature EOF, and receives a later source_promotion event. Updated the Process intent contract. Browser EventSource/reconciliation code is unchanged. Initial regression: cargo test --lib file_process_supervisor_output_observation_skips_a_process_reaped_after_listing -- --nocapture failed 0 passed/1 failed with 'ordinary reaping after enumeration must be a skipped output observation'. An intermediate cargo test --lib sse -- --nocapture failed 18 passed/1 failed because strict malformed-record enumeration made web_server_lists_processes_and_updates_pause_controls return HTTP 500 instead of 200; that out-of-scope strictness was removed, and the isolated rerun passed 1/1. Final verification: cargo test --lib file_process_supervisor_ -- --nocapture passed 13/13; cargo test --lib sse -- --nocapture passed 19/19, including the existing TCP longevity regression, the deterministic reaping race, later-event delivery, and relevant static tests; cargo check passed; rustfmt --edition 2024 --check on all three modified Rust files passed; git diff --check passed; browser/static diff check passed with exit 0; final scope is four modified files. Repository-wide cargo fmt --all --check remains failed only on the untouched current-main src/workflow/mod.rs:2002 GOVERNANCE_VERDICT_UNPARSABLE line, where rustfmt requests joining the existing two-line constant. During execution main advanced to e870d63a06018ceb1f9f50188e40d77ce717ada4 through another Goal and touched web_server/tests.rs; this workflow-owned candidate remains on its verified assignment base without rebasing, cherry-picking, or merging. Out-of-scope concerns remain unchanged and are reported separately: process_output timestamps still defeat replay deduplication and output observation still reads complete log files before tailing; generic projection failures still emit reserved SSE error and close; browser disconnect/reconnect warning toast behavior can still flap.",
+      "implementation_reported_at": "2026-07-26T10:15:42Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Recover Goal 00000SZ59QXMSGV335QP2BA001 from current main. Preserve all prior rounds, branches, dirty worktrees, candidates, failures, and provider or Governance evidence, but build a fresh candidate without rebasing, cherry-picking, or copying the existing Round 2 implementation by default.\n\nFix only the proven /api/sse disconnect caused by ordinary managed-process reaping. In the authoritative shared Process capability, make process enumeration and output observation treat a process record or output artifact disappearing after enumeration as a normal terminal or skipped observation. Preserve actionable errors for permission failures, persistent I/O failures, serialization failures, or identity conflicts. Keep the web server a thin adapter.\n\nEnsure this benign reaping race cannot emit the reserved SSE error event or close the global live-update stream. Add deterministic real-TCP coverage that reaps a managed process between enumeration and output capture, then proves there is no reserved error event or premature EOF and that a later SSE event still arrives.\n\nKeep the existing browser EventSource reconnect and one-shot durable reconciliation behavior unchanged. Do not add generic SSE retry or backoff machinery, durable SSE diagnostic activity, disconnect-toast UX changes, process-output replay or load optimization, browser polling, or broader Process refactoring unless failing evidence proves one is required for this narrow correctness fix. Report any remaining process-output volume, generic diagnostic, or warning-UX concern separately rather than expanding this round.\n\nRun the focused shared Process and SSE race tests, the real-TCP longevity regression, relevant browser/static tests if affected, cargo check, formatting, and diff checks. Report every initial and final failure exactly. Leave the result reviewable through normal Governance, Quality, and human Review. Do not approve, merge, force rewrite history, delete or clean prior worktrees, or directly edit durable Goal state.",
+      "quality_checked_at": "2026-07-26T10:18:18Z",
+      "quality_details": {
+        "candidate_commit": "d4f249a3cfd10fca40737067aea78fea4f1a89ef",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ59QXMSGV335QP2BA001-round-3",
+        "diagnostics": [
+          "No Quality tests or migrated commands are configured; evaluation was a no-op."
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "19f9deec55e38ea52",
+        "results": [],
+        "source_candidate_commit": "d4f249a3cfd10fca40737067aea78fea4f1a89ef"
+      },
+      "quality_message": "No Quality tests configured.",
+      "quality_state": "passed",
+      "reporter": "Buddy Williams",
+      "rule_state": "passed",
+      "updated": "2026-07-28T16:39:59Z",
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "d4f249a3cfd10fca40737067aea78fea4f1a89ef",
+        "integrated_at": "2026-07-26T10:18:23.962025285+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Auto-merging src/surfaces/web_server/tests.rs\nMerge made by the 'ort' strategy.\n docs/intent/03-capabilities/01-process.md     |   5 +\n src/process/subprocess/mod.rs                 | 288 +++++++++++++++++++++++++-\n src/surfaces/web_server/support/http_state.rs |  13 +-\n src/surfaces/web_server/tests.rs              | 126 ++++++++++-\n 4 files changed, 419 insertions(+), 13 deletions(-)",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "4b2e352a2e3454de22a791ef2223b211d51fdaad"
+      },
+      "workflow_quality_timing": "pre_merge"
+    }
+  ],
+  "status": "done",
+  "target_branch": "main",
+  "updated": "2026-07-28T16:40:11Z",
+  "workflow_revision": 39
+}

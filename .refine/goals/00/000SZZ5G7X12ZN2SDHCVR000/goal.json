@@ -1,0 +1,365 @@
+{
+  "base_commit": "d32e7461ab0840babb8fe91cd0958f0b5b3cb32c",
+  "branch_name": "refine/00000SZZ5G7X12ZN2SDHCVR000/round-1",
+  "candidate_commit": "99390c4770fd2bc9657d30a207786e16dea05710",
+  "created": "2026-08-13T19:53:56Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZZ5G7X12ZN2SDHCVR000",
+  "name": "If a Goal was canceled and it's moved to Todo, it should not automatically fail",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-13T20:09:37Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "If a Goal was canceled and it's moved to Todo, it should not automatically fail. It should pick up the work or start it anew.",
+          "reporter": "Buddy Williams",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZZ5G7X12ZN2SDHCVR000",
+          "name": "If a Goal was canceled and it's moved to Todo, it should not automatically fail",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-08-13T19:53:56Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "2026-08-13T20:45:11Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZZ5G7X12ZN2SDHCVR000-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "guidance_checked": 2,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No actual governance rule violations found.\",\"violations\":[],\"recovery_analysis\":\"\",\"recovery_round_prompt\":\"\"}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "No actual governance rule violations found.",
+          "recovery_analysis": "",
+          "recovery_round_prompt": "",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZZ5G7X12ZN2SDHCVR000-round-1"
+      },
+      "governance_message": "No actual governance rule violations found.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-13T20:35:15Z",
+        "skipped": []
+      },
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "d32e7461ab0840babb8fe91cd0958f0b5b3cb32c",
+          "context_digest": "0c78642190260af981e705e3bbcc1c75fd751ce134326898e75d4d0899a711f3",
+          "context_version": 1,
+          "goal_id": "00000SZZ5G7X12ZN2SDHCVR000",
+          "implementation_branch": "refine/00000SZZ5G7X12ZN2SDHCVR000/round-1",
+          "round_idx": 0,
+          "target_branch": "main"
+        },
+        "completed_at": "2026-08-13T20:35:10Z",
+        "criticism": {
+          "completed_at": "2026-08-13T20:14:03Z",
+          "git_after": {
+            "branch": "refine/00000SZZ5G7X12ZN2SDHCVR000/round-1",
+            "head_commit": "d32e7461ab0840babb8fe91cd0958f0b5b3cb32c",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000SZZ5G7X12ZN2SDHCVR000/round-1",
+            "head_commit": "d32e7461ab0840babb8fe91cd0958f0b5b3cb32c",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P1",
+                  "P2",
+                  "P3"
+                ],
+                "description": "The regressions stop short of requiring the critical race where cancellation is undone or bulk-moved to Todo and a replacement worker has already claimed the Goal into an automated state before the cancelled worker settles; status-only authority would then let the stale worker fail the replacement attempt and write its error onto the latest Round.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Make P1 and P2 require the originating Round and workflow revision or equivalent attempt binding, and add a P3 regression that settles the old worker after the reopened Goal is re-claimed, including the new-Round case."
+              }
+            ],
+            "summary": "Bind failure settlement to the originating attempt and test the reopened Goal after replacement claim."
+          },
+          "started_at": "2026-08-13T20:11:39Z"
+        },
+        "final_plan": {
+          "completed_at": "2026-08-13T20:16:05Z",
+          "git_after": {
+            "branch": "refine/00000SZZ5G7X12ZN2SDHCVR000/round-1",
+            "head_commit": "d32e7461ab0840babb8fe91cd0958f0b5b3cb32c",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000SZZ5G7X12ZN2SDHCVR000/round-1",
+            "head_commit": "d32e7461ab0840babb8fe91cd0958f0b5b3cb32c",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Define a cohesive workflow-attempt authority value from the originating Round and claim-time workflow revision and carry it through prepared execution and shared failure handling.",
+                "id": "P1"
+              },
+              {
+                "description": "Make Goal failure transition and Round failure-metadata persistence one atomically fenced capability that mutates only when the originating attempt is still authoritative.",
+                "id": "P2"
+              },
+              {
+                "description": "Route preparation failures and behavior failures through the fenced capability, preserving stale workers' logs, process records, candidate branches, and worktrees without changing the reopened Goal or replacement Round.",
+                "id": "P3"
+              },
+              {
+                "description": "Add lifecycle regressions for cancellation followed by Undo or bulk movement to Todo, then settle the old worker after the Goal is reclaimed in both the existing-Round and new-Round cases and prove the replacement remains active with clean current-Round failure metadata.",
+                "id": "P4"
+              },
+              {
+                "description": "Update the cancellation and shared workflow consistency intent pages to state that reopening and replacement claim supersede prior settlement authority while retaining attempt evidence.",
+                "id": "P5"
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "P1-P4 bind both status and Round metadata to the originating Round/revision and test old-worker settlement after replacement claim, including a newly submitted Round."
+              }
+            ],
+            "summary": "Refine will bind workflow failure settlement to the exact Round and claim-time workflow revision of the worker that produced it, so reopening a cancelled Goal to Todo remains newer intent even after another worker claims it; stale workers will retain audit evidence without failing the reopened Goal or contaminating its active Round, allowing the replacement attempt to continue the existing Round or a newly submitted one."
+          },
+          "started_at": "2026-08-13T20:14:06Z"
+        },
+        "implementation": {
+          "completed_at": "2026-08-13T20:35:10Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Added the cohesive WorkflowAttemptAuthority value (originating round_idx plus claim-time workflow_revision), atomically installed it on the claimed Round, and carried it in WorkflowContext and preparation-error handling.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added FileWorkItemService::settle_workflow_attempt_failure, which holds the per-Goal mutation lock, verifies the exact latest Round and claim authority, and writes Goal failed status plus that Round's failure_category, failure_message, and failure_at in one atomic record replacement; stale attempts write neither.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Routed claimed preparation failures, WorkflowContext category failures, uncategorized behavior errors, and worker panics through the shared fenced settlement capability. Reopening clears the attempt authority while logs, process records, candidate branches, and worktrees remain outside settlement and are not deleted.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added lifecycle regressions proving an old worker cannot fail a cancelled Goal after Undo before or after a same-Round replacement claim, nor after bulk movement to Todo, a newly submitted Round, and replacement claim; both replacements remain Plan with clean current-Round failure metadata.",
+                "id": "P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated docs/intent/03-capabilities/03-workflow/10-cancelled.md and 11-consistency-contract.md with reopening, replacement-claim, atomic settlement, and retained-attempt-evidence semantics without changing their established format.",
+                "id": "P5",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "cargo test --lib tools::product::work_items::tests::workflow:: -- --test-threads=1 -> 6 passed, 0 failed",
+              "cargo test --lib workflow::tests::failure_settlement:: -- --test-threads=1 -> 3 passed, 0 failed",
+              "cargo test --lib workflow::tests:: -- --test-threads=1 -> 20 passed, 0 failed",
+              "cargo check --all-targets -> passed",
+              "cargo clippy --all-targets -- -D warnings -> passed",
+              "cargo fmt --all -- --check -> passed",
+              "git diff --check -> passed",
+              "cargo test -> 768 passed, 2 failed, 6 ignored; the failures were prompts::tests::agent_prompts_keep_only_task_specific_contracts (unchanged quality/recovery.md is 94 words versus 90) and surfaces::web_server::tests::static_surface::settings::static_project_settings_explain_governance_and_quality_effects (unchanged settings_quality.js lacks existing expected copy); git diff --quiet HEAD over src/prompts, src/surfaces/web/static, and the static settings test returned 0",
+              "cargo test -- --test-threads=1 -> rejected before tests by the repository harness because --test-threads=1 is not a supported suite flag; corrected to the supported cargo test command above"
+            ]
+          },
+          "report": "Implemented Round- and claim-revision-fenced workflow failure settlement. Reopening a cancelled Goal clears the old attempt authority; replacement claims install a newer authority, and stale preparation, behavior, or panic failures retain operational evidence without changing the reopened Goal or active Round failure metadata. Added Undo/same-Round and bulk-Todo/new-Round regressions, updated cancellation and consistency intent, and completed exact verification. Relevant tests, all-target compilation, Clippy, formatting, and diff checks pass; the full supported unit suite completed with 768 passed, 6 ignored, and 2 unrelated failures in untouched prompt/static-settings scope.",
+          "started_at": "2026-08-13T20:16:13Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-13T20:16:13Z",
+        "proposal": {
+          "completed_at": "2026-08-13T20:11:34Z",
+          "git_after": {
+            "branch": "refine/00000SZZ5G7X12ZN2SDHCVR000/round-1",
+            "head_commit": "d32e7461ab0840babb8fe91cd0958f0b5b3cb32c",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000SZZ5G7X12ZN2SDHCVR000/round-1",
+            "head_commit": "d32e7461ab0840babb8fe91cd0958f0b5b3cb32c",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Fence shared workflow failure settlement to the still-authoritative active attempt so a Goal now in Todo or Cancelled is preserved instead of being marked Failed by a late worker result.",
+                "id": "P1"
+              },
+              {
+                "description": "Apply the same authority decision to Round failure metadata while retaining the cancelled attempt's logs, branch, worktree, and process evidence for audit.",
+                "id": "P2"
+              },
+              {
+                "description": "Add focused lifecycle regressions covering cancellation followed by Undo or bulk movement to Todo, late cancelled-worker settlement, and subsequent workflow eligibility.",
+                "id": "P3"
+              },
+              {
+                "description": "Update the affected cancellation and execution-ownership intent text to state that explicit reopening supersedes the old worker's settlement authority without erasing its evidence.",
+                "id": "P4"
+              }
+            ],
+            "summary": "Refine will treat moving a cancelled Goal back to Todo as newer workflow intent, so termination or failure settlement from the cancelled attempt cannot overwrite the reopened Goal with Failed or attach stale failure evidence; the preserved Goal can then be claimed again using its existing Round or a newly submitted Round."
+          },
+          "started_at": "2026-08-13T20:09:41Z"
+        },
+        "schema_version": 2,
+        "started_at": "2026-08-13T20:09:39Z",
+        "state": "completed",
+        "updated_at": "2026-08-13T20:35:10Z"
+      },
+      "implementation_report": "Implemented Round- and claim-revision-fenced workflow failure settlement. Reopening a cancelled Goal clears the old attempt authority; replacement claims install a newer authority, and stale preparation, behavior, or panic failures retain operational evidence without changing the reopened Goal or active Round failure metadata. Added Undo/same-Round and bulk-Todo/new-Round regressions, updated cancellation and consistency intent, and completed exact verification. Relevant tests, all-target compilation, Clippy, formatting, and diff checks pass; the full supported unit suite completed with 768 passed, 6 ignored, and 2 unrelated failures in untouched prompt/static-settings scope.",
+      "implementation_reported_at": "2026-08-13T20:35:12Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "If a Goal was canceled and it's moved to Todo, it should not automatically fail. It should pick up the work or start it anew.",
+      "quality_agent_report": "Quality review found no candidate defect requiring correction. The committed implementation adds Round/revision workflow-attempt authority, atomically fenced Goal/Round failure settlement, fenced preparation/behavior/panic routing, same-Round Undo and new-Round bulk-Todo regressions, and the two accepted intent updates. Focused tests, formatting, all-target compilation, strict Clippy, and diff checks pass. The full library suite still has two deterministic failures in untouched prompt/static-settings scope; three additional parallel-suite flakes all passed when rerun exactly.",
+      "quality_candidate_commit": "99390c4770fd2bc9657d30a207786e16dea05710",
+      "quality_checked_at": "2026-08-13T20:43:48Z",
+      "quality_details": {
+        "candidate_commit": "99390c4770fd2bc9657d30a207786e16dea05710",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZZ5G7X12ZN2SDHCVR000-round-1",
+        "diagnostics": [
+          "{\"ok\":true,\"summary\":\"Candidate satisfies the Goal and relevant intent contracts. Focused cancellation/reopening, workflow, compilation, lint, formatting, diff, and cleanliness checks passed; no candidate defect found.\",\"results\":[{\"test\":\"The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\",\"status\":\"passed\",\"evidence\":\"Exit 0. Failure-settlement regressions: 3 passed; work-item workflow regressions: 6 passed; workflow regressions: 20 passed. cargo check, strict Clippy, formatting, diff integrity, and tracked-worktree cleanliness all passed.\",\"command\":\"bash -lc 'set -euo pipefail\\ncargo test --lib workflow::tests::failure_settlement:: -- --test-threads=1\\ncargo test --lib tools::product::work_items::tests::workflow:: -- --test-threads=1\\ncargo test --lib workflow::tests:: -- --test-threads=1\\ncargo check --all-targets\\ncargo clippy --all-targets -- -D warnings\\ncargo fmt --all -- --check\\ngit diff --check\\ntest -z \\\"$(git status --porcelain --untracked-files=no)\\\"'\"}]}",
+          "Observed supervised process proc-1786653810033-3027609-185 exited 0. stdout: rent_states_but_never_emitted ... ok\ntest model::workflow::tests::manual_user_transitions_match_spec ... ok\ntest workflow::tests::execution_ownership::backlog_promotion_changes_only_goal_state_and_does_not_create_worktrees ... ok\ntest workflow::tests::execution_ownership::cleanup_observes_candidate_handoff_through_governance_integration ... ok\ntest workflow::tests::execution_ownership::newer_round_handoff_supersedes_only_the_same_goal_candidate ... ok\ntest workflow::tests::execution_ownership::restart_recovery_preserves_active_zero_round_goal_and_recovers_valid_sibling ... ok\ntest workflow::tests::execution_ownership::restart_recovery_preserves_goal_state_and_removes_retired_execution_files ... ok\ntest workflow::tests::execution_ownership::zero_round_backlog_is_ineligible_while_valid_sibling_promotes ... ok\ntest workflow::tests::failure_settlement::authoritative_failure_atomically_fails_goal_and_its_originating_round ... ok\ntest workflow::tests::failure_settlement::bulk_todo_reclaim_with_new_round_supersedes_old_failure ... ok\ntest workflow::tests::failure_settlement::undo_reclaim_of_cancelled_goal_supersedes_old_same_round_failure ... ok\ntest workflow::tests::governance::file_automation_fails_after_the_governance_recovery_budget_is_exhausted ... ok\ntest workflow::tests::governance::governance_failing_verdict_records_the_parsed_violations ... ok\ntest workflow::tests::governance::governance_review_prose_with_code_braces_reads_the_verdict_not_the_first_brace ... ok\ntest workflow::tests::governance::governance_review_without_a_verdict_fails_closed_as_a_parse_error ... ok\ntest workflow::tests::governance::governance_verdict_survives_an_unclosed_brace_in_the_review_prose ... ok\ntest workflow::tests::quality_recovery::file_automation_fails_after_the_shared_quality_recovery_budget_is_exhausted ... ok\ntest workflow::tests::workflow_pass_reports_only_projection_mutations ... ok\n\ntest result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 756 filtered out; finished in 14.23s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.10s\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s"
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "19ffcdbfaf22e32996",
+        "results": [
+          {
+            "command": "bash -lc 'set -euo pipefail\ncargo test --lib workflow::tests::failure_settlement:: -- --test-threads=1\ncargo test --lib tools::product::work_items::tests::workflow:: -- --test-threads=1\ncargo test --lib workflow::tests:: -- --test-threads=1\ncargo check --all-targets\ncargo clippy --all-targets -- -D warnings\ncargo fmt --all -- --check\ngit diff --check\ntest -z \"$(git status --porcelain --untracked-files=no)\"'",
+            "evidence": "Observed supervised process proc-1786653810033-3027609-185 exited 0. stdout: rent_states_but_never_emitted ... ok\ntest model::workflow::tests::manual_user_transitions_match_spec ... ok\ntest workflow::tests::execution_ownership::backlog_promotion_changes_only_goal_state_and_does_not_create_worktrees ... ok\ntest workflow::tests::execution_ownership::cleanup_observes_candidate_handoff_through_governance_integration ... ok\ntest workflow::tests::execution_ownership::newer_round_handoff_supersedes_only_the_same_goal_candidate ... ok\ntest workflow::tests::execution_ownership::restart_recovery_preserves_active_zero_round_goal_and_recovers_valid_sibling ... ok\ntest workflow::tests::execution_ownership::restart_recovery_preserves_goal_state_and_removes_retired_execution_files ... ok\ntest workflow::tests::execution_ownership::zero_round_backlog_is_ineligible_while_valid_sibling_promotes ... ok\ntest workflow::tests::failure_settlement::authoritative_failure_atomically_fails_goal_and_its_originating_round ... ok\ntest workflow::tests::failure_settlement::bulk_todo_reclaim_with_new_round_supersedes_old_failure ... ok\ntest workflow::tests::failure_settlement::undo_reclaim_of_cancelled_goal_supersedes_old_same_round_failure ... ok\ntest workflow::tests::governance::file_automation_fails_after_the_governance_recovery_budget_is_exhausted ... ok\ntest workflow::tests::governance::governance_failing_verdict_records_the_parsed_violations ... ok\ntest workflow::tests::governance::governance_review_prose_with_code_braces_reads_the_verdict_not_the_first_brace ... ok\ntest workflow::tests::governance::governance_review_without_a_verdict_fails_closed_as_a_parse_error ... ok\ntest workflow::tests::governance::governance_verdict_survives_an_unclosed_brace_in_the_review_prose ... ok\ntest workflow::tests::quality_recovery::file_automation_fails_after_the_shared_quality_recovery_budget_is_exhausted ... ok\ntest workflow::tests::workflow_pass_reports_only_projection_mutations ... ok\n\ntest result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 756 filtered out; finished in 14.23s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.10s\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s Agent report: Exit 0. Failure-settlement regressions: 3 passed; work-item workflow regressions: 6 passed; workflow regressions: 20 passed. cargo check, strict Clippy, formatting, diff integrity, and tracked-worktree cleanliness all passed.",
+            "exit_code": 0,
+            "process_id": "proc-1786653810033-3027609-185",
+            "status": "passed",
+            "test": "The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks."
+          }
+        ],
+        "source_candidate_commit": "99390c4770fd2bc9657d30a207786e16dea05710"
+      },
+      "quality_message": "All Quality tests passed with observed supervised evidence.",
+      "quality_state": "passed",
+      "reporter": "Buddy Williams",
+      "rule_state": "passed",
+      "updated": "2026-08-13T20:45:21Z",
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "99390c4770fd2bc9657d30a207786e16dea05710",
+        "integrated_at": "2026-08-13T20:45:21.108086156+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n .../03-capabilities/03-workflow/10-cancelled.md    |   3 +\n .../03-workflow/11-consistency-contract.md         |   5 +\n src/tools/product/work_items/mod.rs                |   2 +-\n src/tools/product/work_items/service.rs            |   2 +\n .../product/work_items/service/persistence.rs      |   3 +\n .../product/work_items/service/round_helpers.rs    |  13 ++\n src/tools/product/work_items/service/workflow.rs   |  76 +------\n .../work_items/service/workflow_attempts.rs        | 227 +++++++++++++++++++++\n src/tools/product/work_items/tests/workflow.rs     |   9 +-\n src/workflow/context.rs                            |  69 ++-----\n src/workflow/execution.rs                          | 116 +++++++----\n src/workflow/failure_settlement.rs                 |  33 ++-\n src/workflow/tests/failure_settlement.rs           | 167 +++++++++++++++\n src/workflow/tests/mod.rs                          |   1 +\n 14 files changed, 543 insertions(+), 183 deletions(-)\n create mode 100644 src/tools/product/work_items/service/workflow_attempts.rs\n create mode 100644 src/workflow/tests/failure_settlement.rs",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "8631f540490f3f4ce84ea0365e36ded46c0c0b5e"
+      },
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    }
+  ],
+  "status": "done",
+  "target_branch": "main",
+  "updated": "2026-08-13T21:27:33Z",
+  "workflow_revision": 27
+}

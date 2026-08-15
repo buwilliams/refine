@@ -1,0 +1,439 @@
+{
+  "base_commit": "9a3d7efb118b21e09f88e6df1520b37cd525d106",
+  "branch_name": "refine/00000SZXT9QJZ2C3NQ53X9W001/round-1",
+  "candidate_commit": "ffdfe11aa409f2e0f54dfb0f5766567d34a2e149",
+  "created": "2026-08-12T18:43:52Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZXT9QJZ2C3NQ53X9W001",
+  "name": "Add a node selector on the main nav controls sub-menu similar to the Reporter se",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-12T18:43:57Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Add a node selector on the main nav controls sub-menu similar to the Reporter selector on the same menu.",
+          "reporter": "Buddy Williams",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZXT9QJZ2C3NQ53X9W001",
+          "name": "Add a node selector on the main nav controls sub-menu similar to the Reporter se",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-08-12T18:43:52Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "2026-08-12T19:13:08Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZXT9QJZ2C3NQ53X9W001-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "No governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZXT9QJZ2C3NQ53X9W001-round-1"
+      },
+      "governance_message": "No governance rule violations found.",
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-12T19:12:02Z",
+        "skipped": []
+      },
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "9a3d7efb118b21e09f88e6df1520b37cd525d106",
+          "context_digest": "3f01fc42ab8bcb78e9158c4ea5dd3820d806410de248e44d676d452d7a877365",
+          "context_version": 1,
+          "goal_id": "00000SZXT9QJZ2C3NQ53X9W001",
+          "implementation_branch": "refine/00000SZXT9QJZ2C3NQ53X9W001/round-1",
+          "round_idx": 0,
+          "target_branch": "main"
+        },
+        "completed_at": "2026-08-12T19:11:59Z",
+        "criticism": {
+          "completed_at": "2026-08-12T18:51:04Z",
+          "git_after": {
+            "branch": "refine/00000SZXT9QJZ2C3NQ53X9W001/round-1",
+            "head_commit": "9a3d7efb118b21e09f88e6df1520b37cd525d106",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000SZXT9QJZ2C3NQ53X9W001/round-1",
+            "head_commit": "9a3d7efb118b21e09f88e6df1520b37cd525d106",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P2",
+                  "P3"
+                ],
+                "description": "The plan hydrates the Controls options at initialization and centralizes successful activation, but it does not keep that registry projection current. Node settings create, rename, and archive currently refresh only the settings tab; the SSE project_updated payload/signature contains projection counts rather than Node registry or active identity; and api_mutation events have no browser listener. The new selector can therefore retain a removed name or omit a new Node in the same tab, while another browser on the same port can retain the wrong active label, Reporter context, and current-node data after activation.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Add one authoritative Node-context reconciliation path that rereads /api/nodes (and project status where needed), repopulates the selector, and is invoked after every local Node CRUD/activation plus attach/detach. Define a Node-specific SSE or a filtered api_mutation reconciliation for other clients, and test create/rename/archive plus two-client activation convergence."
+              },
+              {
+                "checklist_item_ids": [
+                  "P2",
+                  "P3"
+                ],
+                "description": "The proposed cache invalidation, Node-scoped reset, and current-surface reconciliation are underspecified for the actual SPA. refreshNodeScopedState currently clears chat, Reporter, dashboard, and current Goal state but redraws no route. Goals, Features, Logs, Changes, details, and settings have separate refresh paths; several reads lack a request generation fence, so an old-node GET can resolve after activation and overwrite the new-node render. A forced settings refresh can also overwrite a dirty Target App form, while New Goal, import, Feature, and detail modals can remain open across the ownership-context change.",
+                "id": "C2",
+                "material": true,
+                "recommendation": "Specify activation as one serialized transaction: persist the ID, reread authoritative identity, advance a Node-context generation or abort old reads, reset Node-owned state, then reconcile an explicit route/modal dispatch table. Preserve current/all/named URL semantics. Block or confirm switching when a Node-scoped draft is dirty, or explicitly preserve and safely rebind it. Add delayed-old-response and dirty/open-modal regressions."
+              },
+              {
+                "checklist_item_ids": [
+                  "P3",
+                  "P4"
+                ],
+                "description": "The verification list claims to retain the port-scoped active-Node contract but only schedules the static nav Rust test and mocked browser/VM behavior. It does not execute the existing backend regression that distinguishes the shared app-registry root from the port runtime root and proves activation, project status, current-node filtering, and new Goal ownership agree.",
+                "id": "C3",
+                "material": true,
+                "recommendation": "Add cargo test --lib surfaces::web_server::tests::project_runtime::project_status_uses_the_port_scoped_node_that_owns_and_filters_new_goals -- --exact to P3 and P4, and keep the selector browser test focused on the surface transition rather than treating a mocked POST as proof of runtime-root ownership."
+              }
+            ],
+            "summary": "Keep P1's accessible Controls markup and focused Nav intent update, but revise P2-P4 before implementation. A Node switch is a runtime-shared context transition, not only a local select change: the plan must keep the Node registry and every browser client converged, fence old Node-scoped reads, define safe behavior for dirty forms and open modals, and execute the existing port-scoped ownership regression."
+          },
+          "started_at": "2026-08-12T18:46:30Z"
+        },
+        "final_plan": {
+          "completed_at": "2026-08-12T18:55:59Z",
+          "git_after": {
+            "branch": "refine/00000SZXT9QJZ2C3NQ53X9W001/round-1",
+            "head_commit": "9a3d7efb118b21e09f88e6df1520b37cd525d106",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000SZXT9QJZ2C3NQ53X9W001/round-1",
+            "head_commit": "9a3d7efb118b21e09f88e6df1520b37cd525d106",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "affected_behavior": [
+                  "Controls exposes one accessible Node selector adjacent to Reporter and highlights the authoritative active Node by display name.",
+                  "Archived Nodes are absent and detached projects show a disabled No node state rather than a false selection.",
+                  "The durable Nav intent records direct Node switching without changing unrelated product intent."
+                ],
+                "description": "Extend src/surfaces/web/static/index.html so Controls contains a labeled, test-addressable Node select immediately before the existing Reporter select. Reuse the current menu/select styling unless a narrowly scoped responsive rule is required; show display names while storing Node IDs, exclude archived Nodes, and render a disabled non-actionable state when no project is attached. Update only docs/intent/04-surfaces/03-browser/02-nav.md to state that Controls displays and switches the runtime-local active Node and that Node IDs, not labels, remain authoritative.",
+                "governance_rationale": "Guidance 0 applies because this changes the browser shell surface contract; the Nav intent page is the only affected durable intent. Guidance 1 keeps styling and markup changes focused and avoids unrelated shell cleanup.",
+                "id": "P1",
+                "verification": [
+                  "cargo test --lib surfaces::web_server::tests::static_surface::navigation::static_main_nav_consolidates_context_and_controls -- --exact",
+                  "node --test --test-name-pattern='Controls Node selector' tests/web_screen_render.test.js (pass when Chromium is available; otherwise record the explicit skip)"
+                ]
+              },
+              {
+                "affected_behavior": [
+                  "Controls and Node settings share one Node-ID-based activation transaction and cannot drift in labels, options, busy state, or rollback behavior.",
+                  "Local Node CRUD and attach/detach immediately reconcile the selector; filtered runtime-local api_mutation notices converge every browser on the same port.",
+                  "Activation is serialized and authoritative rereads prevent a successful POST response, cached registry, or display name from becoming a parallel source of truth.",
+                  "Existing port-scoped runtime state remains the sole active-Node authority while the shared app registry remains attachment storage."
+                ],
+                "description": "Add a cohesive src/surfaces/web/static/js/node-context.js module, loaded after common.js and before feature/router/init scripts, to own selector hydration and all Node-context transitions. Its forced reconciliation reads GET /api/project/status and GET /api/nodes with cache disabled, repopulates non-archived ID/display-name options, and runs after init, attach/detach, every local Node create/rename/archive/fleet update, and activation. Make settings_nodes.js delegate activation to the same serialized transaction: preflight local dirty surfaces, POST the selected node_id, advance a Node-context generation, invalidate cached projections, reread and validate authoritative identity, reset Reporter/chat/dashboard/current-detail state, update selector/brand/title, then refresh the current surface; an unchanged ID is a no-op, concurrent switches are disabled/coalesced, and failures restore the authoritative selection with an actionable error. Listen to the existing SSE api_mutation event, filter and debounce Node registry/activation plus attach/detach paths, and invoke the same reconciliation so other browser clients converge after create, rename, archive, or activation without adding a second durable authority.",
+                "governance_rationale": "Guidance 0 requires the thin browser surface to delegate to the existing Node and project APIs and preserve runtime-local inspectable authority. Guidance 1 favors one focused Node-context module with a stable activation/reconciliation API over enlarging common.js or duplicating settings and Controls semantics.",
+                "id": "P2",
+                "verification": [
+                  "node --test tests/web_controls_node_selector.test.js",
+                  "Focused assertions cover ID/display-name mapping, archived filtering, detached state, no-op and concurrent selection, exact POST payload, forced authoritative reread, failure rollback, local create/rename/archive reconciliation, and two independent browser runtimes converging from an api_mutation activation notice."
+                ]
+              },
+              {
+                "affected_behavior": [
+                  "A delayed old-Node response cannot overwrite the new Node label, Reporter projection, table, detail, settings, or target-app state.",
+                  "Dashboard and Goals retain their URL source of truth: current follows the new active Node while all and named filters remain unchanged.",
+                  "Local switching never silently discards a dirty Node-scoped draft, and remote switching never allows a preserved stale draft to mutate under the new context.",
+                  "Clean Goal, Feature, New Goal, import, and settings modal contexts close or refresh through an explicit route-aware transition instead of remaining bound to the old Node."
+                ],
+                "description": "Fence Node-scoped asynchronous rendering with the coordinator generation and define one explicit post-switch route/modal dispatch table. Dashboard, Goals, Features, Logs, Changes, Reporter/target-app indicators, and settings loaders capture the generation before reads and silently discard late prior-generation results before mutating state or DOM. Reconcile Dashboard and Goals through their existing URL-backed current/all/named scope so switching changes the meaning of current only and never rewrites all or a named Node filter. For a local switch, reuse or expose focused guards for New Goal, recoverable import operations, Target App settings, Goal round edits, and Feature autosave: require confirmation before discarding dirty work and cancel activation if the user keeps editing; close clean Node-owned detail/create modals before route refresh. An external SSE-detected switch cannot be vetoed, so preserve any dirty values, mark that surface stale, disable its mutation controls, and require explicit discard/reopen before submission while the shell, selector, and safe underlay reconcile immediately. Clean modals close and the route dispatcher refreshes the visible surface. Add generation checks to Goal/Feature detail loads and all listed route refreshes so delayed old-Node GETs cannot repaint after the switch.",
+                "governance_rationale": "Guidance 0 requires context changes to remain recoverable and semantically consistent across thin browser surfaces. Guidance 1 keeps generation ownership and dispatch coordination in node-context.js while each feature file exposes only its own small guard or refresh hook.",
+                "id": "P3",
+                "verification": [
+                  "node --test tests/web_controls_node_selector.test.js",
+                  "node --test --test-name-pattern='Controls Node selector|Node context' tests/web_screen_render.test.js (pass when Chromium is available; otherwise record the explicit skip)",
+                  "cargo test --lib surfaces::web_server::tests::project_runtime::project_status_uses_the_port_scoped_node_that_owns_and_filters_new_goals -- --exact"
+                ]
+              },
+              {
+                "affected_behavior": [
+                  "The candidate is reviewable with exact accessibility, behavioral, cross-client, delayed-response, runtime-ownership, regression, formatting, and scope evidence."
+                ],
+                "description": "Run focused checks before the complete static web regression suite, formatting, and hygiene checks. Inspect the final diff to confirm the candidate contains only the Controls selector, cohesive Node-context coordination and feature hooks, focused tests, and the affected Nav intent page; report Chromium absence as a skip rather than browser verification.",
+                "governance_rationale": "This is proportionate evidence for a shared browser context change, explicitly proves the runtime ownership boundary, and preserves Refine's human review boundary without unrelated cleanup.",
+                "id": "P4",
+                "verification": [
+                  "cargo test --lib surfaces::web_server::tests::static_surface::navigation::static_main_nav_consolidates_context_and_controls -- --exact",
+                  "cargo test --lib surfaces::web_server::tests::project_runtime::project_status_uses_the_port_scoped_node_that_owns_and_filters_new_goals -- --exact",
+                  "node --test tests/web_controls_node_selector.test.js",
+                  "node --test tests/web_*.test.js",
+                  "node --test --test-name-pattern='Controls Node selector|Node context' tests/web_screen_render.test.js (pass when Chromium is available; otherwise record the explicit skip)",
+                  "cargo fmt --all -- --check",
+                  "git diff --check",
+                  "git status --short",
+                  "git diff --stat and final git diff inspection"
+                ]
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "P2 now defines one forced authoritative project-status and Node-registry reconciliation path for init, attach/detach, all local Node CRUD/activation, and filtered/debounced api_mutation SSE notices. It explicitly tests create, rename, archive, and two-client activation convergence."
+              },
+              {
+                "criticism_id": "C2",
+                "resolution": "P2-P3 now define a serialized activation transaction, cache invalidation and authoritative reread, a Node-context generation fence for every Node-scoped route/detail read, an explicit URL-preserving route/modal dispatcher, confirmation or cancellation for local dirty drafts, and a stale disabled preservation state for dirty surfaces when another client changes the Node. Delayed-response and dirty/open-modal regressions are required."
+              },
+              {
+                "criticism_id": "C3",
+                "resolution": "P3-P4 now run the exact existing project_runtime test that separates the shared app-registry root from the port runtime root and proves activation, project status, current-node filtering, and new Goal ownership agree; mocked browser POST coverage is limited to surface-transition behavior."
+              }
+            ],
+            "summary": "Add an accessible Node selector immediately beside Reporter in the main Controls menu and back it with one cohesive browser Node-context coordinator. The coordinator will treat Node IDs as authoritative, reconcile project status plus the non-archived Node registry after local CRUD, activation, attach/detach, and filtered api_mutation SSE notices, serialize switches, fence old Node-scoped reads, protect dirty drafts and open modals, and dispatch an explicit URL-preserving refresh for every affected route. Focused VM/browser regressions and the existing port-runtime Rust test will prove both surface behavior and authoritative ownership."
+          },
+          "started_at": "2026-08-12T18:51:07Z"
+        },
+        "implementation": {
+          "completed_at": "2026-08-12T19:11:59Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Added the accessible, test-addressable global-node select immediately before Reporter; it renders non-archived Node display names backed by Node IDs, disables to No node when detached, updates only the Nav intent page, and extends the static navigation contract. The focused real-browser case was attempted and explicitly skipped because no Playwright Chromium build is available.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added the 288-line cohesive node-context.js coordinator after common.js. It forces uncached project-status and Node-registry reconciliation on init, attachment changes, local Node CRUD/fleet changes, and filtered/debounced api_mutation notices; settings activation delegates to its serialized/coalesced ID transaction with exact POST payload, authoritative reread/validation, cache invalidation, rollback, and two-client convergence. Focused VM tests pass 11/11.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added Node-context generation fences to Dashboard, Goals, Features, Logs, Changes, Reporter/project status, Goal and Feature detail reads, settings loads, Target App, and agent status. URL-backed current/all/named scopes are never rewritten. Local dirty Node-owned surfaces can veto before POST; confirmed local switches safely discard/cancel and close; external changes preserve dirty values, mark them stale, disable mutation controls, and leave the shell authoritative. Feature autosave is generation-fenced and delayed prior-generation results are discarded.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Ran both exact Rust contracts, the focused 11-case coordinator suite, the complete web regression suite, both requested browser patterns, Rust formatting, diff hygiene, status/stat, trailing-whitespace checks for new files, and final diff inspection. Scope is limited to the Controls selector, cohesive coordinator and feature hooks, tests, and the affected Nav intent page; Chromium absence is recorded as a skip.",
+                "id": "P4",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "cargo test --lib surfaces::web_server::tests::static_surface::navigation::static_main_nav_consolidates_context_and_controls -- --exact -> passed: 1 passed, 0 failed",
+              "cargo test --lib surfaces::web_server::tests::project_runtime::project_status_uses_the_port_scoped_node_that_owns_and_filters_new_goals -- --exact -> passed: 1 passed, 0 failed",
+              "node --test tests/web_controls_node_selector.test.js -> passed: 11 passed, 0 failed, 0 skipped",
+              "node --test tests/web_*.test.js -> passed: 171 passed, 0 failed, 26 skipped; all skips report no Playwright chromium build is available",
+              "node --test --test-name-pattern='Controls Node selector' tests/web_screen_render.test.js -> explicit skip: 0 passed, 0 failed, 1 skipped because no Playwright chromium build is available",
+              "node --test --test-name-pattern='Controls Node selector|Node context' tests/web_screen_render.test.js -> explicit skip: 0 passed, 0 failed, 1 skipped because no Playwright chromium build is available",
+              "cargo fmt --all -- --check -> passed with no output",
+              "git diff --check -> passed with no output",
+              "git status --short -> 19 modified tracked files and 2 intended untracked files: src/surfaces/web/static/js/node-context.js and tests/web_controls_node_selector.test.js",
+              "git diff --stat and final git diff inspection -> tracked diff: 19 files, 145 insertions, 20 deletions; inspected tracked diff plus both intended new files; node-context.js is cohesive and 288 lines",
+              "rg -n '[ \\t]+$' src/surfaces/web/static/js/node-context.js tests/web_controls_node_selector.test.js -> no trailing whitespace matches"
+            ]
+          },
+          "report": "Added the Controls Node selector and cohesive runtime-local Node-context coordination; exact Rust, VM/static-web, formatting, hygiene, scope, and explicit Chromium-skip evidence recorded.",
+          "started_at": "2026-08-12T18:56:01Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-12T18:56:01Z",
+        "proposal": {
+          "completed_at": "2026-08-12T18:46:28Z",
+          "git_after": {
+            "branch": "refine/00000SZXT9QJZ2C3NQ53X9W001/round-1",
+            "head_commit": "9a3d7efb118b21e09f88e6df1520b37cd525d106",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000SZXT9QJZ2C3NQ53X9W001/round-1",
+            "head_commit": "9a3d7efb118b21e09f88e6df1520b37cd525d106",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "affected_behavior": [
+                  "The main navigation Controls submenu exposes the active Node as an accessible selector using display names.",
+                  "Detached projects show a non-actionable Node state rather than an invalid selection.",
+                  "The durable browser Nav intent records Controls as the direct Node-switching surface."
+                ],
+                "description": "Extend the Controls context section in src/surfaces/web/static/index.html with a labeled, test-addressable Node select adjacent to Reporter; use existing select/menu styling with only narrowly scoped CSS if needed, and update docs/intent/04-surfaces/03-browser/02-nav.md to state that active Node selection is visible and switchable from Controls.",
+                "governance_rationale": "Guidance 0 applies because this changes the browser shell surface contract. The Nav intent page is the affected durable context; no unrelated intent pages need modification. Node IDs remain authoritative ownership keys and display names remain labels.",
+                "id": "P1",
+                "verification": [
+                  "Static markup assertions prove the Node label/select is inside the Controls menu exactly once, is accessible, and remains adjacent to Reporter.",
+                  "A rendered desktop/narrow browser check confirms the added selector fits the existing Controls menu without overflow when Chromium is available."
+                ]
+              },
+              {
+                "affected_behavior": [
+                  "Opening/initializing the attached shell hydrates the current selectable Node registry and highlights the authoritative active Node.",
+                  "Choosing another Node persists runtime-local activation through the existing API and immediately refreshes the brand label, page title, Reporter context, and Node-scoped route data.",
+                  "Archived Nodes are not offered for activation, selecting the already-active Node is a no-op, concurrent changes are guarded, and activation failures do not leave a false UI selection.",
+                  "Node settings and Controls use one browser-side activation transition rather than duplicate state semantics."
+                ],
+                "description": "Add a cohesive browser module for Controls Node selection and load it before init: hydrate non-archived Node options from GET /api/nodes, select by active_node_id, disable safely when detached or busy, and activate changed IDs through POST /api/nodes/activate. Centralize the successful activation state transition so the Controls selector and src/surfaces/web/static/js/features/settings_nodes.js reuse the same Node-ID-based update, active-label/title update, cache invalidation, Node-scoped state reset, and current-surface reconciliation; restore the authoritative selection and surface an actionable error on failure.",
+                "governance_rationale": "Guidance 0 requires the thin browser surface to use the existing Node capability/API and preserve local inspectable active-Node state. Guidance 1 favors a focused Node-selection module and shared stable helper instead of expanding the already broad common.js or duplicating activation logic across surfaces.",
+                "id": "P2",
+                "verification": [
+                  "Focused Node tests prove ID/display-name mapping, archived filtering, detached state, no-op selection, successful POST payload and projection refresh, and failure rollback/error reporting.",
+                  "Existing Node settings activation coverage proves the shared helper preserves that surface's behavior."
+                ]
+              },
+              {
+                "affected_behavior": [
+                  "The Controls menu structure, script load order, and accessible Node selector become stable static contracts.",
+                  "Browser behavior is protected against stale display names, incorrect ID payloads, archived choices, and incomplete refresh after activation.",
+                  "Port-scoped active Node remains the owner/filter source rather than a stale app-registry-root selection."
+                ],
+                "description": "Extend src/surfaces/web_server/tests/static_surface/navigation.rs and add a focused tests/web_controls_node_selector.test.js regression suite; add or extend a rendered browser fixture to exercise selecting a second Node and observing the authoritative label/route refresh while retaining the existing port-scoped active-Node contract.",
+                "governance_rationale": "The tests enforce the Foundation boundary that Node IDs own work while labels orient users, and the Surfaces boundary that the browser delegates activation to the existing API. They also preserve the known port-local runtime identity contract.",
+                "id": "P3",
+                "verification": [
+                  "cargo test --lib surfaces::web_server::tests::static_surface::navigation::static_main_nav_consolidates_context_and_controls -- --exact",
+                  "node --test tests/web_controls_node_selector.test.js",
+                  "node --test --test-name-pattern='Controls Node selector' tests/web_screen_render.test.js (pass when Chromium is available; otherwise report as skipped)"
+                ]
+              },
+              {
+                "affected_behavior": [
+                  "The completed candidate is reviewable with exact functional, regression, formatting, and scope evidence."
+                ],
+                "description": "Run focused checks first, then the complete static web regression suite and repository hygiene checks; inspect the final diff to confirm only the accepted Controls selector, shared activation path, tests, and affected Nav intent changed.",
+                "governance_rationale": "This provides proportionate evidence for a browser surface change while preserving the review boundary and avoiding unrelated cleanup.",
+                "id": "P4",
+                "verification": [
+                  "cargo test --lib surfaces::web_server::tests::static_surface::navigation::static_main_nav_consolidates_context_and_controls -- --exact",
+                  "node --test tests/web_controls_node_selector.test.js",
+                  "node --test tests/web_*.test.js",
+                  "cargo fmt --all -- --check",
+                  "git diff --check",
+                  "git status --short and git diff --stat plus final diff inspection"
+                ]
+              }
+            ],
+            "criticism_resolutions": [],
+            "summary": "Add an accessible Node selector beside the Reporter selector in the main Controls menu, backed by the existing authoritative runtime-local Node APIs. Keep Node IDs authoritative and display names presentational, centralize browser-side activation so Controls and Node settings cannot drift, refresh all Node-scoped UI after a switch, document the updated Nav context contract, and add focused static and behavioral regressions."
+          },
+          "started_at": "2026-08-12T18:43:59Z"
+        },
+        "schema_version": 2,
+        "started_at": "2026-08-12T18:43:58Z",
+        "state": "completed",
+        "updated_at": "2026-08-12T19:11:59Z"
+      },
+      "implementation_report": "Added the Controls Node selector and cohesive runtime-local Node-context coordination; exact Rust, VM/static-web, formatting, hygiene, scope, and explicit Chromium-skip evidence recorded.",
+      "implementation_reported_at": "2026-08-12T19:12:00Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Add a node selector on the main nav controls sub-menu similar to the Reporter selector on the same menu.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "passed",
+      "updated": "2026-08-12T19:13:15Z",
+      "workflow_git_remote": "origin",
+      "workflow_quality_timing": "pre_merge",
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    }
+  ],
+  "status": "cancelled",
+  "target_branch": "main",
+  "updated": "2026-08-14T09:43:54Z",
+  "workflow_revision": 24
+}

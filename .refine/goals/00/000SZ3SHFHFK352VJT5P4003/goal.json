@@ -13,7 +13,7 @@
   "reporter": "Buddy Williams",
   "rounds": [
     {
-      "assignee": "Refine",
+      "assignee": "Buddy Williams",
       "constitution_state": "unclassified",
       "created": "2026-07-23T13:36:53Z",
       "governance_checked_at": "",
@@ -30,7 +30,7 @@
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
-      "reporter": "Refine",
+      "reporter": "Buddy Williams",
       "rule_state": "unclassified",
       "updated": "2026-07-23T13:36:53Z",
       "workflow_quality_timing": null
@@ -77,11 +77,12 @@
       "quality_state": "passed",
       "reporter": "Buddy Williams",
       "rule_state": "passed",
-      "updated": "2026-07-23T14:13:04Z",
+      "updated": "2026-07-28T16:39:36Z",
       "workflow_quality_timing": "pre_merge"
     }
   ],
   "status": "done",
   "target_branch": "main",
-  "updated": "2026-07-23T18:13:19Z"
+  "updated": "2026-07-28T16:39:48Z",
+  "workflow_revision": 5
 }

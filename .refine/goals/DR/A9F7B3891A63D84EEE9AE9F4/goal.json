@@ -1,0 +1,490 @@
+{
+  "base_commit": "7cea117ae9b0887a36a1ca45c1fdc07eb7c03213",
+  "branch_name": "refine/DRA9F7B3891A63D84EEE9AE9F4/round-3",
+  "candidate_commit": "529872f2aaae3e7be9e251b6b2726e763d0f428c",
+  "created": "2026-08-06T17:22:41Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "DRA9F7B3891A63D84EEE9AE9F4",
+  "name": "Bound workflow claim history",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "agent_context": null,
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-08-06T17:22:43Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "guidance_decision": null,
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Implement and verify this Goal.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-08-06T17:51:09Z",
+      "workflow_git_remote": "origin",
+      "workflow_quality_timing": "pre_merge",
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-06T17:22:47Z",
+        "current_round": {
+          "assignee": "Refine",
+          "prompt": "Implement and verify this Goal.",
+          "reporter": "Refine",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "buddy.williams@insurity.com",
+          "id": "DRA9F7B3891A63D84EEE9AE9F4",
+          "name": "Bound workflow claim history",
+          "node_id": "default",
+          "priority": "high",
+          "reporter": "buddy.williams@insurity.com"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-08-06T17:22:44Z",
+      "failure_at": "2026-08-06T17:51:23Z",
+      "failure_category": "merge",
+      "failure_message": "Goal DRA9F7B3891A63D84EEE9AE9F4 round changed before Ready Merge integration",
+      "governance_checked_at": "2026-08-06T17:51:02Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRA9F7B3891A63D84EEE9AE9F4-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No actual governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 9,
+        "verdict": {
+          "message": "No actual governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRA9F7B3891A63D84EEE9AE9F4-round-1"
+      },
+      "governance_message": "No actual governance rule violations found.",
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-06T17:47:21Z",
+        "skipped": []
+      },
+      "implementation_report": "Implemented bounded workflow claim history with compact per-Goal summaries, semantic terminal deduplication, a 256-record terminal hard cap that preserves every active claim, durable preparation-failure evidence, bounded failure messages, capped exponential execution retry admission, and quarantine after five consecutive execution failures. Refactored scheduler, dashboard/status, next-actions, process-control, merge, cluster, worktree-cleanup, and execution lookups away from historical scans; added compatible legacy-state migration and updated workflow intent. Verification: cargo test --lib workflow::tests::claim_history -- --nocapture (7 passed); cargo test --lib workflow::tests -- --nocapture (63 passed); cargo test --lib tools::product::process_control::tests -- --nocapture (33 passed); focused dashboard/next-actions/cluster/worktree-cleanup tests (23 passed); cargo check --all-targets (passed); cargo clippy --all-targets --all-features -- -D warnings (passed); cargo test (748 passed, 6 platform-gated ignored); cargo fmt --all -- --check and git diff --check (passed).",
+      "implementation_reported_at": "2026-08-06T17:47:19Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Prevent workflow-automation claim retry storms and unbounded state growth. Add bounded retention/garbage collection that preserves all active claims and the latest preparation-stage failure per goal, deduplicate equivalent claims, apply capped exponential backoff and quarantine after repeated execution-stage failures, and enforce a hard safety cap on terminal claim history. Refactor dashboard, status, next-actions, process-control, and scheduler lookups to use a compact per-goal index or summary rather than scanning all historical attempts. Add tests proving repeated execution failures produce bounded claims, state-file size remains bounded over long failure runs, preparation-failure quarantine survives compaction, hot-path work scales with active goals rather than historical attempts, and resuming automation with many todo goals does not recreate the retry storm or dashboard slowdown.",
+      "quality_checked_at": "2026-08-06T17:51:14Z",
+      "quality_details": {
+        "candidate_commit": "b4495eb409dd353fbe18651a21063fd6e8341978",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRA9F7B3891A63D84EEE9AE9F4-round-1",
+        "diagnostics": [
+          "No Quality tests or migrated commands are configured; evaluation was a no-op."
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "19fd83365c91d80538",
+        "results": [],
+        "source_candidate_commit": "b4495eb409dd353fbe18651a21063fd6e8341978"
+      },
+      "quality_message": "No Quality tests configured.",
+      "quality_state": "passed",
+      "reporter": "Buddy Williams",
+      "rule_state": "passed",
+      "updated": "2026-08-06T17:51:24Z",
+      "workflow_quality_timing": null,
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-06T18:27:02Z",
+        "current_round": {
+          "assignee": "buddy.williams@insurity.com",
+          "prompt": "Recover the retained implementation candidate b4495eb409dd353fbe18651a21063fd6e8341978 after the prior Ready Merge round-fence failure. Preserve all prior Goal, branch, candidate, Governance, Quality, and failure evidence. Start from current main, replay or reimplement the candidate changes without force-push or history rewrite, inspect the full diff against the original Goal prompt, and correct any issues found. Verify bounded terminal claim retention, preservation of every active claim and current preparation-failure quarantine, semantic deduplication, capped exponential execution retry admission, quarantine after repeated execution failures, compact per-Goal hot-path lookups, bounded persisted state over long runs, and safe resume with many todo Goals. Run focused claim-history and Ready Merge tests plus the relevant workflow, process-control, dashboard/status, next-actions, cluster, worktree-cleanup, formatting, compilation, Clippy, and full test gates. Keep evidence attributed to this recovery round. Do not directly merge, approve, or bypass Governance, configured Quality, or human Review.",
+          "reporter": "buddy.williams@insurity.com",
+          "round": 3
+        },
+        "goal": {
+          "assignee": "buddy.williams@insurity.com",
+          "id": "DRA9F7B3891A63D84EEE9AE9F4",
+          "name": "Bound workflow claim history",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "buddy.williams@insurity.com"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "Refine",
+            "prompt": "Implement and verify this Goal.",
+            "reporter": "Refine",
+            "round": 1
+          },
+          {
+            "assignee": "buddy.williams@insurity.com",
+            "constitution_state": "passed",
+            "governance_checked_at": "2026-08-06T17:51:02Z",
+            "governance_details": {
+              "configured": true,
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRA9F7B3891A63D84EEE9AE9F4-round-1",
+              "failed_actions": [],
+              "governance_configured": true,
+              "phase": "post_implementation",
+              "provider": "codex",
+              "raw_output": "{\"status\":\"passed\",\"message\":\"No actual governance rule violations found.\",\"violations\":[]}",
+              "rules_checked": 9,
+              "verdict": {
+                "message": "No actual governance rule violations found.",
+                "status": "passed",
+                "violations": []
+              },
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRA9F7B3891A63D84EEE9AE9F4-round-1"
+            },
+            "governance_message": "No actual governance rule violations found.",
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                },
+                {
+                  "enabled": true,
+                  "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+                  "name": "Cohesive code files",
+                  "rule": "Apply whenever an agent adds or changes code files in any language."
+                }
+              ],
+              "code_files_changed": true,
+              "context_version": 1,
+              "recorded_at": "2026-08-06T17:47:21Z",
+              "skipped": []
+            },
+            "implementation_report": "Implemented bounded workflow claim history with compact per-Goal summaries, semantic terminal deduplication, a 256-record terminal hard cap that preserves every active claim, durable preparation-failure evidence, bounded failure messages, capped exponential execution retry admission, and quarantine after five consecutive execution failures. Refactored scheduler, dashboard/status, next-actions, process-control, merge, cluster, worktree-cleanup, and execution lookups away from historical scans; added compatible legacy-state migration and updated workflow intent. Verification: cargo test --lib workflow::tests::claim_history -- --nocapture (7 passed); cargo test --lib workflow::tests -- --nocapture (63 passed); cargo test --lib tools::product::process_control::tests -- --nocapture (33 passed); focused dashboard/next-actions/cluster/worktree-cleanup tests (23 passed); cargo check --all-targets (passed); cargo clippy --all-targets --all-features -- -D warnings (passed); cargo test (748 passed, 6 platform-gated ignored); cargo fmt --all -- --check and git diff --check (passed).",
+            "implementation_reported_at": "2026-08-06T17:47:19Z",
+            "meta_rule_state": "passed",
+            "product_state": "passed",
+            "prompt": "Prevent workflow-automation claim retry storms and unbounded state growth. Add bounded retention/garbage collection that preserves all active claims and the latest preparation-stage failure per goal, deduplicate equivalent claims, apply capped exponential backoff and quarantine after repeated execution-stage failures, and enforce a hard safety cap on terminal claim history. Refactor dashboard, status, next-actions, process-control, and scheduler lookups to use a compact per-goal index or summary rather than scanning all historical attempts. Add tests proving repeated execution failures produce bounded claims, state-file size remains bounded over long failure runs, preparation-failure quarantine survives compaction, hot-path work scales with active goals rather than historical attempts, and resuming automation with many todo goals does not recreate the retry storm or dashboard slowdown.",
+            "quality_checked_at": "2026-08-06T17:51:14Z",
+            "quality_details": {
+              "candidate_commit": "b4495eb409dd353fbe18651a21063fd6e8341978",
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRA9F7B3891A63D84EEE9AE9F4-round-1",
+              "diagnostics": [
+                "No Quality tests or migrated commands are configured; evaluation was a no-op."
+              ],
+              "evaluation_scope": "isolated_candidate",
+              "operation_id": "19fd83365c91d80538",
+              "results": [],
+              "source_candidate_commit": "b4495eb409dd353fbe18651a21063fd6e8341978"
+            },
+            "quality_message": "No Quality tests configured.",
+            "quality_state": "passed",
+            "reporter": "buddy.williams@insurity.com",
+            "round": 2,
+            "rule_state": "passed"
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-08-06T18:26:44Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "2026-08-06T18:43:16Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRA9F7B3891A63D84EEE9AE9F4-round-3",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No actual governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 9,
+        "verdict": {
+          "message": "No actual governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRA9F7B3891A63D84EEE9AE9F4-round-3"
+      },
+      "governance_message": "No actual governance rule violations found.",
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-06T18:39:43Z",
+        "skipped": []
+      },
+      "implementation_report": "Recovered b4495eb409dd353fbe18651a21063fd6e8341978 onto current main 7cea117ae9b0887a36a1ca45c1fdc07eb7c03213 without merge or history rewrite; audited the full 24-file diff and corrected active-claim indexing so newer terminal history cannot hide an older active claim. Verification passed: claim-history 8/8; Ready Merge 14/14; workflow 64/64; process-control 33/33; dashboard/runtime 6/6; next-actions 3/3; cluster 9/9; worktree-cleanup 10/10; workflow-execution status 2/2; merging 3/3; cargo fmt --all -- --check; cargo check --all-targets; cargo clippy --all-targets --all-features -- -D warnings; cargo test 757 passed, 6 platform-gated ignored; git diff --cached --check.",
+      "implementation_reported_at": "2026-08-06T18:39:41Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Recover the retained implementation candidate b4495eb409dd353fbe18651a21063fd6e8341978 after the prior Ready Merge round-fence failure. Preserve all prior Goal, branch, candidate, Governance, Quality, and failure evidence. Start from current main, replay or reimplement the candidate changes without force-push or history rewrite, inspect the full diff against the original Goal prompt, and correct any issues found. Verify bounded terminal claim retention, preservation of every active claim and current preparation-failure quarantine, semantic deduplication, capped exponential execution retry admission, quarantine after repeated execution failures, compact per-Goal hot-path lookups, bounded persisted state over long runs, and safe resume with many todo Goals. Run focused claim-history and Ready Merge tests plus the relevant workflow, process-control, dashboard/status, next-actions, cluster, worktree-cleanup, formatting, compilation, Clippy, and full test gates. Keep evidence attributed to this recovery round. Do not directly merge, approve, or bypass Governance, configured Quality, or human Review.",
+      "quality_checked_at": "2026-08-06T18:43:23Z",
+      "quality_details": {
+        "candidate_commit": "529872f2aaae3e7be9e251b6b2726e763d0f428c",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRA9F7B3891A63D84EEE9AE9F4-round-3",
+        "diagnostics": [
+          "No Quality tests or migrated commands are configured; evaluation was a no-op."
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "19fd86324061d8053c",
+        "results": [],
+        "source_candidate_commit": "529872f2aaae3e7be9e251b6b2726e763d0f428c"
+      },
+      "quality_message": "No Quality tests configured.",
+      "quality_state": "passed",
+      "reporter": "Buddy Williams",
+      "rule_state": "passed",
+      "updated": "2026-08-06T18:43:31Z",
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "529872f2aaae3e7be9e251b6b2726e763d0f428c",
+        "integrated_at": "2026-08-06T18:43:30.942522647+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n .../03-capabilities/03-workflow/00-overview.md     |   8 +\n .../web_server/operation_routes/helpers.rs         |  10 +-\n src/surfaces/web_server/tests/project_runtime.rs   |   1 +\n src/tools/host/cluster/mod.rs                      |  21 +-\n src/tools/product/merging/mod.rs                   |   7 +-\n src/tools/product/next_actions/mod.rs              |  24 +-\n src/tools/product/process_control.rs               |  39 +--\n .../product/process_control/bulk_cancellation.rs   |  10 +-\n src/tools/product/process_control/termination.rs   |   4 +-\n .../product/process_control/tests/settlement.rs    |   1 +\n src/tools/product/worktree_cleanup/mod.rs          |  13 +-\n src/tools/product/worktree_cleanup/tests.rs        |   3 +\n src/workflow/automation.rs                         |  32 ++-\n src/workflow/claim_history.rs                      | 255 +++++++++++++++++\n src/workflow/context.rs                            |   2 +\n src/workflow/execution.rs                          |  49 +++-\n src/workflow/mod.rs                                |  81 ++++--\n src/workflow/policy.rs                             |  32 +--\n src/workflow/ready_merge.rs                        |  24 +-\n src/workflow/state.rs                              |  21 +-\n src/workflow/state_persistence.rs                  |  12 +-\n src/workflow/tests/claim_history.rs                | 305 +++++++++++++++++++++\n src/workflow/tests/mod.rs                          |   1 +\n src/workflow/tests/ready_merge.rs                  |   1 +\n 24 files changed, 770 insertions(+), 186 deletions(-)\n create mode 100644 src/workflow/claim_history.rs\n create mode 100644 src/workflow/tests/claim_history.rs",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "e1ba58688fcd9b67d940ff609a8ffe90c6b3c612"
+      },
+      "workflow_quality_timing": "pre_merge",
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    }
+  ],
+  "status": "done",
+  "target_branch": "main",
+  "updated": "2026-08-06T18:44:03Z",
+  "workflow_revision": 40
+}

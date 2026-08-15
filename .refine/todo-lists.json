@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "lists": [
+    {
+      "id": "a3fca29c-74e8-4118-9ead-100d5df14118",
+      "reporter": "Buddy Williams",
+      "name": "Backlog",
+      "created": "2026-08-06T13:37:47Z",
+      "updated": "2026-08-06T13:37:49Z",
+      "items": [
+        {
+          "id": "6e4e5d47-286c-40f9-bfee-9b9079942d0f",
+          "text": "How often will the implementation check for new mail at goal@getrefine.dev?",
+          "done": false,
+          "created": "2026-08-06T13:37:49Z",
+          "updated": "2026-08-06T13:37:49Z"
+        }
+      ]
+    }
+  ]
+}

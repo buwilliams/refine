@@ -1,0 +1,498 @@
+{
+  "base_commit": "47279214b3049a88ad57a5b18c42fe9788dd47af",
+  "branch_name": "refine/00000T01C4M1YG6BHGV8WFJ000/round-1",
+  "candidate_commit": "5f13e206bd925d7134c80f3419bb950d8743834f",
+  "created": "2026-08-15T13:02:53Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000T01C4M1YG6BHGV8WFJ000",
+  "name": "Recover missing state-sync baselines without weakening conflict safety",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": null,
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-15T13:03:23Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Implement a production-safe recovery for Refine state synchronization when the persisted three-way baseline is missing but both a non-bootstrap live store and an existing remote refine/state branch are present. This currently leaves sync permanently failed with the misleading message Refine state changed on multiple nodes. The development reproduction is the deliberate bootstrap topology where /home/buddy/projects/refine runs the daemon against /home/buddy/projects/refine-next; only refine-next owns live state. Do not encode that topology or assume that a production target app is Refine itself.\n\nPreserve normal fail-closed multi-node conflict detection. Ordinary automatic and manual sync must never silently choose a winner when the baseline is absent. Add an explicit operator-authorized recovery capability shared by product services and exposed through the daemon-backed CLI/API. It must first provide a read-only report containing target identity, configured remote, exact local and remote state heads, baseline status, live-only, remote-only, equal, and differing path counts, and the conflicting paths in bounded form. Applying recovery must require an explicit authority choice. Live authority must treat the fetched remote snapshot as the observed base and then use ordinary reconciliation to publish live additions, modifications, and deletions as a linear non-force refine/state commit while retaining remote history. Remote authority must preserve a recoverable snapshot of the pre-recovery live state before replacing it, then hydrate from the fetched remote snapshot. Reject recovery if the baseline exists, repository identity or remote head changes, the worktree is unsafe, another Git operation owns the lock, or supplied preview evidence is stale. Never alter the application branch/index/worktree, force-push, rewrite history, discard Goal evidence, or bypass configured remote/authentication.\n\nMake recovery auditable and restart-safe. Persist a bounded manifest with authority choice, node, target identity, configured remote, exact before/after heads, path counts, timestamp, outcome, and recovery location or ref. Preserve both sides through Git history or a dedicated recovery ref/snapshot. A failed or interrupted apply must remain retryable without fabricating a successful baseline. Use atomic durable writes for the baseline and recovery evidence. Return actionable recovery guidance from the missing-baseline conflict instead of the generic multiple-nodes claim.\n\nAlso stop failed sync attempts from leaving the managed state worktree dirty with deletions of newly excluded Goal logs and chat sessions. Either order retirement after conflict validation or restore the managed worktree on every failure, while retaining the intended eventual deletion after successful sync.\n\nAdd focused tests for missing-baseline preview, no-mutation dry run, live-authority recovery, remote-authority recovery with local snapshot preservation, stale preview/remote race rejection, interruption/retry, configured remotes, repository locking, remote-only deletion semantics, excluded-log retirement, managed-worktree cleanliness after failure, and proof that real unequal two-node edits with a valid baseline still conflict. Cover daemon API and CLI thin adapters and update intent/runbook documentation. Run targeted Git-sync and CLI/API tests, the multi-instance synchronization gate, formatting, Clippy, and broader tests proportional to the change. Keep all evidence visible and do not perform the live recovery from an isolated candidate worktree.",
+          "reporter": "Buddy Williams",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000T01C4M1YG6BHGV8WFJ000",
+          "name": "Recover missing state-sync baselines without weakening conflict safety",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-08-15T13:03:21Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "2026-08-15T14:16:09Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T01C4M1YG6BHGV8WFJ000-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "guidance_checked": 2,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No actual governance rule violations found.\",\"violations\":[],\"recovery_analysis\":\"\",\"recovery_round_prompt\":\"\"}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "No actual governance rule violations found.",
+          "recovery_analysis": "",
+          "recovery_round_prompt": "",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T01C4M1YG6BHGV8WFJ000-round-1"
+      },
+      "governance_message": "No actual governance rule violations found.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-15T13:55:07Z",
+        "skipped": []
+      },
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "47279214b3049a88ad57a5b18c42fe9788dd47af",
+          "context_digest": "bf6d0eb276f6a97351b5e83580dc924b083319da988d1b9e7520fcdd940ffc6a",
+          "context_version": 1,
+          "goal_id": "00000T01C4M1YG6BHGV8WFJ000",
+          "implementation_branch": "refine/00000T01C4M1YG6BHGV8WFJ000/round-1",
+          "round_idx": 0,
+          "target_branch": "main"
+        },
+        "completed_at": "2026-08-15T13:55:07Z",
+        "criticism": {
+          "completed_at": "2026-08-15T13:09:29Z",
+          "git_after": {
+            "branch": "refine/00000T01C4M1YG6BHGV8WFJ000/round-1",
+            "head_commit": "47279214b3049a88ad57a5b18c42fe9788dd47af",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T01C4M1YG6BHGV8WFJ000/round-1",
+            "head_commit": "47279214b3049a88ad57a5b18c42fe9788dd47af",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P3"
+                ],
+                "description": "The read-only preview boundary omits the managed state worktree and persistent local or remote-tracking refs, so an implementation could reuse the existing fetch/setup/rebase path and mutate exactly the state implicated by the failure while still satisfying the narrower no-live/baseline/application/remote wording.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Require preview to leave every persistent repository ref, index, worktree, live store, baseline, and remote unchanged, using disposable observation storage where remote objects are needed, and assert that full no-mutation boundary in tests."
+              },
+              {
+                "checklist_item_ids": [
+                  "P4",
+                  "P6",
+                  "P7",
+                  "P8"
+                ],
+                "description": "Apply fencing checks live evidence only before work begins, but the repository Git lock does not serialize normal durable record writes; remote-authority hydration could therefore overwrite a concurrent Goal mutation or record success without distinguishing it as a post-preview local delta.",
+                "id": "C2",
+                "material": true,
+                "recommendation": "Add compare-and-swap hydration against the exact preview live snapshot plus a final rescan, preserving concurrent writes as deferred post-baseline local changes or failing retryably before any success outcome is recorded."
+              },
+              {
+                "checklist_item_ids": [
+                  "P1",
+                  "P2",
+                  "P3",
+                  "P4",
+                  "P5",
+                  "P6",
+                  "P7",
+                  "P8",
+                  "P9"
+                ],
+                "description": "No checklist item implements the request's focused regression matrix or required verification commands, leaving the safety claims and thin daemon/CLI contracts disconnected from executable evidence.",
+                "id": "C3",
+                "material": true,
+                "recommendation": "Add a verification item covering every named recovery, race, locking, deletion, cleanliness, valid-baseline conflict, daemon API, and CLI case, then run targeted Git-sync and surface tests, the multi-instance gate, formatting, Clippy, and proportionate broader tests."
+              }
+            ],
+            "summary": "The plan is directionally sound but must close three safety and verification gaps before implementation."
+          },
+          "started_at": "2026-08-15T13:05:39Z"
+        },
+        "final_plan": {
+          "completed_at": "2026-08-15T13:11:14Z",
+          "git_after": {
+            "branch": "refine/00000T01C4M1YG6BHGV8WFJ000/round-1",
+            "head_commit": "47279214b3049a88ad57a5b18c42fe9788dd47af",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T01C4M1YG6BHGV8WFJ000/round-1",
+            "head_commit": "47279214b3049a88ad57a5b18c42fe9788dd47af",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Add a cohesive recovery module within the shared Git-sync capability containing typed preview evidence, explicit authority choices, bounded comparisons, recovery outcomes, durable manifest contracts, and actionable missing-baseline guidance.",
+                "id": "P1"
+              },
+              {
+                "description": "Move missing-baseline and conflict validation ahead of excluded Goal-log or chat retirement and guard every ordinary-sync failure by restoring the managed state worktree, while preserving bootstrap behavior and strict unequal-edit conflicts when a valid baseline exists.",
+                "id": "P2"
+              },
+              {
+                "description": "Implement preview with disposable observation storage so it resolves canonical target and repository identity, honors only the configured remote, captures exact local and fetched remote state heads and baseline absence, and reports live-only, remote-only, equal, differing, and bounded conflicting paths without changing any persistent ref, index, worktree, live store, baseline, or remote.",
+                "id": "P3"
+              },
+              {
+                "description": "Bind apply to the complete supplied preview and reject an existing baseline, changed target or repository identity, changed configured remote or remote head, changed live snapshot, unsafe managed worktree, repository lock contention, or an in-progress foreign Git operation.",
+                "id": "P4"
+              },
+              {
+                "description": "Implement live authority by anchoring the managed state branch at the exact observed remote head and using ordinary reconciliation to publish live additions, modifications, and deletions, including remote-only paths absent from live state, as one linear non-force commit retaining remote history.",
+                "id": "P5"
+              },
+              {
+                "description": "Implement remote authority by durably preserving the complete pre-recovery live state in a dedicated recovery snapshot or ref before replacing live durable state with the exact fetched remote snapshot.",
+                "id": "P6"
+              },
+              {
+                "description": "Fence remote-authority hydration with compare-and-swap checks against the exact preview live snapshot and a final rescan so concurrent durable writes are preserved as deferred post-baseline changes or cause a retryable failure before success is recorded.",
+                "id": "P7"
+              },
+              {
+                "description": "Journal each apply through atomic durable writes to a bounded manifest containing authority, node, target identity, configured remote, exact before and after heads, path counts, timestamp, outcome, and recovery location, and publish the successful baseline only after authority-specific work and final fencing complete.",
+                "id": "P8"
+              },
+              {
+                "description": "Make failed or interrupted applies resumable from owned recovery evidence without fabricating a baseline, restore unexplained managed-worktree changes, and retain excluded-log and chat retirement for the next successful synchronization.",
+                "id": "P9"
+              },
+              {
+                "description": "Expose preview and explicit-authority apply through daemon project routes and thin daemon-backed CLI subcommands that use the shared service and structured errors without remote overrides or direct local mutation paths.",
+                "id": "P10"
+              },
+              {
+                "description": "Update only the affected intent and state-synchronization runbook pages to document the fail-closed boundary, preview-to-apply procedure, recovery evidence, retry semantics, and prohibition on performing live recovery from an isolated candidate worktree.",
+                "id": "P11"
+              },
+              {
+                "description": "Add focused regression coverage for missing-baseline preview and no-mutation behavior, both authority paths and snapshot preservation, stale and concurrent races, interruption and retry, configured remotes, locking, remote-only deletions, excluded-state retirement, failure cleanliness, valid-baseline conflicts, daemon and CLI adapters, and the required targeted, multi-instance, formatting, lint, and broader-suite gates.",
+                "id": "P12"
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "P3 now requires disposable remote observation and an unchanged boundary covering every persistent ref, index, worktree, live store, baseline, and remote, with P12 covering the no-mutation regression."
+              },
+              {
+                "criticism_id": "C2",
+                "resolution": "P4, P6, and P7 now bind recovery to the exact live preview, preserve the pre-recovery snapshot, use compare-and-swap hydration plus a final rescan, and defer concurrent writes or fail retryably before success."
+              },
+              {
+                "criticism_id": "C3",
+                "resolution": "P12 now covers every requested recovery, race, locking, deletion, cleanliness, valid-conflict, daemon, CLI, multi-instance, formatting, lint, and broader-suite evidence requirement."
+              }
+            ],
+            "summary": "Refine will gain a shared, operator-authorized recovery path for the exceptional case where a non-bootstrap live store and an existing remote refine/state branch have no persisted three-way baseline, while ordinary synchronization remains fail-closed; recovery will begin with a fully non-mutating preview, require an explicit live or remote authority choice, preserve both sides and remote history, reject stale or unsafe evidence including concurrent live changes, and record atomic audit evidence so interrupted work remains recoverable and retryable."
+          },
+          "started_at": "2026-08-15T13:09:29Z"
+        },
+        "implementation": {
+          "completed_at": "2026-08-15T13:55:07Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Added cohesive recovery contracts, inspection, application, hydration, storage, and test-hook modules with typed previews, authority, bounded counts/paths, manifests, outcomes, and actionable missing-baseline errors.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Ordinary sync validates missing baselines/conflicts before excluded-state retirement and restores the managed state worktree on all errors; bootstrap and valid-baseline conflict behavior remain covered.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Preview uses disposable observation storage, canonical target/repository identity, configured remote, exact heads and SHA-256 snapshots, bounded comparisons, and a no-mutation regression over refs, app head, remote, live state, and baseline.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Apply binds the full preview and rejects changed identity, remote/configuration/head/live state, existing foreign baselines, unsafe managed worktrees, repository lock contention, and foreign Git operation markers.",
+                "id": "P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Live authority anchors at the observed remote head, applies ordinary reconciliation including remote-only deletions, and publishes one linear non-force commit retaining remote ancestry.",
+                "id": "P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Remote authority first records the complete pre-recovery live state under a dedicated refs/refine/state-recovery ref, then hydrates the exact observed remote snapshot.",
+                "id": "P6",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Remote hydration compares each live path against preview/preserved content, accepts already-applied owned writes for restart, rejects concurrent content, and performs a final full-state fence before baseline publication.",
+                "id": "P7",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Recovery manifests and baselines use atomic durable writes and contain authority, node, identities, configured remote, exact before/after heads, counts, timestamps, outcome, and recovery ref. Final heads are verified before baseline publication; later manifest failure rolls back only the matching owned baseline.",
+                "id": "P8",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Failed pre-baseline attempts retain owned evidence without fabricating a baseline. An exact Started post-baseline interruption finalizes idempotently without republishing; foreign baseline substitution is rejected and does not poison the owned retry. Managed-worktree restoration preserves eventual retirement.",
+                "id": "P9",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added daemon project preview/apply routes and daemon-backed CLI state-recovery preview/apply subcommands requiring a full preview file and explicit live/remote authority, with no remote override.",
+                "id": "P10",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated only affected target-app/fleet intent and fleet runbook pages for fail-closed behavior, preview/apply, evidence, retries, authority semantics, and the isolated-candidate prohibition.",
+                "id": "P11",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "All focused, daemon/CLI, full library, and multi-instance gates pass. Implementation-owned rustfmt and all-target Clippy pass. The unmodified repository-wide cargo fmt check and strict Clippy gate still fail only on unrelated pre-existing files/lints; exact failures and a scoped -D warnings pass are recorded below.",
+                "id": "P12",
+                "outcome": "deviated"
+              }
+            ],
+            "verification": [
+              "cargo test --lib post_authority_remote_verification_failure_leaves_no_baseline_and_is_retryable -- --test-threads=1 => 1 passed, 0 failed",
+              "cargo test --lib interruption_after_baseline_finalizes_owned_apply_without_republishing_or_foreign_acceptance -- --test-threads=1 => 1 passed, 0 failed",
+              "cargo test --lib git_sync::tests::recovery -- --test-threads=1 => 12 passed, 0 failed",
+              "cargo test --lib git_sync::tests -- --test-threads=1 => 39 passed, 0 failed",
+              "cargo test --lib web_server_state_recovery -- --test-threads=1 => 2 passed, 0 failed",
+              "cargo test --lib project_state_recovery -- --test-threads=1 => 1 passed, 0 failed",
+              "cargo test --lib operational_runbooks_use_current_cli_and_layout_contracts -- --test-threads=1 => 1 passed, 0 failed",
+              "cargo test --lib -- --test-threads=1 => 835 passed, 0 failed, 6 ignored",
+              "cargo run --manifest-path xtask/Cargo.toml -- test-multi-instance-sync => 1 passed, 0 failed",
+              "cargo check => passed",
+              "rustfmt --edition 2024 --check <15 changed recovery, Git-sync, CLI/API, and multi-instance leaf files> && git diff --check => exit 0",
+              "cargo clippy --all-targets --all-features -- -A clippy::needless_pub_self -A clippy::unnecessary_sort_by -A clippy::items_after_test_module -D warnings => passed",
+              "cargo clippy --all-targets --all-features -- -D warnings => failed only on pre-existing needless_pub_self (src/tools/product/project_projection/store.rs:46,54), unnecessary_sort_by (src/surfaces/web_server/http/background_loops.rs:213), and items_after_test_module (src/surfaces/cli/dispatch/config.rs:353/392)",
+              "cargo fmt --all -- --check => failed on pre-existing formatting drift in unrelated files; implementation-owned leaf rustfmt check passed",
+              "git diff --check => passed"
+            ]
+          },
+          "report": "Implemented explicit missing-baseline state recovery with non-mutating previews, live/remote authority, fail-closed ordinary sync, durable audit and recovery evidence, daemon API/CLI adapters, documentation, and restart-safe owned finalization. Final remote/local verification now precedes baseline publication; a post-authority remote disappearance leaves no baseline and retries, while interruption immediately after baseline publication can only finalize a matching Started manifest with the same evidence, authority, identities, exact heads, recovery ref, and settled baseline. A substituted or unrelated baseline remains rejected. Focused recovery tests, API/CLI tests, full library tests, and the multi-instance gate pass. Implementation-owned formatting and lint pass; repository-wide fmt/strict Clippy remain blocked only by unrelated pre-existing drift recorded in verification.",
+          "started_at": "2026-08-15T13:11:15Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-15T13:11:15Z",
+        "proposal": {
+          "completed_at": "2026-08-15T13:05:38Z",
+          "git_after": {
+            "branch": "refine/00000T01C4M1YG6BHGV8WFJ000/round-1",
+            "head_commit": "47279214b3049a88ad57a5b18c42fe9788dd47af",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T01C4M1YG6BHGV8WFJ000/round-1",
+            "head_commit": "47279214b3049a88ad57a5b18c42fe9788dd47af",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Add cohesive typed recovery contracts within the shared Git-sync capability for preview evidence, authority choice, bounded path comparisons, recovery outcomes, and actionable missing-baseline errors.",
+                "id": "P1"
+              },
+              {
+                "description": "Restructure ordinary synchronization so missing-baseline validation and all conflict checks occur before excluded-state retirement or other managed-worktree mutations, with an error guard restoring the managed state worktree while preserving strict valid-baseline conflicts and bootstrap adoption.",
+                "id": "P2"
+              },
+              {
+                "description": "Implement a repository-locked read-only preview that resolves the canonical target and repository identity, uses only the configured remote, captures exact local and fetched remote refine/state heads, confirms the baseline is absent, and reports live-only, remote-only, equal, differing, and bounded conflicting paths without changing live, baseline, application, or remote state.",
+                "id": "P3"
+              },
+              {
+                "description": "Fence apply against the supplied preview by rejecting an existing baseline, changed target or repository identity, changed configured remote or remote head, changed live evidence, unexplained managed-worktree state, repository lock contention, and any in-progress foreign Git operation.",
+                "id": "P4"
+              },
+              {
+                "description": "For live authority, anchor the managed state branch at the exact observed remote head and run ordinary delta reconciliation with that remote snapshot as the base so live additions, modifications, and deletions including remote-only paths become one linear non-force commit that retains remote history.",
+                "id": "P5"
+              },
+              {
+                "description": "For remote authority, durably preserve the complete pre-recovery live durable state at a dedicated recovery snapshot or ref before idempotently hydrating live state from the exact fetched remote snapshot.",
+                "id": "P6"
+              },
+              {
+                "description": "Journal each apply with atomic durable writes to a bounded manifest containing authority, node, target identity, configured remote, exact before and after heads, path counts, timestamp, outcome, and recovery location, and publish the successful baseline only after all authority-specific work completes.",
+                "id": "P7"
+              },
+              {
+                "description": "Make interrupted or failed applies resumable from owned recovery evidence, leave unsuccessful attempts without a fabricated baseline, restore unexplained managed-worktree changes, and retain excluded-log and chat retirement for the next successful synchronization.",
+                "id": "P8"
+              },
+              {
+                "description": "Expose preview and explicit-authority apply through daemon project routes and thin daemon-backed CLI subcommands using the shared service and structured operation errors without accepting remote overrides or direct local mutation paths.",
+                "id": "P9"
+              },
+              {
+                "description": "Update the affected target-app intent and state-synchronization runbook to document the fail-closed boundary, preview-to-apply operator procedure, recovery evidence locations, retry behavior, and the prohibition on using an isolated candidate worktree for live recovery.",
+                "id": "P10"
+              }
+            ],
+            "summary": "Refine will gain a separate operator-authorized recovery path for the specific missing-baseline state-sync topology, with a read-only preview that precisely identifies both sides and an apply step that either publishes live state through ordinary linear reconciliation or preserves live state before accepting remote state; normal synchronization will remain fail-closed, recovery will be fenced against stale or unsafe evidence, and every attempt will leave durable audit and retry information without touching application Git state."
+          },
+          "started_at": "2026-08-15T13:03:23Z"
+        },
+        "schema_version": 2,
+        "started_at": "2026-08-15T13:03:23Z",
+        "state": "completed",
+        "updated_at": "2026-08-15T13:55:07Z"
+      },
+      "implementation_report": "Implemented explicit missing-baseline state recovery with non-mutating previews, live/remote authority, fail-closed ordinary sync, durable audit and recovery evidence, daemon API/CLI adapters, documentation, and restart-safe owned finalization. Final remote/local verification now precedes baseline publication; a post-authority remote disappearance leaves no baseline and retries, while interruption immediately after baseline publication can only finalize a matching Started manifest with the same evidence, authority, identities, exact heads, recovery ref, and settled baseline. A substituted or unrelated baseline remains rejected. Focused recovery tests, API/CLI tests, full library tests, and the multi-instance gate pass. Implementation-owned formatting and lint pass; repository-wide fmt/strict Clippy remain blocked only by unrelated pre-existing drift recorded in verification.",
+      "implementation_reported_at": "2026-08-15T13:55:07Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Implement a production-safe recovery for Refine state synchronization when the persisted three-way baseline is missing but both a non-bootstrap live store and an existing remote refine/state branch are present. This currently leaves sync permanently failed with the misleading message Refine state changed on multiple nodes. The development reproduction is the deliberate bootstrap topology where /home/buddy/projects/refine runs the daemon against /home/buddy/projects/refine-next; only refine-next owns live state. Do not encode that topology or assume that a production target app is Refine itself.\n\nPreserve normal fail-closed multi-node conflict detection. Ordinary automatic and manual sync must never silently choose a winner when the baseline is absent. Add an explicit operator-authorized recovery capability shared by product services and exposed through the daemon-backed CLI/API. It must first provide a read-only report containing target identity, configured remote, exact local and remote state heads, baseline status, live-only, remote-only, equal, and differing path counts, and the conflicting paths in bounded form. Applying recovery must require an explicit authority choice. Live authority must treat the fetched remote snapshot as the observed base and then use ordinary reconciliation to publish live additions, modifications, and deletions as a linear non-force refine/state commit while retaining remote history. Remote authority must preserve a recoverable snapshot of the pre-recovery live state before replacing it, then hydrate from the fetched remote snapshot. Reject recovery if the baseline exists, repository identity or remote head changes, the worktree is unsafe, another Git operation owns the lock, or supplied preview evidence is stale. Never alter the application branch/index/worktree, force-push, rewrite history, discard Goal evidence, or bypass configured remote/authentication.\n\nMake recovery auditable and restart-safe. Persist a bounded manifest with authority choice, node, target identity, configured remote, exact before/after heads, path counts, timestamp, outcome, and recovery location or ref. Preserve both sides through Git history or a dedicated recovery ref/snapshot. A failed or interrupted apply must remain retryable without fabricating a successful baseline. Use atomic durable writes for the baseline and recovery evidence. Return actionable recovery guidance from the missing-baseline conflict instead of the generic multiple-nodes claim.\n\nAlso stop failed sync attempts from leaving the managed state worktree dirty with deletions of newly excluded Goal logs and chat sessions. Either order retirement after conflict validation or restore the managed worktree on every failure, while retaining the intended eventual deletion after successful sync.\n\nAdd focused tests for missing-baseline preview, no-mutation dry run, live-authority recovery, remote-authority recovery with local snapshot preservation, stale preview/remote race rejection, interruption/retry, configured remotes, repository locking, remote-only deletion semantics, excluded-log retirement, managed-worktree cleanliness after failure, and proof that real unequal two-node edits with a valid baseline still conflict. Cover daemon API and CLI thin adapters and update intent/runbook documentation. Run targeted Git-sync and CLI/API tests, the multi-instance synchronization gate, formatting, Clippy, and broader tests proportional to the change. Keep all evidence visible and do not perform the live recovery from an isolated candidate worktree.",
+      "quality_agent_report": "Quality corrected two recovery defects: apply now recomputes and fences the complete bounded preview comparison before creating recovery evidence and again against the owned snapshot, and remote-authority hydration now updates the active-Goal scheduler index with restart-safe retry repair. Added focused regressions for fabricated comparison evidence, hydrated scheduler visibility, and interruption between file settlement and index repair. All recovery, Git-sync, CLI/API adapter, multi-instance, and broader library tests pass. Quality-owned formatting and diff checks pass. Repository-wide cargo fmt and strict all-target Clippy remain blocked only by unrelated pre-existing drift outside this Goal diff; no merge, push, approval, or live recovery was performed.",
+      "quality_candidate_commit": "5f13e206bd925d7134c80f3419bb950d8743834f",
+      "quality_checked_at": "2026-08-15T14:13:58Z",
+      "quality_details": {
+        "candidate_commit": "5f13e206bd925d7134c80f3419bb950d8743834f",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T01C4M1YG6BHGV8WFJ000-round-1",
+        "diagnostics": [
+          "{\"ok\":true,\"summary\":\"Candidate 5f13e206 satisfies the Goal and relevant intent contracts. Remaining uncertainty: production remote/authentication variants were not exercised; live recovery was correctly not performed from the candidate worktree.\",\"results\":[{\"test\":\"The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\",\"status\":\"passed\",\"evidence\":\"Exit 0. Executed 42 Git-sync tests, 2 daemon API recovery tests, 1 CLI adapter test, and the supervised two-daemon multi-instance test with 46 passed, 0 failed, 0 ignored. Diff whitespace validation passed and the worktree remained clean. Read-only review confirmed fail-closed ordinary sync, disposable preview observation, explicit stale-fenced authority, retained remote history and live recovery snapshots, atomic manifests/baselines, retry handling, thin daemon-backed surfaces, and coherent target-app/fleet intent documentation.\",\"command\":\"set -euo pipefail\\ncargo test --lib tools::host::git_sync::tests -- --test-threads=1\\ncargo test --lib surfaces::web_server::tests::git_changes::web_server_state_recovery -- --test-threads=1\\ncargo test --lib surfaces::cli::tests::parsing::project_state_recovery_requires_a_preview_file_and_explicit_authority -- --exact\\ncargo run --manifest-path xtask/Cargo.toml -- test-multi-instance-sync\\ngit diff --check 47279214b3049a88ad57a5b18c42fe9788dd47af..HEAD\\ntest -z \\\"$(git status --porcelain)\\\"\"}]}",
+          "Observed supervised process proc-1786803219311-1128710-42 exited 0. stdout: ols::host::git_sync::tests::synchronization::sync_does_not_publish_transient_state_artifacts ... ok\ntest tools::host::git_sync::tests::synchronization::sync_does_not_touch_uncommitted_target_app_changes ... ok\ntest tools::host::git_sync::tests::synchronization::sync_merges_disjoint_goal_changes_without_blocking_remote_records ... ok\ntest tools::host::git_sync::tests::synchronization::sync_rebases_disjoint_state_when_nodes_race ... ok\ntest tools::host::git_sync::tests::synchronization::sync_recovers_completed_state_copy_interrupted_before_commit ... ok\ntest tools::host::git_sync::tests::synchronization::sync_removes_transient_artifacts_already_on_state_branch ... ok\ntest tools::host::git_sync::tests::synchronization::sync_reports_same_record_multi_node_conflicts ... ok\ntest tools::host::git_sync::tests::synchronization::sync_requires_legacy_state_to_be_removed_from_application_branch ... ok\ntest tools::host::git_sync::tests::synchronization::sync_skips_noop_commits_and_summarizes_batches ... ok\ntest tools::host::git_sync::tests::synchronization::unresolved_goal_conflict_does_not_write_other_prepared_merges ... ok\n\ntest result: ok. 42 passed; 0 failed; 0 ignored; 0 measured; 802 filtered out; finished in 6.69s\n\n\nrunning 2 tests\ntest surfaces::web_server::tests::git_changes::web_server_state_recovery_preview_and_apply_use_the_shared_service ... ok\ntest surfaces::web_server::tests::git_changes::web_server_state_recovery_routes_are_thin_and_structured ... ok\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 842 filtered out; finished in 0.25s\n\n\nrunning 1 test\ntest surfaces::cli::tests::parsing::project_state_recovery_requires_a_preview_file_and_explicit_authority ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 843 filtered out; finished in 0.00s\n\n\nrunning 1 test\ntest state_replication::two_daemons_sync_refine_state_through_shared_git_remote ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.70s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running `xtask/target/debug/refine-xtask test-multi-instance-sync`\n==> build smoke-ai fixture\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.00s\n==> run multi-instance sync tests\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running tests/multi_instance_sync.rs (target/debug/deps/multi_instance_sync-c2a092d00bb57769)"
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "1a005c10fa11139061",
+        "results": [
+          {
+            "command": "set -euo pipefail\ncargo test --lib tools::host::git_sync::tests -- --test-threads=1\ncargo test --lib surfaces::web_server::tests::git_changes::web_server_state_recovery -- --test-threads=1\ncargo test --lib surfaces::cli::tests::parsing::project_state_recovery_requires_a_preview_file_and_explicit_authority -- --exact\ncargo run --manifest-path xtask/Cargo.toml -- test-multi-instance-sync\ngit diff --check 47279214b3049a88ad57a5b18c42fe9788dd47af..HEAD\ntest -z \"$(git status --porcelain)\"",
+            "evidence": "Observed supervised process proc-1786803219311-1128710-42 exited 0. stdout: ols::host::git_sync::tests::synchronization::sync_does_not_publish_transient_state_artifacts ... ok\ntest tools::host::git_sync::tests::synchronization::sync_does_not_touch_uncommitted_target_app_changes ... ok\ntest tools::host::git_sync::tests::synchronization::sync_merges_disjoint_goal_changes_without_blocking_remote_records ... ok\ntest tools::host::git_sync::tests::synchronization::sync_rebases_disjoint_state_when_nodes_race ... ok\ntest tools::host::git_sync::tests::synchronization::sync_recovers_completed_state_copy_interrupted_before_commit ... ok\ntest tools::host::git_sync::tests::synchronization::sync_removes_transient_artifacts_already_on_state_branch ... ok\ntest tools::host::git_sync::tests::synchronization::sync_reports_same_record_multi_node_conflicts ... ok\ntest tools::host::git_sync::tests::synchronization::sync_requires_legacy_state_to_be_removed_from_application_branch ... ok\ntest tools::host::git_sync::tests::synchronization::sync_skips_noop_commits_and_summarizes_batches ... ok\ntest tools::host::git_sync::tests::synchronization::unresolved_goal_conflict_does_not_write_other_prepared_merges ... ok\n\ntest result: ok. 42 passed; 0 failed; 0 ignored; 0 measured; 802 filtered out; finished in 6.69s\n\n\nrunning 2 tests\ntest surfaces::web_server::tests::git_changes::web_server_state_recovery_preview_and_apply_use_the_shared_service ... ok\ntest surfaces::web_server::tests::git_changes::web_server_state_recovery_routes_are_thin_and_structured ... ok\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 842 filtered out; finished in 0.25s\n\n\nrunning 1 test\ntest surfaces::cli::tests::parsing::project_state_recovery_requires_a_preview_file_and_explicit_authority ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 843 filtered out; finished in 0.00s\n\n\nrunning 1 test\ntest state_replication::two_daemons_sync_refine_state_through_shared_git_remote ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 9.70s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.07s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running `xtask/target/debug/refine-xtask test-multi-instance-sync`\n==> build smoke-ai fixture\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.00s\n==> run multi-instance sync tests\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running tests/multi_instance_sync.rs (target/debug/deps/multi_instance_sync-c2a092d00bb57769) Agent report: Exit 0. Executed 42 Git-sync tests, 2 daemon API recovery tests, 1 CLI adapter test, and the supervised two-daemon multi-instance test with 46 passed, 0 failed, 0 ignored. Diff whitespace validation passed and the worktree remained clean. Read-only review confirmed fail-closed ordinary sync, disposable preview observation, explicit stale-fenced authority, retained remote history and live recovery snapshots, atomic manifests/baselines, retry handling, thin daemon-backed surfaces, and coherent target-app/fleet intent documentation.",
+            "exit_code": 0,
+            "process_id": "proc-1786803219311-1128710-42",
+            "status": "passed",
+            "test": "The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks."
+          }
+        ],
+        "source_candidate_commit": "5f13e206bd925d7134c80f3419bb950d8743834f"
+      },
+      "quality_message": "All Quality tests passed with observed supervised evidence.",
+      "quality_state": "passed",
+      "reporter": "Buddy Williams",
+      "rule_state": "passed",
+      "updated": "2026-08-15T14:16:12Z",
+      "workflow_attempt_authority": null,
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "5f13e206bd925d7134c80f3419bb950d8743834f",
+        "integrated_at": "2026-08-15T14:16:12.795450300+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n docs/intent/02-foundation/03-target-app.md         |   7 +\n docs/intent/02-foundation/04-fleet.md              |   8 +\n docs/runbooks/manage-fleet.md                      |  53 ++\n src/surfaces/cli/actions.rs                        |   2 +-\n src/surfaces/cli/actions/projects.rs               |  34 ++\n src/surfaces/cli/catalog.rs                        |  16 +\n src/surfaces/cli/dispatch.rs                       |   4 +\n src/surfaces/cli/dispatch/projects.rs              | 116 ++++\n src/surfaces/cli/tests/parsing.rs                  |  48 ++\n src/surfaces/web_server/mod.rs                     |   2 +-\n src/surfaces/web_server/project_routes/projects.rs |  41 ++\n src/surfaces/web_server/runtime.rs                 |   3 -\n src/surfaces/web_server/server.rs                  |   8 +\n src/surfaces/web_server/tests/git_changes.rs       | 118 ++++\n src/tools/host/git_sync/mod.rs                     |  10 +\n src/tools/host/git_sync/recovery/contracts.rs      |  85 +++\n src/tools/host/git_sync/recovery/hydration.rs      |  62 +++\n src/tools/host/git_sync/recovery/inspection.rs     | 216 ++++++++\n src/tools/host/git_sync/recovery/mod.rs            |  49 ++\n src/tools/host/git_sync/recovery/service.rs        | 615 +++++++++++++++++++++\n src/tools/host/git_sync/recovery/storage.rs        | 126 +++++\n src/tools/host/git_sync/recovery/test_hooks.rs     |  53 ++\n src/tools/host/git_sync/service.rs                 |  29 +-\n src/tools/host/git_sync/state_codec.rs             |   4 +-\n src/tools/host/git_sync/state_worktree.rs          |  52 +-\n src/tools/host/git_sync/tests/mod.rs               |   1 +\n src/tools/host/git_sync/tests/recovery.rs          | 553 ++++++++++++++++++\n src/tools/host/git_sync/tests/remote.rs            |  21 +-\n src/tools/host/git_sync/tests/synchronization.rs   |   4 +-\n tests/multi_instance_sync.rs                       |  42 +-\n 30 files changed, 2355 insertions(+), 27 deletions(-)\n create mode 100644 src/tools/host/git_sync/recovery/contracts.rs\n create mode 100644 src/tools/host/git_sync/recovery/hydration.rs\n create mode 100644 src/tools/host/git_sync/recovery/inspection.rs\n create mode 100644 src/tools/host/git_sync/recovery/mod.rs\n create mode 100644 src/tools/host/git_sync/recovery/service.rs\n create mode 100644 src/tools/host/git_sync/recovery/storage.rs\n create mode 100644 src/tools/host/git_sync/recovery/test_hooks.rs\n create mode 100644 src/tools/host/git_sync/tests/recovery.rs",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "f50b1571672da4a7c308d47918746eac3931bfaa"
+      },
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    }
+  ],
+  "status": "done",
+  "target_branch": "main",
+  "updated": "2026-08-15T14:16:48Z",
+  "workflow_revision": 29
+}

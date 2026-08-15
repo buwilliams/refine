@@ -1,0 +1,193 @@
+{
+  "base_commit": "54da5af00a096f72bd9b59846ba4a8abba7b9f5a",
+  "branch_name": "refine/00000SZ597ABSGKH22AA2BA000/round-1",
+  "candidate_commit": "0e4398046a1b7c77f998d20be2a4ca3310ee906e",
+  "created": "2026-07-24T17:23:30Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ597ABSGKH22AA2BA000",
+  "name": "Make Jira evidence exports fit Jira's description limit",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-07-24T17:30:50Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Fix Jira evidence export so large, valid Refine Goals produce a Jira-importable row instead of failing at the description-size guard.\n\nObserved reproduction:\n- refine goal export 00000SZ1T921F15X91MBZWE000 fails with: Goal 00000SZ1T921F15X91MBZWE000 Jira description exceeds Jira's 30000 character limit.\n- The shared renderer builds a 41,520-character description, 11,520 characters over the configured limit.\n- It emits every one of the six rounds in full: 18,414 characters of requested-work prompts, 4,925 characters of implementation reports, and verbose pretty-printed governance_details/governance_rule_actions. governance_details also embeds raw provider output, duplicating evidence already represented by governance messages and structured verdicts.\n- jira_row constructs the complete unbounded description and then returns InvalidInput when its character count exceeds JIRA_DESCRIPTION_LIMIT. There is no compact or budgeted rendering path, so a single large Goal also fails a bulk export operation.\n\nRequired behavior:\n1. Replace the reject-only behavior with one shared, deterministic, character-budgeted Jira description renderer that always stays at or below JIRA_DESCRIPTION_LIMIT and counts Unicode characters consistently with the final guard.\n2. Preserve high-value audit identity and traceability first: Goal id/status/priority/ownership/timestamps, feature/node when present, target and implementation branches, base/candidate commits, and useful commit evidence. Define an explicit priority order for all sections so pathological input remains bounded.\n3. Keep round-by-round requested work, implementation outcome, quality, and governance evidence useful, but compact redundant machine payloads. Do not replay raw provider output or duplicate the same verdict through message, raw_output, and structured JSON. Render concise normalized governance/quality summaries and action/violation information where material.\n4. When lower-priority narrative must be shortened or omitted, truncate only at valid character boundaries and include a clear deterministic omission marker that says what was shortened or omitted. Never silently discard evidence and never emit malformed CSV.\n5. Preserve the existing shared behavior: bulk Goals export, single-Goal CLI export, HTTP/API, and MCP must continue to use the same row renderer. An oversized Goal must not abort an otherwise valid bulk selection.\n6. Add focused regression coverage using a representative multi-round Goal shaped like 00000SZ1T921F15X91MBZWE000 and prove the resulting Description is no more than 30,000 characters, retains required identity/commit/outcome evidence, records omissions, and round-trips through CSV quoting. Cover exact-boundary, over-boundary, long Unicode content, verbose governance JSON/raw_output duplication, and stable output across repeated runs.\n7. Preserve the hard final length assertion as a safety invariant, but make ordinary valid Goal history fit before that assertion. Return an actionable error only for genuinely unrenderable required data, not merely because optional evidence is verbose.\n8. Update the Jira export intent/spec documentation to describe evidence prioritization and omission markers, then run formatting, focused export/service/API tests, the relevant bulk operation and browser coverage, all Rust tests, strict Clippy, CLI/static checks, and diff checks.",
+          "reporter": "Buddy Williams",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZ597ABSGKH22AA2BA000",
+          "name": "Make Jira evidence exports fit Jira's description limit",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-07-24T17:23:55Z",
+      "governance_checked_at": "2026-07-24T17:49:49Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ597ABSGKH22AA2BA000-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 9,
+        "verdict": {
+          "message": "No governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ597ABSGKH22AA2BA000-round-1"
+      },
+      "governance_message": "No governance rule violations found.",
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          }
+        ],
+        "context_version": 1,
+        "recorded_at": "2026-07-24T17:47:09Z",
+        "skipped": []
+      },
+      "implementation_report": "Implemented one shared deterministic Unicode-character-budgeted Jira Description renderer with explicit evidence priority, bounded required identity/branch fields, fair per-round narrative budgets, normalized Quality/governance summaries, material action/violation retention, raw provider/verdict payload suppression, named omission markers, CSV-safe output, and the final 30,000-character invariant. Added exact-boundary, over-boundary Unicode, stable repeat, six-round verbose governance duplication, CSV round-trip, required audit/commit/outcome, and oversized-with-valid-bulk-row regression coverage. Updated Jira export API, Goal surface intent, and Rust spec docs. Verification: focused goal export 4/4 passed; focused shared Jira CLI/MCP/API/service/worker/bulk tests 11/11 passed; focused Jira browser 4/4 passed; ./r test rust passed 493/493 unit, 2/2 cli_target_root, 8/8 production_binary_install, and 0 doc tests; ./r test cli passed 1/1; xtask check passed API contract, 54 static assets, and 61/61 browser tests; generated CLI reference unchanged; cargo fmt --check and git diff --check passed. cargo clippy --all-targets --all-features -- -D warnings failed on 13 pre-existing unrelated warnings (result_large_err x2, missing_const_for_thread_local, drop_non_drop x2, too_many_arguments x3, enum_variant_names, question_mark, if_same_then_else, ptr_arg, type_complexity); the same all-target strict run with only those baseline lint categories allowed passed, with no Jira-export findings.",
+      "implementation_reported_at": "2026-07-24T17:47:11Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Fix Jira evidence export so large, valid Refine Goals produce a Jira-importable row instead of failing at the description-size guard.\n\nObserved reproduction:\n- refine goal export 00000SZ1T921F15X91MBZWE000 fails with: Goal 00000SZ1T921F15X91MBZWE000 Jira description exceeds Jira's 30000 character limit.\n- The shared renderer builds a 41,520-character description, 11,520 characters over the configured limit.\n- It emits every one of the six rounds in full: 18,414 characters of requested-work prompts, 4,925 characters of implementation reports, and verbose pretty-printed governance_details/governance_rule_actions. governance_details also embeds raw provider output, duplicating evidence already represented by governance messages and structured verdicts.\n- jira_row constructs the complete unbounded description and then returns InvalidInput when its character count exceeds JIRA_DESCRIPTION_LIMIT. There is no compact or budgeted rendering path, so a single large Goal also fails a bulk export operation.\n\nRequired behavior:\n1. Replace the reject-only behavior with one shared, deterministic, character-budgeted Jira description renderer that always stays at or below JIRA_DESCRIPTION_LIMIT and counts Unicode characters consistently with the final guard.\n2. Preserve high-value audit identity and traceability first: Goal id/status/priority/ownership/timestamps, feature/node when present, target and implementation branches, base/candidate commits, and useful commit evidence. Define an explicit priority order for all sections so pathological input remains bounded.\n3. Keep round-by-round requested work, implementation outcome, quality, and governance evidence useful, but compact redundant machine payloads. Do not replay raw provider output or duplicate the same verdict through message, raw_output, and structured JSON. Render concise normalized governance/quality summaries and action/violation information where material.\n4. When lower-priority narrative must be shortened or omitted, truncate only at valid character boundaries and include a clear deterministic omission marker that says what was shortened or omitted. Never silently discard evidence and never emit malformed CSV.\n5. Preserve the existing shared behavior: bulk Goals export, single-Goal CLI export, HTTP/API, and MCP must continue to use the same row renderer. An oversized Goal must not abort an otherwise valid bulk selection.\n6. Add focused regression coverage using a representative multi-round Goal shaped like 00000SZ1T921F15X91MBZWE000 and prove the resulting Description is no more than 30,000 characters, retains required identity/commit/outcome evidence, records omissions, and round-trips through CSV quoting. Cover exact-boundary, over-boundary, long Unicode content, verbose governance JSON/raw_output duplication, and stable output across repeated runs.\n7. Preserve the hard final length assertion as a safety invariant, but make ordinary valid Goal history fit before that assertion. Return an actionable error only for genuinely unrenderable required data, not merely because optional evidence is verbose.\n8. Update the Jira export intent/spec documentation to describe evidence prioritization and omission markers, then run formatting, focused export/service/API tests, the relevant bulk operation and browser coverage, all Rust tests, strict Clippy, CLI/static checks, and diff checks.",
+      "quality_checked_at": "2026-07-24T17:49:53Z",
+      "quality_details": {
+        "candidate_commit": "0e4398046a1b7c77f998d20be2a4ca3310ee906e",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ597ABSGKH22AA2BA000-round-1",
+        "diagnostics": [
+          "No Quality tests or migrated commands are configured; evaluation was a no-op."
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "19f953f7b283484f40",
+        "results": [],
+        "source_candidate_commit": "0e4398046a1b7c77f998d20be2a4ca3310ee906e"
+      },
+      "quality_message": "No Quality tests configured.",
+      "quality_state": "passed",
+      "reporter": "Buddy Williams",
+      "rule_state": "passed",
+      "updated": "2026-07-28T16:39:56Z",
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "0e4398046a1b7c77f998d20be2a4ca3310ee906e",
+        "integrated_at": "2026-07-24T17:49:58.682393024+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n .../04-surfaces/03-browser-desktop/08-goal.md      |   2 +-\n docs/intent/04-surfaces/04-api.md                  |   2 +-\n docs/spec/rust-spec.md                             |  13 +\n src/tools/product/goal_exports/mod.rs              | 741 ++++++++++++++++++---\n 4 files changed, 667 insertions(+), 91 deletions(-)",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "e1dd93e11b18d3f16cefca4e6302de9673074976"
+      },
+      "workflow_quality_timing": "pre_merge"
+    }
+  ],
+  "status": "done",
+  "target_branch": "main",
+  "updated": "2026-07-28T16:40:08Z",
+  "workflow_revision": 23
+}

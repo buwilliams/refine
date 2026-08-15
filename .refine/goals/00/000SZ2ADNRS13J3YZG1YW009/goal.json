@@ -106,10 +106,11 @@
       "quality_state": "passed",
       "reporter": "Refine supervisor",
       "rule_state": "passed",
-      "updated": "2026-07-22T10:46:44Z"
+      "updated": "2026-07-28T16:38:16Z"
     }
   ],
   "status": "done",
   "target_branch": "main",
-  "updated": "2026-07-22T10:48:52Z"
+  "updated": "2026-07-28T16:38:27Z",
+  "workflow_revision": 4
 }

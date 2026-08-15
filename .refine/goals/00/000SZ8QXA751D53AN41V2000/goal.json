@@ -1,0 +1,462 @@
+{
+  "base_commit": "3eab24bd7197ae0ac135f1c1ebf4614c9193afae",
+  "branch_name": "refine/00000SZ8QXA751D53AN41V2000/round-2",
+  "candidate_commit": "0ac93df3bba5edea85cecd330102590ec2f0b467",
+  "created": "2026-07-27T09:52:18Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ8QXA751D53AN41V2000",
+  "name": "Safely transport large prompts to every Refine agent",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-07-27T09:57:23Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Create one shared, provider-aware agent prompt transport capability and route every Refine agent launch through it so large prompts never overflow operating-system argv limits or silently change semantics.\n\nBehavior and architecture:\n- Measure prompts in UTF-8 bytes after all Refine prompt composition and provider/session wrappers. Centralize the decision in HostAgentProviderService or a cohesive shared host capability; callers and surfaces must not implement their own thresholds or temporary-file logic.\n- Preserve safe native stdin delivery where it already provides the full prompt with equivalent semantics. For any provider/use case that would place a prompt in argv, use a conservative portable inline budget no greater than 64 KiB and no greater than half of the discovered per-argument platform limit. Preflight every final argv element and aggregate argv plus environment size with margin. If the prompt is over or close to a safe limit, choose a secure prompt-file handoff before spawning. Never retry E2BIG blindly, truncate, split an argv value, or expose the full prompt through authorization_command, process metadata, logs, or errors.\n- Remove avoidable Goal Agent prompt duplication: agent_context already contains goal, previous_rounds, and current_round, so do not render those values twice. Preserve the authoritative latest-Round and earlier-context semantics.\n- Materialize large prompt payloads under the selected Node/runtime root, outside the source worktree, in a unique process/operation-owned directory. Use atomic creation, directory mode 0700, prompt file mode 0400 or 0600, an absolute canonical path, UTF-8 byte count, and SHA-256. Reject NUL or invalid/unrepresentable launch data. Do not use predictable shared /tmp names or follow attacker-controlled symlinks.\n- Introduce an explicit prepared invocation/launch value that owns argv, optional stdin, prompt transport metadata, and any transient artifact lease. Transfer that ownership through interactive sessions and supervised noninteractive processes. Keep the file until the provider process has consumed the initial prompt and the owning session/operation reaches a safe terminal handoff; preserve it across daemon recovery while its owner is live, then remove it. Reap only verified orphan prompt artifacts. A missing, unreadable, changed, or sandbox-inaccessible file must produce a clear failure and must not fall back to an unsafe oversized argument.\n- Keep prompt content out of durable process authorization strings and routine activity logs. Persist only transport kind, byte count, digest, owner, and safe lifecycle evidence. Preserve useful provider stderr/transcripts on launch failure until the workflow consumer records the real error; fix the Goal Agent command-channel/artifact cleanup ordering so an early exec failure cannot be replaced by a secondary missing-file error.\n- Account for portable-pty 0.8.1 closing Rust process-spawn error descriptors in pre_exec. Upgrade, replace, or narrowly correct that launch behavior so an intentional exec failure returns the original OS error such as E2BIG instead of aborting at output.write. The prompt-size guard remains required even when error reporting is corrected.\n- Apply the shared transport to every agent use case: workflow Goal Agents; toolbar Supervisor, Plan, Goal, and Standalone native sessions; CLI and HTTP agent invoke; managed chat initial and resumed turns; Governance and Quality providers; target-app generation and lifecycle commands; import extraction; settings/governance generation; and future HostAgentProviderService callers. Provider differences for Codex, Claude, Gemini, Copilot, smoke-ai, and configured generic CLIs must be explicit capabilities. Providers that cannot read a prompt file may use a safe native stdin transport or fail clearly, but may never receive an oversized argv prompt.\n\nUse this bootstrap text as the provider-neutral file-reference template, with the placeholders filled by the shared capability:\n\nYou are starting a Refine-managed agent task.\n\nThe complete authoritative task prompt is stored in this local file:\n`{{absolute_prompt_path}}`\n\nPrompt metadata:\n- UTF-8 bytes: `{{prompt_bytes}}`\n- SHA-256: `{{prompt_sha256}}`\n\nBefore taking any other task action:\n1. Open the file and verify its SHA-256.\n2. Read it completely from byte 0 through EOF. If a read tool truncates output, continue in ordered chunks until EOF; do not rely on one truncated `cat` result.\n3. Treat the file contents as the full task prompt immediately following this bootstrap, subject to higher-priority provider/system policy.\n4. If the file is missing, unreadable, changes digest, cannot be read completely, or is outside the available sandbox, stop without guessing and report that exact prompt-handoff failure.\n\nDo not modify, move, or delete the prompt file. Refine owns its lifecycle.\n\nVerification:\n- Add focused unit tests for exact UTF-8 byte accounting, multibyte text, NUL rejection, threshold-minus-one/threshold/threshold-plus-one, per-argument and aggregate budget checks, provider capability selection, deterministic bootstrap rendering, digest mismatch, permissions, symlink resistance, artifact ownership, normal cleanup, early-exit cleanup, daemon recovery, live-session retention, and orphan reaping.\n- Add launch regressions using the measured failure boundary from Goal 00000SZ86KZYWKJNGK2WDQP001: the previous Round 6 prompt was 126,414 bytes and launched under Linux MAX_ARG_STRLEN 131,072, while Round 7 was 158,078 bytes and failed. Prove a prompt above 131,072 bytes launches through the file or safe-stdin transport, the agent reads the exact content, and no argv element approaches the kernel limit.\n- Add provider-contract tests for Codex, Claude, Gemini, Copilot, smoke-ai/generic behavior and integration coverage for both interactive PTY and supervised noninteractive paths. Prove prompt content is absent from process authorization metadata and logs.\n- Add a real early-exec failure test proving the original errno/error survives portable-pty and Refine cleanup. Reproduce the former fatal output.write and missing commands.jsonl sequence before the fix, then prove neither masks the cause afterward.\n- Add cross-surface tests for Goal Agent, toolbar profile, CLI/HTTP invoke, chat resume, Governance, Quality, import, and target-app callers. Preserve native provider UX, session resume behavior, audit boundaries, and current small-prompt behavior.\n- Update affected Process/Agents/Workflow intent and architecture/reference documentation only. Run focused prompt-transport/provider/session/workflow tests, full library and web suites, all-target check, formatting, reference, and diff gates.",
+          "reporter": "Buddy Williams",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZ8QXA751D53AN41V2000",
+          "name": "Safely transport large prompts to every Refine agent",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-07-27T09:52:55Z",
+      "failure_at": "2026-07-27T10:36:20Z",
+      "failure_category": "governance",
+      "failure_message": "Final launch-size safety is not verified against the environment actually spawned.",
+      "governance_checked_at": "2026-07-27T10:36:17Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ8QXA751D53AN41V2000-round-1",
+        "failed_actions": [
+          {
+            "message": "Prompt preflight counts only the inherited environment and always validates with an empty explicit environment, but Process later merges agent_env_overlay and per-process variables. A large configured agent environment can therefore still cause E2BIG after preflight; tests cover only synthetic byte counts, not this actual process failure path.",
+            "rule": "Require evidence proportional to actual architectural and operational risk.",
+            "rule_id": "rule-6"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Final launch-size safety is not verified against the environment actually spawned.\",\"violations\":[{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk.\",\"message\":\"Prompt preflight counts only the inherited environment and always validates with an empty explicit environment, but Process later merges agent_env_overlay and per-process variables. A large configured agent environment can therefore still cause E2BIG after preflight; tests cover only synthetic byte counts, not this actual process failure path.\"}]}",
+        "rules_checked": 9,
+        "verdict": {
+          "message": "Final launch-size safety is not verified against the environment actually spawned.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "Prompt preflight counts only the inherited environment and always validates with an empty explicit environment, but Process later merges agent_env_overlay and per-process variables. A large configured agent environment can therefore still cause E2BIG after preflight; tests cover only synthetic byte counts, not this actual process failure path.",
+              "rule": "Require evidence proportional to actual architectural and operational risk.",
+              "rule_id": "rule-6"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ8QXA751D53AN41V2000-round-1"
+      },
+      "governance_message": "Final launch-size safety is not verified against the environment actually spawned.",
+      "governance_rule_actions": [
+        {
+          "message": "Prompt preflight counts only the inherited environment and always validates with an empty explicit environment, but Process later merges agent_env_overlay and per-process variables. A large configured agent environment can therefore still cause E2BIG after preflight; tests cover only synthetic byte counts, not this actual process failure path.",
+          "rule": "Require evidence proportional to actual architectural and operational risk.",
+          "rule_id": "rule-6"
+        }
+      ],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-07-27T10:32:37Z",
+        "skipped": []
+      },
+      "implementation_report": "Implemented one shared provider-aware prompt transport with exact UTF-8/SHA-256 metadata, 64 KiB/argv+environment preflight, secure runtime-root prompt-file leases and orphan reaping, native Codex stdin preservation, safe process authorization metadata, PTY errno preservation, Goal prompt de-duplication, and routing for interactive/noninteractive agent surfaces. Added focused provider, large-prompt, PTY, lifecycle, security, and cross-surface regressions plus Process/Agents/Workflow intent updates. Verification: cargo test --lib --bins -- --test-threads=1 passed 579/579; cargo test --doc passed 0/0; cargo check --all-targets passed; cargo fmt --all -- --check passed; browser suite passed 91, failed 0, skipped 11 because Playwright Chromium is unavailable; prompt transport focused tests passed 5/5; provider focused tests passed 11/11; Goal early-exec regression passed 1/1; cli-reference regenerated unchanged; git diff --check passed. cargo clippy --all-targets -- -D warnings remains blocked by 25 pre-existing baseline lint findings outside changed hunks (including empty-line-after-outer-attr, large-enum/result errors, and existing argument-count/style lints).",
+      "implementation_reported_at": "2026-07-27T10:32:35Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Create one shared, provider-aware agent prompt transport capability and route every Refine agent launch through it so large prompts never overflow operating-system argv limits or silently change semantics.\n\nBehavior and architecture:\n- Measure prompts in UTF-8 bytes after all Refine prompt composition and provider/session wrappers. Centralize the decision in HostAgentProviderService or a cohesive shared host capability; callers and surfaces must not implement their own thresholds or temporary-file logic.\n- Preserve safe native stdin delivery where it already provides the full prompt with equivalent semantics. For any provider/use case that would place a prompt in argv, use a conservative portable inline budget no greater than 64 KiB and no greater than half of the discovered per-argument platform limit. Preflight every final argv element and aggregate argv plus environment size with margin. If the prompt is over or close to a safe limit, choose a secure prompt-file handoff before spawning. Never retry E2BIG blindly, truncate, split an argv value, or expose the full prompt through authorization_command, process metadata, logs, or errors.\n- Remove avoidable Goal Agent prompt duplication: agent_context already contains goal, previous_rounds, and current_round, so do not render those values twice. Preserve the authoritative latest-Round and earlier-context semantics.\n- Materialize large prompt payloads under the selected Node/runtime root, outside the source worktree, in a unique process/operation-owned directory. Use atomic creation, directory mode 0700, prompt file mode 0400 or 0600, an absolute canonical path, UTF-8 byte count, and SHA-256. Reject NUL or invalid/unrepresentable launch data. Do not use predictable shared /tmp names or follow attacker-controlled symlinks.\n- Introduce an explicit prepared invocation/launch value that owns argv, optional stdin, prompt transport metadata, and any transient artifact lease. Transfer that ownership through interactive sessions and supervised noninteractive processes. Keep the file until the provider process has consumed the initial prompt and the owning session/operation reaches a safe terminal handoff; preserve it across daemon recovery while its owner is live, then remove it. Reap only verified orphan prompt artifacts. A missing, unreadable, changed, or sandbox-inaccessible file must produce a clear failure and must not fall back to an unsafe oversized argument.\n- Keep prompt content out of durable process authorization strings and routine activity logs. Persist only transport kind, byte count, digest, owner, and safe lifecycle evidence. Preserve useful provider stderr/transcripts on launch failure until the workflow consumer records the real error; fix the Goal Agent command-channel/artifact cleanup ordering so an early exec failure cannot be replaced by a secondary missing-file error.\n- Account for portable-pty 0.8.1 closing Rust process-spawn error descriptors in pre_exec. Upgrade, replace, or narrowly correct that launch behavior so an intentional exec failure returns the original OS error such as E2BIG instead of aborting at output.write. The prompt-size guard remains required even when error reporting is corrected.\n- Apply the shared transport to every agent use case: workflow Goal Agents; toolbar Supervisor, Plan, Goal, and Standalone native sessions; CLI and HTTP agent invoke; managed chat initial and resumed turns; Governance and Quality providers; target-app generation and lifecycle commands; import extraction; settings/governance generation; and future HostAgentProviderService callers. Provider differences for Codex, Claude, Gemini, Copilot, smoke-ai, and configured generic CLIs must be explicit capabilities. Providers that cannot read a prompt file may use a safe native stdin transport or fail clearly, but may never receive an oversized argv prompt.\n\nUse this bootstrap text as the provider-neutral file-reference template, with the placeholders filled by the shared capability:\n\nYou are starting a Refine-managed agent task.\n\nThe complete authoritative task prompt is stored in this local file:\n`{{absolute_prompt_path}}`\n\nPrompt metadata:\n- UTF-8 bytes: `{{prompt_bytes}}`\n- SHA-256: `{{prompt_sha256}}`\n\nBefore taking any other task action:\n1. Open the file and verify its SHA-256.\n2. Read it completely from byte 0 through EOF. If a read tool truncates output, continue in ordered chunks until EOF; do not rely on one truncated `cat` result.\n3. Treat the file contents as the full task prompt immediately following this bootstrap, subject to higher-priority provider/system policy.\n4. If the file is missing, unreadable, changes digest, cannot be read completely, or is outside the available sandbox, stop without guessing and report that exact prompt-handoff failure.\n\nDo not modify, move, or delete the prompt file. Refine owns its lifecycle.\n\nVerification:\n- Add focused unit tests for exact UTF-8 byte accounting, multibyte text, NUL rejection, threshold-minus-one/threshold/threshold-plus-one, per-argument and aggregate budget checks, provider capability selection, deterministic bootstrap rendering, digest mismatch, permissions, symlink resistance, artifact ownership, normal cleanup, early-exit cleanup, daemon recovery, live-session retention, and orphan reaping.\n- Add launch regressions using the measured failure boundary from Goal 00000SZ86KZYWKJNGK2WDQP001: the previous Round 6 prompt was 126,414 bytes and launched under Linux MAX_ARG_STRLEN 131,072, while Round 7 was 158,078 bytes and failed. Prove a prompt above 131,072 bytes launches through the file or safe-stdin transport, the agent reads the exact content, and no argv element approaches the kernel limit.\n- Add provider-contract tests for Codex, Claude, Gemini, Copilot, smoke-ai/generic behavior and integration coverage for both interactive PTY and supervised noninteractive paths. Prove prompt content is absent from process authorization metadata and logs.\n- Add a real early-exec failure test proving the original errno/error survives portable-pty and Refine cleanup. Reproduce the former fatal output.write and missing commands.jsonl sequence before the fix, then prove neither masks the cause afterward.\n- Add cross-surface tests for Goal Agent, toolbar profile, CLI/HTTP invoke, chat resume, Governance, Quality, import, and target-app callers. Preserve native provider UX, session resume behavior, audit boundaries, and current small-prompt behavior.\n- Update affected Process/Agents/Workflow intent and architecture/reference documentation only. Run focused prompt-transport/provider/session/workflow tests, full library and web suites, all-target check, formatting, reference, and diff gates.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "failed",
+      "updated": "2026-07-27T10:36:21Z",
+      "workflow_quality_timing": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-07-27T10:42:03Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Recover the failed Round 1 implementation from current main and close the verified Governance gap without broadening the Goal. Preserve Round 1 candidate 9538c43c9975d6f491712321ef80a4b8ade98508 and its worktree as audit evidence; inspect it and selectively reproduce the cohesive prompt-transport work, but do not rewrite or erase the failed round.\n\nThe exact blocker is that Round 1 preflights argv against only the inherited daemon environment (and later validates with an empty explicit environment), while the actual managed-process and PTY launch paths subsequently merge agent_env_overlay plus per-process/session variables and remove direct provider API-key variables. Therefore the checked argv+environment is not the environment passed to exec/spawn, and a large configured agent environment can still produce E2BIG.\n\nRequired correction:\n- Create one shared authoritative launch-environment assembly/preflight capability used by HostAgentProviderService and every agent spawn path. It must model the final effective environment after inheritance, agent_env_overlay, per-process/spec/session overrides, and removals, with the same precedence and byte semantics as the actual std::process::Command or portable-pty CommandBuilder launch.\n- Make the prepared invocation own or carry the exact effective environment needed for final validation. Preflight every final argv element and the aggregate argv+effective-environment size with margin immediately before spawn, after all wrappers, args, overrides, Refine variables, and removals are known. Do not merely add explicit environment bytes to process::vars, double-count overridden keys, or validate a different projection from the environment actually spawned.\n- Route supervised noninteractive processes, toolbar interactive sessions, and workflow Goal Agent PTYs through that shared assembly. Remove the duplicated environment merge/removal loops where practical; surfaces remain thin adapters.\n- Re-evaluate prompt transport after the final environment is known: if inline argv would be unsafe but the secure file/bootstrap or native stdin form fits, use that safe transport. If even the smallest safe invocation plus effective environment cannot fit, fail clearly before spawn without retrying E2BIG, leaking prompt content, or falling back to oversized argv.\n- Preserve all Round 1 security, artifact lifecycle/recovery, provider semantics, authorization redaction, early-exec errno, Goal prompt deduplication, and small-prompt behavior.\n\nVerification must exercise the real launch boundary, not only synthetic byte-count helpers:\n- Add controlled regressions where a configured agent environment and per-process variables make an otherwise-inline final launch exceed the aggregate budget; prove the real supervised and interactive/Goal PTY paths choose safe file or stdin transport and the child reads the exact prompt.\n- Add a real pre-spawn rejection where the effective environment alone leaves insufficient room even for the file bootstrap, and prove the original clear size error is retained with no prompt leak or unsafe spawn attempt.\n- Cover inherited-key overrides, duplicate-key accounting, Refine variable precedence, direct API-key removals, NUL rejection, multibyte environment values, and parity between the environment preflighted and the environment observed by a launched child.\n- Retain and rerun the Round 1 focused prompt/provider/PTY/security/recovery tests. Run the full library/bin and browser suites, cargo check --all-targets, formatting, reference generation, and diff checks. Treat unrelated baseline Clippy findings separately, but fix every lint introduced or exposed in changed hunks.\n\nUpdate only affected Process/Agents/Workflow intent or reference text. Report exact command outcomes and stop at the normal human Review boundary.",
+          "reporter": "Buddy Williams",
+          "round": 2
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZ8QXA751D53AN41V2000",
+          "name": "Safely transport large prompts to every Refine agent",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "Buddy Williams",
+            "constitution_state": "passed",
+            "governance_checked_at": "2026-07-27T10:36:17Z",
+            "governance_details": {
+              "configured": true,
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ8QXA751D53AN41V2000-round-1",
+              "failed_actions": [
+                {
+                  "message": "Prompt preflight counts only the inherited environment and always validates with an empty explicit environment, but Process later merges agent_env_overlay and per-process variables. A large configured agent environment can therefore still cause E2BIG after preflight; tests cover only synthetic byte counts, not this actual process failure path.",
+                  "rule": "Require evidence proportional to actual architectural and operational risk.",
+                  "rule_id": "rule-6"
+                }
+              ],
+              "governance_configured": true,
+              "phase": "post_implementation",
+              "provider": "codex",
+              "raw_output": "{\"status\":\"failed\",\"message\":\"Final launch-size safety is not verified against the environment actually spawned.\",\"violations\":[{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk.\",\"message\":\"Prompt preflight counts only the inherited environment and always validates with an empty explicit environment, but Process later merges agent_env_overlay and per-process variables. A large configured agent environment can therefore still cause E2BIG after preflight; tests cover only synthetic byte counts, not this actual process failure path.\"}]}",
+              "rules_checked": 9,
+              "verdict": {
+                "message": "Final launch-size safety is not verified against the environment actually spawned.",
+                "status": "failed",
+                "violations": [
+                  {
+                    "message": "Prompt preflight counts only the inherited environment and always validates with an empty explicit environment, but Process later merges agent_env_overlay and per-process variables. A large configured agent environment can therefore still cause E2BIG after preflight; tests cover only synthetic byte counts, not this actual process failure path.",
+                    "rule": "Require evidence proportional to actual architectural and operational risk.",
+                    "rule_id": "rule-6"
+                  }
+                ]
+              },
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ8QXA751D53AN41V2000-round-1"
+            },
+            "governance_message": "Final launch-size safety is not verified against the environment actually spawned.",
+            "governance_rule_actions": [
+              {
+                "message": "Prompt preflight counts only the inherited environment and always validates with an empty explicit environment, but Process later merges agent_env_overlay and per-process variables. A large configured agent environment can therefore still cause E2BIG after preflight; tests cover only synthetic byte counts, not this actual process failure path.",
+                "rule": "Require evidence proportional to actual architectural and operational risk.",
+                "rule_id": "rule-6"
+              }
+            ],
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                },
+                {
+                  "enabled": true,
+                  "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+                  "name": "Cohesive code files",
+                  "rule": "Apply whenever an agent adds or changes code files in any language."
+                }
+              ],
+              "code_files_changed": true,
+              "context_version": 1,
+              "recorded_at": "2026-07-27T10:32:37Z",
+              "skipped": []
+            },
+            "implementation_report": "Implemented one shared provider-aware prompt transport with exact UTF-8/SHA-256 metadata, 64 KiB/argv+environment preflight, secure runtime-root prompt-file leases and orphan reaping, native Codex stdin preservation, safe process authorization metadata, PTY errno preservation, Goal prompt de-duplication, and routing for interactive/noninteractive agent surfaces. Added focused provider, large-prompt, PTY, lifecycle, security, and cross-surface regressions plus Process/Agents/Workflow intent updates. Verification: cargo test --lib --bins -- --test-threads=1 passed 579/579; cargo test --doc passed 0/0; cargo check --all-targets passed; cargo fmt --all -- --check passed; browser suite passed 91, failed 0, skipped 11 because Playwright Chromium is unavailable; prompt transport focused tests passed 5/5; provider focused tests passed 11/11; Goal early-exec regression passed 1/1; cli-reference regenerated unchanged; git diff --check passed. cargo clippy --all-targets -- -D warnings remains blocked by 25 pre-existing baseline lint findings outside changed hunks (including empty-line-after-outer-attr, large-enum/result errors, and existing argument-count/style lints).",
+            "implementation_reported_at": "2026-07-27T10:32:35Z",
+            "meta_rule_state": "passed",
+            "product_state": "passed",
+            "prompt": "Create one shared, provider-aware agent prompt transport capability and route every Refine agent launch through it so large prompts never overflow operating-system argv limits or silently change semantics.\n\nBehavior and architecture:\n- Measure prompts in UTF-8 bytes after all Refine prompt composition and provider/session wrappers. Centralize the decision in HostAgentProviderService or a cohesive shared host capability; callers and surfaces must not implement their own thresholds or temporary-file logic.\n- Preserve safe native stdin delivery where it already provides the full prompt with equivalent semantics. For any provider/use case that would place a prompt in argv, use a conservative portable inline budget no greater than 64 KiB and no greater than half of the discovered per-argument platform limit. Preflight every final argv element and aggregate argv plus environment size with margin. If the prompt is over or close to a safe limit, choose a secure prompt-file handoff before spawning. Never retry E2BIG blindly, truncate, split an argv value, or expose the full prompt through authorization_command, process metadata, logs, or errors.\n- Remove avoidable Goal Agent prompt duplication: agent_context already contains goal, previous_rounds, and current_round, so do not render those values twice. Preserve the authoritative latest-Round and earlier-context semantics.\n- Materialize large prompt payloads under the selected Node/runtime root, outside the source worktree, in a unique process/operation-owned directory. Use atomic creation, directory mode 0700, prompt file mode 0400 or 0600, an absolute canonical path, UTF-8 byte count, and SHA-256. Reject NUL or invalid/unrepresentable launch data. Do not use predictable shared /tmp names or follow attacker-controlled symlinks.\n- Introduce an explicit prepared invocation/launch value that owns argv, optional stdin, prompt transport metadata, and any transient artifact lease. Transfer that ownership through interactive sessions and supervised noninteractive processes. Keep the file until the provider process has consumed the initial prompt and the owning session/operation reaches a safe terminal handoff; preserve it across daemon recovery while its owner is live, then remove it. Reap only verified orphan prompt artifacts. A missing, unreadable, changed, or sandbox-inaccessible file must produce a clear failure and must not fall back to an unsafe oversized argument.\n- Keep prompt content out of durable process authorization strings and routine activity logs. Persist only transport kind, byte count, digest, owner, and safe lifecycle evidence. Preserve useful provider stderr/transcripts on launch failure until the workflow consumer records the real error; fix the Goal Agent command-channel/artifact cleanup ordering so an early exec failure cannot be replaced by a secondary missing-file error.\n- Account for portable-pty 0.8.1 closing Rust process-spawn error descriptors in pre_exec. Upgrade, replace, or narrowly correct that launch behavior so an intentional exec failure returns the original OS error such as E2BIG instead of aborting at output.write. The prompt-size guard remains required even when error reporting is corrected.\n- Apply the shared transport to every agent use case: workflow Goal Agents; toolbar Supervisor, Plan, Goal, and Standalone native sessions; CLI and HTTP agent invoke; managed chat initial and resumed turns; Governance and Quality providers; target-app generation and lifecycle commands; import extraction; settings/governance generation; and future HostAgentProviderService callers. Provider differences for Codex, Claude, Gemini, Copilot, smoke-ai, and configured generic CLIs must be explicit capabilities. Providers that cannot read a prompt file may use a safe native stdin transport or fail clearly, but may never receive an oversized argv prompt.\n\nUse this bootstrap text as the provider-neutral file-reference template, with the placeholders filled by the shared capability:\n\nYou are starting a Refine-managed agent task.\n\nThe complete authoritative task prompt is stored in this local file:\n`{{absolute_prompt_path}}`\n\nPrompt metadata:\n- UTF-8 bytes: `{{prompt_bytes}}`\n- SHA-256: `{{prompt_sha256}}`\n\nBefore taking any other task action:\n1. Open the file and verify its SHA-256.\n2. Read it completely from byte 0 through EOF. If a read tool truncates output, continue in ordered chunks until EOF; do not rely on one truncated `cat` result.\n3. Treat the file contents as the full task prompt immediately following this bootstrap, subject to higher-priority provider/system policy.\n4. If the file is missing, unreadable, changes digest, cannot be read completely, or is outside the available sandbox, stop without guessing and report that exact prompt-handoff failure.\n\nDo not modify, move, or delete the prompt file. Refine owns its lifecycle.\n\nVerification:\n- Add focused unit tests for exact UTF-8 byte accounting, multibyte text, NUL rejection, threshold-minus-one/threshold/threshold-plus-one, per-argument and aggregate budget checks, provider capability selection, deterministic bootstrap rendering, digest mismatch, permissions, symlink resistance, artifact ownership, normal cleanup, early-exit cleanup, daemon recovery, live-session retention, and orphan reaping.\n- Add launch regressions using the measured failure boundary from Goal 00000SZ86KZYWKJNGK2WDQP001: the previous Round 6 prompt was 126,414 bytes and launched under Linux MAX_ARG_STRLEN 131,072, while Round 7 was 158,078 bytes and failed. Prove a prompt above 131,072 bytes launches through the file or safe-stdin transport, the agent reads the exact content, and no argv element approaches the kernel limit.\n- Add provider-contract tests for Codex, Claude, Gemini, Copilot, smoke-ai/generic behavior and integration coverage for both interactive PTY and supervised noninteractive paths. Prove prompt content is absent from process authorization metadata and logs.\n- Add a real early-exec failure test proving the original errno/error survives portable-pty and Refine cleanup. Reproduce the former fatal output.write and missing commands.jsonl sequence before the fix, then prove neither masks the cause afterward.\n- Add cross-surface tests for Goal Agent, toolbar profile, CLI/HTTP invoke, chat resume, Governance, Quality, import, and target-app callers. Preserve native provider UX, session resume behavior, audit boundaries, and current small-prompt behavior.\n- Update affected Process/Agents/Workflow intent and architecture/reference documentation only. Run focused prompt-transport/provider/session/workflow tests, full library and web suites, all-target check, formatting, reference, and diff gates.",
+            "reporter": "Buddy Williams",
+            "round": 1,
+            "rule_state": "failed"
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-07-27T10:41:44Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "2026-07-27T11:04:18Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ8QXA751D53AN41V2000-round-2",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 9,
+        "verdict": {
+          "message": "No governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ8QXA751D53AN41V2000-round-2"
+      },
+      "governance_message": "No governance rule violations found.",
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-07-27T11:00:42Z",
+        "skipped": []
+      },
+      "implementation_report": "Recovered Round 1 candidate 9538c43c9975d6f491712321ef80a4b8ade98508 onto Round 2 without changing its branch or worktree. Added Process-owned EffectiveLaunchEnvironment assembly with inheritance, configured agent overlay, last-wins per-process/session overrides, direct API-key removals, exact UTF-8/OS byte accounting, NUL/key validation, per-string and aggregate preflight, and env_clear-based application to std::process::Command and portable-pty CommandBuilder. Prepared provider launches now carry the exact final environment; prompt transport is re-evaluated against it and the same value is used at supervised, toolbar PTY, and Goal Agent PTY spawn boundaries. Removed duplicated spawn-side merge/removal loops and updated only Process/Agents intent text. Added real regressions proving environment-driven file fallback and exact child prompt reads for supervised, toolbar PTY, and configured-environment Goal PTY paths; clear pre-spawn rejection with no marker execution or prompt leak; whole-environment child parity; inherited and duplicate override precedence; Refine variable precedence; API-key removals; NUL rejection; and multibyte values. Verification: cargo test --lib --bins -- --test-threads=1 passed 586/586 plus bin 0/0; cargo test --doc passed 0/0; cargo check --all-targets passed; cargo fmt --all -- --check passed; browser suite passed 91, failed 0, skipped 11 because Playwright Chromium is unavailable; focused provider suite passed 18/18, Goal Agent suite 7/7, toolbar PTY suite 3/3, environment parity regression 1/1; cli-reference regenerated unchanged; git diff --check passed. cargo clippy --all-targets -- -D warnings remains blocked by exactly 25 pre-existing baseline findings outside changed hunks; the changed-hunk too-many-arguments lint exposed during verification was fixed.",
+      "implementation_reported_at": "2026-07-27T11:00:39Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Recover the failed Round 1 implementation from current main and close the verified Governance gap without broadening the Goal. Preserve Round 1 candidate 9538c43c9975d6f491712321ef80a4b8ade98508 and its worktree as audit evidence; inspect it and selectively reproduce the cohesive prompt-transport work, but do not rewrite or erase the failed round.\n\nThe exact blocker is that Round 1 preflights argv against only the inherited daemon environment (and later validates with an empty explicit environment), while the actual managed-process and PTY launch paths subsequently merge agent_env_overlay plus per-process/session variables and remove direct provider API-key variables. Therefore the checked argv+environment is not the environment passed to exec/spawn, and a large configured agent environment can still produce E2BIG.\n\nRequired correction:\n- Create one shared authoritative launch-environment assembly/preflight capability used by HostAgentProviderService and every agent spawn path. It must model the final effective environment after inheritance, agent_env_overlay, per-process/spec/session overrides, and removals, with the same precedence and byte semantics as the actual std::process::Command or portable-pty CommandBuilder launch.\n- Make the prepared invocation own or carry the exact effective environment needed for final validation. Preflight every final argv element and the aggregate argv+effective-environment size with margin immediately before spawn, after all wrappers, args, overrides, Refine variables, and removals are known. Do not merely add explicit environment bytes to process::vars, double-count overridden keys, or validate a different projection from the environment actually spawned.\n- Route supervised noninteractive processes, toolbar interactive sessions, and workflow Goal Agent PTYs through that shared assembly. Remove the duplicated environment merge/removal loops where practical; surfaces remain thin adapters.\n- Re-evaluate prompt transport after the final environment is known: if inline argv would be unsafe but the secure file/bootstrap or native stdin form fits, use that safe transport. If even the smallest safe invocation plus effective environment cannot fit, fail clearly before spawn without retrying E2BIG, leaking prompt content, or falling back to oversized argv.\n- Preserve all Round 1 security, artifact lifecycle/recovery, provider semantics, authorization redaction, early-exec errno, Goal prompt deduplication, and small-prompt behavior.\n\nVerification must exercise the real launch boundary, not only synthetic byte-count helpers:\n- Add controlled regressions where a configured agent environment and per-process variables make an otherwise-inline final launch exceed the aggregate budget; prove the real supervised and interactive/Goal PTY paths choose safe file or stdin transport and the child reads the exact prompt.\n- Add a real pre-spawn rejection where the effective environment alone leaves insufficient room even for the file bootstrap, and prove the original clear size error is retained with no prompt leak or unsafe spawn attempt.\n- Cover inherited-key overrides, duplicate-key accounting, Refine variable precedence, direct API-key removals, NUL rejection, multibyte environment values, and parity between the environment preflighted and the environment observed by a launched child.\n- Retain and rerun the Round 1 focused prompt/provider/PTY/security/recovery tests. Run the full library/bin and browser suites, cargo check --all-targets, formatting, reference generation, and diff checks. Treat unrelated baseline Clippy findings separately, but fix every lint introduced or exposed in changed hunks.\n\nUpdate only affected Process/Agents/Workflow intent or reference text. Report exact command outcomes and stop at the normal human Review boundary.",
+      "quality_checked_at": "2026-07-27T11:04:27Z",
+      "quality_details": {
+        "candidate_commit": "0ac93df3bba5edea85cecd330102590ec2f0b467",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ8QXA751D53AN41V2000-round-2",
+        "diagnostics": [
+          "No Quality tests or migrated commands are configured; evaluation was a no-op."
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "19fa33f60213f56",
+        "results": [],
+        "source_candidate_commit": "0ac93df3bba5edea85cecd330102590ec2f0b467"
+      },
+      "quality_message": "No Quality tests configured.",
+      "quality_state": "passed",
+      "reporter": "Buddy Williams",
+      "rule_state": "passed",
+      "updated": "2026-07-28T16:40:55Z",
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "0ac93df3bba5edea85cecd330102590ec2f0b467",
+        "integrated_at": "2026-07-27T11:04:34.189885413+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n Cargo.lock                                         | 159 ++--\n Cargo.toml                                         |   7 +-\n docs/intent/03-capabilities/01-process.md          |  15 +\n .../03-capabilities/02-agents/00-overview.md       |  11 +\n .../03-capabilities/03-workflow/03-in-progress.md  |   6 +\n src/process/agent_sessions/session_runtime.rs      |  71 +-\n src/process/agent_sessions/tests.rs                | 136 ++++\n src/process/launch_environment.rs                  | 276 +++++++\n src/process/mod.rs                                 |   1 +\n src/process/subprocess/command_spec.rs             |  51 +-\n src/process/subprocess/execution.rs                |  33 +-\n src/process/subprocess/supervision.rs              |   6 +-\n src/process/subprocess/tests/security.rs           | 104 +++\n src/process/supervisor/config/settings_codec.rs    |  19 +-\n src/process/supervisor/config/tests.rs             |   4 +\n src/prompts/goal-agent.md                          |   9 -\n src/prompts/mod.rs                                 |  11 +-\n src/surfaces/cli/tests/agents_processes.rs         |  15 +-\n src/surfaces/web_server/operation_routes/agents.rs |   4 +-\n src/surfaces/web_server/project_routes.rs          |   4 +-\n .../project_routes/settings_governance.rs          |   2 +-\n .../web_server/project_routes/target_app.rs        |   2 +-\n src/surfaces/web_server/runtime.rs                 |   8 +\n src/surfaces/web_server/support/terminal.rs        | 235 +++++-\n .../web_server/tests/agents_chat/agents.rs         |  18 +-\n .../web_server/work_routes/file_terminal_routes.rs |  20 +-\n .../web_server/work_routes/import_routes.rs        |  14 +-\n .../work_routes/import_routes/extraction.rs        |   2 +-\n src/tools/host/agent_providers/mod.rs              |  36 +-\n src/tools/host/agent_providers/prompt_transport.rs | 722 ++++++++++++++++++\n src/tools/host/agent_providers/service.rs          | 275 +++++--\n src/tools/host/agent_providers/spec.rs             |  57 +-\n src/tools/host/agent_providers/tests.rs            | 229 +++++-\n src/workflow/goal_agent_context.rs                 |  68 +-\n src/workflow/tests/execution.rs                    |  11 +-\n vendor/portable-pty/.cargo_vcs_info.json           |   6 +\n vendor/portable-pty/Cargo.lock                     | 734 ++++++++++++++++++\n vendor/portable-pty/Cargo.toml                     | 120 +++\n vendor/portable-pty/Cargo.toml.orig                |  43 ++\n vendor/portable-pty/LICENSE.md                     |  21 +\n vendor/portable-pty/src/cmdbuilder.rs              | 823 +++++++++++++++++++++\n vendor/portable-pty/src/lib.rs                     | 407 ++++++++++\n vendor/portable-pty/src/serial.rs                  | 305 ++++++++\n vendor/portable-pty/src/unix.rs                    | 440 +++++++++++\n vendor/portable-pty/src/win/conpty.rs              | 117 +++\n vendor/portable-pty/src/win/mod.rs                 | 149 ++++\n vendor/portable-pty/src/win/procthreadattr.rs      |  72 ++\n vendor/portable-pty/src/win/psuedocon.rs           | 175 +++++\n xtask/Cargo.lock                                   | 159 ++--\n xtask/Cargo.toml                                   |   3 +\n 50 files changed, 5814 insertions(+), 401 deletions(-)\n create mode 100644 src/process/launch_environment.rs\n create mode 100644 src/tools/host/agent_providers/prompt_transport.rs\n create mode 100644 vendor/portable-pty/.cargo_vcs_info.json\n create mode 100644 vendor/portable-pty/Cargo.lock\n create mode 100644 vendor/portable-pty/Cargo.toml\n create mode 100644 vendor/portable-pty/Cargo.toml.orig\n create mode 100644 vendor/portable-pty/LICENSE.md\n create mode 100644 vendor/portable-pty/src/cmdbuilder.rs\n create mode 100644 vendor/portable-pty/src/lib.rs\n create mode 100644 vendor/portable-pty/src/serial.rs\n create mode 100644 vendor/portable-pty/src/unix.rs\n create mode 100644 vendor/portable-pty/src/win/conpty.rs\n create mode 100644 vendor/portable-pty/src/win/mod.rs\n create mode 100644 vendor/portable-pty/src/win/procthreadattr.rs\n create mode 100644 vendor/portable-pty/src/win/psuedocon.rs",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "fc7c48c1476b81bfdcdecee76874bc8b8cf88db0"
+      },
+      "workflow_quality_timing": "pre_merge"
+    }
+  ],
+  "status": "done",
+  "target_branch": "main",
+  "updated": "2026-07-28T16:41:04Z",
+  "workflow_revision": 34
+}

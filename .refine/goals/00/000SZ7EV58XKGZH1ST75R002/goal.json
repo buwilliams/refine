@@ -1,0 +1,459 @@
+{
+  "base_commit": "4b2e352a2e3454de22a791ef2223b211d51fdaad",
+  "branch_name": "refine/00000SZ7EV58XKGZH1ST75R002/round-2",
+  "candidate_commit": "c2adcb784a8f8ef9ad4652033a4833f3dad22d82",
+  "created": "2026-07-26T09:56:53Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ7EV58XKGZH1ST75R002",
+  "name": "\"Bulk set status\" modal dropdown in the web UI should include review and done. I",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-07-26T10:01:51Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "\"Bulk set status\" modal dropdown in the web UI should include review and done. I think there is some backend logic that prevents that kind of move (maybe); if so, that should also be corrected.",
+          "reporter": "Buddy Williams",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZ7EV58XKGZH1ST75R002",
+          "name": "\"Bulk set status\" modal dropdown in the web UI should include review and done. I",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-07-26T09:56:53Z",
+      "failure_at": "2026-07-26T10:16:31Z",
+      "failure_category": "governance",
+      "failure_message": "Bulk review/done updates can overwrite concurrently claimed workflow state.",
+      "governance_checked_at": "2026-07-26T10:16:30Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ7EV58XKGZH1ST75R002-round-1",
+        "failed_actions": [
+          {
+            "message": "Eligibility is selected before acquiring the workflow coordination lock, then each Goal is re-read and written with set_goal_status_unchecked without revalidating its status or active claim. A Goal can become claimed or automated between selection and mutation, allowing bulk review/done to overwrite workflow-owned state.",
+            "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+            "rule_id": "rule-5"
+          },
+          {
+            "message": "Tests cover static automated statuses but provide no active-claim or selection-to-write race evidence for the new workflow-state mutation path.",
+            "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics.",
+            "rule_id": "rule-6"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Bulk review/done updates can overwrite concurrently claimed workflow state.\",\"violations\":[{\"rule_id\":\"rule-5\",\"rule\":\"Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.\",\"message\":\"Eligibility is selected before acquiring the workflow coordination lock, then each Goal is re-read and written with set_goal_status_unchecked without revalidating its status or active claim. A Goal can become claimed or automated between selection and mutation, allowing bulk review/done to overwrite workflow-owned state.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics.\",\"message\":\"Tests cover static automated statuses but provide no active-claim or selection-to-write race evidence for the new workflow-state mutation path.\"}]}",
+        "rules_checked": 9,
+        "verdict": {
+          "message": "Bulk review/done updates can overwrite concurrently claimed workflow state.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "Eligibility is selected before acquiring the workflow coordination lock, then each Goal is re-read and written with set_goal_status_unchecked without revalidating its status or active claim. A Goal can become claimed or automated between selection and mutation, allowing bulk review/done to overwrite workflow-owned state.",
+              "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "rule_id": "rule-5"
+            },
+            {
+              "message": "Tests cover static automated statuses but provide no active-claim or selection-to-write race evidence for the new workflow-state mutation path.",
+              "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics.",
+              "rule_id": "rule-6"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ7EV58XKGZH1ST75R002-round-1"
+      },
+      "governance_message": "Bulk review/done updates can overwrite concurrently claimed workflow state.",
+      "governance_rule_actions": [
+        {
+          "message": "Eligibility is selected before acquiring the workflow coordination lock, then each Goal is re-read and written with set_goal_status_unchecked without revalidating its status or active claim. A Goal can become claimed or automated between selection and mutation, allowing bulk review/done to overwrite workflow-owned state.",
+          "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+          "rule_id": "rule-5"
+        },
+        {
+          "message": "Tests cover static automated statuses but provide no active-claim or selection-to-write race evidence for the new workflow-state mutation path.",
+          "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics.",
+          "rule_id": "rule-6"
+        }
+      ],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          }
+        ],
+        "context_version": 1,
+        "recorded_at": "2026-07-26T10:12:55Z",
+        "skipped": []
+      },
+      "implementation_report": "Added review and done to the web Bulk set status picker. Updated the shared workflow/work-item capability so both are valid bulk targets, Review can be bulk-completed as Done, and active automated states remain protected; Review/Done also remain protected from unrelated bulk targets such as Todo. Added model, service, web API, and modal coverage plus the affected intent contract. Exact final verification: cargo test --lib passed 515/515; cargo test --lib bulk passed 7/7; node --test tests/web_*.test.js passed 78, failed 0, skipped 4 because no Playwright Chromium build was available; cargo check --all-targets passed; cargo fmt --all -- --check passed; node --check src/surfaces/web/static/js/features/goals-bulk.js passed; git diff --check passed. An initial full library run exposed one over-broad Review-to-Todo transition (514 passed, 1 failed); the policy was narrowed and both the failed test and the full suite then passed. A clean-base rustfmt mismatch in src/workflow/mod.rs was mechanically normalized so the final formatting gate passes.",
+      "implementation_reported_at": "2026-07-26T10:12:55Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "\"Bulk set status\" modal dropdown in the web UI should include review and done. I think there is some backend logic that prevents that kind of move (maybe); if so, that should also be corrected.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "failed",
+      "updated": "2026-07-26T10:16:32Z",
+      "workflow_quality_timing": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-07-26T10:23:50Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Recover the Round 1 Governance rejection without weakening or changing Governance rules 5 or 6. Preserve the delivered user behavior: the web Bulk set status picker includes review and done, both targets use the shared work-item capability, active workflow-owned Goals remain protected, and unrelated bulk targets retain their existing protections. Fix only the two recorded Governance violations and keep the prior candidate and evidence auditable.\n\n1. Close the selection-to-write race in bulk Goal status updates. Eligibility selected from a projection is not authoritative at mutation time. Under the canonical workflow coordination and Goal mutation boundary, re-read each selected Goal from durable state and revalidate its current status, Node ownership, and active workflow claim immediately before changing it. A Goal that becomes claimed, enters an automated status, or otherwise becomes workflow-owned after selection must be skipped or rejected with truthful existing bulk-result evidence; bulk review or done must never overwrite workflow-owned state. Use shared capability code, not a web-only guard. Avoid nested or inconsistent lock ordering.\n2. Add deterministic regression evidence for the selection-to-write race and active-claim case, not only static status fixtures. Exercise a Goal becoming claimed or workflow-owned between selection and mutation and prove review/done does not overwrite it. Retain the existing model, service, API, and modal coverage.\n3. Reconcile the prior Round 1 behavior onto current main through the supported fresh Round. Do not force merge, rewrite history, approve, or merge. Keep unrelated cleanup out of scope.\n\nVerify with focused work-item and web bulk tests, the new race/claim regression, cargo test --lib, cargo check --all-targets, cargo fmt --all -- --check, relevant Node tests, and git diff --check. Report exact outcomes and any pre-existing environmental skips.",
+          "reporter": "Buddy Williams",
+          "round": 2
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZ7EV58XKGZH1ST75R002",
+          "name": "\"Bulk set status\" modal dropdown in the web UI should include review and done. I",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "Buddy Williams",
+            "constitution_state": "passed",
+            "governance_checked_at": "2026-07-26T10:16:30Z",
+            "governance_details": {
+              "configured": true,
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ7EV58XKGZH1ST75R002-round-1",
+              "failed_actions": [
+                {
+                  "message": "Eligibility is selected before acquiring the workflow coordination lock, then each Goal is re-read and written with set_goal_status_unchecked without revalidating its status or active claim. A Goal can become claimed or automated between selection and mutation, allowing bulk review/done to overwrite workflow-owned state.",
+                  "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+                  "rule_id": "rule-5"
+                },
+                {
+                  "message": "Tests cover static automated statuses but provide no active-claim or selection-to-write race evidence for the new workflow-state mutation path.",
+                  "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics.",
+                  "rule_id": "rule-6"
+                }
+              ],
+              "governance_configured": true,
+              "phase": "post_implementation",
+              "provider": "codex",
+              "raw_output": "{\"status\":\"failed\",\"message\":\"Bulk review/done updates can overwrite concurrently claimed workflow state.\",\"violations\":[{\"rule_id\":\"rule-5\",\"rule\":\"Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.\",\"message\":\"Eligibility is selected before acquiring the workflow coordination lock, then each Goal is re-read and written with set_goal_status_unchecked without revalidating its status or active claim. A Goal can become claimed or automated between selection and mutation, allowing bulk review/done to overwrite workflow-owned state.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics.\",\"message\":\"Tests cover static automated statuses but provide no active-claim or selection-to-write race evidence for the new workflow-state mutation path.\"}]}",
+              "rules_checked": 9,
+              "verdict": {
+                "message": "Bulk review/done updates can overwrite concurrently claimed workflow state.",
+                "status": "failed",
+                "violations": [
+                  {
+                    "message": "Eligibility is selected before acquiring the workflow coordination lock, then each Goal is re-read and written with set_goal_status_unchecked without revalidating its status or active claim. A Goal can become claimed or automated between selection and mutation, allowing bulk review/done to overwrite workflow-owned state.",
+                    "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+                    "rule_id": "rule-5"
+                  },
+                  {
+                    "message": "Tests cover static automated statuses but provide no active-claim or selection-to-write race evidence for the new workflow-state mutation path.",
+                    "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics.",
+                    "rule_id": "rule-6"
+                  }
+                ]
+              },
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ7EV58XKGZH1ST75R002-round-1"
+            },
+            "governance_message": "Bulk review/done updates can overwrite concurrently claimed workflow state.",
+            "governance_rule_actions": [
+              {
+                "message": "Eligibility is selected before acquiring the workflow coordination lock, then each Goal is re-read and written with set_goal_status_unchecked without revalidating its status or active claim. A Goal can become claimed or automated between selection and mutation, allowing bulk review/done to overwrite workflow-owned state.",
+                "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+                "rule_id": "rule-5"
+              },
+              {
+                "message": "Tests cover static automated statuses but provide no active-claim or selection-to-write race evidence for the new workflow-state mutation path.",
+                "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics.",
+                "rule_id": "rule-6"
+              }
+            ],
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                }
+              ],
+              "context_version": 1,
+              "recorded_at": "2026-07-26T10:12:55Z",
+              "skipped": []
+            },
+            "implementation_report": "Added review and done to the web Bulk set status picker. Updated the shared workflow/work-item capability so both are valid bulk targets, Review can be bulk-completed as Done, and active automated states remain protected; Review/Done also remain protected from unrelated bulk targets such as Todo. Added model, service, web API, and modal coverage plus the affected intent contract. Exact final verification: cargo test --lib passed 515/515; cargo test --lib bulk passed 7/7; node --test tests/web_*.test.js passed 78, failed 0, skipped 4 because no Playwright Chromium build was available; cargo check --all-targets passed; cargo fmt --all -- --check passed; node --check src/surfaces/web/static/js/features/goals-bulk.js passed; git diff --check passed. An initial full library run exposed one over-broad Review-to-Todo transition (514 passed, 1 failed); the policy was narrowed and both the failed test and the full suite then passed. A clean-base rustfmt mismatch in src/workflow/mod.rs was mechanically normalized so the final formatting gate passes.",
+            "implementation_reported_at": "2026-07-26T10:12:55Z",
+            "meta_rule_state": "passed",
+            "product_state": "passed",
+            "prompt": "\"Bulk set status\" modal dropdown in the web UI should include review and done. I think there is some backend logic that prevents that kind of move (maybe); if so, that should also be corrected.",
+            "reporter": "Buddy Williams",
+            "round": 1,
+            "rule_state": "failed"
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-07-26T10:23:22Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "2026-07-26T10:39:21Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ7EV58XKGZH1ST75R002-round-2",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 9,
+        "verdict": {
+          "message": "No governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ7EV58XKGZH1ST75R002-round-2"
+      },
+      "governance_message": "No governance rule violations found.",
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          }
+        ],
+        "context_version": 1,
+        "recorded_at": "2026-07-26T10:36:38Z",
+        "skipped": []
+      },
+      "implementation_report": "Reconciled the auditable Round 1 behavior onto current main: the web bulk status picker includes review and done, both targets remain owned by the shared work-item capability, and unrelated bulk targets retain Review/Done protection. Bulk status mutation now acquires the canonical workflow coordination and Goal mutation locks, re-reads the Goal from durable state, and revalidates current status, Node ownership, and active workflow claim immediately before writing; newly automated, moved, or claimed Goals are skipped with truthful status:, node:, or claim: bulk evidence. Added retained model/service/API/modal/intent coverage plus a deterministic selection-to-write regression proving review and done cannot overwrite a claim created after selection, done cannot overwrite a Goal changed to qa after selection, and review cannot overwrite a Goal transferred after selection. Final verification: exact race regression 1 passed, 0 failed; focused work-item tests 28 passed, 0 failed; focused web bulk API test 1 passed, 0 failed; cargo test --lib bulk 8 passed, 0 failed; cargo test --lib 520 passed, 0 failed; cargo check --all-targets passed; cargo fmt --all -- --check passed; node --test tests/web_*.test.js reported 83 tests, 79 passed, 0 failed, 4 skipped because no Playwright Chromium build was available; node --check src/surfaces/web/static/js/features/goals-bulk.js passed; git diff --check passed. Initial focused Rust compilation failed with E0624 because the test-only race hook was private to the service submodule; it was narrowed to pub(super) and the rerun passed. The first format check also reported the known clean-base governance-verdict wrap plus one new assertion wrap; both were mechanically formatted and the final gate passed.",
+      "implementation_reported_at": "2026-07-26T10:36:39Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Recover the Round 1 Governance rejection without weakening or changing Governance rules 5 or 6. Preserve the delivered user behavior: the web Bulk set status picker includes review and done, both targets use the shared work-item capability, active workflow-owned Goals remain protected, and unrelated bulk targets retain their existing protections. Fix only the two recorded Governance violations and keep the prior candidate and evidence auditable.\n\n1. Close the selection-to-write race in bulk Goal status updates. Eligibility selected from a projection is not authoritative at mutation time. Under the canonical workflow coordination and Goal mutation boundary, re-read each selected Goal from durable state and revalidate its current status, Node ownership, and active workflow claim immediately before changing it. A Goal that becomes claimed, enters an automated status, or otherwise becomes workflow-owned after selection must be skipped or rejected with truthful existing bulk-result evidence; bulk review or done must never overwrite workflow-owned state. Use shared capability code, not a web-only guard. Avoid nested or inconsistent lock ordering.\n2. Add deterministic regression evidence for the selection-to-write race and active-claim case, not only static status fixtures. Exercise a Goal becoming claimed or workflow-owned between selection and mutation and prove review/done does not overwrite it. Retain the existing model, service, API, and modal coverage.\n3. Reconcile the prior Round 1 behavior onto current main through the supported fresh Round. Do not force merge, rewrite history, approve, or merge. Keep unrelated cleanup out of scope.\n\nVerify with focused work-item and web bulk tests, the new race/claim regression, cargo test --lib, cargo check --all-targets, cargo fmt --all -- --check, relevant Node tests, and git diff --check. Report exact outcomes and any pre-existing environmental skips.",
+      "quality_checked_at": "2026-07-26T10:39:27Z",
+      "quality_details": {
+        "candidate_commit": "c2adcb784a8f8ef9ad4652033a4833f3dad22d82",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ7EV58XKGZH1ST75R002-round-2",
+        "diagnostics": [
+          "No Quality tests or migrated commands are configured; evaluation was a no-op."
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "19f9e0221d138ea54",
+        "results": [],
+        "source_candidate_commit": "c2adcb784a8f8ef9ad4652033a4833f3dad22d82"
+      },
+      "quality_message": "No Quality tests configured.",
+      "quality_state": "passed",
+      "reporter": "Buddy Williams",
+      "rule_state": "passed",
+      "updated": "2026-07-28T16:40:13Z",
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "c2adcb784a8f8ef9ad4652033a4833f3dad22d82",
+        "integrated_at": "2026-07-26T10:39:32.903270542+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n .../03-capabilities/03-workflow/00-overview.md     |   2 +\n .../04-surfaces/03-browser-desktop/08-goal.md      |   4 +-\n src/model/workflow/mod.rs                          |  16 +-\n src/surfaces/web/static/js/features/goals-bulk.js  |   2 +\n src/surfaces/web_server/tests.rs                   |  22 +++\n src/tools/product/work_items/service.rs            | 191 ++++++++++++++++----\n src/tools/product/work_items/tests.rs              | 200 +++++++++++++++++++++\n src/workflow/mod.rs                                |  23 ++-\n tests/web_goals_bulk_reporter.test.js              |  15 ++\n 9 files changed, 421 insertions(+), 54 deletions(-)",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "f00fbf1524971854821bf04a579ab1dbe555a261"
+      },
+      "workflow_quality_timing": "pre_merge"
+    }
+  ],
+  "status": "done",
+  "target_branch": "main",
+  "updated": "2026-07-28T16:40:24Z",
+  "workflow_revision": 33
+}

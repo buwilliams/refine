@@ -1,0 +1,349 @@
+{
+  "base_commit": "8341900516676fe0228a6e1d223a6c89042c04ce",
+  "branch_name": "refine/00000SZ874N4WKETRHHCDQP006/round-2",
+  "candidate_commit": "df15860621dd31ca36f12b5a0ded3552f2f32db3",
+  "created": "2026-07-27T00:06:07Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ874N4WKETRHHCDQP006",
+  "name": "When the web UI toolbar context menu is open, clicking outside of it should auto",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-07-27T00:06:18Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "When the web UI toolbar context menu is open, clicking outside of it should automatically close/hide it. Currently, I have to click the + icon to close it which is annoying.",
+          "reporter": "Buddy Williams",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZ874N4WKETRHHCDQP006",
+          "name": "When the web UI toolbar context menu is open, clicking outside of it should auto",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-27T00:06:07Z",
+      "failure_at": "2026-07-27T00:11:49Z",
+      "failure_category": "guidance",
+      "failure_message": "Goal Agent must apply enabled Guidance whose Rule requires it for changed code files",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "guidance_decision": null,
+      "implementation_report": "Added a document-level Toolbar Add-menu dismissal handler that closes the open native details menu only when a click lands outside it; inside clicks and existing menu-item behavior remain intact. Added deterministic fake-DOM coverage for inside/outside clicks and real Chromium coverage for opening the menu then dismissing it from the Toolbar label. Verification: node --check src/surfaces/web/static/js/features/toolbar.js passed; node --test tests/web_supervisor_toolbar.test.js passed 28/28; NODE_PATH=/home/buddy/projects/refine/node_modules node --test --test-name-pattern='Toolbar add menu closes when the user clicks outside it' tests/web_screen_render.test.js passed 1/1 with Chromium and 0 skipped; cargo fmt --all -- --check passed; git diff --check passed. Broader NODE_PATH=/home/buddy/projects/refine/node_modules node --test tests/web_*.test.js passed 96/97; the sole failure is the unrelated existing releases-screen test 'every Node, Project, and legacy Settings tab renders and refreshes', which reproducibly times out waiting for source-promotion-section and is outside this candidate's Toolbar-only files.",
+      "implementation_reported_at": "2026-07-27T00:11:46Z",
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "When the web UI toolbar context menu is open, clicking outside of it should automatically close/hide it. Currently, I have to click the + icon to close it which is annoying.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-27T00:11:50Z",
+      "workflow_quality_timing": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-07-27T01:01:40Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Recover the tested Round 1 Toolbar Add-menu outside-click candidate from current main while preserving its commit and failure evidence. Before changing code, explicitly evaluate and record every enabled Guidance decision; the prior round failed because required Guidance for changed code files was not recorded. Keep the implementation narrowly on the existing native details menu and shared toolbar event path: clicking outside closes the open menu, clicks inside preserve existing interactions, menu-item behavior and keyboard and accessibility semantics remain unchanged, inactive terminals and toolbar sessions are unaffected, and no polling or timer is introduced. Reuse the deterministic fake-DOM and real mounted Chromium outside-click coverage plus JavaScript syntax, formatting, diff, and relevant web tests, separating any unrelated baseline failure exactly.",
+          "reporter": "Buddy Williams",
+          "round": 2
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZ874N4WKETRHHCDQP006",
+          "name": "When the web UI toolbar context menu is open, clicking outside of it should auto",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "Buddy Williams",
+            "implementation_report": "Added a document-level Toolbar Add-menu dismissal handler that closes the open native details menu only when a click lands outside it; inside clicks and existing menu-item behavior remain intact. Added deterministic fake-DOM coverage for inside/outside clicks and real Chromium coverage for opening the menu then dismissing it from the Toolbar label. Verification: node --check src/surfaces/web/static/js/features/toolbar.js passed; node --test tests/web_supervisor_toolbar.test.js passed 28/28; NODE_PATH=/home/buddy/projects/refine/node_modules node --test --test-name-pattern='Toolbar add menu closes when the user clicks outside it' tests/web_screen_render.test.js passed 1/1 with Chromium and 0 skipped; cargo fmt --all -- --check passed; git diff --check passed. Broader NODE_PATH=/home/buddy/projects/refine/node_modules node --test tests/web_*.test.js passed 96/97; the sole failure is the unrelated existing releases-screen test 'every Node, Project, and legacy Settings tab renders and refreshes', which reproducibly times out waiting for source-promotion-section and is outside this candidate's Toolbar-only files.",
+            "implementation_reported_at": "2026-07-27T00:11:46Z",
+            "prompt": "When the web UI toolbar context menu is open, clicking outside of it should automatically close/hide it. Currently, I have to click the + icon to close it which is annoying.",
+            "reporter": "Buddy Williams",
+            "round": 1
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-07-27T01:00:46Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "2026-07-27T01:07:47Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ874N4WKETRHHCDQP006-round-2",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No actual governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 9,
+        "verdict": {
+          "message": "No actual governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ874N4WKETRHHCDQP006-round-2"
+      },
+      "governance_message": "No actual governance rule violations found.",
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-07-27T01:05:10Z",
+        "skipped": []
+      },
+      "implementation_report": "Recovered the exact Round 1 Toolbar Add-menu patch from preserved commit a456301622025ecc8b039c77b82095d8e45dda10 onto current main 8341900516676fe0228a6e1d223a6c89042c04ce; stable patch ID matches at 6d8a20be863c214b16c75dce103f52e0e3038910. Added a document click handler that closes only an open native .toolbar-add-menu when the click target is outside it, plus deterministic fake-DOM inside/outside coverage and mounted Chromium outside-click coverage. Existing inside interactions, menu-item behavior, native keyboard/accessibility semantics, terminal/session state, and event-driven behavior are unchanged; no polling or timer was added. Verification: node --check src/surfaces/web/static/js/features/toolbar.js passed; node --test tests/web_supervisor_toolbar.test.js passed 29/29; NODE_PATH=/home/buddy/projects/refine/node_modules node --test --test-name-pattern='Toolbar add menu closes when the user clicks outside it' tests/web_screen_render.test.js passed 1/1 with 0 skipped; cargo fmt --all -- --check passed; git diff --check passed. Broader NODE_PATH=/home/buddy/projects/refine/node_modules node --test tests/web_*.test.js passed 97/98; sole failure was every Node, Project, and legacy Settings tab renders and refreshes because #/node/releases lacked [data-testid=source-promotion-section]. The identical focused failure reproduced 0/1 in a temporary clean worktree at unmodified current main 83419005, separating it as unrelated baseline behavior; the temporary worktree was removed. Guidance 0 applied: existing surface contract and shared Toolbar capability preserved, with no architectural or docs/intent contract change. Guidance 1 applied: all three changed files retain their existing cohesive responsibilities; no unrelated structural split.",
+      "implementation_reported_at": "2026-07-27T01:05:08Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Recover the tested Round 1 Toolbar Add-menu outside-click candidate from current main while preserving its commit and failure evidence. Before changing code, explicitly evaluate and record every enabled Guidance decision; the prior round failed because required Guidance for changed code files was not recorded. Keep the implementation narrowly on the existing native details menu and shared toolbar event path: clicking outside closes the open menu, clicks inside preserve existing interactions, menu-item behavior and keyboard and accessibility semantics remain unchanged, inactive terminals and toolbar sessions are unaffected, and no polling or timer is introduced. Reuse the deterministic fake-DOM and real mounted Chromium outside-click coverage plus JavaScript syntax, formatting, diff, and relevant web tests, separating any unrelated baseline failure exactly.",
+      "quality_checked_at": "2026-07-27T01:07:56Z",
+      "quality_details": {
+        "candidate_commit": "df15860621dd31ca36f12b5a0ded3552f2f32db3",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ874N4WKETRHHCDQP006-round-2",
+        "diagnostics": [
+          "No Quality tests or migrated commands are configured; evaluation was a no-op."
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "19fa11d41293f50",
+        "results": [],
+        "source_candidate_commit": "df15860621dd31ca36f12b5a0ded3552f2f32db3"
+      },
+      "quality_message": "No Quality tests configured.",
+      "quality_state": "passed",
+      "reporter": "Buddy Williams",
+      "rule_state": "passed",
+      "updated": "2026-07-28T16:40:52Z",
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "df15860621dd31ca36f12b5a0ded3552f2f32db3",
+        "integrated_at": "2026-07-27T01:08:03.706640392+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n src/surfaces/web/static/js/features/toolbar.js |  7 ++++++\n tests/web_screen_render.test.js                | 17 +++++++++++++\n tests/web_supervisor_toolbar.test.js           | 33 ++++++++++++++++++++++++++\n 3 files changed, 57 insertions(+)",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "247bca00b391509fa65af11595a32616075a64e3"
+      },
+      "workflow_quality_timing": "pre_merge"
+    }
+  ],
+  "status": "done",
+  "target_branch": "main",
+  "updated": "2026-07-28T16:41:02Z",
+  "workflow_revision": 31
+}

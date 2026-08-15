@@ -1,0 +1,211 @@
+{
+  "base_commit": "fd22cdbf54741de30e3f5c84fee4c95bdae5dc9b",
+  "branch_name": "refine/00000SZNS0FRSJR46ARN0NE001/round-1",
+  "candidate_commit": "ab3611b76e01d2a984c4f40095d2c89b3d174f75",
+  "created": "2026-08-06T12:50:58Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZNS0FRSJR46ARN0NE001",
+  "name": "Make the Goals table Node column readable and resizable",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Ethan Jacobson",
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-06T12:55:23Z",
+        "current_round": {
+          "assignee": "Ethan",
+          "prompt": "Improve the desktop Goals table so users can read long Node display names and widen the Node column when needed.\n\nProduction report from Ethan (not locally reproduced): the Node column is too narrow, every row appears as the same truncated \"BO2LN...\" value, and columns cannot be resized. Local review confirms the table uses fixed layout with the Node column set to 8%. A prior completed Goal added safe ellipsis and a full-value tooltip; preserve that protection, but treat this as a follow-up usability gap rather than reopening the prior Goal. The separate stale-node-label report is outside this Goal: this Goal owns presentation and resizing, not the correctness of node metadata.\n\nGive the Node column a useful default width and provide an obvious, accessible way to resize it on desktop without allowing it to overlap or hide adjacent columns. Preserve the complete Node value for inspection and copying. Constrain widths sensibly, keep the table usable through horizontal scrolling when necessary, and ensure sorting, row navigation, selection controls, filtering, and responsive mobile card layout continue to work. Prefer a reusable table-column behavior if that is consistent with the current surface architecture, but do not expand the Goal into a redesign of every table.\n\nDecide and document whether user-selected width persists across rerenders, pagination, refresh, and browser sessions; at minimum, a resize must survive ordinary Goals-table rerenders during the current page session. Support keyboard operation or an equivalent accessible control, not pointer dragging alone.\n\nAdd focused renderer and real-layout regression coverage for the default Node width, widening a truncated long label, min/max constraints, adjacent-column containment, rerender behavior, and the mobile layout. Run focused web tests, the broader web suite, formatting, strict Clippy, complete unit tests, and release build; report unrelated baseline failures separately.",
+          "reporter": "Ethan",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Ethan",
+          "id": "00000SZNS0FRSJR46ARN0NE001",
+          "name": "Make the Goals table Node column readable and resizable",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Ethan"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Ethan Jacobson",
+      "constitution_state": "passed",
+      "created": "2026-08-06T12:50:59Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "2026-08-06T13:15:11Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZNS0FRSJR46ARN0NE001-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 9,
+        "verdict": {
+          "message": "No governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZNS0FRSJR46ARN0NE001-round-1"
+      },
+      "governance_message": "No governance rule violations found.",
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-06T13:13:04Z",
+        "skipped": []
+      },
+      "implementation_report": "Added a reusable bounded table-column resize helper and a 220px default Goals Node column with pointer plus keyboard controls, 144-480px constraints, horizontal containment, full-value ellipsis/tooltip preservation, sessionStorage rerender/pagination/refresh persistence, and unchanged mobile cards. Verification: focused renderer 4/4 passed; focused Chromium layout 3/3 passed; full web suite 118/120 passed with both failures reproduced on unchanged HEAD (xterm ANSI rendering and stale Releases source-promotion selector); cargo fmt --all -- --check passed; strict cargo clippy --all-targets --all-features -- -D warnings passed; cargo test passed 718, failed 0, ignored 6; cargo build --release --locked passed; git diff --check passed.",
+      "implementation_reported_at": "2026-08-06T13:13:02Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Improve the desktop Goals table so users can read long Node display names and widen the Node column when needed.\n\nProduction report from Ethan (not locally reproduced): the Node column is too narrow, every row appears as the same truncated \"BO2LN...\" value, and columns cannot be resized. Local review confirms the table uses fixed layout with the Node column set to 8%. A prior completed Goal added safe ellipsis and a full-value tooltip; preserve that protection, but treat this as a follow-up usability gap rather than reopening the prior Goal. The separate stale-node-label report is outside this Goal: this Goal owns presentation and resizing, not the correctness of node metadata.\n\nGive the Node column a useful default width and provide an obvious, accessible way to resize it on desktop without allowing it to overlap or hide adjacent columns. Preserve the complete Node value for inspection and copying. Constrain widths sensibly, keep the table usable through horizontal scrolling when necessary, and ensure sorting, row navigation, selection controls, filtering, and responsive mobile card layout continue to work. Prefer a reusable table-column behavior if that is consistent with the current surface architecture, but do not expand the Goal into a redesign of every table.\n\nDecide and document whether user-selected width persists across rerenders, pagination, refresh, and browser sessions; at minimum, a resize must survive ordinary Goals-table rerenders during the current page session. Support keyboard operation or an equivalent accessible control, not pointer dragging alone.\n\nAdd focused renderer and real-layout regression coverage for the default Node width, widening a truncated long label, min/max constraints, adjacent-column containment, rerender behavior, and the mobile layout. Run focused web tests, the broader web suite, formatting, strict Clippy, complete unit tests, and release build; report unrelated baseline failures separately.",
+      "quality_checked_at": "2026-08-06T13:15:18Z",
+      "quality_details": {
+        "candidate_commit": "ab3611b76e01d2a984c4f40095d2c89b3d174f75",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZNS0FRSJR46ARN0NE001-round-1",
+        "diagnostics": [
+          "No Quality tests or migrated commands are configured; evaluation was a no-op."
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "19fd736c4e0419f6",
+        "results": [],
+        "source_candidate_commit": "ab3611b76e01d2a984c4f40095d2c89b3d174f75"
+      },
+      "quality_message": "No Quality tests configured.",
+      "quality_state": "passed",
+      "reporter": "Ethan",
+      "rule_state": "passed",
+      "updated": "2026-08-14T10:34:41Z",
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "ab3611b76e01d2a984c4f40095d2c89b3d174f75",
+        "integrated_at": "2026-08-06T13:15:25.904400479+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n .../01-shared-components/01-table.md               |   5 +\n src/surfaces/web/static/css/goals.css              |  72 +++++++++--\n src/surfaces/web/static/index.html                 |   1 +\n src/surfaces/web/static/js/features/goals-list.js  |  29 ++++-\n src/surfaces/web/static/js/table-column-resize.js  | 114 +++++++++++++++++\n tests/web_screen_render.test.js                    | 139 ++++++++++++++++++++-\n tests/web_table_column_resize.test.js              |  73 +++++++++++\n 7 files changed, 414 insertions(+), 19 deletions(-)\n create mode 100644 src/surfaces/web/static/js/table-column-resize.js\n create mode 100644 tests/web_table_column_resize.test.js",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "6fdab0202c300200b701ec5e0cf9eb72b7d91262"
+      },
+      "workflow_quality_timing": "pre_merge",
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    }
+  ],
+  "status": "done",
+  "target_branch": "main",
+  "updated": "2026-08-14T10:34:41Z",
+  "workflow_revision": 21
+}

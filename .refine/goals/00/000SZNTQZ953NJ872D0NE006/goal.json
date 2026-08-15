@@ -1,0 +1,211 @@
+{
+  "base_commit": "d7ed609971b165bb8df3ed2e08bff5f443b92ea4",
+  "branch_name": "refine/00000SZNTQZ953NJ872D0NE006/round-1",
+  "candidate_commit": "f286bbea8b5307f44e599cfb4b7ea583f18ecd3d",
+  "created": "2026-08-06T13:51:34Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZNTQZ953NJ872D0NE006",
+  "name": "Teach the web UI Agent to initiate Refine workflow work",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": null,
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-06T13:52:02Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Update the initial prompt for the general Agent launched from the web UI so it treats Refine as the execution path for repository changes. The Agent may inspect source, runtime state, logs, Git history, and other evidence itself to understand a request and prepare precise work. When the request calls for implementation, it should autonomously translate the desired outcome and its findings into a complete Refine Goal and make that Goal eligible for the workflow instead of requiring the user to recite lifecycle commands. When continuing work that ended unsuccessfully, it should preserve the recorded attempt, add a new round containing relevant findings and actionable next-step guidance, and use supported Refine interfaces to return the work to an eligible workflow state. Keep conversational answers and evidence gathering available, but do not perform implementation ad hoc outside the Refine workflow. Preserve confirmation and audit boundaries: never directly edit durable Goal state, conceal failures, approve or merge on the users behalf, destructively discard retained work, or begin ongoing supervision unless requested. Scope this behavior to the web UI general Agent launch; do not change the workflow-owned Goal Agent protocol, the attached diagnostic Goal profile, Plan, or Standalone behavior. Add focused regression coverage showing the launch prompt contains this operating contract and retains the existing checkout-local Refine executable guidance.",
+          "reporter": "Buddy Williams",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZNTQZ953NJ872D0NE006",
+          "name": "Teach the web UI Agent to initiate Refine workflow work",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-08-06T13:51:50Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "2026-08-06T13:59:27Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZNTQZ953NJ872D0NE006-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 9,
+        "verdict": {
+          "message": "No governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZNTQZ953NJ872D0NE006-round-1"
+      },
+      "governance_message": "No governance rule violations found.",
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-06T13:58:37Z",
+        "skipped": []
+      },
+      "implementation_report": "Updated only the web UI general-Agent launch prompt to route repository implementation through complete, workflow-eligible Refine Goals; added unsuccessful-attempt recovery and confirmation/audit boundaries; retained checkout-local ./r guidance; documented the affected browser contract; and added scoped regression coverage proving the contract is absent from Plan, diagnostic Goal, and Standalone prompts. Verification: cargo test --lib surfaces::web_server::tests::agents_chat::agents:: -- --test-threads=1 (5 passed, 0 failed); cargo test --lib workflow_goal_agent_prompt_excludes_interactive_checkout_guidance -- --nocapture (1 passed, 0 failed); cargo check --all-targets (passed); cargo clippy --all-targets -- -D warnings (passed); cargo fmt --all -- --check (passed); git diff --check (passed).",
+      "implementation_reported_at": "2026-08-06T13:58:35Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Update the initial prompt for the general Agent launched from the web UI so it treats Refine as the execution path for repository changes. The Agent may inspect source, runtime state, logs, Git history, and other evidence itself to understand a request and prepare precise work. When the request calls for implementation, it should autonomously translate the desired outcome and its findings into a complete Refine Goal and make that Goal eligible for the workflow instead of requiring the user to recite lifecycle commands. When continuing work that ended unsuccessfully, it should preserve the recorded attempt, add a new round containing relevant findings and actionable next-step guidance, and use supported Refine interfaces to return the work to an eligible workflow state. Keep conversational answers and evidence gathering available, but do not perform implementation ad hoc outside the Refine workflow. Preserve confirmation and audit boundaries: never directly edit durable Goal state, conceal failures, approve or merge on the users behalf, destructively discard retained work, or begin ongoing supervision unless requested. Scope this behavior to the web UI general Agent launch; do not change the workflow-owned Goal Agent protocol, the attached diagnostic Goal profile, Plan, or Standalone behavior. Add focused regression coverage showing the launch prompt contains this operating contract and retains the existing checkout-local Refine executable guidance.",
+      "quality_checked_at": "2026-08-06T13:59:33Z",
+      "quality_details": {
+        "candidate_commit": "f286bbea8b5307f44e599cfb4b7ea583f18ecd3d",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZNTQZ953NJ872D0NE006-round-1",
+        "diagnostics": [
+          "No Quality tests or migrated commands are configured; evaluation was a no-op."
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "19fd75f47f0419fa",
+        "results": [],
+        "source_candidate_commit": "f286bbea8b5307f44e599cfb4b7ea583f18ecd3d"
+      },
+      "quality_message": "No Quality tests configured.",
+      "quality_state": "passed",
+      "reporter": "Buddy Williams",
+      "rule_state": "passed",
+      "updated": "2026-08-06T13:59:41Z",
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "f286bbea8b5307f44e599cfb4b7ea583f18ecd3d",
+        "integrated_at": "2026-08-06T13:59:40.900722492+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n .../04-surfaces/03-browser-desktop/15-toolbar.md   |  7 ++++-\n .../04-surfaces/03-browser-desktop/20-chat.md      |  1 +\n .../web_server/tests/agents_chat/agents.rs         | 35 +++++++++++++++++++++-\n .../web_server/work_routes/terminal_profiles.rs    | 18 +++++++++++\n 4 files changed, 59 insertions(+), 2 deletions(-)",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "0532b38380a84e18ac32a91344426e10f51b2b37"
+      },
+      "workflow_quality_timing": "pre_merge",
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    }
+  ],
+  "status": "done",
+  "target_branch": "main",
+  "updated": "2026-08-06T14:10:21Z",
+  "workflow_revision": 19
+}

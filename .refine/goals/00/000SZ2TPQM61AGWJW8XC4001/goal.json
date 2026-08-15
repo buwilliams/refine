@@ -350,7 +350,7 @@
       "updated": "2026-07-22T23:22:28Z"
     },
     {
-      "assignee": "Refine",
+      "assignee": "Buddy Williams",
       "constitution_state": "passed",
       "created": "2026-07-22T23:23:04Z",
       "governance_checked_at": "2026-07-22T23:40:27Z",
@@ -460,12 +460,12 @@
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
-      "reporter": "Refine",
+      "reporter": "Buddy Williams",
       "rule_state": "failed",
       "updated": "2026-07-22T23:40:27Z"
     },
     {
-      "assignee": "Refine",
+      "assignee": "Buddy Williams",
       "constitution_state": "passed",
       "created": "2026-07-22T23:41:15Z",
       "governance_checked_at": "2026-07-23T00:04:31Z",
@@ -560,12 +560,12 @@
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
-      "reporter": "Refine",
+      "reporter": "Buddy Williams",
       "rule_state": "failed",
       "updated": "2026-07-23T00:04:31Z"
     },
     {
-      "assignee": "Refine",
+      "assignee": "Buddy Williams",
       "constitution_state": "passed",
       "created": "2026-07-23T00:05:26Z",
       "governance_checked_at": "2026-07-23T00:19:01Z",
@@ -601,12 +601,13 @@
       },
       "quality_message": "Quality checks passed",
       "quality_state": "passed",
-      "reporter": "Refine",
+      "reporter": "Buddy Williams",
       "rule_state": "passed",
-      "updated": "2026-07-23T00:19:04Z"
+      "updated": "2026-07-28T16:38:56Z"
     }
   ],
   "status": "done",
   "target_branch": "main",
-  "updated": "2026-07-23T09:52:10Z"
+  "updated": "2026-07-28T16:39:11Z",
+  "workflow_revision": 5
 }

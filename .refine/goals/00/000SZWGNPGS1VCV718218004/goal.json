@@ -1,0 +1,396 @@
+{
+  "base_commit": "329ad47e9529243323bea27d345d334d74665043",
+  "branch_name": "refine/00000SZWGNPGS1VCV718218004/round-2",
+  "candidate_commit": "d2de9d3ca3d62bd9ed14c8ad6d95cce68bf7fb34",
+  "created": "2026-08-11T18:28:56Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZWGNPGS1VCV718218004",
+  "name": "Remove permanent workflow failure quarantine",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": null,
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-11T18:29:44Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Remove the permanent workflow failure quarantine feature. It is not wanted product behavior. Preserve bounded terminal-claim retention, semantic deduplication, compact per-Goal summaries, the hard state-size cap, failure evidence, and temporary capped retry backoff where it prevents tight retry loops. Remove execution_quarantined, the five-failure permanent admission latch, silent scheduler exclusion based only on historical failures, and any preparation/execution quarantine that can leave a user-submitted Goal visibly todo but unclaimable. A workflow failure must settle visibly; after the user explicitly adds or submits a fresh Round or requeues a failed Goal, automation must create a fresh claim and execution identity without reusing stale attempts. Provide compatible migration for existing workflow-automation state so persisted quarantine fields cease blocking Goals while prior claims and failures remain inspectable. Surface any temporary retry delay truthfully instead of silently presenting inert todo work. Add focused tests for bounded retry behavior, state migration, fresh-Round recovery after more than five historic failures, node/capacity/feature eligibility, restart, and shared status surfaces. Update only affected workflow intent. Do not weaken claim ownership, capacity, cancellation, or Git/worktree evidence, and do not approve or merge.",
+          "reporter": "Buddy Williams",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZWGNPGS1VCV718218004",
+          "name": "Remove permanent workflow failure quarantine",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-08-11T18:29:09Z",
+      "failure_at": "2026-08-11T18:58:42Z",
+      "failure_category": "governance",
+      "failure_message": "Dashboard retry-delay reporting bypasses project indexes and caching.",
+      "governance_checked_at": "2026-08-11T18:58:39Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZWGNPGS1VCV718218004-round-1",
+        "failed_actions": [
+          {
+            "message": "retry_delays_needing_attention creates an uncached FileWorkItemService, then show_goal_summary and show_goal_detail each rebuild the full project projection for every failed claim. The dashboard API therefore scales with failed claims times all project records and cannot preserve the indexed/cached sub-50ms contract.",
+            "rule": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+            "rule_id": "generated-rule-1786471155372-2"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Dashboard retry-delay reporting bypasses project indexes and caching.\",\"violations\":[{\"rule_id\":\"generated-rule-1786471155372-2\",\"rule\":\"Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.\",\"message\":\"retry_delays_needing_attention creates an uncached FileWorkItemService, then show_goal_summary and show_goal_detail each rebuild the full project projection for every failed claim. The dashboard API therefore scales with failed claims times all project records and cannot preserve the indexed/cached sub-50ms contract.\"}]}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "Dashboard retry-delay reporting bypasses project indexes and caching.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "retry_delays_needing_attention creates an uncached FileWorkItemService, then show_goal_summary and show_goal_detail each rebuild the full project projection for every failed claim. The dashboard API therefore scales with failed claims times all project records and cannot preserve the indexed/cached sub-50ms contract.",
+              "rule": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "rule_id": "generated-rule-1786471155372-2"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZWGNPGS1VCV718218004-round-1"
+      },
+      "governance_message": "Dashboard retry-delay reporting bypasses project indexes and caching.",
+      "governance_rule_actions": [
+        {
+          "message": "retry_delays_needing_attention creates an uncached FileWorkItemService, then show_goal_summary and show_goal_detail each rebuild the full project projection for every failed claim. The dashboard API therefore scales with failed claims times all project records and cannot preserve the indexed/cached sub-50ms contract.",
+          "rule": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+          "rule_id": "generated-rule-1786471155372-2"
+        }
+      ],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-11T18:56:58Z",
+        "skipped": []
+      },
+      "implementation_report": "Removed permanent workflow failure quarantine and preparation exclusion; added revision-scoped capped retry delays, visible failure settlement/status, fresh Round/requeue claim and execution identities, v2 state migration retaining bounded claim evidence, focused tests, and workflow intent updates. Verification: cargo test --lib workflow::tests (66 passed); focused claim-history (10 passed), dashboard (2 passed), dirty-checkpoint retry (1 passed), and round metadata (4 passed); cargo check --all-targets passed; cargo clippy --all-targets -- -D warnings passed; cargo test passed 761, failed 0, ignored 6; cargo fmt --all -- --check and git diff --check passed.",
+      "implementation_reported_at": "2026-08-11T18:56:56Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Remove the permanent workflow failure quarantine feature. It is not wanted product behavior. Preserve bounded terminal-claim retention, semantic deduplication, compact per-Goal summaries, the hard state-size cap, failure evidence, and temporary capped retry backoff where it prevents tight retry loops. Remove execution_quarantined, the five-failure permanent admission latch, silent scheduler exclusion based only on historical failures, and any preparation/execution quarantine that can leave a user-submitted Goal visibly todo but unclaimable. A workflow failure must settle visibly; after the user explicitly adds or submits a fresh Round or requeues a failed Goal, automation must create a fresh claim and execution identity without reusing stale attempts. Provide compatible migration for existing workflow-automation state so persisted quarantine fields cease blocking Goals while prior claims and failures remain inspectable. Surface any temporary retry delay truthfully instead of silently presenting inert todo work. Add focused tests for bounded retry behavior, state migration, fresh-Round recovery after more than five historic failures, node/capacity/feature eligibility, restart, and shared status surfaces. Update only affected workflow intent. Do not weaken claim ownership, capacity, cancellation, or Git/worktree evidence, and do not approve or merge.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "failed",
+      "updated": "2026-08-11T18:58:43Z",
+      "workflow_quality_timing": null,
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-11T19:36:32Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Recover and retain Round 1 candidate 710fa565991f6d6be07acbecfe6b4572097c3be6 while reconciling it with current main. Preserve the removal of permanent workflow failure quarantine, bounded terminal-claim history, semantic deduplication, compact summaries, hard state-size cap, failure evidence, revision-scoped capped retry backoff, visible failure settlement, fresh Round/requeue claim and execution identities, compatible state migration, node/capacity/feature eligibility, restart behavior, shared status surfaces, and the focused tests and workflow intent update. Fix the recorded Governance blocker only: retry_delays_needing_attention and the Dashboard path must not construct an uncached FileWorkItemService or rebuild the full project projection per failed claim. Reuse the existing indexed/cached project authority once per request, or the ActiveGoalIndex plus direct per-Goal revision reads, and keep Dashboard/API work within the sub-50ms contract. Add a focused regression that exercises the real Dashboard retry-delay path with multiple failed claims and proves projection rebuild count does not grow with failure count while exact retry time and node filtering remain correct. Reconcile carefully with current-main changes in work item service, round metadata, workflow module, and policy files. Run focused workflow and Dashboard tests, cargo fmt --check, cargo check --all-targets, cargo clippy --all-targets -- -D warnings, and the full test suite. Do not weaken ownership, capacity, cancellation, Git/worktree evidence, Governance, Quality, or Review, and do not approve or merge.",
+          "reporter": "Buddy Williams",
+          "round": 2
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZWGNPGS1VCV718218004",
+          "name": "Remove permanent workflow failure quarantine",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "Buddy Williams",
+            "constitution_state": "passed",
+            "governance_checked_at": "2026-08-11T18:58:39Z",
+            "governance_details": {
+              "configured": true,
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZWGNPGS1VCV718218004-round-1",
+              "failed_actions": [
+                {
+                  "message": "retry_delays_needing_attention creates an uncached FileWorkItemService, then show_goal_summary and show_goal_detail each rebuild the full project projection for every failed claim. The dashboard API therefore scales with failed claims times all project records and cannot preserve the indexed/cached sub-50ms contract.",
+                  "rule": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+                  "rule_id": "generated-rule-1786471155372-2"
+                }
+              ],
+              "governance_configured": true,
+              "phase": "post_implementation",
+              "provider": "codex",
+              "raw_output": "{\"status\":\"failed\",\"message\":\"Dashboard retry-delay reporting bypasses project indexes and caching.\",\"violations\":[{\"rule_id\":\"generated-rule-1786471155372-2\",\"rule\":\"Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.\",\"message\":\"retry_delays_needing_attention creates an uncached FileWorkItemService, then show_goal_summary and show_goal_detail each rebuild the full project projection for every failed claim. The dashboard API therefore scales with failed claims times all project records and cannot preserve the indexed/cached sub-50ms contract.\"}]}",
+              "rules_checked": 4,
+              "verdict": {
+                "message": "Dashboard retry-delay reporting bypasses project indexes and caching.",
+                "status": "failed",
+                "violations": [
+                  {
+                    "message": "retry_delays_needing_attention creates an uncached FileWorkItemService, then show_goal_summary and show_goal_detail each rebuild the full project projection for every failed claim. The dashboard API therefore scales with failed claims times all project records and cannot preserve the indexed/cached sub-50ms contract.",
+                    "rule": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+                    "rule_id": "generated-rule-1786471155372-2"
+                  }
+                ]
+              },
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZWGNPGS1VCV718218004-round-1"
+            },
+            "governance_message": "Dashboard retry-delay reporting bypasses project indexes and caching.",
+            "governance_rule_actions": [
+              {
+                "message": "retry_delays_needing_attention creates an uncached FileWorkItemService, then show_goal_summary and show_goal_detail each rebuild the full project projection for every failed claim. The dashboard API therefore scales with failed claims times all project records and cannot preserve the indexed/cached sub-50ms contract.",
+                "rule": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+                "rule_id": "generated-rule-1786471155372-2"
+              }
+            ],
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                },
+                {
+                  "enabled": true,
+                  "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+                  "name": "Cohesive code files",
+                  "rule": "Apply whenever an agent adds or changes code files in any language."
+                }
+              ],
+              "code_files_changed": true,
+              "context_version": 1,
+              "recorded_at": "2026-08-11T18:56:58Z",
+              "skipped": []
+            },
+            "implementation_report": "Removed permanent workflow failure quarantine and preparation exclusion; added revision-scoped capped retry delays, visible failure settlement/status, fresh Round/requeue claim and execution identities, v2 state migration retaining bounded claim evidence, focused tests, and workflow intent updates. Verification: cargo test --lib workflow::tests (66 passed); focused claim-history (10 passed), dashboard (2 passed), dirty-checkpoint retry (1 passed), and round metadata (4 passed); cargo check --all-targets passed; cargo clippy --all-targets -- -D warnings passed; cargo test passed 761, failed 0, ignored 6; cargo fmt --all -- --check and git diff --check passed.",
+            "implementation_reported_at": "2026-08-11T18:56:56Z",
+            "meta_rule_state": "passed",
+            "product_state": "passed",
+            "prompt": "Remove the permanent workflow failure quarantine feature. It is not wanted product behavior. Preserve bounded terminal-claim retention, semantic deduplication, compact per-Goal summaries, the hard state-size cap, failure evidence, and temporary capped retry backoff where it prevents tight retry loops. Remove execution_quarantined, the five-failure permanent admission latch, silent scheduler exclusion based only on historical failures, and any preparation/execution quarantine that can leave a user-submitted Goal visibly todo but unclaimable. A workflow failure must settle visibly; after the user explicitly adds or submits a fresh Round or requeues a failed Goal, automation must create a fresh claim and execution identity without reusing stale attempts. Provide compatible migration for existing workflow-automation state so persisted quarantine fields cease blocking Goals while prior claims and failures remain inspectable. Surface any temporary retry delay truthfully instead of silently presenting inert todo work. Add focused tests for bounded retry behavior, state migration, fresh-Round recovery after more than five historic failures, node/capacity/feature eligibility, restart, and shared status surfaces. Update only affected workflow intent. Do not weaken claim ownership, capacity, cancellation, or Git/worktree evidence, and do not approve or merge.",
+            "reporter": "Buddy Williams",
+            "round": 1,
+            "rule_state": "failed"
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-08-11T19:36:16Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "2026-08-11T19:55:23Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZWGNPGS1VCV718218004-round-2",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No actual governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "No actual governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZWGNPGS1VCV718218004-round-2"
+      },
+      "governance_message": "No actual governance rule violations found.",
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-11T19:53:41Z",
+        "skipped": []
+      },
+      "implementation_report": "Recovered Round 1 candidate 710fa565991f6d6be07acbecfe6b4572097c3be6 onto current main as 1de8d138 and retained its quarantine-removal behavior, migration, evidence, backoff, status surfaces, intent, and tests. Fixed the Governance blocker by making Dashboard attention queries reuse the request-scoped cached ProjectionSnapshot and perform direct per-Goal workflow-revision reads, with no uncached FileWorkItemService or per-failure full projection rebuild. Added a real /api/dashboard regression covering one versus three failed claims, zero projection rebuild growth (0 to 0), exact retry timestamps, and current/all-node filtering. Verification: cargo test --lib workflow::tests (71 passed, 0 failed); cargo test --lib surfaces::web_server::tests::dashboard_retry (1 passed, 0 failed); cargo test --lib surfaces::web_server::tests::project_runtime (7 passed, 0 failed); cargo fmt --all -- --check passed; cargo check --all-targets passed; cargo clippy --all-targets -- -D warnings passed; cargo test passed 774, failed 0, ignored 6; git diff --check passed.",
+      "implementation_reported_at": "2026-08-11T19:53:39Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Recover and retain Round 1 candidate 710fa565991f6d6be07acbecfe6b4572097c3be6 while reconciling it with current main. Preserve the removal of permanent workflow failure quarantine, bounded terminal-claim history, semantic deduplication, compact summaries, hard state-size cap, failure evidence, revision-scoped capped retry backoff, visible failure settlement, fresh Round/requeue claim and execution identities, compatible state migration, node/capacity/feature eligibility, restart behavior, shared status surfaces, and the focused tests and workflow intent update. Fix the recorded Governance blocker only: retry_delays_needing_attention and the Dashboard path must not construct an uncached FileWorkItemService or rebuild the full project projection per failed claim. Reuse the existing indexed/cached project authority once per request, or the ActiveGoalIndex plus direct per-Goal revision reads, and keep Dashboard/API work within the sub-50ms contract. Add a focused regression that exercises the real Dashboard retry-delay path with multiple failed claims and proves projection rebuild count does not grow with failure count while exact retry time and node filtering remain correct. Reconcile carefully with current-main changes in work item service, round metadata, workflow module, and policy files. Run focused workflow and Dashboard tests, cargo fmt --check, cargo check --all-targets, cargo clippy --all-targets -- -D warnings, and the full test suite. Do not weaken ownership, capacity, cancellation, Git/worktree evidence, Governance, Quality, or Review, and do not approve or merge.",
+      "quality_checked_at": "2026-08-11T19:55:30Z",
+      "quality_details": {
+        "candidate_commit": "d2de9d3ca3d62bd9ed14c8ad6d95cce68bf7fb34",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZWGNPGS1VCV718218004-round-2",
+        "diagnostics": [
+          "No Quality tests or migrated commands are configured; evaluation was a no-op."
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "19ff264f5d245aa",
+        "results": [],
+        "source_candidate_commit": "d2de9d3ca3d62bd9ed14c8ad6d95cce68bf7fb34"
+      },
+      "quality_message": "No Quality tests configured.",
+      "quality_state": "passed",
+      "reporter": "Buddy Williams",
+      "rule_state": "passed",
+      "updated": "2026-08-11T19:55:39Z",
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "d2de9d3ca3d62bd9ed14c8ad6d95cce68bf7fb34",
+        "integrated_at": "2026-08-11T19:55:38.773668021+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n .../03-capabilities/03-workflow/00-overview.md     |  16 +-\n src/surfaces/web_server/project_routes.rs          |  20 +-\n .../web_server/project_routes/dashboard.rs         |  17 +-\n src/surfaces/web_server/tests/dashboard_retry.rs   | 152 ++++++++++++\n src/surfaces/web_server/tests/mod.rs               |   1 +\n src/surfaces/web_server/tests/project_runtime.rs   |  44 +++-\n src/tools/product/work_items/mod.rs                |   2 +-\n src/tools/product/work_items/service.rs            |   3 +-\n .../product/work_items/service/persistence.rs      |   7 +\n .../work_items/service/record_persistence.rs       |  20 ++\n .../work_items/service/rounds_and_metadata.rs      |  24 +-\n src/workflow/automation.rs                         |  75 +++---\n src/workflow/claim_history.rs                      |  58 +++--\n src/workflow/execution.rs                          |  29 +--\n src/workflow/failure_settlement.rs                 |  88 +++++++\n src/workflow/mod.rs                                |  39 +--\n src/workflow/policy.rs                             |  21 +-\n src/workflow/state.rs                              |  79 +++++-\n src/workflow/tests/claim_history.rs                | 264 ++++++++++++++++-----\n src/workflow/tests/mod.rs                          |   1 +\n src/workflow/tests/ready_merge.rs                  |  59 +++--\n 21 files changed, 819 insertions(+), 200 deletions(-)\n create mode 100644 src/surfaces/web_server/tests/dashboard_retry.rs\n create mode 100644 src/workflow/failure_settlement.rs",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "4a504929c5152b545403a2d7921e5196d3b058f7"
+      },
+      "workflow_quality_timing": "pre_merge",
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    }
+  ],
+  "status": "done",
+  "target_branch": "main",
+  "updated": "2026-08-12T13:04:12Z",
+  "workflow_revision": 30
+}

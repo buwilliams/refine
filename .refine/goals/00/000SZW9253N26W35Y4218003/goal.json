@@ -1,0 +1,1012 @@
+{
+  "base_commit": "7602499e4ab090969bb830de087bee4579e1a52c",
+  "branch_name": "refine/00000SZW9253N26W35Y4218003/round-4",
+  "candidate_commit": "35a12df2d0c908535c68b35cc0d12ce2914ff661",
+  "created": "2026-08-11T14:02:55Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZW9253N26W35Y4218003",
+  "name": "Add governed implementation planning to In Progress",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": null,
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-11T14:03:02Z",
+        "current_round": {
+          "assignee": "Refine",
+          "prompt": "Implement and verify this Goal.",
+          "reporter": "Refine",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Refine",
+          "id": "00000SZW9253N26W35Y4218003",
+          "name": "Add governed implementation planning to In Progress",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Refine"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Run agents, Git, quality, lifecycle, and long work through the supervised process substrate, with explicit ownership, status, logs, cancellation, failures, and recovery. When activating a new Refine build requires replacing or restarting that supervisor, a restart-safe handoff may run outside it and independently complete the upgrade. The handoff must retain durable, operation-correlated ownership and state, visible progress and failures, and restart, rollback, and recovery reconciliation.",
+              "updated": "2026-08-06T20:32:30Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-08-11T14:02:57Z",
+      "failure_at": "2026-08-11T14:04:22Z",
+      "failure_category": "agent",
+      "failure_message": "Goal Agent exited unsuccessfully: 1",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "guidance_decision": null,
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Implement and verify this Goal.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-08-11T14:04:23Z",
+      "workflow_quality_timing": null,
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-11T14:05:45Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Implement a one-pass governed implementation-planning pipeline for every Goal Round before repository implementation begins.\n\nProtected product intent\n\nImprove implementation alignment by asking installed native agents to reason explicitly about the Goal, repository, Product, Constitution, Governance, Guidance, and prior evidence before code is changed. Refine owns phase ordering, durable state, process supervision, identity fencing, recovery, and visible evidence; agents continue to own adaptable planning, criticism, revision, and implementation judgment. Keep this execution-time planning distinct from pre-Goal Plan Mode.\n\nRequired behavior and revised implementation plan\n\n1. Add a backward-compatible, typed, optional `implementation_plan` field to `GoalRound`. Treat it as Workflow-owned durable evidence, not an unstructured string and not surface-owned state. Preserve:\n   - a schema version and explicit phase/state;\n   - the binding to the exact Goal ID, Round index, pinned agent-context identity/digest, workflow claim/attempt, target branch, and base commit used to make the plan;\n   - the original proposed plan and checklist;\n   - the independent criticism;\n   - the revised final plan and checklist;\n   - phase timestamps, relevant managed-process/operation identities, and failure evidence.\n   Legacy Goals and Rounds without the field must continue to load and behave correctly.\n\n2. Within the existing `in-progress` workflow behavior, orchestrate these phases in order against the same pinned context and implementation worktree:\n   - Plan: launch a supervised planning agent to inspect the real repository and propose an actionable implementation plan with stable checklist item IDs, affected behavior/surfaces, Governance rationale where relevant, and intended verification evidence.\n   - Criticize: launch a fresh supervised critic with the same pinned context, repository access, and proposed plan. Ask it to find material omissions, incorrect assumptions, cross-surface inconsistencies, failure/recovery gaps, and Governance conflicts. Criticism is model judgment given the full scenario, not a deterministic checklist verdict.\n   - Revise: launch a fresh supervised planning agent with the proposal and criticism. It must produce the final plan/checklist, resolving each material criticism or explaining why it does not apply.\n   - Implement: launch a fresh supervised implementation agent with the ordinary pinned Goal specification plus the final plan/checklist. The final Round request remains authoritative. The implementation agent must report completion, deviation, rejection, or blockage for every checklist item ID and record verification evidence.\n\n3. Pin the Round's existing agent context before planning and reuse that exact snapshot for all four phases and post-implementation Governance. Persist each phase result before launching the next phase. Fence every phase launch and durable update to the exact Goal, Round, claim/attempt, context, target branch, and base commit. A changed Round, claim, Governance/context binding, branch, or base must conflict visibly rather than allowing stale planning or implementation to continue.\n\n4. Make planning phases observational with respect to the repository. Use an available provider-independent read-only execution boundary where supported; in all cases inspect Git state before and after each planning/criticism/revision phase. If a non-implementation phase changes the worktree, stop, preserve the process/output and Git evidence, and fail visibly instead of silently accepting, resetting, or hiding those changes.\n\n5. Make the pipeline restartable and interruption-safe. The durable phase state must let workflow recovery resume from the first incomplete phase without rerunning completed agent judgments or overwriting their artifacts. Give every phase distinct supervised process metadata, logs, status, cancellation/pause behavior, and failure categorization. The browser/CLI attachment for an in-progress Goal must resolve the currently active phase process rather than create a duplicate agent. Preserve existing needs-input semantics where applicable.\n\n6. After implementation, retain the existing commit, Guidance selection, Governance, Quality, Ready Merge, and Review boundaries. The accepted plan is guidance for execution, not approval of the resulting code. Preserve the immutable proposed/criticized/final planning history; record actual checklist completion and discrepancies in implementation evidence rather than rewriting the accepted plan.\n\n7. Each follow-up or recovery Round receives its own implementation plan bound to that Round. Its planning context must include relevant prior Round requests, reports, failures, Governance/Quality evidence, and retained recovery evidence through the existing context contract.\n\n8. Expose the shared Round planning evidence through authoritative Goal detail capabilities so CLI, API, MCP/agent tools, exports where appropriate, and browser all observe the same data rather than duplicating planning semantics in a surface. In the Goal detail modal, add a read-only per-Round Implementation Plan card:\n   - show the current planning phase and final plan/checklist by default;\n   - make the original proposal and criticism available as expandable history;\n   - show timestamps, failures, checklist completion/deviation evidence, and active phase where useful;\n   - preserve accessible markup and modal open state;\n   - update live state only through existing SSE/reconciliation paths, with no polling, retry timers, or repeated status GETs.\n\n9. Update only affected intent documentation. At minimum reconcile execution-time implementation planning with the existing Planning, Goal Agents, In Progress, Goal surface, Process/evidence, and shared workflow consistency contracts without redefining pre-Goal Plan Mode.\n\nCriticism-driven corrections incorporated into this plan\n\nThe initial design only described a visible plan field and four prompts. This revised plan also covers typed shared ownership, immutable proposal/criticism/final evidence, restart recovery, stale-authority fencing, supervised phase identity, prevention/detection of unintended planning edits, current-process attachment, prior-Round recovery context, cross-surface access, SSE-only UI updates, and the distinction between implementation planning and existing Plan Mode.\n\nVerification checklist\n\n- [ ] Legacy plan-less Goal JSON deserializes and follows the existing implementation path or the newly defined default behavior without migration loss.\n- [ ] New Round planning evidence round-trips through the authoritative model/store and shared Goal detail interfaces.\n- [ ] Provider-fixture tests prove the four agent phases run in order and receive the correct pinned context and preceding artifacts.\n- [ ] The implementation prompt contains the revised final plan/checklist and preserves the final Round request as authoritative.\n- [ ] Each phase result is durable before the next launch; restart tests at every boundary resume without repeating completed phases.\n- [ ] Concurrency tests prove changed Round/claim/context/base observations conflict and cannot overwrite newer evidence.\n- [ ] Planning-phase worktree mutation is detected, retained as evidence, and blocks implementation without destructive cleanup.\n- [ ] Pause, cancellation, process exit, provider failure, and needs-input behavior remain observable and recoverable for every phase.\n- [ ] Follow-up Rounds create new planning evidence and receive relevant prior failure/Governance context.\n- [ ] Existing post-implementation commit, Guidance, Governance, Quality, Ready Merge, and Review behavior remains intact.\n- [ ] Goal modal tests cover phase state, final checklist, expandable proposal/criticism history, failure/deviation evidence, accessibility, preserved open state, and safe rendering.\n- [ ] Browser updates remain SSE-driven and introduce no polling or timer-based background observation.\n- [ ] Relevant CLI/API/MCP/export projections expose the same authoritative plan evidence without surface-specific orchestration.\n- [ ] Affected intent pages are updated consistently; focused Rust and web tests, formatting, and proportionate lint/integration checks pass.",
+          "reporter": "Buddy Williams",
+          "round": 2
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZW9253N26W35Y4218003",
+          "name": "Add governed implementation planning to In Progress",
+          "node_id": "default",
+          "priority": "high",
+          "reporter": "Refine"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Run agents, Git, quality, lifecycle, and long work through the supervised process substrate, with explicit ownership, status, logs, cancellation, failures, and recovery. When activating a new Refine build requires replacing or restarting that supervisor, a restart-safe handoff may run outside it and independently complete the upgrade. The handoff must retain durable, operation-correlated ownership and state, visible progress and failures, and restart, rollback, and recovery reconciliation.",
+              "updated": "2026-08-06T20:32:30Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "Refine",
+            "prompt": "Implement and verify this Goal.",
+            "reporter": "Refine",
+            "round": 1
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-08-11T14:04:57Z",
+      "failure_at": "2026-08-11T15:25:09Z",
+      "failure_category": "governance",
+      "failure_message": "Planning recovery and verification evidence violate governance.",
+      "governance_checked_at": "2026-08-11T15:25:06Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZW9253N26W35Y4218003-round-2",
+        "failed_actions": [
+          {
+            "message": "Durable phase-boundary recovery is broken: completed planning phases clear active_git_before, but restart recovery requires it, so interruption after persisting a proposal, criticism, or final plan can fail the Goal instead of resuming. Invalid/provider output is also not durably retained before session transcript cleanup.",
+            "rule": "Run agents, Git, quality, lifecycle, and long work through the supervised process substrate, with explicit ownership, status, logs, cancellation, failures, and recovery.",
+            "rule_id": "rule-4"
+          },
+          {
+            "message": "Focused tests cover only the happy-path sequence, one active pre-launch restart checkpoint, and worktree mutation. They do not verify recovery at every persisted phase boundary, cancellation/pause/needs-input/provider failures, stale launch fences, or active-phase attachment despite those high-risk contracts changing.",
+            "rule": "Require evidence proportional to actual architectural and operational risk, including integration or failure-path evidence for concurrency, persistence, process, recovery, and cross-surface changes.",
+            "rule_id": "rule-6"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Planning recovery and verification evidence violate governance.\",\"violations\":[{\"rule_id\":\"rule-4\",\"rule\":\"Run agents, Git, quality, lifecycle, and long work through the supervised process substrate, with explicit ownership, status, logs, cancellation, failures, and recovery.\",\"message\":\"Durable phase-boundary recovery is broken: completed planning phases clear active_git_before, but restart recovery requires it, so interruption after persisting a proposal, criticism, or final plan can fail the Goal instead of resuming. Invalid/provider output is also not durably retained before session transcript cleanup.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk, including integration or failure-path evidence for concurrency, persistence, process, recovery, and cross-surface changes.\",\"message\":\"Focused tests cover only the happy-path sequence, one active pre-launch restart checkpoint, and worktree mutation. They do not verify recovery at every persisted phase boundary, cancellation/pause/needs-input/provider failures, stale launch fences, or active-phase attachment despite those high-risk contracts changing.\"}]}",
+        "rules_checked": 9,
+        "verdict": {
+          "message": "Planning recovery and verification evidence violate governance.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "Durable phase-boundary recovery is broken: completed planning phases clear active_git_before, but restart recovery requires it, so interruption after persisting a proposal, criticism, or final plan can fail the Goal instead of resuming. Invalid/provider output is also not durably retained before session transcript cleanup.",
+              "rule": "Run agents, Git, quality, lifecycle, and long work through the supervised process substrate, with explicit ownership, status, logs, cancellation, failures, and recovery.",
+              "rule_id": "rule-4"
+            },
+            {
+              "message": "Focused tests cover only the happy-path sequence, one active pre-launch restart checkpoint, and worktree mutation. They do not verify recovery at every persisted phase boundary, cancellation/pause/needs-input/provider failures, stale launch fences, or active-phase attachment despite those high-risk contracts changing.",
+              "rule": "Require evidence proportional to actual architectural and operational risk, including integration or failure-path evidence for concurrency, persistence, process, recovery, and cross-surface changes.",
+              "rule_id": "rule-6"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZW9253N26W35Y4218003-round-2"
+      },
+      "governance_message": "Planning recovery and verification evidence violate governance.",
+      "governance_rule_actions": [
+        {
+          "message": "Durable phase-boundary recovery is broken: completed planning phases clear active_git_before, but restart recovery requires it, so interruption after persisting a proposal, criticism, or final plan can fail the Goal instead of resuming. Invalid/provider output is also not durably retained before session transcript cleanup.",
+          "rule": "Run agents, Git, quality, lifecycle, and long work through the supervised process substrate, with explicit ownership, status, logs, cancellation, failures, and recovery.",
+          "rule_id": "rule-4"
+        },
+        {
+          "message": "Focused tests cover only the happy-path sequence, one active pre-launch restart checkpoint, and worktree mutation. They do not verify recovery at every persisted phase boundary, cancellation/pause/needs-input/provider failures, stale launch fences, or active-phase attachment despite those high-risk contracts changing.",
+          "rule": "Require evidence proportional to actual architectural and operational risk, including integration or failure-path evidence for concurrency, persistence, process, recovery, and cross-surface changes.",
+          "rule_id": "rule-6"
+        }
+      ],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-11T15:21:51Z",
+        "skipped": []
+      },
+      "implementation_report": "Implemented typed per-Round implementation_plan evidence; fenced, supervised Plan/Criticize/Revise/Implement orchestration; immutable artifacts and checklist outcomes; worktree mutation detection; restart checkpoints; shared CLI/API/MCP/export/browser detail; SSE-only accessible UI; and affected intent docs. Verification: cargo test --lib -- --test-threads=1 passed 764, ignored 6; cargo test --lib workflow::tests::implementation_planning -- --nocapture passed 3; cargo clippy --lib --tests -- -D warnings passed; cargo check --all-targets passed; node --test tests/web_*.test.js passed 132, skipped 21 because Playwright Chromium is unavailable; node --test tests/web_goal_detail_diagnostics.test.js passed 4; cargo fmt -- --check and git diff --check passed. A parallel cargo test --lib run exposed 3 existing shared-state/timing interference failures; each failed case passed alone and the complete serial suite passed.",
+      "implementation_reported_at": "2026-08-11T15:21:49Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Implement a one-pass governed implementation-planning pipeline for every Goal Round before repository implementation begins.\n\nProtected product intent\n\nImprove implementation alignment by asking installed native agents to reason explicitly about the Goal, repository, Product, Constitution, Governance, Guidance, and prior evidence before code is changed. Refine owns phase ordering, durable state, process supervision, identity fencing, recovery, and visible evidence; agents continue to own adaptable planning, criticism, revision, and implementation judgment. Keep this execution-time planning distinct from pre-Goal Plan Mode.\n\nRequired behavior and revised implementation plan\n\n1. Add a backward-compatible, typed, optional `implementation_plan` field to `GoalRound`. Treat it as Workflow-owned durable evidence, not an unstructured string and not surface-owned state. Preserve:\n   - a schema version and explicit phase/state;\n   - the binding to the exact Goal ID, Round index, pinned agent-context identity/digest, workflow claim/attempt, target branch, and base commit used to make the plan;\n   - the original proposed plan and checklist;\n   - the independent criticism;\n   - the revised final plan and checklist;\n   - phase timestamps, relevant managed-process/operation identities, and failure evidence.\n   Legacy Goals and Rounds without the field must continue to load and behave correctly.\n\n2. Within the existing `in-progress` workflow behavior, orchestrate these phases in order against the same pinned context and implementation worktree:\n   - Plan: launch a supervised planning agent to inspect the real repository and propose an actionable implementation plan with stable checklist item IDs, affected behavior/surfaces, Governance rationale where relevant, and intended verification evidence.\n   - Criticize: launch a fresh supervised critic with the same pinned context, repository access, and proposed plan. Ask it to find material omissions, incorrect assumptions, cross-surface inconsistencies, failure/recovery gaps, and Governance conflicts. Criticism is model judgment given the full scenario, not a deterministic checklist verdict.\n   - Revise: launch a fresh supervised planning agent with the proposal and criticism. It must produce the final plan/checklist, resolving each material criticism or explaining why it does not apply.\n   - Implement: launch a fresh supervised implementation agent with the ordinary pinned Goal specification plus the final plan/checklist. The final Round request remains authoritative. The implementation agent must report completion, deviation, rejection, or blockage for every checklist item ID and record verification evidence.\n\n3. Pin the Round's existing agent context before planning and reuse that exact snapshot for all four phases and post-implementation Governance. Persist each phase result before launching the next phase. Fence every phase launch and durable update to the exact Goal, Round, claim/attempt, context, target branch, and base commit. A changed Round, claim, Governance/context binding, branch, or base must conflict visibly rather than allowing stale planning or implementation to continue.\n\n4. Make planning phases observational with respect to the repository. Use an available provider-independent read-only execution boundary where supported; in all cases inspect Git state before and after each planning/criticism/revision phase. If a non-implementation phase changes the worktree, stop, preserve the process/output and Git evidence, and fail visibly instead of silently accepting, resetting, or hiding those changes.\n\n5. Make the pipeline restartable and interruption-safe. The durable phase state must let workflow recovery resume from the first incomplete phase without rerunning completed agent judgments or overwriting their artifacts. Give every phase distinct supervised process metadata, logs, status, cancellation/pause behavior, and failure categorization. The browser/CLI attachment for an in-progress Goal must resolve the currently active phase process rather than create a duplicate agent. Preserve existing needs-input semantics where applicable.\n\n6. After implementation, retain the existing commit, Guidance selection, Governance, Quality, Ready Merge, and Review boundaries. The accepted plan is guidance for execution, not approval of the resulting code. Preserve the immutable proposed/criticized/final planning history; record actual checklist completion and discrepancies in implementation evidence rather than rewriting the accepted plan.\n\n7. Each follow-up or recovery Round receives its own implementation plan bound to that Round. Its planning context must include relevant prior Round requests, reports, failures, Governance/Quality evidence, and retained recovery evidence through the existing context contract.\n\n8. Expose the shared Round planning evidence through authoritative Goal detail capabilities so CLI, API, MCP/agent tools, exports where appropriate, and browser all observe the same data rather than duplicating planning semantics in a surface. In the Goal detail modal, add a read-only per-Round Implementation Plan card:\n   - show the current planning phase and final plan/checklist by default;\n   - make the original proposal and criticism available as expandable history;\n   - show timestamps, failures, checklist completion/deviation evidence, and active phase where useful;\n   - preserve accessible markup and modal open state;\n   - update live state only through existing SSE/reconciliation paths, with no polling, retry timers, or repeated status GETs.\n\n9. Update only affected intent documentation. At minimum reconcile execution-time implementation planning with the existing Planning, Goal Agents, In Progress, Goal surface, Process/evidence, and shared workflow consistency contracts without redefining pre-Goal Plan Mode.\n\nCriticism-driven corrections incorporated into this plan\n\nThe initial design only described a visible plan field and four prompts. This revised plan also covers typed shared ownership, immutable proposal/criticism/final evidence, restart recovery, stale-authority fencing, supervised phase identity, prevention/detection of unintended planning edits, current-process attachment, prior-Round recovery context, cross-surface access, SSE-only UI updates, and the distinction between implementation planning and existing Plan Mode.\n\nVerification checklist\n\n- [ ] Legacy plan-less Goal JSON deserializes and follows the existing implementation path or the newly defined default behavior without migration loss.\n- [ ] New Round planning evidence round-trips through the authoritative model/store and shared Goal detail interfaces.\n- [ ] Provider-fixture tests prove the four agent phases run in order and receive the correct pinned context and preceding artifacts.\n- [ ] The implementation prompt contains the revised final plan/checklist and preserves the final Round request as authoritative.\n- [ ] Each phase result is durable before the next launch; restart tests at every boundary resume without repeating completed phases.\n- [ ] Concurrency tests prove changed Round/claim/context/base observations conflict and cannot overwrite newer evidence.\n- [ ] Planning-phase worktree mutation is detected, retained as evidence, and blocks implementation without destructive cleanup.\n- [ ] Pause, cancellation, process exit, provider failure, and needs-input behavior remain observable and recoverable for every phase.\n- [ ] Follow-up Rounds create new planning evidence and receive relevant prior failure/Governance context.\n- [ ] Existing post-implementation commit, Guidance, Governance, Quality, Ready Merge, and Review behavior remains intact.\n- [ ] Goal modal tests cover phase state, final checklist, expandable proposal/criticism history, failure/deviation evidence, accessibility, preserved open state, and safe rendering.\n- [ ] Browser updates remain SSE-driven and introduce no polling or timer-based background observation.\n- [ ] Relevant CLI/API/MCP/export projections expose the same authoritative plan evidence without surface-specific orchestration.\n- [ ] Affected intent pages are updated consistently; focused Rust and web tests, formatting, and proportionate lint/integration checks pass.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "failed",
+      "updated": "2026-08-11T15:25:09Z",
+      "workflow_quality_timing": null,
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-11T15:52:00Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Recover the retained Round 2 candidate and complete governed implementation planning with deliberately simple interruption semantics.\n\nThis Round supersedes Round 2 requirement 5 and every verification item that requires automatic phase-boundary recovery, reuse of completed planning judgments after interruption, or reuse of an interrupted claim/execution identity. Governance must evaluate the simpler contract below, not the superseded resume contract.\n\nProtected product intent\n\nKeep the useful core of candidate dab57644909296e5ab1f5aecfd9f044618e9e316: every Goal Round runs supervised Plan, Criticize, Revise, and Implement phases against one pinned Round context before ordinary post-implementation Guidance, Governance, Quality, Ready Merge, and Review. Workflow owns ordering, durable shared evidence, fencing, and visible failures; agents own adaptable planning, criticism, revision, and implementation judgment. Execution-time implementation planning remains distinct from pre-Goal Plan Mode.\n\nRequired recovery\n\n1. Inspect retained candidate dab57644909296e5ab1f5aecfd9f044618e9e316 and its Round 2 Governance evidence. Reuse its valid typed model, phase orchestration, prompts, shared Goal-detail projections, browser presentation, SSE-only updates, and intent documentation where they satisfy this Round. Preserve the failed candidate, branch, logs, and prior evidence; do not merge, rewrite, or discard them.\n\n2. Retain a backward-compatible optional typed implementation_plan on GoalRound, exact Round/context/branch/base/claim-attempt fencing, immutable successful proposal/criticism/final-plan artifacts, implementation checklist outcomes, supervised phase identities, and persistence of each successful phase result before the next phase launches.\n\n3. Simplify interruption behavior:\n   - Do not automatically resume Plan, Criticize, Revise, or Implement after a workflow runner, daemon, or phase process interruption.\n   - An interruption, cancellation, or terminated provider process ends the current workflow attempt through existing shared Process and Workflow failure/settlement behavior. Preserve available process output, logs, failure evidence, branch, and worktree.\n   - A supported follow-up or recovery Round starts a completely fresh Plan -> Criticize -> Revise -> Implement pipeline with a new claim and execution identity and its own per-Round implementation_plan.\n   - Remove the candidate changes that requeue interrupted in-progress planning claims, reuse execution IDs, hydrate in-progress execution for phase resumption, or introduce Git-observation checkpoint recovery.\n   - A stale interrupted attempt must conflict and must never overwrite a newer Round, claim, context, branch, base, or planning artifact.\n\n4. Keep non-implementation phases observational. Record ordinary Git before/after observations as phase evidence and fail visibly if a planning, criticism, or revision agent changes the worktree. These observations detect forbidden edits; they are not restart checkpoints and must not create commits, refs, stashes, or a new Git checkpoint subsystem. Use a shared provider read-only execution mode where genuinely supported, with mutation detection as the provider-independent backstop.\n\n5. Keep failures inspectable without inventing a planning-specific transcript system. Compose the shared managed Process/session evidence so provider exits, invalid structured output, needs-input, cancellation, pause/stop settlement, operation/process identity, and relevant output remain visible before transient session cleanup. Durable-write or stale-authority failures must be surfaced rather than discarded by best-effort error handling.\n\n6. Keep one workflow-owned agent truth across active phases. Browser and CLI attachment must attach to the currently registered workflow phase process. During the short interval between supervised phase processes, they must report that the workflow is between phases and must not launch a diagnostic substitute for the active Goal.\n\n7. Preserve existing commit, Guidance selection, post-implementation Governance, Quality, Ready Merge, build, and Review behavior. A plan guides implementation but never approves resulting code.\n\n8. Preserve shared authoritative Goal detail across model/store, API, CLI, MCP/agent tools, exports where appropriate, and browser. Keep the accessible per-Round Implementation Plan card, immutable history, checklist outcome/deviation evidence, modal open state, safe rendering, and SSE-only live updates.\n\n9. Update only affected intent pages so they explicitly describe fresh-Round restart after interruption and do not promise phase-level resume.\n\nVerification\n\n- Legacy plan-less Goal JSON loads without migration loss, and new planning evidence round-trips through the authoritative model/store and shared Goal detail surfaces.\n- Provider-fixture coverage proves Plan -> Criticize -> Revise -> Implement ordering, pinned context reuse, preceding-artifact prompts, authoritative final Round request, final checklist reporting, and persistence before the next launch.\n- Focused interruption coverage proves the attempt fails without phase resume or execution-ID reuse, retains evidence/worktree/branch, and a follow-up Round starts from Plan with new identities.\n- Concurrency coverage proves stale Round/claim/context/base/branch observations cannot overwrite newer authority.\n- Mutation coverage proves planning edits are detected and retained without destructive cleanup.\n- Focused Process integration covers visible provider/invalid-output failure and between-phase attachment. Reuse existing shared Process tests for unchanged generic pause, cancellation, stop, and needs-input semantics; do not require a phase-boundary resume matrix for the superseded behavior.\n- Existing post-implementation workflow behavior and shared surface/SSE contracts remain intact.\n- Run focused Rust and web tests, formatting, strict lint/checks, and proportionate integration verification. Report skipped browser execution as skipped rather than passed.",
+          "reporter": "Buddy Williams",
+          "round": 3
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZW9253N26W35Y4218003",
+          "name": "Add governed implementation planning to In Progress",
+          "node_id": "default",
+          "priority": "high",
+          "reporter": "Refine"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Run agents, Git, quality, lifecycle, and long work through the supervised process substrate, with explicit ownership, status, logs, cancellation, failures, and recovery. When activating a new Refine build requires replacing or restarting that supervisor, a restart-safe handoff may run outside it and independently complete the upgrade. The handoff must retain durable, operation-correlated ownership and state, visible progress and failures, and restart, rollback, and recovery reconciliation.",
+              "updated": "2026-08-06T20:32:30Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "Refine",
+            "prompt": "Implement and verify this Goal.",
+            "reporter": "Refine",
+            "round": 1
+          },
+          {
+            "assignee": "Buddy Williams",
+            "constitution_state": "passed",
+            "governance_checked_at": "2026-08-11T15:25:06Z",
+            "governance_details": {
+              "configured": true,
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZW9253N26W35Y4218003-round-2",
+              "failed_actions": [
+                {
+                  "message": "Durable phase-boundary recovery is broken: completed planning phases clear active_git_before, but restart recovery requires it, so interruption after persisting a proposal, criticism, or final plan can fail the Goal instead of resuming. Invalid/provider output is also not durably retained before session transcript cleanup.",
+                  "rule": "Run agents, Git, quality, lifecycle, and long work through the supervised process substrate, with explicit ownership, status, logs, cancellation, failures, and recovery.",
+                  "rule_id": "rule-4"
+                },
+                {
+                  "message": "Focused tests cover only the happy-path sequence, one active pre-launch restart checkpoint, and worktree mutation. They do not verify recovery at every persisted phase boundary, cancellation/pause/needs-input/provider failures, stale launch fences, or active-phase attachment despite those high-risk contracts changing.",
+                  "rule": "Require evidence proportional to actual architectural and operational risk, including integration or failure-path evidence for concurrency, persistence, process, recovery, and cross-surface changes.",
+                  "rule_id": "rule-6"
+                }
+              ],
+              "governance_configured": true,
+              "phase": "post_implementation",
+              "provider": "codex",
+              "raw_output": "{\"status\":\"failed\",\"message\":\"Planning recovery and verification evidence violate governance.\",\"violations\":[{\"rule_id\":\"rule-4\",\"rule\":\"Run agents, Git, quality, lifecycle, and long work through the supervised process substrate, with explicit ownership, status, logs, cancellation, failures, and recovery.\",\"message\":\"Durable phase-boundary recovery is broken: completed planning phases clear active_git_before, but restart recovery requires it, so interruption after persisting a proposal, criticism, or final plan can fail the Goal instead of resuming. Invalid/provider output is also not durably retained before session transcript cleanup.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk, including integration or failure-path evidence for concurrency, persistence, process, recovery, and cross-surface changes.\",\"message\":\"Focused tests cover only the happy-path sequence, one active pre-launch restart checkpoint, and worktree mutation. They do not verify recovery at every persisted phase boundary, cancellation/pause/needs-input/provider failures, stale launch fences, or active-phase attachment despite those high-risk contracts changing.\"}]}",
+              "rules_checked": 9,
+              "verdict": {
+                "message": "Planning recovery and verification evidence violate governance.",
+                "status": "failed",
+                "violations": [
+                  {
+                    "message": "Durable phase-boundary recovery is broken: completed planning phases clear active_git_before, but restart recovery requires it, so interruption after persisting a proposal, criticism, or final plan can fail the Goal instead of resuming. Invalid/provider output is also not durably retained before session transcript cleanup.",
+                    "rule": "Run agents, Git, quality, lifecycle, and long work through the supervised process substrate, with explicit ownership, status, logs, cancellation, failures, and recovery.",
+                    "rule_id": "rule-4"
+                  },
+                  {
+                    "message": "Focused tests cover only the happy-path sequence, one active pre-launch restart checkpoint, and worktree mutation. They do not verify recovery at every persisted phase boundary, cancellation/pause/needs-input/provider failures, stale launch fences, or active-phase attachment despite those high-risk contracts changing.",
+                    "rule": "Require evidence proportional to actual architectural and operational risk, including integration or failure-path evidence for concurrency, persistence, process, recovery, and cross-surface changes.",
+                    "rule_id": "rule-6"
+                  }
+                ]
+              },
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZW9253N26W35Y4218003-round-2"
+            },
+            "governance_message": "Planning recovery and verification evidence violate governance.",
+            "governance_rule_actions": [
+              {
+                "message": "Durable phase-boundary recovery is broken: completed planning phases clear active_git_before, but restart recovery requires it, so interruption after persisting a proposal, criticism, or final plan can fail the Goal instead of resuming. Invalid/provider output is also not durably retained before session transcript cleanup.",
+                "rule": "Run agents, Git, quality, lifecycle, and long work through the supervised process substrate, with explicit ownership, status, logs, cancellation, failures, and recovery.",
+                "rule_id": "rule-4"
+              },
+              {
+                "message": "Focused tests cover only the happy-path sequence, one active pre-launch restart checkpoint, and worktree mutation. They do not verify recovery at every persisted phase boundary, cancellation/pause/needs-input/provider failures, stale launch fences, or active-phase attachment despite those high-risk contracts changing.",
+                "rule": "Require evidence proportional to actual architectural and operational risk, including integration or failure-path evidence for concurrency, persistence, process, recovery, and cross-surface changes.",
+                "rule_id": "rule-6"
+              }
+            ],
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                },
+                {
+                  "enabled": true,
+                  "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+                  "name": "Cohesive code files",
+                  "rule": "Apply whenever an agent adds or changes code files in any language."
+                }
+              ],
+              "code_files_changed": true,
+              "context_version": 1,
+              "recorded_at": "2026-08-11T15:21:51Z",
+              "skipped": []
+            },
+            "implementation_report": "Implemented typed per-Round implementation_plan evidence; fenced, supervised Plan/Criticize/Revise/Implement orchestration; immutable artifacts and checklist outcomes; worktree mutation detection; restart checkpoints; shared CLI/API/MCP/export/browser detail; SSE-only accessible UI; and affected intent docs. Verification: cargo test --lib -- --test-threads=1 passed 764, ignored 6; cargo test --lib workflow::tests::implementation_planning -- --nocapture passed 3; cargo clippy --lib --tests -- -D warnings passed; cargo check --all-targets passed; node --test tests/web_*.test.js passed 132, skipped 21 because Playwright Chromium is unavailable; node --test tests/web_goal_detail_diagnostics.test.js passed 4; cargo fmt -- --check and git diff --check passed. A parallel cargo test --lib run exposed 3 existing shared-state/timing interference failures; each failed case passed alone and the complete serial suite passed.",
+            "implementation_reported_at": "2026-08-11T15:21:49Z",
+            "meta_rule_state": "passed",
+            "product_state": "passed",
+            "prompt": "Implement a one-pass governed implementation-planning pipeline for every Goal Round before repository implementation begins.\n\nProtected product intent\n\nImprove implementation alignment by asking installed native agents to reason explicitly about the Goal, repository, Product, Constitution, Governance, Guidance, and prior evidence before code is changed. Refine owns phase ordering, durable state, process supervision, identity fencing, recovery, and visible evidence; agents continue to own adaptable planning, criticism, revision, and implementation judgment. Keep this execution-time planning distinct from pre-Goal Plan Mode.\n\nRequired behavior and revised implementation plan\n\n1. Add a backward-compatible, typed, optional `implementation_plan` field to `GoalRound`. Treat it as Workflow-owned durable evidence, not an unstructured string and not surface-owned state. Preserve:\n   - a schema version and explicit phase/state;\n   - the binding to the exact Goal ID, Round index, pinned agent-context identity/digest, workflow claim/attempt, target branch, and base commit used to make the plan;\n   - the original proposed plan and checklist;\n   - the independent criticism;\n   - the revised final plan and checklist;\n   - phase timestamps, relevant managed-process/operation identities, and failure evidence.\n   Legacy Goals and Rounds without the field must continue to load and behave correctly.\n\n2. Within the existing `in-progress` workflow behavior, orchestrate these phases in order against the same pinned context and implementation worktree:\n   - Plan: launch a supervised planning agent to inspect the real repository and propose an actionable implementation plan with stable checklist item IDs, affected behavior/surfaces, Governance rationale where relevant, and intended verification evidence.\n   - Criticize: launch a fresh supervised critic with the same pinned context, repository access, and proposed plan. Ask it to find material omissions, incorrect assumptions, cross-surface inconsistencies, failure/recovery gaps, and Governance conflicts. Criticism is model judgment given the full scenario, not a deterministic checklist verdict.\n   - Revise: launch a fresh supervised planning agent with the proposal and criticism. It must produce the final plan/checklist, resolving each material criticism or explaining why it does not apply.\n   - Implement: launch a fresh supervised implementation agent with the ordinary pinned Goal specification plus the final plan/checklist. The final Round request remains authoritative. The implementation agent must report completion, deviation, rejection, or blockage for every checklist item ID and record verification evidence.\n\n3. Pin the Round's existing agent context before planning and reuse that exact snapshot for all four phases and post-implementation Governance. Persist each phase result before launching the next phase. Fence every phase launch and durable update to the exact Goal, Round, claim/attempt, context, target branch, and base commit. A changed Round, claim, Governance/context binding, branch, or base must conflict visibly rather than allowing stale planning or implementation to continue.\n\n4. Make planning phases observational with respect to the repository. Use an available provider-independent read-only execution boundary where supported; in all cases inspect Git state before and after each planning/criticism/revision phase. If a non-implementation phase changes the worktree, stop, preserve the process/output and Git evidence, and fail visibly instead of silently accepting, resetting, or hiding those changes.\n\n5. Make the pipeline restartable and interruption-safe. The durable phase state must let workflow recovery resume from the first incomplete phase without rerunning completed agent judgments or overwriting their artifacts. Give every phase distinct supervised process metadata, logs, status, cancellation/pause behavior, and failure categorization. The browser/CLI attachment for an in-progress Goal must resolve the currently active phase process rather than create a duplicate agent. Preserve existing needs-input semantics where applicable.\n\n6. After implementation, retain the existing commit, Guidance selection, Governance, Quality, Ready Merge, and Review boundaries. The accepted plan is guidance for execution, not approval of the resulting code. Preserve the immutable proposed/criticized/final planning history; record actual checklist completion and discrepancies in implementation evidence rather than rewriting the accepted plan.\n\n7. Each follow-up or recovery Round receives its own implementation plan bound to that Round. Its planning context must include relevant prior Round requests, reports, failures, Governance/Quality evidence, and retained recovery evidence through the existing context contract.\n\n8. Expose the shared Round planning evidence through authoritative Goal detail capabilities so CLI, API, MCP/agent tools, exports where appropriate, and browser all observe the same data rather than duplicating planning semantics in a surface. In the Goal detail modal, add a read-only per-Round Implementation Plan card:\n   - show the current planning phase and final plan/checklist by default;\n   - make the original proposal and criticism available as expandable history;\n   - show timestamps, failures, checklist completion/deviation evidence, and active phase where useful;\n   - preserve accessible markup and modal open state;\n   - update live state only through existing SSE/reconciliation paths, with no polling, retry timers, or repeated status GETs.\n\n9. Update only affected intent documentation. At minimum reconcile execution-time implementation planning with the existing Planning, Goal Agents, In Progress, Goal surface, Process/evidence, and shared workflow consistency contracts without redefining pre-Goal Plan Mode.\n\nCriticism-driven corrections incorporated into this plan\n\nThe initial design only described a visible plan field and four prompts. This revised plan also covers typed shared ownership, immutable proposal/criticism/final evidence, restart recovery, stale-authority fencing, supervised phase identity, prevention/detection of unintended planning edits, current-process attachment, prior-Round recovery context, cross-surface access, SSE-only UI updates, and the distinction between implementation planning and existing Plan Mode.\n\nVerification checklist\n\n- [ ] Legacy plan-less Goal JSON deserializes and follows the existing implementation path or the newly defined default behavior without migration loss.\n- [ ] New Round planning evidence round-trips through the authoritative model/store and shared Goal detail interfaces.\n- [ ] Provider-fixture tests prove the four agent phases run in order and receive the correct pinned context and preceding artifacts.\n- [ ] The implementation prompt contains the revised final plan/checklist and preserves the final Round request as authoritative.\n- [ ] Each phase result is durable before the next launch; restart tests at every boundary resume without repeating completed phases.\n- [ ] Concurrency tests prove changed Round/claim/context/base observations conflict and cannot overwrite newer evidence.\n- [ ] Planning-phase worktree mutation is detected, retained as evidence, and blocks implementation without destructive cleanup.\n- [ ] Pause, cancellation, process exit, provider failure, and needs-input behavior remain observable and recoverable for every phase.\n- [ ] Follow-up Rounds create new planning evidence and receive relevant prior failure/Governance context.\n- [ ] Existing post-implementation commit, Guidance, Governance, Quality, Ready Merge, and Review behavior remains intact.\n- [ ] Goal modal tests cover phase state, final checklist, expandable proposal/criticism history, failure/deviation evidence, accessibility, preserved open state, and safe rendering.\n- [ ] Browser updates remain SSE-driven and introduce no polling or timer-based background observation.\n- [ ] Relevant CLI/API/MCP/export projections expose the same authoritative plan evidence without surface-specific orchestration.\n- [ ] Affected intent pages are updated consistently; focused Rust and web tests, formatting, and proportionate lint/integration checks pass.",
+            "reporter": "Buddy Williams",
+            "round": 2,
+            "rule_state": "failed"
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-08-11T15:51:48Z",
+      "failure_at": "2026-08-11T16:25:03Z",
+      "failure_category": "governance",
+      "failure_message": "Three governance violations remain in planning authority, interruption recovery, and verification.",
+      "governance_checked_at": "2026-08-11T16:25:01Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZW9253N26W35Y4218003-round-3",
+        "failed_actions": [
+          {
+            "message": "Implementation-plan evidence has two write paths. The fenced compare-and-swap writer validates claim, execution, context, branch, base, and status, but the generic Round-evaluation updater and its HTTP endpoint can replace implementation_plan with arbitrary JSON while bypassing every fence.",
+            "rule": "Compose existing capabilities before creating new machinery; each concern should have one authoritative implementation and source of truth.",
+            "rule_id": "rule-2"
+          },
+          {
+            "message": "Interactive Stop still cancels the claim and requeues the same Round to todo. That Round retains a plan bound to the cancelled claim/execution, so the next execution conflicts instead of starting the required fresh planning pipeline in a new recovery Round.",
+            "rule": "Run agents and workflow through the supervised process substrate with explicit ownership, cancellation, failures, and recovery.",
+            "rule_id": "rule-4"
+          },
+          {
+            "message": "Tests separately verify planning interruption and legacy process-stop requeue behavior, but never exercise Stop or cancellation with an implementation_plan present. The missing integration coverage leaves the incompatible same-Round requeue behavior undetected.",
+            "rule": "Require verification evidence proportional to architectural and operational risk, including integration and failure-path evidence.",
+            "rule_id": "rule-6"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Three governance violations remain in planning authority, interruption recovery, and verification.\",\"violations\":[{\"rule_id\":\"rule-2\",\"rule\":\"Compose existing capabilities before creating new machinery; each concern should have one authoritative implementation and source of truth.\",\"message\":\"Implementation-plan evidence has two write paths. The fenced compare-and-swap writer validates claim, execution, context, branch, base, and status, but the generic Round-evaluation updater and its HTTP endpoint can replace implementation_plan with arbitrary JSON while bypassing every fence.\"},{\"rule_id\":\"rule-4\",\"rule\":\"Run agents and workflow through the supervised process substrate with explicit ownership, cancellation, failures, and recovery.\",\"message\":\"Interactive Stop still cancels the claim and requeues the same Round to todo. That Round retains a plan bound to the cancelled claim/execution, so the next execution conflicts instead of starting the required fresh planning pipeline in a new recovery Round.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require verification evidence proportional to architectural and operational risk, including integration and failure-path evidence.\",\"message\":\"Tests separately verify planning interruption and legacy process-stop requeue behavior, but never exercise Stop or cancellation with an implementation_plan present. The missing integration coverage leaves the incompatible same-Round requeue behavior undetected.\"}]}",
+        "rules_checked": 9,
+        "verdict": {
+          "message": "Three governance violations remain in planning authority, interruption recovery, and verification.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "Implementation-plan evidence has two write paths. The fenced compare-and-swap writer validates claim, execution, context, branch, base, and status, but the generic Round-evaluation updater and its HTTP endpoint can replace implementation_plan with arbitrary JSON while bypassing every fence.",
+              "rule": "Compose existing capabilities before creating new machinery; each concern should have one authoritative implementation and source of truth.",
+              "rule_id": "rule-2"
+            },
+            {
+              "message": "Interactive Stop still cancels the claim and requeues the same Round to todo. That Round retains a plan bound to the cancelled claim/execution, so the next execution conflicts instead of starting the required fresh planning pipeline in a new recovery Round.",
+              "rule": "Run agents and workflow through the supervised process substrate with explicit ownership, cancellation, failures, and recovery.",
+              "rule_id": "rule-4"
+            },
+            {
+              "message": "Tests separately verify planning interruption and legacy process-stop requeue behavior, but never exercise Stop or cancellation with an implementation_plan present. The missing integration coverage leaves the incompatible same-Round requeue behavior undetected.",
+              "rule": "Require verification evidence proportional to architectural and operational risk, including integration and failure-path evidence.",
+              "rule_id": "rule-6"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZW9253N26W35Y4218003-round-3"
+      },
+      "governance_message": "Three governance violations remain in planning authority, interruption recovery, and verification.",
+      "governance_rule_actions": [
+        {
+          "message": "Implementation-plan evidence has two write paths. The fenced compare-and-swap writer validates claim, execution, context, branch, base, and status, but the generic Round-evaluation updater and its HTTP endpoint can replace implementation_plan with arbitrary JSON while bypassing every fence.",
+          "rule": "Compose existing capabilities before creating new machinery; each concern should have one authoritative implementation and source of truth.",
+          "rule_id": "rule-2"
+        },
+        {
+          "message": "Interactive Stop still cancels the claim and requeues the same Round to todo. That Round retains a plan bound to the cancelled claim/execution, so the next execution conflicts instead of starting the required fresh planning pipeline in a new recovery Round.",
+          "rule": "Run agents and workflow through the supervised process substrate with explicit ownership, cancellation, failures, and recovery.",
+          "rule_id": "rule-4"
+        },
+        {
+          "message": "Tests separately verify planning interruption and legacy process-stop requeue behavior, but never exercise Stop or cancellation with an implementation_plan present. The missing integration coverage leaves the incompatible same-Round requeue behavior undetected.",
+          "rule": "Require verification evidence proportional to architectural and operational risk, including integration and failure-path evidence.",
+          "rule_id": "rule-6"
+        }
+      ],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-11T16:21:05Z",
+        "skipped": []
+      },
+      "implementation_report": "Recovered retained candidate dab57644909296e5ab1f5aecfd9f044618e9e316 non-destructively and preserved its branch. Kept typed per-Round planning, ordered supervised Plan/Criticize/Revise/Implement, immutable artifacts, shared projections/UI/SSE, mutation detection, and intent docs. Removed in-progress claim requeue, execution-ID reuse, phase hydration, and active Git checkpoint recovery. Interruptions now durably fail the planning attempt with retained process evidence; a follow-up Round starts at Plan with new claim/execution identities. Added settlement-before-cleanup evidence for provider exits and invalid structured output, surfaced persistence conflicts, prevented between-phase diagnostic substitutes, and retained exact Round/context/branch/base/claim fencing. Verification: cargo test --lib -- --test-threads=1 passed 768, ignored 6; final focused cargo test --lib workflow::tests::implementation_planning -- --test-threads=1 passed 5 and cargo test --lib workflow_goal_agent -- --test-threads=1 passed 9; node --test tests/web_*.test.js passed 132 and skipped 21 because Playwright Chromium is unavailable; cargo clippy --lib --tests -- -D warnings passed; cargo check --all-targets passed; cargo fmt --all -- --check and git diff --check HEAD passed. An initial full Rust run concurrent with the web suite hit one unrelated 50ms timing threshold at 106.7ms; the exact test passed alone at 20.1ms and the uncontended full serial suite then passed.",
+      "implementation_reported_at": "2026-08-11T16:21:03Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Recover the retained Round 2 candidate and complete governed implementation planning with deliberately simple interruption semantics.\n\nThis Round supersedes Round 2 requirement 5 and every verification item that requires automatic phase-boundary recovery, reuse of completed planning judgments after interruption, or reuse of an interrupted claim/execution identity. Governance must evaluate the simpler contract below, not the superseded resume contract.\n\nProtected product intent\n\nKeep the useful core of candidate dab57644909296e5ab1f5aecfd9f044618e9e316: every Goal Round runs supervised Plan, Criticize, Revise, and Implement phases against one pinned Round context before ordinary post-implementation Guidance, Governance, Quality, Ready Merge, and Review. Workflow owns ordering, durable shared evidence, fencing, and visible failures; agents own adaptable planning, criticism, revision, and implementation judgment. Execution-time implementation planning remains distinct from pre-Goal Plan Mode.\n\nRequired recovery\n\n1. Inspect retained candidate dab57644909296e5ab1f5aecfd9f044618e9e316 and its Round 2 Governance evidence. Reuse its valid typed model, phase orchestration, prompts, shared Goal-detail projections, browser presentation, SSE-only updates, and intent documentation where they satisfy this Round. Preserve the failed candidate, branch, logs, and prior evidence; do not merge, rewrite, or discard them.\n\n2. Retain a backward-compatible optional typed implementation_plan on GoalRound, exact Round/context/branch/base/claim-attempt fencing, immutable successful proposal/criticism/final-plan artifacts, implementation checklist outcomes, supervised phase identities, and persistence of each successful phase result before the next phase launches.\n\n3. Simplify interruption behavior:\n   - Do not automatically resume Plan, Criticize, Revise, or Implement after a workflow runner, daemon, or phase process interruption.\n   - An interruption, cancellation, or terminated provider process ends the current workflow attempt through existing shared Process and Workflow failure/settlement behavior. Preserve available process output, logs, failure evidence, branch, and worktree.\n   - A supported follow-up or recovery Round starts a completely fresh Plan -> Criticize -> Revise -> Implement pipeline with a new claim and execution identity and its own per-Round implementation_plan.\n   - Remove the candidate changes that requeue interrupted in-progress planning claims, reuse execution IDs, hydrate in-progress execution for phase resumption, or introduce Git-observation checkpoint recovery.\n   - A stale interrupted attempt must conflict and must never overwrite a newer Round, claim, context, branch, base, or planning artifact.\n\n4. Keep non-implementation phases observational. Record ordinary Git before/after observations as phase evidence and fail visibly if a planning, criticism, or revision agent changes the worktree. These observations detect forbidden edits; they are not restart checkpoints and must not create commits, refs, stashes, or a new Git checkpoint subsystem. Use a shared provider read-only execution mode where genuinely supported, with mutation detection as the provider-independent backstop.\n\n5. Keep failures inspectable without inventing a planning-specific transcript system. Compose the shared managed Process/session evidence so provider exits, invalid structured output, needs-input, cancellation, pause/stop settlement, operation/process identity, and relevant output remain visible before transient session cleanup. Durable-write or stale-authority failures must be surfaced rather than discarded by best-effort error handling.\n\n6. Keep one workflow-owned agent truth across active phases. Browser and CLI attachment must attach to the currently registered workflow phase process. During the short interval between supervised phase processes, they must report that the workflow is between phases and must not launch a diagnostic substitute for the active Goal.\n\n7. Preserve existing commit, Guidance selection, post-implementation Governance, Quality, Ready Merge, build, and Review behavior. A plan guides implementation but never approves resulting code.\n\n8. Preserve shared authoritative Goal detail across model/store, API, CLI, MCP/agent tools, exports where appropriate, and browser. Keep the accessible per-Round Implementation Plan card, immutable history, checklist outcome/deviation evidence, modal open state, safe rendering, and SSE-only live updates.\n\n9. Update only affected intent pages so they explicitly describe fresh-Round restart after interruption and do not promise phase-level resume.\n\nVerification\n\n- Legacy plan-less Goal JSON loads without migration loss, and new planning evidence round-trips through the authoritative model/store and shared Goal detail surfaces.\n- Provider-fixture coverage proves Plan -> Criticize -> Revise -> Implement ordering, pinned context reuse, preceding-artifact prompts, authoritative final Round request, final checklist reporting, and persistence before the next launch.\n- Focused interruption coverage proves the attempt fails without phase resume or execution-ID reuse, retains evidence/worktree/branch, and a follow-up Round starts from Plan with new identities.\n- Concurrency coverage proves stale Round/claim/context/base/branch observations cannot overwrite newer authority.\n- Mutation coverage proves planning edits are detected and retained without destructive cleanup.\n- Focused Process integration covers visible provider/invalid-output failure and between-phase attachment. Reuse existing shared Process tests for unchanged generic pause, cancellation, stop, and needs-input semantics; do not require a phase-boundary resume matrix for the superseded behavior.\n- Existing post-implementation workflow behavior and shared surface/SSE contracts remain intact.\n- Run focused Rust and web tests, formatting, strict lint/checks, and proportionate integration verification. Report skipped browser execution as skipped rather than passed.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "failed",
+      "updated": "2026-08-11T16:25:04Z",
+      "workflow_quality_timing": null,
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-11T18:29:38Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Recover retained corrective candidate 3e6c1436696d49667d4708f932a8ad3d47626f84 onto current main and complete this Goal under the current reworked Governance. The retained candidate closes the prior Round 3 failures by making implementation_plan evidence writable only through the fenced Workflow authority; making interactive Stop fail an active planned attempt while retaining its branch, worktree, process, claim, capacity, and journal evidence; keeping explicit cancellation terminal; requiring retry through a fresh follow-up Round with new claim and execution identities; and adding Process, persistence, HTTP, replay, and browser integration coverage. Preserve all prior candidates, worktrees, logs, and failed Governance evidence. Revalidate the candidate against current main and current Governance, resolve only real drift, run proportionate focused and full verification, and do not approve or merge.",
+          "reporter": "Buddy Williams",
+          "round": 4
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZW9253N26W35Y4218003",
+          "name": "Add governed implementation planning to In Progress",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Refine"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "Refine",
+            "prompt": "Implement and verify this Goal.",
+            "reporter": "Refine",
+            "round": 1
+          },
+          {
+            "assignee": "Buddy Williams",
+            "constitution_state": "passed",
+            "governance_checked_at": "2026-08-11T15:25:06Z",
+            "governance_details": {
+              "configured": true,
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZW9253N26W35Y4218003-round-2",
+              "failed_actions": [
+                {
+                  "message": "Durable phase-boundary recovery is broken: completed planning phases clear active_git_before, but restart recovery requires it, so interruption after persisting a proposal, criticism, or final plan can fail the Goal instead of resuming. Invalid/provider output is also not durably retained before session transcript cleanup.",
+                  "rule": "Run agents, Git, quality, lifecycle, and long work through the supervised process substrate, with explicit ownership, status, logs, cancellation, failures, and recovery.",
+                  "rule_id": "rule-4"
+                },
+                {
+                  "message": "Focused tests cover only the happy-path sequence, one active pre-launch restart checkpoint, and worktree mutation. They do not verify recovery at every persisted phase boundary, cancellation/pause/needs-input/provider failures, stale launch fences, or active-phase attachment despite those high-risk contracts changing.",
+                  "rule": "Require evidence proportional to actual architectural and operational risk, including integration or failure-path evidence for concurrency, persistence, process, recovery, and cross-surface changes.",
+                  "rule_id": "rule-6"
+                }
+              ],
+              "governance_configured": true,
+              "phase": "post_implementation",
+              "provider": "codex",
+              "raw_output": "{\"status\":\"failed\",\"message\":\"Planning recovery and verification evidence violate governance.\",\"violations\":[{\"rule_id\":\"rule-4\",\"rule\":\"Run agents, Git, quality, lifecycle, and long work through the supervised process substrate, with explicit ownership, status, logs, cancellation, failures, and recovery.\",\"message\":\"Durable phase-boundary recovery is broken: completed planning phases clear active_git_before, but restart recovery requires it, so interruption after persisting a proposal, criticism, or final plan can fail the Goal instead of resuming. Invalid/provider output is also not durably retained before session transcript cleanup.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk, including integration or failure-path evidence for concurrency, persistence, process, recovery, and cross-surface changes.\",\"message\":\"Focused tests cover only the happy-path sequence, one active pre-launch restart checkpoint, and worktree mutation. They do not verify recovery at every persisted phase boundary, cancellation/pause/needs-input/provider failures, stale launch fences, or active-phase attachment despite those high-risk contracts changing.\"}]}",
+              "rules_checked": 9,
+              "verdict": {
+                "message": "Planning recovery and verification evidence violate governance.",
+                "status": "failed",
+                "violations": [
+                  {
+                    "message": "Durable phase-boundary recovery is broken: completed planning phases clear active_git_before, but restart recovery requires it, so interruption after persisting a proposal, criticism, or final plan can fail the Goal instead of resuming. Invalid/provider output is also not durably retained before session transcript cleanup.",
+                    "rule": "Run agents, Git, quality, lifecycle, and long work through the supervised process substrate, with explicit ownership, status, logs, cancellation, failures, and recovery.",
+                    "rule_id": "rule-4"
+                  },
+                  {
+                    "message": "Focused tests cover only the happy-path sequence, one active pre-launch restart checkpoint, and worktree mutation. They do not verify recovery at every persisted phase boundary, cancellation/pause/needs-input/provider failures, stale launch fences, or active-phase attachment despite those high-risk contracts changing.",
+                    "rule": "Require evidence proportional to actual architectural and operational risk, including integration or failure-path evidence for concurrency, persistence, process, recovery, and cross-surface changes.",
+                    "rule_id": "rule-6"
+                  }
+                ]
+              },
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZW9253N26W35Y4218003-round-2"
+            },
+            "governance_message": "Planning recovery and verification evidence violate governance.",
+            "governance_rule_actions": [
+              {
+                "message": "Durable phase-boundary recovery is broken: completed planning phases clear active_git_before, but restart recovery requires it, so interruption after persisting a proposal, criticism, or final plan can fail the Goal instead of resuming. Invalid/provider output is also not durably retained before session transcript cleanup.",
+                "rule": "Run agents, Git, quality, lifecycle, and long work through the supervised process substrate, with explicit ownership, status, logs, cancellation, failures, and recovery.",
+                "rule_id": "rule-4"
+              },
+              {
+                "message": "Focused tests cover only the happy-path sequence, one active pre-launch restart checkpoint, and worktree mutation. They do not verify recovery at every persisted phase boundary, cancellation/pause/needs-input/provider failures, stale launch fences, or active-phase attachment despite those high-risk contracts changing.",
+                "rule": "Require evidence proportional to actual architectural and operational risk, including integration or failure-path evidence for concurrency, persistence, process, recovery, and cross-surface changes.",
+                "rule_id": "rule-6"
+              }
+            ],
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                },
+                {
+                  "enabled": true,
+                  "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+                  "name": "Cohesive code files",
+                  "rule": "Apply whenever an agent adds or changes code files in any language."
+                }
+              ],
+              "code_files_changed": true,
+              "context_version": 1,
+              "recorded_at": "2026-08-11T15:21:51Z",
+              "skipped": []
+            },
+            "implementation_report": "Implemented typed per-Round implementation_plan evidence; fenced, supervised Plan/Criticize/Revise/Implement orchestration; immutable artifacts and checklist outcomes; worktree mutation detection; restart checkpoints; shared CLI/API/MCP/export/browser detail; SSE-only accessible UI; and affected intent docs. Verification: cargo test --lib -- --test-threads=1 passed 764, ignored 6; cargo test --lib workflow::tests::implementation_planning -- --nocapture passed 3; cargo clippy --lib --tests -- -D warnings passed; cargo check --all-targets passed; node --test tests/web_*.test.js passed 132, skipped 21 because Playwright Chromium is unavailable; node --test tests/web_goal_detail_diagnostics.test.js passed 4; cargo fmt -- --check and git diff --check passed. A parallel cargo test --lib run exposed 3 existing shared-state/timing interference failures; each failed case passed alone and the complete serial suite passed.",
+            "implementation_reported_at": "2026-08-11T15:21:49Z",
+            "meta_rule_state": "passed",
+            "product_state": "passed",
+            "prompt": "Implement a one-pass governed implementation-planning pipeline for every Goal Round before repository implementation begins.\n\nProtected product intent\n\nImprove implementation alignment by asking installed native agents to reason explicitly about the Goal, repository, Product, Constitution, Governance, Guidance, and prior evidence before code is changed. Refine owns phase ordering, durable state, process supervision, identity fencing, recovery, and visible evidence; agents continue to own adaptable planning, criticism, revision, and implementation judgment. Keep this execution-time planning distinct from pre-Goal Plan Mode.\n\nRequired behavior and revised implementation plan\n\n1. Add a backward-compatible, typed, optional `implementation_plan` field to `GoalRound`. Treat it as Workflow-owned durable evidence, not an unstructured string and not surface-owned state. Preserve:\n   - a schema version and explicit phase/state;\n   - the binding to the exact Goal ID, Round index, pinned agent-context identity/digest, workflow claim/attempt, target branch, and base commit used to make the plan;\n   - the original proposed plan and checklist;\n   - the independent criticism;\n   - the revised final plan and checklist;\n   - phase timestamps, relevant managed-process/operation identities, and failure evidence.\n   Legacy Goals and Rounds without the field must continue to load and behave correctly.\n\n2. Within the existing `in-progress` workflow behavior, orchestrate these phases in order against the same pinned context and implementation worktree:\n   - Plan: launch a supervised planning agent to inspect the real repository and propose an actionable implementation plan with stable checklist item IDs, affected behavior/surfaces, Governance rationale where relevant, and intended verification evidence.\n   - Criticize: launch a fresh supervised critic with the same pinned context, repository access, and proposed plan. Ask it to find material omissions, incorrect assumptions, cross-surface inconsistencies, failure/recovery gaps, and Governance conflicts. Criticism is model judgment given the full scenario, not a deterministic checklist verdict.\n   - Revise: launch a fresh supervised planning agent with the proposal and criticism. It must produce the final plan/checklist, resolving each material criticism or explaining why it does not apply.\n   - Implement: launch a fresh supervised implementation agent with the ordinary pinned Goal specification plus the final plan/checklist. The final Round request remains authoritative. The implementation agent must report completion, deviation, rejection, or blockage for every checklist item ID and record verification evidence.\n\n3. Pin the Round's existing agent context before planning and reuse that exact snapshot for all four phases and post-implementation Governance. Persist each phase result before launching the next phase. Fence every phase launch and durable update to the exact Goal, Round, claim/attempt, context, target branch, and base commit. A changed Round, claim, Governance/context binding, branch, or base must conflict visibly rather than allowing stale planning or implementation to continue.\n\n4. Make planning phases observational with respect to the repository. Use an available provider-independent read-only execution boundary where supported; in all cases inspect Git state before and after each planning/criticism/revision phase. If a non-implementation phase changes the worktree, stop, preserve the process/output and Git evidence, and fail visibly instead of silently accepting, resetting, or hiding those changes.\n\n5. Make the pipeline restartable and interruption-safe. The durable phase state must let workflow recovery resume from the first incomplete phase without rerunning completed agent judgments or overwriting their artifacts. Give every phase distinct supervised process metadata, logs, status, cancellation/pause behavior, and failure categorization. The browser/CLI attachment for an in-progress Goal must resolve the currently active phase process rather than create a duplicate agent. Preserve existing needs-input semantics where applicable.\n\n6. After implementation, retain the existing commit, Guidance selection, Governance, Quality, Ready Merge, and Review boundaries. The accepted plan is guidance for execution, not approval of the resulting code. Preserve the immutable proposed/criticized/final planning history; record actual checklist completion and discrepancies in implementation evidence rather than rewriting the accepted plan.\n\n7. Each follow-up or recovery Round receives its own implementation plan bound to that Round. Its planning context must include relevant prior Round requests, reports, failures, Governance/Quality evidence, and retained recovery evidence through the existing context contract.\n\n8. Expose the shared Round planning evidence through authoritative Goal detail capabilities so CLI, API, MCP/agent tools, exports where appropriate, and browser all observe the same data rather than duplicating planning semantics in a surface. In the Goal detail modal, add a read-only per-Round Implementation Plan card:\n   - show the current planning phase and final plan/checklist by default;\n   - make the original proposal and criticism available as expandable history;\n   - show timestamps, failures, checklist completion/deviation evidence, and active phase where useful;\n   - preserve accessible markup and modal open state;\n   - update live state only through existing SSE/reconciliation paths, with no polling, retry timers, or repeated status GETs.\n\n9. Update only affected intent documentation. At minimum reconcile execution-time implementation planning with the existing Planning, Goal Agents, In Progress, Goal surface, Process/evidence, and shared workflow consistency contracts without redefining pre-Goal Plan Mode.\n\nCriticism-driven corrections incorporated into this plan\n\nThe initial design only described a visible plan field and four prompts. This revised plan also covers typed shared ownership, immutable proposal/criticism/final evidence, restart recovery, stale-authority fencing, supervised phase identity, prevention/detection of unintended planning edits, current-process attachment, prior-Round recovery context, cross-surface access, SSE-only UI updates, and the distinction between implementation planning and existing Plan Mode.\n\nVerification checklist\n\n- [ ] Legacy plan-less Goal JSON deserializes and follows the existing implementation path or the newly defined default behavior without migration loss.\n- [ ] New Round planning evidence round-trips through the authoritative model/store and shared Goal detail interfaces.\n- [ ] Provider-fixture tests prove the four agent phases run in order and receive the correct pinned context and preceding artifacts.\n- [ ] The implementation prompt contains the revised final plan/checklist and preserves the final Round request as authoritative.\n- [ ] Each phase result is durable before the next launch; restart tests at every boundary resume without repeating completed phases.\n- [ ] Concurrency tests prove changed Round/claim/context/base observations conflict and cannot overwrite newer evidence.\n- [ ] Planning-phase worktree mutation is detected, retained as evidence, and blocks implementation without destructive cleanup.\n- [ ] Pause, cancellation, process exit, provider failure, and needs-input behavior remain observable and recoverable for every phase.\n- [ ] Follow-up Rounds create new planning evidence and receive relevant prior failure/Governance context.\n- [ ] Existing post-implementation commit, Guidance, Governance, Quality, Ready Merge, and Review behavior remains intact.\n- [ ] Goal modal tests cover phase state, final checklist, expandable proposal/criticism history, failure/deviation evidence, accessibility, preserved open state, and safe rendering.\n- [ ] Browser updates remain SSE-driven and introduce no polling or timer-based background observation.\n- [ ] Relevant CLI/API/MCP/export projections expose the same authoritative plan evidence without surface-specific orchestration.\n- [ ] Affected intent pages are updated consistently; focused Rust and web tests, formatting, and proportionate lint/integration checks pass.",
+            "reporter": "Buddy Williams",
+            "round": 2,
+            "rule_state": "failed"
+          },
+          {
+            "assignee": "Buddy Williams",
+            "constitution_state": "passed",
+            "governance_checked_at": "2026-08-11T16:25:01Z",
+            "governance_details": {
+              "configured": true,
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZW9253N26W35Y4218003-round-3",
+              "failed_actions": [
+                {
+                  "message": "Implementation-plan evidence has two write paths. The fenced compare-and-swap writer validates claim, execution, context, branch, base, and status, but the generic Round-evaluation updater and its HTTP endpoint can replace implementation_plan with arbitrary JSON while bypassing every fence.",
+                  "rule": "Compose existing capabilities before creating new machinery; each concern should have one authoritative implementation and source of truth.",
+                  "rule_id": "rule-2"
+                },
+                {
+                  "message": "Interactive Stop still cancels the claim and requeues the same Round to todo. That Round retains a plan bound to the cancelled claim/execution, so the next execution conflicts instead of starting the required fresh planning pipeline in a new recovery Round.",
+                  "rule": "Run agents and workflow through the supervised process substrate with explicit ownership, cancellation, failures, and recovery.",
+                  "rule_id": "rule-4"
+                },
+                {
+                  "message": "Tests separately verify planning interruption and legacy process-stop requeue behavior, but never exercise Stop or cancellation with an implementation_plan present. The missing integration coverage leaves the incompatible same-Round requeue behavior undetected.",
+                  "rule": "Require verification evidence proportional to architectural and operational risk, including integration and failure-path evidence.",
+                  "rule_id": "rule-6"
+                }
+              ],
+              "governance_configured": true,
+              "phase": "post_implementation",
+              "provider": "codex",
+              "raw_output": "{\"status\":\"failed\",\"message\":\"Three governance violations remain in planning authority, interruption recovery, and verification.\",\"violations\":[{\"rule_id\":\"rule-2\",\"rule\":\"Compose existing capabilities before creating new machinery; each concern should have one authoritative implementation and source of truth.\",\"message\":\"Implementation-plan evidence has two write paths. The fenced compare-and-swap writer validates claim, execution, context, branch, base, and status, but the generic Round-evaluation updater and its HTTP endpoint can replace implementation_plan with arbitrary JSON while bypassing every fence.\"},{\"rule_id\":\"rule-4\",\"rule\":\"Run agents and workflow through the supervised process substrate with explicit ownership, cancellation, failures, and recovery.\",\"message\":\"Interactive Stop still cancels the claim and requeues the same Round to todo. That Round retains a plan bound to the cancelled claim/execution, so the next execution conflicts instead of starting the required fresh planning pipeline in a new recovery Round.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require verification evidence proportional to architectural and operational risk, including integration and failure-path evidence.\",\"message\":\"Tests separately verify planning interruption and legacy process-stop requeue behavior, but never exercise Stop or cancellation with an implementation_plan present. The missing integration coverage leaves the incompatible same-Round requeue behavior undetected.\"}]}",
+              "rules_checked": 9,
+              "verdict": {
+                "message": "Three governance violations remain in planning authority, interruption recovery, and verification.",
+                "status": "failed",
+                "violations": [
+                  {
+                    "message": "Implementation-plan evidence has two write paths. The fenced compare-and-swap writer validates claim, execution, context, branch, base, and status, but the generic Round-evaluation updater and its HTTP endpoint can replace implementation_plan with arbitrary JSON while bypassing every fence.",
+                    "rule": "Compose existing capabilities before creating new machinery; each concern should have one authoritative implementation and source of truth.",
+                    "rule_id": "rule-2"
+                  },
+                  {
+                    "message": "Interactive Stop still cancels the claim and requeues the same Round to todo. That Round retains a plan bound to the cancelled claim/execution, so the next execution conflicts instead of starting the required fresh planning pipeline in a new recovery Round.",
+                    "rule": "Run agents and workflow through the supervised process substrate with explicit ownership, cancellation, failures, and recovery.",
+                    "rule_id": "rule-4"
+                  },
+                  {
+                    "message": "Tests separately verify planning interruption and legacy process-stop requeue behavior, but never exercise Stop or cancellation with an implementation_plan present. The missing integration coverage leaves the incompatible same-Round requeue behavior undetected.",
+                    "rule": "Require verification evidence proportional to architectural and operational risk, including integration and failure-path evidence.",
+                    "rule_id": "rule-6"
+                  }
+                ]
+              },
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZW9253N26W35Y4218003-round-3"
+            },
+            "governance_message": "Three governance violations remain in planning authority, interruption recovery, and verification.",
+            "governance_rule_actions": [
+              {
+                "message": "Implementation-plan evidence has two write paths. The fenced compare-and-swap writer validates claim, execution, context, branch, base, and status, but the generic Round-evaluation updater and its HTTP endpoint can replace implementation_plan with arbitrary JSON while bypassing every fence.",
+                "rule": "Compose existing capabilities before creating new machinery; each concern should have one authoritative implementation and source of truth.",
+                "rule_id": "rule-2"
+              },
+              {
+                "message": "Interactive Stop still cancels the claim and requeues the same Round to todo. That Round retains a plan bound to the cancelled claim/execution, so the next execution conflicts instead of starting the required fresh planning pipeline in a new recovery Round.",
+                "rule": "Run agents and workflow through the supervised process substrate with explicit ownership, cancellation, failures, and recovery.",
+                "rule_id": "rule-4"
+              },
+              {
+                "message": "Tests separately verify planning interruption and legacy process-stop requeue behavior, but never exercise Stop or cancellation with an implementation_plan present. The missing integration coverage leaves the incompatible same-Round requeue behavior undetected.",
+                "rule": "Require verification evidence proportional to architectural and operational risk, including integration and failure-path evidence.",
+                "rule_id": "rule-6"
+              }
+            ],
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                },
+                {
+                  "enabled": true,
+                  "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+                  "name": "Cohesive code files",
+                  "rule": "Apply whenever an agent adds or changes code files in any language."
+                }
+              ],
+              "code_files_changed": true,
+              "context_version": 1,
+              "recorded_at": "2026-08-11T16:21:05Z",
+              "skipped": []
+            },
+            "implementation_report": "Recovered retained candidate dab57644909296e5ab1f5aecfd9f044618e9e316 non-destructively and preserved its branch. Kept typed per-Round planning, ordered supervised Plan/Criticize/Revise/Implement, immutable artifacts, shared projections/UI/SSE, mutation detection, and intent docs. Removed in-progress claim requeue, execution-ID reuse, phase hydration, and active Git checkpoint recovery. Interruptions now durably fail the planning attempt with retained process evidence; a follow-up Round starts at Plan with new claim/execution identities. Added settlement-before-cleanup evidence for provider exits and invalid structured output, surfaced persistence conflicts, prevented between-phase diagnostic substitutes, and retained exact Round/context/branch/base/claim fencing. Verification: cargo test --lib -- --test-threads=1 passed 768, ignored 6; final focused cargo test --lib workflow::tests::implementation_planning -- --test-threads=1 passed 5 and cargo test --lib workflow_goal_agent -- --test-threads=1 passed 9; node --test tests/web_*.test.js passed 132 and skipped 21 because Playwright Chromium is unavailable; cargo clippy --lib --tests -- -D warnings passed; cargo check --all-targets passed; cargo fmt --all -- --check and git diff --check HEAD passed. An initial full Rust run concurrent with the web suite hit one unrelated 50ms timing threshold at 106.7ms; the exact test passed alone at 20.1ms and the uncontended full serial suite then passed.",
+            "implementation_reported_at": "2026-08-11T16:21:03Z",
+            "meta_rule_state": "passed",
+            "product_state": "passed",
+            "prompt": "Recover the retained Round 2 candidate and complete governed implementation planning with deliberately simple interruption semantics.\n\nThis Round supersedes Round 2 requirement 5 and every verification item that requires automatic phase-boundary recovery, reuse of completed planning judgments after interruption, or reuse of an interrupted claim/execution identity. Governance must evaluate the simpler contract below, not the superseded resume contract.\n\nProtected product intent\n\nKeep the useful core of candidate dab57644909296e5ab1f5aecfd9f044618e9e316: every Goal Round runs supervised Plan, Criticize, Revise, and Implement phases against one pinned Round context before ordinary post-implementation Guidance, Governance, Quality, Ready Merge, and Review. Workflow owns ordering, durable shared evidence, fencing, and visible failures; agents own adaptable planning, criticism, revision, and implementation judgment. Execution-time implementation planning remains distinct from pre-Goal Plan Mode.\n\nRequired recovery\n\n1. Inspect retained candidate dab57644909296e5ab1f5aecfd9f044618e9e316 and its Round 2 Governance evidence. Reuse its valid typed model, phase orchestration, prompts, shared Goal-detail projections, browser presentation, SSE-only updates, and intent documentation where they satisfy this Round. Preserve the failed candidate, branch, logs, and prior evidence; do not merge, rewrite, or discard them.\n\n2. Retain a backward-compatible optional typed implementation_plan on GoalRound, exact Round/context/branch/base/claim-attempt fencing, immutable successful proposal/criticism/final-plan artifacts, implementation checklist outcomes, supervised phase identities, and persistence of each successful phase result before the next phase launches.\n\n3. Simplify interruption behavior:\n   - Do not automatically resume Plan, Criticize, Revise, or Implement after a workflow runner, daemon, or phase process interruption.\n   - An interruption, cancellation, or terminated provider process ends the current workflow attempt through existing shared Process and Workflow failure/settlement behavior. Preserve available process output, logs, failure evidence, branch, and worktree.\n   - A supported follow-up or recovery Round starts a completely fresh Plan -> Criticize -> Revise -> Implement pipeline with a new claim and execution identity and its own per-Round implementation_plan.\n   - Remove the candidate changes that requeue interrupted in-progress planning claims, reuse execution IDs, hydrate in-progress execution for phase resumption, or introduce Git-observation checkpoint recovery.\n   - A stale interrupted attempt must conflict and must never overwrite a newer Round, claim, context, branch, base, or planning artifact.\n\n4. Keep non-implementation phases observational. Record ordinary Git before/after observations as phase evidence and fail visibly if a planning, criticism, or revision agent changes the worktree. These observations detect forbidden edits; they are not restart checkpoints and must not create commits, refs, stashes, or a new Git checkpoint subsystem. Use a shared provider read-only execution mode where genuinely supported, with mutation detection as the provider-independent backstop.\n\n5. Keep failures inspectable without inventing a planning-specific transcript system. Compose the shared managed Process/session evidence so provider exits, invalid structured output, needs-input, cancellation, pause/stop settlement, operation/process identity, and relevant output remain visible before transient session cleanup. Durable-write or stale-authority failures must be surfaced rather than discarded by best-effort error handling.\n\n6. Keep one workflow-owned agent truth across active phases. Browser and CLI attachment must attach to the currently registered workflow phase process. During the short interval between supervised phase processes, they must report that the workflow is between phases and must not launch a diagnostic substitute for the active Goal.\n\n7. Preserve existing commit, Guidance selection, post-implementation Governance, Quality, Ready Merge, build, and Review behavior. A plan guides implementation but never approves resulting code.\n\n8. Preserve shared authoritative Goal detail across model/store, API, CLI, MCP/agent tools, exports where appropriate, and browser. Keep the accessible per-Round Implementation Plan card, immutable history, checklist outcome/deviation evidence, modal open state, safe rendering, and SSE-only live updates.\n\n9. Update only affected intent pages so they explicitly describe fresh-Round restart after interruption and do not promise phase-level resume.\n\nVerification\n\n- Legacy plan-less Goal JSON loads without migration loss, and new planning evidence round-trips through the authoritative model/store and shared Goal detail surfaces.\n- Provider-fixture coverage proves Plan -> Criticize -> Revise -> Implement ordering, pinned context reuse, preceding-artifact prompts, authoritative final Round request, final checklist reporting, and persistence before the next launch.\n- Focused interruption coverage proves the attempt fails without phase resume or execution-ID reuse, retains evidence/worktree/branch, and a follow-up Round starts from Plan with new identities.\n- Concurrency coverage proves stale Round/claim/context/base/branch observations cannot overwrite newer authority.\n- Mutation coverage proves planning edits are detected and retained without destructive cleanup.\n- Focused Process integration covers visible provider/invalid-output failure and between-phase attachment. Reuse existing shared Process tests for unchanged generic pause, cancellation, stop, and needs-input semantics; do not require a phase-boundary resume matrix for the superseded behavior.\n- Existing post-implementation workflow behavior and shared surface/SSE contracts remain intact.\n- Run focused Rust and web tests, formatting, strict lint/checks, and proportionate integration verification. Report skipped browser execution as skipped rather than passed.",
+            "reporter": "Buddy Williams",
+            "round": 3,
+            "rule_state": "failed"
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-08-11T18:14:17Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "2026-08-11T18:39:28Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZW9253N26W35Y4218003-round-4",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No actual governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "No actual governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZW9253N26W35Y4218003-round-4"
+      },
+      "governance_message": "No actual governance rule violations found.",
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-11T18:37:01Z",
+        "skipped": []
+      },
+      "implementation_report": "Recovered retained candidate 3e6c1436696d49667d4708f932a8ad3d47626f84 exactly onto current main 7602499e as commits 0565adb2 and 35a12df2, preserving the original Round 3 branch/candidate. Verified focused planning 5/5, Process termination/replay 8/8, fenced persistence 1/1, Goal lifecycle HTTP/attachment 8/8, and Round authoring rejection 1/1; full cargo test --lib -- --test-threads=1 passed 770 with 6 ignored and 0 failed; node --test tests/web_*.test.js passed 133 with 21 skipped because Playwright Chromium is unavailable and 0 failed; cargo clippy --lib --tests -- -D warnings, cargo check --all-targets, cargo fmt --all -- --check, git diff --check HEAD~2..HEAD, retained-tree equality, and clean git status all passed.",
+      "implementation_reported_at": "2026-08-11T18:36:59Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Recover retained corrective candidate 3e6c1436696d49667d4708f932a8ad3d47626f84 onto current main and complete this Goal under the current reworked Governance. The retained candidate closes the prior Round 3 failures by making implementation_plan evidence writable only through the fenced Workflow authority; making interactive Stop fail an active planned attempt while retaining its branch, worktree, process, claim, capacity, and journal evidence; keeping explicit cancellation terminal; requiring retry through a fresh follow-up Round with new claim and execution identities; and adding Process, persistence, HTTP, replay, and browser integration coverage. Preserve all prior candidates, worktrees, logs, and failed Governance evidence. Revalidate the candidate against current main and current Governance, resolve only real drift, run proportionate focused and full verification, and do not approve or merge.",
+      "quality_checked_at": "2026-08-11T18:39:36Z",
+      "quality_details": {
+        "candidate_commit": "35a12df2d0c908535c68b35cc0d12ce2914ff661",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZW9253N26W35Y4218003-round-4",
+        "diagnostics": [
+          "No Quality tests or migrated commands are configured; evaluation was a no-op."
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "19ff21f797d45a6",
+        "results": [],
+        "source_candidate_commit": "35a12df2d0c908535c68b35cc0d12ce2914ff661"
+      },
+      "quality_message": "No Quality tests configured.",
+      "quality_state": "passed",
+      "reporter": "Buddy Williams",
+      "rule_state": "passed",
+      "updated": "2026-08-11T18:39:47Z",
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "35a12df2d0c908535c68b35cc0d12ce2914ff661",
+        "integrated_at": "2026-08-11T18:39:46.395866771+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n docs/intent/02-foundation/02-models.md             |   5 +\n docs/intent/03-capabilities/01-process.md          |  13 +-\n .../03-capabilities/02-agents/07-planning.md       |   3 +\n .../03-capabilities/02-agents/10-goal-agents.md    |  38 +-\n .../03-capabilities/03-workflow/03-in-progress.md  |  17 +\n .../03-workflow/11-consistency-contract.md         |  12 +\n .../04-surfaces/03-browser-desktop/08-goal.md      |  14 +\n src/model/goal/implementation_plan.rs              | 210 ++++++++++\n src/model/goal/mod.rs                              |   8 +\n src/process/agent_sessions.rs                      |  21 +-\n src/process/agent_sessions/session_runtime.rs      |  71 +++-\n src/process/agent_sessions/tests.rs                |   4 +-\n src/prompts/goal-agent-session.md                  |   8 +-\n src/surfaces/cli/dispatch/goals.rs                 |   4 +-\n src/surfaces/mcp/tools.rs                          |   2 +-\n .../web/static/js/features/goals-detail.js         |  54 ++-\n .../web/static/js/features/settings_processes.js   |   6 +-\n src/surfaces/web/static/js/features/toolbar.js     |   4 +-\n src/surfaces/web_server/tests/goals/lifecycle.rs   | 111 +++++\n src/surfaces/web_server/tests/goals/rounds.rs      |  15 +\n .../web_server/work_routes/file_terminal_routes.rs |  34 +-\n src/tools/host/git_worktrees/worktrees.rs          |  19 +\n src/tools/product/goal_exports/rendering.rs        |   1 +\n src/tools/product/goal_exports/summaries.rs        |  50 +++\n src/tools/product/goal_exports/tests.rs            |  19 +\n src/tools/product/process_control.rs               |  13 +-\n .../product/process_control/planning_settlement.rs |  80 ++++\n src/tools/product/process_control/receipts.rs      |  36 +-\n src/tools/product/process_control/settlement.rs    |  62 ++-\n src/tools/product/process_control/stop_intent.rs   |  15 +-\n .../process_control/termination_recovery.rs        |  21 +-\n src/tools/product/process_control/tests/intent.rs  |   2 +-\n src/tools/product/process_control/tests/mod.rs     |  80 ++++\n .../product/process_control/tests/termination.rs   | 161 ++++++++\n .../process_control/tests/worktree_retention.rs    |   4 +-\n src/tools/product/work_items/service.rs            |   4 +-\n .../work_items/service/implementation_planning.rs  | 185 +++++++++\n .../product/work_items/service/round_helpers.rs    |   1 +\n .../work_items/service/rounds_and_metadata.rs      |   6 +\n src/tools/product/work_items/service/workflow.rs   |  55 ++-\n .../product/work_items/tests/rounds_metadata.rs    | 160 +++++++\n src/workflow/behaviors/mod.rs                      |  58 ++-\n src/workflow/goal_agent_context.rs                 |   1 +\n src/workflow/goal_agent_spec.rs                    |   1 +\n src/workflow/implementation_planning/codec.rs      | 126 ++++++\n src/workflow/implementation_planning/mod.rs        | 421 +++++++++++++++++++\n src/workflow/implementation_planning/prompts.rs    |  80 ++++\n src/workflow/implementation_planning/runtime.rs    | 381 +++++++++++++++++\n src/workflow/mod.rs                                |   8 +\n src/workflow/policy.rs                             |  71 +++-\n src/workflow/tests/implementation_planning.rs      | 458 +++++++++++++++++++++\n .../tests/implementation_planning_failures.rs      | 105 +++++\n src/workflow/tests/mod.rs                          |   2 +\n tests/web_goal_detail_diagnostics.test.js          |  42 ++\n tests/web_settings_processes.test.js               |   1 +\n tests/web_supervisor_toolbar.test.js               |  36 ++\n 56 files changed, 3323 insertions(+), 96 deletions(-)\n create mode 100644 src/model/goal/implementation_plan.rs\n create mode 100644 src/tools/product/process_control/planning_settlement.rs\n create mode 100644 src/tools/product/work_items/service/implementation_planning.rs\n create mode 100644 src/workflow/implementation_planning/codec.rs\n create mode 100644 src/workflow/implementation_planning/mod.rs\n create mode 100644 src/workflow/implementation_planning/prompts.rs\n create mode 100644 src/workflow/implementation_planning/runtime.rs\n create mode 100644 src/workflow/tests/implementation_planning.rs\n create mode 100644 src/workflow/tests/implementation_planning_failures.rs",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "a38089ad57340f75eae6f38179f7c21b96ab31c2"
+      },
+      "workflow_quality_timing": "pre_merge",
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    }
+  ],
+  "status": "done",
+  "target_branch": "main",
+  "updated": "2026-08-11T18:40:28Z",
+  "workflow_revision": 65
+}

@@ -1,0 +1,700 @@
+{
+  "base_commit": "247bca00b391509fa65af11595a32616075a64e3",
+  "branch_name": "refine/00000SZ872BYCG155B60DQP005/round-3",
+  "candidate_commit": "1def9c4f4345b421ded1f592b7e1c0a651931eaa",
+  "created": "2026-07-27T00:03:38Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZ872BYCG155B60DQP005",
+  "name": "Bulk canceling items in the 'in-progress' state isn't working. I can cancel them",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-07-27T00:04:13Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Bulk canceling items in the 'in-progress' state isn't working. I can cancel them one at a time, but bulk should also work. It might not be working for other bulk movements or states. Take a look and make any allowed corrections.",
+          "reporter": "Buddy Williams",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZ872BYCG155B60DQP005",
+          "name": "Bulk canceling items in the 'in-progress' state isn't working. I can cancel them",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "unclassified",
+      "created": "2026-07-27T00:03:38Z",
+      "failure_at": "2026-07-27T00:11:58Z",
+      "failure_category": "guidance",
+      "failure_message": "Goal Agent must apply enabled Guidance whose Rule requires it for changed code files",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "guidance_decision": null,
+      "implementation_report": "Bulk status cancellation now bypasses generic automated-state and active-claim replacement guards so selected in-progress, QA, failed, and review Goals can move to cancelled, while durable node ownership and Done protection are revalidated at mutation time. Other bulk status targets retain their existing workflow guards. Updated the bulk picker explanation and affected Workflow/Goal intent pages; added service coverage for active/claimed and other source states plus a Done race, route-level API coverage, and browser modal coverage. Verification: cargo test --lib bulk: 10 passed, 0 failed; cargo test --lib: 553 passed, 0 failed; node --test tests/web_goals_bulk_reporter.test.js: 3 passed, 0 failed; node --test tests/web_*.test.js: 85 passed, 0 failed, 10 skipped because Playwright Chromium is unavailable; cargo check --all-targets: passed; cargo fmt --all -- --check: passed; node --check src/surfaces/web/static/js/features/goals-bulk.js: passed; git diff --check: passed.",
+      "implementation_reported_at": "2026-07-27T00:11:55Z",
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Bulk canceling items in the 'in-progress' state isn't working. I can cancel them one at a time, but bulk should also work. It might not be working for other bulk movements or states. Take a look and make any allowed corrections.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-07-27T00:11:58Z",
+      "workflow_quality_timing": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-07-27T01:01:34Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Recover the tested Round 1 bulk-cancel candidate from current main while preserving its commit and failure evidence. Before changing code, explicitly evaluate and record every enabled Guidance decision; the prior round failed because required Guidance for changed code files was not recorded. Keep the behavior narrow: bulk cancelled must work for selected in-progress and other cancellable Goals with the same durable ownership, active-claim settlement, Done protection, and mutation-time race revalidation as supported single cancellation, while unrelated bulk targets retain existing workflow guards. Reuse the prior focused service, route, browser, intent, full-library, formatting, check, syntax, and diff verification, adapting only for current-main conflicts or newly discovered defects.",
+          "reporter": "Buddy Williams",
+          "round": 2
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZ872BYCG155B60DQP005",
+          "name": "Bulk canceling items in the 'in-progress' state isn't working. I can cancel them",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "Buddy Williams",
+            "implementation_report": "Bulk status cancellation now bypasses generic automated-state and active-claim replacement guards so selected in-progress, QA, failed, and review Goals can move to cancelled, while durable node ownership and Done protection are revalidated at mutation time. Other bulk status targets retain their existing workflow guards. Updated the bulk picker explanation and affected Workflow/Goal intent pages; added service coverage for active/claimed and other source states plus a Done race, route-level API coverage, and browser modal coverage. Verification: cargo test --lib bulk: 10 passed, 0 failed; cargo test --lib: 553 passed, 0 failed; node --test tests/web_goals_bulk_reporter.test.js: 3 passed, 0 failed; node --test tests/web_*.test.js: 85 passed, 0 failed, 10 skipped because Playwright Chromium is unavailable; cargo check --all-targets: passed; cargo fmt --all -- --check: passed; node --check src/surfaces/web/static/js/features/goals-bulk.js: passed; git diff --check: passed.",
+            "implementation_reported_at": "2026-07-27T00:11:55Z",
+            "prompt": "Bulk canceling items in the 'in-progress' state isn't working. I can cancel them one at a time, but bulk should also work. It might not be working for other bulk movements or states. Take a look and make any allowed corrections.",
+            "reporter": "Buddy Williams",
+            "round": 1
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-07-27T01:00:38Z",
+      "failure_at": "2026-07-27T01:12:06Z",
+      "failure_category": "governance",
+      "failure_message": "Bulk cancellation changes Goal status without settling active runtime work.",
+      "governance_checked_at": "2026-07-27T01:12:03Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ872BYCG155B60DQP005-round-2",
+        "failed_actions": [
+          {
+            "message": "The new bulk-cancellation special case bypasses the existing process-control cancellation settlement and directly writes cancelled status.",
+            "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+            "rule_id": "rule-2"
+          },
+          {
+            "message": "Cancelling an active Goal does not terminate its managed process or settle its operation; the process can continue after the Goal becomes cancelled.",
+            "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+            "rule_id": "rule-4"
+          },
+          {
+            "message": "The implementation deliberately skips active-claim protection but never marks the claim cancelled or releases its capacity, leaving durable Goal and workflow state inconsistent.",
+            "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+            "rule_id": "rule-5"
+          },
+          {
+            "message": "Tests verify only the Goal status write and Done protection; none verify managed-process termination, operation cancellation, claim settlement, capacity release, or cancellation recovery despite claiming active-claim settlement.",
+            "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+            "rule_id": "rule-6"
+          }
+        ],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Bulk cancellation changes Goal status without settling active runtime work.\",\"violations\":[{\"rule_id\":\"rule-2\",\"rule\":\"Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.\",\"message\":\"The new bulk-cancellation special case bypasses the existing process-control cancellation settlement and directly writes cancelled status.\"},{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"Cancelling an active Goal does not terminate its managed process or settle its operation; the process can continue after the Goal becomes cancelled.\"},{\"rule_id\":\"rule-5\",\"rule\":\"Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.\",\"message\":\"The implementation deliberately skips active-claim protection but never marks the claim cancelled or releases its capacity, leaving durable Goal and workflow state inconsistent.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.\",\"message\":\"Tests verify only the Goal status write and Done protection; none verify managed-process termination, operation cancellation, claim settlement, capacity release, or cancellation recovery despite claiming active-claim settlement.\"}]}",
+        "rules_checked": 9,
+        "verdict": {
+          "message": "Bulk cancellation changes Goal status without settling active runtime work.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "The new bulk-cancellation special case bypasses the existing process-control cancellation settlement and directly writes cancelled status.",
+              "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "rule_id": "rule-2"
+            },
+            {
+              "message": "Cancelling an active Goal does not terminate its managed process or settle its operation; the process can continue after the Goal becomes cancelled.",
+              "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "rule_id": "rule-4"
+            },
+            {
+              "message": "The implementation deliberately skips active-claim protection but never marks the claim cancelled or releases its capacity, leaving durable Goal and workflow state inconsistent.",
+              "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "rule_id": "rule-5"
+            },
+            {
+              "message": "Tests verify only the Goal status write and Done protection; none verify managed-process termination, operation cancellation, claim settlement, capacity release, or cancellation recovery despite claiming active-claim settlement.",
+              "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "rule_id": "rule-6"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ872BYCG155B60DQP005-round-2"
+      },
+      "governance_message": "Bulk cancellation changes Goal status without settling active runtime work.",
+      "governance_rule_actions": [
+        {
+          "message": "The new bulk-cancellation special case bypasses the existing process-control cancellation settlement and directly writes cancelled status.",
+          "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+          "rule_id": "rule-2"
+        },
+        {
+          "message": "Cancelling an active Goal does not terminate its managed process or settle its operation; the process can continue after the Goal becomes cancelled.",
+          "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+          "rule_id": "rule-4"
+        },
+        {
+          "message": "The implementation deliberately skips active-claim protection but never marks the claim cancelled or releases its capacity, leaving durable Goal and workflow state inconsistent.",
+          "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+          "rule_id": "rule-5"
+        },
+        {
+          "message": "Tests verify only the Goal status write and Done protection; none verify managed-process termination, operation cancellation, claim settlement, capacity release, or cancellation recovery despite claiming active-claim settlement.",
+          "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+          "rule_id": "rule-6"
+        }
+      ],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-07-27T01:07:11Z",
+        "skipped": []
+      },
+      "implementation_report": "Recovered the intact Round 1 bulk-cancel candidate from commit 4e649749823be8593023d24343311fff69214845 onto current main with an exact matching patch ID (aa410d3cabcf6039493e4048543bb86c447d1a76) and no conflicts. Bulk cancelled now accepts selected in-progress, qa, failed, and review Goals, revalidates durable node ownership and Done protection at mutation time, permits active-claim cancellation settlement like supported single cancellation, and leaves unrelated bulk targets under their existing workflow/claim guards. Updated the bulk picker explanation plus affected Workflow and Goal intent pages; added focused service, Done-race, route, and browser coverage. Exact verification: cargo test --lib bulk: 10 passed, 0 failed, 543 filtered out; cargo test --lib: 553 passed, 0 failed; node --test tests/web_goals_bulk_reporter.test.js: 3 passed, 0 failed; node --test tests/web_*.test.js: 96 tests, 86 passed, 0 failed, 10 skipped because no Playwright Chromium build is available; cargo check --all-targets: passed; cargo fmt --all -- --check: passed; node --check src/surfaces/web/static/js/features/goals-bulk.js: passed; git diff --cached --check: passed. Final worktree has exactly eight staged candidate files and no unstaged or untracked changes.",
+      "implementation_reported_at": "2026-07-27T01:07:09Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Recover the tested Round 1 bulk-cancel candidate from current main while preserving its commit and failure evidence. Before changing code, explicitly evaluate and record every enabled Guidance decision; the prior round failed because required Guidance for changed code files was not recorded. Keep the behavior narrow: bulk cancelled must work for selected in-progress and other cancellable Goals with the same durable ownership, active-claim settlement, Done protection, and mutation-time race revalidation as supported single cancellation, while unrelated bulk targets retain existing workflow guards. Reuse the prior focused service, route, browser, intent, full-library, formatting, check, syntax, and diff verification, adapting only for current-main conflicts or newly discovered defects.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "failed",
+      "updated": "2026-07-27T01:12:06Z",
+      "workflow_quality_timing": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-07-27T01:13:50Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Recover the bulk-cancel intent from current main while preserving Round 1 and Round 2 candidates and failure evidence. Address Round 2 Governance directly: do not implement active cancellation as a status-only bulk write and do not bypass active-claim protection without settlement. Compose the existing authoritative Process, Workflow, operation-cancellation, claim, capacity, receipt, and recovery capabilities used by supported single cancellation so every selected active Goal has its managed process terminated, operation cancellation durably requested or settled, claim cancelled, capacity released, and Goal state transitioned consistently; surface per-Goal partial failures instead of reporting unsafe success. Preserve mutation-time node ownership and Done revalidation, and keep unrelated bulk targets under existing guards. Add focused service and real integration or deterministic failure-path coverage for managed-process termination, operation cancellation, claim and capacity settlement, partial batch failure, recovery and replay, concurrent state change, and inactive cancellable Goals. Explicitly evaluate and record every enabled Guidance decision before code changes, and verify UI and API surfaces remain thin over the shared capability.",
+          "reporter": "Buddy Williams",
+          "round": 3
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZ872BYCG155B60DQP005",
+          "name": "Bulk canceling items in the 'in-progress' state isn't working. I can cancel them",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Organize Refine as Foundation, Capabilities, and Surfaces. Foundation holds the durable concepts, Capabilities own the powers and product semantics, and Surfaces remain replaceable adapters.\n- Keep the foundation small and legible: Nodes, Goals, Features, target-app context, workflow state, settings, and evidence must remain explicit enough for people and agents to inspect.\n- Keep Process, Agents, and Workflow as shared capabilities. They may evolve or be replaced, but their responsibilities and composition must remain coherent across the system.\n- Preserve local ownership. Authoritative state, Git history, settings, runtime records, and agent output must be inspectable and recoverable; caches and projections must remain derived.\n- Be agent-first by using installed coding-agent CLIs and host tools through shared configuration, process supervision, workflow, and evidence rather than provider- or surface-specific product paths.\n- Treat workflow as durable state advancement, process as the observable execution substrate, and agents as actors that use both without redefining either.\n- Prefer mitigation and accountability over broad capability denial: isolation, Git, governance, quality, review, visible errors, and recovery should make powerful work safe enough to use.\n- Preserve room for architectural discovery. A better design may replace current machinery when it explains the tradeoff, protects product intent, and supplies proportionate migration and verification evidence.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It turns understandable Goals and Features into reviewable changes by coordinating explicit workflow state, supervised processes, installed coding-agent CLIs, Git isolation, quality, governance, and durable evidence across one or many Nodes. Its core promise is that powerful autonomous work remains user-owned, inspectable, recoverable, and consistent across replaceable human and agent surfaces.",
+          "rules": [
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-1",
+              "source": "manual",
+              "text": "Respect the Foundation-Capabilities-Surfaces boundary: durable concepts belong in the model and target-app foundation, product behavior and orchestration belong in shared capabilities, and UI, CLI, API, desktop, and agent surfaces stay thin and semantically consistent.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-2",
+              "source": "manual",
+              "text": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-3",
+              "source": "manual",
+              "text": "Keep authoritative target-app state local, durable, inspectable, and outside the primary source worktree; keep runtime artifacts separate and projections or caches rebuildable. State-layout changes require a compatible migration or explicit transition plan.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-4",
+              "source": "manual",
+              "text": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-5",
+              "source": "manual",
+              "text": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-6",
+              "source": "manual",
+              "text": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-7",
+              "source": "manual",
+              "text": "Allow architectural evolution when a Goal states the protected product intent, explains why the new design is better, updates capability boundaries and intent docs, and provides migration, compatibility, and verification evidence proportionate to the change.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-8",
+              "source": "manual",
+              "text": "Keep Refine agent-first: delegate adaptable reasoning and execution to installed agents through shared context and tools instead of duplicating it in bespoke product logic or surface-specific controls. Add first-class functionality when it provides durable coordination, state, synchronization, supervision, evidence, recovery, accessibility, deterministic integrity, or a materially better shared human and agent surface; preserve one capability across UI, CLI, API, and MCP.",
+              "updated": "2026-07-24T10:33:10Z"
+            },
+            {
+              "created": "2026-07-24T10:33:10Z",
+              "id": "rule-9",
+              "source": "manual",
+              "text": "Use SSE as the only mechanism for live browser updates. UI code must not use periodic polling, retry loops, timers, or repeated status GETs to observe background work or state changes; use one-shot authoritative reads only for initial load, operation registration race closure, reconnect reconciliation, or explicit user refresh.",
+              "updated": "2026-07-24T10:33:10Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "Buddy Williams",
+            "implementation_report": "Bulk status cancellation now bypasses generic automated-state and active-claim replacement guards so selected in-progress, QA, failed, and review Goals can move to cancelled, while durable node ownership and Done protection are revalidated at mutation time. Other bulk status targets retain their existing workflow guards. Updated the bulk picker explanation and affected Workflow/Goal intent pages; added service coverage for active/claimed and other source states plus a Done race, route-level API coverage, and browser modal coverage. Verification: cargo test --lib bulk: 10 passed, 0 failed; cargo test --lib: 553 passed, 0 failed; node --test tests/web_goals_bulk_reporter.test.js: 3 passed, 0 failed; node --test tests/web_*.test.js: 85 passed, 0 failed, 10 skipped because Playwright Chromium is unavailable; cargo check --all-targets: passed; cargo fmt --all -- --check: passed; node --check src/surfaces/web/static/js/features/goals-bulk.js: passed; git diff --check: passed.",
+            "implementation_reported_at": "2026-07-27T00:11:55Z",
+            "prompt": "Bulk canceling items in the 'in-progress' state isn't working. I can cancel them one at a time, but bulk should also work. It might not be working for other bulk movements or states. Take a look and make any allowed corrections.",
+            "reporter": "Buddy Williams",
+            "round": 1
+          },
+          {
+            "assignee": "Buddy Williams",
+            "constitution_state": "passed",
+            "governance_checked_at": "2026-07-27T01:12:03Z",
+            "governance_details": {
+              "configured": true,
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ872BYCG155B60DQP005-round-2",
+              "failed_actions": [
+                {
+                  "message": "The new bulk-cancellation special case bypasses the existing process-control cancellation settlement and directly writes cancelled status.",
+                  "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+                  "rule_id": "rule-2"
+                },
+                {
+                  "message": "Cancelling an active Goal does not terminate its managed process or settle its operation; the process can continue after the Goal becomes cancelled.",
+                  "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+                  "rule_id": "rule-4"
+                },
+                {
+                  "message": "The implementation deliberately skips active-claim protection but never marks the claim cancelled or releases its capacity, leaving durable Goal and workflow state inconsistent.",
+                  "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+                  "rule_id": "rule-5"
+                },
+                {
+                  "message": "Tests verify only the Goal status write and Done protection; none verify managed-process termination, operation cancellation, claim settlement, capacity release, or cancellation recovery despite claiming active-claim settlement.",
+                  "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+                  "rule_id": "rule-6"
+                }
+              ],
+              "governance_configured": true,
+              "phase": "post_implementation",
+              "provider": "codex",
+              "raw_output": "{\"status\":\"failed\",\"message\":\"Bulk cancellation changes Goal status without settling active runtime work.\",\"violations\":[{\"rule_id\":\"rule-2\",\"rule\":\"Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.\",\"message\":\"The new bulk-cancellation special case bypasses the existing process-control cancellation settlement and directly writes cancelled status.\"},{\"rule_id\":\"rule-4\",\"rule\":\"Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.\",\"message\":\"Cancelling an active Goal does not terminate its managed process or settle its operation; the process can continue after the Goal becomes cancelled.\"},{\"rule_id\":\"rule-5\",\"rule\":\"Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.\",\"message\":\"The implementation deliberately skips active-claim protection but never marks the claim cancelled or releases its capacity, leaving durable Goal and workflow state inconsistent.\"},{\"rule_id\":\"rule-6\",\"rule\":\"Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.\",\"message\":\"Tests verify only the Goal status write and Done protection; none verify managed-process termination, operation cancellation, claim settlement, capacity release, or cancellation recovery despite claiming active-claim settlement.\"}]}",
+              "rules_checked": 9,
+              "verdict": {
+                "message": "Bulk cancellation changes Goal status without settling active runtime work.",
+                "status": "failed",
+                "violations": [
+                  {
+                    "message": "The new bulk-cancellation special case bypasses the existing process-control cancellation settlement and directly writes cancelled status.",
+                    "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+                    "rule_id": "rule-2"
+                  },
+                  {
+                    "message": "Cancelling an active Goal does not terminate its managed process or settle its operation; the process can continue after the Goal becomes cancelled.",
+                    "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+                    "rule_id": "rule-4"
+                  },
+                  {
+                    "message": "The implementation deliberately skips active-claim protection but never marks the claim cancelled or releases its capacity, leaving durable Goal and workflow state inconsistent.",
+                    "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+                    "rule_id": "rule-5"
+                  },
+                  {
+                    "message": "Tests verify only the Goal status write and Done protection; none verify managed-process termination, operation cancellation, claim settlement, capacity release, or cancellation recovery despite claiming active-claim settlement.",
+                    "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+                    "rule_id": "rule-6"
+                  }
+                ]
+              },
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ872BYCG155B60DQP005-round-2"
+            },
+            "governance_message": "Bulk cancellation changes Goal status without settling active runtime work.",
+            "governance_rule_actions": [
+              {
+                "message": "The new bulk-cancellation special case bypasses the existing process-control cancellation settlement and directly writes cancelled status.",
+                "rule": "Compose the existing Process, Agents, Workflow, Git, state, quality, governance, and evidence capabilities before creating new machinery. Each concern should have one authoritative implementation and source of truth unless the Goal explicitly proposes an architectural replacement.",
+                "rule_id": "rule-2"
+              },
+              {
+                "message": "Cancelling an active Goal does not terminate its managed process or settle its operation; the process can continue after the Goal becomes cancelled.",
+                "rule": "Keep the daemon and surfaces responsive by running agent, Git, quality, lifecycle, and other long-running work through the supervised process substrate with explicit ownership, status, logs, cancellation, failure feedback, and recovery.",
+                "rule_id": "rule-4"
+              },
+              {
+                "message": "The implementation deliberately skips active-claim protection but never marks the claim cancelled or releases its capacity, leaving durable Goal and workflow state inconsistent.",
+                "rule": "Coordinate parallel or distributed work explicitly through Node ownership, workflow claims and capacity, dependency or Feature ordering, and isolated Git branches or worktrees so concurrent changes remain reviewable and recoverable.",
+                "rule_id": "rule-5"
+              },
+              {
+                "message": "Tests verify only the Goal status write and Done protection; none verify managed-process termination, operation cancellation, claim settlement, capacity release, or cancellation recovery despite claiming active-claim settlement.",
+                "rule": "Require evidence proportional to actual architectural and operational risk. Verify the affected behavior with the smallest focused checks that provide confidence, including integration or failure-path evidence when a change alters concurrency, persistence, process, Git, release, recovery, or cross-surface semantics. Update only affected docs/intent pages when documented product intent or an architectural contract changes; do not require unrelated documentation or broad cleanup.",
+                "rule_id": "rule-6"
+              }
+            ],
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                },
+                {
+                  "enabled": true,
+                  "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+                  "name": "Cohesive code files",
+                  "rule": "Apply whenever an agent adds or changes code files in any language."
+                }
+              ],
+              "code_files_changed": true,
+              "context_version": 1,
+              "recorded_at": "2026-07-27T01:07:11Z",
+              "skipped": []
+            },
+            "implementation_report": "Recovered the intact Round 1 bulk-cancel candidate from commit 4e649749823be8593023d24343311fff69214845 onto current main with an exact matching patch ID (aa410d3cabcf6039493e4048543bb86c447d1a76) and no conflicts. Bulk cancelled now accepts selected in-progress, qa, failed, and review Goals, revalidates durable node ownership and Done protection at mutation time, permits active-claim cancellation settlement like supported single cancellation, and leaves unrelated bulk targets under their existing workflow/claim guards. Updated the bulk picker explanation plus affected Workflow and Goal intent pages; added focused service, Done-race, route, and browser coverage. Exact verification: cargo test --lib bulk: 10 passed, 0 failed, 543 filtered out; cargo test --lib: 553 passed, 0 failed; node --test tests/web_goals_bulk_reporter.test.js: 3 passed, 0 failed; node --test tests/web_*.test.js: 96 tests, 86 passed, 0 failed, 10 skipped because no Playwright Chromium build is available; cargo check --all-targets: passed; cargo fmt --all -- --check: passed; node --check src/surfaces/web/static/js/features/goals-bulk.js: passed; git diff --cached --check: passed. Final worktree has exactly eight staged candidate files and no unstaged or untracked changes.",
+            "implementation_reported_at": "2026-07-27T01:07:09Z",
+            "meta_rule_state": "passed",
+            "product_state": "passed",
+            "prompt": "Recover the tested Round 1 bulk-cancel candidate from current main while preserving its commit and failure evidence. Before changing code, explicitly evaluate and record every enabled Guidance decision; the prior round failed because required Guidance for changed code files was not recorded. Keep the behavior narrow: bulk cancelled must work for selected in-progress and other cancellable Goals with the same durable ownership, active-claim settlement, Done protection, and mutation-time race revalidation as supported single cancellation, while unrelated bulk targets retain existing workflow guards. Reuse the prior focused service, route, browser, intent, full-library, formatting, check, syntax, and diff verification, adapting only for current-main conflicts or newly discovered defects.",
+            "reporter": "Buddy Williams",
+            "round": 2,
+            "rule_state": "failed"
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree. Implement and verify the current Round; Refine then commits the candidate, runs configured Quality, integrates it at Ready Merge, performs any configured build and post-build Quality, and stops at human Review. Do not directly advance Goal state, approve, or merge."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-07-27T01:13:30Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "2026-07-27T01:44:30Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ872BYCG155B60DQP005-round-3",
+        "failed_actions": [],
+        "governance_configured": true,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 9,
+        "verdict": {
+          "message": "No governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ872BYCG155B60DQP005-round-3"
+      },
+      "governance_message": "No governance rule violations found.",
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-07-27T01:36:14Z",
+        "skipped": []
+      },
+      "implementation_report": "Recovered Round 2 onto current main while preserving Round 1 and Round 2 branches, then replaced status-only bulk cancellation with a shared Process/Workflow cancellation capability. Each selected active execution now receives durable operation cancellation, exact managed-process termination, journaled claim/capacity/Goal settlement, receipts, and replay; claimed-but-unstarted and inactive Goals settle through the same journal without fabricated process evidence. Bulk results continue safely across Goals and return structured per-Goal failures; Done and node ownership are revalidated at mutation time; unrelated bulk targets retain their existing guards. Single and bulk web routes are thin adapters over the shared capability, and the browser warns on partial outcomes. Added real-process and deterministic coverage for operation/process/claim/capacity settlement, inactive cancellation, partial failure, interrupted replay, and concurrent Done/node changes; updated affected Process, Workflow, Cancelled, and Goal surface intent. Exact verification: cargo test --lib process_control: 21 passed, 0 failed; cargo test --lib process_control::tests::bulk: 3 passed, 0 failed; cargo test --lib web_server_accepts_static_ui: 2 passed, 0 failed; cargo test --lib: 554 passed, 0 failed; node --test tests/web_*.test.js: 99 tests, 88 passed, 0 failed, 11 skipped because no Playwright Chromium build is available; node --test tests/web_goals_bulk_reporter.test.js: 4 passed, 0 failed; cargo check --all-targets: passed; cargo fmt --all -- --check: passed; node --check src/surfaces/web/static/js/features/goals-bulk.js: passed; git diff --cached --check: passed. Final worktree has only the staged Round 3 candidate atop the recovered Round 2 commit, with no unstaged or untracked files; earlier candidate branches remain at 4e649749 and 2e07094e.",
+      "implementation_reported_at": "2026-07-27T01:36:12Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "Recover the bulk-cancel intent from current main while preserving Round 1 and Round 2 candidates and failure evidence. Address Round 2 Governance directly: do not implement active cancellation as a status-only bulk write and do not bypass active-claim protection without settlement. Compose the existing authoritative Process, Workflow, operation-cancellation, claim, capacity, receipt, and recovery capabilities used by supported single cancellation so every selected active Goal has its managed process terminated, operation cancellation durably requested or settled, claim cancelled, capacity released, and Goal state transitioned consistently; surface per-Goal partial failures instead of reporting unsafe success. Preserve mutation-time node ownership and Done revalidation, and keep unrelated bulk targets under existing guards. Add focused service and real integration or deterministic failure-path coverage for managed-process termination, operation cancellation, claim and capacity settlement, partial batch failure, recovery and replay, concurrent state change, and inactive cancellable Goals. Explicitly evaluate and record every enabled Guidance decision before code changes, and verify UI and API surfaces remain thin over the shared capability.",
+      "quality_checked_at": "2026-07-27T01:44:39Z",
+      "quality_details": {
+        "candidate_commit": "1def9c4f4345b421ded1f592b7e1c0a651931eaa",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZ872BYCG155B60DQP005-round-3",
+        "diagnostics": [
+          "No Quality tests or migrated commands are configured; evaluation was a no-op."
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "19fa13edd813f52",
+        "results": [],
+        "source_candidate_commit": "1def9c4f4345b421ded1f592b7e1c0a651931eaa"
+      },
+      "quality_message": "No Quality tests configured.",
+      "quality_state": "passed",
+      "reporter": "Buddy Williams",
+      "rule_state": "passed",
+      "updated": "2026-07-28T16:40:49Z",
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "1def9c4f4345b421ded1f592b7e1c0a651931eaa",
+        "integrated_at": "2026-07-27T01:44:46.195428682+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n docs/intent/03-capabilities/01-process.md          |   3 +\n .../03-capabilities/03-workflow/00-overview.md     |   5 +-\n .../03-capabilities/03-workflow/10-cancelled.md    |   2 +\n .../04-surfaces/03-browser-desktop/08-goal.md      |   4 +-\n src/surfaces/web/static/js/features/goals-bulk.js  |  12 +-\n .../web_server/tests/static_surface/navigation.rs  |  36 ++-\n src/surfaces/web_server/work_routes.rs             |   5 +-\n src/surfaces/web_server/work_routes/goal_routes.rs |  13 +-\n .../work_routes/goal_routes/lifecycle.rs           |  10 +-\n .../web_server/work_routes/goal_routes/queries.rs  |  14 +\n src/tools/product/process_control.rs               |  41 ++-\n .../product/process_control/bulk_cancellation.rs   | 213 +++++++++++++\n src/tools/product/process_control/discovery.rs     |  24 +-\n src/tools/product/process_control/settlement.rs    | 126 ++++++--\n src/tools/product/process_control/termination.rs   |  19 +-\n src/tools/product/process_control/tests/bulk.rs    | 328 +++++++++++++++++++++\n src/tools/product/process_control/tests/mod.rs     |   1 +\n .../product/process_control/tests/termination.rs   |   2 +-\n src/workflow/automation.rs                         |  11 +-\n tests/web_goals_bulk_reporter.test.js              |  30 +-\n 20 files changed, 828 insertions(+), 71 deletions(-)\n create mode 100644 src/tools/product/process_control/bulk_cancellation.rs\n create mode 100644 src/tools/product/process_control/tests/bulk.rs",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "dc27da7e6f2ac48594a12076ce621bc413c90fc3"
+      },
+      "workflow_quality_timing": "pre_merge"
+    }
+  ],
+  "status": "done",
+  "target_branch": "main",
+  "updated": "2026-07-28T16:40:59Z",
+  "workflow_revision": 42
+}

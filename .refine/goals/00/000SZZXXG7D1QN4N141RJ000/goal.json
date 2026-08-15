@@ -1,0 +1,352 @@
+{
+  "base_commit": "8f0700affd519b27a566351ae8f2136e1dbb4870",
+  "branch_name": "refine/00000SZZXXG7D1QN4N141RJ000/round-1",
+  "candidate_commit": "c15b4dc1933ae4fbf60d9300a9f1f910124be40a",
+  "created": "2026-08-14T10:07:17Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000SZZXXG7D1QN4N141RJ000",
+  "name": "In the web UI, when bulk actions are submitted, there is a long delay before the",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "Buddy Williams",
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-14T10:07:18Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "In the web UI, when bulk actions are submitted, there is a long delay before they appear in the UI and toast. There needs to be a toast that says that the system is working on it asynchronously.",
+          "reporter": "Buddy Williams",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000SZZXXG7D1QN4N141RJ000",
+          "name": "In the web UI, when bulk actions are submitted, there is a long delay before the",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "assignee": "Buddy Williams",
+      "constitution_state": "passed",
+      "created": "2026-08-14T10:07:17Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_checked_at": "2026-08-14T10:35:41Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZZXXG7D1QN4N141RJ000-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "guidance_checked": 2,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "No governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZZXXG7D1QN4N141RJ000-round-1"
+      },
+      "governance_message": "No governance rule violations found.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
+      "governance_rule_actions": [],
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-14T10:16:33Z",
+        "skipped": []
+      },
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "8f0700affd519b27a566351ae8f2136e1dbb4870",
+          "context_digest": "ac890122198cd260db56b5a9818d41c256e39738f68771864a46593770d0982a",
+          "context_version": 1,
+          "goal_id": "00000SZZXXG7D1QN4N141RJ000",
+          "implementation_branch": "refine/00000SZZXXG7D1QN4N141RJ000/round-1",
+          "round_idx": 0,
+          "target_branch": "main"
+        },
+        "completed_at": "2026-08-14T10:16:33Z",
+        "criticism": {
+          "completed_at": "2026-08-14T10:11:11Z",
+          "git_after": {
+            "branch": "refine/00000SZZXXG7D1QN4N141RJ000/round-1",
+            "head_commit": "8f0700affd519b27a566351ae8f2136e1dbb4870",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000SZZXXG7D1QN4N141RJ000/round-1",
+            "head_commit": "8f0700affd519b27a566351ae8f2136e1dbb4870",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P1",
+                  "P2"
+                ],
+                "description": "The checklist does not require a test that keeps the bulk request pending and proves the asynchronous-work toast is emitted before the request resolves, so an implementation could preserve the reported delay while appearing covered by ordinary immediate-response tests.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Require focused tests for the Goals bulk panel and equivalent command path that assert the toast appears while the API promise is pending and that a later background-operation response does not emit a duplicate notice."
+              }
+            ],
+            "summary": "Add a deterministic timing regression check before implementation."
+          },
+          "started_at": "2026-08-14T10:10:05Z"
+        },
+        "final_plan": {
+          "completed_at": "2026-08-14T10:11:58Z",
+          "git_after": {
+            "branch": "refine/00000SZZXXG7D1QN4N141RJ000/round-1",
+            "head_commit": "8f0700affd519b27a566351ae8f2136e1dbb4870",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000SZZXXG7D1QN4N141RJ000/round-1",
+            "head_commit": "8f0700affd519b27a566351ae8f2136e1dbb4870",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Define one cohesive Goals bulk-submission feedback path that emits the working-asynchronously toast before awaiting the request and suppresses a duplicate notice when the response contains a background operation.",
+                "id": "P1"
+              },
+              {
+                "description": "Apply the immediate feedback path consistently to the Goals bulk-actions panel and equivalent web command actions while retaining their existing success, partial-failure, error, and post-completion refresh behavior.",
+                "id": "P2"
+              },
+              {
+                "description": "Add focused tests for the Goals bulk panel and equivalent command path that hold the API promise pending, assert the toast appears before settlement, and confirm a later background-operation response does not emit a duplicate notice.",
+                "id": "P3"
+              },
+              {
+                "description": "Update the Goal browser intent page to state that confirmed bulk actions receive immediate asynchronous-work acknowledgement before their authoritative outcome is available.",
+                "id": "P4"
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "Added focused pending-promise timing tests for both bulk entry points, including duplicate suppression after a background-operation response."
+              }
+            ],
+            "summary": "The Goals web surface will immediately acknowledge each confirmed bulk submission with one informational toast that Refine is working on it asynchronously, using a shared feedback path across the bulk panel and equivalent commands so users are not left waiting while final outcomes and refreshed Goal state remain authoritative."
+          },
+          "started_at": "2026-08-14T10:11:11Z"
+        },
+        "implementation": {
+          "completed_at": "2026-08-14T10:16:33Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Added submitGoalsBulkAction in goals-bulk.js. It emits exactly one 'Refine is working on it asynchronously.' info toast before awaiting POST /api/goals/bulk, then resolves a returned background operation without passing a second notice message.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Routed openBulkModal, runBulkStatusCommand, and runFailedBackCommand through submitGoalsBulkAction while retaining existing result toasts, partial-failure warning, error handling, and Goals/Dashboard refreshes.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added tests/web_goals_bulk_async_feedback.test.js with pending API promises for both panel and command paths; each asserts acknowledgement before settlement and exactly one acknowledgement after a later operation response. Updated the existing partial-failure expectation to include the new immediate notice.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated docs/intent/04-surfaces/03-browser/08-goal.md to require immediate asynchronous-work acknowledgement before the authoritative bulk outcome.",
+                "id": "P4",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "node --test tests/web_goals_bulk_async_feedback.test.js tests/web_goals_bulk_reporter.test.js: 6 passed, 0 failed",
+              "node --test tests/web_*.test.js: 212 tests, 186 passed, 0 failed, 26 skipped because no Playwright Chromium build is available",
+              "node --check src/surfaces/web/static/js/features/goals-bulk.js: exit 0",
+              "node --check src/surfaces/web/static/js/commands.js: exit 0",
+              "cargo test --lib web_server_accepts_static_ui: 2 passed, 0 failed, 787 filtered out",
+              "git diff --check: exit 0",
+              "cargo fmt --all -- --check: exit 1; reported unrelated pre-existing formatting drift in Rust files outside this change, including src/surfaces/cli/dispatch/features.rs"
+            ]
+          },
+          "report": "Implemented immediate asynchronous acknowledgement for confirmed Goals bulk submissions through one shared path used by the bulk panel and both equivalent commands; preserved authoritative success, partial-failure, error, refresh, and background-operation settlement behavior; added pending-promise and duplicate-suppression tests; updated Goal browser intent. Exact verification: focused web tests 6/6 passed; full web suite 212 total, 186 passed, 0 failed, 26 skipped because Playwright Chromium is unavailable; JavaScript syntax checks passed; static UI Rust contract 2/2 passed; git diff check passed. Repository-wide cargo fmt check remains blocked by unrelated pre-existing Rust formatting drift.",
+          "started_at": "2026-08-14T10:11:58Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-14T10:11:58Z",
+        "proposal": {
+          "completed_at": "2026-08-14T10:10:05Z",
+          "git_after": {
+            "branch": "refine/00000SZZXXG7D1QN4N141RJ000/round-1",
+            "head_commit": "8f0700affd519b27a566351ae8f2136e1dbb4870",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000SZZXXG7D1QN4N141RJ000/round-1",
+            "head_commit": "8f0700affd519b27a566351ae8f2136e1dbb4870",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Define one cohesive Goals bulk-submission feedback path that emits the working-asynchronously toast before awaiting the request and avoids a duplicate notice when the response contains a background operation.",
+                "id": "P1"
+              },
+              {
+                "description": "Apply the immediate feedback path consistently to the Goals bulk-actions panel and equivalent web command actions while retaining their existing success, partial-failure, error, and post-completion refresh behavior.",
+                "id": "P2"
+              },
+              {
+                "description": "Update the Goal browser intent page to state that confirmed bulk actions receive immediate asynchronous-work acknowledgement before their authoritative outcome is available.",
+                "id": "P3"
+              }
+            ],
+            "summary": "The Goals web surface will acknowledge every confirmed bulk submission immediately with a clear informational toast that Refine is working on it asynchronously, so users receive prompt feedback during slow requests while existing final results and refreshed Goal state remain authoritative."
+          },
+          "started_at": "2026-08-14T10:07:18Z"
+        },
+        "schema_version": 2,
+        "started_at": "2026-08-14T10:07:18Z",
+        "state": "completed",
+        "updated_at": "2026-08-14T10:16:33Z"
+      },
+      "implementation_report": "Implemented immediate asynchronous acknowledgement for confirmed Goals bulk submissions through one shared path used by the bulk panel and both equivalent commands; preserved authoritative success, partial-failure, error, refresh, and background-operation settlement behavior; added pending-promise and duplicate-suppression tests; updated Goal browser intent. Exact verification: focused web tests 6/6 passed; full web suite 212 total, 186 passed, 0 failed, 26 skipped because Playwright Chromium is unavailable; JavaScript syntax checks passed; static UI Rust contract 2/2 passed; git diff check passed. Repository-wide cargo fmt check remains blocked by unrelated pre-existing Rust formatting drift.",
+      "implementation_reported_at": "2026-08-14T10:16:33Z",
+      "logs": [],
+      "meta_rule_state": "passed",
+      "product_state": "passed",
+      "prompt": "In the web UI, when bulk actions are submitted, there is a long delay before they appear in the UI and toast. There needs to be a toast that says that the system is working on it asynchronously.",
+      "quality_agent_report": "Quality review accepted the shared Goals bulk-submission feedback implementation and corrected focused coverage to exercise both equivalent command paths, including the failed-to-last-workflow-state command, while asserting the exact POST route and update payload. The immediate informational toast, duplicate suppression for background-operation responses, final outcome/partial-failure behavior, refresh paths, and Goal browser intent contract were preserved. Exact verification: focused Node tests 7/7 passed; full web suite 213 total, 187 passed, 0 failed, 26 skipped because Playwright Chromium is unavailable; changed JavaScript syntax checks passed; focused Rust static web/API contracts 2/2 passed; combined candidate diff check passed. cargo fmt --all -- --check exited 1 only for pre-existing formatting drift in untouched Rust files and was not changed.",
+      "quality_candidate_commit": "c15b4dc1933ae4fbf60d9300a9f1f910124be40a",
+      "quality_checked_at": "2026-08-14T10:33:31Z",
+      "quality_details": {
+        "candidate_commit": "c15b4dc1933ae4fbf60d9300a9f1f910124be40a",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000SZZXXG7D1QN4N141RJ000-round-1",
+        "diagnostics": [
+          "{\"ok\":true,\"summary\":\"Passed. Focused deterministic checks cover all affected bulk-action entry points; remaining uncertainty is limited to no real-browser rendering check.\",\"results\":[{\"test\":\"The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\",\"status\":\"passed\",\"evidence\":\"Exit 0. Node: 7 passed, 0 failed, covering immediate pre-settlement feedback, duplicate suppression, both command paths, status options, reporter behavior, and partial failures. JavaScript syntax checks passed. Rust static web/API contracts: 2 passed, 0 failed. Candidate diff check passed.\",\"command\":\"bash -lc 'set -euo pipefail\\nnode --test tests/web_goals_bulk_async_feedback.test.js tests/web_goals_bulk_reporter.test.js\\nnode --check src/surfaces/web/static/js/features/goals-bulk.js\\nnode --check src/surfaces/web/static/js/commands.js\\ncargo test --lib web_server_accepts_static_ui -- --test-threads=1\\ngit diff --check 8f0700affd519b27a566351ae8f2136e1dbb4870..HEAD'\"}]}",
+          "Observed supervised process proc-1786703611031-2164341-16 exited 0. stdout: ✔ Goals bulk panel acknowledges asynchronous work before the API settles (6.555418ms)\n✔ Goals bulk command shares immediate acknowledgement without an operation duplicate (2.498362ms)\n✔ failed Goals retry command shares immediate acknowledgement without an operation duplicate (1.738052ms)\n✔ bulk status offers review and done without automated workflow states (3.969167ms)\n✔ bulk reporter loads the reporter model before rendering its picker (0.893504ms)\n✔ bulk reporter reports a model-load failure instead of showing an empty picker (1.443856ms)\n✔ bulk cancellation surfaces per-Goal partial failure (0.914765ms)\nℹ tests 7\nℹ suites 0\nℹ pass 7\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 112.318498\n\nrunning 2 tests\ntest surfaces::web_server::tests::static_surface::navigation::web_server_accepts_static_ui_api_aliases_for_work_routes ... ok\ntest surfaces::web_server::tests::static_surface::navigation::web_server_accepts_static_ui_bulk_api_aliases ... ok\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 787 filtered out; finished in 0.31s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)"
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "19fffd43b1f2106751",
+        "results": [
+          {
+            "command": "bash -lc 'set -euo pipefail\nnode --test tests/web_goals_bulk_async_feedback.test.js tests/web_goals_bulk_reporter.test.js\nnode --check src/surfaces/web/static/js/features/goals-bulk.js\nnode --check src/surfaces/web/static/js/commands.js\ncargo test --lib web_server_accepts_static_ui -- --test-threads=1\ngit diff --check 8f0700affd519b27a566351ae8f2136e1dbb4870..HEAD'",
+            "evidence": "Observed supervised process proc-1786703611031-2164341-16 exited 0. stdout: ✔ Goals bulk panel acknowledges asynchronous work before the API settles (6.555418ms)\n✔ Goals bulk command shares immediate acknowledgement without an operation duplicate (2.498362ms)\n✔ failed Goals retry command shares immediate acknowledgement without an operation duplicate (1.738052ms)\n✔ bulk status offers review and done without automated workflow states (3.969167ms)\n✔ bulk reporter loads the reporter model before rendering its picker (0.893504ms)\n✔ bulk reporter reports a model-load failure instead of showing an empty picker (1.443856ms)\n✔ bulk cancellation surfaces per-Goal partial failure (0.914765ms)\nℹ tests 7\nℹ suites 0\nℹ pass 7\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 112.318498\n\nrunning 2 tests\ntest surfaces::web_server::tests::static_surface::navigation::web_server_accepts_static_ui_api_aliases_for_work_routes ... ok\ntest surfaces::web_server::tests::static_surface::navigation::web_server_accepts_static_ui_bulk_api_aliases ... ok\n\ntest result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 787 filtered out; finished in 0.31s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e) Agent report: Exit 0. Node: 7 passed, 0 failed, covering immediate pre-settlement feedback, duplicate suppression, both command paths, status options, reporter behavior, and partial failures. JavaScript syntax checks passed. Rust static web/API contracts: 2 passed, 0 failed. Candidate diff check passed.",
+            "exit_code": 0,
+            "process_id": "proc-1786703611031-2164341-16",
+            "status": "passed",
+            "test": "The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks."
+          }
+        ],
+        "source_candidate_commit": "c15b4dc1933ae4fbf60d9300a9f1f910124be40a"
+      },
+      "quality_message": "All Quality tests passed with observed supervised evidence.",
+      "quality_state": "passed",
+      "reporter": "Buddy Williams",
+      "rule_state": "passed",
+      "updated": "2026-08-14T10:35:46Z",
+      "workflow_attempt_authority": null,
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "c15b4dc1933ae4fbf60d9300a9f1f910124be40a",
+        "integrated_at": "2026-08-14T10:35:46.162876386+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n docs/intent/04-surfaces/03-browser/08-goal.md     |   1 +\n src/surfaces/web/static/js/commands.js            |  12 +-\n src/surfaces/web/static/js/features/goals-bulk.js |  14 ++-\n tests/web_goals_bulk_async_feedback.test.js       | 132 ++++++++++++++++++++++\n tests/web_goals_bulk_reporter.test.js             |  14 ++-\n 5 files changed, 154 insertions(+), 19 deletions(-)\n create mode 100644 tests/web_goals_bulk_async_feedback.test.js",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "0ea59abc84c932e06a2e9c06296850879d167ed8"
+      },
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    }
+  ],
+  "status": "done",
+  "target_branch": "main",
+  "updated": "2026-08-14T11:05:30Z",
+  "workflow_revision": 30
+}
