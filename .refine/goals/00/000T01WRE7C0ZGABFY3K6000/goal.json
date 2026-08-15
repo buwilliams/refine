@@ -85,15 +85,35 @@
         "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
       },
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-08-15T22:43:46Z",
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
-      "governance_candidate_commit": "",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_candidate_commit": "ac258625e54a18d9174a6f920368848a3e0c076a",
+      "governance_checked_at": "2026-08-15T23:01:27Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T01WRE7C0ZGABFY3K6000-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "guidance_checked": 2,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"Committed Round 1 has no actual governance rule violations.\",\"violations\":[],\"recovery_analysis\":\"\",\"recovery_round_prompt\":\"\"}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "Committed Round 1 has no actual governance rule violations.",
+          "recovery_analysis": "",
+          "recovery_round_prompt": "",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T01WRE7C0ZGABFY3K6000-round-1"
+      },
+      "governance_message": "Committed Round 1 has no actual governance rule violations.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
       "governance_rule_actions": [],
       "guidance_decision": {
         "applied": [
@@ -251,29 +271,88 @@
       "implementation_report": "Changed the Controls menu Node management link from #/node/application to #/node/processes, added a focused static navigation assertion for that stable destination, and documented Processes as the browser navigation intent while leaving the adjacent Node selector unchanged. Exact verification: focused static contract passed 1/1; full static-surface suite passed 20/20; Node-selector suite passed 13/13; git diff check passed. Repository-wide cargo fmt and standalone navigation-file rustfmt checks remain blocked by pre-existing formatting drift outside this Round's modified hunk.",
       "implementation_reported_at": "2026-08-15T22:50:44Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Web UI surface, Controls > Node should take the user to /#/node/processes",
       "quality_agent_report": "Quality reviewed candidate ac258625 against the finalized P1-P3 plan, implementation report, diff, intent, and tests. No code or test corrections were required and the worktree remains clean. The Controls management Node anchor now targets #/node/processes while the adjacent Node selector is unchanged; the focused static contract pins that exact menu anchor; and the browser navigation intent records Processes as the stable management destination. The implementation report's standalone-formatting caveat was corrected: rustfmt --edition 2024 --check passes for the modified navigation test file. Repository-wide cargo fmt remains blocked by pre-existing drift only in files outside this candidate. The complete Rust unit suite was attempted three times, consistently exposed two pre-existing failures outside the candidate, and then stalled after an existing test emitted a daemon SESSION_ID; all test processes started by Quality were terminated and no process remains. No merge, push, Governance approval, or commit was performed.",
       "quality_candidate_commit": "ac258625e54a18d9174a6f920368848a3e0c076a",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-08-15T22:59:05Z",
+      "quality_details": {
+        "candidate_commit": "ac258625e54a18d9174a6f920368848a3e0c076a",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T01WRE7C0ZGABFY3K6000-round-1",
+        "diagnostics": [
+          "{\"ok\":true,\"summary\":\"Candidate satisfies the Goal and relevant navigation intent; focused deterministic checks passed. Remaining uncertainty: no rendered-browser click test was run.\",\"results\":[{\"test\":\"The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\",\"status\":\"passed\",\"evidence\":\"Exit 0. Diff scope matched the three intended files; git diff --check passed; static Controls navigation contract passed 1/1; independent Node-selector behavior suite passed 13/13 with 0 failures.\",\"command\":\"bash -lc '\\nset -euo pipefail\\ncandidate_base=0b561bcd40255af2d9b651175903f64326700433\\ncandidate_expected_files=$'\\\"'\\\"'docs/intent/04-surfaces/03-browser/02-nav.md\\\\nsrc/surfaces/web/static/index.html\\\\nsrc/surfaces/web_server/tests/static_surface/navigation.rs'\\\"'\\\"'\\ncandidate_actual_files=$(git diff --name-only \\\"$candidate_base\\\"..HEAD)\\nprintf '\\\"'\\\"'Candidate files:\\\\n%s\\\\n'\\\"'\\\"' \\\"$candidate_actual_files\\\"\\ntest \\\"$candidate_actual_files\\\" = \\\"$candidate_expected_files\\\"\\ngit diff --check \\\"$candidate_base\\\"..HEAD\\ncargo test --lib static_main_nav_consolidates_context_and_controls\\nnode --test tests/web_controls_node_selector.test.js\\n'\"}]}",
+          "Observed supervised process proc-1786834744961-2918220-37 exited 0. stdout: Candidate files:\ndocs/intent/04-surfaces/03-browser/02-nav.md\nsrc/surfaces/web/static/index.html\nsrc/surfaces/web_server/tests/static_surface/navigation.rs\n\nrunning 1 test\ntest surfaces::web_server::tests::static_surface::navigation::static_main_nav_consolidates_context_and_controls ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 889 filtered out; finished in 0.00s\n\n✔ Controls Node selector maps authoritative IDs to display names and excludes archived Nodes (3.201584ms)\n✔ Controls Node selector is disabled and non-actionable while detached (0.681933ms)\n✔ attach and detach reconciliation advances context without inventing a Node selection (1.552306ms)\n✔ switching apps advances context even when both apps use the same Node ID (0.616446ms)\n✔ activation sends the exact Node ID, coalesces concurrent selection, and rereads authority (5.119375ms)\n✔ activation failure rolls the selector back to authoritative identity (0.824989ms)\n✔ a reconciliation started before activation cannot repaint the confirmed Node (0.829839ms)\n✔ a local dirty draft can veto Node activation without losing its values (0.696226ms)\n✔ a local Feature composer draft can veto Node activation (0.704607ms)\n✔ an external activation preserves a dirty draft but marks it stale and disables submission (0.857322ms)\n✔ local create, rename, and archive reconciliation redraws registry truth (1.671844ms)\n✔ two browser runtimes converge after a filtered api_mutation activation notice (302.593386ms)\n✔ a prior-generation read is rejected after authoritative Node transition (0.729281ms)\nℹ tests 13\nℹ suites 0\nℹ pass 13\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 420.325358 stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e)"
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "1a007a4a1622c874c1",
+        "provider_attempts": [
+          {
+            "accepted": true,
+            "attempt": 1,
+            "process_id": "proc-1786834625155-2918220-34",
+            "raw_output": "{\"ok\":true,\"summary\":\"Candidate satisfies the Goal and relevant navigation intent; focused deterministic checks passed. Remaining uncertainty: no rendered-browser click test was run.\",\"results\":[{\"test\":\"The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\",\"status\":\"passed\",\"evidence\":\"Exit 0. Diff scope matched the three intended files; git diff --check passed; static Controls navigation contract passed 1/1; independent Node-selector behavior suite passed 13/13 with 0 failures.\",\"command\":\"bash -lc '\\nset -euo pipefail\\ncandidate_base=0b561bcd40255af2d9b651175903f64326700433\\ncandidate_expected_files=$'\\\"'\\\"'docs/intent/04-surfaces/03-browser/02-nav.md\\\\nsrc/surfaces/web/static/index.html\\\\nsrc/surfaces/web_server/tests/static_surface/navigation.rs'\\\"'\\\"'\\ncandidate_actual_files=$(git diff --name-only \\\"$candidate_base\\\"..HEAD)\\nprintf '\\\"'\\\"'Candidate files:\\\\n%s\\\\n'\\\"'\\\"' \\\"$candidate_actual_files\\\"\\ntest \\\"$candidate_actual_files\\\" = \\\"$candidate_expected_files\\\"\\ngit diff --check \\\"$candidate_base\\\"..HEAD\\ncargo test --lib static_main_nav_consolidates_context_and_controls\\nnode --test tests/web_controls_node_selector.test.js\\n'\"}]}"
+          }
+        ],
+        "quality_proof": {
+          "checked_at": "2026-08-15T22:59:05Z",
+          "checked_candidate_commit": "ac258625e54a18d9174a6f920368848a3e0c076a",
+          "evaluation_scope": "isolated_candidate",
+          "goal_id": "00000T01WRE7C0ZGABFY3K6000",
+          "operation_id": "1a007a4a1622c874c1",
+          "results": [
+            {
+              "command": "bash -lc '\nset -euo pipefail\ncandidate_base=0b561bcd40255af2d9b651175903f64326700433\ncandidate_expected_files=$'\"'\"'docs/intent/04-surfaces/03-browser/02-nav.md\\nsrc/surfaces/web/static/index.html\\nsrc/surfaces/web_server/tests/static_surface/navigation.rs'\"'\"'\ncandidate_actual_files=$(git diff --name-only \"$candidate_base\"..HEAD)\nprintf '\"'\"'Candidate files:\\n%s\\n'\"'\"' \"$candidate_actual_files\"\ntest \"$candidate_actual_files\" = \"$candidate_expected_files\"\ngit diff --check \"$candidate_base\"..HEAD\ncargo test --lib static_main_nav_consolidates_context_and_controls\nnode --test tests/web_controls_node_selector.test.js\n'",
+              "evidence": "Observed supervised process proc-1786834744961-2918220-37 exited 0. stdout: Candidate files:\ndocs/intent/04-surfaces/03-browser/02-nav.md\nsrc/surfaces/web/static/index.html\nsrc/surfaces/web_server/tests/static_surface/navigation.rs\n\nrunning 1 test\ntest surfaces::web_server::tests::static_surface::navigation::static_main_nav_consolidates_context_and_controls ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 889 filtered out; finished in 0.00s\n\n✔ Controls Node selector maps authoritative IDs to display names and excludes archived Nodes (3.201584ms)\n✔ Controls Node selector is disabled and non-actionable while detached (0.681933ms)\n✔ attach and detach reconciliation advances context without inventing a Node selection (1.552306ms)\n✔ switching apps advances context even when both apps use the same Node ID (0.616446ms)\n✔ activation sends the exact Node ID, coalesces concurrent selection, and rereads authority (5.119375ms)\n✔ activation failure rolls the selector back to authoritative identity (0.824989ms)\n✔ a reconciliation started before activation cannot repaint the confirmed Node (0.829839ms)\n✔ a local dirty draft can veto Node activation without losing its values (0.696226ms)\n✔ a local Feature composer draft can veto Node activation (0.704607ms)\n✔ an external activation preserves a dirty draft but marks it stale and disables submission (0.857322ms)\n✔ local create, rename, and archive reconciliation redraws registry truth (1.671844ms)\n✔ two browser runtimes converge after a filtered api_mutation activation notice (302.593386ms)\n✔ a prior-generation read is rejected after authoritative Node transition (0.729281ms)\nℹ tests 13\nℹ suites 0\nℹ pass 13\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 420.325358 stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e) Agent report: Exit 0. Diff scope matched the three intended files; git diff --check passed; static Controls navigation contract passed 1/1; independent Node-selector behavior suite passed 13/13 with 0 failures.",
+              "exit_code": 0,
+              "process_id": "proc-1786834744961-2918220-37",
+              "status": "passed",
+              "test": "The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks."
+            }
+          ],
+          "round_idx": 0,
+          "schema_version": 1,
+          "source_candidate_commit": "ac258625e54a18d9174a6f920368848a3e0c076a",
+          "state": "passed"
+        },
+        "results": [
+          {
+            "command": "bash -lc '\nset -euo pipefail\ncandidate_base=0b561bcd40255af2d9b651175903f64326700433\ncandidate_expected_files=$'\"'\"'docs/intent/04-surfaces/03-browser/02-nav.md\\nsrc/surfaces/web/static/index.html\\nsrc/surfaces/web_server/tests/static_surface/navigation.rs'\"'\"'\ncandidate_actual_files=$(git diff --name-only \"$candidate_base\"..HEAD)\nprintf '\"'\"'Candidate files:\\n%s\\n'\"'\"' \"$candidate_actual_files\"\ntest \"$candidate_actual_files\" = \"$candidate_expected_files\"\ngit diff --check \"$candidate_base\"..HEAD\ncargo test --lib static_main_nav_consolidates_context_and_controls\nnode --test tests/web_controls_node_selector.test.js\n'",
+            "evidence": "Observed supervised process proc-1786834744961-2918220-37 exited 0. stdout: Candidate files:\ndocs/intent/04-surfaces/03-browser/02-nav.md\nsrc/surfaces/web/static/index.html\nsrc/surfaces/web_server/tests/static_surface/navigation.rs\n\nrunning 1 test\ntest surfaces::web_server::tests::static_surface::navigation::static_main_nav_consolidates_context_and_controls ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 889 filtered out; finished in 0.00s\n\n✔ Controls Node selector maps authoritative IDs to display names and excludes archived Nodes (3.201584ms)\n✔ Controls Node selector is disabled and non-actionable while detached (0.681933ms)\n✔ attach and detach reconciliation advances context without inventing a Node selection (1.552306ms)\n✔ switching apps advances context even when both apps use the same Node ID (0.616446ms)\n✔ activation sends the exact Node ID, coalesces concurrent selection, and rereads authority (5.119375ms)\n✔ activation failure rolls the selector back to authoritative identity (0.824989ms)\n✔ a reconciliation started before activation cannot repaint the confirmed Node (0.829839ms)\n✔ a local dirty draft can veto Node activation without losing its values (0.696226ms)\n✔ a local Feature composer draft can veto Node activation (0.704607ms)\n✔ an external activation preserves a dirty draft but marks it stale and disables submission (0.857322ms)\n✔ local create, rename, and archive reconciliation redraws registry truth (1.671844ms)\n✔ two browser runtimes converge after a filtered api_mutation activation notice (302.593386ms)\n✔ a prior-generation read is rejected after authoritative Node transition (0.729281ms)\nℹ tests 13\nℹ suites 0\nℹ pass 13\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 420.325358 stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-591d3469d7c9014e) Agent report: Exit 0. Diff scope matched the three intended files; git diff --check passed; static Controls navigation contract passed 1/1; independent Node-selector behavior suite passed 13/13 with 0 failures.",
+            "exit_code": 0,
+            "process_id": "proc-1786834744961-2918220-37",
+            "status": "passed",
+            "test": "The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks."
+          }
+        ],
+        "source_candidate_commit": "ac258625e54a18d9174a6f920368848a3e0c076a"
+      },
+      "quality_message": "All Quality tests passed with observed supervised evidence.",
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-08-15T22:57:03Z",
-      "workflow_attempt_authority": {
-        "claimed_at": "2026-08-15T22:43:46Z",
-        "round_idx": 0,
-        "workflow_revision": 2
+      "rule_state": "passed",
+      "updated": "2026-08-15T23:01:32Z",
+      "workflow_attempt_authority": null,
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "ac258625e54a18d9174a6f920368848a3e0c076a",
+        "integrated_at": "2026-08-15T23:01:32.292082177+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n docs/intent/04-surfaces/03-browser/02-nav.md               | 2 ++\n src/surfaces/web/static/index.html                         | 2 +-\n src/surfaces/web_server/tests/static_surface/navigation.rs | 3 +++\n 3 files changed, 6 insertions(+), 1 deletion(-)",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "6d284fb82c3a8bb999558fcebb3c7f0cfe9eb083"
       },
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "quality",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-08-15T22:57:03Z",
-  "workflow_revision": 21
+  "updated": "2026-08-15T23:01:32Z",
+  "workflow_revision": 27
 }
