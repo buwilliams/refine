@@ -1,7 +1,7 @@
 {
-  "base_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
-  "branch_name": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-2",
-  "candidate_commit": "404761736282119b272595ae63a09808492b4f77",
+  "base_commit": "d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f",
+  "branch_name": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-3",
+  "candidate_commit": null,
   "created": "2026-08-15T17:44:01Z",
   "feature_id": null,
   "feature_order": null,
@@ -943,10 +943,26 @@
         "source_candidate_commit": "404761736282119b272595ae63a09808492b4f77"
       },
       "quality_message": "Quality failed: “The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across aff…” — supervised command exited with code 1.",
+      "quality_recovery_analysis": "Candidate 404761736282119b272595ae63a09808492b4f77 is clean and its focused suites compile and pass; the failure exposes a real control-flow defect, not a bad test. `resolve_already_merged_quality` regenerates missing exact-candidate Quality evidence, but after receiving and durably recording `quality.ok == false` it unconditionally calls the shared resolver. Because `current_round_quality_proof` admits only passed proof, the resolver treats that valid failure as missing proof and evaluates the same candidate again; a later pass can overwrite the authoritative failure. Add an explicit fail-closed branch for the first valid failed result before resolver invocation, preserving its exact operation, candidate/source commits, scope, timestamp, results, diagnostics, and authority-fenced failure evidence. Add a semantic regression proving a fail-then-pass provider is called once and the first failure remains terminal and idempotent.",
+      "quality_recovery_attempt": 1,
+      "quality_recovery_checked_at": "2026-08-15T19:58:07Z",
+      "quality_recovery_details": {
+        "candidate_commit": "404761736282119b272595ae63a09808492b4f77",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR6626D11FDB6F9A57F6EA4B0F-round-2",
+        "phase": "quality_recovery",
+        "provider": "codex",
+        "raw_output": "{\"recovery_analysis\":\"Candidate 404761736282119b272595ae63a09808492b4f77 is clean and its focused suites compile and pass; the failure exposes a real control-flow defect, not a bad test. `resolve_already_merged_quality` regenerates missing exact-candidate Quality evidence, but after receiving and durably recording `quality.ok == false` it unconditionally calls the shared resolver. Because `current_round_quality_proof` admits only passed proof, the resolver treats that valid failure as missing proof and evaluates the same candidate again; a later pass can overwrite the authoritative failure. Add an explicit fail-closed branch for the first valid failed result before resolver invocation, preserving its exact operation, candidate/source commits, scope, timestamp, results, diagnostics, and authority-fenced failure evidence. Add a semantic regression proving a fail-then-pass provider is called once and the first failure remains terminal and idempotent.\",\"recovery_round_prompt\":\"Start a fresh Round from current main and selectively preserve the complete relevant behavior from candidate 404761736282119b272595ae63a09808492b4f77; do not blindly merge it. Preserve both retained Round worktrees and all audit evidence unchanged. Correct already-merged Quality reconciliation so `resolve_already_merged_quality` handles a valid `quality.ok == false` result immediately and fail-closed under the originating Round/workflow-revision authority without invoking any resolver or second Quality regeneration. Retain the first evaluation’s exact candidate/source identity, operation ID, isolated scope, timestamp, failed results, diagnostics, and provider attempts with an explicit already-merged Quality failure category; do not create approval, Review transition, or another evaluation from a later result. Preserve the existing passed-proof path, exact-candidate proof validation, clean-checkout regeneration, idempotent resolver behavior, output repair, candidate refresh, and recovery-budget changes. Add behavior-level regression coverage using a fail-then-pass response sequence or invocation counter that asserts exactly one Quality run, durable retention of the first failed proof, terminal fail-closed settlement, and no rerun on repeated handling. Re-run the failed Quality command, focused planning/Quality/reconciliation/refresh/already-merged/behavior suites, cargo check, scoped rustfmt and Clippy, and the broad suite while reporting unchanged baseline exclusions separately.\"}\n",
+        "verdict": {
+          "recovery_analysis": "Candidate 404761736282119b272595ae63a09808492b4f77 is clean and its focused suites compile and pass; the failure exposes a real control-flow defect, not a bad test. `resolve_already_merged_quality` regenerates missing exact-candidate Quality evidence, but after receiving and durably recording `quality.ok == false` it unconditionally calls the shared resolver. Because `current_round_quality_proof` admits only passed proof, the resolver treats that valid failure as missing proof and evaluates the same candidate again; a later pass can overwrite the authoritative failure. Add an explicit fail-closed branch for the first valid failed result before resolver invocation, preserving its exact operation, candidate/source commits, scope, timestamp, results, diagnostics, and authority-fenced failure evidence. Add a semantic regression proving a fail-then-pass provider is called once and the first failure remains terminal and idempotent.",
+          "recovery_round_prompt": "Start a fresh Round from current main and selectively preserve the complete relevant behavior from candidate 404761736282119b272595ae63a09808492b4f77; do not blindly merge it. Preserve both retained Round worktrees and all audit evidence unchanged. Correct already-merged Quality reconciliation so `resolve_already_merged_quality` handles a valid `quality.ok == false` result immediately and fail-closed under the originating Round/workflow-revision authority without invoking any resolver or second Quality regeneration. Retain the first evaluation’s exact candidate/source identity, operation ID, isolated scope, timestamp, failed results, diagnostics, and provider attempts with an explicit already-merged Quality failure category; do not create approval, Review transition, or another evaluation from a later result. Preserve the existing passed-proof path, exact-candidate proof validation, clean-checkout regeneration, idempotent resolver behavior, output repair, candidate refresh, and recovery-budget changes. Add behavior-level regression coverage using a fail-then-pass response sequence or invocation counter that asserts exactly one Quality run, durable retention of the first failed proof, terminal fail-closed settlement, and no rerun on repeated handling. Re-run the failed Quality command, focused planning/Quality/reconciliation/refresh/already-merged/behavior suites, cargo check, scoped rustfmt and Clippy, and the broad suite while reporting unchanged baseline exclusions separately."
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR6626D11FDB6F9A57F6EA4B0F-round-2"
+      },
+      "quality_recovery_round_prompt": "Start a fresh Round from current main and selectively preserve the complete relevant behavior from candidate 404761736282119b272595ae63a09808492b4f77; do not blindly merge it. Preserve both retained Round worktrees and all audit evidence unchanged. Correct already-merged Quality reconciliation so `resolve_already_merged_quality` handles a valid `quality.ok == false` result immediately and fail-closed under the originating Round/workflow-revision authority without invoking any resolver or second Quality regeneration. Retain the first evaluation’s exact candidate/source identity, operation ID, isolated scope, timestamp, failed results, diagnostics, and provider attempts with an explicit already-merged Quality failure category; do not create approval, Review transition, or another evaluation from a later result. Preserve the existing passed-proof path, exact-candidate proof validation, clean-checkout regeneration, idempotent resolver behavior, output repair, candidate refresh, and recovery-budget changes. Add behavior-level regression coverage using a fail-then-pass response sequence or invocation counter that asserts exactly one Quality run, durable retention of the first failed proof, terminal fail-closed settlement, and no rerun on repeated handling. Re-run the failed Quality command, focused planning/Quality/reconciliation/refresh/already-merged/behavior suites, cargo check, scoped rustfmt and Clippy, and the broad suite while reporting unchanged baseline exclusions separately.",
       "quality_state": "failed",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T19:53:59Z",
+      "updated": "2026-08-15T19:58:07Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T18:58:48Z",
         "round_idx": 1,
@@ -954,10 +970,687 @@
       },
       "workflow_reconciliation": null,
       "workflow_recovery": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-15T19:58:08Z",
+        "current_round": {
+          "assignee": "Refine",
+          "prompt": "Start a fresh Round from current main and selectively preserve the complete relevant behavior from candidate 404761736282119b272595ae63a09808492b4f77; do not blindly merge it. Preserve both retained Round worktrees and all audit evidence unchanged. Correct already-merged Quality reconciliation so `resolve_already_merged_quality` handles a valid `quality.ok == false` result immediately and fail-closed under the originating Round/workflow-revision authority without invoking any resolver or second Quality regeneration. Retain the first evaluation’s exact candidate/source identity, operation ID, isolated scope, timestamp, failed results, diagnostics, and provider attempts with an explicit already-merged Quality failure category; do not create approval, Review transition, or another evaluation from a later result. Preserve the existing passed-proof path, exact-candidate proof validation, clean-checkout regeneration, idempotent resolver behavior, output repair, candidate refresh, and recovery-budget changes. Add behavior-level regression coverage using a fail-then-pass response sequence or invocation counter that asserts exactly one Quality run, durable retention of the first failed proof, terminal fail-closed settlement, and no rerun on repeated handling. Re-run the failed Quality command, focused planning/Quality/reconciliation/refresh/already-merged/behavior suites, cargo check, scoped rustfmt and Clippy, and the broad suite while reporting unchanged baseline exclusions separately.",
+          "reporter": "Refine",
+          "round": 3
+        },
+        "goal": {
+          "assignee": "Refine",
+          "id": "DR6626D11FDB6F9A57F6EA4B0F",
+          "name": "Refine Bug Report �X Goal failures are dominated by harness/infra faults, not implementation defects",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "Buddy Williams",
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+                "context_digest": "1a126a4d7f00187879bb4b984eb8734195ed81c8969916373548e3206d166e3b",
+                "context_version": 1,
+                "goal_id": "DR6626D11FDB6F9A57F6EA4B0F",
+                "implementation_branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-1",
+                "round_idx": 0,
+                "target_branch": "main"
+              },
+              "criticism": {
+                "completed_at": "2026-08-15T17:50:28Z",
+                "git_after": {
+                  "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-1",
+                  "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-1",
+                  "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "findings": [
+                    {
+                      "checklist_item_ids": [
+                        "P4",
+                        "P5"
+                      ],
+                      "description": "The plan never defines which durable Quality artifact is compatible or how it remains bound to the exact current-Round candidate, so it could either keep rejecting the reported cases when evidence is absent or unsafely accept a later shared-target result by ancestry.",
+                      "id": "C1",
+                      "material": true,
+                      "recommendation": "Specify the admissible artifact fields and exact identity relation; preserve or recover candidate-bound passed evidence, and require a new exact-candidate Quality run when that proof cannot be reconstructed."
+                    },
+                    {
+                      "checklist_item_ids": [
+                        "P6",
+                        "P7"
+                      ],
+                      "description": "The repository raises stale_candidate when the recorded base is not an ancestor of the candidate, which is a provenance mismatch rather than ordinary target-tip advancement; treating every such case as an out-of-date candidate and rebasing can hide a wrong base or replay the wrong delta.",
+                      "id": "C2",
+                      "material": true,
+                      "recommendation": "Classify target advancement separately from base/candidate provenance failure, auto-rebase only when the original candidate delta is provable, and route ambiguous provenance or conflicts to a fresh fenced recovery Round with the original evidence retained."
+                    },
+                    {
+                      "checklist_item_ids": [
+                        "P8"
+                      ],
+                      "description": "P8 omits the merge-review Git/worktree and execution-ownership intent pages even though P6-P7 change serialized lease scope, candidate identity replacement, handoff retention, cancellation boundaries, and conflict recovery.",
+                      "id": "C3",
+                      "material": true,
+                      "recommendation": "Add those affected intent pages and document when the lease begins, how old and replacement candidate identities remain auditable, and which authority and cancellation fences govern gate reruns and recovery."
+                    }
+                  ],
+                  "summary": "The plan is directionally sound but needs tighter evidence, recovery, and documentation boundaries."
+                },
+                "started_at": "2026-08-15T17:47:37Z"
+              },
+              "failure": {
+                "category": "provider",
+                "failed_at": "2026-08-15T18:39:41Z",
+                "message": "failed to read Goal Agent command channel /home/buddy/projects/refine/run/8082/processes/goal-agent-7b5eff1d-5538-4305-9f74-b5a1c0ca5576.commands.jsonl: No such file or directory (os error 2)",
+                "phase": "implement"
+              },
+              "final_plan": {
+                "completed_at": "2026-08-15T17:54:01Z",
+                "git_after": {
+                  "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-1",
+                  "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-1",
+                  "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Add a cohesive structured-output repair capability for proposal, criticism, and revision that records each raw invalid attempt, returns its parse or validation diagnostics to a bounded follow-up invocation, and resumes from the last valid phase artifact before failing as an output-contract fault.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Apply the same bounded diagnostic repair policy to unreadable Quality evaluations while preserving every attempted response and keeping exhausted provider or contract faults distinct from valid failed implementation findings.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Retain the current 20,000-character planning-summary boundary and the Goal Agent session ownership rule that creates command and transcript artifacts before launch and keeps them available through reader and settlement completion.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Introduce a durable Quality proof shape bound to goal ID, zero-based Round, evaluation scope, operation ID, checked candidate commit, source candidate commit, passed state, timestamp, and recorded results, and normalize legacy Round fields only when they reconstruct that complete exact-candidate identity.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Extend already-merged reconciliation to require the current Round's exact integration identity and candidate-bound passed Governance evidence, accept a normalized isolated Quality proof for that same candidate, or materialize a clean managed checkout of the exact candidate and run isolated Quality again when such proof cannot be reconstructed, never deriving approval from ancestry or a shared-target descendant.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Settle an eligible already-merged Goal atomically and idempotently from Quality to Review under repository observation and originating Round plus workflow-revision fences, recording whether Quality proof was retained, normalized, or regenerated and leaving failed or unavailable proof explicit.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Classify ordinary target advancement separately from provenance failure by permitting refresh only when the recorded base resolves, is an ancestor of the exact candidate, the clean candidate branch still names that commit, the target descends from that base, and the original base-to-candidate delta is unambiguous.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Acquire the integrated-target workflow lease before final target revalidation and retain it through a clean rebase of a provable delta, atomic persistence of old and replacement base and candidate identities, exact replacement-candidate Quality and Governance reruns, merge or push, and evidence settlement, with Round, workflow-revision, node, status, and cancellation authority reread before each consequential boundary.",
+                      "id": "P8"
+                    },
+                    {
+                      "description": "Abort and clean any conflicted refresh without moving or deleting the original candidate, then atomically queue one fresh fenced recovery Round for conflicts or ambiguous provenance with the original base, candidate, branch, handoff, gate evidence, target snapshot, and conflict details retained.",
+                      "id": "P9"
+                    },
+                    {
+                      "description": "Update the affected Planning, Quality, Governance, Failed, merge-review Git/worktree, execution-ownership, and workflow consistency intent pages to describe bounded output repair, exact Quality proof regeneration, lease start and duration, candidate replacement audit history, and the authority and cancellation rules for gate reruns and recovery.",
+                      "id": "P10"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "C1",
+                      "resolution": "P4-P6 now define the admissible durable Quality fields and exact current-Round candidate relationship, allow legacy normalization only when that binding is complete, and require a new isolated exact-candidate Quality run when it is not."
+                    },
+                    {
+                      "criticism_id": "C2",
+                      "resolution": "P7-P9 now separate target-tip advancement from a base and candidate provenance mismatch, permit rebasing only for a provable original delta, and retain ambiguous or conflicted work in a fresh authority-fenced recovery Round."
+                    },
+                    {
+                      "criticism_id": "C3",
+                      "resolution": "P8 and P10 now define the integrated-target lease boundary, preserve old and replacement candidate identities, apply Round, workflow-revision, node, status, and cancellation fences, and include the merge-review Git/worktree and execution-ownership intent pages."
+                    }
+                  ],
+                  "summary": "Make the remaining infrastructure-dominated failures recoverable without weakening exact-candidate approval: invalid planning and Quality responses will receive bounded diagnostic repair attempts, already-integrated work will use only reconstructable current-Round Quality proof or a new isolated run of the exact candidate, and shared-target movement will be handled inside serialized integration ownership by refreshing only provable candidate deltas and rerunning the gates for any replacement commit. Preserve the relaxed planning-summary contract, Goal Agent artifact-handoff safeguards, durable old and replacement identities, and explicit recovery when provenance or conflicts are ambiguous."
+                },
+                "started_at": "2026-08-15T17:50:29Z"
+              },
+              "phase": "implement",
+              "phase_started_at": "2026-08-15T17:54:01Z",
+              "proposal": {
+                "completed_at": "2026-08-15T17:47:37Z",
+                "git_after": {
+                  "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-1",
+                  "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-1",
+                  "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Add a bounded structured-output repair loop that returns precise schema or validation diagnostics to planning agents, preserves every invalid attempt, and resumes from the last valid proposal or criticism before declaring the phase failed.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Apply the same bounded contract-repair policy to unreadable Quality evaluations while keeping real implementation findings distinct from provider, parsing, and infrastructure faults.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Preserve the current relaxed summary contract and artifact-handoff ownership semantics, with regression scenarios covering formerly oversized plans and reaper-versus-settlement command-channel races.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Define a backward-compatible already-merged evidence classifier that accepts an exact current-Round integration identity plus candidate-bound passed Governance and durable compatible Quality evidence, but never treats ancestry by itself as approval.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Settle eligible already-merged Goals atomically and idempotently to Review under repository and Goal authority fences while recording which durable evidence justified reconciliation and retaining ambiguous cases as explicit failures.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "At the serialized integration boundary, revalidate the target and cleanly rebase an out-of-date candidate onto its latest tip, then persist the new base and candidate identities and rerun candidate-bound Quality and Governance before integration.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Abort conflicted rebases without losing the original branch or evidence and queue a fresh actionable recovery Round instead of terminally failing stale-base or merge-conflict cases.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Update the affected Plan, Quality, Governance, Failed, and consistency intent pages to document bounded output repair, compatible reconciliation evidence, and serialized shared-target recovery without weakening exact-candidate authority.",
+                      "id": "P8"
+                    }
+                  ],
+                  "summary": "Build on the relaxed planning-summary limit and Goal Agent artifact-handoff safeguards already present on current main by making structured planning and Quality outputs repairable before a Round fails, allowing already-integrated candidates to recover from compatible durable gate evidence without trusting reachability alone, and refreshing candidates safely when a serialized shared target advances. The workflow will preserve exact Round, candidate, authority, and audit boundaries while converting recoverable formatting, stale-base, and merge-conflict conditions into bounded correction or explicit recovery instead of terminal harness failures."
+                },
+                "started_at": "2026-08-15T17:44:02Z"
+              },
+              "schema_version": 2,
+              "started_at": "2026-08-15T17:44:02Z",
+              "state": "failed",
+              "updated_at": "2026-08-15T18:39:41Z"
+            },
+            "prompt": "From: Buddy Williams <buddy.williams@insurity.com>\nSubject: Refine Bug Report �X Goal failures are dominated by harness/infra faults, not implementation defects\n\nBody:\n# Refine Bug Report �X Goal failures are dominated by harness/infra faults, not implementation defects\r\n\r\n  **Reporter:** Buddy Williams (node `bo2lnxnevo03-buddy` / BO2LNXNEVO03)\r\n  **Refine version:** 4.2.0\r\n  **Date:** 2026-08-15\r\n  **Target app:** ProSuite / ClaimsXPress, branch `insurity-claims`\r\n  **Fleet:** 5 nodes sharing one target repo, integrating into one shared branch/checkout\r\n\r\n  ---\r\n\r\n  ## Summary\r\n\r\n  Of the current failed Goals, **~96% of failing rounds are caused by the Refine harness itself** (plan-stage output-contract rejections, an IPC/process-lifecycle race, and\r\n  a reconciliation false-negative) �X **not** by the implementation being wrong. Because retries re-enter the same infrastructural failure, these Goals never recover, which\r\n  is why the queue *looks* like it is \"mostly failing.\"\r\n\r\n  Concrete counts on this node:\r\n\r\n  | Status | Count |\r\n  |---|---|\r\n  | done | 6 |\r\n  | **failed** | **28** |\r\n  | todo | 75 |\r\n  | review | 11 |\r\n  | plan (in-flight) | 3 |\r\n\r\n  **All 28 failures are on a single node** (`bo2lnxnevo03-buddy`). The `default` node has **788 done / 0 failed**; other active nodes (`bo2lnxnevo02-ethan`: 16 done / 0\r\n  failed) also have zero failures. The failing Goals were retried repeatedly, producing **55 failing rounds across the 28 Goals** (up to 6 rounds on one Goal).\r\n\r\n  ## Failure distribution (55 failing rounds, 28 Goals)\r\n\r\n  | # | Category / message | Rounds | Goals | Nature |\r\n  |---|---|---|---|---|\r\n  | A1 | `plan`: *implementation plan summary must be concise (at most 600 characters, observed N)* | 17 | 16 | Harness output-contract |\r\n  | A2 | `plan`: *agent returned no valid structured implementation plan JSON* | 12 | 10 | Harness output-contract |\r\n  | A3 | `plan`: *failed to read Goal Agent command channel �K/goal-agent-<uuid>.commands.jsonl: No such file or directory (os error 2)* | 8 | 8 | IPC / process lifecycle |\r\n  | B | `already_merged_reconciliation_unsafe`: *lacks durable passed isolated Quality evidence for exact candidate <sha>* | 12 | 12 | Reconciliation false-negative |\r\n  | C1 | `stale_candidate`: *recorded base �K is not its ancestor* | 3 | 3 | Shared-branch integration race |\r\n  | C2 | `merge`: *candidate integration failed �K CONFLICT (content) �K* | 1 | 1 | Shared-branch integration race |\r\n  | D1 | `governance`: real finding (Auth0 default-on-error fallback) | 1 | 1 | **Legitimate** signal |\r\n  | D2 | `quality`: *Quality agent did not return the required JSON evaluation* | 1 | 1 | Harness output-contract |\r\n\r\n  **Only 1 of 55 failing rounds (D1) is a legitimate \"the code is wrong\" signal.** Everything else is the harness rejecting or losing otherwise-good work.\r\n\r\n  ---\r\n\r\n  ## Cluster A �X Plan stage output contract is too brittle (37/55 rounds)\r\n\r\n  The plan stage runs a `proposal �� criticism �� revise` loop (`implementation_plan.schema_version: 2`). Three independent failure modes discard fully-formed plans:\r\n\r\n  ### A1 �X 600-character summary cap (17 rounds / 16 Goals)\r\n  failure_category: plan\r\n  failure_message: implementation plan summary must be concise (at most 600 characters, observed 1228)\r\n\r\n  The plan itself is complete (populated `checklist`, `findings`); it is hard-rejected **solely because the summary text exceeds 600 chars**. For non-trivial bugfixes the\r\n  agent routinely writes 1000�V1300 char summaries, so this cap fails the Goal on formatting, not substance. A hard cap on a free-text summary should not be a terminal\r\n  failure �X truncate, warn, or ask the agent to shorten in-loop instead of failing the round.\r\n\r\n  ### A2 �X Revise phase emits unparseable JSON (12 rounds / 10 Goals)\r\n  failure_category: plan\r\n  failure_message: agent returned no valid structured implementation plan JSON\r\n  implementation_plan.state: failed   phase: revise   failure.category: invalid_output\r\n  For an affected Goal (`00000SZ65QQQ0H85WQZGN80016`), **`proposal.result.checklist` and `criticism.result.findings` are both fully populated with substantive analysis** �X\r\n  the proposal and criticism phases produced valid structured JSON. The loop then fails at the **revise** phase because that step's output didn't parse. A single\r\n  non-conforming emit at the end throws away a complete, correct plan. The revise step needs a parse-retry / repair path rather than a terminal fail.\r\n\r\n  ### A3 �X Goal-agent command channel missing (8 rounds / 8 Goals)\r\n  failure_category: plan\r\n  failure_message: failed to read Goal Agent command channel\r\n    /insurity/refine/run/8082/processes/goal-agent-<uuid>.commands.jsonl: No such file or directory (os error 2)\r\n  The daemon tries to read a per-process command-channel file that does not exist. The referenced `goal-agent-<uuid>.stdout.log` is **also gone** from `run/8082/processes/`.\r\n  This looks like a process-lifecycle / cleanup race: the command channel is expected but the agent process either never created it or a cleanup step removed it before the\r\n  reader ran. This one is node-local runtime state (not a model-output problem) and points at daemon IPC ordering.\r\n\r\n  ---\r\n\r\n  ## Cluster B �X Reconciliation marks already-merged work as FAILED (12 rounds / 12 Goals)\r\n\r\n  failure_category: already_merged_reconciliation_unsafe\r\n  failure_message: Goal <id> lacks durable passed isolated Quality evidence for exact candidate <sha>\r\n  quality_state: failed        governance verdict: passed\r\n\r\n  **Verified in git �X the work actually shipped:**\r\n\r\n  | Goal | Candidate | In repo? | Reachable? |\r\n  |---|---|---|---|\r\n  | �KPDN70RNF67WN80003 | `5509b5a�K` | yes | **ancestor of HEAD** |\r\n  | �KPEVXJHDYJ2RN80004 | `5b1611c�K` | yes | **ancestor of HEAD** |\r\n  | �KPH7Y21AMD5CN80006 | `64d72f6�K` | yes | **ancestor of HEAD** |\r\n  | �KPR9S009BPSMN8000C | `a66b18a�K` | yes | **ancestor of HEAD** |\r\n\r\n  Each candidate is a real commit (`Implement <goal> round 1`) already merged into the branch and reachable from HEAD. Governance passed. Yet the Goal is **failed** because\r\n  reconciliation can't find *durable, isolated* Quality evidence tied to that **exact candidate SHA**.\r\n\r\n  In this fleet, multiple nodes/Goals integrate their post-build result into one shared branch/checkout, so the isolated-Quality evidence for a specific candidate isn't\r\n  retained by the time reconciliation runs. The result is a **false-negative**: merged, governance-passed code is labeled `failed`. This both (a) blocks the Goal from ever\r\n  reaching `done` on retry (the code is already in �X nothing new to do) and (b) corrupts delivery metrics and the SOC 2 evidence trail. Reconciliation should recognize a\r\n  candidate that is already an ancestor of the integration branch and reconcile from the existing passed evidence rather than requiring isolated per-SHA Quality that the\r\n  shared-branch model has already discarded.\r\n\r\n  ---\r\n\r\n  ## Cluster C �X Shared-branch integration races (4 rounds)\r\n\r\n  - **C1 `stale_candidate` (3):** `Candidate <sha> is stale: recorded base <sha> is not its ancestor` �X the base branch advanced (another node's merge) between the candidate\r\n  commit and integration, invalidating the recorded base. Notably one such Goal had **already passed governance and Quality** before being failed on the stale base.\r\n  - **C2 `merge` conflict (1):** `CONFLICT (content): Merge conflict in �K/batch-reserve-approval.component.ts` �X two Goals edited the same file concurrently and integration\r\n  had no rebase/replan path, so the round failed outright.\r\n\r\n  Both are consequences of many Goals racing into one shared branch with no auto-rebase/serialization at the integration boundary.\r\n\r\n  ---\r\n\r\n  ## Impact\r\n\r\n  1. **Perceived \"mostly failing\" queue** is driven by ~96% harness/infra faults; retries deterministically re-hit the same fault, so Goals never self-heal.\r\n  2. **Shipped work is mislabeled `failed` (Cluster B)** �X false delivery signal and lost audit/SOC 2 evidence for code that is actually merged.\r\n  3. **Substantive plans are discarded on formatting/parse technicalities (A1/A2)** �X wasted agent time and repeated retries.\r\n  4. Failures are **concentrated on one node**, suggesting node-local daemon/run-state contributes (esp. A3), on top of the general contract brittleness.\r\n\r\n  ## Requested fixes / questions for Refine devs\r\n  - **A1:** Don't fail the round on summary length. Truncate + warn, or feed the length constraint back into the loop for a shorten pass.\r\n  - **A2:** Add a parse-repair / bounded retry for the `revise` emit before failing; don't discard a valid proposal+criticism because the final emit didn't parse.\r\n  - **A3:** Investigate the command-channel lifecycle race in `run/<port>/processes/` �X why is `goal-agent-<uuid>.commands.jsonl` (and its stdout.log) absent when the daemon\r\n  reads it? Is cleanup racing the reader, or is the child failing to create the channel?\r\n  - **B:** Make reconciliation treat \"candidate is already an ancestor of the integration branch, governance passed\" as reconcilable from existing evidence instead of\r\n  demanding isolated per-SHA Quality that the shared-branch model has already dropped.\r\n  - **C:** Add auto-rebase / serialization at the integration boundary so a base advancing under a candidate (C1) or two Goals touching one file (C2) triggers a\r\n  replan/rebase rather than a terminal failure.\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nBuddy Williams\r\nBuddy.Williams@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
+            "reporter": "Buddy Williams",
+            "round": 1
+          },
+          {
+            "assignee": "Buddy Williams",
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "id": "guidance-1",
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                },
+                {
+                  "enabled": true,
+                  "id": "guidance-2",
+                  "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+                  "name": "Cohesive code files",
+                  "rule": "Apply whenever an agent adds or changes code files in any language."
+                }
+              ],
+              "code_files_changed": true,
+              "context_version": 1,
+              "recorded_at": "2026-08-15T19:31:39Z",
+              "skipped": []
+            },
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+                "context_digest": "acd9057ed56db8f928eda20866d9d3590d98ec455e08634a833f7685ab9bd438",
+                "context_version": 1,
+                "goal_id": "DR6626D11FDB6F9A57F6EA4B0F",
+                "implementation_branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-2",
+                "round_idx": 1,
+                "target_branch": "main"
+              },
+              "completed_at": "2026-08-15T19:31:39Z",
+              "criticism": {
+                "completed_at": "2026-08-15T19:03:29Z",
+                "git_after": {
+                  "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-2",
+                  "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-2",
+                  "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "findings": [
+                    {
+                      "checklist_item_ids": [
+                        "P2",
+                        "P3",
+                        "P5",
+                        "P6",
+                        "P8"
+                      ],
+                      "description": "The plan adds repeated provider invocations and long-running exact-candidate Quality and Governance reruns, but only names a final revalidation and settlement fences; it does not require status, node, Round, workflow-revision, and cancellation authority to be reread before every new invocation and consequential Git or durable-state boundary.",
+                      "id": "C1",
+                      "material": true,
+                      "recommendation": "Require the full synchronized execution-ownership and cancellation checks before each repair attempt, proof-regeneration or replacement gate launch, identity write, push, integration, recovery enqueue, and settlement, with superseded work stopping without mutation."
+                    },
+                    {
+                      "checklist_item_ids": [
+                        "P8"
+                      ],
+                      "description": "Conflict or ambiguous-provenance recovery queues a new Round without joining the existing max_automatic_round_retries lineage and budget, so deterministic shared-target conflicts can create an unbounded retry loop like the failure pattern this Goal is intended to remove.",
+                      "id": "C2",
+                      "material": true,
+                      "recommendation": "Give integration recovery a durable automatic_retry kind, source Round, monotonic shared attempt count, configured retry-budget check, and explicit exhausted outcome that retains the original evidence without creating another Round."
+                    },
+                    {
+                      "checklist_item_ids": [
+                        "P1",
+                        "P2",
+                        "P3",
+                        "P4",
+                        "P5",
+                        "P6",
+                        "P7",
+                        "P8",
+                        "P9"
+                      ],
+                      "description": "The checklist contains no verification or clean-handoff evidence requirement, despite the Round request requiring exact evidence and the retained implementation spanning structured-output repair, durable proof migration, reconciliation, serialization, and Git recovery.",
+                      "id": "C3",
+                      "material": true,
+                      "recommendation": "Add a verification item covering the retained Round 1 worktree's unchanged identity and dirtiness, focused regressions for bounded planning and Quality repair, exact-proof acceptance and regeneration rejection paths, authority and cancellation races, target-advance refresh and conflict recovery under concurrency, documentation checks, and final clean diff and test evidence on Round 2."
+                    }
+                  ],
+                  "summary": "The plan needs explicit ownership fencing, bounded integration recovery, and exact verification evidence."
+                },
+                "started_at": "2026-08-15T19:00:39Z"
+              },
+              "final_plan": {
+                "completed_at": "2026-08-15T19:04:44Z",
+                "git_after": {
+                  "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-2",
+                  "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-2",
+                  "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Compare current main, the Round 1 base, and the retained dirty Round 1 worktree, then selectively port only missing Goal behavior without modifying or blindly merging the retained worktree or regressing the existing 4519b5ff contracts.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Add one cohesive bounded structured-output repair path for proposal, criticism, and revision that durably records each invalid response and diagnostic, retries the same phase from its last valid artifact, and distinguishes exhausted contract faults from provider failures.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Apply the same bounded diagnostic repair policy to unreadable Quality evaluations while retaining provider receipts and every attempted response and keeping valid failed findings distinct from output-contract or infrastructure faults.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Introduce a versioned durable Quality proof bound to Goal ID, zero-based Round, evaluation scope, operation ID, checked and source candidate commits, passed state, timestamp, and recorded results, with legacy normalization allowed only when that complete identity is reconstructable.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Extend already-merged reconciliation to require the current Round integration identity and exact-candidate passed Governance, use retained or fully normalized isolated Quality proof, or regenerate proof in a clean managed checkout of the exact candidate without treating ancestry or a shared-target descendant as approval.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Settle eligible already-merged Goals atomically and idempotently from Quality to Review under repository observation and exact execution authority, recording whether exact-candidate Quality proof was retained, normalized, or regenerated and leaving unavailable proof explicit.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Separate ordinary target advancement from candidate provenance failure and refresh only when the durable base and candidate resolve exactly, the candidate branch remains clean at that commit, the target descends from the base, and the base-to-candidate delta is linear and unambiguous.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Hold the existing integrated-target workflow lease through final revalidation, any provable refresh, atomic old-and-replacement identity persistence, replacement-candidate gates, integration, and settlement, rereading synchronized status, node, Round, workflow revision, and cancellation authority before every repair or gate invocation and every consequential Git or durable-state boundary so superseded work stops without mutation.",
+                      "id": "P8"
+                    },
+                    {
+                      "description": "Abort conflicts or ambiguous provenance without moving the original candidate and route recovery through a durable automatic_retry kind carrying the source Round and monotonic shared attempt count, creating one fenced Round only within max_automatic_round_retries and otherwise recording an explicit exhausted outcome with all original evidence retained.",
+                      "id": "P9"
+                    },
+                    {
+                      "description": "Update only the affected planning, Quality, Governance, failed-state, merge-review Git and worktree, execution-ownership, and workflow-consistency intent pages to document bounded repair, exact proof recovery, lease scope, replacement identity history, retry exhaustion, and fenced integration recovery.",
+                      "id": "P10"
+                    },
+                    {
+                      "description": "Produce exact Round 2 handoff evidence that the retained Round 1 worktree identity and dirtiness are unchanged, focused regressions cover bounded planning and Quality repair, proof acceptance and regeneration rejection, authority and cancellation races, concurrent target refresh and conflict recovery, and the final Round 2 diff, documentation, and test state are clean and reviewable.",
+                      "id": "P11"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "C1",
+                      "resolution": "P8 now requires the full synchronized execution-ownership and cancellation fence before every repeated provider or gate invocation and every consequential Git or durable-state boundary, with P2, P3, P5, and P6 operating inside that rule."
+                    },
+                    {
+                      "criticism_id": "C2",
+                      "resolution": "P9 now joins integration recovery to a durable automatic-retry kind, source Round, monotonic shared attempt count, configured shared budget, and explicit exhausted outcome instead of allowing unbounded recovery Rounds."
+                    },
+                    {
+                      "criticism_id": "C3",
+                      "resolution": "P11 now requires exact preservation, regression, concurrency, documentation, clean-diff, and test evidence for the Round 2 review handoff."
+                    }
+                  ],
+                  "summary": "Recover the substantive Round 1 workflow changes selectively onto current main while preserving the dirty Round 1 worktree as audit evidence and retaining the planning-summary and Goal Agent handoff fixes already shipped in 4519b5ff. The implementation will make malformed planning and Quality responses repairable through bounded, authority-fenced attempts; bind gate proof and already-merged reconciliation to exact candidate identities; and serialize shared-target refresh so only provable deltas advance, while conflicts or ambiguous provenance enter the existing bounded recovery lineage with their original evidence intact."
+                },
+                "started_at": "2026-08-15T19:03:29Z"
+              },
+              "implementation": {
+                "completed_at": "2026-08-15T19:31:39Z",
+                "execution": {
+                  "checklist": [
+                    {
+                      "evidence": "Started Round 2 at current-main commit 4519b5ff2c5894b0fccf1c4c0e57612f694ffe79, compared it with the retained Round 1 worktree, and selectively reapplied only Goal behavior. No merge, reset, cleanup, commit, or push was performed; the existing planning-summary and command-channel handoff contracts remain in the base.",
+                      "id": "P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Implemented one bounded three-attempt structured-output path for proposal, criticism, and revision. Every invalid raw response and diagnostic is retained, retries resume the same phase from prior valid artifacts, execution authority is revalidated around provider and persistence boundaries, and exhausted invalid output is classified separately from provider failure.",
+                      "id": "P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Applied the shared bounded repair policy to Quality, retaining provider receipts and all raw attempts in operation and Round evidence. Valid failed findings remain implementation findings, while exhausted parsing is a quality_output_contract_fault; cancellation and authority-loss regressions prove later provider attempts do not launch.",
+                      "id": "P3",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added a versioned durable Quality proof carrying Goal ID, zero-based Round, isolated evaluation scope, operation ID, checked and source candidate commits, passed state, timestamp, and recorded results. Legacy evidence normalizes only when all exact identity fields can be reconstructed.",
+                      "id": "P4",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Already-merged reconciliation now requires current-Round integration identity and exact-candidate passed Governance plus retained or completely normalized isolated Quality proof; otherwise it materializes a clean managed checkout of the exact candidate and reruns Quality. Tests reject ancestry-only, shared-descendant, and wrong-branch regeneration evidence.",
+                      "id": "P5",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Eligible already-merged settlement is idempotent and atomic under repository observation and Round/workflow-revision authority, transitions Quality to Review only with exact proof, records retained/normalized/regenerated proof mode, and leaves unavailable proof explicit.",
+                      "id": "P6",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Candidate refresh distinguishes target movement from provenance failure and requires exact resolvable base/candidate identities, an exact clean candidate branch, target descent from base, and a linear unambiguous base-to-candidate delta before rebasing.",
+                      "id": "P7",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "The integrated-target repository lease now spans final revalidation, refresh, atomic old/replacement identity persistence, replacement Quality and Governance, push/integration, and settlement. Status, node, Round, workflow revision, operation state, and cancellation authority are reread at provider, gate, Git, and durable-state boundaries.",
+                      "id": "P8",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Conflicted or ambiguous refresh aborts without moving or deleting the original candidate and records original base, candidate, branch, handoff, gate, target, and conflict evidence. Recovery uses automatic_retry kind integration with source Round and the shared monotonic attempt count, creates one fenced Round within max_automatic_round_retries, and otherwise records integration_retry_exhausted without a successor.",
+                      "id": "P9",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Updated only affected planning, Quality, Governance, failed-state, merge-review Git/worktree, execution-ownership, and workflow-consistency intent pages for bounded repair, proof regeneration, lease duration, candidate history, retry exhaustion, and authority-fenced recovery.",
+                      "id": "P10",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Round 1 remains at branch refine/DR6626D11FDB6F9A57F6EA4B0F/round-1 and HEAD 4519b5ff2c5894b0fccf1c4c0e57612f694ffe79 with the identical tracked binary-diff SHA-256 f36d5f6f347d6c97bea3c8bb7766dcbd3ce54732292472ed06359dfb720ed77f and unchanged dirty/untracked audit paths. Focused tests cover planning/Quality repair, retained attempts, authority/cancellation loss, exact-proof normalization/regeneration rejection, concurrent refresh serialization, conflict recovery, shared retry counting, and exhaustion. Round 2 has only intended source/docs/test changes, git diff --check is clean, and no integration or review boundary was crossed.",
+                      "id": "P11",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "cargo check --all-targets: exit 0; finished dev profile successfully.",
+                    "cargo clippy --all-targets -- -D warnings: failed only on four pre-existing warnings in untouched files (two needless_pub_self, one unnecessary_sort_by, one items_after_test_module).",
+                    "cargo clippy --all-targets -- -A clippy::needless_pub_self -A clippy::unnecessary_sort_by -A clippy::items_after_test_module -D warnings: exit 0; finished successfully.",
+                    "mapfile -t files < <({ git diff --name-only --diff-filter=ACM; git ls-files --others --exclude-standard; } | LC_ALL=C sort -u | awk '/\\.rs$/'); rustfmt --edition 2024 --config skip_children=true --check \"${files[@]}\": exit 0; checked 40 changed Rust files.",
+                    "git diff --check: exit 0.",
+                    "cargo test --lib governed_planning_repairs_invalid_proposal_and_retains_the_attempt: 1 passed, 0 failed.",
+                    "cargo test --lib quality_repairs_one_invalid_response_and_retains_both_attempts: 1 passed, 0 failed.",
+                    "cargo test --lib workflow_quality_authority_loss_prevents_provider_launch: 1 passed, 0 failed.",
+                    "cargo test --lib quality_cancellation_during_repair_prevents_further_attempts: 1 passed, 0 failed.",
+                    "cargo test --lib quality_operation_settles_parsing_failure_and_persists_the_same_goal_evidence: 1 passed, 0 failed.",
+                    "cargo test --lib workflow::tests::candidate_refresh: 5 passed, 0 failed.",
+                    "cargo test --lib tools::product::governance_integration::tests::reconciliation: 8 passed, 0 failed.",
+                    "cargo test --lib -- --skip prompts::tests::agent_prompts_keep_only_task_specific_contracts --skip surfaces::cli::catalog::tests::operational_runbooks_use_current_cli_and_layout_contracts: 859 passed, 0 failed, 6 ignored, 2 filtered out.",
+                    "cargo test --lib: 857 passed, 4 failed, 6 ignored; two deterministic failures are unchanged baseline contracts in src/prompts/implementation_planning/plan.md and docs/runbooks/install.md, and the two unrelated concurrent-state failures each passed when rerun in isolation.",
+                    "git diff --quiet -- src/prompts/implementation_planning/plan.md docs/runbooks/install.md: exit 0, confirming both deterministic baseline-failure inputs are untouched.",
+                    "git -C /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR6626D11FDB6F9A57F6EA4B0F-round-1 rev-parse HEAD: 4519b5ff2c5894b0fccf1c4c0e57612f694ffe79.",
+                    "git -C /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR6626D11FDB6F9A57F6EA4B0F-round-1 diff --binary | sha256sum: f36d5f6f347d6c97bea3c8bb7766dcbd3ce54732292472ed06359dfb720ed77f; identical to the pre-recovery fingerprint.",
+                    "git -C /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR6626D11FDB6F9A57F6EA4B0F-round-1 diff --check: exit 0.",
+                    "jq . /home/buddy/projects/refine/run/8082/processes/goal-agent-5b49841a-fa73-4e4e-b65d-5f4b5f9c5272.signal.json.tmp >/dev/null && mv /home/buddy/projects/refine/run/8082/processes/goal-agent-5b49841a-fa73-4e4e-b65d-5f4b5f9c5272.signal.json.tmp /home/buddy/projects/refine/run/8082/processes/goal-agent-5b49841a-fa73-4e4e-b65d-5f4b5f9c5272.signal.json: exit 0."
+                  ]
+                },
+                "report": "Recovered the substantive Round 1 workflow changes selectively onto current main without modifying or merging the retained audit worktree. Added bounded authority-fenced planning and Quality output repair; exact-candidate durable Quality proof and safe already-merged regeneration; serialized provable candidate refresh with replacement-gate reruns; bounded shared integration recovery with explicit exhaustion; and affected intent documentation. Verification passed for compilation, scoped formatting, lint after enumerated baseline allowances, focused recovery/race regressions, and the broad library suite with only two confirmed unchanged baseline contract failures excluded.",
+                "started_at": "2026-08-15T19:04:44Z"
+              },
+              "phase": "implement",
+              "phase_started_at": "2026-08-15T19:04:44Z",
+              "proposal": {
+                "completed_at": "2026-08-15T19:00:38Z",
+                "git_after": {
+                  "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-2",
+                  "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-2",
+                  "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Reconcile the retained Round 1 delta against current main and selectively port only missing Goal behavior, preserving the original dirty worktree and the existing 4519b5ff command-channel and planning-summary contracts.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Add one cohesive bounded structured-output repair path for proposal, criticism, and revision that persists each invalid response and diagnostic, retries the same phase from its last valid artifact, and distinguishes exhausted contract faults from provider failures.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Apply the bounded diagnostic repair policy to unreadable Quality evaluations while retaining provider receipts and all response attempts and keeping valid failed findings distinct from output-contract or infrastructure faults.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Introduce versioned durable Quality proof bound to Goal ID, zero-based Round, evaluation scope, operation ID, checked and source candidate commits, passed state, timestamp, and recorded results, with legacy normalization allowed only when that full identity is reconstructable.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Extend already-merged reconciliation to require current-Round integration identity and exact-candidate passed Governance, use retained or fully normalized isolated Quality proof, or regenerate proof in a clean managed checkout of the exact candidate without treating ancestry or a shared-target descendant as approval.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Settle eligible already-merged Goals atomically and idempotently from Quality to Review under repository observation plus Round and workflow-revision authority fences, recording whether exact-candidate Quality proof was retained, normalized, or regenerated.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Separate ordinary target advancement from candidate provenance failure and refresh only when the durable base and candidate resolve exactly, the target descends from the base, the candidate checkout is clean and unchanged, and the base-to-candidate delta is linear and unambiguous.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Use the existing integrated-target workflow lease through final revalidation, any provable refresh, atomic old-and-replacement identity persistence, replacement-candidate Quality and Governance, integration, and settlement, while aborting conflicts or ambiguity without moving the original candidate and queuing one authority-fenced recovery Round with retained evidence.",
+                      "id": "P8"
+                    },
+                    {
+                      "description": "Update only the affected planning, Quality, Governance, failed-state, merge-review Git/worktree, execution-ownership, and workflow-consistency intent pages to document bounded repair, exact proof recovery, lease scope, replacement identity history, and fenced integration recovery.",
+                      "id": "P9"
+                    }
+                  ],
+                  "summary": "Recover the substantive Round 1 workflow changes selectively onto the clean current-main base while leaving the retained dirty worktree untouched and preserving the planning-summary and Goal Agent handoff fixes already shipped in 4519b5ff. The implementation will make malformed planning and Quality responses repairable within bounded, auditable attempts; bind Quality and Governance decisions to exact candidate identities; safely reconcile already-integrated work by retaining or regenerating isolated proof; and serialize shared-target refresh so only provable candidate deltas advance, with conflicts or ambiguous provenance producing a fenced recovery Round instead of a misleading implementation failure."
+                },
+                "started_at": "2026-08-15T18:58:49Z"
+              },
+              "schema_version": 2,
+              "started_at": "2026-08-15T18:58:49Z",
+              "state": "completed",
+              "updated_at": "2026-08-15T19:31:39Z"
+            },
+            "implementation_report": "Recovered the substantive Round 1 workflow changes selectively onto current main without modifying or merging the retained audit worktree. Added bounded authority-fenced planning and Quality output repair; exact-candidate durable Quality proof and safe already-merged regeneration; serialized provable candidate refresh with replacement-gate reruns; bounded shared integration recovery with explicit exhaustion; and affected intent documentation. Verification passed for compilation, scoped formatting, lint after enumerated baseline allowances, focused recovery/race regressions, and the broad library suite with only two confirmed unchanged baseline contract failures excluded.",
+            "implementation_reported_at": "2026-08-15T19:31:39Z",
+            "prompt": "Recover the original Goal after the Round 1 implementation attempt failed solely because the pre-fix Refine daemon deleted its Goal Agent command channel. Preserve the retained dirty Round 1 worktree at /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR6626D11FDB6F9A57F6EA4B0F-round-1 as audit evidence: do not clean, reset, delete, or blindly merge it. Start from current main, which already contains 4519b5ff Preserve Goal Agent command channels during handoff. Compare current main with the retained Round 1 changes, selectively reapply and reconcile the complete relevant behavior for the original Goal, preserve unrelated current-main behavior, then implement and verify the governed plan with exact evidence.",
+            "quality_checked_at": "2026-08-15T19:53:59Z",
+            "quality_details": {
+              "candidate_commit": "404761736282119b272595ae63a09808492b4f77",
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR6626D11FDB6F9A57F6EA4B0F-round-2",
+              "diagnostics": [
+                "{\"ok\":false,\"summary\":\"Focused checks passed, but already-merged reconciliation can rerun and replace a valid failed Quality result.\",\"results\":[{\"test\":\"The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\",\"status\":\"failed\",\"evidence\":\"Exit 1. Compilation, diff hygiene, Round 1 preservation, and focused suites passed: planning 1, Quality 15, reconciliation 9, candidate refresh 6, already-merged 1, and behavior 7. The final guard found that resolve_already_merged_quality has no fail-closed branch for quality.ok == false before invoking the resolver. Consequently, a valid failed exact-candidate Quality evaluation is regenerated a second time and may be replaced by a later pass, violating candidate-bound fail-closed Quality behavior. No existing regression covers this failure path.\",\"command\":\"bash -lc '\\nset -euo pipefail\\nbase=4519b5ff2c5894b0fccf1c4c0e57612f694ffe79\\nround1=/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR6626D11FDB6F9A57F6EA4B0F-round-1\\ntest \\\"$(git rev-parse \\\"${base}^{commit}\\\")\\\" = \\\"$base\\\"\\ngit diff --check \\\"$base\\\"..HEAD\\ntest -z \\\"$(git status --porcelain)\\\"\\ntest \\\"$(git -C \\\"$round1\\\" rev-parse HEAD)\\\" = \\\"$base\\\"\\ntest \\\"$(git -C \\\"$round1\\\" diff --binary | sha256sum | awk \\\"{print \\\\$1}\\\")\\\" = f36d5f6f347d6c97bea3c8bb7766dcbd3ce54732292472ed06359dfb720ed77f\\ngit -C \\\"$round1\\\" diff --cached --quiet\\ncargo check --quiet --all-targets\\ncargo test --quiet --lib workflow::tests::planning_repair:: -- --test-threads=1\\ncargo test --quiet --lib tools::host::quality::tests::execution:: -- --test-threads=1\\ncargo test --quiet --lib tools::product::governance_integration::tests::reconciliation:: -- --test-threads=1\\ncargo test --quiet --lib workflow::tests::candidate_refresh:: -- --test-threads=1\\ncargo test --quiet --lib workflow::tests::already_merged:: -- --test-threads=1\\ncargo test --quiet --lib workflow::behaviors::tests:: -- --test-threads=1\\nblock=$(sed -n \\\"/^fn resolve_already_merged_quality(/,/^impl WorkflowBehavior for WorkflowGovernance/p\\\" src/workflow/behaviors/mod.rs)\\nfailed_short_circuits=$(printf \\\"%s\\\\n\\\" \\\"$block\\\" | grep -c \\\"if !quality\\\\\\\\.ok\\\" || true)\\nif [ \\\"$failed_short_circuits\\\" -ne 1 ]; then\\n  printf \\\"FAIL: resolve_already_merged_quality runs isolated Quality but has %s fail-closed branch(es) for a valid failed result before calling the resolver; the resolver therefore regenerates the same candidate again and can replace a valid failure.\\\\n\\\" \\\"$failed_short_circuits\\\" >&2\\n  exit 1\\nfi\\n'\"}]}",
+                "Observed supervised process proc-1786823625671-972354-190 exited 1. stdout: tialized empty Git repository in /tmp/refine-quality-provider-settlement-1751032-1786823629900506049/candidate/.git/\n[main (root-commit) 5766732] candidate\n 1 file changed, 1 insertion(+)\n create mode 100644 candidate.txt\n.Initialized empty Git repository in /tmp/refine-quality-restart-recovery-1751032-1786823630007162855/candidate/.git/\n[main (root-commit) 8f2df5c] candidate\n 1 file changed, 1 insertion(+)\n create mode 100644 candidate.txt\n.Initialized empty Git repository in /tmp/refine-quality-parse-settlement-1751032-1786823630109700709/candidate/.git/\n[main (root-commit) 8f2df5c] candidate\n 1 file changed, 1 insertion(+)\n create mode 100644 candidate.txt\n.Initialized empty Git repository in /tmp/refine-quality-output-repair-1751032-1786823630215112939/candidate/.git/\n[main (root-commit) 8f2df5c] candidate\n 1 file changed, 1 insertion(+)\n create mode 100644 candidate.txt\n.Initialized empty Git repository in /tmp/refine-quality-linked-candidate-deletion-1751032-1786823630326992529/target/.git/\n[main (root-commit) 9b5078b] base\n 1 file changed, 1 insertion(+)\n create mode 100644 app.txt\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nHEAD is now at 9b5078b base\n.Initialized empty Git repository in /tmp/refine-quality-workflow-authority-fence-1751032-1786823630485533282/candidate/.git/\n[main (root-commit) 8f2df5c] candidate\n 1 file changed, 1 insertion(+)\n create mode 100644 candidate.txt\n.\ntest result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 855 filtered out; finished in 3.00s\n\n\nrunning 9 tests\n.........\ntest result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 861 filtered out; finished in 4.07s\n\n\nrunning 6 tests\n......\ntest result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 864 filtered out; finished in 2.39s\n\n\nrunning 1 test\n.\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 869 filtered out; finished in 0.49s\n\n\nrunning 7 tests\n.......\ntest result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 863 filtered out; finished in 0.00s stderr: FAIL: resolve_already_merged_quality runs isolated Quality but has 0 fail-closed branch(es) for a valid failed result before calling the resolver; the resolver therefore regenerates the same candidate again and can replace a valid failure."
+              ],
+              "evaluation_scope": "isolated_candidate",
+              "operation_id": "1a006f7ab99ed6426",
+              "results": [
+                {
+                  "command": "bash -lc '\nset -euo pipefail\nbase=4519b5ff2c5894b0fccf1c4c0e57612f694ffe79\nround1=/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR6626D11FDB6F9A57F6EA4B0F-round-1\ntest \"$(git rev-parse \"${base}^{commit}\")\" = \"$base\"\ngit diff --check \"$base\"..HEAD\ntest -z \"$(git status --porcelain)\"\ntest \"$(git -C \"$round1\" rev-parse HEAD)\" = \"$base\"\ntest \"$(git -C \"$round1\" diff --binary | sha256sum | awk \"{print \\$1}\")\" = f36d5f6f347d6c97bea3c8bb7766dcbd3ce54732292472ed06359dfb720ed77f\ngit -C \"$round1\" diff --cached --quiet\ncargo check --quiet --all-targets\ncargo test --quiet --lib workflow::tests::planning_repair:: -- --test-threads=1\ncargo test --quiet --lib tools::host::quality::tests::execution:: -- --test-threads=1\ncargo test --quiet --lib tools::product::governance_integration::tests::reconciliation:: -- --test-threads=1\ncargo test --quiet --lib workflow::tests::candidate_refresh:: -- --test-threads=1\ncargo test --quiet --lib workflow::tests::already_merged:: -- --test-threads=1\ncargo test --quiet --lib workflow::behaviors::tests:: -- --test-threads=1\nblock=$(sed -n \"/^fn resolve_already_merged_quality(/,/^impl WorkflowBehavior for WorkflowGovernance/p\" src/workflow/behaviors/mod.rs)\nfailed_short_circuits=$(printf \"%s\\n\" \"$block\" | grep -c \"if !quality\\\\.ok\" || true)\nif [ \"$failed_short_circuits\" -ne 1 ]; then\n  printf \"FAIL: resolve_already_merged_quality runs isolated Quality but has %s fail-closed branch(es) for a valid failed result before calling the resolver; the resolver therefore regenerates the same candidate again and can replace a valid failure.\\n\" \"$failed_short_circuits\" >&2\n  exit 1\nfi\n'",
+                  "evidence": "Observed supervised process proc-1786823625671-972354-190 exited 1. stdout: tialized empty Git repository in /tmp/refine-quality-provider-settlement-1751032-1786823629900506049/candidate/.git/\n[main (root-commit) 5766732] candidate\n 1 file changed, 1 insertion(+)\n create mode 100644 candidate.txt\n.Initialized empty Git repository in /tmp/refine-quality-restart-recovery-1751032-1786823630007162855/candidate/.git/\n[main (root-commit) 8f2df5c] candidate\n 1 file changed, 1 insertion(+)\n create mode 100644 candidate.txt\n.Initialized empty Git repository in /tmp/refine-quality-parse-settlement-1751032-1786823630109700709/candidate/.git/\n[main (root-commit) 8f2df5c] candidate\n 1 file changed, 1 insertion(+)\n create mode 100644 candidate.txt\n.Initialized empty Git repository in /tmp/refine-quality-output-repair-1751032-1786823630215112939/candidate/.git/\n[main (root-commit) 8f2df5c] candidate\n 1 file changed, 1 insertion(+)\n create mode 100644 candidate.txt\n.Initialized empty Git repository in /tmp/refine-quality-linked-candidate-deletion-1751032-1786823630326992529/target/.git/\n[main (root-commit) 9b5078b] base\n 1 file changed, 1 insertion(+)\n create mode 100644 app.txt\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nHEAD is now at 9b5078b base\n.Initialized empty Git repository in /tmp/refine-quality-workflow-authority-fence-1751032-1786823630485533282/candidate/.git/\n[main (root-commit) 8f2df5c] candidate\n 1 file changed, 1 insertion(+)\n create mode 100644 candidate.txt\n.\ntest result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 855 filtered out; finished in 3.00s\n\n\nrunning 9 tests\n.........\ntest result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 861 filtered out; finished in 4.07s\n\n\nrunning 6 tests\n......\ntest result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 864 filtered out; finished in 2.39s\n\n\nrunning 1 test\n.\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 869 filtered out; finished in 0.49s\n\n\nrunning 7 tests\n.......\ntest result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 863 filtered out; finished in 0.00s stderr: FAIL: resolve_already_merged_quality runs isolated Quality but has 0 fail-closed branch(es) for a valid failed result before calling the resolver; the resolver therefore regenerates the same candidate again and can replace a valid failure. Agent report: Exit 1. Compilation, diff hygiene, Round 1 preservation, and focused suites passed: planning 1, Quality 15, reconciliation 9, candidate refresh 6, already-merged 1, and behavior 7. The final guard found that resolve_already_merged_quality has no fail-closed branch for quality.ok == false before invoking the resolver. Consequently, a valid failed exact-candidate Quality evaluation is regenerated a second time and may be replaced by a later pass, violating candidate-bound fail-closed Quality behavior. No existing regression covers this failure path.",
+                  "exit_code": 1,
+                  "process_id": "proc-1786823625671-972354-190",
+                  "status": "failed",
+                  "test": "The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks."
+                }
+              ],
+              "source_candidate_commit": "404761736282119b272595ae63a09808492b4f77"
+            },
+            "quality_message": "Quality failed: “The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across aff…” — supervised command exited with code 1.",
+            "quality_state": "failed",
+            "reporter": "Buddy Williams",
+            "round": 2
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "assignee": "Refine",
+      "automatic_retry": {
+        "attempt": 1,
+        "generated_at": "2026-08-15T19:58:07Z",
+        "kind": "quality",
+        "source_round": 2
+      },
+      "constitution_state": "unclassified",
+      "created": "2026-08-15T19:58:07Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_candidate_commit": "",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "guidance_decision": null,
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f",
+          "context_digest": "993baecb78598cdcf3048d78293d5ba475b5b808062737f055f94af45418c609",
+          "context_version": 1,
+          "goal_id": "DR6626D11FDB6F9A57F6EA4B0F",
+          "implementation_branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-3",
+          "round_idx": 2,
+          "target_branch": "main"
+        },
+        "phase": "plan",
+        "phase_started_at": "2026-08-15T19:58:08Z",
+        "schema_version": 2,
+        "started_at": "2026-08-15T19:58:08Z",
+        "state": "in_progress",
+        "updated_at": "2026-08-15T19:58:08Z"
+      },
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Start a fresh Round from current main and selectively preserve the complete relevant behavior from candidate 404761736282119b272595ae63a09808492b4f77; do not blindly merge it. Preserve both retained Round worktrees and all audit evidence unchanged. Correct already-merged Quality reconciliation so `resolve_already_merged_quality` handles a valid `quality.ok == false` result immediately and fail-closed under the originating Round/workflow-revision authority without invoking any resolver or second Quality regeneration. Retain the first evaluation’s exact candidate/source identity, operation ID, isolated scope, timestamp, failed results, diagnostics, and provider attempts with an explicit already-merged Quality failure category; do not create approval, Review transition, or another evaluation from a later result. Preserve the existing passed-proof path, exact-candidate proof validation, clean-checkout regeneration, idempotent resolver behavior, output repair, candidate refresh, and recovery-budget changes. Add behavior-level regression coverage using a fail-then-pass response sequence or invocation counter that asserts exactly one Quality run, durable retention of the first failed proof, terminal fail-closed settlement, and no rerun on repeated handling. Re-run the failed Quality command, focused planning/Quality/reconciliation/refresh/already-merged/behavior suites, cargo check, scoped rustfmt and Clippy, and the broad suite while reporting unchanged baseline exclusions separately.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Refine",
+      "rule_state": "unclassified",
+      "updated": "2026-08-15T19:58:08Z",
+      "workflow_attempt_authority": {
+        "claimed_at": "2026-08-15T19:58:07Z",
+        "round_idx": 2,
+        "workflow_revision": 40
+      },
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
     }
   ],
-  "status": "quality",
+  "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-15T19:53:59Z",
-  "workflow_revision": 38
+  "updated": "2026-08-15T19:58:08Z",
+  "workflow_revision": 45
 }
