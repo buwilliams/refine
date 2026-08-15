@@ -97,6 +97,17 @@ impl FileGitSyncService {
     }
 
     pub(super) fn sync_locked(&self, fetch_scope: GitFetchScope) -> RefineResult<GitSyncResult> {
+        let result = self.sync_locked_inner(fetch_scope);
+        if result.is_err() {
+            // Sync owns only the managed state worktree. Any failure must leave
+            // that checkout clean so a later retry starts from durable Git
+            // evidence instead of half-applied retirement or reconciliation.
+            let _ = self.restore_managed_state_worktree();
+        }
+        result
+    }
+
+    fn sync_locked_inner(&self, fetch_scope: GitFetchScope) -> RefineResult<GitSyncResult> {
         if !self.target_root.join(".git").exists() {
             return Ok(skipped("Target app is not a Git repository."));
         }
@@ -124,6 +135,17 @@ impl FileGitSyncService {
         } else {
             false
         };
+        // Missing three-way authority is an exceptional operator recovery,
+        // not an empty baseline. Fail before creating, rebasing, or retiring
+        // anything in the managed worktree. Bootstrap-only metadata retains
+        // its established remote-first initialization behavior.
+        let stored_base = self.load_state_baseline()?;
+        let local = durable_state_map(&live_refine)?;
+        if stored_base.is_none() && remote_exists && !bootstrap_only_state(&local) {
+            return Err(RefineError::Conflict(format!(
+                "Refine state synchronization baseline is missing while non-bootstrap live state and {remote}/{REFINE_STATE_BRANCH} both exist. Ordinary sync remains fail-closed. Run `refine project state-recovery preview`, review the bounded comparison, then apply it with explicit live or remote authority. Do not recover live state from an isolated candidate worktree."
+            )));
+        }
         let setup = self.ensure_state_worktree(&remote, remote_exists, &live_refine)?;
         let state_root = setup.path;
         let state_refine = state_root.join(".refine");
@@ -133,8 +155,6 @@ impl FileGitSyncService {
         // into the live store. Persist the last successfully copied state so an
         // absent local record is only interpreted as a deletion after this node
         // has actually observed it.
-        let stored_base = self.load_state_baseline()?;
-        let local = durable_state_map(&live_refine)?;
         let before = self.git_at_stdout(&state_root, &["rev-parse", "HEAD"])?;
 
         let mut pulled = setup.pulled;
@@ -163,7 +183,6 @@ impl FileGitSyncService {
             }
         }
 
-        let removed_excluded = self.retire_excluded_tracked_state(&state_root, &state_refine)?;
         let remote_state = durable_state_map(&state_refine)?;
         let bootstrap_remote_state =
             stored_base.is_none() && remote_exists && bootstrap_only_state(&local);
@@ -198,6 +217,10 @@ impl FileGitSyncService {
                 conflicts.join(", ")
             )));
         }
+        // Retirement mutates the managed checkout, so it follows every
+        // fail-closed validation. Successful sync still records the intended
+        // deletions in the next state commit.
+        let removed_excluded = self.retire_excluded_tracked_state(&state_root, &state_refine)?;
         write_reconciled_goal_changes(&state_refine, &reconciled_goals)?;
         apply_local_state_delta(&live_refine, &state_refine, &base, &local, &resolved_paths)?;
 

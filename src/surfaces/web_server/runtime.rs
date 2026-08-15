@@ -13,10 +13,8 @@ use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationProjectionRefresher, OperationRegistry, OperationState,
 };
 use crate::tools::host::agent_providers::HostAgentProviderService;
-#[cfg(test)]
 use crate::tools::host::git_sync::FileGitSyncService;
 use crate::tools::host::project_layout::prepare_refine_dir;
-#[cfg(test)]
 use crate::tools::host::project_layout::refine_dir_for_target_root;
 use crate::tools::host::state_sync_health::{FileStateSyncHealthService, StateSyncHealth};
 use crate::tools::product::chat::FileChatService;
@@ -99,7 +97,6 @@ impl InProcessWebServer {
             .unwrap_or_default()
     }
 
-    #[cfg(test)]
     pub(super) fn current_git_sync_service(&self) -> RefineResult<Option<FileGitSyncService>> {
         let Some(target_root) = self.current_target_root()? else {
             return Ok(None);

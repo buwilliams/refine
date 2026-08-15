@@ -349,6 +349,56 @@ impl FileGitSyncService {
                 "failed to commit Refine state baseline {}: {error}",
                 path.display()
             ))
-        })
+        })?;
+        let parent = path.parent().ok_or_else(|| {
+            RefineError::Io(format!(
+                "Refine state baseline {} has no parent directory",
+                path.display()
+            ))
+        })?;
+        File::open(parent)
+            .and_then(|directory| directory.sync_all())
+            .map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to durably commit Refine state baseline directory {}: {error}",
+                    parent.display()
+                ))
+            })
+    }
+
+    pub(super) fn remove_state_baseline_if_owned(
+        &self,
+        expected: &DurableStateMap,
+    ) -> RefineResult<()> {
+        let path = git_common_dir(&self.target_root)?.join(STATE_BASELINE_FILE);
+        let Some(current) = self.load_state_baseline()? else {
+            return Ok(());
+        };
+        if &current != expected {
+            return Err(RefineError::Conflict(
+                "Refusing to remove a state baseline that is not owned by this recovery."
+                    .to_string(),
+            ));
+        }
+        fs::remove_file(&path).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to roll back Refine state baseline {}: {error}",
+                path.display()
+            ))
+        })?;
+        let parent = path.parent().ok_or_else(|| {
+            RefineError::Io(format!(
+                "Refine state baseline {} has no parent directory",
+                path.display()
+            ))
+        })?;
+        File::open(parent)
+            .and_then(|directory| directory.sync_all())
+            .map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to durably roll back Refine state baseline directory {}: {error}",
+                    parent.display()
+                ))
+            })
     }
 }

@@ -107,6 +107,12 @@ pub enum ProjectAction {
         #[arg(long)]
         cache_dir: Option<PathBuf>,
     },
+    /// Inspect or apply explicit recovery when refine/state exists but the
+    /// persisted three-way synchronization baseline is missing.
+    StateRecovery {
+        #[command(subcommand)]
+        action: ProjectStateRecoveryAction,
+    },
     /// Inspect or hibernate clean inactive Goal worktrees for the attached target app.
     ///
     /// Dry-run is the default. Recoverable branches remain; exact integrated refs may be retired.
@@ -136,4 +142,32 @@ pub enum ProjectAction {
         #[arg(long, default_value = ".")]
         repo_root: PathBuf,
     },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ProjectStateRecoveryAction {
+    /// Produce a read-only, bounded comparison suitable for operator review.
+    Preview {
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
+        target_root: Option<PathBuf>,
+    },
+    /// Apply a previously saved preview with an explicit authority choice.
+    Apply {
+        /// Which side is authoritative for the exceptional recovery.
+        #[arg(long, value_enum)]
+        authority: CliStateRecoveryAuthority,
+        /// JSON file containing the complete preview returned by `preview`.
+        #[arg(long)]
+        preview_file: PathBuf,
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
+        target_root: Option<PathBuf>,
+    },
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub enum CliStateRecoveryAuthority {
+    Live,
+    Remote,
 }

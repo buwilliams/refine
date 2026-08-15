@@ -28,7 +28,7 @@ pub use fleet::FleetAction;
 pub use goals::GoalAction;
 pub use logs::LogAction;
 pub use nodes::NodeAction;
-pub use projects::ProjectAction;
+pub use projects::{CliStateRecoveryAuthority, ProjectAction, ProjectStateRecoveryAction};
 pub use system::{CliInstallTarget, SystemAction};
 pub use todos::TodoAction;
 pub use workflow::{CliGoalStatus, WorkflowAction};

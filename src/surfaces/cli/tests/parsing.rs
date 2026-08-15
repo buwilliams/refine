@@ -93,6 +93,54 @@ fn project_worktree_cleanup_is_dry_run_by_default_and_requires_explicit_apply() 
 }
 
 #[test]
+fn project_state_recovery_requires_a_preview_file_and_explicit_authority() {
+    let preview = Cli::try_parse_from(["refine", "project", "state-recovery", "preview"]).unwrap();
+    assert!(matches!(
+        preview.command,
+        Commands::Project {
+            action: ProjectAction::StateRecovery {
+                action: ProjectStateRecoveryAction::Preview { target_root: None }
+            }
+        }
+    ));
+
+    let apply = Cli::try_parse_from([
+        "refine",
+        "project",
+        "state-recovery",
+        "apply",
+        "--authority",
+        "remote",
+        "--preview-file",
+        "/tmp/preview.json",
+    ])
+    .unwrap();
+    assert!(matches!(
+        apply.command,
+        Commands::Project {
+            action: ProjectAction::StateRecovery {
+                action: ProjectStateRecoveryAction::Apply {
+                    authority: CliStateRecoveryAuthority::Remote,
+                    preview_file,
+                    target_root: None,
+                }
+            }
+        } if preview_file.as_path() == std::path::Path::new("/tmp/preview.json")
+    ));
+    assert!(
+        Cli::try_parse_from([
+            "refine",
+            "project",
+            "state-recovery",
+            "apply",
+            "--preview-file",
+            "/tmp/preview.json",
+        ])
+        .is_err()
+    );
+}
+
+#[test]
 fn todo_commands_parse_explicit_reporter_and_identifiers() {
     let parsed = Cli::try_parse_from([
         "refine",

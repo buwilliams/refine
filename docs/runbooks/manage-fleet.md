@@ -176,3 +176,56 @@ state appears on it before distributing work.
 - Fleet state does not appear: inspect `refine system status` and the System
   process diagnostics. Reconciliation retries automatically; users should not
   edit, stash, commit, or force-push application files to repair Refine state.
+
+## Recover a missing synchronization baseline
+
+Use this procedure only when sync explicitly reports that its persisted
+three-way baseline is missing while non-bootstrap live state and the configured
+remote's existing `refine/state` branch are both present. Ordinary sync remains
+fail-closed in this topology and does not choose either side.
+
+1. Run the preview through the daemon-backed CLI and save the complete JSON:
+
+```bash
+refine project state-recovery preview > /tmp/refine-state-recovery-preview.json
+```
+
+   The preview is read-only. Confirm its target identity, configured remote,
+   exact local and remote state heads, missing baseline status, live-only,
+   remote-only, equal, and differing counts, and its bounded conflicting path
+   list. Do not edit the preview: the complete object is stale-fenced evidence.
+2. Choose authority explicitly:
+
+   - `live` anchors at the observed remote head, then uses normal state delta
+     semantics to publish live additions, modifications, and deletions as one
+     linear non-force commit. A path present only on the remote is deleted.
+   - `remote` first commits the complete pre-recovery live durable state to a
+     dedicated recovery ref, then compare-and-swap hydrates the observed remote
+     state into the live store.
+
+3. Apply the reviewed evidence:
+
+```bash
+refine project state-recovery apply --authority live \
+  --preview-file /tmp/refine-state-recovery-preview.json
+# or: --authority remote
+```
+
+   The equivalent daemon API is
+   `GET /api/project/state-recovery/preview` followed by
+   `POST /api/project/state-recovery/apply` with `authority` and the complete
+   `preview` object.
+4. Read the result and inspect the reported recovery ref and manifest under the
+   repository's Git common directory in `refine-state-recoveries/`. The bounded
+   manifest records authority, node, target and remote identity, before/after
+   heads, counts, timestamps, outcome, and recovery location. Only a successful
+   result creates the baseline.
+5. If apply fails or is interrupted, do not delete its recovery ref or
+   manifest and do not fabricate a baseline. Retry with the same preview when
+   the failure is retryable; a changed target, repository, remote, remote head,
+   or unrelated live write requires a new preview and operator review.
+
+Never run this live recovery from a Goal candidate or other isolated worktree.
+Run it through the daemon attached to the production target app. Recovery never
+accepts a remote override, force-pushes, rewrites history, or changes the
+application branch, index, or worktree.

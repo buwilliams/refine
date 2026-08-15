@@ -1,3 +1,4 @@
+mod recovery;
 mod remote;
 mod safety;
 mod synchronization;

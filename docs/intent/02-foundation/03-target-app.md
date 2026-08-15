@@ -50,6 +50,13 @@ The current implementation details that matter to intent are:
 - Git provides history, isolation, rollback, and merge discipline;
 - shared services and daemon routes should coordinate state mutation so surfaces do not compete for authority.
 - the active checkout-owned daemon is the normal configuration mutation authority for browser and CLI. Guidance and Governance collection revisions make stale writers explicit while stable item ids preserve unrelated entries; no surface writes `.git/refine-live-state` directly or creates a parallel configuration model.
+- the synchronization baseline is durable authority for ordinary three-way
+  reconciliation. If it is absent while both non-bootstrap live state and a
+  remote `refine/state` branch exist, automatic and manual sync fail closed.
+  Recovery is a separate daemon-owned capability: a read-only, bounded preview
+  must be supplied back with an explicit live or remote authority choice, both
+  sides remain recoverable, and a successful apply records atomic local audit
+  evidence before establishing a new baseline.
 
 The important boundary is source of truth. Caches, indexes, projections, and UI state are allowed and necessary for performance, but they should not replace durable target-app state. If a cache is wrong, the repair path should be refresh or rebuild, not manual database surgery.
 

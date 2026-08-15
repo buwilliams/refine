@@ -117,7 +117,7 @@ fn push_retry_rechecks_original_base_against_fresh_local_and_remote_state() {
 }
 
 #[test]
-fn failed_first_reconciliation_does_not_turn_remote_records_into_local_deletions() {
+fn missing_first_reconciliation_requires_explicit_authority_without_deleting_remote_records() {
     let fixture = SyncFixture::new("failed-first-reconciliation");
     write_goal(&fixture.a, "GOALA");
     let refine_a = refine_dir_for_target_root(&fixture.a).unwrap();
@@ -128,12 +128,23 @@ fn failed_first_reconciliation_does_not_turn_remote_records_into_local_deletions
     fixture.service(&fixture.a).sync().unwrap();
 
     let error = fixture.service(&fixture.b).sync().unwrap_err();
-    assert!(error.to_string().contains("shared.json"), "{error}");
-    fs::copy(refine_a.join("shared.json"), refine_b.join("shared.json")).unwrap();
+    assert!(error.to_string().contains("baseline is missing"), "{error}");
+    assert!(refine_b.join("shared.json").exists());
+    assert!(
+        !git_stdout(
+            &fixture.b,
+            &["show", "origin/refine/state:.refine/goals/GOALA/goal.json"],
+        )
+        .is_empty()
+    );
 
-    let recovered = fixture.service(&fixture.b).sync().unwrap();
+    let service = fixture.service(&fixture.b);
+    let preview = service.preview_state_recovery().unwrap();
+    let recovered = service
+        .apply_state_recovery(StateRecoveryAuthority::Remote, preview)
+        .unwrap();
 
-    assert!(!recovered.committed, "{recovered:?}");
+    assert!(recovered.baseline_created, "{recovered:?}");
     assert!(refine_b.join("goals/GOALA/goal.json").exists());
     assert!(
         !git_stdout(

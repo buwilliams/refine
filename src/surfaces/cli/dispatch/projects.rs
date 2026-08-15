@@ -175,6 +175,72 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
         }
         Commands::Project {
             action:
+                ProjectAction::StateRecovery {
+                    action:
+                        ProjectStateRecoveryAction::Preview {
+                            target_root: Some(target_root),
+                        },
+                },
+        } => {
+            let runtime_root = refine_dir_for_target_root(&target_root)?.join("runtime");
+            let preview =
+                FileGitSyncService::new(target_root, runtime_root).preview_state_recovery()?;
+            print_json(&serde_json::to_value(preview).unwrap());
+            Ok(())
+        }
+        Commands::Project {
+            action:
+                ProjectAction::StateRecovery {
+                    action:
+                        ProjectStateRecoveryAction::Apply {
+                            authority,
+                            preview_file,
+                            target_root: Some(target_root),
+                        },
+                },
+        } => {
+            let preview = read_state_recovery_preview(&preview_file)?;
+            let runtime_root = refine_dir_for_target_root(&target_root)?.join("runtime");
+            let result = FileGitSyncService::new(target_root, runtime_root)
+                .apply_state_recovery(recovery_authority(authority), preview)?;
+            print_json(&serde_json::to_value(result).unwrap());
+            Ok(())
+        }
+        Commands::Project {
+            action:
+                ProjectAction::StateRecovery {
+                    action: ProjectStateRecoveryAction::Preview { target_root: None },
+                },
+        } => {
+            let response = daemon_json("GET", "/project/state-recovery/preview", None)?;
+            print_json(&response);
+            Ok(())
+        }
+        Commands::Project {
+            action:
+                ProjectAction::StateRecovery {
+                    action:
+                        ProjectStateRecoveryAction::Apply {
+                            authority,
+                            preview_file,
+                            target_root: None,
+                        },
+                },
+        } => {
+            let preview = read_state_recovery_preview(&preview_file)?;
+            let response = daemon_json(
+                "POST",
+                "/project/state-recovery/apply",
+                Some(json!({
+                    "authority": recovery_authority(authority),
+                    "preview": preview
+                })),
+            )?;
+            print_json(&response);
+            Ok(())
+        }
+        Commands::Project {
+            action:
                 ProjectAction::CleanupWorktrees {
                     apply,
                     older_than_seconds,
@@ -255,6 +321,26 @@ pub(super) fn dispatch_project_daemon(action: ProjectAction) -> RefineResult<()>
         }
         ProjectAction::Migrate { .. } => daemon_json("POST", "/project/migrate", None)?,
         ProjectAction::Sync { .. } => daemon_json("POST", "/project/sync", None)?,
+        ProjectAction::StateRecovery { action } => match action {
+            ProjectStateRecoveryAction::Preview { .. } => {
+                daemon_json("GET", "/project/state-recovery/preview", None)?
+            }
+            ProjectStateRecoveryAction::Apply {
+                authority,
+                preview_file,
+                ..
+            } => {
+                let preview = read_state_recovery_preview(&preview_file)?;
+                daemon_json(
+                    "POST",
+                    "/project/state-recovery/apply",
+                    Some(json!({
+                        "authority": recovery_authority(authority),
+                        "preview": preview
+                    })),
+                )?
+            }
+        },
         ProjectAction::CleanupWorktrees {
             apply,
             older_than_seconds,
@@ -271,4 +357,34 @@ pub(super) fn dispatch_project_daemon(action: ProjectAction) -> RefineResult<()>
     };
     print_json(&response);
     Ok(())
+}
+
+fn read_state_recovery_preview(
+    path: &Path,
+) -> RefineResult<crate::tools::host::git_sync::StateRecoveryPreview> {
+    let bytes = fs::read(path).map_err(|error| {
+        RefineError::InvalidInput(format!(
+            "failed to read state recovery preview {}: {error}",
+            path.display()
+        ))
+    })?;
+    serde_json::from_slice(&bytes).map_err(|error| {
+        RefineError::InvalidInput(format!(
+            "failed to parse state recovery preview {}: {error}",
+            path.display()
+        ))
+    })
+}
+
+fn recovery_authority(
+    authority: CliStateRecoveryAuthority,
+) -> crate::tools::host::git_sync::StateRecoveryAuthority {
+    match authority {
+        CliStateRecoveryAuthority::Live => {
+            crate::tools::host::git_sync::StateRecoveryAuthority::Live
+        }
+        CliStateRecoveryAuthority::Remote => {
+            crate::tools::host::git_sync::StateRecoveryAuthority::Remote
+        }
+    }
 }
