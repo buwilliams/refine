@@ -8,7 +8,11 @@ function browserRuntime() {
   const context = vm.createContext({
     URLSearchParams,
     location: { hash: "#/" },
+    state: { currentRoute: "dashboard", dashboard: null },
     htmlEscape(value) { return String(value); },
+    sharedNodeScopeFromHash() { return "current"; },
+    captureNodeContextGeneration() { return 0; },
+    isNodeContextGenerationCurrent(generation) { return generation === 0; },
   });
   for (const file of [
     "../src/surfaces/web/static/js/features/goals-list.js",
@@ -25,6 +29,12 @@ function browserRuntime() {
       resetRecovery: () => { dashboardStateRecovery = newDashboardStateRecovery(""); },
       clearRecoveryForRoute: () => clearDashboardStateRecoveryForRouteChange(),
       setRecoveryPreview: (preview) => dashboardRecoverySetPreview(preview),
+      setRecoveryContext: (dashboard) => {
+        state.currentRoute = "dashboard";
+        state.dashboard = dashboard;
+        dashboardStateRecovery = newDashboardStateRecovery(dashboardRecoveryContextKey(dashboard));
+      },
+      setRecoveryRoute: (route) => { state.currentRoute = route; },
       renderRecovery: (dashboard) => renderDashboardStateRecovery(dashboard),
       selectRecoveryAuthority: (authority) => dashboardRecoverySelectAuthority(authority),
       confirmRecovery: (confirmed, evidenceId) => dashboardRecoverySetConfirmed(confirmed, evidenceId),
@@ -39,6 +49,11 @@ function browserRuntime() {
         previewRefreshRequired: dashboardStateRecovery.previewRefreshRequired,
       }),
       setDashboardApi: (implementation) => { dashboardApi = implementation; },
+      setRecoveryUiHooks: (redraw, refresh) => {
+        redrawDashboardRecovery = redraw;
+        refreshDashboard = refresh;
+      },
+      applyRecovery: () => applyDashboardStateRecovery(),
       reconcileRecovery: (dashboard) => reconcileDashboardStateRecovery(dashboard),
       completeRecovery: (result) => {
         dashboardStateRecovery.phase = "success";
@@ -151,6 +166,25 @@ function recoveryPreview() {
   };
 }
 
+function recoveryResult() {
+  return {
+    authority: "remote",
+    baseline_created: true,
+    remote_state_head: "published-head",
+    local_state_head: "local-after",
+    recovery_location: "refs/refine/state-recovery/evidence-123/remote",
+    manifest_path: "/git/refine-state-recoveries/evidence-123-remote.json",
+    path_counts: recoveryPreview().path_counts,
+    detail: "Remote authority recovery completed.",
+    state_sync_health: {
+      status: "healthy",
+      target_root: "/target",
+      node_id: "default",
+      revision: 2,
+    },
+  };
+}
+
 test("recovery preview renders complete evidence with neutral unselected authority", () => {
   const runtime = browserRuntime();
   runtime.resetRecovery();
@@ -243,16 +277,7 @@ test("successful recovery retains evidence and renders authoritative health clea
   const runtime = browserRuntime();
   runtime.resetRecovery();
   runtime.setRecoveryPreview(recoveryPreview());
-  runtime.completeRecovery({
-    authority: "remote",
-    baseline_created: true,
-    remote_state_head: "published-head",
-    local_state_head: "local-after",
-    recovery_location: "refs/refine/state-recovery/evidence-123/remote",
-    manifest_path: "/git/refine-state-recoveries/evidence-123-remote.json",
-    path_counts: recoveryPreview().path_counts,
-    detail: "Remote authority recovery completed.",
-  });
+  runtime.completeRecovery(recoveryResult());
 
   const html = runtime.renderRecovery({
     ...recoveryDashboard(),
@@ -265,4 +290,47 @@ test("successful recovery retains evidence and renders authoritative health clea
     "/git/refine-state-recoveries/evidence-123-remote.json", "evidence-123",
     "Remote authority recovery completed.",
   ]) assert.match(html, new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+});
+
+test("successful apply paints retained evidence before the health refetch settles", async () => {
+  const runtime = browserRuntime();
+  const dashboard = recoveryDashboard();
+  dashboard.state_sync_health.revision = 1;
+  runtime.setRecoveryContext(dashboard);
+  runtime.setRecoveryPreview(recoveryPreview());
+  runtime.selectRecoveryAuthority("remote");
+  runtime.confirmRecovery(true, "evidence-123");
+  runtime.setDashboardApi(async () => recoveryResult());
+  const phases = [];
+  runtime.setRecoveryUiHooks(
+    () => phases.push(runtime.recoveryState().phase),
+    async () => { throw new Error("health refresh unavailable"); },
+  );
+
+  await runtime.applyRecovery();
+
+  assert.deepEqual(phases, ["applying", "success", "success"]);
+  assert.equal(runtime.recoveryState().phase, "success");
+  assert.match(runtime.renderRecovery(dashboard), /State-sync error cleared:<\/strong> Yes/);
+});
+
+test("late apply completion cannot restore recovery state after route context changes", async () => {
+  const runtime = browserRuntime();
+  runtime.setRecoveryContext(recoveryDashboard());
+  runtime.setRecoveryPreview(recoveryPreview());
+  runtime.selectRecoveryAuthority("live");
+  runtime.confirmRecovery(true, "evidence-123");
+  let resolveApply;
+  runtime.setDashboardApi(() => new Promise((resolve) => { resolveApply = resolve; }));
+  runtime.setRecoveryUiHooks(() => {}, async () => {});
+
+  const apply = runtime.applyRecovery();
+  runtime.setRecoveryRoute("goals");
+  runtime.clearRecoveryForRoute();
+  resolveApply(recoveryResult());
+  await apply;
+
+  assert.equal(runtime.recoveryState().phase, "idle");
+  assert.equal(runtime.recoveryState().preview, null);
+  assert.equal(runtime.recoveryState().authority, "");
 });

@@ -83,14 +83,41 @@ fn missing_baseline_recovery_kind_is_typed_and_cleared_by_success() {
         "missing_baseline"
     );
 
-    service
-        .record_success(&target, "node-a")
+    let (settled, activity) = service
+        .record_recovery_success(&target, "node-a", StateSyncRecoveryKind::MissingBaseline)
         .expect("recovered");
+    assert!(settled);
+    assert!(matches!(
+        activity,
+        Some(StateSyncHealthActivity::Recovered { .. })
+    ));
     let recovered = service
         .inspect(&target, "node-a", Duration::from_secs(900))
         .expect("recovered health");
     assert_eq!(recovered.status, "healthy");
     assert_eq!(recovered.recovery_kind, None);
+
+    service
+        .record_failure(&target, "node-a", "unrelated fetch failure")
+        .expect("unrelated failure");
+    let unrelated_revision = service
+        .inspect(&target, "node-a", Duration::from_secs(900))
+        .expect("unrelated health")
+        .revision;
+    let (settled, activity) = service
+        .record_recovery_success(&target, "node-a", StateSyncRecoveryKind::MissingBaseline)
+        .expect("conditional settlement");
+    assert!(!settled);
+    assert_eq!(activity, None);
+    let unchanged = service
+        .inspect(&target, "node-a", Duration::from_secs(900))
+        .expect("unchanged health");
+    assert_eq!(unchanged.status, "failed");
+    assert_eq!(
+        unchanged.last_error.as_deref(),
+        Some("unrelated fetch failure")
+    );
+    assert_eq!(unchanged.revision, unrelated_revision);
 
     fs::remove_dir_all(temp).expect("cleanup");
 }

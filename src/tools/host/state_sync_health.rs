@@ -188,22 +188,7 @@ impl FileStateSyncHealthService {
     ) -> RefineResult<Option<StateSyncHealthActivity>> {
         let mut activity = None;
         self.update(target_root, node_id, |record| {
-            if let Some(failure_since) = record.failure_since.clone() {
-                activity = Some(StateSyncHealthActivity::Recovered { failure_since });
-            }
-            let now = now_timestamp();
-            record.last_attempt_at = Some(now.clone());
-            record.last_attempt_outcome = Some("succeeded".to_string());
-            record.last_success_at = Some(now);
-            record.last_success_attempt_id = record.last_attempt_id;
-            record.failure_since = None;
-            record.last_failure_at = None;
-            record.last_error = None;
-            record.last_conflict_report_id = None;
-            record.last_conflict_report_location = None;
-            record.recovery_kind = None;
-            record.last_reminder_at = None;
-            record.remote_configured = Some(true);
+            activity = settle_success_record(record);
         })?;
         Ok(activity)
     }
@@ -244,6 +229,21 @@ impl FileStateSyncHealthService {
             record.remote_configured = Some(true);
         })?;
         Ok(activity)
+    }
+
+    pub fn record_recovery_success(
+        &self,
+        target_root: &Path,
+        node_id: &str,
+        expected_kind: StateSyncRecoveryKind,
+    ) -> RefineResult<(bool, Option<StateSyncHealthActivity>)> {
+        let activity = self.update_if(target_root, node_id, |record| {
+            (record.recovery_kind == Some(expected_kind)).then(|| settle_success_record(record))
+        })?;
+        Ok(match activity {
+            Some(activity) => (true, activity),
+            None => (false, None),
+        })
     }
 
     pub fn record_failure(
@@ -359,6 +359,19 @@ impl FileStateSyncHealthService {
         node_id: &str,
         mutate: impl FnOnce(&mut StateSyncHealthRecord),
     ) -> RefineResult<()> {
+        self.update_if(target_root, node_id, |record| {
+            mutate(record);
+            Some(())
+        })?;
+        Ok(())
+    }
+
+    fn update_if<T>(
+        &self,
+        target_root: &Path,
+        node_id: &str,
+        mutate: impl FnOnce(&mut StateSyncHealthRecord) -> Option<T>,
+    ) -> RefineResult<Option<T>> {
         fs::create_dir_all(&self.runtime_root).map_err(|error| {
             RefineError::Io(format!(
                 "failed to create state-sync health root {}: {error}",
@@ -397,9 +410,12 @@ impl FileStateSyncHealthService {
                 record.revision = previous_revision;
                 record
             });
-        mutate(&mut record);
+        let Some(result) = mutate(&mut record) else {
+            return Ok(None);
+        };
         record.revision = record.revision.saturating_add(1);
-        self.write(&record)
+        self.write(&record)?;
+        Ok(Some(result))
     }
 
     fn read(&self) -> RefineResult<Option<StateSyncHealthRecord>> {
@@ -449,6 +465,27 @@ impl FileStateSyncHealthService {
             ))
         })
     }
+}
+
+fn settle_success_record(record: &mut StateSyncHealthRecord) -> Option<StateSyncHealthActivity> {
+    let activity = record
+        .failure_since
+        .clone()
+        .map(|failure_since| StateSyncHealthActivity::Recovered { failure_since });
+    let now = now_timestamp();
+    record.last_attempt_at = Some(now.clone());
+    record.last_attempt_outcome = Some("succeeded".to_string());
+    record.last_success_at = Some(now);
+    record.last_success_attempt_id = record.last_attempt_id;
+    record.failure_since = None;
+    record.last_failure_at = None;
+    record.last_error = None;
+    record.last_conflict_report_id = None;
+    record.last_conflict_report_location = None;
+    record.recovery_kind = None;
+    record.last_reminder_at = None;
+    record.remote_configured = Some(true);
+    activity
 }
 
 fn derive_health(

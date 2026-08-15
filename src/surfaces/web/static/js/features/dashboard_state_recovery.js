@@ -145,8 +145,14 @@ function renderDashboardRecoverySuccess(d) {
   const result = dashboardStateRecovery.result;
   const preview = dashboardStateRecovery.preview;
   if (!result) return "";
-  const currentHealth = d?.state_sync_health || result.state_sync_health || {};
-  const healthCleared = currentHealth.status !== "failed"
+  const dashboardHealth = d?.state_sync_health || {};
+  const resultHealth = result.state_sync_health || {};
+  const dashboardRevision = Number(dashboardHealth.revision ?? -1);
+  const resultRevision = Number(resultHealth.revision ?? -1);
+  const currentHealth = resultHealth.status && resultRevision >= dashboardRevision
+    ? resultHealth
+    : dashboardHealth;
+  const healthCleared = !!currentHealth.status && currentHealth.status !== "failed"
     && currentHealth.recovery_kind !== DASHBOARD_MISSING_BASELINE_RECOVERY;
   return `
     <section class="dashboard-state-recovery success" data-testid="state-recovery-success">
@@ -256,6 +262,14 @@ function redrawDashboardRecovery() {
   drawDashboard(state.dashboard, state.dashboardReviewSnapshot || {});
 }
 
+function dashboardRecoveryApplyContextCurrent(context) {
+  return state.currentRoute === "dashboard"
+    && dashboardScopeFromHash() === context.scope
+    && isNodeContextGenerationCurrent(context.nodeGeneration)
+    && dashboardStateRecovery.contextKey === context.contextKey
+    && dashboardStateRecovery.preview?.evidence_id === context.evidenceId;
+}
+
 async function refreshDashboardRecoveryPreview() {
   const contextKey = dashboardStateRecovery.contextKey;
   dashboardStateRecovery = newDashboardStateRecovery(contextKey);
@@ -265,22 +279,37 @@ async function refreshDashboardRecoveryPreview() {
 async function applyDashboardStateRecovery() {
   if (!dashboardRecoveryApplyReady()) return;
   const payload = dashboardRecoveryApplyPayload();
+  const context = {
+    contextKey: dashboardStateRecovery.contextKey,
+    evidenceId: dashboardStateRecovery.preview.evidence_id,
+    scope: dashboardScopeFromHash(),
+    nodeGeneration: captureNodeContextGeneration(),
+  };
   dashboardStateRecovery.phase = "applying";
   redrawDashboardRecovery();
+  let result;
   try {
-    const result = await dashboardApi(
+    result = await dashboardApi(
       "POST",
       "/api/project/state-recovery/apply",
       payload,
     );
-    dashboardStateRecovery.phase = "success";
-    dashboardStateRecovery.confirmedEvidenceId = "";
-    dashboardStateRecovery.result = result;
-    dashboardStateRecovery.error = "";
-    await refreshDashboard();
   } catch (error) {
+    if (!dashboardRecoveryApplyContextCurrent(context)) return;
     dashboardRecoveryHandleConflict(error);
     redrawDashboardRecovery();
+    return;
+  }
+  if (!dashboardRecoveryApplyContextCurrent(context)) return;
+  dashboardStateRecovery.phase = "success";
+  dashboardStateRecovery.confirmedEvidenceId = "";
+  dashboardStateRecovery.result = result;
+  dashboardStateRecovery.error = "";
+  redrawDashboardRecovery();
+  try {
+    await refreshDashboard();
+  } catch (_) {
+    if (dashboardRecoveryApplyContextCurrent(context)) redrawDashboardRecovery();
   }
 }
 
