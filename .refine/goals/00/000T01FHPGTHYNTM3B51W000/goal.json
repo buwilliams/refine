@@ -1,7 +1,7 @@
 {
   "base_commit": "d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f",
   "branch_name": "refine/00000T01FHPGTHYNTM3B51W000/round-5",
-  "candidate_commit": "1394d8d16f8d2898a1b025496ebdeb53a438721a",
+  "candidate_commit": "20105b9a78f1977a34c3d8e2e1dd573e4eb85df9",
   "created": "2026-08-15T15:02:01Z",
   "feature_id": null,
   "feature_order": null,
@@ -4253,13 +4253,15 @@
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
       "prompt": "Recover the missing-baseline Dashboard recovery workflow through a fresh Round 5 because Round 4 ended in a Quality harness fault, not a product or candidate failure. Preserve every prior Round, branch, commit, log, failed operation, and Quality report as immutable evidence; do not delete, reset, amend, clean, or directly merge historical artifacts. The retained corrected Round 4 candidate is 827c7f56fa94b7f8d61eda21dc4ff813cc16d98f on refine/00000T01FHPGTHYNTM3B51W000/round-4, with pre-Quality candidate dfdfa68f093cd695ecb106f8dd6a19e8fb3ea867 and original Round 4 base 4519b5ff2c5894b0fccf1c4c0e57612f694ffe79. Round 4 Quality changed only src/surfaces/web/static/js/features/dashboard_state_recovery.js and tests/web_dashboard_attention.test.js so retained success yields to a newer missing-baseline failure episode for the same target, node, and scope, triggering a fresh preview with authority and confirmation reset. Its recorded focused checks passed, but the final predicate never ran because a single-quoted bash -lc wrapper could not parse nested single-quoted Git exclude pathspecs. Treat 827c7f56 as recovery evidence, not passing exact-candidate Quality. At Round 5 claim time, compare the actual current main and configured remote main with 4519b5ff..827c7f56, then selectively reapply and reconcile the complete Goal-specific semantic delta while preserving all unrelated current-main behavior. Current inspection found local main d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f and origin/main 9729b9b4be27f7a58629d8f04a1c0e8171636c82; their six-path worktree-handoff advance has no path overlap with the 25-path Goal delta, but re-read both heads because main may move again. Preserve the original contract: daemon-owned Git and durable-state mutation, typed missing-baseline eligibility, atomic target-and-node-bound health settlement, complete-preview stale fencing, typed git_busy and stale_preview recovery, neutral unselected authority plus separate exact-preview confirmation, late-response and context fencing, retained recovery audit evidence, focused Rust API and browser regressions, and only the affected Dashboard, API, and runbook documentation. Include the Round 4 lifecycle correction and regression. Produce a clean fresh candidate from the Round 5 base, prove recovered-delta fidelity and cumulative scope without blind merging, and run fresh exact-candidate formatting, cargo check, focused Git recovery, state-sync, state-recovery API and CLI, Dashboard, browser, and command-channel handoff checks. Report unchanged baseline failures and unavailable Playwright Chromium skips separately. Keep predicate commands shell-safe: do not nest single-quoted Git pathspecs inside a single-quoted bash -lc payload; use independently supervised commands or quoting that the outer shell preserves. Let fresh Quality and Governance evaluate the new exact candidate normally. Do not approve, merge, or push.",
+      "quality_agent_report": "Quality reviewed and corrected Round 5. Added revision-fenced target/node health settlement so a successful apply cannot clear or overwrite a newer same-kind state-sync episode, and made Git contention return typed git_busy for both missing-baseline and newer valid-baseline reported recovery. Added focused no-mutation and newer-episode regressions. Focused Rust/API/CLI/Dashboard/browser/command-channel checks pass; the full Rust gate has only two unchanged pinned-base failures, and Playwright Chromium remains unavailable for 27 browser tests.",
+      "quality_candidate_commit": "20105b9a78f1977a34c3d8e2e1dd573e4eb85df9",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T21:05:52Z",
+      "updated": "2026-08-15T21:18:22Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T20:40:24Z",
         "round_idx": 4,
@@ -4271,6 +4273,6 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-15T21:05:52Z",
-  "workflow_revision": 107
+  "updated": "2026-08-15T21:18:22Z",
+  "workflow_revision": 109
 }
