@@ -2607,8 +2607,37 @@
           "round_idx": 3,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-08-15T19:07:57Z",
+        "criticism": {
+          "completed_at": "2026-08-15T19:09:46Z",
+          "git_after": {
+            "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-4",
+            "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-4",
+            "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P7",
+                  "P8"
+                ],
+                "description": "P7 carries forward regression coverage and P8 produces a new candidate for later evaluation, but neither requires running fresh verification against the exact final Round 4 commit, so the plan does not fulfill the Latest Round instruction to replace the infrastructure-failed prior attempt with durable exact-candidate evidence.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Revise P8 or add a verification item that records the final candidate SHA, proves recovered-delta and cumulative-scope fidelity, and runs the focused Rust/API/browser suites plus targeted formatting and cumulative diff checks on that exact commit, reporting baseline failures or environment skips separately."
+              }
+            ],
+            "summary": "Add explicit fresh exact-candidate verification so the recovered Round 4 commit has durable evidence independent of the failed prior Quality attempt."
+          },
+          "started_at": "2026-08-15T19:07:57Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-08-15T19:09:46Z",
         "proposal": {
           "completed_at": "2026-08-15T19:07:56Z",
           "git_after": {
@@ -2663,7 +2692,7 @@
         "schema_version": 2,
         "started_at": "2026-08-15T19:05:44Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T19:07:57Z"
+        "updated_at": "2026-08-15T19:09:46Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -2677,7 +2706,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T19:07:57Z",
+      "updated": "2026-08-15T19:09:46Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T19:05:44Z",
         "round_idx": 3,
@@ -2689,6 +2718,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-15T19:07:57Z",
-  "workflow_revision": 75
+  "updated": "2026-08-15T19:09:46Z",
+  "workflow_revision": 77
 }
