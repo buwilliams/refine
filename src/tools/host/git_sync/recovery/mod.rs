@@ -47,7 +47,17 @@ impl Drop for DisposableCheckout {
 }
 
 fn stale_recovery(reason: &str) -> RefineError {
-    RefineError::Conflict(format!(
-        "State recovery preview is stale because {reason}; run a new read-only preview."
-    ))
+    RefineError::StateRecoveryConflict {
+        reason: crate::process::supervisor::errors::StateRecoveryConflictReason::StalePreview,
+        message: format!(
+            "State recovery preview is stale because {reason}; run a new read-only preview."
+        ),
+    }
+}
+
+fn git_busy_recovery() -> RefineError {
+    RefineError::StateRecoveryConflict {
+        reason: crate::process::supervisor::errors::StateRecoveryConflictReason::GitBusy,
+        message: "Repository Git operations are busy; recovery was not started.".to_string(),
+    }
 }

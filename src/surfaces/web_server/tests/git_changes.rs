@@ -287,6 +287,7 @@ fn web_server_state_recovery_routes_are_thin_and_structured() {
     });
     assert_eq!(preview.status, 400, "{:#}", preview.body);
     assert_eq!(preview.body["error"]["code"], "invalid_input");
+    assert!(preview.body["error"].get("reason").is_none());
 
     let apply = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -368,20 +369,78 @@ fn web_server_state_recovery_preview_and_apply_use_the_shared_service() {
 
     let mut server = server_with_projection();
     server.target_root = Some(b.clone());
-    server.runtime_root = Some(b.join("run"));
+    let runtime_root = b.join("run");
+    server.runtime_root = Some(runtime_root.clone());
+    crate::tools::host::state_sync_health::FileStateSyncHealthService::new(&runtime_root)
+        .record_failure_with_recovery_kind(
+            &b,
+            "default",
+            "baseline missing",
+            Some(crate::tools::host::state_sync_health::StateSyncRecoveryKind::MissingBaseline),
+        )
+        .unwrap();
     let preview = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/project/state-recovery/preview".to_string(),
         body: None,
     });
     assert_eq!(preview.status, 200, "{:#}", preview.body);
-    let applied = server.handle(ApiRequest {
+
+    fs::write(
+        refine_b.join("goals/LIVE/changed-after-preview.json"),
+        "{}\n",
+    )
+    .unwrap();
+    let stale = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/project/state-recovery/apply".to_string(),
         body: Some(json!({"authority": "remote", "preview": preview.body})),
     });
+    assert_eq!(stale.status, 409, "{:#}", stale.body);
+    assert_eq!(stale.body["error"]["reason"], "stale_preview");
+    assert!(!b.join(".git/refine-state-baseline.json").exists());
+
+    let fresh_preview = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/project/state-recovery/preview".to_string(),
+        body: None,
+    });
+    assert_eq!(fresh_preview.status, 200, "{:#}", fresh_preview.body);
+    let (held_tx, held_rx) = std::sync::mpsc::channel();
+    let (release_tx, release_rx) = std::sync::mpsc::channel();
+    let locked_target = b.clone();
+    let holder = thread::spawn(move || {
+        crate::tools::host::git_sync::with_repository_git_lock(&locked_target, || {
+            held_tx.send(()).unwrap();
+            release_rx.recv().unwrap();
+            Ok(())
+        })
+        .unwrap();
+    });
+    held_rx.recv().unwrap();
+    let busy = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/project/state-recovery/apply".to_string(),
+        body: Some(json!({"authority": "remote", "preview": fresh_preview.body.clone()})),
+    });
+    assert_eq!(busy.status, 409, "{:#}", busy.body);
+    assert_eq!(busy.body["error"]["reason"], "git_busy");
+    assert!(!b.join(".git/refine-state-baseline.json").exists());
+    release_tx.send(()).unwrap();
+    holder.join().unwrap();
+
+    let applied = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/project/state-recovery/apply".to_string(),
+        body: Some(json!({"authority": "remote", "preview": fresh_preview.body})),
+    });
     assert_eq!(applied.status, 200, "{:#}", applied.body);
     assert_eq!(applied.body["baseline_created"], true);
+    assert_eq!(applied.body["health_settled"], true);
+    assert_eq!(applied.body["state_sync_health"]["status"], "healthy");
+    assert!(applied.body["state_sync_health"]["recovery_kind"].is_null());
+    assert!(applied.body["recovery_location"].as_str().is_some());
+    assert!(applied.body["manifest_path"].as_str().is_some());
     assert!(refine_b.join("goals/REMOTE/goal.json").exists());
     assert!(!refine_b.join("goals/LIVE/goal.json").exists());
 

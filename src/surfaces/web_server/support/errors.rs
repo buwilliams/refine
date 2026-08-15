@@ -9,20 +9,25 @@ pub(in crate::surfaces::web_server) fn error_response(error: RefineError) -> Api
         RefineError::InvalidInput(_) => (400, "invalid_input"),
         RefineError::NotFound(_) => (404, "not_found"),
         RefineError::Unauthorized(_) => (401, "unauthorized"),
-        RefineError::Conflict(_) => (409, "conflict"),
+        RefineError::Conflict(_)
+        | RefineError::StateSyncMissingBaseline(_)
+        | RefineError::StateRecoveryConflict { .. } => (409, "conflict"),
         RefineError::StaleCandidate { .. } => (409, "stale_candidate"),
         RefineError::QualityCandidateInfrastructure(_) => (409, "quality_candidate_infrastructure"),
         RefineError::Degraded(_) => (503, "degraded"),
         RefineError::Io(_) | RefineError::Serialization(_) => (500, "storage_error"),
         RefineError::NotImplemented(_) => (501, "not_implemented"),
     };
-    ApiResponse::json(
-        status,
-        json!({
-            "error": {
-                "code": code,
-                "message": error.to_string()
-            }
-        }),
-    )
+    let reason = match &error {
+        RefineError::StateRecoveryConflict { reason, .. } => Some(reason.as_str()),
+        _ => None,
+    };
+    let mut error_body = json!({
+        "code": code,
+        "message": error.to_string()
+    });
+    if let (Some(reason), Some(fields)) = (reason, error_body.as_object_mut()) {
+        fields.insert("reason".to_string(), json!(reason));
+    }
+    ApiResponse::json(status, json!({"error": error_body}))
 }

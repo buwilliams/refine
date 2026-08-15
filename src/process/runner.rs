@@ -96,6 +96,7 @@ use jira_export::*;
 use project_sync::*;
 pub(crate) use schedule::state_sync_stale_threshold;
 use schedule::*;
+pub(crate) use state_sync_health::settle_state_recovery_success;
 use state_sync_health::*;
 #[cfg(test)]
 use test_hooks::*;

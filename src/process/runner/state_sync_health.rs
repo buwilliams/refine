@@ -68,6 +68,8 @@ pub(super) fn record_state_sync_failure(
         .filter(|report| {
             report.attempt_id == attempt_id.to_string() && report.attempt_source == source
         });
+    let recovery_kind = matches!(error, RefineError::StateSyncMissingBaseline(_))
+        .then_some(crate::tools::host::state_sync_health::StateSyncRecoveryKind::MissingBaseline);
     let activity = FileStateSyncHealthService::new(runtime_root).settle_failure(
         target_root,
         node_id,
@@ -78,8 +80,29 @@ pub(super) fn record_state_sync_failure(
         report
             .as_ref()
             .map(|report| report.report_location.as_str()),
+        recovery_kind,
     )?;
     append_state_sync_activity(target_root, node_id, activity, report.as_ref())
+}
+
+pub(crate) fn settle_state_recovery_success(
+    runtime_root: &Path,
+    target_root: &Path,
+    expected_health: &crate::tools::host::state_sync_health::StateSyncHealth,
+) -> RefineResult<(bool, crate::tools::host::state_sync_health::StateSyncHealth)> {
+    let health_service = FileStateSyncHealthService::new(runtime_root);
+    let (settled, activity) = health_service.record_recovery_success(
+        target_root,
+        &expected_health.node_id,
+        crate::tools::host::state_sync_health::StateSyncRecoveryKind::MissingBaseline,
+        expected_health.revision,
+    )?;
+    append_state_sync_activity(target_root, &expected_health.node_id, activity, None)?;
+    let threshold = state_sync_stale_threshold(runtime_root, target_root)?;
+    Ok((
+        settled,
+        health_service.inspect(target_root, &expected_health.node_id, threshold)?,
+    ))
 }
 
 fn append_state_sync_activity(

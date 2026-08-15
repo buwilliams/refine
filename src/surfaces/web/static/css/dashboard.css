@@ -114,3 +114,103 @@
   color: var(--color-danger);
   overflow-wrap: anywhere;
 }
+
+.dashboard-state-recovery {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.dashboard-state-recovery.degraded {
+  border-color: var(--color-danger);
+}
+
+.dashboard-state-recovery.success {
+  border-color: var(--color-success, var(--color-border));
+}
+
+.dashboard-state-recovery h3,
+.dashboard-state-recovery p {
+  margin: 0;
+}
+
+.dashboard-recovery-evidence {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 8px 16px;
+  margin: 0;
+}
+
+.dashboard-recovery-evidence div {
+  min-width: 0;
+}
+
+.dashboard-recovery-evidence dt {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dashboard-recovery-evidence dd {
+  margin: 2px 0 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.dashboard-recovery-counts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(90px, 1fr));
+  gap: 8px;
+}
+
+.dashboard-recovery-counts > div {
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-muted);
+}
+
+.dashboard-recovery-counts span {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.dashboard-recovery-conflicts ul {
+  max-height: 180px;
+  margin: 8px 0 0;
+  overflow: auto;
+}
+
+.dashboard-recovery-authority {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+}
+
+.dashboard-recovery-authority label,
+.dashboard-recovery-confirmation {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.dashboard-recovery-warning {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--color-danger-subtle, var(--color-surface-muted));
+  color: var(--color-danger);
+}
+
+@media (max-width: 720px) {
+  .dashboard-recovery-counts {
+    grid-template-columns: repeat(2, minmax(90px, 1fr));
+  }
+}

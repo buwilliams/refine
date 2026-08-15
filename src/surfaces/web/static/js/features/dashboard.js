@@ -106,6 +106,9 @@ async function refreshDashboard() {
     if (refreshSeq !== dashboardRefreshSeq || state.currentRoute !== "dashboard"
         || !isNodeContextGenerationCurrent(nodeGeneration)) return;
     if (renderNoProjectIfApiDetached(d, "Dashboard")) return;
+    await reconcileDashboardStateRecovery(d);
+    if (refreshSeq !== dashboardRefreshSeq || state.currentRoute !== "dashboard"
+        || !isNodeContextGenerationCurrent(nodeGeneration)) return;
     state.dashboard = d;
     state.dashboardReviewSnapshot = { reviewsForReporter: reviews.goals || [], reporter };
     drawDashboard(d, state.dashboardReviewSnapshot);
@@ -130,11 +133,11 @@ async function refreshDashboard() {
   }
 }
 
-async function dashboardApi(method, path) {
+async function dashboardApi(method, path, body, options = {}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), DASHBOARD_REFRESH_TIMEOUT_MS);
   try {
-    return await api(method, path, undefined, { signal: controller.signal });
+    return await api(method, path, body, { ...options, signal: controller.signal });
   } finally {
     clearTimeout(timer);
   }
@@ -231,6 +234,7 @@ function drawDashboard(d, opts = {}) {
       className: "dashboard-status-grid",
     })}
     ${renderDashboardStateSyncHealth(d)}
+    ${renderDashboardStateRecovery(d)}
 
     ${showReviewPanel ? `
     <details class="filter-shell dashboard-collapsible-shell" id="reviews-for-reporter-card" data-testid="dashboard-review-panel"${reviewsShellOpen ? " open" : ""}>
@@ -344,6 +348,7 @@ function drawDashboard(d, opts = {}) {
 
     wireDashboardPanelPersistence("reviews-for-reporter-card");
     wireDashboardPanelPersistence("dashboard-contributor-rankings-shell");
+    wireDashboardStateRecovery();
     wireReviewsForReporter(reviewsForReporter);
   });
 }

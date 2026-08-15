@@ -79,6 +79,9 @@ function navigate() {
   // Leaving the Goals list forgets in-memory bulk-selection exceptions on
   // purpose — a fresh visit starts with all matching Goals selected again.
   const prevRoute = state.currentRoute;
+  if (prevRoute === "dashboard" && r.route !== "dashboard") {
+    clearDashboardStateRecoveryForRouteChange();
+  }
   if (prevRoute === "goals" && r.route !== "goals") {
     resetGoalsSelection();
   }
