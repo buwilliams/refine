@@ -26,6 +26,8 @@ canonical checkout-local runtime root so clients can diagnose ownership.
 
 Those groups are useful because they map surfaces onto shared behavior. They should not drift into page-specific endpoints when a shared service would express the capability better.
 
+Dashboard responses include typed node-local state-sync health, freshness timestamps, the configured stale threshold, and whether all-node counts are authoritative. Nodes responses attach that evidence only to the serving daemon's active node and explicitly mark other nodes unknown, without changing fleet bootstrap health. The event stream publishes typed `state_sync_health` state whose semantic fingerprint changes on failure, the wall-clock stale boundary, and recovery; clients reconcile Dashboard, Nodes, and Logs from their authoritative read endpoints on those events and after reconnect.
+
 Settings, Quality, Governance, and Guidance routes are the shared configuration contract for browser and CLI. Ordinary Settings and Quality writes remain validated partial patches. Governance scalar patches preserve rules, while every rule replacement carries the observed `rules_revision`; Guidance entries have stable ids, item routes mutate one entry under the repository coordination lock, and both item and compatibility whole-list writes carry the observed `revision`. Stale revisions return `409` without overwriting unrelated state, missing ids return `404`, and successful writes return the normalized authoritative collection.
 
 Browser mutations must present an `Origin` or `Referer` whose authority matches

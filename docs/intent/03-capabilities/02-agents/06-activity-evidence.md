@@ -28,6 +28,8 @@ Activity and evidence should support every major capability:
 
 Activity should not be only a UI feed. It is product memory. Future agents should be able to inspect it to understand the current state, diagnose failures, and decide what should happen next.
 
+Recurring state synchronization is operational evidence with a node-local boundary. The first failure in an outage records a redacted `state_sync` activity entry, continued failure produces bounded reminders rather than retry-cadence log storms, and the first successful reconciliation records recovery. Lock deferrals, intentional pauses, and an unconfigured remote are neutral. These entries remain queryable through normal Logs and activity contracts but are excluded from synchronized state so one node's outage evidence cannot create cross-node conflicts.
+
 ## Future Direction
 
 Future evidence should become richer and more structured: screenshots, traces, dependency graphs, provenance, risk classifications, test artifacts, review summaries, and agent reasoning summaries.

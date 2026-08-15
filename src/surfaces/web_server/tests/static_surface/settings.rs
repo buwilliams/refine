@@ -20,6 +20,10 @@ fn static_runtime_settings_expose_state_sync_controls() {
         runtime.contains(r##"state_sync_debounce_seconds: $("#s-state-sync-debounce").value"##)
     );
     assert!(runtime.contains(
+        r##"state_sync_stale_threshold_seconds: $("#s-state-sync-stale-threshold").value"##
+    ));
+    assert!(runtime.contains("runtime-state-sync-stale-threshold"));
+    assert!(runtime.contains(
         r##"project_update_pulse_interval_seconds: $("#s-project-update-pulse").value"##
     ));
     assert!(

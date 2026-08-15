@@ -59,7 +59,7 @@ fn dashboard_distinguishes_workflow_pause_from_runtime_reachability() {
     ];
 
     for (runner_reachable, workflow_paused, expected_banner) in scenarios {
-        let attention = dashboard_attention_items(&[], runner_reachable, workflow_paused);
+        let attention = dashboard_attention_items(&[], runner_reachable, workflow_paused, None);
         let banners = attention
             .iter()
             .filter(|item| item["kind"] == "banner")
@@ -73,6 +73,54 @@ fn dashboard_distinguishes_workflow_pause_from_runtime_reachability() {
             None => assert!(banners.is_empty(), "{attention:#?}"),
         }
     }
+}
+
+#[test]
+fn dashboard_marks_failed_state_sync_counts_non_authoritative() {
+    let temp_root = unique_temp_dir("dashboard-state-sync-health");
+    let runtime_root = temp_root.join("run/8080");
+    fs::create_dir_all(temp_root.join(".refine")).unwrap();
+    crate::tools::host::state_sync_health::FileStateSyncHealthService::new(&runtime_root)
+        .record_failure(
+            &temp_root,
+            "default",
+            "git fetch https://user:secret@example.com failed",
+        )
+        .unwrap();
+    let mut server = server_with_projection();
+    server.target_root = Some(temp_root.clone());
+    server.runtime_root = Some(runtime_root);
+
+    let response = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: "/api/dashboard?node=all".to_string(),
+        body: None,
+    });
+
+    assert_eq!(response.status, 200, "{:#}", response.body);
+    assert_eq!(response.body["state_sync_health"]["status"], "failed");
+    assert_eq!(response.body["aggregate_counts_authoritative"], false);
+    assert_eq!(
+        response.body["all_node_counts_label"],
+        "local projection; non-authoritative"
+    );
+    assert!(
+        response.body["state_sync_health"]["last_error"]
+            .as_str()
+            .unwrap()
+            .contains("[REDACTED]")
+    );
+    assert!(
+        response.body["needs_attention"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("State sync has failed")))
+    );
+
+    remove_temp_dir(&temp_root);
 }
 
 #[test]

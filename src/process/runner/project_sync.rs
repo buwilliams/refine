@@ -11,7 +11,18 @@ pub(super) fn run_project_sync_operation(
             operation_id,
             json!({"message": "Synchronizing Refine state"}),
         )?;
-        let git_sync = FileGitSyncService::new(target_root, runtime_root).sync()?;
+        let node_id = state_sync_node_id(runtime_root, target_root)?;
+        record_state_sync_attempt(runtime_root, target_root, &node_id)?;
+        let git_sync = match FileGitSyncService::new(target_root, runtime_root).sync() {
+            Ok(result) => {
+                record_state_sync_result(runtime_root, target_root, &node_id, &result)?;
+                result
+            }
+            Err(error) => {
+                let _ = record_state_sync_failure(runtime_root, target_root, &node_id, &error);
+                return Err(error);
+            }
+        };
         registry.update_progress(operation_id, json!({"message": "Rebuilding projection"}))?;
         let projection = refresh_projection(runtime_root, target_root)?;
         Ok::<Value, RefineError>(project_sync_result(&git_sync, &projection))

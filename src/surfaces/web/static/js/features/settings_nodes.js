@@ -18,7 +18,7 @@ function renderSettingsNodesTab({
           </div>
         </div>`).join("")}
       <table class="table" data-testid="node-settings-table">
-        <thead><tr><th>Name</th><th>ID</th><th>Goals</th><th>Host</th><th>Refine</th><th>Status</th><th></th></tr></thead>
+        <thead><tr><th>Name</th><th>ID</th><th>Goals</th><th>Host</th><th>Refine</th><th>Status</th><th>State sync</th><th></th></tr></thead>
         <tbody>
           ${nodes.map((inst) => {
             const counts = nodeCounts[inst.id] || {};
@@ -32,6 +32,11 @@ function renderSettingsNodesTab({
               <td data-testid="node-settings-remote-host">${htmlEscape(inst.ssh_host || "")}</td>
               <td data-testid="node-settings-refine-port">${htmlEscape(String(inst.refine_port || 8082))}</td>
               <td data-testid="node-settings-status">${inst.enabled === false ? "disabled" : htmlEscape(inst.health?.status || (hasRemote ? "enabled" : "local"))}</td>
+              <td data-testid="node-state-sync-health"
+                  data-state-sync-status="${htmlEscape(inst.state_sync_health?.status || "unknown")}">
+                ${htmlEscape(inst.state_sync_health?.status || "unknown")}
+                ${inst.state_sync_health?.failure_since ? `<div class="muted small">since ${htmlEscape(inst.state_sync_health.failure_since)}</div>` : ""}
+              </td>
               <td class="actions node-row-actions">
                 <div class="nav-create-group node-action-group">
                   <button data-node-activate="${htmlEscape(inst.id)}"

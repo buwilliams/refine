@@ -366,7 +366,39 @@ impl InProcessWebServer {
                 .entry(goal.goal.status.as_str().to_string())
                 .or_insert(0) += 1;
         }
-        self.node_registry_service(refine_dir)
-            .list_with_counts_response(counts)
+        let mut response = self
+            .node_registry_service(&refine_dir)
+            .list_with_counts_response(counts)?;
+        let active_node_id = response
+            .get("active_node_id")
+            .and_then(Value::as_str)
+            .unwrap_or("default")
+            .to_string();
+        let local_health = self.current_state_sync_health()?;
+        if let Some(nodes) = response.get_mut("nodes").and_then(Value::as_array_mut) {
+            for node in nodes {
+                let node_id = node.get("id").and_then(Value::as_str).unwrap_or("");
+                let health = if node_id == active_node_id {
+                    local_health
+                        .as_ref()
+                        .map(|health| json!(health))
+                        .unwrap_or_else(|| {
+                            json!({
+                                "status": "unknown",
+                                "reason": "runtime_health_unavailable"
+                            })
+                        })
+                } else {
+                    json!({
+                        "status": "unknown",
+                        "reason": "node_local_evidence_unavailable"
+                    })
+                };
+                if let Some(node) = node.as_object_mut() {
+                    node.insert("state_sync_health".to_string(), health);
+                }
+            }
+        }
+        Ok(response)
     }
 }

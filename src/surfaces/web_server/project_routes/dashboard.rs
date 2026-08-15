@@ -60,11 +60,25 @@ impl InProcessWebServer {
             .get("workflow_paused")
             .and_then(|value| value.as_bool())
             .unwrap_or(false);
+        let state_sync_health = match self.current_state_sync_health() {
+            Ok(health) => health,
+            Err(error) => return error_response(error),
+        };
+        let aggregate_counts_authoritative = state_sync_health
+            .as_ref()
+            .is_none_or(|health| health.aggregate_counts_authoritative);
         ApiResponse::json(
             200,
             json!({
                 "counts": dashboard.counts,
                 "all_node_counts": dashboard.all_node_counts,
+                "aggregate_counts_authoritative": aggregate_counts_authoritative,
+                "all_node_counts_label": if aggregate_counts_authoritative {
+                    "all nodes"
+                } else {
+                    "local projection; non-authoritative"
+                },
+                "state_sync_health": state_sync_health.as_ref(),
                 "running": [],
                 "governance_integrator": null,
                 "governance": null,
@@ -82,7 +96,8 @@ impl InProcessWebServer {
                 "needs_attention": dashboard_attention_items(
                     &dashboard.attention_indicators,
                     runner_reachable,
-                    workflow_paused
+                    workflow_paused,
+                    state_sync_health.as_ref()
                 ),
                 "attached": attached
             }),

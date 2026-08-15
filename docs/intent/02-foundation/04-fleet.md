@@ -6,6 +6,7 @@
 - **Distribute Is The Mechanism**: assignment, rebalance, and handoff use one explicit operation.
 - **Ephemeral Workers, Durable Evidence**: a worker can be rebuilt from Git and synchronized state.
 - **Symmetric Sync**: every node publishes and pulls the same control branch.
+- **Node-Local Sync Health**: each daemon reports its own reconciliation freshness; it cannot infer another daemon's health from shared state.
 - **Judgment Converges**: implementation may run anywhere while review converges where judgment occurs.
 
 ## Purpose
@@ -19,6 +20,8 @@ Distribute reassigns eligible queued Goals among enabled, healthy nodes. It does
 Convergence is distribution pointed toward the review node. Strategies remain inspectable: spread evenly, fill observed capacity, or match provider capability while respecting priority and Feature order.
 
 State synchronizes symmetrically on `refine/state`; application branches remain separate. Goal records carry target branch, base commit, candidate branch, and exact candidate commit. Implementation, quality, and governance evidence are produced where work runs, and review and integration consume that durable evidence.
+
+Sync health is bound to the serving daemon's active target and node and remains outside `refine/state`. A daemon reports its active node from local evidence and reports other nodes as unknown unless it has direct evidence from those daemons. A stale or failed local reconciliation means that daemon's fleet-wide counts are a local projection, not an authoritative fleet total; surfaces must label that boundary instead of presenting divergent arithmetic as fact.
 
 Infrastructure and credentials remain outside Refine's core. The manage-fleet runbook guides agents through provisioning and authentication without placing secrets in shared state.
 

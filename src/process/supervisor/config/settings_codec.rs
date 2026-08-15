@@ -24,6 +24,7 @@ pub(super) fn default_settings() -> JsonObject {
         ("worktree_cleanup_after_seconds", "0"),
         ("worktree_cleanup_generated_paths", ""),
         ("state_sync_debounce_seconds", "5"),
+        ("state_sync_stale_threshold_seconds", "900"),
         ("project_update_pulse_interval_seconds", "300"),
         ("file_browser_ignore_patterns", ""),
         ("agent_subpath", ""),
@@ -80,6 +81,7 @@ pub(super) fn allowed_settings() -> BTreeSet<&'static str> {
         "worktree_cleanup_after_seconds",
         "worktree_cleanup_generated_paths",
         "state_sync_debounce_seconds",
+        "state_sync_stale_threshold_seconds",
         "project_update_pulse_interval_seconds",
         "file_browser_ignore_patterns",
         "agent_subpath",
@@ -225,6 +227,7 @@ pub(super) fn normalize_setting(key: &str, value: &Value) -> RefineResult<String
                 normalize_range(key, value, 1, 65535)
             }
         }
+        "state_sync_stale_threshold_seconds" => normalize_range(key, value, 1, 86_400),
         key if key.ends_with("_timeout_seconds")
             || matches!(
                 key,

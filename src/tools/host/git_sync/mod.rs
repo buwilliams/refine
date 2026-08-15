@@ -73,6 +73,10 @@ pub struct GitSyncResult {
     pub branch: Option<String>,
     pub commit: Option<String>,
     pub detail: Option<String>,
+    /// Whether this target has the configured Git remote. `None` means the
+    /// operation did not reach remote discovery (for example, a lock deferral).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub remote_configured: Option<bool>,
     /// The repository is temporarily unsafe or busy. The reconciler should retry
     /// without requiring user action.
     pub deferred: bool,
