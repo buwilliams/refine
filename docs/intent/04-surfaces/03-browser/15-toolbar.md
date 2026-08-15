@@ -49,7 +49,9 @@ Each selection creates or opens only the requested surface. Repeated Agent selec
 - when explicit cancellation already won, Stop reports the terminal cancelled
   result and retained worktree evidence instead of promising that the Goal
   returned to todo;
-- resizing remains continuous across terminal status and exit redraws;
+- terminal sizing ignores hidden or unmeasurable layouts, retains the last valid
+  geometry, and refits the renderer and managed PTY together after restore,
+  resize, and fullscreen transitions;
 - the Add menu is anchored to its Toolbar control, so it follows the collapsed,
   resized, and fullscreen Toolbar positions;
 - an interrupted browser event stream is not evidence that the managed process exited;
