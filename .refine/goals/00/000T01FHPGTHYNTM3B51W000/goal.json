@@ -2636,8 +2636,69 @@
           },
           "started_at": "2026-08-15T19:07:57Z"
         },
-        "phase": "revise",
-        "phase_started_at": "2026-08-15T19:09:46Z",
+        "final_plan": {
+          "completed_at": "2026-08-15T19:11:45Z",
+          "git_after": {
+            "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-4",
+            "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-4",
+            "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Compare current main with the original base-to-retained-candidate chain and selectively recover only the complete Goal-specific semantic delta while preserving the command-channel fix, unrelated main changes, and every retained historical ref and commit.",
+                "id": "P1"
+              },
+              {
+                "description": "Restore the dedicated missing-baseline failure and optional typed state-sync recovery kind with atomic target-and-node-bound settlement so unrelated, stale, detached, bootstrap, and generic failure states remain fail-closed and correctly classified.",
+                "id": "P2"
+              },
+              {
+                "description": "Restore the shared daemon preview-and-apply contract with unchanged complete-preview fencing, stable git_busy and stale_preview conflict reasons, generic handling for other conflicts, and all Git and durable-state mutation kept out of browser code.",
+                "id": "P3"
+              },
+              {
+                "description": "Restore the cohesive Dashboard recovery controller and panel so only typed eligibility fetches a preview, all required identities, heads, counts, bounded conflicts, consequences, and evidence are shown neutrally, and authority remains unselected until a separate exact-preview confirmation.",
+                "id": "P4"
+              },
+              {
+                "description": "Restore context and response fencing so target, node, route, scope, eligibility, preview identity, late responses, Git-busy retry, and stale-preview refresh transitions invalidate authority or confirmation exactly when their reviewed evidence is no longer sufficient.",
+                "id": "P5"
+              },
+              {
+                "description": "Restore successful recovery reconciliation so authoritative health clears only for the intended target while the Dashboard retains the resulting baseline, heads, audit ref, manifest, evidence identity, counts, authority, detail, and cleared-error status.",
+                "id": "P6"
+              },
+              {
+                "description": "Carry forward the focused daemon, API, and browser regression coverage together with only the affected Dashboard intent, API intent, and missing-baseline runbook updates, keeping the recovery controller and other changed files within their established cohesive responsibilities.",
+                "id": "P7"
+              },
+              {
+                "description": "Produce a clean Round 4 candidate whose cumulative scope faithfully combines current main with the recovered Goal behavior, preserving b003a0de only as historical recovery evidence so evaluation attaches to the new candidate commit.",
+                "id": "P8"
+              },
+              {
+                "description": "Record the final Round 4 candidate SHA and run fresh checks against that exact commit to prove recovered-delta and cumulative-scope fidelity and exercise the focused Rust, API, and browser coverage plus targeted formatting, reporting unrelated baseline failures or environment skips separately.",
+                "id": "P9"
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "P9 binds fresh recovery-fidelity, scope, formatting, and focused suite evidence to the recorded final Round 4 SHA, replacing reliance on the prior infrastructure-failed Quality attempt while separating baseline failures and environment skips."
+              }
+            ],
+            "summary": "Recover the complete missing-baseline Dashboard workflow from the retained Round 3 commit chain onto current main without merging or altering the historical branch, reconciling only where needed so the command-channel handoff fix and other unrelated main behavior remain intact. The new Round 4 candidate will restore the daemon-owned recovery contracts, neutral exact-preview authority flow, response fencing, retained audit evidence, focused regressions, and affected documentation, then receive fresh verification bound to its final commit rather than inheriting approval from the infrastructure-failed prior attempt."
+          },
+          "started_at": "2026-08-15T19:09:46Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-15T19:11:46Z",
         "proposal": {
           "completed_at": "2026-08-15T19:07:56Z",
           "git_after": {
@@ -2692,7 +2753,7 @@
         "schema_version": 2,
         "started_at": "2026-08-15T19:05:44Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T19:09:46Z"
+        "updated_at": "2026-08-15T19:11:46Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -2706,7 +2767,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T19:09:46Z",
+      "updated": "2026-08-15T19:11:46Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T19:05:44Z",
         "round_idx": 3,
@@ -2716,8 +2777,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-08-15T19:09:46Z",
-  "workflow_revision": 77
+  "updated": "2026-08-15T19:11:46Z",
+  "workflow_revision": 80
 }
