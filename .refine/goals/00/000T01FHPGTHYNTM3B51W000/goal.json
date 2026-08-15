@@ -1516,9 +1516,9 @@
       "assignee": "Buddy Williams",
       "constitution_state": "unclassified",
       "created": "2026-08-15T16:41:44Z",
-      "failure_at": "",
-      "failure_category": "",
-      "failure_message": "",
+      "failure_at": "2026-08-15T17:00:41Z",
+      "failure_category": "quality",
+      "failure_message": "failed to read Goal Agent command channel /home/buddy/projects/refine/run/8082/processes/goal-agent-cac1330e-b0e7-4b6f-8117-67cef33eac14.commands.jsonl: No such file or directory (os error 2)",
       "governance_candidate_commit": "",
       "governance_checked_at": "",
       "governance_details": "",
@@ -1780,7 +1780,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T16:55:01Z",
+      "updated": "2026-08-15T17:00:41Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T16:41:44Z",
         "round_idx": 2,
@@ -1790,8 +1790,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "quality",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-08-15T16:55:01Z",
-  "workflow_revision": 66
+  "updated": "2026-08-15T17:00:41Z",
+  "workflow_revision": 67
 }
