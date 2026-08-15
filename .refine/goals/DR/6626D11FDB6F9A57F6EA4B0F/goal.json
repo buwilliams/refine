@@ -1,7 +1,7 @@
 {
   "base_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
   "branch_name": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-2",
-  "candidate_commit": "0dcc1254d8142cc63fba5b7833dd7313504c366c",
+  "candidate_commit": "404761736282119b272595ae63a09808492b4f77",
   "created": "2026-08-15T17:44:01Z",
   "feature_id": null,
   "feature_order": null,
@@ -918,13 +918,15 @@
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
       "prompt": "Recover the original Goal after the Round 1 implementation attempt failed solely because the pre-fix Refine daemon deleted its Goal Agent command channel. Preserve the retained dirty Round 1 worktree at /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR6626D11FDB6F9A57F6EA4B0F-round-1 as audit evidence: do not clean, reset, delete, or blindly merge it. Start from current main, which already contains 4519b5ff Preserve Goal Agent command channels during handoff. Compare current main with the retained Round 1 changes, selectively reapply and reconcile the complete relevant behavior for the original Goal, preserve unrelated current-main behavior, then implement and verify the governed plan with exact evidence.",
+      "quality_agent_report": "Quality reviewed and corrected Round 2 without merge, push, or Governance approval. Corrections bind accepted Quality proofs to their enclosing durable operation, timestamp, scope, commits, and passed results; restore the original clean candidate branch when authority-fenced refresh persistence rejects an already-created replacement; preserve dirty or changed checkouts instead of resetting user work; and retain a distinct quality_output_contract failure category after repair exhaustion. Added focused reconciliation, refresh-authority, and failure-category regressions. Exact verification: focused planning/Quality/reconciliation/refresh/already-merged/behavior suites passed; cargo check passed; scoped rustfmt passed; Clippy passed with only the three enumerated unchanged baseline lint IDs allowed; the broad suite passed 861 tests with 6 ignored after excluding three unchanged baseline tests, all three of which were separately characterized and the two concurrency-sensitive cases passed in isolation. Round 1 audit worktree HEAD, branch, status path set, empty staged diff, and tracked-diff SHA-256 remained unchanged.",
+      "quality_candidate_commit": "404761736282119b272595ae63a09808492b4f77",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T19:31:39Z",
+      "updated": "2026-08-15T19:48:09Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T18:58:48Z",
         "round_idx": 1,
@@ -936,6 +938,6 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-15T19:31:39Z",
-  "workflow_revision": 35
+  "updated": "2026-08-15T19:48:09Z",
+  "workflow_revision": 37
 }
