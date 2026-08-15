@@ -48,12 +48,34 @@ fn state_sync_health_emits_one_failure_episode_and_one_recovery_activity() {
     std::fs::create_dir_all(target_root.join(".refine")).unwrap();
     let error =
         RefineError::Conflict("git fetch https://user:secret@example.com failed".to_string());
-    record_state_sync_failure(&runtime_root, &target_root, "default", &error).unwrap();
-    record_state_sync_failure(&runtime_root, &target_root, "default", &error).unwrap();
+    let first = record_state_sync_attempt(&runtime_root, &target_root, "default", "test").unwrap();
+    record_state_sync_failure(
+        &runtime_root,
+        &target_root,
+        "default",
+        first,
+        "test",
+        &error,
+    )
+    .unwrap();
+    let second = record_state_sync_attempt(&runtime_root, &target_root, "default", "test").unwrap();
+    record_state_sync_failure(
+        &runtime_root,
+        &target_root,
+        "default",
+        second,
+        "test",
+        &error,
+    )
+    .unwrap();
+    let recovered =
+        record_state_sync_attempt(&runtime_root, &target_root, "default", "test").unwrap();
     record_state_sync_result(
         &runtime_root,
         &target_root,
         "default",
+        recovered,
+        "test",
         &GitSyncResult {
             ok: true,
             attempted: true,

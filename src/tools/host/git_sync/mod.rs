@@ -18,6 +18,9 @@ use crate::process::subprocess::{
     FileProcessSupervisor, ManagedProcessSpec, ProcessOwner, ProcessResourceLimits,
 };
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
+use crate::process::supervisor::coordination::{
+    record_lock_key, replace_file_durably, with_record_lock,
+};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 #[cfg(test)]
 use crate::tools::host::project_layout::refine_dir_for_target_root;
@@ -44,7 +47,9 @@ const STATE_BASELINE_FILE: &str = "refine-state-baseline.json";
 static REPOSITORY_GIT_LOCKS: OnceLock<Mutex<BTreeMap<PathBuf, Arc<Mutex<()>>>>> = OnceLock::new();
 static STATE_COPY_COUNTER: AtomicU64 = AtomicU64::new(0);
 
+mod conflict_report;
 mod git_commands;
+mod goal_merge;
 mod locks;
 mod recovery;
 mod service;
@@ -52,10 +57,16 @@ mod state_codec;
 mod state_files;
 mod state_worktree;
 
+pub use conflict_report::{
+    StateSyncConflictPhase, StateSyncConflictReport, StateSyncConflictSummary,
+    latest_state_sync_conflict_report,
+};
 pub use locks::with_repository_git_lock;
+use recovery::hydrate_recovery_target_from_map;
 pub use recovery::{
-    StateRecoveryAuthority, StateRecoveryManifest, StateRecoveryOutcome, StateRecoveryPathCounts,
-    StateRecoveryPreview, StateRecoveryResult,
+    StateRecoveryAuthority, StateRecoveryDecision, StateRecoveryManifest, StateRecoveryOutcome,
+    StateRecoveryOverride, StateRecoveryPathCounts, StateRecoveryPreview, StateRecoveryResult,
+    StateRecoveryStage,
 };
 #[cfg(test)]
 use recovery::{
@@ -63,6 +74,7 @@ use recovery::{
     install_after_recovery_baseline_hook,
 };
 
+use goal_merge::*;
 use locks::*;
 use state_codec::*;
 use state_files::*;
@@ -90,6 +102,25 @@ pub struct GitSyncResult {
     /// The repository is temporarily unsafe or busy. The reconciler should retry
     /// without requiring user action.
     pub deferred: bool,
+}
+
+#[derive(Clone, Debug)]
+pub struct StateSyncAttemptContext {
+    pub id: String,
+    pub source: String,
+}
+
+impl StateSyncAttemptContext {
+    pub fn new(id: impl Into<String>, source: impl Into<String>) -> Self {
+        Self {
+            id: id.into(),
+            source: source.into(),
+        }
+    }
+
+    fn direct() -> Self {
+        Self::new(uuid::Uuid::new_v4().to_string(), "direct")
+    }
 }
 
 #[derive(Clone, Debug)]

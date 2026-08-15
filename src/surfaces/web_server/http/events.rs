@@ -23,6 +23,9 @@ struct StateSyncHealthFingerprint {
     failure_since: Option<String>,
     stale_since: Option<String>,
     last_error: Option<String>,
+    last_attempt_id: Option<u64>,
+    last_attempt_source: Option<String>,
+    last_conflict_report_id: Option<String>,
 }
 
 impl From<&StateSyncHealth> for StateSyncHealthFingerprint {
@@ -34,6 +37,9 @@ impl From<&StateSyncHealth> for StateSyncHealthFingerprint {
             failure_since: health.failure_since.clone(),
             stale_since: health.stale_since.clone(),
             last_error: health.last_error.clone(),
+            last_attempt_id: health.last_attempt_id,
+            last_attempt_source: health.last_attempt_source.clone(),
+            last_conflict_report_id: health.last_conflict_report_id.clone(),
         }
     }
 }

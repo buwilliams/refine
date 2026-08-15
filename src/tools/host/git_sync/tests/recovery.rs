@@ -22,6 +22,381 @@ fn write_schedulable_goal(root: &Path, id: &str) {
     write_schedulable_goal_in_refine(&refine_dir_for_target_root(root).unwrap(), id);
 }
 
+fn write_shared_state(root: &Path, path: &str, value: &str) {
+    let destination = refine_dir_for_target_root(root).unwrap().join(path);
+    fs::create_dir_all(destination.parent().unwrap()).unwrap();
+    fs::write(destination, value).unwrap();
+}
+
+fn valid_baseline_conflict_fixture(name: &str) -> SyncFixture {
+    let fixture = SyncFixture::new(name);
+    write_shared_state(&fixture.a, "shared/state.json", "base\n");
+    fixture.service(&fixture.a).sync().unwrap();
+    fixture.service(&fixture.b).sync().unwrap();
+    write_shared_state(&fixture.a, "shared/state.json", "remote\n");
+    write_shared_state(&fixture.a, "shared/remote-only.json", "remote-only\n");
+    fixture.service(&fixture.a).sync().unwrap();
+    write_shared_state(&fixture.b, "shared/state.json", "live\n");
+    write_shared_state(&fixture.b, "shared/live-only.json", "live-only\n");
+    fixture.service(&fixture.b).sync().unwrap_err();
+    fixture
+}
+
+#[test]
+fn valid_baseline_conflict_report_is_complete_and_preview_is_exact() {
+    let fixture = valid_baseline_conflict_fixture("reported-recovery-preview");
+    let report = latest_state_sync_conflict_report(&fixture.b.join("run"))
+        .unwrap()
+        .unwrap();
+    assert_eq!(report.phase, StateSyncConflictPhase::FirstPass);
+    assert_eq!(report.unresolved_paths, vec!["shared/state.json"]);
+    assert!(std::path::Path::new(&report.report_location).is_file());
+    assert!(
+        !std::path::Path::new(&report.report_location)
+            .parent()
+            .unwrap()
+            .read_dir()
+            .unwrap()
+            .any(|entry| entry
+                .unwrap()
+                .path()
+                .extension()
+                .and_then(|value| value.to_str())
+                == Some("tmp"))
+    );
+
+    let preview = fixture
+        .service(&fixture.b)
+        .preview_state_recovery()
+        .unwrap();
+    assert_eq!(preview.version, 2);
+    assert_eq!(preview.baseline_status, "valid_conflict");
+    assert_eq!(
+        preview.conflict_report_id.as_deref(),
+        Some(report.report_id.as_str())
+    );
+    assert_eq!(preview.conflicting_paths, report.unresolved_paths);
+    assert_eq!(preview.conflicting_paths_truncated, 0);
+}
+
+#[test]
+fn valid_baseline_conflict_report_keeps_every_path_while_the_error_stays_bounded() {
+    let fixture = SyncFixture::new("reported-recovery-complete-paths");
+    for index in 0..128 {
+        write_shared_state(
+            &fixture.a,
+            &format!("shared/conflict-{index:03}.json"),
+            "base\n",
+        );
+    }
+    fixture.service(&fixture.a).sync().unwrap();
+    fixture.service(&fixture.b).sync().unwrap();
+    for index in 0..128 {
+        write_shared_state(
+            &fixture.a,
+            &format!("shared/conflict-{index:03}.json"),
+            "remote\n",
+        );
+    }
+    fixture.service(&fixture.a).sync().unwrap();
+    for index in 0..128 {
+        write_shared_state(
+            &fixture.b,
+            &format!("shared/conflict-{index:03}.json"),
+            "live\n",
+        );
+    }
+
+    let error = fixture.service(&fixture.b).sync().unwrap_err().to_string();
+    assert!(error.contains("128 unresolved path(s)"), "{error}");
+    assert!(
+        error.len() < 1_000,
+        "bounded error was {} bytes",
+        error.len()
+    );
+    let report = latest_state_sync_conflict_report(&fixture.b.join("run"))
+        .unwrap()
+        .unwrap();
+    assert_eq!(report.unresolved_paths.len(), 128);
+    assert_eq!(
+        report.unresolved_paths.last().map(String::as_str),
+        Some("shared/conflict-127.json")
+    );
+}
+
+#[test]
+fn valid_baseline_recovery_applies_only_reported_overrides_and_preserves_one_sided_changes() {
+    let fixture = valid_baseline_conflict_fixture("reported-recovery-overrides");
+    let service = fixture.service(&fixture.b);
+    let preview = service.preview_state_recovery().unwrap();
+    let result = service
+        .apply_state_recovery_decision(
+            StateRecoveryDecision {
+                default_authority: StateRecoveryAuthority::Remote,
+                overrides: vec![StateRecoveryOverride {
+                    path: "shared/state.json".to_string(),
+                    authority: StateRecoveryAuthority::Live,
+                }],
+            },
+            preview,
+        )
+        .unwrap();
+
+    assert!(result.ok && result.baseline_created, "{result:#?}");
+    let live = refine_dir_for_target_root(&fixture.b).unwrap();
+    assert_eq!(
+        fs::read_to_string(live.join("shared/state.json")).unwrap(),
+        "live\n"
+    );
+    assert!(live.join("shared/live-only.json").exists());
+    assert!(live.join("shared/remote-only.json").exists());
+    let manifest: StateRecoveryManifest =
+        serde_json::from_slice(&fs::read(&result.manifest_path).unwrap()).unwrap();
+    assert_eq!(manifest.stage, StateRecoveryStage::Completed);
+    assert_eq!(manifest.outcome, StateRecoveryOutcome::Succeeded);
+    assert!(
+        manifest
+            .target_location
+            .as_deref()
+            .is_some_and(|reference| {
+                reference.starts_with("refs/refine/state-recovery-target/")
+            })
+    );
+}
+
+#[test]
+fn valid_baseline_recovery_rejects_fabricated_decisions_and_preserves_post_apply_writes() {
+    let fixture = valid_baseline_conflict_fixture("reported-recovery-live-race");
+    let service = fixture.service(&fixture.b);
+    let preview = service.preview_state_recovery().unwrap();
+    let fabricated = service
+        .apply_state_recovery_decision(
+            StateRecoveryDecision {
+                default_authority: StateRecoveryAuthority::Remote,
+                overrides: vec![StateRecoveryOverride {
+                    path: "shared/not-reported.json".to_string(),
+                    authority: StateRecoveryAuthority::Live,
+                }],
+            },
+            preview.clone(),
+        )
+        .unwrap_err();
+    assert!(
+        fabricated
+            .to_string()
+            .contains("outside the reported conflict set")
+    );
+    let duplicate = service
+        .apply_state_recovery_decision(
+            StateRecoveryDecision {
+                default_authority: StateRecoveryAuthority::Remote,
+                overrides: vec![
+                    StateRecoveryOverride {
+                        path: "shared/state.json".to_string(),
+                        authority: StateRecoveryAuthority::Live,
+                    },
+                    StateRecoveryOverride {
+                        path: "shared/state.json".to_string(),
+                        authority: StateRecoveryAuthority::Remote,
+                    },
+                ],
+            },
+            preview.clone(),
+        )
+        .unwrap_err();
+    assert!(duplicate.to_string().contains("supplied more than once"));
+
+    let live_path = refine_dir_for_target_root(&fixture.b)
+        .unwrap()
+        .join("shared/state.json");
+    install_after_recovery_authority_hook(&fixture.b, move || {
+        fs::write(live_path, "post-apply\n").unwrap();
+    });
+    let result = service
+        .apply_state_recovery_decision(
+            StateRecoveryDecision::uniform(StateRecoveryAuthority::Remote),
+            preview,
+        )
+        .unwrap();
+    assert!(result.baseline_created);
+    let live = refine_dir_for_target_root(&fixture.b).unwrap();
+    assert_eq!(
+        fs::read_to_string(live.join("shared/state.json")).unwrap(),
+        "post-apply\n"
+    );
+    let published = service.sync().unwrap();
+    assert!(published.committed && published.pushed, "{published:#?}");
+}
+
+#[test]
+fn valid_baseline_recovery_rejects_missing_baseline_bytes_before_owned_side_effects() {
+    let fixture = valid_baseline_conflict_fixture("reported-recovery-missing-base-bytes");
+    let service = fixture.service(&fixture.b);
+    let baseline_path = git_common_dir(&fixture.b)
+        .unwrap()
+        .join(STATE_BASELINE_FILE);
+    let mut stored: BTreeMap<String, u64> =
+        serde_json::from_slice(&fs::read(&baseline_path).unwrap()).unwrap();
+    stored.insert("shared/state.json".to_string(), u64::MAX);
+    fs::write(&baseline_path, serde_json::to_vec_pretty(&stored).unwrap()).unwrap();
+    service.sync().unwrap_err();
+    let preview = service.preview_state_recovery().unwrap();
+    let refs_before = git_stdout(&fixture.b, &["show-ref"]);
+
+    let error = service
+        .apply_state_recovery_decision(
+            StateRecoveryDecision::uniform(StateRecoveryAuthority::Remote),
+            preview.clone(),
+        )
+        .unwrap_err();
+
+    assert!(
+        error
+            .to_string()
+            .contains("cannot reproduce baseline bytes")
+    );
+    assert_eq!(git_stdout(&fixture.b, &["show-ref"]), refs_before);
+    assert!(
+        !git_common_dir(&fixture.b)
+            .unwrap()
+            .join("refine-state-recoveries")
+            .join(format!("{}-reported.json", preview.evidence_id))
+            .exists()
+    );
+}
+
+#[test]
+fn valid_baseline_recovery_rejects_stale_preview_before_side_effects() {
+    let fixture = valid_baseline_conflict_fixture("reported-recovery-stale");
+    let service = fixture.service(&fixture.b);
+    let preview = service.preview_state_recovery().unwrap();
+    write_shared_state(&fixture.b, "shared/later.json", "later\n");
+    let error = service
+        .apply_state_recovery_decision(
+            StateRecoveryDecision::uniform(StateRecoveryAuthority::Remote),
+            preview,
+        )
+        .unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("live state snapshot changed before apply")
+    );
+    assert!(
+        !git_common_dir(&fixture.b)
+            .unwrap()
+            .join("refine-state-recoveries")
+            .exists()
+    );
+}
+
+#[test]
+fn valid_baseline_recovery_resumes_only_its_exact_manifest_and_owned_target() {
+    let fixture = valid_baseline_conflict_fixture("reported-recovery-resume");
+    let service = fixture.service(&fixture.b);
+    let preview = service.preview_state_recovery().unwrap();
+    let baseline_path = git_common_dir(&fixture.b)
+        .unwrap()
+        .join(STATE_BASELINE_FILE);
+    let original_baseline = fs::read(&baseline_path).unwrap();
+    let remote = fixture.root.join("remote.git");
+    let hook_remote = remote.clone();
+    install_after_recovery_authority_hook(&fixture.b, move || {
+        git(&hook_remote, &["update-ref", "-d", REFINE_STATE_REF]);
+    });
+    let decision = StateRecoveryDecision::uniform(StateRecoveryAuthority::Remote);
+    let interrupted = service
+        .apply_state_recovery_decision(decision.clone(), preview.clone())
+        .unwrap_err();
+    assert!(
+        interrupted
+            .to_string()
+            .contains("moved from the owned target")
+    );
+    let manifest_path = git_common_dir(&fixture.b)
+        .unwrap()
+        .join("refine-state-recoveries")
+        .join(format!("{}-reported.json", preview.evidence_id));
+    let manifest: StateRecoveryManifest =
+        serde_json::from_slice(&fs::read(&manifest_path).unwrap()).unwrap();
+    assert_eq!(manifest.stage, StateRecoveryStage::Hydrated);
+    assert_eq!(fs::read(&baseline_path).unwrap(), original_baseline);
+    fs::remove_file(preview.conflict_report_location.as_ref().unwrap()).unwrap();
+
+    let different = service
+        .apply_state_recovery_decision(
+            StateRecoveryDecision::uniform(StateRecoveryAuthority::Live),
+            preview.clone(),
+        )
+        .unwrap_err();
+    assert!(
+        different
+            .to_string()
+            .contains("exact owned preview and decision set")
+    );
+
+    let target_head = manifest.local_state_head_after.unwrap();
+    git(&remote, &["update-ref", REFINE_STATE_REF, &target_head]);
+    let resumed = service
+        .apply_state_recovery_decision(decision, preview)
+        .unwrap();
+    assert!(resumed.ok && resumed.baseline_created, "{resumed:#?}");
+    let completed: StateRecoveryManifest =
+        serde_json::from_slice(&fs::read(manifest_path).unwrap()).unwrap();
+    assert_eq!(completed.stage, StateRecoveryStage::Completed);
+}
+
+#[test]
+fn valid_baseline_recovery_resumes_the_exact_manifest_after_baseline_interruption() {
+    let fixture = valid_baseline_conflict_fixture("reported-recovery-baseline-interruption");
+    let service = fixture.service(&fixture.b);
+    let preview = service.preview_state_recovery().unwrap();
+    let decision = StateRecoveryDecision::uniform(StateRecoveryAuthority::Remote);
+    install_after_recovery_baseline_hook(&fixture.b);
+
+    let interrupted = service
+        .apply_state_recovery_decision(decision.clone(), preview.clone())
+        .unwrap_err();
+    assert!(
+        interrupted.to_string().contains("simulated interruption"),
+        "{interrupted}"
+    );
+    let manifest_path = git_common_dir(&fixture.b)
+        .unwrap()
+        .join("refine-state-recoveries")
+        .join(format!("{}-reported.json", preview.evidence_id));
+    let interrupted_manifest: StateRecoveryManifest =
+        serde_json::from_slice(&fs::read(&manifest_path).unwrap()).unwrap();
+    assert_eq!(interrupted_manifest.stage, StateRecoveryStage::Hydrated);
+    assert!(
+        git_common_dir(&fixture.b)
+            .unwrap()
+            .join(STATE_BASELINE_FILE)
+            .exists()
+    );
+
+    let different = service
+        .apply_state_recovery_decision(
+            StateRecoveryDecision::uniform(StateRecoveryAuthority::Live),
+            preview.clone(),
+        )
+        .unwrap_err();
+    assert!(
+        different
+            .to_string()
+            .contains("exact owned preview and decision set")
+    );
+
+    let resumed = service
+        .apply_state_recovery_decision(decision, preview)
+        .unwrap();
+    assert!(resumed.ok && resumed.baseline_created, "{resumed:#?}");
+    let completed: StateRecoveryManifest =
+        serde_json::from_slice(&fs::read(manifest_path).unwrap()).unwrap();
+    assert_eq!(completed.stage, StateRecoveryStage::Completed);
+    assert_eq!(completed.outcome, StateRecoveryOutcome::Succeeded);
+}
+
 #[test]
 fn missing_baseline_preview_is_bounded_and_does_not_mutate_target_state() {
     let fixture = missing_baseline_fixture("recovery-preview");

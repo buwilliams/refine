@@ -133,10 +133,18 @@ fn freshness_derivation_crosses_the_wall_clock_threshold() {
         monitoring_since: monitoring_since.clone(),
         last_attempt_at: None,
         last_attempt_outcome: None,
+        attempt_sequence: 0,
+        last_attempt_id: None,
+        last_attempt_source: None,
         last_success_at: Some(monitoring_since),
+        last_success_attempt_id: None,
         failure_since: None,
         last_failure_at: None,
         last_error: None,
+        last_failure_attempt_id: None,
+        last_failure_source: None,
+        last_conflict_report_id: None,
+        last_conflict_report_location: None,
         last_reminder_at: None,
         remote_configured: Some(true),
         revision: 7,
@@ -155,4 +163,86 @@ fn freshness_derivation_crosses_the_wall_clock_threshold() {
     assert_eq!(stale.status, "stale");
     assert_eq!(stale.stale_since.as_deref(), Some("2026-08-15T12:15:00Z"));
     assert!(!stale.aggregate_counts_authoritative);
+}
+
+#[test]
+fn correlated_attempt_settlement_keeps_newer_metadata_and_active_failure_evidence() {
+    let temp = temp_root("correlated-attempts");
+    let runtime = temp.join("run");
+    let target = temp.join("target");
+    fs::create_dir_all(&target).unwrap();
+    let service = FileStateSyncHealthService::new(&runtime);
+    let first = service
+        .begin_attempt(&target, "node-a", "background")
+        .unwrap();
+    let second = service.begin_attempt(&target, "node-a", "manual").unwrap();
+
+    service
+        .settle_failure(
+            &target,
+            "node-a",
+            first,
+            "background",
+            "conflict",
+            Some("report-1"),
+            Some("/run/conflicts/latest.json"),
+        )
+        .unwrap();
+    service
+        .settle_neutral(&target, "node-a", second, "manual", "deferred", Some(true))
+        .unwrap();
+
+    let failed = service
+        .inspect(&target, "node-a", Duration::from_secs(900))
+        .unwrap();
+    assert_eq!(failed.status, "failed");
+    assert_eq!(failed.last_attempt_id, Some(second));
+    assert_eq!(failed.last_attempt_source.as_deref(), Some("manual"));
+    assert_eq!(failed.last_attempt_outcome.as_deref(), Some("deferred"));
+    assert_eq!(failed.last_failure_attempt_id, Some(first));
+    assert_eq!(failed.last_conflict_report_id.as_deref(), Some("report-1"));
+
+    let third = service
+        .begin_attempt(&target, "node-a", "background")
+        .unwrap();
+    service
+        .settle_success(&target, "node-a", third, "background")
+        .unwrap();
+    let recovered = service
+        .inspect(&target, "node-a", Duration::from_secs(900))
+        .unwrap();
+    assert_eq!(recovered.status, "healthy");
+    assert!(recovered.failure_since.is_none());
+    assert!(recovered.last_conflict_report_id.is_none());
+
+    let fourth = service
+        .begin_attempt(&target, "node-a", "background")
+        .unwrap();
+    let fifth = service.begin_attempt(&target, "node-a", "manual").unwrap();
+    service
+        .settle_success(&target, "node-a", fifth, "manual")
+        .unwrap();
+    service
+        .settle_failure(
+            &target,
+            "node-a",
+            fourth,
+            "background",
+            "late conflict",
+            Some("stale-report"),
+            Some("/run/conflicts/stale.json"),
+        )
+        .unwrap();
+    let still_healthy = service
+        .inspect(&target, "node-a", Duration::from_secs(900))
+        .unwrap();
+    assert_eq!(still_healthy.status, "healthy");
+    assert_eq!(still_healthy.last_attempt_id, Some(fifth));
+    assert_eq!(
+        still_healthy.last_attempt_outcome.as_deref(),
+        Some("succeeded")
+    );
+    assert!(still_healthy.failure_since.is_none());
+    assert!(still_healthy.last_conflict_report_id.is_none());
+    fs::remove_dir_all(temp).unwrap();
 }

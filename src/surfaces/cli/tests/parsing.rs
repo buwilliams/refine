@@ -123,6 +123,7 @@ fn project_state_recovery_requires_a_preview_file_and_explicit_authority() {
                     authority: CliStateRecoveryAuthority::Remote,
                     preview_file,
                     target_root: None,
+                    ..
                 }
             }
         } if preview_file.as_path() == std::path::Path::new("/tmp/preview.json")

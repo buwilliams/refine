@@ -425,7 +425,7 @@ fn web_server_project_sync_returns_while_repository_worker_is_busy() {
 
     assert_eq!(response.status, 202, "{:#}", response.body);
     assert!(
-        started.elapsed() < Duration::from_millis(250),
+        started.elapsed() < Duration::from_millis(50),
         "project sync request waited for the repository lock"
     );
     release_tx.send(()).unwrap();

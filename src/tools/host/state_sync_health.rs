@@ -24,10 +24,26 @@ pub struct StateSyncHealthRecord {
     pub monitoring_since: String,
     pub last_attempt_at: Option<String>,
     pub last_attempt_outcome: Option<String>,
+    #[serde(default)]
+    pub attempt_sequence: u64,
+    #[serde(default)]
+    pub last_attempt_id: Option<u64>,
+    #[serde(default)]
+    pub last_attempt_source: Option<String>,
     pub last_success_at: Option<String>,
+    #[serde(default)]
+    pub last_success_attempt_id: Option<u64>,
     pub failure_since: Option<String>,
     pub last_failure_at: Option<String>,
     pub last_error: Option<String>,
+    #[serde(default)]
+    pub last_failure_attempt_id: Option<u64>,
+    #[serde(default)]
+    pub last_failure_source: Option<String>,
+    #[serde(default)]
+    pub last_conflict_report_id: Option<String>,
+    #[serde(default)]
+    pub last_conflict_report_location: Option<String>,
     pub last_reminder_at: Option<String>,
     pub remote_configured: Option<bool>,
     pub revision: u64,
@@ -41,10 +57,16 @@ pub struct StateSyncHealth {
     pub monitoring_since: String,
     pub last_attempt_at: Option<String>,
     pub last_attempt_outcome: Option<String>,
+    pub last_attempt_id: Option<u64>,
+    pub last_attempt_source: Option<String>,
     pub last_success_at: Option<String>,
     pub failure_since: Option<String>,
     pub stale_since: Option<String>,
     pub last_error: Option<String>,
+    pub last_failure_attempt_id: Option<u64>,
+    pub last_failure_source: Option<String>,
+    pub last_conflict_report_id: Option<String>,
+    pub last_conflict_report_location: Option<String>,
     pub remote_configured: Option<bool>,
     pub stale_threshold_seconds: u64,
     pub aggregate_counts_authoritative: bool,
@@ -79,9 +101,51 @@ impl FileStateSyncHealthService {
     }
 
     pub fn record_attempt(&self, target_root: &Path, node_id: &str) -> RefineResult<()> {
+        self.begin_attempt(target_root, node_id, "legacy")?;
+        Ok(())
+    }
+
+    pub fn begin_attempt(
+        &self,
+        target_root: &Path,
+        node_id: &str,
+        source: &str,
+    ) -> RefineResult<u64> {
+        let mut attempt_id = 0;
         self.update(target_root, node_id, |record| {
+            record.attempt_sequence = record
+                .attempt_sequence
+                .max(record.last_attempt_id.unwrap_or_default())
+                .saturating_add(1);
+            attempt_id = record.attempt_sequence;
+            record.last_attempt_id = Some(attempt_id);
+            record.last_attempt_source = Some(source.to_string());
             record.last_attempt_at = Some(now_timestamp());
             record.last_attempt_outcome = Some("attempting".to_string());
+        })?;
+        Ok(attempt_id)
+    }
+
+    pub fn settle_neutral(
+        &self,
+        target_root: &Path,
+        node_id: &str,
+        attempt_id: u64,
+        source: &str,
+        outcome: &str,
+        remote_configured: Option<bool>,
+    ) -> RefineResult<()> {
+        self.update(target_root, node_id, |record| {
+            if record.last_attempt_id != Some(attempt_id)
+                || record.last_attempt_source.as_deref() != Some(source)
+            {
+                return;
+            }
+            record.last_attempt_at = Some(now_timestamp());
+            record.last_attempt_outcome = Some(outcome.to_string());
+            if let Some(remote_configured) = remote_configured {
+                record.remote_configured = Some(remote_configured);
+            }
         })
     }
 
@@ -115,10 +179,48 @@ impl FileStateSyncHealthService {
             record.last_attempt_at = Some(now.clone());
             record.last_attempt_outcome = Some("succeeded".to_string());
             record.last_success_at = Some(now);
+            record.last_success_attempt_id = record.last_attempt_id;
             record.failure_since = None;
             record.last_failure_at = None;
             record.last_error = None;
+            record.last_conflict_report_id = None;
+            record.last_conflict_report_location = None;
             record.last_reminder_at = None;
+            record.remote_configured = Some(true);
+        })?;
+        Ok(activity)
+    }
+
+    pub fn settle_success(
+        &self,
+        target_root: &Path,
+        node_id: &str,
+        attempt_id: u64,
+        source: &str,
+    ) -> RefineResult<Option<StateSyncHealthActivity>> {
+        let mut activity = None;
+        self.update(target_root, node_id, |record| {
+            if record.last_attempt_id != Some(attempt_id)
+                || record.last_attempt_source.as_deref() != Some(source)
+            {
+                return;
+            }
+            if let Some(failure_since) = record.failure_since.clone()
+                && record.last_failure_attempt_id.unwrap_or_default() <= attempt_id
+            {
+                activity = Some(StateSyncHealthActivity::Recovered { failure_since });
+                record.failure_since = None;
+                record.last_failure_at = None;
+                record.last_error = None;
+                record.last_reminder_at = None;
+                record.last_conflict_report_id = None;
+                record.last_conflict_report_location = None;
+            }
+            let now = now_timestamp();
+            record.last_attempt_at = Some(now.clone());
+            record.last_attempt_outcome = Some("succeeded".to_string());
+            record.last_success_at = Some(now);
+            record.last_success_attempt_id = Some(attempt_id);
             record.remote_configured = Some(true);
         })?;
         Ok(activity)
@@ -138,6 +240,55 @@ impl FileStateSyncHealthService {
             record.last_attempt_outcome = Some("failed".to_string());
             record.last_failure_at = Some(now.clone());
             record.last_error = Some(error.clone());
+            record.remote_configured = Some(true);
+            if record.failure_since.is_none() {
+                record.failure_since = Some(now.clone());
+                record.last_reminder_at = Some(now);
+                activity = Some(StateSyncHealthActivity::FailureStarted {
+                    error: error.clone(),
+                });
+            } else if reminder_due(record.last_reminder_at.as_deref()) {
+                record.last_reminder_at = Some(now);
+                activity = Some(StateSyncHealthActivity::FailureReminder {
+                    error: error.clone(),
+                });
+            }
+        })?;
+        Ok(activity)
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    pub fn settle_failure(
+        &self,
+        target_root: &Path,
+        node_id: &str,
+        attempt_id: u64,
+        source: &str,
+        error: &str,
+        conflict_report_id: Option<&str>,
+        conflict_report_location: Option<&str>,
+    ) -> RefineResult<Option<StateSyncHealthActivity>> {
+        let error = redact_sync_error(error);
+        let mut activity = None;
+        self.update(target_root, node_id, |record| {
+            let is_latest_attempt = record.last_attempt_id == Some(attempt_id)
+                && record.last_attempt_source.as_deref() == Some(source);
+            if is_latest_attempt {
+                record.last_attempt_at = Some(now_timestamp());
+                record.last_attempt_outcome = Some("failed".to_string());
+            }
+            if record.last_failure_attempt_id.unwrap_or_default() > attempt_id
+                || record.last_success_attempt_id.unwrap_or_default() > attempt_id
+            {
+                return;
+            }
+            let now = now_timestamp();
+            record.last_failure_attempt_id = Some(attempt_id);
+            record.last_failure_source = Some(source.to_string());
+            record.last_failure_at = Some(now.clone());
+            record.last_error = Some(error.clone());
+            record.last_conflict_report_id = conflict_report_id.map(str::to_string);
+            record.last_conflict_report_location = conflict_report_location.map(str::to_string);
             record.remote_configured = Some(true);
             if record.failure_since.is_none() {
                 record.failure_since = Some(now.clone());
@@ -298,10 +449,16 @@ fn derive_health(
         monitoring_since: record.monitoring_since,
         last_attempt_at: record.last_attempt_at,
         last_attempt_outcome: record.last_attempt_outcome,
+        last_attempt_id: record.last_attempt_id,
+        last_attempt_source: record.last_attempt_source,
         last_success_at: record.last_success_at,
         failure_since: record.failure_since,
         stale_since: stale.then(|| timestamp(stale_boundary.expect("stale boundary"))),
         last_error: record.last_error,
+        last_failure_attempt_id: record.last_failure_attempt_id,
+        last_failure_source: record.last_failure_source,
+        last_conflict_report_id: record.last_conflict_report_id,
+        last_conflict_report_location: record.last_conflict_report_location,
         remote_configured: record.remote_configured,
         stale_threshold_seconds: stale_threshold.as_secs(),
         aggregate_counts_authoritative: !matches!(status, "failed" | "stale"),
@@ -332,10 +489,18 @@ fn new_record(target_root: String, node_id: &str) -> StateSyncHealthRecord {
         monitoring_since: now_timestamp(),
         last_attempt_at: None,
         last_attempt_outcome: None,
+        attempt_sequence: 0,
+        last_attempt_id: None,
+        last_attempt_source: None,
         last_success_at: None,
+        last_success_attempt_id: None,
         failure_since: None,
         last_failure_at: None,
         last_error: None,
+        last_failure_attempt_id: None,
+        last_failure_source: None,
+        last_conflict_report_id: None,
+        last_conflict_report_location: None,
         last_reminder_at: None,
         remote_configured: None,
         revision: 0,

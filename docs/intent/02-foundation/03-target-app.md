@@ -53,10 +53,15 @@ The current implementation details that matter to intent are:
 - the synchronization baseline is durable authority for ordinary three-way
   reconciliation. If it is absent while both non-bootstrap live state and a
   remote `refine/state` branch exist, automatic and manual sync fail closed.
-  Recovery is a separate daemon-owned capability: a read-only, bounded preview
-  must be supplied back with an explicit live or remote authority choice, both
-  sides remain recoverable, and a successful apply records atomic local audit
-  evidence before establishing a new baseline.
+  Recovery is a separate daemon-owned capability. Missing-baseline recovery
+  retains its explicit whole-side choice. A valid-baseline conflict first
+  writes a complete node-local report, then a read-only preview binds the exact
+  baseline, live snapshot, remote head, and report. Apply accepts one default
+  live or remote authority plus path overrides only inside that report. It
+  persists an owned target and manifest, publishes with remote-head
+  compare-and-swap, hydrates records under their normal leases and preimage
+  fences, preserves later writes as the next local delta, and creates the new
+  baseline only after those boundaries are durable.
 
 The important boundary is source of truth. Caches, indexes, projections, and UI state are allowed and necessary for performance, but they should not replace durable target-app state. If a cache is wrong, the repair path should be refresh or rebuild, not manual database surgery.
 

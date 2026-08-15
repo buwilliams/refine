@@ -21,15 +21,17 @@ Convergence is distribution pointed toward the review node. Strategies remain in
 
 State synchronizes symmetrically on `refine/state`; application branches remain separate. Goal records carry target branch, base commit, candidate branch, and exact candidate commit. Implementation, quality, and governance evidence are produced where work runs, and review and integration consume that durable evidence.
 
-Symmetric sync never infers authority from a missing three-way baseline. A
-node in that exceptional state reports actionable recovery guidance and leaves
-its managed state worktree clean. Operator recovery compares exact local and
-remote heads through disposable observation, requires a stale-fenced authority
-choice, retains remote history and a dedicated pre-recovery snapshot, and only
-then publishes a new baseline. Real unequal edits observed from a valid
-baseline remain conflicts.
+Symmetric sync never infers authority. A missing baseline remains a fail-closed
+whole-side recovery. Unequal edits from a valid baseline produce an atomic,
+complete node-local conflict report while health and activity expose only its
+stable id, count, location, and guidance. The corresponding stale-fenced
+preview supports a default side and explicit per-path overrides. Recovery
+preserves one-sided and schema-proven changes, retains pre-recovery and target
+refs, compare-and-swaps the remote head, and resumes only its exact manifest.
+Rounds and other identity-free ordered arrays remain atomic; compatible Goal
+merges are limited to object members and stable keyed collections.
 
-Sync health is bound to the serving daemon's active target and node and remains outside `refine/state`. A daemon reports its active node from local evidence and reports other nodes as unknown unless it has direct evidence from those daemons. A stale or failed local reconciliation means that daemon's fleet-wide counts are a local projection, not an authoritative fleet total; surfaces must label that boundary instead of presenting divergent arithmetic as fact.
+Sync health is bound to the serving daemon's active target and node and remains outside `refine/state`. Monotonic attempt ids and sources fence overlapping settlements: a late result cannot relabel a newer attempt, and a neutral lock deferral cannot clear an active failure episode or its report pointer. A daemon reports its active node from local evidence and reports other nodes as unknown unless it has direct evidence from those daemons. A stale or failed local reconciliation means that daemon's fleet-wide counts are a local projection, not an authoritative fleet total; surfaces must label that boundary instead of presenting divergent arithmetic as fact.
 
 Infrastructure and credentials remain outside Refine's core. The manage-fleet runbook guides agents through provisioning and authentication without placing secrets in shared state.
 

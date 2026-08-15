@@ -167,11 +167,17 @@ function renderDashboardStateSyncHealth(d) {
       </div>
       <div class="muted small dashboard-sync-health-metadata">
         ${field("Last attempt", health.last_attempt_at)}
+        ${field("Attempt", health.last_attempt_id
+          ? `${health.last_attempt_id} (${health.last_attempt_source || "unknown"})`
+          : "")}
         ${field("Last success", health.last_success_at)}
         ${field("Failure since", health.failure_since)}
         ${field("Stale since", health.stale_since)}
       </div>
       ${health.last_error ? `<div class="small dashboard-sync-error">${htmlEscape(health.last_error)}</div>` : ""}
+      ${health.last_conflict_report_location
+        ? `<div class="muted small dashboard-sync-report">Complete conflict report ${htmlEscape(health.last_conflict_report_id || "")}: ${htmlEscape(health.last_conflict_report_location)}</div>`
+        : ""}
     </section>`;
 }
 

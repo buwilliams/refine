@@ -17,19 +17,22 @@ pub(super) fn record_state_sync_attempt(
     runtime_root: &Path,
     target_root: &Path,
     node_id: &str,
-) -> RefineResult<()> {
-    FileStateSyncHealthService::new(runtime_root).record_attempt(target_root, node_id)
+    source: &str,
+) -> RefineResult<u64> {
+    FileStateSyncHealthService::new(runtime_root).begin_attempt(target_root, node_id, source)
 }
 
 pub(super) fn record_state_sync_result(
     runtime_root: &Path,
     target_root: &Path,
     node_id: &str,
+    attempt_id: u64,
+    source: &str,
     result: &GitSyncResult,
 ) -> RefineResult<()> {
     let health = FileStateSyncHealthService::new(runtime_root);
     let activity = if result.ok && result.attempted && result.remote_configured == Some(true) {
-        health.record_success(target_root, node_id)?
+        health.settle_success(target_root, node_id, attempt_id, source)?
     } else {
         let outcome = if result.remote_configured == Some(false) {
             "unconfigured"
@@ -38,30 +41,52 @@ pub(super) fn record_state_sync_result(
         } else {
             "skipped"
         };
-        health.record_neutral(target_root, node_id, outcome, result.remote_configured)?;
+        health.settle_neutral(
+            target_root,
+            node_id,
+            attempt_id,
+            source,
+            outcome,
+            result.remote_configured,
+        )?;
         None
     };
-    append_state_sync_activity(target_root, node_id, activity)
+    append_state_sync_activity(target_root, node_id, activity, None)
 }
 
 pub(super) fn record_state_sync_failure(
     runtime_root: &Path,
     target_root: &Path,
     node_id: &str,
+    attempt_id: u64,
+    source: &str,
     error: &RefineError,
 ) -> RefineResult<()> {
-    let activity = FileStateSyncHealthService::new(runtime_root).record_failure(
+    let report = latest_state_sync_conflict_report(runtime_root)
+        .ok()
+        .flatten()
+        .filter(|report| {
+            report.attempt_id == attempt_id.to_string() && report.attempt_source == source
+        });
+    let activity = FileStateSyncHealthService::new(runtime_root).settle_failure(
         target_root,
         node_id,
+        attempt_id,
+        source,
         &error.to_string(),
+        report.as_ref().map(|report| report.report_id.as_str()),
+        report
+            .as_ref()
+            .map(|report| report.report_location.as_str()),
     )?;
-    append_state_sync_activity(target_root, node_id, activity)
+    append_state_sync_activity(target_root, node_id, activity, report.as_ref())
 }
 
 fn append_state_sync_activity(
     target_root: &Path,
     node_id: &str,
     activity: Option<StateSyncHealthActivity>,
+    report: Option<&crate::tools::host::git_sync::StateSyncConflictReport>,
 ) -> RefineResult<()> {
     let Some(activity) = activity else {
         return Ok(());
@@ -103,6 +128,8 @@ fn append_state_sync_activity(
         "node_id": node_id,
         "error": error,
         "failure_since": failure_since,
+        "conflict_report_id": report.map(|report| report.report_id.as_str()),
+        "conflict_report_location": report.map(|report| report.report_location.as_str()),
         "local_only": true
     })
     .as_object()

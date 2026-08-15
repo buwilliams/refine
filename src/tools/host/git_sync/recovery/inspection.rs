@@ -1,8 +1,9 @@
 use super::*;
 
 impl FileGitSyncService {
-    /// Inspect the exceptional missing-baseline topology without changing any
-    /// target repository ref, index, worktree, live state, baseline, or remote.
+    /// Inspect missing-baseline or reported valid-baseline recovery without
+    /// changing any target repository ref, index, worktree, live state,
+    /// baseline, or remote.
     pub fn preview_state_recovery(&self) -> RefineResult<StateRecoveryPreview> {
         self.validate_recovery_target()?;
         let live_refine =
@@ -13,10 +14,7 @@ impl FileGitSyncService {
             ));
         }
         if self.load_state_baseline()?.is_some() {
-            return Err(RefineError::Conflict(
-                "State recovery is unavailable because the synchronization baseline exists."
-                    .to_string(),
-            ));
+            return self.preview_reported_state_recovery();
         }
         let live = durable_state_map(&live_refine)?;
         if live.is_empty() || bootstrap_only_state(&live) {
@@ -57,6 +55,9 @@ impl FileGitSyncService {
             local_state_head,
             remote_state_head: remote_head,
             baseline_status: "missing".to_string(),
+            baseline_snapshot: None,
+            conflict_report_id: None,
+            conflict_report_location: None,
             live_snapshot: state_tree_digest(&live_refine, &live)?,
             remote_snapshot: state_tree_digest(&observation.path.join(".refine"), &remote_state)?,
             path_counts,
@@ -103,7 +104,9 @@ impl FileGitSyncService {
         ))
     }
 
-    pub(super) fn local_state_head(&self) -> RefineResult<Option<String>> {
+    pub(in crate::tools::host::git_sync) fn local_state_head(
+        &self,
+    ) -> RefineResult<Option<String>> {
         if !self.git_success(&["show-ref", "--verify", "--quiet", REFINE_STATE_REF])? {
             return Ok(None);
         }
@@ -163,7 +166,7 @@ impl FileGitSyncService {
     }
 }
 
-fn recovery_path_counts(
+pub(super) fn recovery_path_counts(
     live: &DurableStateMap,
     remote: &DurableStateMap,
 ) -> StateRecoveryPathCounts {
@@ -180,7 +183,10 @@ fn recovery_path_counts(
     counts
 }
 
-fn recovery_conflicting_paths(live: &DurableStateMap, remote: &DurableStateMap) -> Vec<String> {
+pub(super) fn recovery_conflicting_paths(
+    live: &DurableStateMap,
+    remote: &DurableStateMap,
+) -> Vec<String> {
     live.keys()
         .chain(remote.keys())
         .cloned()

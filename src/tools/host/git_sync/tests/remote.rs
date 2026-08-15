@@ -101,10 +101,20 @@ fn push_retry_rechecks_original_base_against_fresh_local_and_remote_state() {
     assert!(
         errors[0]
             .to_string()
-            .contains("during push retry: goals/GOALA/goal.json"),
+            .contains("during push_retry: 1 unresolved path"),
         "{}",
         errors[0]
     );
+    let failed_root = if left.is_err() {
+        &fixture.a
+    } else {
+        &fixture.b
+    };
+    let report = latest_state_sync_conflict_report(&failed_root.join("run"))
+        .unwrap()
+        .unwrap();
+    assert_eq!(report.phase, StateSyncConflictPhase::PushRetry);
+    assert_eq!(report.unresolved_paths, vec!["goals/GOALA/goal.json"]);
     assert!(left.is_ok() || right.is_ok());
     assert_eq!(
         fs::read_to_string(&goal_a).unwrap(),
