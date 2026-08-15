@@ -4002,8 +4002,81 @@
           },
           "started_at": "2026-08-15T20:43:06Z"
         },
-        "phase": "revise",
-        "phase_started_at": "2026-08-15T20:45:45Z",
+        "final_plan": {
+          "completed_at": "2026-08-15T20:47:48Z",
+          "git_after": {
+            "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-5",
+            "head_commit": "d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-5",
+            "head_commit": "d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Re-read the pinned Round 5 base and local main at d8a6285c, configured origin/main at 9729b9b4, original Round 4 base, pre-Quality candidate, and corrected candidate, then map the retained Goal delta against overlapping local recovery changes while treating the six remote-only handoff paths as a read-only drift and non-overlap fence.",
+                "id": "P1"
+              },
+              {
+                "description": "Reconcile the dedicated missing-baseline domain failure and optional typed recovery eligibility with current main's expanded state-sync health model, preserving atomic target-and-node-bound settlement and correct handling of unrelated, stale, detached, bootstrap, generic, and newer failure episodes.",
+                "id": "P2"
+              },
+              {
+                "description": "Integrate stable git_busy and stale_preview classifications and unchanged complete-preview fencing into the current daemon recovery service without replacing its newer reported-conflict, resumability, or audit behavior or moving Git or durable-state mutation into browser code.",
+                "id": "P3"
+              },
+              {
+                "description": "Expose the reconciled eligibility, conflict reasons, successful health settlement, resulting heads, audit ref, manifest, counts, authority, detail, and evidence identity through the existing thin Dashboard and project recovery API contracts.",
+                "id": "P4"
+              },
+              {
+                "description": "Restore a cohesive Dashboard recovery controller and panel that fetches only for typed missing-baseline eligibility and neutrally renders target and repository identities, configured remote, heads, snapshots, all comparison counts, bounded conflicts, consequences, and evidence without inferring or preselecting authority.",
+                "id": "P5"
+              },
+              {
+                "description": "Require a separate explicit authority choice and exact-preview confirmation, invalidating reviewed state across evidence, target, node, scope, route, eligibility, stale-preview, Git-busy, and late-response transitions according to whether the displayed preview remains trustworthy.",
+                "id": "P6"
+              },
+              {
+                "description": "Carry forward the Round 4 lifecycle correction so retained success remains visible for its completed failure episode but yields to a newer eligible failure for the same target, node, and scope by loading a fresh preview with authority and confirmation reset.",
+                "id": "P7"
+              },
+              {
+                "description": "Reconcile the focused daemon, API, CLI, Dashboard, browser, command-channel handoff, rejection-without-mutation, context-race, success-retention, health-clearing, and newer-failure regression coverage with current main's enlarged recovery suites without replacing newer tests.",
+                "id": "P8"
+              },
+              {
+                "description": "Update only the affected Dashboard and API intent contracts and established state-sync recovery runbook material, preserving current main's newer documentation structure and avoiding duplicated or unrelated changes.",
+                "id": "P9"
+              },
+              {
+                "description": "Produce a clean fresh candidate rooted only in the pinned Round 5 base whose cumulative scope preserves the retained Goal semantics, Round 4 lifecycle correction, and local current-main recovery extensions while leaving historical evidence and the six origin/main-only handoff paths untouched.",
+                "id": "P10"
+              },
+              {
+                "description": "Record and assert the final Round 5 candidate SHA and clean tree, prove retained-delta and cumulative-scope fidelity, and run the requested exact-candidate formatting, cargo check, focused Git recovery, state-sync, state-recovery API and CLI, Dashboard, browser, and command-channel handoff checks with independently supervised or safely quoted predicates, reporting unchanged baseline failures and unavailable Playwright Chromium skips separately.",
+                "id": "P11"
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "P11 binds all requested checks, cleanliness and fidelity assertions, and shell-safe predicates to the recorded final Round 5 SHA, with baseline failures and browser-environment skips reported separately."
+              },
+              {
+                "criticism_id": "C2",
+                "resolution": "P1 and P10 make origin/main a read-only drift and non-overlap fence and keep the fresh candidate rooted in the pinned d8a6285c Round 5 base without importing the six remote-only handoff paths."
+              }
+            ],
+            "summary": "Recover the complete missing-baseline Dashboard workflow and Round 4 lifecycle correction from retained candidate 827c7f56 onto the pinned Round 5 base, reconciling that Goal-specific behavior with current main's newer recovery architecture while preserving every unrelated and historical artifact. The fresh candidate will retain daemon-owned, fail-closed recovery; neutral exact-preview authority confirmation; context and late-response fencing; auditable outcomes; focused regressions; and narrowly affected documentation, while using origin/main only to fence drift and non-overlap rather than importing its remote-only handoff changes."
+          },
+          "started_at": "2026-08-15T20:45:45Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-15T20:47:48Z",
         "proposal": {
           "completed_at": "2026-08-15T20:43:06Z",
           "git_after": {
@@ -4066,7 +4139,7 @@
         "schema_version": 2,
         "started_at": "2026-08-15T20:40:25Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T20:45:45Z"
+        "updated_at": "2026-08-15T20:47:48Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -4080,7 +4153,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T20:45:45Z",
+      "updated": "2026-08-15T20:47:48Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T20:40:24Z",
         "round_idx": 4,
@@ -4090,8 +4163,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-08-15T20:45:45Z",
-  "workflow_revision": 99
+  "updated": "2026-08-15T20:47:48Z",
+  "workflow_revision": 102
 }
