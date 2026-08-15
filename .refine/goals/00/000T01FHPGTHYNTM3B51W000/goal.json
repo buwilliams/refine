@@ -3942,15 +3942,35 @@
         "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
       },
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-08-15T20:40:24Z",
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
-      "governance_candidate_commit": "",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_candidate_commit": "20105b9a78f1977a34c3d8e2e1dd573e4eb85df9",
+      "governance_checked_at": "2026-08-15T21:25:25Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T01FHPGTHYNTM3B51W000-round-5",
+        "failed_actions": [],
+        "governance_configured": true,
+        "guidance_checked": 2,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No actual governance rule violations found.\",\"violations\":[],\"recovery_analysis\":\"\",\"recovery_round_prompt\":\"\"}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "No actual governance rule violations found.",
+          "recovery_analysis": "",
+          "recovery_round_prompt": "",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T01FHPGTHYNTM3B51W000-round-5"
+      },
+      "governance_message": "No actual governance rule violations found.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
       "governance_rule_actions": [],
       "guidance_decision": {
         "applied": [
@@ -4250,8 +4270,8 @@
       "implementation_report": "Recovered the complete missing-baseline Dashboard workflow and Round 4 lifecycle correction onto pinned Round 5 base d8a6285c as clean exact candidate 1394d8d16f8d2898a1b025496ebdeb53a438721a. Reconciled typed eligibility and target/node-bound settlement with current main's monotonic attempt, conflict-report, decision override, resumability, and audit contracts; preserved the daemon mutation boundary, complete-preview fencing, typed git_busy/stale_preview handling, neutral exact-preview confirmation, late/context response fencing, retained success evidence, and existing intent/runbook structure. The cumulative delta has the same 25-path scope as retained candidate 827c7f56; its lifecycle correction has identical stable patch identity; the six origin/main-only handoff paths and both unchanged full-gate failure paths are untouched. Exact-candidate formatting, cargo check, 23 Git-recovery tests, 16 state-sync tests, 3 state-recovery API/CLI tests, 12 focused Dashboard tests, the command-channel handoff regression, and 202 browser-harness tests passed. Browser harness skipped 27 tests only because Playwright Chromium is unavailable. Full cargo test reported 862 passed, 2 unchanged-base failures, and 6 ignored: plan.md remains too prescriptive at 95 words and install.md still documents unknown refine system update.",
       "implementation_reported_at": "2026-08-15T21:05:52Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Recover the missing-baseline Dashboard recovery workflow through a fresh Round 5 because Round 4 ended in a Quality harness fault, not a product or candidate failure. Preserve every prior Round, branch, commit, log, failed operation, and Quality report as immutable evidence; do not delete, reset, amend, clean, or directly merge historical artifacts. The retained corrected Round 4 candidate is 827c7f56fa94b7f8d61eda21dc4ff813cc16d98f on refine/00000T01FHPGTHYNTM3B51W000/round-4, with pre-Quality candidate dfdfa68f093cd695ecb106f8dd6a19e8fb3ea867 and original Round 4 base 4519b5ff2c5894b0fccf1c4c0e57612f694ffe79. Round 4 Quality changed only src/surfaces/web/static/js/features/dashboard_state_recovery.js and tests/web_dashboard_attention.test.js so retained success yields to a newer missing-baseline failure episode for the same target, node, and scope, triggering a fresh preview with authority and confirmation reset. Its recorded focused checks passed, but the final predicate never ran because a single-quoted bash -lc wrapper could not parse nested single-quoted Git exclude pathspecs. Treat 827c7f56 as recovery evidence, not passing exact-candidate Quality. At Round 5 claim time, compare the actual current main and configured remote main with 4519b5ff..827c7f56, then selectively reapply and reconcile the complete Goal-specific semantic delta while preserving all unrelated current-main behavior. Current inspection found local main d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f and origin/main 9729b9b4be27f7a58629d8f04a1c0e8171636c82; their six-path worktree-handoff advance has no path overlap with the 25-path Goal delta, but re-read both heads because main may move again. Preserve the original contract: daemon-owned Git and durable-state mutation, typed missing-baseline eligibility, atomic target-and-node-bound health settlement, complete-preview stale fencing, typed git_busy and stale_preview recovery, neutral unselected authority plus separate exact-preview confirmation, late-response and context fencing, retained recovery audit evidence, focused Rust API and browser regressions, and only the affected Dashboard, API, and runbook documentation. Include the Round 4 lifecycle correction and regression. Produce a clean fresh candidate from the Round 5 base, prove recovered-delta fidelity and cumulative scope without blind merging, and run fresh exact-candidate formatting, cargo check, focused Git recovery, state-sync, state-recovery API and CLI, Dashboard, browser, and command-channel handoff checks. Report unchanged baseline failures and unavailable Playwright Chromium skips separately. Keep predicate commands shell-safe: do not nest single-quoted Git pathspecs inside a single-quoted bash -lc payload; use independently supervised commands or quoting that the outer shell preserves. Let fresh Quality and Governance evaluate the new exact candidate normally. Do not approve, merge, or push.",
       "quality_agent_report": "Quality reviewed and corrected Round 5. Added revision-fenced target/node health settlement so a successful apply cannot clear or overwrite a newer same-kind state-sync episode, and made Git contention return typed git_busy for both missing-baseline and newer valid-baseline reported recovery. Added focused no-mutation and newer-episode regressions. Focused Rust/API/CLI/Dashboard/browser/command-channel checks pass; the full Rust gate has only two unchanged pinned-base failures, and Playwright Chromium remains unavailable for 27 browser tests.",
       "quality_candidate_commit": "20105b9a78f1977a34c3d8e2e1dd573e4eb85df9",
@@ -4280,19 +4300,29 @@
       "quality_message": "All Quality tests passed with observed supervised evidence.",
       "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-08-15T21:23:15Z",
-      "workflow_attempt_authority": {
-        "claimed_at": "2026-08-15T20:40:24Z",
-        "round_idx": 4,
-        "workflow_revision": 90
+      "rule_state": "passed",
+      "updated": "2026-08-15T21:25:29Z",
+      "workflow_attempt_authority": null,
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "20105b9a78f1977a34c3d8e2e1dd573e4eb85df9",
+        "integrated_at": "2026-08-15T21:25:29.618887480+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n docs/intent/04-surfaces/03-browser/05-dashboard.md |   2 +\n docs/intent/04-surfaces/04-api.md                  |   4 +-\n docs/runbooks/manage-fleet.md                      |  16 +-\n src/process/runner.rs                              |   1 +\n src/process/runner/state_sync_health.rs            |  23 ++\n src/process/runner/tests.rs                        |  34 ++\n src/process/supervisor/errors/mod.rs               |  24 ++\n src/surfaces/web/static/css/dashboard.css          | 100 ++++++\n src/surfaces/web/static/index.html                 |   1 +\n src/surfaces/web/static/js/features/dashboard.js   |   9 +-\n .../static/js/features/dashboard_state_recovery.js | 362 +++++++++++++++++++++\n src/surfaces/web/static/js/router.js               |   3 +\n src/surfaces/web_server/http/events.rs             |   2 +\n src/surfaces/web_server/project_routes/projects.rs |  31 +-\n src/surfaces/web_server/runtime.rs                 |  13 +-\n src/surfaces/web_server/support/errors.rs          |  25 +-\n src/surfaces/web_server/tests/git_changes.rs       |  63 +++-\n src/tools/host/git_sync/recovery/mod.rs            |  16 +-\n src/tools/host/git_sync/recovery/reported.rs       |   8 +-\n src/tools/host/git_sync/recovery/service.rs        |   8 +-\n src/tools/host/git_sync/service.rs                 |   2 +-\n src/tools/host/git_sync/tests/recovery.rs          |  52 +++\n src/tools/host/source_promotion/git_support.rs     |   9 +\n src/tools/host/state_sync_health.rs                | 106 +++++-\n src/tools/host/state_sync_health/tests.rs          | 129 ++++++++\n tests/web_dashboard_attention.test.js              | 278 ++++++++++++++++\n 26 files changed, 1265 insertions(+), 56 deletions(-)\n create mode 100644 src/surfaces/web/static/js/features/dashboard_state_recovery.js",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "258d04dcd1b32b1285c619785ccada06ec5f928c"
       },
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "governance",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-08-15T21:23:15Z",
-  "workflow_revision": 111
+  "updated": "2026-08-15T21:25:29Z",
+  "workflow_revision": 115
 }

@@ -2869,8 +2869,69 @@
           },
           "started_at": "2026-08-15T21:21:36Z"
         },
-        "phase": "revise",
-        "phase_started_at": "2026-08-15T21:24:04Z",
+        "final_plan": {
+          "completed_at": "2026-08-15T21:25:26Z",
+          "git_after": {
+            "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-4",
+            "head_commit": "d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-4",
+            "head_commit": "d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Three-way compare current main, the Round 3 base, and candidate 68d2c526a7199e2018dac9a1be3baa98ba2052b6, then selectively reapply only the complete relevant source, documentation, and regression coverage without modifying retained Round worktrees or unrelated current-main behavior.",
+                "id": "P1"
+              },
+              {
+                "description": "Restore the cohesive bounded structured-output repair path for planning and Quality so invalid attempts, diagnostics, and provider receipts remain durable and every repeated invocation is fenced by the originating Round, workflow revision, status, node, operation, and cancellation authority.",
+                "id": "P2"
+              },
+              {
+                "description": "Restore the versioned exact-candidate Quality proof and already-merged reconciliation paths so passed evidence is retained or fully normalized only for the same candidate, missing proof is regenerated in an isolated exact-candidate checkout, and ancestry or shared-target descendants never imply approval.",
+                "id": "P3"
+              },
+              {
+                "description": "Preserve restart-safe terminal settlement of the first valid failed already-merged Quality result with its original candidate and source identity, operation ID, isolated scope, timestamp, results, diagnostics, and provider attempts, short-circuiting before any resolver, second evaluation, approval, or Review transition under both current and superseded authority.",
+                "id": "P4"
+              },
+              {
+                "description": "Restore serialized shared-target refresh and recovery so only an exact clean candidate with a provable linear delta can be rebased and regated under the integration lease, while conflicts or ambiguous provenance retain original evidence and consume the bounded automatic-retry lineage before explicit exhaustion.",
+                "id": "P5"
+              },
+              {
+                "description": "Add a focused synthetic source-product test fixture that creates the required checkout shape, runtime root, and fake target/debug executable beneath one canonical product home, and use it in both source worker and daemon lifecycle inheritance tests instead of combining CARGO_MANIFEST_DIR with current_exe().",
+                "id": "P6"
+              },
+              {
+                "description": "Retain explicit foreign-product-home rejection coverage for the shared executable-ownership boundary and keep RefineCheckoutPaths::require_owned_executable and all production ownership rules unchanged.",
+                "id": "P7"
+              },
+              {
+                "description": "Restore only the affected intent pages from the candidate so bounded repair, exact Quality proof recovery, terminal first-failure handling, integration lease and retry boundaries, and execution ownership remain documented in the established architecture.",
+                "id": "P8"
+              },
+              {
+                "description": "Produce an exact clean Round 4 handoff by rerunning both inheritance regressions and every requested focused, compilation, formatting, lint, and broad-library check from the candidate checkout with its own non-symlinked target directory, separating confirmed unchanged baseline failures and proving every retained audit worktree is unchanged before and after.",
+                "id": "P9"
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "P9 now requires the two individual inheritance reruns, all named focused and broad checks, checkout-local non-symlinked target ownership, separate baseline reporting, before-and-after retained-worktree evidence, and a clean reviewable Round 4 handoff."
+              }
+            ],
+            "summary": "Selectively recover candidate 68d2c526's complete infrastructure-reliability behavior and coverage onto current main while preserving newer main behavior and every retained Round worktree, then make the two source-executable inheritance tests independent of the checkout that compiled the test binary by using a synthetic product home whose runtime and fake debug executable share one canonical owner. The fail-closed first-result Quality contract, exact-candidate proof rules, serialized integration recovery, and strict production executable ownership remain unchanged."
+          },
+          "started_at": "2026-08-15T21:24:04Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-15T21:25:27Z",
         "proposal": {
           "completed_at": "2026-08-15T21:21:36Z",
           "git_after": {
@@ -2925,7 +2986,7 @@
         "schema_version": 2,
         "started_at": "2026-08-15T21:19:08Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T21:24:04Z"
+        "updated_at": "2026-08-15T21:25:27Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -2939,7 +3000,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T21:24:04Z",
+      "updated": "2026-08-15T21:25:27Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T21:19:08Z",
         "round_idx": 3,
@@ -2949,8 +3010,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-08-15T21:24:04Z",
-  "workflow_revision": 73
+  "updated": "2026-08-15T21:25:27Z",
+  "workflow_revision": 76
 }
