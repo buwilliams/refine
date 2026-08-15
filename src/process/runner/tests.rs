@@ -1,17 +1,53 @@
 use super::*;
 
 #[test]
-fn state_sync_health_emits_one_failure_episode_and_one_recovery_activity() {
+fn git_sync_schedule_exposes_validated_stale_threshold() {
+    let defaults = GitSyncSchedule::default();
+    assert!(
+        defaults.stale_threshold > defaults.remote_fetch_interval.unwrap(),
+        "the default stale boundary must tolerate the normal fetch cadence"
+    );
+
     let temp_root = std::env::temp_dir().join(format!(
-        "refine-state-sync-health-{}",
+        "refine-state-sync-schedule-{}",
         uuid::Uuid::new_v4()
     ));
     let target_root = temp_root.join("target");
     let runtime_root = temp_root.join("run/8082");
-    std::fs::create_dir_all(target_root.join(".refine")).unwrap();
-    let error = RefineError::Conflict(
-        "git fetch https://user:secret@example.com failed".to_string(),
+    let refine_dir = target_root.join(".refine");
+    std::fs::create_dir_all(&refine_dir).unwrap();
+    FileSettingsService::with_active_root(&refine_dir, &runtime_root)
+        .update(&json!({
+            "state_sync_debounce_seconds": 7,
+            "project_update_pulse_interval_seconds": 11,
+            "state_sync_stale_threshold_seconds": 31
+        }))
+        .unwrap();
+
+    let schedule = git_sync_schedule(&runtime_root, &target_root).unwrap();
+
+    assert_eq!(schedule.debounce, Duration::from_secs(7));
+    assert_eq!(
+        schedule.remote_fetch_interval,
+        Some(Duration::from_secs(11))
     );
+    assert_eq!(schedule.stale_threshold, Duration::from_secs(31));
+    assert_eq!(
+        state_sync_stale_threshold(&runtime_root, &target_root).unwrap(),
+        Duration::from_secs(31)
+    );
+    std::fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn state_sync_health_emits_one_failure_episode_and_one_recovery_activity() {
+    let temp_root =
+        std::env::temp_dir().join(format!("refine-state-sync-health-{}", uuid::Uuid::new_v4()));
+    let target_root = temp_root.join("target");
+    let runtime_root = temp_root.join("run/8082");
+    std::fs::create_dir_all(target_root.join(".refine")).unwrap();
+    let error =
+        RefineError::Conflict("git fetch https://user:secret@example.com failed".to_string());
     record_state_sync_failure(&runtime_root, &target_root, "default", &error).unwrap();
     record_state_sync_failure(&runtime_root, &target_root, "default", &error).unwrap();
     record_state_sync_result(
@@ -33,8 +69,16 @@ fn state_sync_health_emits_one_failure_episode_and_one_recovery_activity() {
     assert_eq!(entries.len(), 2, "{entries:#?}");
     assert!(entries.iter().all(|entry| entry.category == "state_sync"));
     assert!(entries.iter().any(|entry| entry.message.contains("failed")));
-    assert!(entries.iter().any(|entry| entry.message.contains("recovered")));
-    assert!(entries.iter().all(|entry| !entry.message.contains("secret")));
+    assert!(
+        entries
+            .iter()
+            .any(|entry| entry.message.contains("recovered"))
+    );
+    assert!(
+        entries
+            .iter()
+            .all(|entry| !entry.message.contains("secret"))
+    );
     std::fs::remove_dir_all(temp_root).unwrap();
 }
 

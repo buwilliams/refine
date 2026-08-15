@@ -9,6 +9,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 
+mod redaction;
+
+pub use redaction::redact_sync_error;
+
 pub const STATE_SYNC_HEALTH_FILE: &str = "state-sync-health.json";
 const STATE_SYNC_HEALTH_LOCK_FILE: &str = "state-sync-health.lock";
 const FAILURE_REMINDER_INTERVAL: Duration = Duration::from_secs(30 * 60);
@@ -180,6 +184,7 @@ impl FileStateSyncHealthService {
         let lock_path = self.runtime_root.join(STATE_SYNC_HEALTH_LOCK_FILE);
         let lock = OpenOptions::new()
             .create(true)
+            .truncate(false)
             .read(true)
             .write(true)
             .open(&lock_path)
@@ -351,161 +356,5 @@ fn now_timestamp() -> String {
     timestamp(Utc::now())
 }
 
-pub fn redact_sync_error(error: &str) -> String {
-    error
-        .split_whitespace()
-        .map(redact_error_token)
-        .collect::<Vec<_>>()
-        .join(" ")
-}
-
-fn redact_error_token(token: &str) -> String {
-    let lower = token.to_ascii_lowercase();
-    if lower.starts_with("password=") || lower.starts_with("token=") {
-        return token
-            .split_once('=')
-            .map(|(key, _)| format!("{key}=[REDACTED]"))
-            .unwrap_or_else(|| "[REDACTED]".to_string());
-    }
-    let Some(scheme_end) = token.find("://").map(|index| index + 3) else {
-        return token.to_string();
-    };
-    let Some(at) = token[scheme_end..]
-        .find('@')
-        .map(|index| scheme_end + index)
-    else {
-        return token.to_string();
-    };
-    format!("{}[REDACTED]{}", &token[..scheme_end], &token[at..])
-}
-
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn temp_root(label: &str) -> PathBuf {
-        std::env::temp_dir().join(format!("refine-{label}-{}", uuid::Uuid::new_v4()))
-    }
-
-    #[test]
-    fn failure_episode_is_redacted_and_recovery_is_transition_based() {
-        let temp = temp_root("state-sync-failure");
-        let target = temp.join("target");
-        fs::create_dir_all(&target).expect("target");
-        let service = FileStateSyncHealthService::new(temp.join("run"));
-        let first = service
-            .record_failure(
-                &target,
-                "node-a",
-                "git fetch https://user:secret@example.com password=hunter2",
-            )
-            .expect("failure");
-        assert_eq!(
-            first,
-            Some(StateSyncHealthActivity::FailureStarted {
-                error: "git fetch https://[REDACTED]@example.com password=[REDACTED]".to_string()
-            })
-        );
-        assert!(
-            service
-                .record_failure(&target, "node-a", "still failed")
-                .expect("retry")
-                .is_none()
-        );
-        let health = service
-            .inspect(&target, "node-a", Duration::from_secs(900))
-            .expect("health");
-        assert_eq!(health.status, "failed");
-        assert!(!health.aggregate_counts_authoritative);
-        assert_eq!(health.last_error.as_deref(), Some("still failed"));
-        assert!(matches!(
-            service.record_success(&target, "node-a").expect("success"),
-            Some(StateSyncHealthActivity::Recovered { .. })
-        ));
-        assert_eq!(
-            service
-                .inspect(&target, "node-a", Duration::from_secs(900))
-                .expect("recovered")
-                .status,
-            "healthy"
-        );
-        assert!(
-            service
-                .record_success(&target, "node-a")
-                .expect("repeat")
-                .is_none()
-        );
-        fs::remove_dir_all(temp).expect("cleanup");
-    }
-
-    #[test]
-    fn binding_is_scoped_to_target_and_node() {
-        let temp = temp_root("state-sync-binding");
-        let target = temp.join("target");
-        let other = temp.join("other");
-        fs::create_dir_all(&target).expect("target");
-        fs::create_dir_all(&other).expect("other");
-        let service = FileStateSyncHealthService::new(temp.join("run"));
-        service.record_success(&target, "node-a").expect("success");
-        let original_revision = service
-            .inspect(&target, "node-a", Duration::from_secs(900))
-            .expect("original")
-            .revision;
-        service.bind(&other, "node-a").expect("rebind");
-        assert_eq!(
-            service
-                .inspect(&other, "node-a", Duration::from_secs(900))
-                .expect("other")
-                .status,
-            "unknown"
-        );
-        assert!(
-            service
-                .inspect(&other, "node-a", Duration::from_secs(900))
-                .expect("rebound")
-                .revision
-                > original_revision
-        );
-        assert_eq!(
-            service
-                .inspect(&target, "node-b", Duration::from_secs(900))
-                .expect("node")
-                .status,
-            "unknown"
-        );
-        fs::remove_dir_all(temp).expect("cleanup");
-    }
-
-    #[test]
-    fn freshness_derivation_crosses_the_wall_clock_threshold() {
-        let monitoring_since = "2026-08-15T12:00:00Z".to_string();
-        let record = StateSyncHealthRecord {
-            target_root: "/target".to_string(),
-            node_id: "node-a".to_string(),
-            monitoring_since: monitoring_since.clone(),
-            last_attempt_at: None,
-            last_attempt_outcome: None,
-            last_success_at: Some(monitoring_since),
-            failure_since: None,
-            last_failure_at: None,
-            last_error: None,
-            last_reminder_at: None,
-            remote_configured: Some(true),
-            revision: 7,
-        };
-        let before = derive_health(
-            record.clone(),
-            Duration::from_secs(900),
-            parse_timestamp("2026-08-15T12:14:59Z").unwrap(),
-        );
-        assert_eq!(before.status, "healthy");
-        let stale = derive_health(
-            record,
-            Duration::from_secs(900),
-            parse_timestamp("2026-08-15T12:15:00Z").unwrap(),
-        );
-        assert_eq!(stale.status, "stale");
-        assert_eq!(stale.stale_since.as_deref(), Some("2026-08-15T12:15:00Z"));
-        assert!(!stale.aggregate_counts_authoritative);
-    }
-}
+mod tests;
