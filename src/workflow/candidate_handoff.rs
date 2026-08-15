@@ -114,13 +114,18 @@ pub(super) fn retain_candidate_handoff_after_failure(
     runtime_root: &Path,
     operation_id: &str,
     code: &str,
+    current_candidate_commit: Option<&str>,
     error: &RefineError,
 ) {
     let registry = FileOperationRegistry::new(runtime_root);
-    let candidate_commit = registry
-        .status(operation_id)
-        .ok()
-        .and_then(|operation| operation.progress.get("candidate_commit").cloned());
+    let candidate_commit = current_candidate_commit
+        .map(|commit| Value::String(commit.to_string()))
+        .or_else(|| {
+            registry
+                .status(operation_id)
+                .ok()
+                .and_then(|operation| operation.progress.get("candidate_commit").cloned())
+        });
     let _ = registry.update_progress(
         operation_id,
         json!({

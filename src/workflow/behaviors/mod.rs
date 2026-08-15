@@ -630,6 +630,7 @@ impl WorkflowBehavior for WorkflowImplementation {
                 ctx.runtime_root,
                 &handoff_id,
                 "candidate_handoff_transition_failed",
+                ctx.commit.as_deref(),
                 &error,
             );
             return fail(ctx, "candidate_handoff", error);
@@ -1598,6 +1599,7 @@ fn fail<T>(ctx: &WorkflowContext<'_>, category: &str, error: RefineError) -> Ref
             ctx.runtime_root,
             &handoff.id,
             "candidate_handoff_workflow_failed",
+            ctx.commit.as_deref(),
             &error,
         );
     }

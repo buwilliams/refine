@@ -6,6 +6,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
+use crate::model::workflow::is_automated_status;
 use crate::process::subprocess::{FileProcessSupervisor, ManagedProcess};
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::coordination::acquire_workflow_coordination;
@@ -342,6 +343,15 @@ fn classify_worktree(
     entry.goal_status = Some(goal.status.as_str().to_string());
     if active_ownership.goal_ids.contains(&goal.id) {
         entry.reason = "active_owner".to_string();
+        return entry;
+    }
+    // Runtime ownership is intentionally reconstructable and can disappear
+    // briefly while the daemon settles or recovers interrupted operations.
+    // Durable workflow status is the fail-closed authority during that gap: a
+    // Plan, Implement, Quality, or Governance worktree may still be required
+    // to resume the current Round even when no live process is observable.
+    if is_automated_status(&goal.status) {
+        entry.reason = "active_goal_status".to_string();
         return entry;
     }
     if goal_is_too_recent(&goal.updated, now, older_than_seconds) {

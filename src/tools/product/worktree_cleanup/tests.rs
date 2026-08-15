@@ -749,6 +749,44 @@ fn cleanup_preserves_dirty_missing_and_owned_worktrees_but_hibernates_inactive_s
 }
 
 #[test]
+fn cleanup_preserves_automated_status_worktrees_without_live_runtime_ownership() {
+    let fixture = Fixture::new("automated-status-restart-gap");
+    let mut worktrees = Vec::new();
+    for (goal_id, status) in [
+        ("PLAN", GoalStatus::Plan),
+        ("IMPLEMENT", GoalStatus::Implement),
+        ("QUALITY", GoalStatus::Quality),
+        ("GOVERNANCE", GoalStatus::Governance),
+    ] {
+        let branch = format!("refine/{goal_id}/round-1");
+        fixture.create_goal(goal_id, &branch, false);
+        FileWorkItemService::new(&fixture.refine_dir)
+            .set_goal_status_unchecked(goal_id, &status)
+            .unwrap();
+        worktrees.push(fixture.add_worktree(&branch));
+    }
+
+    let report = FileWorktreeCleanupService::new(&fixture.repo, &fixture.runtime_root)
+        .run(WorktreeCleanupOptions {
+            apply: true,
+            older_than_seconds: 0,
+        })
+        .unwrap();
+
+    assert_eq!(report.removed, 0);
+    assert_eq!(report.preserved, 4);
+    assert!(
+        report
+            .entries
+            .iter()
+            .all(|entry| entry.reason == "active_goal_status")
+    );
+    for worktree in worktrees {
+        assert!(worktree.exists(), "preserved {}", worktree.display());
+    }
+}
+
+#[test]
 fn cleanup_retention_window_and_disable_setting_fail_closed() {
     let fixture = Fixture::new("retention");
     fixture.create_goal("GOAL1", "refine/GOAL1/round-1", true);

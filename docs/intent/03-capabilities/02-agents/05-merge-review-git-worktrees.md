@@ -28,12 +28,17 @@ This capability should connect workflow with the user's source repository:
 - review should preserve human or agent judgment over the integrated result;
 - approval should mark the reviewed integration accepted without merging or pushing again;
 - failed or conflicted merges should create recoverable evidence;
+- a failed candidate handoff should retain the latest implementation, Quality,
+  or replacement candidate identity observed by that workflow attempt rather
+  than an earlier runtime projection;
 - standalone worktree output should be able to become structured Quality work.
-- clean managed Goal worktrees in any status should be hibernated by the shared
-  maintenance capability after the configured retention delay when no live
-  live operation or process owns them. Recoverable branches recreate the
-  checkout on demand. Dirty work, ambiguous ownership, standalone worktrees,
-  the state worktree, and unrecognized ignored content remain protected.
+- clean managed Goal worktrees outside Plan, Implement, Quality, and Governance
+  should be hibernated by the shared maintenance capability after the configured
+  retention delay when no live operation or process owns them. Automated-phase
+  status remains a durable ownership fence across daemon settlement and restart
+  gaps; recoverable branches recreate inactive checkouts on demand. Dirty work,
+  ambiguous ownership, standalone worktrees, the state worktree, and
+  unrecognized ignored content remain protected.
   Generated cache paths are removable only when recognized by Refine or
   explicitly configured for the target app. After the same retention delay,
   maintenance independently inventories exact `refine/<goal>/round-N` refs
