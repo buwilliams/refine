@@ -17,6 +17,14 @@ pub(in crate::tools::host::git_sync) fn hydrate_remote_with_recovery_cas(
         let before = original.get(&relative).copied();
         let desired = remote.get(&relative).copied();
         if current == desired {
+            // File replacement and the derived scheduler-index append cannot
+            // be one filesystem transaction. Reconcile the index even when a
+            // retry finds that an interrupted apply already settled the file.
+            if desired.is_some() {
+                record_synchronized_goal(live_root, &relative, &live_root.join(&relative));
+            } else {
+                forget_synchronized_goal(live_root, &relative);
+            }
             continue;
         }
         if current != before {
@@ -28,6 +36,7 @@ pub(in crate::tools::host::git_sync) fn hydrate_remote_with_recovery_cas(
         let destination = live_root.join(&relative);
         if desired.is_some() {
             copy_state_file(&remote_root.join(&relative), &destination)?;
+            record_synchronized_goal(live_root, &relative, &destination);
         } else if destination.exists() {
             fs::remove_file(&destination).map_err(|error| {
                 RefineError::Io(format!(
@@ -35,6 +44,7 @@ pub(in crate::tools::host::git_sync) fn hydrate_remote_with_recovery_cas(
                     destination.display()
                 ))
             })?;
+            forget_synchronized_goal(live_root, &relative);
         }
     }
     Ok(())

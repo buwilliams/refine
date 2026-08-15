@@ -8,6 +8,20 @@ fn missing_baseline_fixture(name: &str) -> SyncFixture {
     fixture
 }
 
+fn write_schedulable_goal_in_refine(refine: &Path, id: &str) {
+    let goal = refine.join("goals").join(&id[..2]).join(&id[2..]);
+    fs::create_dir_all(&goal).unwrap();
+    fs::write(
+        goal.join("goal.json"),
+        format!(r#"{{"id":"{id}","name":"{id}","status":"todo","rounds":[]}}"#),
+    )
+    .unwrap();
+}
+
+fn write_schedulable_goal(root: &Path, id: &str) {
+    write_schedulable_goal_in_refine(&refine_dir_for_target_root(root).unwrap(), id);
+}
+
 #[test]
 fn missing_baseline_preview_is_bounded_and_does_not_mutate_target_state() {
     let fixture = missing_baseline_fixture("recovery-preview");
@@ -137,6 +151,75 @@ fn remote_authority_preserves_live_snapshot_before_hydrating_remote() {
         git_stdout(&fixture.b, &["status", "--porcelain"]),
         "",
         "application worktree changed"
+    );
+}
+
+#[test]
+fn remote_authority_updates_the_scheduler_index_with_hydrated_goals() {
+    let fixture = SyncFixture::new("recovery-remote-active-index");
+    write_schedulable_goal(&fixture.a, "REMOTEGOAL");
+    fixture.service(&fixture.a).sync().unwrap();
+    write_schedulable_goal(&fixture.b, "LIVEGOAL00");
+    let live = refine_dir_for_target_root(&fixture.b).unwrap();
+    let before = ActiveGoalIndex::load_or_rebuild(&live).unwrap();
+    assert_eq!(
+        before
+            .goals()
+            .map(|goal| goal.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["LIVEGOAL00"]
+    );
+
+    let service = fixture.service(&fixture.b);
+    let preview = service.preview_state_recovery().unwrap();
+    service
+        .apply_state_recovery(StateRecoveryAuthority::Remote, preview)
+        .unwrap();
+
+    let after = ActiveGoalIndex::load_or_rebuild(&live).unwrap();
+    assert_eq!(
+        after
+            .goals()
+            .map(|goal| goal.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["REMOTEGOAL"]
+    );
+}
+
+#[test]
+fn recovery_rejects_a_rehashed_preview_with_fabricated_comparison_evidence() {
+    let fixture = missing_baseline_fixture("recovery-fabricated-comparison");
+    let service = fixture.service(&fixture.b);
+    let mut preview = service.preview_state_recovery().unwrap();
+    preview.path_counts.live_only += 1;
+    preview.evidence_id =
+        crate::tools::host::git_sync::recovery::preview_evidence_id_for_test(&preview).unwrap();
+
+    let error = service
+        .apply_state_recovery(StateRecoveryAuthority::Remote, preview)
+        .unwrap_err();
+
+    assert!(
+        error.to_string().contains("bounded path comparison"),
+        "{error}"
+    );
+    assert!(
+        !git_common_dir(&fixture.b)
+            .unwrap()
+            .join(STATE_BASELINE_FILE)
+            .exists()
+    );
+    assert_eq!(
+        git_stdout(
+            &fixture.b,
+            &[
+                "for-each-ref",
+                "--format=%(refname)",
+                "refs/refine/state-recovery",
+            ]
+        ),
+        "",
+        "invalid comparison evidence must be rejected before a recovery ref is created"
     );
 }
 
@@ -433,6 +516,38 @@ fn remote_hydration_resumes_owned_partial_writes_and_rejects_concurrent_content(
     assert_eq!(
         fs::read_to_string(live.join("b.json")).unwrap(),
         "concurrent\n"
+    );
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn remote_hydration_retry_repairs_the_scheduler_index_after_files_settle() {
+    let root = unique_temp_dir("recovery-hydration-index-retry");
+    let original = root.join("original");
+    let remote = root.join("remote");
+    let live = root.join("live");
+    for path in [&original, &remote, &live] {
+        fs::create_dir_all(path).unwrap();
+    }
+    write_schedulable_goal_in_refine(&original, "LIVEGOAL00");
+    write_schedulable_goal_in_refine(&live, "LIVEGOAL00");
+    write_schedulable_goal_in_refine(&remote, "REMOTEGOAL");
+    let before = ActiveGoalIndex::load_or_rebuild(&live).unwrap();
+    assert_eq!(before.goals().next().unwrap().id, "LIVEGOAL00");
+
+    // Stand in for interruption after file replacement but before the
+    // scheduler-index append/forget operations.
+    fs::remove_dir_all(live.join("goals")).unwrap();
+    write_schedulable_goal_in_refine(&live, "REMOTEGOAL");
+    hydrate_remote_with_recovery_cas(&original, &remote, &live).unwrap();
+
+    let after = ActiveGoalIndex::load_or_rebuild(&live).unwrap();
+    assert_eq!(
+        after
+            .goals()
+            .map(|goal| goal.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["REMOTEGOAL"]
     );
     fs::remove_dir_all(root).unwrap();
 }

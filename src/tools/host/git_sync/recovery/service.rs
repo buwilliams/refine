@@ -123,6 +123,20 @@ impl FileGitSyncService {
         {
             return Err(stale_recovery("the fetched remote state snapshot changed"));
         }
+        let prevalidated_live = if existing.is_none() {
+            let live_now = durable_state_map(&live_refine)?;
+            if state_tree_digest(&live_refine, &live_now)? != preview.live_snapshot {
+                return Err(stale_recovery("the live state snapshot changed"));
+            }
+            // Reject fabricated or internally inconsistent preview metadata
+            // before journaling or preserving any recovery ref. The stable
+            // owned snapshot below repeats this fence to catch a live write
+            // racing the initial read.
+            super::inspection::validate_recovery_comparison(preview, &live_now, &remote_state)?;
+            Some(live_now)
+        } else {
+            None
+        };
 
         let recovery_ref = self.recovery_ref(preview, authority);
         let mut manifest = existing.unwrap_or_else(|| StateRecoveryManifest {
@@ -157,7 +171,10 @@ impl FileGitSyncService {
         manifest.message = "Recovery started; no baseline has been created.".to_string();
         write_manifest(&manifest_path, &manifest)?;
 
-        let live_now = durable_state_map(&live_refine)?;
+        let live_now = match prevalidated_live {
+            Some(live) => live,
+            None => durable_state_map(&live_refine)?,
+        };
         let resume = self.git_success(&["show-ref", "--verify", "--quiet", &recovery_ref])?;
         if !resume && state_tree_digest(&live_refine, &live_now)? != preview.live_snapshot {
             return Err(stale_recovery("the live state snapshot changed"));
@@ -172,6 +189,34 @@ impl FileGitSyncService {
             return Err(RefineError::Conflict(
                 "The owned recovery snapshot does not match the supplied preview.".to_string(),
             ));
+        }
+        if observed_remote_head == preview.remote_state_head {
+            super::inspection::validate_recovery_comparison(
+                preview,
+                &original_live,
+                &remote_state,
+            )?;
+        } else {
+            // A resumed live-authority apply may already have published its
+            // owned descendant. Re-read the exact preview head from retained
+            // history so the original operator-reviewed comparison remains
+            // part of the apply fence rather than trusting client-supplied
+            // counts or paths.
+            let preview_remote = self.observe_repository_ref(&preview.remote_state_head)?;
+            let preview_remote_refine = preview_remote.path.join(".refine");
+            let preview_remote_state = durable_state_map(&preview_remote_refine)?;
+            if state_tree_digest(&preview_remote_refine, &preview_remote_state)?
+                != preview.remote_snapshot
+            {
+                return Err(stale_recovery(
+                    "the retained preview remote snapshot changed",
+                ));
+            }
+            super::inspection::validate_recovery_comparison(
+                preview,
+                &original_live,
+                &preview_remote_state,
+            )?;
         }
 
         self.fetch_state_branch(&remote)?;

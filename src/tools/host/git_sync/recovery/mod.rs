@@ -25,6 +25,13 @@ const RECOVERY_PATH_LIMIT: usize = 100;
 const RECOVERY_MANIFEST_DIR: &str = "refine-state-recoveries";
 const RECOVERY_REF_PREFIX: &str = "refs/refine/state-recovery";
 
+#[cfg(test)]
+pub(in crate::tools::host::git_sync) fn preview_evidence_id_for_test(
+    preview: &StateRecoveryPreview,
+) -> RefineResult<String> {
+    storage::preview_evidence_id(preview)
+}
+
 struct DisposableCheckout {
     path: PathBuf,
 }

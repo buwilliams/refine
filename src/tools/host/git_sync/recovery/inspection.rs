@@ -190,3 +190,27 @@ fn recovery_conflicting_paths(live: &DurableStateMap, remote: &DurableStateMap) 
         .map(|path| path.to_string_lossy().replace('\\', "/"))
         .collect()
 }
+
+pub(super) fn validate_recovery_comparison(
+    preview: &StateRecoveryPreview,
+    live: &DurableStateMap,
+    remote: &DurableStateMap,
+) -> RefineResult<()> {
+    let path_counts = recovery_path_counts(live, remote);
+    let all_conflicts = recovery_conflicting_paths(live, remote);
+    let conflicting_paths = all_conflicts
+        .iter()
+        .take(RECOVERY_PATH_LIMIT)
+        .cloned()
+        .collect::<Vec<_>>();
+    let conflicting_paths_truncated = all_conflicts.len() - conflicting_paths.len();
+    if preview.path_counts != path_counts
+        || preview.conflicting_paths != conflicting_paths
+        || preview.conflicting_paths_truncated != conflicting_paths_truncated
+    {
+        return Err(stale_recovery(
+            "the bounded path comparison does not match the observed snapshots",
+        ));
+    }
+    Ok(())
+}
