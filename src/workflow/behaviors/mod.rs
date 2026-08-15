@@ -183,6 +183,18 @@ fn prepare_already_merged_reconciliation(
             ctx.goal_id, integration.candidate_commit, candidate
         )));
     }
+    if recorded_reconciliation_state.is_none() {
+        ctx.log(
+            "reconcile",
+            "Admitted current-Round integration evidence for terminal already-merged resolution",
+            Some(json_object(json!({
+                "candidate_commit": candidate,
+                "target_branch": integration.target_branch,
+                "integration_target_commit": integration.target_commit
+            }))),
+        )?;
+        return enter_already_merged_quality(ctx, &detail, round, integration, candidate);
+    }
     let (target_commit, published_commit, candidate_present) = with_repository_git_lock(
         ctx.target_root,
         || -> RefineResult<(String, Option<String>, bool)> {
@@ -309,6 +321,16 @@ fn prepare_already_merged_reconciliation(
             "published_target_commit": published_commit
         }))),
     )?;
+    enter_already_merged_quality(ctx, &detail, round, integration, candidate)
+}
+
+fn enter_already_merged_quality(
+    ctx: &mut WorkflowContext<'_>,
+    detail: &Value,
+    round: &Value,
+    integration: crate::model::goal::RoundIntegration,
+    candidate: &str,
+) -> RefineResult<Option<WorkflowAdvanceOutcome>> {
     ctx.branch = detail
         .get("branch_name")
         .and_then(Value::as_str)
@@ -330,7 +352,7 @@ fn prepare_already_merged_reconciliation(
     Ok(Some(WorkflowAdvanceOutcome::Transition {
         from: GoalStatus::Todo,
         to: GoalStatus::Quality,
-        reason: "Already-merged candidate requires reconciliation".to_string(),
+        reason: "Already-merged candidate requires terminal resolution".to_string(),
     }))
 }
 
