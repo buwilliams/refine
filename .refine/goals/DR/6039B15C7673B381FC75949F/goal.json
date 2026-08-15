@@ -85,14 +85,32 @@
         "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
       },
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-08-15T14:21:36Z",
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_checked_at": "2026-08-15T15:26:04Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR6039B15C7673B381FC75949F-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "guidance_checked": 2,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No actual governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "No actual governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR6039B15C7673B381FC75949F-round-1"
+      },
+      "governance_message": "No actual governance rule violations found.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
       "governance_rule_actions": [],
       "guidance_decision": {
         "applied": [
@@ -384,8 +402,8 @@
       "implementation_report": "Implemented terminal already-merged reconciliation with exact current-Round Quality and Governance gate binding, repository-coordinated local and published ancestry observations, Round/revision-fenced idempotent Review or Failed settlement, a daemon-routed goal resolve-merged escape hatch, intent updates, and regression coverage. Focused checks and all-target compilation pass; full-suite formatting, strict clippy, and one library policy test retain unrelated baseline failures reported in verification.",
       "implementation_reported_at": "2026-08-15T15:07:25Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "From: Buddy Williams <buddy.williams@insurity.com>\nSubject: Goals whose candidate is already merged into the target branch loop forever in `quality` �� no supported path advances them\n\nBody:\nBug report - Goals whose candidate is already merged into the target branch loop forever in `quality` �� no supported path advances them\r\n\r\n  ### Refine version\r\n  4.2.0 (linux_cli_web, native supervisor daemon, port 8082)\r\n\r\n  ### Severity\r\n  High �� completed, already-integrated work is permanently stuck; the queue shows 12 \"in progress\" goals that can never finish, and the only forward CLI verb makes it worse\r\n  (re-queues into the same failure).\r\n\r\n  ### Environment\r\n  - Node: `bo2lnxnevo03-buddy`, 4-node fleet\r\n  - Target branch: `insurity-claims` �� a SHARED integration branch that many goals build on and merge into in parallel. Because goals integrate into one shared\r\n  branch/checkout, a later goal's `post_build` can land another goal's candidate commit into the target before that goal's Quality stage runs.\r\n\r\n  ### Summary\r\n  When the workflow reaches the Quality stage for a goal whose `candidate_commit` is already an ancestor of its `target_branch`, an \"already-merged reconciliation\" fires,\r\n  decides Quality \"could not run,\" and PRESERVES the goal at `quality` status. The engine then immediately re-resumes the goal from `quality`, which hits the same\r\n  reconciliation again �� an infinite loop. Status never advances to `review`.\r\n\r\n  ### Repro / evidence\r\n  12 goals in this state simultaneously. For each, the activity log repeats (25+ times for a single goal):\r\n      �� Resumed workflow from quality\r\n      �� Already-merged reconciliation Quality could not run; target and Goal status were preserved\r\n\r\n  Confirmed already-merged for all 12, e.g. goal 00000SZ65PBBNHVG7B24N80001:\r\n  - base_commit=70b59a2c, candidate_commit=b217bd2c, target_branch=insurity-claims\r\n  - `git merge-base --is-ancestor b217bd2c insurity-claims` �� true (candidate IS in target)\r\n\r\n  `goal updated` timestamps keep bumping (so they look \"active\"), but status is pinned at `quality`.\r\n\r\n  ### No supported recovery path\r\n  - `goal retry --stage quality` �� re-queues (\"Queued for Quality\") and loops right back to the already-merged reconciliation (verified live on 00000SZ65PDN70RNF67WN80003).\r\n  - `goal approve` �� rejected; requires `review` status.\r\n  - `goal undo` �� only walks backward (done��review, cancelled��todo); cannot push quality��review.\r\n  - No `quality��review`/promote/reconcile-resolve verb exists in `refine commands`.\r\n  - `system doctor` reports healthy; `config quality` doesn't govern this guard.\r\n  - Note: `system status` shows `degraded_integrations: [\"operation-recovery-interrupted\"]` on port 8082 �� possibly related to why the reconciliation re-fires instead of\r\n  resolving.\r\n\r\n  ### Expected behavior\r\n  When the already-merged reconciliation detects that a goal's candidate is already merged into the target, it should RESOLVE the goal forward (mark it `review`, or `done`\r\n  if Quality/Governance are otherwise satisfied) �� the work is delivered. It must NOT preserve `quality` and re-enter the resume loop.\r\n\r\n  ### Additional asks\r\n  1. Make the already-merged case terminal, not looping (idempotent: detect �� resolve once �� stop resuming).\r\n  2. Provide a supported manual escape hatch for goals already stuck this way (e.g. `goal resolve-merged <id>` or allow `approve`/promote from `quality` when candidate ��\r\n  target), so operators don't have to hand-edit durable state.\r\n  3. Consider guarding the shared-integration-branch case: a goal's Quality stage shouldn't be invalidated just because a *sibling* goal's post_build advanced the shared\r\n  target.\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nBuddy Williams\r\nBuddy.Williams@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
       "quality_agent_report": "Quality corrected the automatic Todo-stage already-merged admission so it no longer rejects safe reconciliation with duplicate legacy HEAD/local-published equality checks before the shared authority-fenced resolver runs. Preserved legacy completed/reverted recovery, strengthened the workflow regression to cover Todo to Quality to Review, a non-target current checkout, divergent local and published descendant snapshots, terminal evidence, and no resume loop. Focused tests and all-target compilation pass. Full-library, strict-clippy, and full-format checks retain only unrelated baseline failures detailed in verification.",
       "quality_candidate_commit": "fec9693dbf3c45c10e4395bbb7d5b84775ddd315",
@@ -414,19 +432,29 @@
       "quality_message": "All Quality tests passed with observed supervised evidence.",
       "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-08-15T15:22:30Z",
-      "workflow_attempt_authority": {
-        "claimed_at": "2026-08-15T14:54:14Z",
-        "round_idx": 0,
-        "workflow_revision": 18
+      "rule_state": "passed",
+      "updated": "2026-08-15T15:26:09Z",
+      "workflow_attempt_authority": null,
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "fec9693dbf3c45c10e4395bbb7d5b84775ddd315",
+        "integrated_at": "2026-08-15T15:26:07.849639679+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n .../intent/03-capabilities/02-agents/03-quality.md |   2 +-\n .../02-agents/05-merge-review-git-worktrees.md     |   1 +\n .../03-workflow/11-consistency-contract.md         |   2 +\n docs/intent/04-surfaces/02-cli.md                  |   1 +\n src/surfaces/cli/actions/goals.rs                  |   8 +\n src/surfaces/cli/catalog.rs                        |   1 +\n src/surfaces/cli/dispatch.rs                       |   3 +\n src/surfaces/cli/dispatch/goals.rs                 |  33 ++\n src/surfaces/cli/tests/goals/lifecycle.rs          |  20 ++\n src/surfaces/cli/tests/mod.rs                      |   2 +-\n src/surfaces/web_server/server.rs                  |   1 +\n src/surfaces/web_server/support/imports.rs         |   1 +\n src/surfaces/web_server/tests/goals/lifecycle.rs   | 121 +++++++\n .../work_routes/goal_routes/lifecycle.rs           |  24 ++\n src/tools/product/governance_integration/mod.rs    |   4 +\n .../governance_integration/reconciliation.rs       | 235 +++++++++++++\n .../product/governance_integration/tests/mod.rs    |   1 +\n .../governance_integration/tests/reconciliation.rs | 372 ++++++++++++++++++++\n src/tools/product/work_items/mod.rs                |   5 +-\n src/tools/product/work_items/service.rs            |   5 +\n .../product/work_items/service/already_merged.rs   | 386 +++++++++++++++++++++\n .../product/work_items/service/round_helpers.rs    |   4 +\n .../work_items/service/rounds_and_metadata.rs      |   1 +\n .../work_items/service/workflow_attempts.rs        |   4 +-\n src/workflow/behaviors/mod.rs                      | 231 +++++-------\n src/workflow/execution_context.rs                  |   7 +\n src/workflow/tests/already_merged.rs               | 139 ++++++++\n src/workflow/tests/mod.rs                          |   1 +\n 28 files changed, 1463 insertions(+), 152 deletions(-)\n create mode 100644 src/tools/product/governance_integration/reconciliation.rs\n create mode 100644 src/tools/product/governance_integration/tests/reconciliation.rs\n create mode 100644 src/tools/product/work_items/service/already_merged.rs\n create mode 100644 src/workflow/tests/already_merged.rs",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "4d916160431d5fcb40ae5087f13b7b4720d8b6ba"
       },
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "governance",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-08-15T15:22:31Z",
-  "workflow_revision": 32
+  "updated": "2026-08-15T15:26:09Z",
+  "workflow_revision": 36
 }
