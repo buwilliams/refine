@@ -122,8 +122,51 @@
           },
           "started_at": "2026-08-15T15:09:04Z"
         },
-        "phase": "revise",
-        "phase_started_at": "2026-08-15T15:10:50Z",
+        "final_plan": {
+          "completed_at": "2026-08-15T15:12:17Z",
+          "git_after": {
+            "branch": "refine/DRB4C53A0CA76FFE4042A58438/round-1",
+            "head_commit": "f50b1571672da4a7c308d47918746eac3931bfaa",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRB4C53A0CA76FFE4042A58438/round-1",
+            "head_commit": "f50b1571672da4a7c308d47918746eac3931bfaa",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Refactor signal reading to distinguish changing partial writes from stable JSON parse failures and typed-schema failures while retaining the short grace period for legacy direct writers.",
+                "id": "P1"
+              },
+              {
+                "description": "Archive each rejected payload under an attempt-numbered, process-scoped invalid-signal filename, remove it from the active signal path, and retain its parse or schema diagnostic for recovery and audit.",
+                "id": "P2"
+              },
+              {
+                "description": "Have the session loop send a concise rewrite instruction through the managed agent input path, reset signal observation state, and accept the first valid replacement without settling the Round as failed.",
+                "id": "P3"
+              },
+              {
+                "description": "Bound recovery to three rejected replacement payloads within the existing session timeout, preserving the final bad payload and returning its terminal diagnostic if the agent exits or exhausts the limit.",
+                "id": "P4"
+              },
+              {
+                "description": "Strengthen every phase-specific completion contract to write and parse-check a temporary signal file before atomically renaming it into place without changing planning or implementation result schemas.",
+                "id": "P5"
+              },
+              {
+                "description": "Update the Goal Agent intent documentation to describe automatic malformed-signal recovery, bounded failure behavior, and retained diagnostic evidence.",
+                "id": "P6"
+              }
+            ],
+            "summary": "Refine will keep malformed completion payloads inside the live Goal Agent session instead of immediately failing the Round: after distinguishing an in-flight write from an actionable JSON or schema error, it will preserve the bad bytes, send the diagnostic back through the managed agent input path, and allow up to three clean rewrites before surfacing a terminal failure. Completion instructions will require a validated temporary file followed by atomic replacement while retaining the current phase-specific typed signal shapes, and the Goal Agent intent contract will document bounded recovery and inspectable invalid-signal evidence."
+          },
+          "started_at": "2026-08-15T15:10:50Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-15T15:12:17Z",
         "proposal": {
           "completed_at": "2026-08-15T15:09:04Z",
           "git_after": {
@@ -170,7 +213,7 @@
         "schema_version": 2,
         "started_at": "2026-08-15T15:06:55Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T15:10:50Z"
+        "updated_at": "2026-08-15T15:12:17Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -184,7 +227,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T15:10:50Z",
+      "updated": "2026-08-15T15:12:17Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T15:06:55Z",
         "round_idx": 0,
@@ -194,8 +237,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-08-15T15:10:50Z",
-  "workflow_revision": 11
+  "updated": "2026-08-15T15:12:17Z",
+  "workflow_revision": 14
 }
