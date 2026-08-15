@@ -87,9 +87,9 @@
       "assignee": "Buddy Williams",
       "constitution_state": "unclassified",
       "created": "2026-08-15T15:02:29Z",
-      "failure_at": "",
-      "failure_category": "",
-      "failure_message": "",
+      "failure_at": "2026-08-15T16:06:41Z",
+      "failure_category": "workflow",
+      "failure_message": "Error: thread/start: thread/start failed: failed to load configuration: No such file or directory (os error 2) (code -32600)",
       "governance_checked_at": "",
       "governance_details": "",
       "governance_message": "",
@@ -389,18 +389,18 @@
       "quality_state": "passed",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T15:43:16Z",
+      "updated": "2026-08-15T16:06:41Z",
       "workflow_attempt_authority": {
-        "claimed_at": "2026-08-15T15:02:31Z",
+        "claimed_at": "2026-08-15T16:06:40Z",
         "round_idx": 0,
-        "workflow_revision": 4
+        "workflow_revision": 26
       },
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "governance",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-08-15T15:43:16Z",
-  "workflow_revision": 26
+  "updated": "2026-08-15T16:06:41Z",
+  "workflow_revision": 28
 }
