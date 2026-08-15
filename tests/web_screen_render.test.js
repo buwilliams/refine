@@ -913,13 +913,13 @@ test("Todo List renders an item-first workspace with responsive list navigation"
   }
 });
 
-test("terminal tabs swap one mounted xterm and retain inactive scrollback", { skip: SKIP }, async () => {
+test("Agent tab round trip retains xterm and scrollback while returning to latest output", { skip: SKIP }, async () => {
   const app = await openApp();
   try {
     await assertScreenRenders(app, { route: "#/", marker: "#dash" });
     const result = await app.page.evaluate(async () => {
       const firstId = "renderer-agent";
-      const secondId = "renderer-plan";
+      const secondId = "renderer-agent-2";
       const makeTab = (label, mode) => normalizeInteractiveTerminalTab({
         goalId: null,
         label,
@@ -939,8 +939,20 @@ test("terminal tabs swap one mounted xterm and retain inactive scrollback", { sk
 
       chatState.tabs = {
         [firstId]: makeTab("Agent", "agent"),
-        [secondId]: makeTab("Planing Agent", "plan"),
+        [secondId]: makeTab("Agent 2", "agent"),
       };
+      for (const tabId of [firstId, secondId]) {
+        const tab = chatState.tabs[tabId];
+        tab.sessionId = `${tabId}-session`;
+        tab.processId = `${tabId}-process`;
+        const terminal = terminalStateFor(tabId);
+        terminal.sessionId = tab.sessionId;
+        terminal.processId = tab.processId;
+        terminal.connected = true;
+        terminal.statusChecked = true;
+        terminal.reattaching = false;
+        terminal.eventSource = { close() {} };
+      }
       chatState.activeTabId = firstId;
       chatState.open = true;
       chatState.bodyHeight = 420;
@@ -959,8 +971,7 @@ test("terminal tabs swap one mounted xterm and retain inactive scrollback", { sk
       const firstViewport = firstTerm.buffer.active.viewportY;
       const firstBase = firstTerm.buffer.active.baseY;
 
-      chatState.activeTabId = secondId;
-      drawToolbar();
+      await activateToolbarTab(secondId);
       await nextFrame();
       const second = terminalStateFor(secondId);
       const secondTerm = second.term;
@@ -976,8 +987,12 @@ test("terminal tabs swap one mounted xterm and retain inactive scrollback", { sk
         secondMounted: secondTerm.element.parentElement === secondHost,
       };
 
-      chatState.activeTabId = firstId;
-      drawToolbar();
+      terminalReceiveOutput("\r\nFIRST-LATEST-MARKER", first);
+      await flushWrites(firstTerm);
+      const firstBaseAfterLatest = firstTerm.buffer.active.baseY;
+      const firstViewportBeforeReturn = firstTerm.buffer.active.viewportY;
+
+      await activateToolbarTab(firstId);
       await nextFrame();
       const firstHost = document.querySelector(".terminal-output");
       const firstBuffer = bufferText(firstTerm);
@@ -990,12 +1005,16 @@ test("terminal tabs swap one mounted xterm and retain inactive scrollback", { sk
         secondInstanceRetained: terminalStateFor(secondId).term === secondTerm,
         firstScrollbackRetained:
           firstBase > 0
-          && firstTerm.buffer.active.baseY === firstBase
-          && firstTerm.buffer.active.viewportY === firstViewport
+          && firstBaseAfterLatest >= firstBase
+          && firstViewportBeforeReturn === firstViewport
           && firstBuffer.includes("FIRST-SCROLLBACK-00")
-          && firstBuffer.includes("FIRST-SCROLLBACK-END"),
-        firstVisible:
-          firstHost.querySelector(".xterm-rows")?.textContent.includes("FIRST-SCROLLBACK-00")
+          && firstBuffer.includes("FIRST-SCROLLBACK-END")
+          && firstBuffer.includes("FIRST-LATEST-MARKER"),
+        firstBaseUnchanged: firstTerm.buffer.active.baseY === firstBaseAfterLatest,
+        firstViewportAtBottom:
+          firstTerm.buffer.active.viewportY === firstTerm.buffer.active.baseY,
+        latestMarkerVisible:
+          firstHost.querySelector(".xterm-rows")?.textContent.includes("FIRST-LATEST-MARKER")
           || false,
         firstExcludesSecond:
           !firstHost.querySelector(".xterm-rows")?.textContent.includes("SECOND-ACTIVE-ONLY"),
@@ -1015,7 +1034,9 @@ test("terminal tabs swap one mounted xterm and retain inactive scrollback", { sk
       firstInstanceRetained: true,
       secondInstanceRetained: true,
       firstScrollbackRetained: true,
-      firstVisible: true,
+      firstBaseUnchanged: true,
+      firstViewportAtBottom: true,
+      latestMarkerVisible: true,
       firstExcludesSecond: true,
     });
     assert.deepEqual(app.pageErrors, []);

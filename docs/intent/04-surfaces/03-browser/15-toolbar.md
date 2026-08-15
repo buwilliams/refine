@@ -54,6 +54,8 @@ Each selection creates or opens only the requested surface. Repeated Agent selec
   resized, and fullscreen Toolbar positions;
 - an interrupted browser event stream is not evidence that the managed process exited;
 - terminal state remains tab-specific, including process identifier, provider, current directory, output, and worktree identity;
+- reselecting an Agent, Planing Agent, Goal, or Standalone terminal preserves
+  its session and scrollback while presenting its latest output at the bottom;
 - every Agent terminal receives the resolved active Refine executable and checkout so it can reliably use the correct CLI;
 - a general Agent may investigate and answer directly, but routes requested repository changes into a complete eligible Goal rather than implementing outside the workflow;
 - when continuing an unsuccessful Goal attempt, the Agent preserves its evidence and retained work, appends an actionable recovery Round, and returns the Goal to workflow eligibility through supported Refine interfaces;
