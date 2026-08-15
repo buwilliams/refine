@@ -154,8 +154,81 @@
           },
           "started_at": "2026-08-15T17:47:37Z"
         },
-        "phase": "revise",
-        "phase_started_at": "2026-08-15T17:50:29Z",
+        "final_plan": {
+          "completed_at": "2026-08-15T17:54:01Z",
+          "git_after": {
+            "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-1",
+            "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-1",
+            "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Add a cohesive structured-output repair capability for proposal, criticism, and revision that records each raw invalid attempt, returns its parse or validation diagnostics to a bounded follow-up invocation, and resumes from the last valid phase artifact before failing as an output-contract fault.",
+                "id": "P1"
+              },
+              {
+                "description": "Apply the same bounded diagnostic repair policy to unreadable Quality evaluations while preserving every attempted response and keeping exhausted provider or contract faults distinct from valid failed implementation findings.",
+                "id": "P2"
+              },
+              {
+                "description": "Retain the current 20,000-character planning-summary boundary and the Goal Agent session ownership rule that creates command and transcript artifacts before launch and keeps them available through reader and settlement completion.",
+                "id": "P3"
+              },
+              {
+                "description": "Introduce a durable Quality proof shape bound to goal ID, zero-based Round, evaluation scope, operation ID, checked candidate commit, source candidate commit, passed state, timestamp, and recorded results, and normalize legacy Round fields only when they reconstruct that complete exact-candidate identity.",
+                "id": "P4"
+              },
+              {
+                "description": "Extend already-merged reconciliation to require the current Round's exact integration identity and candidate-bound passed Governance evidence, accept a normalized isolated Quality proof for that same candidate, or materialize a clean managed checkout of the exact candidate and run isolated Quality again when such proof cannot be reconstructed, never deriving approval from ancestry or a shared-target descendant.",
+                "id": "P5"
+              },
+              {
+                "description": "Settle an eligible already-merged Goal atomically and idempotently from Quality to Review under repository observation and originating Round plus workflow-revision fences, recording whether Quality proof was retained, normalized, or regenerated and leaving failed or unavailable proof explicit.",
+                "id": "P6"
+              },
+              {
+                "description": "Classify ordinary target advancement separately from provenance failure by permitting refresh only when the recorded base resolves, is an ancestor of the exact candidate, the clean candidate branch still names that commit, the target descends from that base, and the original base-to-candidate delta is unambiguous.",
+                "id": "P7"
+              },
+              {
+                "description": "Acquire the integrated-target workflow lease before final target revalidation and retain it through a clean rebase of a provable delta, atomic persistence of old and replacement base and candidate identities, exact replacement-candidate Quality and Governance reruns, merge or push, and evidence settlement, with Round, workflow-revision, node, status, and cancellation authority reread before each consequential boundary.",
+                "id": "P8"
+              },
+              {
+                "description": "Abort and clean any conflicted refresh without moving or deleting the original candidate, then atomically queue one fresh fenced recovery Round for conflicts or ambiguous provenance with the original base, candidate, branch, handoff, gate evidence, target snapshot, and conflict details retained.",
+                "id": "P9"
+              },
+              {
+                "description": "Update the affected Planning, Quality, Governance, Failed, merge-review Git/worktree, execution-ownership, and workflow consistency intent pages to describe bounded output repair, exact Quality proof regeneration, lease start and duration, candidate replacement audit history, and the authority and cancellation rules for gate reruns and recovery.",
+                "id": "P10"
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "P4-P6 now define the admissible durable Quality fields and exact current-Round candidate relationship, allow legacy normalization only when that binding is complete, and require a new isolated exact-candidate Quality run when it is not."
+              },
+              {
+                "criticism_id": "C2",
+                "resolution": "P7-P9 now separate target-tip advancement from a base and candidate provenance mismatch, permit rebasing only for a provable original delta, and retain ambiguous or conflicted work in a fresh authority-fenced recovery Round."
+              },
+              {
+                "criticism_id": "C3",
+                "resolution": "P8 and P10 now define the integrated-target lease boundary, preserve old and replacement candidate identities, apply Round, workflow-revision, node, status, and cancellation fences, and include the merge-review Git/worktree and execution-ownership intent pages."
+              }
+            ],
+            "summary": "Make the remaining infrastructure-dominated failures recoverable without weakening exact-candidate approval: invalid planning and Quality responses will receive bounded diagnostic repair attempts, already-integrated work will use only reconstructable current-Round Quality proof or a new isolated run of the exact candidate, and shared-target movement will be handled inside serialized integration ownership by refreshing only provable candidate deltas and rerunning the gates for any replacement commit. Preserve the relaxed planning-summary contract, Goal Agent artifact-handoff safeguards, durable old and replacement identities, and explicit recovery when provenance or conflicts are ambiguous."
+          },
+          "started_at": "2026-08-15T17:50:29Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-15T17:54:01Z",
         "proposal": {
           "completed_at": "2026-08-15T17:47:37Z",
           "git_after": {
@@ -210,7 +283,7 @@
         "schema_version": 2,
         "started_at": "2026-08-15T17:44:02Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T17:50:29Z"
+        "updated_at": "2026-08-15T17:54:01Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -224,7 +297,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T17:50:29Z",
+      "updated": "2026-08-15T17:54:01Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T17:44:02Z",
         "round_idx": 0,
@@ -234,8 +307,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-08-15T17:50:29Z",
-  "workflow_revision": 12
+  "updated": "2026-08-15T17:54:01Z",
+  "workflow_revision": 15
 }
