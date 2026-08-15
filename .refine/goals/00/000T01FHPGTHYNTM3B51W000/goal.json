@@ -2588,9 +2588,9 @@
       "assignee": "Buddy Williams",
       "constitution_state": "unclassified",
       "created": "2026-08-15T19:05:44Z",
-      "failure_at": "",
-      "failure_category": "",
-      "failure_message": "",
+      "failure_at": "2026-08-15T19:39:35Z",
+      "failure_category": "quality_harness",
+      "failure_message": "Quality command harness fault: supervised shell /usr/bin/bash could not parse \"timeout 900s env CI=1 bash -lc '\\nset -euo pipefail\\nbase=4519b5ff2c5894b0fccf1c4c0e57612f694ffe79\\nrecovered=b003a0decf2bc2667cda876a601dcccf69c8006b\\npre_quality=dfdfa68f093cd695ecb106f8dd6a19e8fb3ea867\\ncandidate=827c7f56fa94b7f8d61eda21dc4ff813cc16d98f\\ntest \\\"$(git rev-parse HEAD)\\\" = \\\"$candidate\\\"\\ntest -z \\\"$(g…",
       "governance_candidate_commit": "",
       "governance_checked_at": "",
       "governance_details": "",
@@ -2856,13 +2856,18 @@
       "prompt": "Recover the original Goal after Rounds 2 and 3 failed because the pre-fix Refine daemon deleted Goal Agent command channels. Preserve the retained Git evidence and do not delete, reset, or directly merge the old branch. Round 3 worktree has been retired, but its complete candidate chain remains reachable as b0eace6911bc687804b12418c018bba0fc73df7a followed by b003a0decf2bc2667cda876a601dcccf69c8006b on refine/00000T01FHPGTHYNTM3B51W000/round-3. Start from current main, which contains 4519b5ff Preserve Goal Agent command channels during handoff. Compare current main with 0e0de3d43fe9284156e9f951dc8c981c1f996fd7..b003a0decf2bc2667cda876a601dcccf69c8006b, selectively reapply and reconcile the complete relevant behavior, and preserve unrelated current-main changes. Do not claim b003a0de passed exact-candidate Quality: the prior Quality attempt failed on infrastructure. Run fresh exact-candidate verification, then let Governance and Quality proceed normally with durable evidence.",
       "quality_agent_report": "Quality corrected one Dashboard recovery lifecycle defect: retained success now yields to a newer missing-baseline failure episode for the same target, node, and scope, triggering a fresh preview with authority and confirmation reset. Added a focused browser regression. Fresh focused Rust, API, Dashboard, formatting, fidelity, and scope checks passed. The browser harness passed 202 tests with 27 Playwright Chromium environment skips. The full Rust gate passed 849 tests with 2 unchanged pinned-main baseline failures and 6 ignored tests. No commit, merge, push, or Governance action was performed.",
       "quality_candidate_commit": "827c7f56fa94b7f8d61eda21dc4ff813cc16d98f",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_checked_at": "2026-08-15T19:39:35Z",
+      "quality_details": {
+        "candidate_commit": "827c7f56fa94b7f8d61eda21dc4ff813cc16d98f",
+        "error": "Quality command harness fault: supervised shell /usr/bin/bash could not parse \"timeout 900s env CI=1 bash -lc '\\nset -euo pipefail\\nbase=4519b5ff2c5894b0fccf1c4c0e57612f694ffe79\\nrecovered=b003a0decf2bc2667cda876a601dcccf69c8006b\\npre_quality=dfdfa68f093cd695ecb106f8dd6a19e8fb3ea867\\ncandidate=827c7f56fa94b7f8d61eda21dc4ff813cc16d98f\\ntest \\\"$(git rev-parse HEAD)\\\" = \\\"$candidate\\\"\\ntest -z \\\"$(git status --porcelain)\\\"\\ntest \\\"$(git diff --name-only \\\"$pre_quality\\\"..HEAD)\\\" = $'src/surfaces/web/static/js/features/dashboard_state_recovery.js\\\\ntests/web_dashboard_attention.test.js'\\ngit diff --check \\\"$base\\\"..HEAD\\ngit diff --exit-code \\\"$base\\\"..HEAD -- src/process/agent_sessions/tests.rs src/process/subprocess/registry.rs src/process/subprocess/tests/registry.rs\\ngit diff --exit-code \\\"$recovered\\\"..\\\"$pre_quality\\\" -- . ':(exclude)src/process/agent_sessions/tests.rs' ':(exclude)src/process/subprocess/registry.rs' ':(exclude)src/process/subprocess/tests/registry.rs'\\ngit diff --name-only \\\"$base\\\"..HEAD -- '*.rs' | xargs -r rustfmt --edition 2024 --check\\ncargo check\\ncargo test --lib tools::host::git_sync::tests::recovery -- --test-threads=1\\ncargo test --lib state_sync -- --test-threads=1\\ncargo test --lib state_recovery -- --test-threads=1\\nnode --test tests/web_dashboard_attention.test.js\\ncargo test --lib process::agent_sessions::tests::workflow_goal_agent_handoff_survives_dead_process_recovery -- --exact --test-threads=1\\nprintf 'QUALITY_PREDICATE_PASS candidate=%s clean=yes focused_checks=all_passed\\\\n' \\\"$candidate\\\"\\n'\". Observed supervised process proc-1786822775042-972354-175 exited 2. stderr: /usr/bin/bash: -c: line 12: syntax error near unexpected token `('\n/usr/bin/bash: -c: line 12: `git diff --exit-code \"$recovered\"..\"$pre_quality\" -- . ':(exclude)src/process/agent_sessions/tests.rs' ':(exclude)src/process/subprocess/registry.rs' ':(exclude)src/process/subprocess/tests/registry.rs''",
+        "error_kind": "harness_fault",
+        "operation_id": "1a006ec94e5ed6425"
+      },
+      "quality_message": "Quality command harness fault: supervised shell /usr/bin/bash could not parse \"timeout 900s env CI=1 bash -lc '\\nset -euo pipefail\\nbase=4519b5ff2c5894b0fccf1c4c0e57612f694ffe79\\nrecovered=b003a0decf2bc2667cda876a601dcccf69c8006b\\npre_quality=dfdfa68f093cd695ecb106f8dd6a19e8fb3ea867\\ncandidate=827c7f56fa94b7f8d61eda21dc4ff813cc16d98f\\ntest \\\"$(git rev-parse HEAD)\\\" = \\\"$candidate\\\"\\ntest -z \\\"$(g…",
+      "quality_state": "harness_fault",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T19:36:02Z",
+      "updated": "2026-08-15T19:39:35Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T19:05:44Z",
         "round_idx": 3,
@@ -2872,8 +2877,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "quality",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-08-15T19:36:02Z",
-  "workflow_revision": 87
+  "updated": "2026-08-15T19:39:35Z",
+  "workflow_revision": 89
 }
