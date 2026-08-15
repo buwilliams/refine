@@ -210,6 +210,68 @@ fn cleanup_discovers_and_retires_a_remote_only_branch_for_a_deleted_goal() {
 }
 
 #[test]
+fn cleanup_preserves_a_missing_goal_ref_with_active_goal_ownership() {
+    let fixture = Fixture::new("active-missing-goal-ref");
+    fixture.add_origin();
+    let worktree = fixture.add_worktree("refine/OWNED_MISSING/round-1");
+    fs::write(worktree.join("candidate.txt"), "candidate\n").unwrap();
+    git(&worktree, &["add", "candidate.txt"]);
+    git(&worktree, &["commit", "-m", "candidate"]);
+    let candidate = git_output(&worktree, &["rev-parse", "HEAD"])
+        .trim()
+        .to_string();
+    git(
+        &fixture.repo,
+        &["merge", "--no-ff", "--no-edit", &candidate],
+    );
+    git(&fixture.repo, &["push", "origin", "main"]);
+    git(
+        &worktree,
+        &["push", "origin", "refine/OWNED_MISSING/round-1"],
+    );
+    git(
+        &fixture.repo,
+        &["worktree", "remove", worktree.to_str().unwrap()],
+    );
+    git(
+        &fixture.repo,
+        &["branch", "-D", "refine/OWNED_MISSING/round-1"],
+    );
+    FileOperationRegistry::new(&fixture.runtime_root)
+        .register_with_request(
+            "active-missing-goal",
+            json!({
+                "kind": "workflow_candidate_handoff",
+                "goal_id": "OWNED_MISSING"
+            }),
+        )
+        .unwrap();
+
+    let report = FileWorktreeCleanupService::new(&fixture.repo, &fixture.runtime_root)
+        .run(WorktreeCleanupOptions {
+            apply: true,
+            older_than_seconds: 0,
+        })
+        .unwrap();
+
+    assert_eq!(report.branches_deleted, 0);
+    assert_eq!(report.branch_entries[0].reason, "active_owner");
+    assert!(
+        !git_output(
+            &fixture.repo,
+            &[
+                "ls-remote",
+                "--heads",
+                "origin",
+                "refine/OWNED_MISSING/round-1"
+            ]
+        )
+        .trim()
+        .is_empty()
+    );
+}
+
+#[test]
 fn cleanup_keeps_terminal_branch_work_that_is_not_in_the_remote_target() {
     let fixture = Fixture::new("unmerged-terminal-ref");
     fixture.add_origin();

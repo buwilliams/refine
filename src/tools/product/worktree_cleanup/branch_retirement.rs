@@ -204,7 +204,7 @@ fn classify_candidate(
     };
     entry.goal_id = Some(goal_id.to_string());
 
-    if actively_owned_branches.contains(branch) {
+    if actively_owned_branches.contains(branch) || active_ownership.goal_ids.contains(goal_id) {
         preserve_both(&mut entry, "active_owner");
         return entry;
     }
@@ -222,10 +222,6 @@ fn classify_candidate(
     let goal = goals.get(goal_id);
     if let Some(goal) = goal {
         entry.goal_status = Some(goal.status.as_str().to_string());
-        if active_ownership.goal_ids.contains(goal_id) {
-            preserve_both(&mut entry, "active_owner");
-            return entry;
-        }
         if !matches!(goal.status, GoalStatus::Done | GoalStatus::Cancelled) {
             preserve_both(&mut entry, "goal_not_terminal");
             return entry;
