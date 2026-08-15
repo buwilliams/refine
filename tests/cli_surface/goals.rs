@@ -180,6 +180,68 @@ pub(crate) fn goal_feature_assignment_and_round_edit_latest(fixture: &Integratio
     );
 }
 
+pub(crate) fn goal_cancel_uses_active_node_and_rejects_foreign_owner(fixture: &IntegrationFixture) {
+    fixture.assert_success(
+        "create cancel active node",
+        &fixture.run_refine(&["node", "create", "cancel-active-node"]),
+    );
+    fixture.assert_success(
+        "create cancel foreign node",
+        &fixture.run_refine(&["node", "create", "cancel-foreign-node"]),
+    );
+    fixture.assert_success(
+        "activate cancel active node",
+        &fixture.run_refine(&["node", "activate", "cancel-active-node"]),
+    );
+
+    let owned_goal = fixture.create_goal("CLI owned cancellation");
+    let note = fixture.run_refine(&[
+        "goal",
+        "note",
+        &owned_goal,
+        "active Node ownership confirmed",
+        "--author",
+        "Refine",
+    ]);
+    fixture.assert_success("goal note on active Node", &note);
+    assert_eq!(
+        fixture.json_stdout(&note)["goal"]["node_id"],
+        "cancel-active-node"
+    );
+    let cancel = fixture.run_refine(&["goal", "cancel", &owned_goal]);
+    fixture.assert_success("goal cancel on active Node", &cancel);
+    assert_eq!(fixture.json_stdout(&cancel)["goal"]["status"], "cancelled");
+
+    fixture.assert_success(
+        "activate cancel foreign node",
+        &fixture.run_refine(&["node", "activate", "cancel-foreign-node"]),
+    );
+    let foreign_goal = fixture.create_goal("CLI foreign cancellation");
+    fixture.assert_success(
+        "restore cancel active node",
+        &fixture.run_refine(&["node", "activate", "cancel-active-node"]),
+    );
+    let rejected = fixture.run_refine(&["goal", "cancel", &foreign_goal]);
+    assert!(!rejected.status.success(), "foreign-owned cancel succeeded");
+    assert!(
+        rejected.stdout.is_empty(),
+        "foreign-owned cancel wrote stdout:\n{}",
+        String::from_utf8_lossy(&rejected.stdout)
+    );
+    assert!(
+        String::from_utf8_lossy(&rejected.stderr)
+            .contains("is owned by node cancel-foreign-node, not active node cancel-active-node"),
+        "stderr:\n{}",
+        String::from_utf8_lossy(&rejected.stderr)
+    );
+    assert_eq!(fixture.goal_field(&foreign_goal, "status"), "backlog");
+
+    fixture.assert_success(
+        "restore default after cancel ownership regression",
+        &fixture.run_refine(&["node", "activate", "default"]),
+    );
+}
+
 pub(crate) fn goal_workflow_actions_start_retry_and_undo(fixture: &IntegrationFixture) {
     let started_id = fixture.create_goal("goal action start");
     let started = fixture.run_refine(&["goal", "start", &started_id]);

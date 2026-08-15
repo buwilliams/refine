@@ -692,6 +692,106 @@ fn public_goal_cancel_api_reports_goal_without_a_local_process_as_durably_cancel
 }
 
 #[test]
+fn goal_cancel_uses_port_scoped_active_node_and_preserves_foreign_goals() {
+    let temp_root = unique_temp_dir("http-goal-cancel-port-active-node");
+    let app_root = temp_root.join("app");
+    let refine_dir = app_root.join(".refine");
+    let runtime_root = temp_root.join("run/8082");
+    let active_node = "bo2lnxnevo03-buddy";
+    let foreign_node = "bo2lnxnevo02-ethan";
+    let nodes = crate::tools::product::nodes::FileNodeRegistryService::with_active_root(
+        &refine_dir,
+        &runtime_root,
+    );
+    nodes.create(active_node).unwrap();
+    nodes.create(foreign_node).unwrap();
+    nodes.activate(active_node).unwrap();
+
+    let active_work_items = FileWorkItemService::for_node(&refine_dir, active_node);
+    active_work_items
+        .create_goal_summary("Owned single cancellation", Some("GOAL-OWNED-SINGLE"))
+        .unwrap();
+    active_work_items
+        .create_goal_summary("Owned bulk cancellation", Some("GOAL-OWNED-BULK"))
+        .unwrap();
+    FileWorkItemService::for_node(&refine_dir, foreign_node)
+        .create_goal_summary("Foreign cancellation", Some("GOAL-FOREIGN"))
+        .unwrap();
+
+    let mut server = server_with_projection();
+    server.target_root = Some(app_root);
+    server.runtime_root = Some(runtime_root.clone());
+
+    let noted = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/goals/GOAL-OWNED-SINGLE/notes".to_string(),
+        body: Some(json!({"author": "Refine", "body": "active Node ownership confirmed"})),
+    });
+    assert_eq!(noted.status, 200, "{}", noted.body);
+    assert_eq!(noted.body["goal"]["node_id"], active_node);
+
+    let cancelled = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/goals/GOAL-OWNED-SINGLE/cancel".to_string(),
+        body: None,
+    });
+    assert_eq!(cancelled.status, 200, "{}", cancelled.body);
+    assert_eq!(cancelled.body["cancelled"], true);
+    assert_eq!(cancelled.body["goal"]["node_id"], active_node);
+
+    let rejected = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/goals/GOAL-FOREIGN/cancel".to_string(),
+        body: None,
+    });
+    assert_eq!(rejected.status, 409, "{}", rejected.body);
+    assert_eq!(rejected.body["error"]["code"], "conflict");
+    assert!(
+        rejected.body["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains(&format!("not active node {active_node}"))
+    );
+    assert_eq!(
+        active_work_items
+            .show_goal_summary("GOAL-FOREIGN")
+            .unwrap()
+            .goal
+            .status,
+        GoalStatus::Backlog
+    );
+
+    let bulk = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/goals/bulk".to_string(),
+        body: Some(json!({
+            "selected_ids": ["GOAL-OWNED-BULK", "GOAL-FOREIGN"],
+            "update": {"status": "cancelled"}
+        })),
+    });
+    assert_eq!(bulk.status, 200, "{}", bulk.body);
+    assert_eq!(bulk.body["updated"], 1);
+    assert_eq!(bulk.body["ids"], json!(["GOAL-OWNED-BULK"]));
+    assert_eq!(bulk.body["skipped"], 1);
+    assert_eq!(
+        bulk.body["skipped_details"][0],
+        json!({"id": "GOAL-FOREIGN", "reason": format!("node:{foreign_node}")})
+    );
+    assert_eq!(
+        active_work_items
+            .show_goal_summary("GOAL-FOREIGN")
+            .unwrap()
+            .goal
+            .status,
+        GoalStatus::Backlog
+    );
+    assert!(!refine_dir.join("active-node.json").exists());
+    assert!(runtime_root.join("active-node.json").exists());
+
+    remove_temp_dir(&temp_root);
+}
+
+#[test]
 fn public_process_stop_api_does_not_requeue_already_cancelled_goal() {
     let temp_root = unique_temp_dir("http-process-stop-cancelled-no-process");
     let app_root = temp_root.join("app");

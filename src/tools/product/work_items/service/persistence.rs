@@ -61,7 +61,7 @@ impl FileWorkItemService {
         })
     }
 
-    pub(super) fn active_node_id(&self) -> RefineResult<String> {
+    pub(crate) fn active_node_id(&self) -> RefineResult<String> {
         if let Some(node_id) = &self.active_node_id_override {
             return Ok(node_id.clone());
         }

@@ -14,7 +14,6 @@ use crate::process::subprocess::{
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::project_layout::refine_dir_for_target_root;
 use crate::tools::product::chat::FileChatService;
-use crate::tools::product::nodes::FileNodeRegistryService;
 use crate::tools::product::project_registry::FileProjectRegistryService;
 use crate::tools::product::work_items::{
     BulkGoalSelection, BulkSkippedDetail, BulkUpdateResult, FileWorkItemService,
@@ -83,7 +82,7 @@ impl FileProcessControlService {
             let session = chat.stop(session_id)?;
             let goal = match (goal_id.as_deref(), expectation.as_ref()) {
                 (Some(goal_id), Some(expectation)) => Some(
-                    FileWorkItemService::new(&refine_dir)
+                    self.work_items()?
                         .fail_goal_after_process_stop_if_current(goal_id, expectation)?,
                 ),
                 _ => None,
@@ -148,7 +147,7 @@ impl FileProcessControlService {
         }
         let goal = match (goal_id.as_deref(), expectation.as_ref()) {
             (Some(goal_id), Some(expectation)) => {
-                let work_items = FileWorkItemService::new(self.resolve_refine_dir()?);
+                let work_items = self.work_items()?;
                 Some(work_items.fail_goal_after_process_stop_if_current(goal_id, expectation)?)
             }
             _ => None,
@@ -188,8 +187,7 @@ impl FileProcessControlService {
         if goal_id.is_empty() {
             return Err(RefineError::InvalidInput("Goal id is required".to_string()));
         }
-        let refine_dir = self.resolve_refine_dir()?;
-        let work_items = FileWorkItemService::new(&refine_dir);
+        let work_items = self.work_items()?;
         let goal = work_items.cancel_goal_summary(goal_id)?;
         let mut stopped = Vec::new();
         let mut failures = Vec::new();
@@ -241,8 +239,7 @@ impl FileProcessControlService {
         &self,
         selection: BulkGoalSelection,
     ) -> RefineResult<BulkUpdateResult> {
-        let refine_dir = self.resolve_refine_dir()?;
-        let work_items = FileWorkItemService::new(&refine_dir);
+        let work_items = self.work_items()?;
         let ids = if let Some(selected_ids) = &selection.selected_ids {
             let excluded = selection
                 .exclude_ids
@@ -259,7 +256,7 @@ impl FileProcessControlService {
         } else {
             work_items.select_bulk_goal_ids(&selection)?
         };
-        let active_node = FileNodeRegistryService::new(&refine_dir).active_node_id()?;
+        let active_node = work_items.active_node_id()?;
         let mut updated_ids = Vec::new();
         let mut skipped_details = Vec::new();
         let mut failures = Vec::new();
@@ -310,7 +307,7 @@ impl FileProcessControlService {
     }
 
     fn goal_expectation(&self, goal_id: &str) -> RefineResult<GoalCancellationExpectation> {
-        let work_items = FileWorkItemService::new(self.resolve_refine_dir()?);
+        let work_items = self.work_items()?;
         let goal = work_items.show_goal_summary(goal_id)?;
         if goal.goal.status == GoalStatus::Done {
             return Err(RefineError::InvalidInput(format!(
@@ -327,6 +324,17 @@ impl FileProcessControlService {
                 .filter(|node| !node.is_empty())
                 .unwrap_or_else(|| "default".to_string()),
         })
+    }
+
+    /// Uses the port-scoped runtime identity for every Goal ownership decision made by
+    /// process control. Projection caching and active-Node selection therefore share the
+    /// same runtime authority as the other daemon-backed Goal operations.
+    fn work_items(&self) -> RefineResult<FileWorkItemService> {
+        Ok(FileWorkItemService::with_projection_cache(
+            self.resolve_refine_dir()?,
+            &self.runtime_root,
+            self.runtime_root.join("cache"),
+        ))
     }
 
     fn find_managed_process(
