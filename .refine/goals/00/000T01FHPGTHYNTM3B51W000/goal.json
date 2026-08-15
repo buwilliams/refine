@@ -1535,12 +1535,71 @@
           "round_idx": 2,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-08-15T16:41:45Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-08-15T16:43:08Z",
+        "proposal": {
+          "completed_at": "2026-08-15T16:43:08Z",
+          "git_after": {
+            "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-3",
+            "head_commit": "0e0de3d43fe9284156e9f951dc8c981c1f996fd7",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-3",
+            "head_commit": "0e0de3d43fe9284156e9f951dc8c981c1f996fd7",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Compare current main, the original and Round 2 bases, and both retained candidates, then selectively reapply the complete reviewed semantic delta without altering historical evidence or unrelated current-main behavior.",
+                "id": "P1"
+              },
+              {
+                "description": "Restore the dedicated missing-baseline domain failure and optional typed state-sync recovery kind with atomic target-bound settlement so success, generic failure, unconfigured state, and unrelated failure episodes remain correctly classified.",
+                "id": "P2"
+              },
+              {
+                "description": "Restore daemon-owned git_busy and stale_preview conflict reasons through the existing preview and apply API contract while preserving complete-preview fencing and safe generic handling for other conflicts.",
+                "id": "P3"
+              },
+              {
+                "description": "Restore the cohesive Dashboard recovery controller so preview fetching is gated by authoritative typed eligibility and recovery state is invalidated across target, node, route, scope, eligibility, preview identity, and late-response context changes.",
+                "id": "P4"
+              },
+              {
+                "description": "Restore neutral rendering of target and repository identities, configured remote, heads, snapshots, evidence identity, bounded conflict details, all comparison counts, and the consequences of live or remote authority without inference, recommendation, or preselection.",
+                "id": "P5"
+              },
+              {
+                "description": "Restore the separate explicit authority choice and exact-preview confirmation gate, requiring renewed confirmation after Git-busy rejection and a fresh preview, authority choice, and confirmation after stale-preview rejection.",
+                "id": "P6"
+              },
+              {
+                "description": "Restore successful recovery reconciliation so authoritative state-sync health clears atomically for the intended target while the Dashboard retains the baseline, resulting heads, audit ref, manifest, evidence identity, counts, authority, detail, and cleared-error status.",
+                "id": "P7"
+              },
+              {
+                "description": "Carry forward the focused daemon, API, and browser regressions covering typed eligibility, rejection without mutation, complete rendering, deliberate confirmation, busy and stale fencing, late-response races, retained success evidence, and health clearing.",
+                "id": "P8"
+              },
+              {
+                "description": "Carry forward only the affected Dashboard intent, API intent, and existing missing-baseline runbook updates while keeping each changed code file within its cohesive established responsibility.",
+                "id": "P9"
+              },
+              {
+                "description": "Demonstrate that the Round 3 cumulative delta faithfully matches the reviewed behavior without unrelated scope, and exercise the requested focused checks, targeted formatting, and cumulative diff checks with baseline failures or browser unavailability reported separately.",
+                "id": "P10"
+              }
+            ],
+            "summary": "Recover the complete Quality-reviewed missing-baseline dashboard workflow onto the clean Round 3 branch by selectively carrying forward the retained implementation and correction while preserving unrelated current-main behavior and every historical branch, worktree, commit, log, failure, operation, and review record; the result will keep recovery eligibility and all Git and state mutation daemon-owned, require a neutral exact-preview authority decision, fence stale or late activity, retain auditable success evidence, and limit documentation and code structure changes to the established product boundaries."
+          },
+          "started_at": "2026-08-15T16:41:45Z"
+        },
         "schema_version": 2,
         "started_at": "2026-08-15T16:41:45Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T16:41:45Z"
+        "updated_at": "2026-08-15T16:43:08Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -1554,7 +1613,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T16:41:45Z",
+      "updated": "2026-08-15T16:43:08Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T16:41:44Z",
         "round_idx": 2,
@@ -1566,6 +1625,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-15T16:41:45Z",
-  "workflow_revision": 54
+  "updated": "2026-08-15T16:43:08Z",
+  "workflow_revision": 56
 }
