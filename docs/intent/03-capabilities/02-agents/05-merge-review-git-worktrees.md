@@ -34,9 +34,16 @@ This capability should connect workflow with the user's source repository:
   checkout on demand. Dirty work, ambiguous ownership, standalone worktrees,
   the state worktree, and unrecognized ignored content remain protected.
   Generated cache paths are removable only when recognized by Refine or
-  explicitly configured for the target app. Refine-owned local and upstream
-  branches may be retired only when exact-SHA integration evidence proves the
-  candidate remains reachable from both target tips;
+  explicitly configured for the target app. After the same retention delay,
+  maintenance independently inventories exact `refine/<goal>/round-N` refs
+  locally and on the configured remote. It may retire local and upstream ref
+  names for done, cancelled, or deleted Goals only when each exact tip remains
+  reachable from the exact configured remote merge-target snapshot. Remote
+  deletion atomically fences both the candidate and target SHAs; checked-out
+  branches may lose only their upstream ref. Active or failed Goals, active
+  ownership, malformed or ambiguous refs, unique commits, inspection failures,
+  and `refine/state` remain protected. Goal, Round, process, and target-reachable
+  commit evidence remains inspectable after a safe ref name is retired;
 
 Review should be a real boundary in workflow. It lets later ordered Feature work proceed when appropriate, but it should not erase the need for evidence or final judgment.
 

@@ -4,7 +4,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
@@ -49,6 +49,26 @@ pub struct GitHeadRef {
 pub struct GitLinkedWorktree {
     pub path: PathBuf,
     pub branch: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct GitRemoteRef {
+    pub branch: String,
+    pub commit: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct GitRemoteRefSnapshot {
+    pub target_commit: Option<String>,
+    pub refine_branches: Vec<GitRemoteRef>,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum GitRemoteRefDeleteOutcome {
+    Deleted,
+    BranchChanged,
+    TargetChanged,
+    AtomicUnsupported,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -146,6 +166,7 @@ fn same_existing_path(left: &Path, right: &Path) -> bool {
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct HostCommandOutput {
     success: bool,
+    exit_code: Option<i32>,
     stdout: Vec<u8>,
     stderr: Vec<u8>,
 }
@@ -288,10 +309,16 @@ fn is_read_only_git_command(args: &[&str]) -> bool {
     match args {
         ["branch", "--show-current"] => true,
         ["worktree", "list", "--porcelain"] => true,
-        ["remote"] | ["remote", "get-url", ..] => true,
+        ["remote"] | ["remote", "get-url", ..] | ["ls-remote", ..] => true,
         [command, ..] => matches!(
             *command,
-            "cat-file" | "diff" | "log" | "merge-base" | "rev-list" | "rev-parse" | "show"
+            "cat-file"
+                | "diff"
+                | "log"
+                | "merge-base"
+                | "rev-list"
+                | "rev-parse"
+                | "show"
                 | "status"
         ),
         [] => false,

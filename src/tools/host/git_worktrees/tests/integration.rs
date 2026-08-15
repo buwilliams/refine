@@ -1,6 +1,31 @@
 use super::*;
 
 #[test]
+fn commit_is_ancestor_distinguishes_negative_results_from_inspection_failures() {
+    let temp_root = unique_temp_dir("git-ancestor-result");
+    let repo = temp_root.join("repo");
+    fs::create_dir_all(&repo).unwrap();
+    init_repo(&repo);
+    commit_file(&repo, "README.md", "base\n", "initial");
+    let base = git_stdout(&repo, &["rev-parse", "HEAD"]);
+    commit_file(&repo, "next.txt", "next\n", "next");
+    let next = git_stdout(&repo, &["rev-parse", "HEAD"]);
+    let service = FileGitWorktreeService::new(&repo);
+
+    assert!(service.commit_is_ancestor(&base, &next).unwrap());
+    assert!(!service.commit_is_ancestor(&next, &base).unwrap());
+    let error = service
+        .commit_is_ancestor("0000000000000000000000000000000000000000", &next)
+        .unwrap_err();
+    assert!(
+        error.to_string().contains("Git ancestry inspection failed"),
+        "{error}"
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn changed_paths_since_reports_the_committed_candidate_diff() {
     let temp_root = unique_temp_dir("git-changed-paths");
     let repo = temp_root.join("repo");
