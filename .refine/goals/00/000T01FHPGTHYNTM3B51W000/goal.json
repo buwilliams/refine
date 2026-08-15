@@ -84,7 +84,7 @@
         "version": 1,
         "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
       },
-      "assignee": "buddy.williams@insurity.com",
+      "assignee": "Buddy Williams",
       "constitution_state": "unclassified",
       "created": "2026-08-15T15:02:29Z",
       "failure_at": "",
@@ -278,7 +278,7 @@
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
-      "reporter": "buddy.williams@insurity.com",
+      "reporter": "Buddy Williams",
       "rule_state": "unclassified",
       "updated": "2026-08-15T15:09:08Z",
       "workflow_attempt_authority": {
@@ -293,5 +293,5 @@
   "status": "implement",
   "target_branch": "main",
   "updated": "2026-08-15T15:09:08Z",
-  "workflow_revision": 16
+  "workflow_revision": 17
 }

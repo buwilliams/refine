@@ -10,7 +10,7 @@
   "node_id": "default",
   "notes": [],
   "priority": "low",
-  "reporter": "buddy.williams@insurity.com",
+  "reporter": "Buddy Williams",
   "rounds": [
     {
       "agent_context": {
@@ -84,7 +84,7 @@
         "version": 1,
         "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
       },
-      "assignee": "buddy.williams@insurity.com",
+      "assignee": "Buddy Williams",
       "constitution_state": "unclassified",
       "created": "2026-08-15T09:05:52Z",
       "failure_at": "",
@@ -365,7 +365,7 @@
       },
       "quality_recovery_round_prompt": "Carry forward the complete implementation and Quality correction represented by candidate 9b287bcbca976eb6739d92b867a955018e72d6cd relative to base 7556a231c381db58b7dc435b514cfb7c13d60d23. Preserve its remote-first configured-authority branch retirement, terminal-or-missing Goal and retention gates, remote-target ancestry proof, atomic exact-SHA branch/target fencing, independent local/upstream outcomes, fail-closed Git ancestry handling, focused regressions, reporting, and three intent updates. No product-code correction is currently indicated. Do not format or otherwise modify unrelated baseline files merely to satisfy workspace-wide rustfmt. Verify with cargo test --lib tools::product::worktree_cleanup -- --test-threads=1; the exact commit_is_ancestor_distinguishes_negative_results_from_inspection_failures test; cargo test --lib; cargo check --all-targets; git diff --check against the Round base; and rustfmt --edition 2024 --check applied only to Rust files changed from that base. Confirm exactly the three affected intent pages remain changed. Report cargo fmt --all -- --check as an inapplicable baseline failure unless the unrelated formatting debt has independently been fixed.",
       "quality_state": "failed",
-      "reporter": "buddy.williams@insurity.com",
+      "reporter": "Buddy Williams",
       "rule_state": "unclassified",
       "updated": "2026-08-15T09:44:38Z",
       "workflow_attempt_authority": {
@@ -1003,5 +1003,5 @@
   "status": "done",
   "target_branch": "main",
   "updated": "2026-08-15T10:04:00Z",
-  "workflow_revision": 50
+  "workflow_revision": 51
 }
