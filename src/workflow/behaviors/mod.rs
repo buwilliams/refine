@@ -6,6 +6,9 @@ use crate::model::workflow::GoalStatus;
 use crate::process::agent_sessions::{GoalAgentLaunch, run_goal_agent_with_settlement};
 use crate::process::supervisor::config::{FileGovernanceService, FileGuidanceService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::operations::{
+    FileOperationRegistry, OperationRegistry, OperationState,
+};
 use crate::prompts::{PromptEngine, PromptTemplate};
 use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
@@ -13,11 +16,13 @@ use crate::tools::host::agent_providers::{
 use crate::tools::host::git_sync::with_repository_git_lock;
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
 use crate::tools::host::quality::{
-    QualityCheckResult, QualityOperationRunner, is_quality_harness_fault, quality_error_summary,
+    QualityCheckResult, QualityOperationRunner, is_quality_harness_fault,
+    is_quality_output_contract_fault, quality_error_summary,
 };
 use crate::tools::product::governance_integration::{
     AlreadyMergedResolutionDisposition, FileGovernanceIntegrationService,
 };
+use crate::tools::product::work_items::AlreadyMergedSettlement;
 use crate::workflow::behavior::{WorkflowAdvanceOutcome, WorkflowBehavior};
 use crate::workflow::candidate_handoff::{
     find_candidate_handoff, record_candidate_handoff_commit, record_candidate_handoff_governance,
@@ -26,12 +31,13 @@ use crate::workflow::candidate_handoff::{
 use crate::workflow::context::WorkflowContext;
 use crate::workflow::implementation_planning::begin_implementation_phase;
 use crate::workflow::{
-    GovernanceEvaluation, QualityRecoveryInvestigation, agent_worktree_cwd,
-    complete_implementation_planning, fail_implementation_phase, governed_implementation_prompt,
-    implementation_branch_name, json_object, now_timestamp, parse_governance_provider_output,
-    parse_quality_recovery_provider_output, post_implementation_governance_prompt,
-    quality_recovery_prompt, round_agent_context, run_governed_implementation_planning,
-    selected_agent_context, setting_string, setting_usize,
+    CandidateRefreshOutcome, GovernanceEvaluation, QualityRecoveryInvestigation,
+    agent_worktree_cwd, complete_implementation_planning, fail_implementation_phase,
+    governed_implementation_prompt, implementation_branch_name, json_object, now_timestamp,
+    parse_governance_provider_output, parse_quality_recovery_provider_output,
+    post_implementation_governance_prompt, quality_recovery_prompt,
+    refresh_candidate_for_target_advancement, round_agent_context,
+    run_governed_implementation_planning, selected_agent_context, setting_string, setting_usize,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -51,6 +57,15 @@ pub struct WorkflowQuality;
 
 #[derive(Clone, Debug, Default)]
 pub struct WorkflowGovernance;
+
+enum GovernanceLeaseResult {
+    Outcome(WorkflowAdvanceOutcome),
+    Integrated {
+        integration: crate::model::goal::RoundIntegration,
+        transitioned: bool,
+        candidate_commit: String,
+    },
+}
 
 #[derive(Clone, Debug, Default)]
 pub struct WorkflowReview;
@@ -671,17 +686,10 @@ impl WorkflowBehavior for WorkflowQuality {
                 "quality_candidate_commit": quality_commit
             }),
         )?;
-        let quality = match run_workflow_quality(ctx) {
+        let quality = match run_workflow_quality(ctx, GoalStatus::Quality) {
             Ok(result) => result,
             Err(error) => {
-                let category =
-                    if crate::tools::host::quality::is_quality_candidate_infrastructure(&error) {
-                        "quality_candidate_infrastructure"
-                    } else if is_quality_harness_fault(&error) {
-                        "quality_harness"
-                    } else {
-                        "quality"
-                    };
+                let category = quality_failure_category(&error);
                 return fail(
                     ctx,
                     category,
@@ -720,6 +728,58 @@ impl WorkflowBehavior for WorkflowQuality {
 fn resolve_already_merged_quality(
     ctx: &mut WorkflowContext<'_>,
 ) -> RefineResult<WorkflowAdvanceOutcome> {
+    let candidate = ctx.require_commit()?.to_string();
+    if let Some(outcome) = recover_failed_already_merged_quality(ctx, &candidate)? {
+        return Ok(outcome);
+    }
+    if ctx
+        .work_items
+        .current_round_quality_proof(&ctx.goal_id, ctx.round_idx, &candidate)?
+        .is_none()
+    {
+        let quality = match run_workflow_quality(ctx, GoalStatus::Quality) {
+            Ok(quality) => quality,
+            Err(error) => {
+                return fail(
+                    ctx,
+                    "already_merged_quality_regeneration",
+                    RefineError::Conflict(format!(
+                        "Exact-candidate Quality proof could not be regenerated: {error}"
+                    )),
+                );
+            }
+        };
+        ctx.log(
+            "reconcile",
+            if quality.ok {
+                "Regenerated passed isolated Quality proof for the exact integrated candidate"
+            } else {
+                "Regenerated isolated Quality proof rejected the exact integrated candidate"
+            },
+            Some(json_object(json!({
+                "candidate_commit": candidate,
+                "quality_ok": quality.ok,
+                "provider_attempts": quality.provider_attempts.len()
+            }))),
+        )?;
+        if !quality.ok {
+            let settlement = ctx
+                .work_items
+                .settle_already_merged_quality_failure(
+                    &ctx.goal_id,
+                    ctx.attempt_authority,
+                    &candidate,
+                    None,
+                )?
+                .ok_or_else(|| {
+                    RefineError::Conflict(format!(
+                        "Exact-candidate failed Quality result for Goal {} was not durably recoverable",
+                        ctx.goal_id
+                    ))
+                })?;
+            return failed_already_merged_quality_outcome(ctx, settlement);
+        }
+    }
     let service = FileGovernanceIntegrationService::with_target_root(
         ctx.runtime_root,
         ctx.refine_dir(),
@@ -770,6 +830,67 @@ fn resolve_already_merged_quality(
     }
 }
 
+fn recover_failed_already_merged_quality(
+    ctx: &mut WorkflowContext<'_>,
+    candidate: &str,
+) -> RefineResult<Option<WorkflowAdvanceOutcome>> {
+    if let Some(settlement) = ctx.work_items.settle_already_merged_quality_failure(
+        &ctx.goal_id,
+        ctx.attempt_authority,
+        candidate,
+        None,
+    )? {
+        return failed_already_merged_quality_outcome(ctx, settlement).map(Some);
+    }
+
+    let owner = format!("quality:{}:{candidate}", ctx.goal_id);
+    for operation in FileOperationRegistry::new(ctx.runtime_root)
+        .recover()?
+        .into_iter()
+        .filter(|operation| operation.owner == owner && operation.state == OperationState::Failed)
+    {
+        if let Some(settlement) = ctx.work_items.settle_already_merged_quality_failure(
+            &ctx.goal_id,
+            ctx.attempt_authority,
+            candidate,
+            Some(&operation),
+        )? {
+            return failed_already_merged_quality_outcome(ctx, settlement).map(Some);
+        }
+    }
+    Ok(None)
+}
+
+fn failed_already_merged_quality_outcome(
+    ctx: &mut WorkflowContext<'_>,
+    settlement: AlreadyMergedSettlement,
+) -> RefineResult<WorkflowAdvanceOutcome> {
+    let (disposition, evidence) = match settlement {
+        AlreadyMergedSettlement::Failed(_, evidence) => ("failed", evidence),
+        AlreadyMergedSettlement::AlreadyFailed(_, evidence) => ("already_failed", evidence),
+        AlreadyMergedSettlement::Resolved(_, _)
+        | AlreadyMergedSettlement::AlreadyResolved(_, _) => {
+            return Err(RefineError::Conflict(
+                "failed already-merged Quality settlement produced approval evidence".to_string(),
+            ));
+        }
+    };
+    ctx.log(
+        "reconcile",
+        "Already-merged exact candidate failed isolated Quality and was settled without regeneration",
+        Some(json_object(json!({
+            "disposition": disposition,
+            "evidence": evidence
+        }))),
+    )?;
+    ctx.final_status = Some(GoalStatus::Failed);
+    Ok(WorkflowAdvanceOutcome::Completed {
+        final_status: GoalStatus::Failed,
+        reason: "Already-merged exact candidate failed its first isolated Quality evaluation"
+            .to_string(),
+    })
+}
+
 impl WorkflowBehavior for WorkflowGovernance {
     fn observes(&self) -> GoalStatus {
         GoalStatus::Governance
@@ -777,67 +898,179 @@ impl WorkflowBehavior for WorkflowGovernance {
 
     fn advance(&self, ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome> {
         let branch = ctx.require_branch()?.to_string();
-        let commit = ctx.require_commit()?.to_string();
         let worktree_path = ctx.require_worktree_path()?.to_string();
-        let goal = ctx.work_items.show_goal_detail(&ctx.goal_id)?;
-        let agent_context = ensure_goal_agent_context(ctx, &goal)?;
         let agent_cwd = agent_worktree_cwd(
             &worktree_path,
             setting_string(&ctx.settings, "agent_subpath", "").as_str(),
         )?;
-        let governance =
-            evaluate_workflow_governance(ctx, &worktree_path, &agent_cwd, &agent_context)?;
-        record_governance(ctx, &governance)?;
-        if governance.failed {
-            return handle_governance_finding(ctx, &governance);
-        }
-        let remote = ctx.git_remote()?;
-        let worktree_git =
-            FileGitWorktreeService::with_runtime_root(&worktree_path, ctx.runtime_root);
-        if worktree_git.remote_exists(&remote)? {
-            with_repository_git_lock(ctx.target_root, || worktree_git.push(&remote, &branch))?;
-        }
-        let next = GoalStatus::Review;
+        let target_root = ctx.target_root.to_path_buf();
+        let max_retries = max_automatic_round_retries(ctx)?;
         let integration_service = FileGovernanceIntegrationService::with_target_root(
             ctx.runtime_root,
             ctx.refine_dir(),
             ctx.target_root,
         );
-        let goal_id = ctx.goal_id.clone();
-        let node_id = ctx.node_id.clone();
-        let round_idx = ctx.round_idx;
-        let (integration, transitioned) = match integration_service
-            .integrate_workflow_candidate_and_settle(
-                &goal_id,
-                round_idx,
-                &node_id,
-                &branch,
-                &commit,
-                &remote,
-                |integration| {
+        let leased = with_repository_git_lock(&target_root, || {
+            let refresh = refresh_candidate_for_target_advancement(ctx, max_retries)?;
+            match refresh {
+                CandidateRefreshOutcome::RecoveryQueued { reason, evidence } => {
                     ctx.log(
                         "governance_integration",
-                        &format!(
-                            "Governance integrated approved implementation candidate {branch}"
-                        ),
+                        "Queued a fresh recovery Round for an ambiguous or conflicted candidate refresh",
                         Some(json_object(json!({
-                            "branch": branch,
-                            "integration": integration
+                            "reason": reason,
+                            "retained_evidence": evidence
                         }))),
                     )?;
-                    let current = ctx.work_items.show_goal_summary(&ctx.goal_id)?;
-                    if current.goal.status == GoalStatus::Cancelled {
-                        Ok(false)
-                    } else {
-                        ctx.request_transition(GoalStatus::Governance, GoalStatus::Review)?;
-                        Ok(true)
+                    ctx.final_status = Some(GoalStatus::Todo);
+                    return Ok(GovernanceLeaseResult::Outcome(
+                        WorkflowAdvanceOutcome::Completed {
+                            final_status: GoalStatus::Todo,
+                            reason: "Integration race queued a fresh fenced recovery Round"
+                                .to_string(),
+                        },
+                    ));
+                }
+                CandidateRefreshOutcome::RecoveryExhausted { reason, evidence } => {
+                    ctx.log(
+                        "governance_integration",
+                        "Integration recovery exhausted the shared automatic Round budget",
+                        Some(json_object(json!({
+                            "reason": reason,
+                            "retained_evidence": evidence,
+                            "max_automatic_round_retries": max_retries
+                        }))),
+                    )?;
+                    ctx.final_status = Some(GoalStatus::Failed);
+                    return Ok(GovernanceLeaseResult::Outcome(
+                        WorkflowAdvanceOutcome::Completed {
+                            final_status: GoalStatus::Failed,
+                            reason:
+                                "Integration recovery exhausted the shared automatic Round budget"
+                                    .to_string(),
+                        },
+                    ));
+                }
+                CandidateRefreshOutcome::Refreshed {
+                    original_candidate,
+                    replacement_candidate,
+                    target_commit,
+                    evidence,
+                } => {
+                    ctx.log(
+                        "governance_integration",
+                        "Refreshed a provable candidate delta onto the advanced target",
+                        Some(json_object(json!({
+                            "original_candidate_commit": original_candidate,
+                            "replacement_candidate_commit": replacement_candidate,
+                            "replacement_base_commit": target_commit,
+                            "refresh_evidence": evidence
+                        }))),
+                    )?;
+                    ctx.revalidate_authority(GoalStatus::Governance)?;
+                    let quality = run_workflow_quality(ctx, GoalStatus::Governance)?;
+                    if !quality.ok {
+                        let retained = json!({
+                            "candidate_refresh": evidence,
+                            "replacement_candidate_commit": replacement_candidate,
+                            "quality_summary": quality.summary,
+                            "quality_results": quality.results,
+                            "quality_diagnostics": quality.diagnostics
+                        });
+                        let recovery = ctx.work_items.queue_integration_recovery_summary(
+                            &ctx.goal_id,
+                            ctx.attempt_authority,
+                            &ctx.node_id,
+                            "replacement candidate failed exact-candidate Quality",
+                            retained.clone(),
+                            max_retries,
+                        )?;
+                        let final_status = recovery.goal.status;
+                        ctx.final_status = Some(final_status.clone());
+                        return Ok(GovernanceLeaseResult::Outcome(
+                            WorkflowAdvanceOutcome::Completed {
+                                final_status: final_status.clone(),
+                                reason: if final_status == GoalStatus::Todo {
+                                    "Replacement candidate Quality queued a fresh recovery Round"
+                                        .to_string()
+                                } else {
+                                    "Replacement candidate Quality exhausted the shared automatic Round budget"
+                                        .to_string()
+                                },
+                            },
+                        ));
                     }
-                },
-            ) {
-            Ok(settled) => settled,
-            Err(error @ RefineError::StaleCandidate { .. }) => {
-                return fail(ctx, "governance_integration", error);
+                    ctx.log(
+                        "quality",
+                        "Replacement candidate passed exact-candidate Quality under the integration lease",
+                        Some(json_object(json!({
+                            "candidate_commit": replacement_candidate
+                        }))),
+                    )?;
+                }
+                CandidateRefreshOutcome::Unchanged => {}
             }
+
+            ctx.revalidate_authority(GoalStatus::Governance)?;
+            let goal = ctx.work_items.show_goal_detail(&ctx.goal_id)?;
+            let agent_context = ensure_goal_agent_context(ctx, &goal)?;
+            let governance =
+                evaluate_workflow_governance(ctx, &worktree_path, &agent_cwd, &agent_context)?;
+            ctx.revalidate_authority(GoalStatus::Governance)?;
+            record_governance(ctx, &governance)?;
+            if governance.failed {
+                return handle_governance_finding(ctx, &governance)
+                    .map(GovernanceLeaseResult::Outcome);
+            }
+
+            ctx.revalidate_authority(GoalStatus::Governance)?;
+            let remote = ctx.git_remote()?;
+            let commit = ctx.require_commit()?.to_string();
+            let worktree_git =
+                FileGitWorktreeService::with_runtime_root(&worktree_path, ctx.runtime_root);
+            if worktree_git.remote_exists(&remote)? {
+                worktree_git.push(&remote, &branch)?;
+            }
+            ctx.revalidate_authority(GoalStatus::Governance)?;
+            let goal_id = ctx.goal_id.clone();
+            let node_id = ctx.node_id.clone();
+            let round_idx = ctx.round_idx;
+            let (integration, transitioned) = integration_service
+                .integrate_workflow_candidate_and_settle_under_repository_lease(
+                    &goal_id,
+                    round_idx,
+                    &node_id,
+                    &branch,
+                    &commit,
+                    &remote,
+                    |integration| {
+                        ctx.log(
+                            "governance_integration",
+                            &format!(
+                                "Governance integrated approved implementation candidate {branch}"
+                            ),
+                            Some(json_object(json!({
+                                "branch": branch,
+                                "integration": integration
+                            }))),
+                        )?;
+                        let current = ctx.work_items.show_goal_summary(&ctx.goal_id)?;
+                        if current.goal.status == GoalStatus::Cancelled {
+                            Ok(false)
+                        } else {
+                            ctx.request_transition(GoalStatus::Governance, GoalStatus::Review)?;
+                            Ok(true)
+                        }
+                    },
+                )?;
+            Ok(GovernanceLeaseResult::Integrated {
+                integration,
+                transitioned,
+                candidate_commit: commit,
+            })
+        });
+        let leased = match leased {
+            Ok(leased) => leased,
             Err(error)
                 if ctx
                     .work_items
@@ -847,6 +1080,14 @@ impl WorkflowBehavior for WorkflowGovernance {
                 return Err(error);
             }
             Err(error) => return fail(ctx, "governance_integration", error),
+        };
+        let (integration, transitioned, candidate_commit) = match leased {
+            GovernanceLeaseResult::Outcome(outcome) => return Ok(outcome),
+            GovernanceLeaseResult::Integrated {
+                integration,
+                transitioned,
+                candidate_commit,
+            } => (integration, transitioned, candidate_commit),
         };
         ctx.merge = Some(integration.merge);
         if let Some(handoff) = find_candidate_handoff(
@@ -860,7 +1101,7 @@ impl WorkflowBehavior for WorkflowGovernance {
                 &handoff.id,
                 "candidate_integrated",
                 json!({
-                    "candidate_commit": commit,
+                    "candidate_commit": candidate_commit,
                     "round_idx": ctx.round_idx
                 }),
             )?;
@@ -875,7 +1116,7 @@ impl WorkflowBehavior for WorkflowGovernance {
         }
         Ok(WorkflowAdvanceOutcome::Transition {
             from: GoalStatus::Governance,
-            to: next,
+            to: GoalStatus::Review,
             reason: "Governance passed and integrated the implementation candidate".to_string(),
         })
     }
@@ -934,6 +1175,7 @@ impl WorkflowBehavior for WorkflowCancelled {
 }
 
 fn run_quality_correction_agent(ctx: &mut WorkflowContext<'_>) -> RefineResult<(String, String)> {
+    ctx.revalidate_authority(GoalStatus::Quality)?;
     let worktree_path = ctx.require_worktree_path()?.to_string();
     let goal = ctx.work_items.show_goal_detail(&ctx.goal_id)?;
     let agent_context = ensure_goal_agent_context(ctx, &goal)?;
@@ -1008,11 +1250,15 @@ fn run_quality_correction_agent(ctx: &mut WorkflowContext<'_>) -> RefineResult<(
             },
             |_| Ok(()),
         )?;
-        result.output
+        let output = result.output;
+        ctx.revalidate_authority(GoalStatus::Quality)?;
+        output
     };
     let target_branch = setting_string(&ctx.settings, "merge_target_branch", "main");
     let worktree_git = FileGitWorktreeService::with_runtime_root(&worktree_path, ctx.runtime_root);
+    ctx.revalidate_authority(GoalStatus::Quality)?;
     let commit = with_repository_git_lock(ctx.target_root, || {
+        ctx.revalidate_authority(GoalStatus::Quality)?;
         worktree_git.commit_or_clean_noop_since(
             &format!("Quality {} round {}", ctx.goal_id, ctx.round_idx + 1),
             &[],
@@ -1030,7 +1276,10 @@ fn run_quality_correction_agent(ctx: &mut WorkflowContext<'_>) -> RefineResult<(
     Ok((report, commit.commit))
 }
 
-fn run_workflow_quality(ctx: &mut WorkflowContext<'_>) -> RefineResult<QualityCheckResult> {
+fn run_workflow_quality(
+    ctx: &mut WorkflowContext<'_>,
+    authority_status: GoalStatus,
+) -> RefineResult<QualityCheckResult> {
     let runner = QualityOperationRunner::new(ctx.refine_dir(), ctx.runtime_root, ctx.target_root);
     if let (Some(operation_id), Some(request)) =
         (ctx.quality_operation_id.take(), ctx.quality_request.take())
@@ -1039,12 +1288,13 @@ fn run_workflow_quality(ctx: &mut WorkflowContext<'_>) -> RefineResult<QualityCh
             .run_registered(&operation_id, request)
             .map(|operation| operation.result)
     } else {
+        let mut metadata =
+            ctx.workflow_process_metadata(authority_status.as_str(), "WorkflowQuality");
+        if ctx.reconciliation.is_some() {
+            metadata.insert("quality_proof_mode".to_string(), json!("regenerated"));
+        }
         runner
-            .run_goal_checks(
-                &ctx.goal_id,
-                &ctx.provider,
-                ctx.workflow_process_metadata("quality", "WorkflowQuality"),
-            )
+            .run_goal_checks(&ctx.goal_id, &ctx.provider, metadata)
             .map(|operation| operation.result)
     }
 }
@@ -1248,6 +1498,7 @@ fn investigate_quality_failure(
     quality_agent_report: &str,
     quality: &QualityCheckResult,
 ) -> RefineResult<QualityRecoveryInvestigation> {
+    ctx.revalidate_authority(GoalStatus::Quality)?;
     let worktree_path = ctx.require_worktree_path()?.to_string();
     let goal = ctx.work_items.show_goal_detail(&ctx.goal_id)?;
     let agent_context = ensure_goal_agent_context(ctx, &goal)?;
@@ -1286,6 +1537,7 @@ fn investigate_quality_failure(
         process_metadata: ctx
             .workflow_process_metadata("quality_recovery", "WorkflowQualityRecovery"),
     })?;
+    ctx.revalidate_authority(GoalStatus::Quality)?;
 
     let after = worktree_git.implementation_planning_observation()?;
     if after != before {
@@ -1586,6 +1838,18 @@ fn max_automatic_round_retries(ctx: &WorkflowContext<'_>) -> RefineResult<u32> {
         .and_then(Value::as_u64)
         .and_then(|value| u32::try_from(value).ok())
         .unwrap_or(5))
+}
+
+fn quality_failure_category(error: &RefineError) -> &'static str {
+    if crate::tools::host::quality::is_quality_candidate_infrastructure(error) {
+        "quality_candidate_infrastructure"
+    } else if is_quality_harness_fault(error) {
+        "quality_harness"
+    } else if is_quality_output_contract_fault(error) {
+        "quality_output_contract"
+    } else {
+        "quality"
+    }
 }
 
 fn fail<T>(ctx: &WorkflowContext<'_>, category: &str, error: RefineError) -> RefineResult<T> {

@@ -44,6 +44,15 @@ pub struct WorkflowContext<'a> {
 }
 
 impl<'a> WorkflowContext<'a> {
+    pub(crate) fn revalidate_authority(&self, status: GoalStatus) -> RefineResult<()> {
+        self.work_items.verify_workflow_attempt(
+            &self.goal_id,
+            self.attempt_authority,
+            status,
+            &self.node_id,
+        )
+    }
+
     // Context construction makes the runtime, target, Goal, node, provider, and Round axes
     // explicit so callers cannot derive execution authority from a local worker identity.
     #[allow(clippy::too_many_arguments)]
@@ -178,6 +187,10 @@ impl<'a> WorkflowContext<'a> {
         );
         metadata.insert("node_id".to_string(), json!(&self.node_id));
         metadata.insert("provider".to_string(), json!(&self.provider));
+        metadata.insert(
+            "workflow_revision".to_string(),
+            json!(self.attempt_authority.workflow_revision),
+        );
         metadata.insert(
             "target_app_id".to_string(),
             json!(self.target_root.display().to_string()),

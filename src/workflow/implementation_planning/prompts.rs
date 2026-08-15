@@ -50,6 +50,19 @@ pub(super) fn implementation_prompt(
     ))
 }
 
+pub(super) fn structured_output_repair_prompt(
+    original_prompt: &str,
+    output_label: &str,
+    invalid_attempt: usize,
+    max_repairs: usize,
+    diagnostics: &str,
+    raw_output: &str,
+) -> String {
+    format!(
+        "{original_prompt}\n\n# Structured Output Repair {invalid_attempt}/{max_repairs}\n\nYour previous {output_label} response was retained but rejected by the output contract. Correct only the structured response using the diagnostic below. Preserve the substantive plan artifacts and return the complete required JSON object.\n\nDiagnostic:\n{diagnostics}\n\nRetained invalid response:\n```text\n{raw_output}\n```"
+    )
+}
+
 fn encode_error(error: serde_json::Error) -> RefineError {
     RefineError::Serialization(format!(
         "failed to encode implementation planning prompt: {error}"
@@ -121,5 +134,21 @@ mod tests {
         assert!(prompt.contains("Implement shared behavior"));
         assert!(!prompt.contains("affected_behavior"));
         assert!(!prompt.contains("\"verification\""));
+    }
+
+    #[test]
+    fn structured_output_repair_returns_diagnostics_and_retained_response() {
+        let prompt = structured_output_repair_prompt(
+            "Original phase contract",
+            "revised implementation plan",
+            1,
+            2,
+            "missing criticism resolution C1",
+            "{not json}",
+        );
+        assert!(prompt.contains("Original phase contract"));
+        assert!(prompt.contains("Repair 1/2"));
+        assert!(prompt.contains("missing criticism resolution C1"));
+        assert!(prompt.contains("{not json}"));
     }
 }

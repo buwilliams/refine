@@ -126,7 +126,24 @@ pub fn validate_quality_identity(
         })?;
 
     if commitment.evaluation_scope == ISOLATED_CANDIDATE {
-        if observed.branch.as_deref() != Some(commitment.branch.as_str()) {
+        let reconciliation_checkout_matches = round
+            .get("workflow_reconciliation")
+            .and_then(|evidence| evidence.get("quality_checkout"))
+            .is_some_and(|checkout| {
+                checkout.get("branch").and_then(Value::as_str) == Some(commitment.branch.as_str())
+                    && checkout.get("path").and_then(Value::as_str)
+                        == Some(commitment.path.as_str())
+                    && checkout.get("candidate_commit").and_then(Value::as_str)
+                        == Some(commitment.candidate_commit.as_str())
+                    && round
+                        .get("workflow_integration")
+                        .and_then(|integration| integration.get("candidate_commit"))
+                        .and_then(Value::as_str)
+                        == Some(commitment.source_candidate_commit.as_str())
+            });
+        if observed.branch.as_deref() != Some(commitment.branch.as_str())
+            && !reconciliation_checkout_matches
+        {
             return Err(infrastructure_error(
                 commitment,
                 phase,

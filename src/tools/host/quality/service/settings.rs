@@ -202,6 +202,32 @@ impl FileQualityService {
             operation.state,
             OperationState::Pending | OperationState::Running
         ) {
+            if let Some(workflow_revision) = request
+                .process_metadata
+                .get("workflow_revision")
+                .and_then(Value::as_u64)
+            {
+                let workflow_state = request
+                    .process_metadata
+                    .get("workflow_state")
+                    .and_then(Value::as_str)
+                    .and_then(GoalStatus::parse_wire)
+                    .ok_or_else(|| {
+                        RefineError::Degraded(
+                            "Quality workflow work is missing its authority status".to_string(),
+                        )
+                    })?;
+                FileWorkItemService::for_node(&self.refine_dir, &request.node_id)
+                    .verify_workflow_attempt(
+                        &request.owner_id,
+                        WorkflowAttemptAuthority {
+                            round_idx: request.round_idx,
+                            workflow_revision,
+                        },
+                        workflow_state,
+                        &request.node_id,
+                    )?;
+            }
             return Ok(());
         }
         Err(RefineError::Conflict(format!(

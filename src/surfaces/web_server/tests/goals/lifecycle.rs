@@ -428,6 +428,7 @@ fn web_server_reports_between_planning_phases_without_launching_a_diagnostic_age
                 final_plan: None,
                 implementation: None,
                 failure: None,
+                invalid_output_attempts: Vec::new(),
             },
         )
         .unwrap();

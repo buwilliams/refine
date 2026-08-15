@@ -7,6 +7,37 @@ impl QualityOperationRunner {
         result: &QualityCheckResult,
         operation_id: &str,
     ) -> RefineResult<()> {
+        let checked_at = result.checked_at.clone().ok_or_else(|| {
+            RefineError::Conflict(format!(
+                "Quality operation {operation_id} has no stable result timestamp"
+            ))
+        })?;
+        let source_candidate_commit = request
+            .source_candidate_commit
+            .as_deref()
+            .unwrap_or(&request.candidate_commit);
+        let recorded_results = result
+            .results
+            .iter()
+            .map(serde_json::to_value)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|error| {
+                RefineError::Serialization(format!(
+                    "failed to encode durable Quality proof results: {error}"
+                ))
+            })?;
+        let proof = QualityProof {
+            schema_version: QUALITY_PROOF_SCHEMA_VERSION,
+            goal_id: request.owner_id.clone(),
+            round_idx: request.round_idx,
+            evaluation_scope: request.evaluation_scope.clone(),
+            operation_id: operation_id.to_string(),
+            checked_candidate_commit: request.candidate_commit.clone(),
+            source_candidate_commit: source_candidate_commit.to_string(),
+            state: if result.ok { "passed" } else { "failed" }.to_string(),
+            checked_at: checked_at.clone(),
+            results: recorded_results,
+        };
         let details = json!({
             "operation_id": operation_id,
             "candidate_commit": request.candidate_commit,
@@ -14,8 +45,18 @@ impl QualityOperationRunner {
             "evaluation_scope": request.evaluation_scope,
             "cwd": request.cwd,
             "results": result.results,
-            "diagnostics": result.diagnostics
+            "diagnostics": result.diagnostics,
+            "provider_attempts": result.provider_attempts,
+            "quality_proof": proof
         });
+        let mut details = details;
+        if let Some(mode) = request
+            .process_metadata
+            .get("quality_proof_mode")
+            .and_then(Value::as_str)
+        {
+            details["quality_proof_mode"] = json!(mode);
+        }
         FileWorkItemService::for_node(&self.refine_dir, &request.node_id)
             .update_goal_round_evaluation_summary(
                 &request.owner_id,
@@ -24,7 +65,8 @@ impl QualityOperationRunner {
                     "quality_state": if result.ok { "passed" } else { "failed" },
                     "quality_message": result.summary,
                     "quality_details": details,
-                    "quality_checked_at": now_timestamp()
+                    "quality_checked_at": checked_at,
+                    "quality_candidate_commit": source_candidate_commit
                 }),
             )?;
         self.append_goal_log(
@@ -43,18 +85,31 @@ impl QualityOperationRunner {
     ) -> RefineResult<()> {
         let message = quality_error_summary(error);
         let harness_fault = is_quality_harness_fault(error);
+        let output_contract_fault = is_quality_output_contract_fault(error);
         let details = json!({
             "operation_id": operation_id,
             "candidate_commit": request.candidate_commit,
             "error": error.to_string(),
-            "error_kind": if harness_fault { "harness_fault" } else { "evaluation_error" }
+            "error_kind": if harness_fault {
+                "harness_fault"
+            } else if output_contract_fault {
+                "output_contract_fault"
+            } else {
+                "evaluation_error"
+            }
         });
         FileWorkItemService::for_node(&self.refine_dir, &request.node_id)
             .update_goal_round_evaluation_summary(
                 &request.owner_id,
                 request.round_idx,
                 &json!({
-                    "quality_state": if harness_fault { "harness_fault" } else { "failed" },
+                    "quality_state": if harness_fault {
+                        "harness_fault"
+                    } else if output_contract_fault {
+                        "output_contract_fault"
+                    } else {
+                        "failed"
+                    },
                     "quality_message": message,
                     "quality_details": details,
                     "quality_checked_at": now_timestamp()

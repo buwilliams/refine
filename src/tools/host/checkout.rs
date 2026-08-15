@@ -5,6 +5,9 @@ use std::sync::OnceLock;
 
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 
+#[cfg(test)]
+pub(crate) mod test_fixture;
+
 pub const DEPLOYED_MARKER: &str = ".refine-deployed";
 pub const INSTALL_RUNBOOK: &str = "docs/runbooks/install.md";
 static ACTIVE_CHECKOUT_PATHS: OnceLock<RefineCheckoutPaths> = OnceLock::new();

@@ -18,6 +18,8 @@ impl QualityService for FileQualityService {
                         .to_string(),
                 ],
                 candidate_commit: request.candidate_commit,
+                checked_at: None,
+                provider_attempts: Vec::new(),
             });
         }
         let test_names = definitions
@@ -41,18 +43,92 @@ impl QualityService for FileQualityService {
             RefineError::Degraded("runtime root is required for Quality".to_string())
         })?;
         self.ensure_operation_active(&request, "provider launch")?;
-        let output = HostAgentProviderService::with_runtime_root(&runtime_root).invoke(
-            ProviderInvocation {
-                provider: request.provider.clone(),
-                prompt,
-                session_id: None,
-                cwd: Some(request.cwd.clone()),
-                process_metadata: request.process_metadata.clone(),
-            },
-        )?;
-        let plan = parse_quality_provider_output(&request.owner_id, &test_names, &output)?;
+        let provider = HostAgentProviderService::with_runtime_root(&runtime_root);
+        let mut invocation = provider.invoke_detailed(ProviderInvocation {
+            provider: request.provider.clone(),
+            prompt: prompt.clone(),
+            session_id: None,
+            cwd: Some(request.cwd.clone()),
+            process_metadata: request.process_metadata.clone(),
+        })?;
+        self.ensure_operation_active(&request, "provider response settlement")?;
+        let mut provider_attempts = Vec::new();
+        let plan = loop {
+            let attempt_number = provider_attempts.len() + 1;
+            match parse_quality_provider_output(&request.owner_id, &test_names, &invocation.output)
+            {
+                Ok(mut plan) => {
+                    let attempt = QualityProviderAttempt {
+                        attempt: attempt_number,
+                        process_id: invocation.process_id.clone(),
+                        provider_session_id: invocation.provider_session_id.clone(),
+                        raw_output: invocation.output.clone(),
+                        diagnostics: None,
+                        accepted: true,
+                    };
+                    record_quality_provider_attempt(&request, &attempt)?;
+                    provider_attempts.push(attempt);
+                    plan.provider_attempts = provider_attempts.clone();
+                    break plan;
+                }
+                Err(error) => {
+                    let diagnostics = error.to_string();
+                    let attempt = QualityProviderAttempt {
+                        attempt: attempt_number,
+                        process_id: invocation.process_id.clone(),
+                        provider_session_id: invocation.provider_session_id.clone(),
+                        raw_output: invocation.output.clone(),
+                        diagnostics: Some(diagnostics.clone()),
+                        accepted: false,
+                    };
+                    record_quality_provider_attempt(&request, &attempt)?;
+                    let raw_output = attempt.raw_output.clone();
+                    let session_id = attempt.provider_session_id.clone();
+                    provider_attempts.push(attempt);
+                    if attempt_number
+                        > crate::tools::host::structured_output::DIAGNOSTIC_REPAIR_ATTEMPTS
+                    {
+                        return Err(exhausted_quality_output_contract(
+                            &error,
+                            provider_attempts.len(),
+                        ));
+                    }
+                    let attempt_label = format!(
+                        "{attempt_number}/{}",
+                        crate::tools::host::structured_output::DIAGNOSTIC_REPAIR_ATTEMPTS
+                    );
+                    let repair_prompt = render(
+                        PromptTemplate::QualityStructuredOutputRepair,
+                        &[
+                            ("original_prompt", &prompt),
+                            ("attempt", &attempt_label),
+                            ("diagnostics", &diagnostics),
+                            ("raw_output", &raw_output),
+                        ],
+                    );
+                    let mut metadata = request.process_metadata.clone();
+                    metadata.insert(
+                        "structured_output_repair_attempt".to_string(),
+                        json!(attempt_number),
+                    );
+                    self.ensure_operation_active(&request, "structured output repair")?;
+                    invocation = provider.invoke_detailed(ProviderInvocation {
+                        provider: request.provider.clone(),
+                        prompt: repair_prompt,
+                        session_id,
+                        cwd: Some(request.cwd.clone()),
+                        process_metadata: metadata,
+                    })?;
+                    self.ensure_operation_active(
+                        &request,
+                        "repaired provider response settlement",
+                    )?;
+                }
+            }
+        };
         let mut results = Vec::with_capacity(definitions.len());
         let mut diagnostics = plan.diagnostics;
+        let provider_attempts = plan.provider_attempts;
         for (definition, planned) in definitions.iter().zip(plan.results) {
             let mut result = planned;
             if let Some(required) = definition.required_command.as_deref()
@@ -109,6 +185,8 @@ impl QualityService for FileQualityService {
             results,
             diagnostics,
             candidate_commit: request.candidate_commit,
+            checked_at: None,
+            provider_attempts,
         };
         if !result.ok {
             result.summary = quality_failure_summary(&result);
@@ -141,6 +219,8 @@ impl QualityService for FileQualityService {
                 "artifacts differ".to_string()
             }],
             candidate_commit: String::new(),
+            checked_at: None,
+            provider_attempts: Vec::new(),
         })
     }
 
@@ -157,6 +237,8 @@ impl QualityService for FileQualityService {
                 settings.legacy_commands.len()
             )],
             candidate_commit: String::new(),
+            checked_at: None,
+            provider_attempts: Vec::new(),
         })
     }
 }

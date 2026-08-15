@@ -1,4 +1,5 @@
 use super::*;
+use crate::tools::host::checkout::test_fixture::SyntheticSourceProduct;
 
 #[test]
 fn git_sync_schedule_exposes_validated_stale_threshold() {
@@ -140,16 +141,14 @@ fn state_sync_missing_baseline_failure_records_typed_recovery_eligibility() {
 
 #[test]
 fn source_worker_inherits_debug_executable_without_installed_binary() {
-    let checkout = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .canonicalize()
-        .unwrap();
-    let runtime_root = checkout.join("run/4557");
-    let test_executable = std::env::current_exe().unwrap();
+    let checkout = SyntheticSourceProduct::new("source-worker-executable");
+    let runtime_root = checkout.port_runtime_root(4557);
+    let test_executable = checkout.debug_executable();
 
     let selected = runner_executable_for_invocation(&runtime_root, &test_executable).unwrap();
 
     assert_eq!(selected, test_executable.canonicalize().unwrap());
-    assert_ne!(selected, checkout.join("bin/refine"));
+    assert_ne!(selected, checkout.installed_executable());
 }
 
 #[test]

@@ -12,6 +12,6 @@ Plan turns an actionable Round into a governed implementation strategy. It makes
 
 ## Expected Role
 
-After Todo admission, Workflow pins the exact Goal, Round, workflow revision, Git base, and project context. Fresh managed agents propose a plan, critique it independently, and finalize a concise checklist. Each artifact is persisted before the next phase begins. Planning agents must leave the repository unchanged.
+After Todo admission, Workflow pins the exact Goal, Round, workflow revision, Git base, and project context. Fresh managed agents propose a plan, critique it independently, and finalize a concise checklist. Each artifact is persisted before the next phase begins. Planning agents must leave the repository unchanged. When proposal, criticism, or revision output cannot be parsed or validated, Workflow durably records the raw attempt and diagnostic, then makes at most two diagnostic repair invocations while retaining the last valid phase artifact.
 
-A completed final plan advances the same Round to Implement. Provider, parsing, authority, or persistence failures preserve their evidence and move the Goal to Failed; they do not create automatic Governance recovery Rounds.
+A completed final plan advances the same Round to Implement. Provider, repair-exhausted output-contract, authority, or persistence failures preserve their distinct evidence and move the Goal to Failed; they do not create automatic Governance recovery Rounds.

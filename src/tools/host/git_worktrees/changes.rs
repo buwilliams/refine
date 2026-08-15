@@ -1,6 +1,55 @@
 use super::*;
 
 impl FileGitWorktreeService {
+    /// Materialize a managed branch/worktree at one exact commit without moving an existing ref.
+    /// This is used to regenerate candidate-bound evidence after the shared target has advanced.
+    pub fn ensure_worktree_at_commit(
+        &self,
+        branch: &str,
+        target: &Path,
+        commit: &str,
+    ) -> RefineResult<String> {
+        validate_branch_name(branch)?;
+        validate_commitish(commit)?;
+        let resolved_commit = self.resolve_commit(commit)?;
+        if let Some(existing) = self.worktree_for_branch(branch)? {
+            let existing_git = FileGitWorktreeService {
+                root: existing.clone(),
+                runtime_root: self.runtime_root.clone(),
+                operation_id: self.operation_id.clone(),
+                process_metadata: self.process_metadata.clone(),
+            };
+            let head = existing_git.head_ref()?;
+            let status = existing_git.inspect("")?;
+            if head.commit.as_deref() != Some(resolved_commit.as_str())
+                || status.dirty_user_changes
+                || !status.refine_owned_artifacts.is_empty()
+            {
+                return Err(RefineError::Conflict(format!(
+                    "managed exact-candidate checkout {} no longer names clean commit {resolved_commit}; existing work was preserved",
+                    existing.display()
+                )));
+            }
+            return Ok(existing.display().to_string());
+        }
+        if self.branch_exists(branch)? {
+            let existing_commit = self.resolve_commit(branch)?;
+            if existing_commit != resolved_commit {
+                return Err(RefineError::Conflict(format!(
+                    "managed exact-candidate branch {branch} names {existing_commit}, expected {resolved_commit}; the branch was not moved"
+                )));
+            }
+        } else {
+            self.git_output(&["branch", branch, &resolved_commit])?;
+            self.audit(
+                "branch",
+                "ok",
+                json!({"name": branch, "commit": resolved_commit, "reconciliation": true}),
+            )?;
+        }
+        self.ensure_worktree(branch, target)
+    }
+
     /// Resolve an already materialized candidate worktree without creating or switching it.
     pub fn existing_worktree_for_branch(&self, branch: &str) -> RefineResult<Option<PathBuf>> {
         self.worktree_for_branch(branch)

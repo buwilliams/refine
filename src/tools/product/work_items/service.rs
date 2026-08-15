@@ -1,9 +1,11 @@
 mod already_merged;
+mod already_merged_quality_failure;
 mod bulk_operations;
 mod features;
 mod goal_authoring;
 mod goal_filters;
 mod implementation_planning;
+mod integration_recovery;
 mod persistence;
 mod record_persistence;
 mod round_helpers;

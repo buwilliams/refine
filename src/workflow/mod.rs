@@ -3,6 +3,7 @@ use std::path::PathBuf;
 pub mod behavior;
 pub mod behaviors;
 mod candidate_handoff;
+mod candidate_refresh;
 pub mod context;
 pub mod promotion;
 
@@ -129,6 +130,7 @@ mod settings;
 #[cfg(test)]
 mod tests;
 
+use candidate_refresh::{CandidateRefreshOutcome, refresh_candidate_for_target_advancement};
 use execution_context::{
     agent_worktree_cwd, authored_workflow_commitment, hydrate_plan_or_implement_context,
     hydrate_retry_context, implementation_branch_name,
