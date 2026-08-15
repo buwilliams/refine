@@ -106,12 +106,63 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-08-15T17:38:31Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-08-15T17:41:28Z",
+        "proposal": {
+          "completed_at": "2026-08-15T17:41:27Z",
+          "git_after": {
+            "branch": "refine/DR3B201F6B1214A5C7A3FEA882/round-1",
+            "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR3B201F6B1214A5C7A3FEA882/round-1",
+            "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Introduce a shared structured conflict result for first-pass and push-retry reconciliation that records the observed baseline, local and remote state identities, every unresolved path, and actionable recovery metadata without embedding the whole path set in an error string.",
+                "id": "P1"
+              },
+              {
+                "description": "Persist each complete conflict report atomically in the node-local runtime tree and project only its stable identifier, count, compact summary, and report location into state-sync health and activity evidence so diagnostics remain bounded but lossless.",
+                "id": "P2"
+              },
+              {
+                "description": "Extend the existing read-only state-recovery preview to valid-baseline conflicts by comparing the exact baseline, live snapshot, and remote head and by emitting a stale-fenced resolution contract that supports a default authority plus per-path live or remote overrides.",
+                "id": "P3"
+              },
+              {
+                "description": "Extend recovery apply to revalidate the preview under the repository mutation lock, retain the pre-recovery live snapshot and manifest, combine non-conflicting deltas with the explicit path decisions, publish with remote-head compare-and-swap, hydrate live state, and advance the baseline only after the reconciled state is durable.",
+                "id": "P4"
+              },
+              {
+                "description": "Enhance Goal-record three-way merging for schema-proven compatible nested and append-only changes such as independently updated Round fields or keyed notes, while continuing to reject competing lifecycle values, deletions, reorders, ambiguous concurrent appends, and revision-only max rules that could hide a lost update.",
+                "id": "P5"
+              },
+              {
+                "description": "Correlate state-sync health updates by attempt and source so a neutral lock deferral cannot obscure the failure that keeps the outage active, while retaining distinct timestamps and outcomes for the latest attempt and latest failed reconciliation.",
+                "id": "P6"
+              },
+              {
+                "description": "Make daemon-routed project and fleet sync CLI paths follow the queued operation to a terminal record and print its structured result or reconciler error, including the conflict-report pointer and recovery command guidance when applicable.",
+                "id": "P7"
+              },
+              {
+                "description": "Update only the affected fleet, CLI, Dashboard, and activity-evidence intent pages to document valid-baseline recovery authority, complete local conflict evidence, terminal CLI error visibility, and the compact non-authoritative-count warning contract.",
+                "id": "P8"
+              }
+            ],
+            "summary": "Extend the existing state-sync and state-recovery capability so a node with a valid but stale three-way baseline can produce complete, inspectable conflict evidence and recover through an explicit, stale-fenced choice for each unresolved path, while preserving compatible local and remote changes, retained Git evidence, and fail-closed behavior. Ordinary synchronization will auto-merge only schema-proven compatible Goal changes, health records will distinguish failures from neutral deferrals, and daemon-routed sync commands will surface the terminal reconciler result instead of stopping at a running operation record."
+          },
+          "started_at": "2026-08-15T17:38:31Z"
+        },
         "schema_version": 2,
         "started_at": "2026-08-15T17:38:31Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T17:38:31Z"
+        "updated_at": "2026-08-15T17:41:28Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -125,7 +176,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T17:38:31Z",
+      "updated": "2026-08-15T17:41:28Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T17:38:30Z",
         "round_idx": 0,
@@ -137,6 +188,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-15T17:38:31Z",
-  "workflow_revision": 7
+  "updated": "2026-08-15T17:41:28Z",
+  "workflow_revision": 9
 }
