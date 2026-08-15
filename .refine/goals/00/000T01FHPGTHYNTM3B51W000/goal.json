@@ -1,7 +1,7 @@
 {
-  "base_commit": "f50b1571672da4a7c308d47918746eac3931bfaa",
+  "base_commit": "76d7f267d55912a3c6c156240fcd8ee0566b59a7",
   "branch_name": "refine/00000T01FHPGTHYNTM3B51W000/round-1",
-  "candidate_commit": "bedb1a5503f65a8fe6a54dd41c7d0bb9930f27a4",
+  "candidate_commit": null,
   "created": "2026-08-15T15:02:01Z",
   "feature_id": null,
   "feature_order": null,
@@ -87,9 +87,9 @@
       "assignee": "Buddy Williams",
       "constitution_state": "unclassified",
       "created": "2026-08-15T15:02:29Z",
-      "failure_at": "2026-08-15T16:06:41Z",
-      "failure_category": "workflow",
-      "failure_message": "Error: thread/start: thread/start failed: failed to load configuration: No such file or directory (os error 2) (code -32600)",
+      "failure_at": "2026-08-15T16:21:10Z",
+      "failure_category": "plan",
+      "failure_message": "Goal 00000T01FHPGTHYNTM3B51W000 round 1 implementation planning binding changed",
       "governance_checked_at": "",
       "governance_details": "",
       "governance_message": "",
@@ -389,11 +389,11 @@
       "quality_state": "passed",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T16:06:41Z",
+      "updated": "2026-08-15T16:21:10Z",
       "workflow_attempt_authority": {
-        "claimed_at": "2026-08-15T16:06:40Z",
+        "claimed_at": "2026-08-15T16:21:09Z",
         "round_idx": 0,
-        "workflow_revision": 26
+        "workflow_revision": 29
       },
       "workflow_reconciliation": null,
       "workflow_recovery": null
@@ -401,6 +401,6 @@
   ],
   "status": "failed",
   "target_branch": "main",
-  "updated": "2026-08-15T16:06:41Z",
-  "workflow_revision": 28
+  "updated": "2026-08-15T16:21:10Z",
+  "workflow_revision": 33
 }
