@@ -526,8 +526,77 @@
           },
           "started_at": "2026-08-15T17:52:58Z"
         },
-        "phase": "revise",
-        "phase_started_at": "2026-08-15T17:54:58Z",
+        "final_plan": {
+          "completed_at": "2026-08-15T17:56:10Z",
+          "git_after": {
+            "branch": "refine/DR3B201F6B1214A5C7A3FEA882/round-2",
+            "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR3B201F6B1214A5C7A3FEA882/round-2",
+            "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Introduce a focused structured state-sync conflict contract containing a stable report id, reconciliation phase, attempt identity, baseline and snapshot identities, local and remote heads, the complete unresolved path set, and applicable recovery metadata.",
+                "id": "P1"
+              },
+              {
+                "description": "Route first-pass and push-retry conflict detection through one report writer that durably replaces a node-local runtime file before returning a bounded typed error whose summary, count, report location, and recovery guidance can be projected without loading the full path list.",
+                "id": "P2"
+              },
+              {
+                "description": "Extend the existing read-only recovery preview and apply contracts to valid-baseline conflict reports, binding each preview to the exact baseline, live snapshot, remote head, report contents, default authority, and optional per-path live or remote overrides.",
+                "id": "P3"
+              },
+              {
+                "description": "Build the recovery target by preserving one-sided and schema-proven merges and applying operator choices only to unresolved paths, while rejecting stale or fabricated evidence, unknown or duplicate overrides, missing baseline bytes, and decisions outside the reported conflict set.",
+                "id": "P4"
+              },
+              {
+                "description": "Persist an exact manifest-owned recovery target before side effects, compare-and-swap the remote head, hydrate each live path under the same canonical record lease and preimage fence used by synchronized-state writers, preserve later writes as the next local delta, and create the baseline only after publish and hydration boundaries are durably recorded.",
+                "id": "P5"
+              },
+              {
+                "description": "Make recovery retries resume only matching manifest stages and owned refs after interruptions around report persistence, publication, partial hydration, baseline creation, or manifest completion, while rejecting any different preview, decision set, remote movement, or unowned partial state.",
+                "id": "P6"
+              },
+              {
+                "description": "Move Goal merge policy into a cohesive schema-aware module that merges only object members and collections with stable identities such as notes keyed by id, keeps rounds and other identity-free ordered arrays atomic, and accepts output only after Goal deserialization and cross-field workflow validation.",
+                "id": "P7"
+              },
+              {
+                "description": "Correlate sync-health begin and settlement updates with monotonic attempt ids and sources so late results cannot overwrite newer attempt metadata, neutral deferrals cannot clear or relabel an active failure episode, and the latest failed reconciliation retains its conflict-report pointer.",
+                "id": "P8"
+              },
+              {
+                "description": "Make daemon-routed project and fleet sync commands follow the returned durable operation to a terminal state, print the structured success result, and return failed, cancelled, interrupted, or timed-out operations as nonzero structured errors with the reconciler report and recovery guidance intact.",
+                "id": "P9"
+              },
+              {
+                "description": "Update only the affected Fleet, CLI, API, Dashboard, activity-evidence, and recovery-runbook contracts to describe complete local conflict evidence, valid-baseline recovery authority, correlated health semantics, terminal CLI behavior, and compact non-authoritative count warnings.",
+                "id": "P10"
+              },
+              {
+                "description": "Add focused coverage for complete first-pass and push-retry reports, atomic report replacement, stale and fabricated decisions, remote and live-write races, interruption-safe manifest resumption without an unowned baseline, schema-safe Goal merges, ordered health settlement, terminal daemon-routed CLI outcomes, and the applicable non-external CLI and API latency bound.",
+                "id": "P11"
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "Added P11 to require focused coverage of every correctness-critical contract identified by the finding, including latency and proof that failed or interrupted recovery cannot establish an unowned baseline."
+              }
+            ],
+            "summary": "Refine will turn valid-baseline multi-node conflicts into complete node-local evidence and an explicit recovery flow instead of repeating a truncated error forever: the existing preview/apply capability will accept stale-fenced default and per-path authority decisions, preserve compatible and post-preview writes, publish and hydrate an exact reconciled snapshot through resumable compare-and-swap stages, and advance the baseline only after that owned result is durable. Goal auto-merging will remain deliberately narrow, sync health will distinguish overlapping attempts from the active outage, and daemon-routed sync commands will wait for and expose the terminal result so operators can diagnose and recover without editing state by hand."
+          },
+          "started_at": "2026-08-15T17:54:58Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-15T17:56:10Z",
         "proposal": {
           "completed_at": "2026-08-15T17:52:58Z",
           "git_after": {
@@ -590,7 +659,7 @@
         "schema_version": 2,
         "started_at": "2026-08-15T17:48:16Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T17:54:58Z"
+        "updated_at": "2026-08-15T17:56:10Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -604,7 +673,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T17:54:58Z",
+      "updated": "2026-08-15T17:56:10Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T17:48:15Z",
         "round_idx": 1,
@@ -614,8 +683,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-08-15T17:54:58Z",
-  "workflow_revision": 24
+  "updated": "2026-08-15T17:56:10Z",
+  "workflow_revision": 27
 }
