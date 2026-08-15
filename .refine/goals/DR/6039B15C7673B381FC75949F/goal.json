@@ -1,7 +1,7 @@
 {
   "base_commit": "f50b1571672da4a7c308d47918746eac3931bfaa",
   "branch_name": "refine/DR6039B15C7673B381FC75949F/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "497213f0f3e0020d6221705d5a0d695bab100ccd",
   "created": "2026-08-15T14:21:36Z",
   "feature_id": null,
   "feature_order": null,
@@ -94,7 +94,28 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-15T15:07:25Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "f50b1571672da4a7c308d47918746eac3931bfaa",
@@ -105,6 +126,7 @@
           "round_idx": 0,
           "target_branch": "main"
         },
+        "completed_at": "2026-08-15T15:07:25Z",
         "criticism": {
           "completed_at": "2026-08-15T14:27:35Z",
           "git_after": {
@@ -229,8 +251,84 @@
           },
           "started_at": "2026-08-15T14:27:36Z"
         },
+        "implementation": {
+          "completed_at": "2026-08-15T15:07:25Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Added one FileGovernanceIntegrationService resolver used by both WorkflowQuality and the operator surface, with Goal inspection and atomic settlement owned by cohesive FileWorkItemService already_merged.rs boundaries.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Resolver admission requires the authoritative latest Round's workflow_integration identity and exact candidate match; candidate ancestry without that identity is rejected and remains on the ordinary isolated Quality path.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Resolution requires passed Quality with isolated_candidate details and exact source/current candidate plus all passed Governance states, a nonempty governance timestamp, and the newly persisted governance_candidate_commit equal to the candidate.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Under the repository Git lock, the resolver expands exact candidate and integration commits, proves candidate ancestry through the integration snapshot and current local target, fetches and proves the published target when pushed, accepts unrelated descendants, and records both observed target SHAs.",
+                "id": "P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Settlement reacquires the per-Goal mutation lock, revalidates latest Round, stored WorkflowAttemptAuthority round_idx/workflow_revision, status, candidate, integration, and gate evidence, then atomically writes terminal reconciliation evidence and Review or Failed status; repeated and concurrent calls return already_resolved or already_failed.",
+                "id": "P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Missing, mismatched, unsuccessful, unavailable, or non-ancestral admitted evidence settles Failed with failure_category, failure_message, timestamps, gate evidence, Git snapshots, and error context. The existing destructive revert capability and its exact target snapshot fence remain intact and tested.",
+                "id": "P6",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added goal resolve-merged <id> to Clap, normal daemon dispatch, /work/goals/<id>/resolve-merged handling, direct test adapter, and the supported command catalog without changing Review-only goal approve behavior.",
+                "id": "P7",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated Quality, merge/review Git worktree, workflow consistency, and CLI intent pages for exact gates, shared-target descendants, terminal fail-closed settlement, idempotence, and the supported recovery command.",
+                "id": "P8",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added six capability tests plus a workflow regression covering loop termination, current-Round admission, exact gate and integration binding, concurrent/repeated idempotence, local and published descendant targets, missing local/published ancestry, durable Failed settlement, and revert fencing.",
+                "id": "P9",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added daemon action coverage for resolved, already_resolved, and rejected ancestry-only outcomes; CLI parsing and encoded daemon-route coverage; and command-catalog coverage for resolve-merged.",
+                "id": "P10",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "cargo test --lib tools::product::governance_integration::tests::reconciliation -- --nocapture => pass: 6 passed, 0 failed",
+              "cargo test --lib workflow::tests::already_merged -- --nocapture => pass: 1 passed, 0 failed; the second workflow pass found no resumable work",
+              "cargo test --lib surfaces::web_server::tests::goals::lifecycle::daemon_resolve_merged_action_reaches_shared_terminal_capability -- --nocapture => pass: 1 passed, 0 failed",
+              "cargo test --lib surfaces::cli::tests::goals::lifecycle::goal_resolve_merged_cli_parses_and_dispatches_to_daemon_route -- --nocapture => pass: 1 passed, 0 failed",
+              "cargo test --lib surfaces::cli::catalog::tests -- --nocapture => pass: 5 passed, 0 failed",
+              "cargo test --lib tools::product::governance_integration::tests::review::governance_integrates_once_and_review_approval_only_accepts -- --nocapture => pass: 1 passed, 0 failed",
+              "cargo check --all-targets => pass",
+              "cargo clippy --all-targets -- -D warnings -A clippy::needless_pub_self -A clippy::unnecessary_sort_by -A clippy::items_after_test_module => pass; these three allows isolate pre-existing untouched warnings",
+              "cargo clippy --all-targets -- -D warnings => baseline fail only: needless_pub_self at src/tools/product/project_projection/store.rs:46 and :54, unnecessary_sort_by at src/surfaces/web_server/http/background_loops.rs:213, and items_after_test_module at src/surfaces/cli/dispatch/config.rs:353/392",
+              "rustfmt --edition 2024 --config skip_children=true --check src/tools/product/governance_integration/reconciliation.rs src/tools/product/governance_integration/tests/reconciliation.rs src/tools/product/work_items/service/already_merged.rs src/workflow/tests/already_merged.rs => pass",
+              "cargo fmt --all -- --check => baseline fail in untouched files beginning at src/surfaces/cli/dispatch/features.rs; the four new cohesive Rust files pass targeted rustfmt check",
+              "git diff --check => pass",
+              "cargo test --lib => 846 passed, 2 failed, 6 ignored; deterministic unrelated failure prompts::tests::agent_prompts_keep_only_task_specific_contracts reports implementation_planning/plan.md at 95 words, while concurrent release_workers cleanup failed DirectoryNotEmpty",
+              "cargo test --lib prompts::tests::agent_prompts_keep_only_task_specific_contracts -- --nocapture => reproduced unrelated deterministic prompt word-count failure",
+              "cargo test --lib surfaces::cli::tests::system::release_workers::system_start_refuses_jira_retry_when_orphan_exit_cannot_be_confirmed -- --nocapture => exact rerun pass: 1 passed, confirming the full-suite DirectoryNotEmpty failure was concurrent-suite flake"
+            ]
+          },
+          "report": "Implemented terminal already-merged reconciliation with exact current-Round Quality and Governance gate binding, repository-coordinated local and published ancestry observations, Round/revision-fenced idempotent Review or Failed settlement, a daemon-routed goal resolve-merged escape hatch, intent updates, and regression coverage. Focused checks and all-target compilation pass; full-suite formatting, strict clippy, and one library policy test retain unrelated baseline failures reported in verification.",
+          "started_at": "2026-08-15T14:54:14Z"
+        },
         "phase": "implement",
-        "phase_started_at": "2026-08-15T14:30:15Z",
+        "phase_started_at": "2026-08-15T14:54:14Z",
         "proposal": {
           "completed_at": "2026-08-15T14:24:23Z",
           "git_after": {
@@ -280,11 +378,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-08-15T14:21:37Z",
-        "state": "in_progress",
-        "updated_at": "2026-08-15T14:30:15Z"
+        "state": "completed",
+        "updated_at": "2026-08-15T15:07:25Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Implemented terminal already-merged reconciliation with exact current-Round Quality and Governance gate binding, repository-coordinated local and published ancestry observations, Round/revision-fenced idempotent Review or Failed settlement, a daemon-routed goal resolve-merged escape hatch, intent updates, and regression coverage. Focused checks and all-target compilation pass; full-suite formatting, strict clippy, and one library policy test retain unrelated baseline failures reported in verification.",
+      "implementation_reported_at": "2026-08-15T15:07:25Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -295,7 +393,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T14:54:14Z",
+      "updated": "2026-08-15T15:07:25Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T14:54:14Z",
         "round_idx": 0,
@@ -305,8 +403,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-15T14:54:14Z",
-  "workflow_revision": 22
+  "updated": "2026-08-15T15:07:25Z",
+  "workflow_revision": 27
 }
