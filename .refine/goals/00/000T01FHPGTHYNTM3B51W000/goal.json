@@ -1535,8 +1535,25 @@
           "round_idx": 2,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-08-15T16:43:08Z",
+        "criticism": {
+          "completed_at": "2026-08-15T16:45:08Z",
+          "git_after": {
+            "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-3",
+            "head_commit": "0e0de3d43fe9284156e9f951dc8c981c1f996fd7",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-3",
+            "head_commit": "0e0de3d43fe9284156e9f951dc8c981c1f996fd7",
+            "status_porcelain": []
+          },
+          "result": {
+            "summary": "The proposed plan is complete, safely scoped, and connected to the retained reviewed behavior."
+          },
+          "started_at": "2026-08-15T16:43:08Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-08-15T16:45:08Z",
         "proposal": {
           "completed_at": "2026-08-15T16:43:08Z",
           "git_after": {
@@ -1599,7 +1616,7 @@
         "schema_version": 2,
         "started_at": "2026-08-15T16:41:45Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T16:43:08Z"
+        "updated_at": "2026-08-15T16:45:08Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -1613,7 +1630,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T16:43:08Z",
+      "updated": "2026-08-15T16:45:08Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T16:41:44Z",
         "round_idx": 2,
@@ -1625,6 +1642,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-15T16:43:08Z",
-  "workflow_revision": 56
+  "updated": "2026-08-15T16:45:08Z",
+  "workflow_revision": 58
 }
