@@ -254,13 +254,15 @@
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
       "prompt": "Web UI surface, Controls > Node should take the user to /#/node/processes",
+      "quality_agent_report": "Quality reviewed candidate ac258625 against the finalized P1-P3 plan, implementation report, diff, intent, and tests. No code or test corrections were required and the worktree remains clean. The Controls management Node anchor now targets #/node/processes while the adjacent Node selector is unchanged; the focused static contract pins that exact menu anchor; and the browser navigation intent records Processes as the stable management destination. The implementation report's standalone-formatting caveat was corrected: rustfmt --edition 2024 --check passes for the modified navigation test file. Repository-wide cargo fmt remains blocked by pre-existing drift only in files outside this candidate. The complete Rust unit suite was attempted three times, consistently exposed two pre-existing failures outside the candidate, and then stalled after an existing test emitted a daemon SESSION_ID; all test processes started by Quality were terminated and no process remains. No merge, push, Governance approval, or commit was performed.",
+      "quality_candidate_commit": "ac258625e54a18d9174a6f920368848a3e0c076a",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T22:50:44Z",
+      "updated": "2026-08-15T22:57:03Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T22:43:46Z",
         "round_idx": 0,
@@ -272,6 +274,6 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-15T22:50:44Z",
-  "workflow_revision": 19
+  "updated": "2026-08-15T22:57:03Z",
+  "workflow_revision": 21
 }
