@@ -1,7 +1,7 @@
 {
   "base_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
   "branch_name": "refine/DR3B201F6B1214A5C7A3FEA882/round-2",
-  "candidate_commit": null,
+  "candidate_commit": "53a285d3da989c319657723d2df5b4288e1ad6b0",
   "created": "2026-08-15T17:38:28Z",
   "feature_id": null,
   "feature_order": null,
@@ -479,7 +479,28 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-15T19:03:25Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
@@ -490,6 +511,7 @@
           "round_idx": 1,
           "target_branch": "main"
         },
+        "completed_at": "2026-08-15T19:03:25Z",
         "criticism": {
           "completed_at": "2026-08-15T17:54:58Z",
           "git_after": {
@@ -595,8 +617,87 @@
           },
           "started_at": "2026-08-15T17:54:58Z"
         },
+        "implementation": {
+          "completed_at": "2026-08-15T19:03:25Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Added StateSyncConflictReport and StateSyncConflictSummary with stable content-derived report id, first-pass or push-retry phase, attempt id/source, target and repository identities, baseline/local/remote snapshot identities, local/remote heads, complete ordered unresolved paths, and recovery metadata.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Both reconciliation conflict sites use one durable atomic latest.json writer and return a bounded Conflict summary containing count, id, location, and recovery command. A 128-path test proves the report remains complete while the returned error stays bounded, and temporary report files are absent after replacement.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Extended recovery contracts to versioned valid_conflict previews and StateRecoveryDecision default authority plus repeated live/remote path overrides. Preview evidence hashes the exact baseline, live and remote snapshots, heads, report id/location, and full conflict set; apply rehashes and revalidates it.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Reported recovery recomputes schema-proven merges, preserves one-sided deltas, applies choices only to the reported conflict set, and rejects stale/fabricated previews, unknown or duplicate overrides, changed conflict sets, and unreproducible baseline bytes before owned refs or manifests are created.",
+                "id": "P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Recovery now durably reserves the exact decision manifest before creating its decision-identified target ref, persists the target before external mutation, force-with-lease publishes against the reviewed remote head, hydrates every record under the canonical striped record lease with preimage CAS, preserves later writes as local delta, and creates the baseline only after owned heads and hydration are verified.",
+                "id": "P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Manifest stages Started, TargetPersisted, Published, Hydrated, BaselineCreated, and Completed resume only the same evidence and decision id with matching owned refs/snapshots. Tests cover failed publication, remote movement, partial hydration, changed decisions, owned-target resumption, and interruption after baseline persistence without accepting a foreign baseline.",
+                "id": "P6",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Moved Goal merging into cohesive goal_merge.rs. It strictly three-way merges object members and notes keyed by stable id, keeps rounds and other arrays atomic, preserves the established authoritative-start rule, rejects cross-node Round authority synthesis, then deserializes Goal and validates ids, feature ordering, notes, and Round evidence invariants.",
+                "id": "P7",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "State-sync health persists monotonic attempt sequence/id/source plus latest failure identity and conflict-report pointer. Settlement is attempt-fenced; neutral deferral preserves an active outage, late success cannot clear newer failure, and late older failure cannot reopen an outage after newer success. Runner and SSE/activity projections carry the correlated fields.",
+                "id": "P8",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Daemon-routed project sync and fleet sync follow the durable operation until complete, failed, cancelled, interrupted, or timed out. Success prints the terminal structured result; all other terminal states return nonzero structured errors retaining operation error, conflict report id/location, and recovery guidance. The daemon-backed CLI surface suite verifies the real fleet sync path.",
+                "id": "P9",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated only affected Target App, Fleet, activity-evidence, CLI, API, and Dashboard intent pages, added the state-sync recovery runbook and index entry, and documented complete local reports, valid-baseline authority, attempt ordering, terminal CLI behavior, and compact non-authoritative Dashboard counts.",
+                "id": "P10",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added focused first-pass and push-retry report, atomic replacement, stale/fabricated/duplicate decision, remote/live race, manifest interruption, partial hydration, schema merge, health ordering, terminal CLI, Dashboard, and strict sub-50ms API adapter tests. Candidate-focused suites pass; unrelated baseline and missing-Docker-plugin results are explicitly separated in verification.",
+                "id": "P11",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "cargo check --all-targets - passed; Finished dev profile successfully.",
+              "cargo test --lib tools::host::git_sync -- --nocapture - passed: 53 passed, 0 failed, 0 ignored.",
+              "cargo test --lib tools::host::state_sync_health -- --nocapture - passed: 7 passed, 0 failed, 0 ignored.",
+              "cargo test --lib process::runner::tests::state_sync_health_emits_one_failure_episode_and_one_recovery_activity - passed: 1 passed, 0 failed.",
+              "cargo test --lib surfaces::cli::tests::projects::daemon_sync_operation_following_returns_terminal_results_and_structured_errors - passed: 1 passed, 0 failed.",
+              "cargo test --lib surfaces::web_server::tests::git_changes::web_server_project_sync_returns_while_repository_worker_is_busy - passed: 1 passed, 0 failed; strict 50ms assertion held.",
+              "node --test tests/web_dashboard_attention.test.js - passed: 4 passed, 0 failed.",
+              "cargo run --manifest-path xtask/Cargo.toml -- test-cli - passed: daemon-backed CLI surface suite 1 passed, 0 failed, including terminal fleet sync output.",
+              "cargo clippy --all-targets -- -D warnings -A clippy::needless-pub-self -A clippy::unnecessary-sort-by -A clippy::items-after-test-module - passed; the three allows correspond to confirmed untouched baseline findings plus the untouched items-after-test-module finding.",
+              "git diff --check - passed with no output; scoped rustfmt --edition 2024 --check --config skip_children=true over changed Rust files passed after excluding src/surfaces/cli/dispatch.rs and dispatch/fleet.rs, whose only rustfmt differences are untouched baseline lines.",
+              "cargo test --lib - baseline-limited result: 860 passed, 2 failed, 6 ignored. The two failures are untouched prompts/implementation_planning/plan.md at 95 words and untouched docs/runbooks/install.md documenting retired refine system update.",
+              "cargo test --test test_all -- --integration - relevant production/CLI suites passed (cli_target_root 2, production_binary_install 9, smoke_ai_contract 1, cli_surface 1); overall harness then failed only because /usr/local/lib/docker/cli-plugins/docker-buildx is absent for the unrelated SSH-backed fleet Docker fixture.",
+              "cargo fmt --all -- --check - baseline-limited: current rustfmt reports formatting drift in untouched repository files; candidate files pass the scoped rustfmt check recorded above."
+            ]
+          },
+          "report": "Implemented complete structured state-sync conflict evidence, stale-fenced valid-baseline preview/apply with manifest-owned resumable publication and record-lease hydration, schema-safe Goal merging, correlated health settlement, terminal daemon-routed sync CLI results, compact Dashboard diagnostics, and affected intent/runbook documentation. Exact verification is recorded in implementation_evidence.verification, including separately identified pre-existing and infrastructure-only failures.",
+          "started_at": "2026-08-15T18:44:55Z"
+        },
         "phase": "implement",
-        "phase_started_at": "2026-08-15T17:56:10Z",
+        "phase_started_at": "2026-08-15T18:44:55Z",
         "proposal": {
           "completed_at": "2026-08-15T17:52:58Z",
           "git_after": {
@@ -658,11 +759,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-08-15T17:48:16Z",
-        "state": "in_progress",
-        "updated_at": "2026-08-15T17:56:10Z"
+        "state": "completed",
+        "updated_at": "2026-08-15T19:03:25Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Implemented complete structured state-sync conflict evidence, stale-fenced valid-baseline preview/apply with manifest-owned resumable publication and record-lease hydration, schema-safe Goal merging, correlated health settlement, terminal daemon-routed sync CLI results, compact Dashboard diagnostics, and affected intent/runbook documentation. Exact verification is recorded in implementation_evidence.verification, including separately identified pre-existing and infrastructure-only failures.",
+      "implementation_reported_at": "2026-08-15T19:03:25Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -673,7 +774,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T18:44:51Z",
+      "updated": "2026-08-15T19:03:25Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T18:44:51Z",
         "round_idx": 1,
@@ -683,8 +784,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-15T18:44:54Z",
-  "workflow_revision": 29
+  "updated": "2026-08-15T19:03:26Z",
+  "workflow_revision": 34
 }

@@ -608,8 +608,66 @@
           "round_idx": 1,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-08-15T19:00:39Z",
+        "criticism": {
+          "completed_at": "2026-08-15T19:03:29Z",
+          "git_after": {
+            "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-2",
+            "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-2",
+            "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P2",
+                  "P3",
+                  "P5",
+                  "P6",
+                  "P8"
+                ],
+                "description": "The plan adds repeated provider invocations and long-running exact-candidate Quality and Governance reruns, but only names a final revalidation and settlement fences; it does not require status, node, Round, workflow-revision, and cancellation authority to be reread before every new invocation and consequential Git or durable-state boundary.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Require the full synchronized execution-ownership and cancellation checks before each repair attempt, proof-regeneration or replacement gate launch, identity write, push, integration, recovery enqueue, and settlement, with superseded work stopping without mutation."
+              },
+              {
+                "checklist_item_ids": [
+                  "P8"
+                ],
+                "description": "Conflict or ambiguous-provenance recovery queues a new Round without joining the existing max_automatic_round_retries lineage and budget, so deterministic shared-target conflicts can create an unbounded retry loop like the failure pattern this Goal is intended to remove.",
+                "id": "C2",
+                "material": true,
+                "recommendation": "Give integration recovery a durable automatic_retry kind, source Round, monotonic shared attempt count, configured retry-budget check, and explicit exhausted outcome that retains the original evidence without creating another Round."
+              },
+              {
+                "checklist_item_ids": [
+                  "P1",
+                  "P2",
+                  "P3",
+                  "P4",
+                  "P5",
+                  "P6",
+                  "P7",
+                  "P8",
+                  "P9"
+                ],
+                "description": "The checklist contains no verification or clean-handoff evidence requirement, despite the Round request requiring exact evidence and the retained implementation spanning structured-output repair, durable proof migration, reconciliation, serialization, and Git recovery.",
+                "id": "C3",
+                "material": true,
+                "recommendation": "Add a verification item covering the retained Round 1 worktree's unchanged identity and dirtiness, focused regressions for bounded planning and Quality repair, exact-proof acceptance and regeneration rejection paths, authority and cancellation races, target-advance refresh and conflict recovery under concurrency, documentation checks, and final clean diff and test evidence on Round 2."
+              }
+            ],
+            "summary": "The plan needs explicit ownership fencing, bounded integration recovery, and exact verification evidence."
+          },
+          "started_at": "2026-08-15T19:00:39Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-08-15T19:03:29Z",
         "proposal": {
           "completed_at": "2026-08-15T19:00:38Z",
           "git_after": {
@@ -668,7 +726,7 @@
         "schema_version": 2,
         "started_at": "2026-08-15T18:58:49Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T19:00:39Z"
+        "updated_at": "2026-08-15T19:03:29Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -682,7 +740,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T19:00:39Z",
+      "updated": "2026-08-15T19:03:29Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T18:58:48Z",
         "round_idx": 1,
@@ -694,6 +752,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-15T19:00:39Z",
-  "workflow_revision": 25
+  "updated": "2026-08-15T19:03:29Z",
+  "workflow_revision": 27
 }
