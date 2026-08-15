@@ -1,7 +1,7 @@
 {
   "base_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
   "branch_name": "refine/DR3B201F6B1214A5C7A3FEA882/round-2",
-  "candidate_commit": "53a285d3da989c319657723d2df5b4288e1ad6b0",
+  "candidate_commit": "f70c529cb133a8f8ae5ff8be07ac4adf90b40399",
   "created": "2026-08-15T17:38:28Z",
   "feature_id": null,
   "feature_order": null,
@@ -768,13 +768,15 @@
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
       "prompt": "Try again.",
+      "quality_agent_report": "Quality corrected two authority defects: late successful reconciliation now clears an older failure episode without overwriting newer attempt metadata, and valid-baseline recovery retries keep manifest stages monotonic and cannot finalize a baseline before the owned hydration boundary. Added focused interleaving and premature-boundary coverage. Candidate-focused Rust, JavaScript, formatting, and Clippy checks pass. The full Rust run has only two confirmed pre-existing failures in untouched prompt/install-runbook files; the integration harness passed CLI and smoke suites before the SSH Docker fixture was blocked by a missing docker-buildx plugin.",
+      "quality_candidate_commit": "f70c529cb133a8f8ae5ff8be07ac4adf90b40399",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T19:03:25Z",
+      "updated": "2026-08-15T19:16:03Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T18:44:51Z",
         "round_idx": 1,
@@ -786,6 +788,6 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-15T19:03:26Z",
-  "workflow_revision": 34
+  "updated": "2026-08-15T19:16:03Z",
+  "workflow_revision": 36
 }
