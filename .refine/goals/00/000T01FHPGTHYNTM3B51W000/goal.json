@@ -3963,12 +3963,71 @@
           "round_idx": 4,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-08-15T20:40:25Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-08-15T20:43:06Z",
+        "proposal": {
+          "completed_at": "2026-08-15T20:43:06Z",
+          "git_after": {
+            "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-5",
+            "head_commit": "d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-5",
+            "head_commit": "d8a6285c8cb7b6b4e40ea4dc11e9f1cff91b388f",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Re-read the Round 5 base, local main, configured remote main, original Round 4 base, pre-Quality candidate, and corrected candidate, then map the retained Goal delta against both overlapping current-main recovery work and non-overlapping handoff advances before selectively applying any behavior.",
+                "id": "P1"
+              },
+              {
+                "description": "Reconcile the dedicated missing-baseline domain failure and optional typed recovery eligibility with current main's expanded state-sync health model, preserving atomic target-and-node-bound settlement and correct handling of unrelated, stale, detached, bootstrap, generic, and newer failure episodes.",
+                "id": "P2"
+              },
+              {
+                "description": "Integrate stable git_busy and stale_preview classifications and unchanged complete-preview fencing into the current daemon recovery service without replacing its newer reported-conflict, resumability, or audit behavior and without moving Git or durable-state mutation into browser code.",
+                "id": "P3"
+              },
+              {
+                "description": "Expose the reconciled eligibility, conflict reasons, successful health settlement, resulting heads, audit ref, manifest, counts, authority, detail, and evidence identity through the existing thin Dashboard and project recovery API contracts.",
+                "id": "P4"
+              },
+              {
+                "description": "Restore a cohesive Dashboard recovery controller and panel that fetches only for typed missing-baseline eligibility and neutrally renders target and repository identities, configured remote, heads, snapshots, all comparison counts, bounded conflicts, consequences, and evidence without inferring or preselecting authority.",
+                "id": "P5"
+              },
+              {
+                "description": "Require a separate explicit authority choice and exact-preview confirmation, invalidating reviewed state across evidence, target, node, scope, route, eligibility, stale-preview, Git-busy, and late-response transitions according to whether the existing preview remains trustworthy.",
+                "id": "P6"
+              },
+              {
+                "description": "Carry forward the Round 4 lifecycle correction so retained success remains visible for the completed failure episode but yields to a newer eligible failure for the same target, node, and scope by loading a fresh preview with authority and confirmation reset.",
+                "id": "P7"
+              },
+              {
+                "description": "Reconcile the focused daemon, API, CLI, Dashboard, browser, command-channel handoff, rejection-without-mutation, context-race, success-retention, health-clearing, and newer-failure regression coverage with current main's enlarged recovery suites rather than replacing newer tests.",
+                "id": "P8"
+              },
+              {
+                "description": "Update only the affected Dashboard and API intent contracts and the established state-sync recovery runbook material, preserving current main's newer documentation structure and avoiding duplicated or unrelated documentation changes.",
+                "id": "P9"
+              },
+              {
+                "description": "Produce a clean fresh Round 5 candidate whose cumulative scope demonstrably preserves the complete retained Goal semantics, the Round 4 lifecycle correction, current-main recovery extensions, and remote handoff changes while leaving all historical evidence immutable.",
+                "id": "P10"
+              }
+            ],
+            "summary": "Recover the complete missing-baseline Dashboard workflow from retained candidate 827c7f56 onto the fresh Round 5 base by reconciling its Goal-specific behavior with current main's newer state-recovery architecture and the configured remote's additional handoff changes, rather than replaying historical commits wholesale. The result will preserve daemon ownership and fail-closed recovery contracts, add the neutral preview-and-confirm Dashboard flow including the corrected newer-failure lifecycle, retain auditable outcomes, regressions, and narrowly affected documentation, and leave every prior Round artifact unchanged."
+          },
+          "started_at": "2026-08-15T20:40:25Z"
+        },
         "schema_version": 2,
         "started_at": "2026-08-15T20:40:25Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T20:40:25Z"
+        "updated_at": "2026-08-15T20:43:06Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -3982,7 +4041,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T20:40:25Z",
+      "updated": "2026-08-15T20:43:06Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T20:40:24Z",
         "round_idx": 4,
@@ -3994,6 +4053,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-15T20:40:25Z",
-  "workflow_revision": 95
+  "updated": "2026-08-15T20:43:06Z",
+  "workflow_revision": 97
 }
