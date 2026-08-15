@@ -106,8 +106,56 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-08-15T17:47:37Z",
+        "criticism": {
+          "completed_at": "2026-08-15T17:50:28Z",
+          "git_after": {
+            "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-1",
+            "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR6626D11FDB6F9A57F6EA4B0F/round-1",
+            "head_commit": "4519b5ff2c5894b0fccf1c4c0e57612f694ffe79",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P4",
+                  "P5"
+                ],
+                "description": "The plan never defines which durable Quality artifact is compatible or how it remains bound to the exact current-Round candidate, so it could either keep rejecting the reported cases when evidence is absent or unsafely accept a later shared-target result by ancestry.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Specify the admissible artifact fields and exact identity relation; preserve or recover candidate-bound passed evidence, and require a new exact-candidate Quality run when that proof cannot be reconstructed."
+              },
+              {
+                "checklist_item_ids": [
+                  "P6",
+                  "P7"
+                ],
+                "description": "The repository raises stale_candidate when the recorded base is not an ancestor of the candidate, which is a provenance mismatch rather than ordinary target-tip advancement; treating every such case as an out-of-date candidate and rebasing can hide a wrong base or replay the wrong delta.",
+                "id": "C2",
+                "material": true,
+                "recommendation": "Classify target advancement separately from base/candidate provenance failure, auto-rebase only when the original candidate delta is provable, and route ambiguous provenance or conflicts to a fresh fenced recovery Round with the original evidence retained."
+              },
+              {
+                "checklist_item_ids": [
+                  "P8"
+                ],
+                "description": "P8 omits the merge-review Git/worktree and execution-ownership intent pages even though P6-P7 change serialized lease scope, candidate identity replacement, handoff retention, cancellation boundaries, and conflict recovery.",
+                "id": "C3",
+                "material": true,
+                "recommendation": "Add those affected intent pages and document when the lease begins, how old and replacement candidate identities remain auditable, and which authority and cancellation fences govern gate reruns and recovery."
+              }
+            ],
+            "summary": "The plan is directionally sound but needs tighter evidence, recovery, and documentation boundaries."
+          },
+          "started_at": "2026-08-15T17:47:37Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-08-15T17:50:29Z",
         "proposal": {
           "completed_at": "2026-08-15T17:47:37Z",
           "git_after": {
@@ -162,7 +210,7 @@
         "schema_version": 2,
         "started_at": "2026-08-15T17:44:02Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T17:47:37Z"
+        "updated_at": "2026-08-15T17:50:29Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -176,7 +224,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T17:47:37Z",
+      "updated": "2026-08-15T17:50:29Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T17:44:02Z",
         "round_idx": 0,
@@ -188,6 +236,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-15T17:47:37Z",
-  "workflow_revision": 10
+  "updated": "2026-08-15T17:50:29Z",
+  "workflow_revision": 12
 }
