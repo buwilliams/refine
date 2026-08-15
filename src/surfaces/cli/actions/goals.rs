@@ -151,6 +151,14 @@ pub enum GoalAction {
         #[arg(long, default_value = "quality")]
         stage: String,
     },
+    /// Resolve an already-integrated current-Round candidate from exact passed Quality and Governance evidence.
+    ResolveMerged {
+        /// Goal id.
+        id: String,
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
+        target_root: Option<PathBuf>,
+    },
     /// Approve a reviewed Goal and mark it done.
     Approve {
         /// Goal id.

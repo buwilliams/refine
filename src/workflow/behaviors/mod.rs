@@ -16,7 +16,7 @@ use crate::tools::host::quality::{
     QualityCheckResult, QualityOperationRunner, is_quality_harness_fault, quality_error_summary,
 };
 use crate::tools::product::governance_integration::{
-    FileGovernanceIntegrationService, ReconciliationRequest,
+    AlreadyMergedResolutionDisposition, FileGovernanceIntegrationService,
 };
 use crate::workflow::behavior::{WorkflowAdvanceOutcome, WorkflowBehavior};
 use crate::workflow::candidate_handoff::{
@@ -626,17 +626,12 @@ impl WorkflowBehavior for WorkflowQuality {
     }
 
     fn advance(&self, ctx: &mut WorkflowContext<'_>) -> RefineResult<WorkflowAdvanceOutcome> {
-        let (quality_report, quality_commit) = if ctx.reconciliation.is_some() {
-            (
-                "Legacy integrated candidate retained; Quality ran against the exact integrated target."
-                    .to_string(),
-                ctx.require_commit()?.to_string(),
-            )
-        } else {
-            match run_quality_correction_agent(ctx) {
-                Ok(result) => result,
-                Err(error) => return fail(ctx, "quality", error),
-            }
+        if ctx.reconciliation.is_some() {
+            return resolve_already_merged_quality(ctx);
+        }
+        let (quality_report, quality_commit) = match run_quality_correction_agent(ctx) {
+            Ok(result) => result,
+            Err(error) => return fail(ctx, "quality", error),
         };
         ctx.commit = Some(quality_commit.clone());
         if let Err(error) = ctx
@@ -655,14 +650,6 @@ impl WorkflowBehavior for WorkflowQuality {
         )?;
         let quality = match run_workflow_quality(ctx) {
             Ok(result) => result,
-            Err(error) if ctx.reconciliation.is_some() => {
-                let _ = ctx.log(
-                    "reconcile",
-                    "Already-merged reconciliation Quality could not run; target and Goal status were preserved",
-                    Some(json_object(json!({"error": error.to_string()}))),
-                );
-                return Err(error);
-            }
             Err(error) => {
                 let category =
                     if crate::tools::host::quality::is_quality_candidate_infrastructure(&error) {
@@ -679,132 +666,6 @@ impl WorkflowBehavior for WorkflowQuality {
                 );
             }
         };
-        if let Some(integration) = ctx.reconciliation.clone() {
-            if quality.ok {
-                ctx.work_items.update_goal_round_evaluation_summary(
-                    &ctx.goal_id,
-                    ctx.round_idx,
-                    &json!({
-                        "workflow_reconciliation": {
-                            "state": "completed",
-                            "candidate_commit": integration.candidate_commit,
-                            "target_branch": integration.target_branch,
-                            "quality_target_commit": quality.candidate_commit,
-                            "completed_at": now_timestamp()
-                        }
-                    }),
-                )?;
-                ctx.log(
-                    "reconcile",
-                    "Already-merged candidate passed Quality; Goal reconciled as done",
-                    Some(json_object(json!({
-                        "candidate_commit": integration.candidate_commit,
-                        "target_branch": integration.target_branch,
-                        "quality_target_commit": quality.candidate_commit
-                    }))),
-                )?;
-                ctx.reconciliation_state = Some("completed".to_string());
-                ctx.request_transition(GoalStatus::Quality, GoalStatus::Done)?;
-                return Ok(WorkflowAdvanceOutcome::Transition {
-                    from: GoalStatus::Quality,
-                    to: GoalStatus::Done,
-                    reason: "Already-merged candidate passed reconciliation Quality".to_string(),
-                });
-            }
-
-            let integration_service = FileGovernanceIntegrationService::with_target_root(
-                ctx.runtime_root,
-                ctx.refine_dir(),
-                ctx.target_root,
-            );
-            let reconciliation_failure = RefineError::Conflict(format!(
-                "{} The already-merged candidate was reverted and complete evidence was preserved.",
-                quality.summary
-            ));
-            let goal_id = ctx.goal_id.clone();
-            let round_idx = ctx.round_idx;
-            let node_id = ctx.node_id.clone();
-            let reverted = match integration_service.revert_reconciled_candidate_and_settle(
-                ReconciliationRequest {
-                    goal_id: &goal_id,
-                    round_idx,
-                    node_id: &node_id,
-                    integration: &integration,
-                    expected_target_commit: &quality.candidate_commit,
-                },
-                |reverted| {
-                    ctx.work_items.update_goal_round_evaluation_summary(
-                        &ctx.goal_id,
-                        ctx.round_idx,
-                        &json!({
-                            "workflow_reconciliation": {
-                                "state": "reverted",
-                                "candidate_commit": integration.candidate_commit,
-                                "target_branch": integration.target_branch,
-                                "quality_target_commit": quality.candidate_commit,
-                                "merge_commit": reverted.merge_commit,
-                                "revert_commit": reverted.revert_commit,
-                                "revert": reverted.result,
-                                "completed_at": now_timestamp()
-                            }
-                        }),
-                    )?;
-                    ctx.log(
-                        "reconcile",
-                        "Already-merged candidate failed Quality and was reverted from the target branch",
-                        Some(json_object(json!({
-                            "candidate_commit": integration.candidate_commit,
-                            "target_branch": integration.target_branch,
-                            "quality_target_commit": quality.candidate_commit,
-                            "merge_commit": reverted.merge_commit,
-                            "revert_commit": reverted.revert_commit,
-                            "revert": reverted.result
-                        }))),
-                    )?;
-                    ctx.reconciliation_state = Some("reverted".to_string());
-                    ctx.fail("quality", &reconciliation_failure)
-                },
-            ) {
-                Ok((reverted, ())) => reverted,
-                Err(error) => {
-                    let goal_status = ctx
-                        .work_items
-                        .show_goal_summary(&ctx.goal_id)
-                        .ok()
-                        .map(|summary| summary.goal.status);
-                    if goal_status == Some(GoalStatus::Failed) {
-                        return Err(reconciliation_failure);
-                    }
-                    let _ = ctx.work_items.update_goal_round_evaluation_summary(
-                        &ctx.goal_id,
-                        ctx.round_idx,
-                        &json!({
-                            "workflow_reconciliation": {
-                                "state": "revert_blocked",
-                                "candidate_commit": integration.candidate_commit,
-                                "target_branch": integration.target_branch,
-                                "quality_target_commit": quality.candidate_commit,
-                                "error": error.to_string(),
-                                "updated_at": now_timestamp()
-                            }
-                        }),
-                    );
-                    let _ = ctx.log(
-                        "reconcile",
-                        "Quality failed but the exact safe revert was blocked; target and Goal status were preserved",
-                        Some(json_object(json!({
-                            "candidate_commit": integration.candidate_commit,
-                            "target_branch": integration.target_branch,
-                            "quality_target_commit": quality.candidate_commit,
-                            "error": error.to_string()
-                        }))),
-                    );
-                    return Err(error);
-                }
-            };
-            let _ = reverted;
-            return Err(reconciliation_failure);
-        }
         if !quality.ok {
             let recovery = match investigate_quality_failure(ctx, &quality_report, &quality) {
                 Ok(recovery) => recovery,
@@ -830,6 +691,59 @@ impl WorkflowBehavior for WorkflowQuality {
             to: GoalStatus::Governance,
             reason: "Quality checks passed".to_string(),
         })
+    }
+}
+
+fn resolve_already_merged_quality(
+    ctx: &mut WorkflowContext<'_>,
+) -> RefineResult<WorkflowAdvanceOutcome> {
+    let service = FileGovernanceIntegrationService::with_target_root(
+        ctx.runtime_root,
+        ctx.refine_dir(),
+        ctx.target_root,
+    );
+    let resolution =
+        service.resolve_already_merged_goal_with_authority(&ctx.goal_id, ctx.attempt_authority)?;
+    ctx.log(
+        "reconcile",
+        match resolution.disposition {
+            AlreadyMergedResolutionDisposition::Resolved => {
+                "Already-merged candidate resolved to Review from exact passed gate evidence"
+            }
+            AlreadyMergedResolutionDisposition::AlreadyResolved => {
+                "Already-merged candidate was already resolved to Review"
+            }
+            AlreadyMergedResolutionDisposition::Failed => {
+                "Already-merged candidate could not be resolved safely and was settled as Failed"
+            }
+            AlreadyMergedResolutionDisposition::AlreadyFailed => {
+                "Already-merged candidate was already settled as Failed"
+            }
+        },
+        Some(json_object(json!({
+            "disposition": resolution.disposition.as_str(),
+            "evidence": resolution.evidence
+        }))),
+    )?;
+    match resolution.goal.goal.status {
+        GoalStatus::Review => Ok(WorkflowAdvanceOutcome::Transition {
+            from: GoalStatus::Quality,
+            to: GoalStatus::Review,
+            reason: "Already-merged candidate resolved from exact passed Quality and Governance evidence"
+                .to_string(),
+        }),
+        GoalStatus::Failed => {
+            ctx.final_status = Some(GoalStatus::Failed);
+            Ok(WorkflowAdvanceOutcome::Completed {
+                final_status: GoalStatus::Failed,
+                reason: "Already-merged reconciliation failed closed with durable recovery evidence"
+                    .to_string(),
+            })
+        }
+        status => Err(RefineError::Conflict(format!(
+            "already-merged resolver returned unexpected Goal status {}",
+            status.as_str()
+        ))),
     }
 }
 
@@ -1489,6 +1403,7 @@ fn record_governance(
             "governance_message": message,
             "governance_details": evaluation.details,
             "governance_checked_at": now_timestamp(),
+            "governance_candidate_commit": ctx.require_commit()?,
             "governance_rule_actions": evaluation.details
                 .get("failed_actions")
                 .cloned()

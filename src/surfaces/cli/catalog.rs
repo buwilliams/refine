@@ -115,6 +115,7 @@ mod tests {
             .map(|command| command["name"].as_str().unwrap())
             .collect::<Vec<_>>();
         assert!(!goal_names.contains(&"verify"));
+        assert!(goal_names.contains(&"resolve-merged"));
 
         let system = commands
             .iter()

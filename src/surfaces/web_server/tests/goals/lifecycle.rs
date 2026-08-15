@@ -7,6 +7,127 @@ use crate::model::goal::{
 };
 
 #[test]
+fn daemon_resolve_merged_action_reaches_shared_terminal_capability() {
+    let temp_root = unique_temp_dir("http-resolve-merged");
+    let target_root = temp_root.join("repo");
+    let runtime_root = temp_root.join("run/8082");
+    init_git_app(&target_root);
+    let base = git_stdout(&target_root, &["rev-parse", "HEAD"]);
+    git(
+        &target_root,
+        &["checkout", "-b", "refine/GOAL-MERGED/round-1"],
+    )
+    .unwrap();
+    fs::write(target_root.join("merged.txt"), "merged\n").unwrap();
+    git(&target_root, &["add", "merged.txt"]).unwrap();
+    git(&target_root, &["commit", "-m", "candidate"]).unwrap();
+    let candidate = git_stdout(&target_root, &["rev-parse", "HEAD"]);
+    git(&target_root, &["checkout", "main"]).unwrap();
+    git(&target_root, &["merge", "--no-ff", "--no-edit", &candidate]).unwrap();
+    let integrated = git_stdout(&target_root, &["rev-parse", "HEAD"]);
+    let refine_dir = refine_dir_for_target_root(&target_root).unwrap();
+    let work_items = FileWorkItemService::new(&refine_dir);
+
+    let create_quality_goal = |goal_id: &str, include_integration: bool| {
+        work_items
+            .create_goal_summary(goal_id, Some(goal_id))
+            .unwrap();
+        work_items
+            .append_goal_round_summary(goal_id, "Buddy", "Implement")
+            .unwrap();
+        work_items
+            .transition_goal_status(goal_id, GoalStatus::Todo)
+            .unwrap();
+        work_items
+            .advance_automated_goal_status(goal_id, GoalStatus::Plan)
+            .unwrap();
+        work_items
+            .update_goal_git_refs(
+                goal_id,
+                &format!("refine/{goal_id}/round-1"),
+                "main",
+                &base,
+                Some(&candidate),
+            )
+            .unwrap();
+        work_items
+            .advance_automated_goal_status(goal_id, GoalStatus::Implement)
+            .unwrap();
+        work_items
+            .advance_automated_goal_status(goal_id, GoalStatus::Quality)
+            .unwrap();
+        let mut evidence = json!({
+            "quality_state": "passed",
+            "quality_candidate_commit": candidate,
+            "quality_checked_at": "2026-08-15T00:01:00Z",
+            "quality_details": {
+                "candidate_commit": candidate,
+                "source_candidate_commit": candidate,
+                "evaluation_scope": "isolated_candidate"
+            },
+            "rule_state": "passed",
+            "meta_rule_state": "passed",
+            "product_state": "passed",
+            "constitution_state": "passed",
+            "governance_candidate_commit": candidate,
+            "governance_checked_at": "2026-08-15T00:02:00Z"
+        });
+        if include_integration {
+            evidence["workflow_integration"] = json!({
+                "candidate_commit": candidate,
+                "target_branch": "main",
+                "target_commit": integrated,
+                "remote": "origin",
+                "pushed": false,
+                "integrated_at": "2026-08-15T00:03:00Z",
+                "merge": {"ok": true, "conflicts": [], "message": "integrated"}
+            });
+        }
+        work_items
+            .update_goal_round_evaluation_summary(goal_id, 0, &evidence)
+            .unwrap();
+        let (round_idx, revision, request) = work_items.authored_goal_commitment(goal_id).unwrap();
+        work_items
+            .claim_workflow_attempt(goal_id, GoalStatus::Quality, round_idx, revision, &request)
+            .unwrap();
+    };
+    create_quality_goal("GOAL-MERGED", true);
+    create_quality_goal("GOAL-SIBLING", false);
+
+    let mut server = server_with_projection();
+    server.target_root = Some(target_root);
+    server.runtime_root = Some(runtime_root);
+    let resolved = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/goals/GOAL-MERGED/resolve-merged".to_string(),
+        body: None,
+    });
+    assert_eq!(resolved.status, 200, "{}", resolved.body);
+    assert_eq!(resolved.body["resolution"], "resolved");
+    assert_eq!(resolved.body["goal"]["status"], "review");
+    let repeated = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/goals/GOAL-MERGED/resolve-merged".to_string(),
+        body: None,
+    });
+    assert_eq!(repeated.status, 200, "{}", repeated.body);
+    assert_eq!(repeated.body["resolution"], "already_resolved");
+    let rejected = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/goals/GOAL-SIBLING/resolve-merged".to_string(),
+        body: None,
+    });
+    assert_eq!(rejected.status, 409, "{}", rejected.body);
+    assert!(
+        rejected.body["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("candidate ancestry alone")
+    );
+    remove_temp_dir(&temp_root);
+}
+
+#[test]
 fn web_server_transitions_goal_and_refine_dir() {
     let temp_root = unique_temp_dir("http-transition");
     let refine_dir = temp_root.join(".refine");

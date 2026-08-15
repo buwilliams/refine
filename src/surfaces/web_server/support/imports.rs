@@ -110,6 +110,7 @@ pub(in crate::surfaces::web_server) fn goal_action_message(action: &str) -> &'st
         "verify" => "Verified",
         "retry-quality" => "Queued for Quality",
         "retry-governance" => "Queued for Governance",
+        "resolve-merged" => "Resolved already-merged candidate",
         "undo" => "Undone",
         _ => "Goal action completed",
     }

@@ -35,6 +35,8 @@ Implementation planning persists typed proposal, criticism, revision, and implem
 
 Governance rereads authority immediately before its first Git side effect under the repository lock. Cancellation or reassignment before that boundary prevents integration. Once integration begins it may finish and persist exact integration evidence even if cancellation arrives; cancellation remains the Goal's terminal status and no rollback is attempted.
 
+Already-merged reconciliation is admitted only by the authoritative current Round's own integration identity, never by candidate reachability alone. The automatic workflow and operator action share one resolver. It observes exact local and required published ancestry under repository coordination, then revalidates the originating Round, claim-time workflow revision, candidate, integration, and passed gate evidence while holding the Goal mutation lock. That mutation records terminal reconciliation evidence and moves Quality to Review atomically. Repeated or concurrent callers return the existing Review outcome. Missing, mismatched, or unavailable admitted evidence settles the Goal as Failed with recovery context instead of leaving Quality resumable; the separate destructive revert capability retains its exact target-snapshot fence for genuine failed verdicts.
+
 The selected Round index and request remain the execution axis through
 Plan, Implement, Quality, and Governance.
 Workflow-owned evidence may advance the record revision, but it may not silently

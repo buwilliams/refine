@@ -85,6 +85,13 @@ pub(super) fn hydrate_retry_context(
     {
         ctx.reconciliation = integration.clone();
         ctx.reconciliation_state = Some(state.to_string());
+    } else if current == GoalStatus::Quality
+        && let Some(integration) = integration.clone()
+    {
+        // A current-Round integration identity is the admission signal for the shared terminal
+        // resolver. Do not inspect the moving shared target here or rerun Quality against it.
+        ctx.reconciliation = Some(integration);
+        ctx.reconciliation_state = Some("pending".to_string());
     } else if reconciliation_state.is_none()
         && let Some(integration) = integration.clone()
     {

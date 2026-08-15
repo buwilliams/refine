@@ -24,6 +24,7 @@ This capability should connect workflow with the user's source repository:
   durably in Plan;
 - Governance should serialize exact candidate integration after Quality passes;
 - Governance should merge and push the isolated candidate exactly once before Review;
+- an integrated current-Round candidate may be reconciled to Review when exact passed Quality and Governance evidence still names that candidate and repository-coordinated observations prove it remains an ancestor of the local target and, when required, the published target. Unrelated descendant commits on a shared target are valid and both observed target snapshots remain inspectable;
 - review should preserve human or agent judgment over the integrated result;
 - approval should mark the reviewed integration accepted without merging or pushing again;
 - failed or conflicted merges should create recoverable evidence;

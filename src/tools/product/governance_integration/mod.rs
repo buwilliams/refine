@@ -17,6 +17,10 @@ use crate::tools::host::project_layout::target_root_for_refine_dir;
 use crate::tools::product::project_projection::GoalSummaryProjection;
 use crate::tools::product::work_items::FileWorkItemService;
 
+mod reconciliation;
+
+pub use reconciliation::{AlreadyMergedResolution, AlreadyMergedResolutionDisposition};
+
 #[derive(Clone, Debug)]
 pub struct FileGovernanceIntegrationService {
     pub runtime_root: PathBuf,
