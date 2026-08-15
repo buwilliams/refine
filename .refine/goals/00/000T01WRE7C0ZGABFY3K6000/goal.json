@@ -1,7 +1,7 @@
 {
   "base_commit": "0b561bcd40255af2d9b651175903f64326700433",
   "branch_name": "refine/00000T01WRE7C0ZGABFY3K6000/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "ac258625e54a18d9174a6f920368848a3e0c076a",
   "created": "2026-08-15T22:43:46Z",
   "feature_id": null,
   "feature_order": null,
@@ -95,7 +95,28 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-15T22:50:44Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "0b561bcd40255af2d9b651175903f64326700433",
@@ -106,6 +127,7 @@
           "round_idx": 0,
           "target_branch": "main"
         },
+        "completed_at": "2026-08-15T22:50:44Z",
         "criticism": {
           "completed_at": "2026-08-15T22:46:12Z",
           "git_after": {
@@ -154,6 +176,40 @@
           },
           "started_at": "2026-08-15T22:46:12Z"
         },
+        "implementation": {
+          "completed_at": "2026-08-15T22:50:44Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Updated only the Controls menu Node management anchor in src/surfaces/web/static/index.html to href=\"#/node/processes\"; the adjacent global-node selector markup and behavior were not changed.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Extended static_main_nav_consolidates_context_and_controls to require the Node management anchor's exact #/node/processes route; the focused test and all 20 static-surface tests pass.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated docs/intent/04-surfaces/03-browser/02-nav.md to define Processes (/#/node/processes) as the stable Controls > Node management destination and explicitly preserve selector behavior.",
+                "id": "P3",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "cargo test --lib static_main_nav_consolidates_context_and_controls: exit 0; 1 passed, 0 failed, 889 filtered out.",
+              "cargo test --lib static_surface: exit 0; 20 passed, 0 failed, 870 filtered out.",
+              "node --test tests/web_controls_node_selector.test.js: exit 0; 13 passed, 0 failed.",
+              "git diff --check: exit 0; no whitespace errors.",
+              "git status --short --branch && git diff --name-status && git diff --stat: branch refine/00000T01WRE7C0ZGABFY3K6000/round-1; exactly three modified planned files; 6 insertions and 1 deletion.",
+              "cargo test static_main_nav_consolidates_context_and_controls -- --exact: exit 2 after successful compilation because the repository's custom tests/test_all.rs harness rejects ordinary name filters as unsupported suite flags; superseded by the passing --lib invocation.",
+              "cargo fmt --check: exit 1 from pre-existing formatting drift in unrelated Rust files including CLI dispatch, daemon lifecycle, source promotion, and project projection; no files were changed by this check.",
+              "rustfmt --check src/surfaces/web_server/tests/static_surface/navigation.rs: exit 1 only for pre-existing untouched assertions around lines 324 and 339; the Round's modified assertion was not reported."
+            ]
+          },
+          "report": "Changed the Controls menu Node management link from #/node/application to #/node/processes, added a focused static navigation assertion for that stable destination, and documented Processes as the browser navigation intent while leaving the adjacent Node selector unchanged. Exact verification: focused static contract passed 1/1; full static-surface suite passed 20/20; Node-selector suite passed 13/13; git diff check passed. Repository-wide cargo fmt and standalone navigation-file rustfmt checks remain blocked by pre-existing formatting drift outside this Round's modified hunk.",
+          "started_at": "2026-08-15T22:47:11Z"
+        },
         "phase": "implement",
         "phase_started_at": "2026-08-15T22:47:11Z",
         "proposal": {
@@ -189,11 +245,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-08-15T22:43:47Z",
-        "state": "in_progress",
-        "updated_at": "2026-08-15T22:47:11Z"
+        "state": "completed",
+        "updated_at": "2026-08-15T22:50:44Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Changed the Controls menu Node management link from #/node/application to #/node/processes, added a focused static navigation assertion for that stable destination, and documented Processes as the browser navigation intent while leaving the adjacent Node selector unchanged. Exact verification: focused static contract passed 1/1; full static-surface suite passed 20/20; Node-selector suite passed 13/13; git diff check passed. Repository-wide cargo fmt and standalone navigation-file rustfmt checks remain blocked by pre-existing formatting drift outside this Round's modified hunk.",
+      "implementation_reported_at": "2026-08-15T22:50:44Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -204,7 +260,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T22:47:11Z",
+      "updated": "2026-08-15T22:50:44Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T22:43:46Z",
         "round_idx": 0,
@@ -214,8 +270,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-15T22:47:11Z",
-  "workflow_revision": 14
+  "updated": "2026-08-15T22:50:44Z",
+  "workflow_revision": 19
 }
