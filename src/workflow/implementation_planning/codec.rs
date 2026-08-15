@@ -7,7 +7,7 @@ use crate::model::goal::{ImplementationCriticism, ProposedImplementationPlan};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 
 const MAX_CRITICISM_FINDINGS: usize = 3;
-const MAX_SUMMARY_CHARS: usize = 600;
+const MAX_SUMMARY_CHARS: usize = 20_000;
 const MAX_ITEM_CHARS: usize = 28_000;
 
 pub(super) fn decode_plan(output: &str) -> RefineResult<ProposedImplementationPlan> {
@@ -262,6 +262,21 @@ mod tests {
 
         let verbose_shape = r#"{"summary":"Do it","checklist":[{"id":"P1","description":"One","verification":["cargo test"]}]}"#;
         assert!(decode_plan(verbose_shape).is_err());
+    }
+
+    #[test]
+    fn plan_summaries_allow_paragraphs_beyond_the_former_600_char_limit() {
+        let formerly_oversized = format!(
+            r#"{{"summary":"{}","checklist":[{{"id":"P1","description":"Change it"}}]}}"#,
+            "x".repeat(805)
+        );
+        assert!(decode_plan(&formerly_oversized).is_ok());
+
+        let oversized = format!(
+            r#"{{"summary":"{}","checklist":[{{"id":"P1","description":"Change it"}}]}}"#,
+            "x".repeat(MAX_SUMMARY_CHARS + 1)
+        );
+        assert!(decode_plan(&oversized).is_err());
     }
 
     #[test]

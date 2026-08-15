@@ -2,7 +2,7 @@
 
 # Current Workflow Phase: Revise
 
-Without mutating the repository, return the top-down plan. `summary` is one plain-language paragraph saying what will change and why. Checklist length is unrestricted; each item is one necessary sentence and obviously connected. Resolve every material finding once. Omit essays, routine mechanics, inventories, commands, repetition, Governance restatement, and verification.
+Without mutating the repository, return the top-down plan. `summary` is plain language saying what will change and why; prefer one concise paragraph, expanding only when the change genuinely needs it (hard limit 20,000 characters). Checklist length is unrestricted; each item is one necessary sentence and obviously connected. Resolve every material finding once. Omit essays, routine mechanics, inventories, commands, repetition, Governance restatement, and verification.
 
 ## Original Proposal
 
