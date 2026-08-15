@@ -145,8 +145,73 @@
           },
           "started_at": "2026-08-15T15:04:10Z"
         },
-        "phase": "revise",
-        "phase_started_at": "2026-08-15T15:07:02Z",
+        "final_plan": {
+          "completed_at": "2026-08-15T15:09:08Z",
+          "git_after": {
+            "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-1",
+            "head_commit": "f50b1571672da4a7c308d47918746eac3931bfaa",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T01FHPGTHYNTM3B51W000/round-1",
+            "head_commit": "f50b1571672da4a7c308d47918746eac3931bfaa",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Represent the missing-baseline topology as a dedicated daemon domain failure and persist an optional typed recovery kind in state-sync health so ordinary failed, stale, detached, bootstrap, and ineligible states remain distinguishable without parsing error text.",
+                "id": "P1"
+              },
+              {
+                "description": "Introduce daemon-owned state-recovery conflict classifications that serialize apply-time HTTP 409 responses with stable git_busy and stale_preview reasons while leaving unrelated conflicts safely generic.",
+                "id": "P2"
+              },
+              {
+                "description": "Extend the Dashboard health controller to request and retain a recovery preview only when authoritative health reports the missing-baseline recovery kind, and clear recovery state when the app, node, route context, eligibility, or preview identity changes.",
+                "id": "P3"
+              },
+              {
+                "description": "Render the complete preview's target and repository identities, configured remote, local and remote heads, evidence and snapshot identifiers, live-only, remote-only, differing, and equal counts, bounded conflicting paths and truncation count, and neutral plain-language consequences of live and remote authority.",
+                "id": "P4"
+              },
+              {
+                "description": "Provide initially unselected live and remote authority controls plus a separate deliberate confirmation bound to the exact displayed preview, enabling apply only after both actions and resetting confirmation whenever reviewed evidence or context changes.",
+                "id": "P5"
+              },
+              {
+                "description": "Post only the explicit authority and unchanged complete preview to the existing apply route, treating git_busy as an explicit retry state that retains the preview but requires renewed confirmation and treating stale_preview as an explicit refresh state that discards the preview, authority, and confirmation before another apply.",
+                "id": "P6"
+              },
+              {
+                "description": "After a successful daemon apply, settle and refetch authoritative state-sync health, preserve the success panel across that refresh, and display the cleared error, baseline creation, resulting published and local heads, recovery audit ref, manifest path, evidence identity, counts, authority, and returned detail.",
+                "id": "P7"
+              },
+              {
+                "description": "Add focused daemon, API, and browser regressions for typed eligibility, eligible-only preview fetching, complete preview rendering, neutral authority controls, deliberate confirmation and invalidation, typed busy retry, stale refresh fencing, successful evidence retention, and post-apply health-error clearing without mutation on rejected requests.",
+                "id": "P8"
+              },
+              {
+                "description": "Update only the Dashboard and API intent pages and the existing missing-baseline runbook section for the typed eligibility and conflict contracts, explicit authority boundary, refresh and retry semantics, and retained recovery evidence.",
+                "id": "P9"
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "P1 makes missing-baseline recovery a daemon-owned typed health condition, P3 gates preview inspection on that condition, and P8 covers the eligibility contract and eligible-only fetch behavior."
+              },
+              {
+                "criticism_id": "C2",
+                "resolution": "P2 defines stable git_busy and stale_preview 409 reasons, P6 binds each reason to safe retry or mandatory refresh behavior with confirmation invalidation, and P8-P9 cover and document the contract."
+              }
+            ],
+            "summary": "Make the exceptional missing-baseline condition safely actionable from the Dashboard by exposing daemon-owned recovery eligibility and conflict reasons, then adding a neutral preview-and-confirm flow that never chooses authority for the user, preserves the complete stale-fenced evidence, and shows authoritative health clearing and audit results after recovery without weakening ordinary fail-closed synchronization."
+          },
+          "started_at": "2026-08-15T15:07:02Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-15T15:09:08Z",
         "proposal": {
           "completed_at": "2026-08-15T15:04:10Z",
           "git_after": {
@@ -201,7 +266,7 @@
         "schema_version": 2,
         "started_at": "2026-08-15T15:02:31Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T15:07:02Z"
+        "updated_at": "2026-08-15T15:09:08Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -215,7 +280,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T15:07:02Z",
+      "updated": "2026-08-15T15:09:08Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T15:02:31Z",
         "round_idx": 0,
@@ -225,8 +290,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-08-15T15:07:02Z",
-  "workflow_revision": 13
+  "updated": "2026-08-15T15:09:08Z",
+  "workflow_revision": 16
 }
