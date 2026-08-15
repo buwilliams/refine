@@ -627,7 +627,38 @@ impl FileProcessSupervisor {
             ))
         })?;
         let mut archived = process.clone();
-        if let Some(stdin_path) = archived.stdin_path.take() {
+        let handoff_path = self.artifact_handoff_path(&archived.id);
+        let mut handoff = None;
+        // A reaper can observe the child exit before its workflow consumer has
+        // finished settlement. Keep the command queue and its history pointer
+        // while that consumer still owns the artifact-handoff lease.
+        let artifacts_deferred = match OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&handoff_path)
+        {
+            Ok(file) => match file.try_lock_exclusive() {
+                Ok(()) => {
+                    handoff = Some(file);
+                    false
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => true,
+                Err(error) => {
+                    return Err(RefineError::Io(format!(
+                        "failed to lock process artifact handoff {} for archiving: {error}",
+                        handoff_path.display()
+                    )));
+                }
+            },
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
+            Err(error) => {
+                return Err(RefineError::Io(format!(
+                    "failed to open process artifact handoff {} for archiving: {error}",
+                    handoff_path.display()
+                )));
+            }
+        };
+        if !artifacts_deferred && let Some(stdin_path) = archived.stdin_path.take() {
             remove_file_if_present(Path::new(&stdin_path), "process stdin")?;
         }
         let encoded = serde_json::to_vec_pretty(&archived).map_err(|error| {
@@ -643,6 +674,7 @@ impl FileProcessSupervisor {
             &self.process_identity_path(&archived.id),
             "process identity",
         )?;
+        drop(handoff);
         Ok(archived)
     }
 

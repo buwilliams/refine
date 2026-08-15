@@ -206,8 +206,12 @@ fn file_process_supervisor_cleans_deferred_artifacts_after_handoff_release() {
     let stdout_path = supervisor
         .processes_dir()
         .join(format!("{process_id}.stdout.log"));
+    let stdin_path = supervisor
+        .processes_dir()
+        .join(format!("{process_id}.commands.jsonl"));
     fs::create_dir_all(supervisor.processes_dir()).unwrap();
     fs::write(&stdout_path, "workflow result").unwrap();
+    fs::write(&stdin_path, "").unwrap();
     let handoff = supervisor.begin_artifact_handoff(process_id).unwrap();
     supervisor
         .register(ManagedProcess {
@@ -219,7 +223,7 @@ fn file_process_supervisor_cleans_deferred_artifacts_after_handoff_release() {
             details: None,
             stdout_path: Some(stdout_path.display().to_string()),
             stderr_path: None,
-            stdin_path: None,
+            stdin_path: Some(stdin_path.display().to_string()),
             limits: None,
             started_at: String::new(),
             exit_code: None,
@@ -228,14 +232,20 @@ fn file_process_supervisor_cleans_deferred_artifacts_after_handoff_release() {
 
     assert!(supervisor.recover().unwrap().is_empty());
     assert!(stdout_path.is_file());
+    assert!(stdin_path.is_file());
     let process_path = supervisor.process_history_path(process_id);
     let reconciled: ManagedProcess =
         serde_json::from_slice(&fs::read(&process_path).unwrap()).unwrap();
     assert_eq!(reconciled.state, "interrupted");
+    assert_eq!(
+        reconciled.stdin_path.as_deref(),
+        Some(stdin_path.to_str().unwrap())
+    );
 
     supervisor.finish_artifact_handoff(handoff).unwrap();
     supervisor.cleanup(process_id).unwrap();
     assert!(!stdout_path.exists());
+    assert!(!stdin_path.exists());
     assert!(!process_path.exists());
     assert!(!supervisor.artifact_handoff_path(process_id).exists());
 
