@@ -106,12 +106,59 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-08-15T23:35:38Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-08-15T23:39:04Z",
+        "proposal": {
+          "completed_at": "2026-08-15T23:39:04Z",
+          "git_after": {
+            "branch": "refine/DRE2A015047036C9717F9959E7/round-1",
+            "head_commit": "6d284fb82c3a8bb999558fcebb3c7f0cfe9eb083",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRE2A015047036C9717F9959E7/round-1",
+            "head_commit": "6d284fb82c3a8bb999558fcebb3c7f0cfe9eb083",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Expand the existing host structured-output capability into a bounded decoder that enumerates direct, fenced, mixed-text, wrapped, and recursively stringified JSON candidates while rejecting ambiguity and resource-limit violations.",
+                "id": "P1"
+              },
+              {
+                "description": "Return structured parse and deserialization failures with the exact candidate and JSON field path so repair prompts can correct the real contract violation instead of receiving a generic no-valid-JSON message.",
+                "id": "P2"
+              },
+              {
+                "description": "Route Plan, Criticize, and Revise through the shared transport decoder while retaining their existing typed validators for compact plans, material findings, and complete one-to-one criticism resolution.",
+                "id": "P3"
+              },
+              {
+                "description": "Add narrowly defined compatibility normalization for semantically identical historical agent fields, including criticism resolution identifier spellings, while continuing to reject missing, duplicate, unrelated, or structurally different data.",
+                "id": "P4"
+              },
+              {
+                "description": "Make planning phase prompts and Goal Agent completion contracts share canonical serialized examples, with a populated revise resolution object, so the instructed schema stays aligned with the Rust model.",
+                "id": "P5"
+              },
+              {
+                "description": "Codify successful observed payload variants and unsafe malformed, ambiguous, deeply nested, and semantically invalid variants as shared contract fixtures used by planning and future agent-output consumers.",
+                "id": "P6"
+              },
+              {
+                "description": "Update the affected planning intent contract to distinguish tolerant transport normalization from strict canonical durable artifacts and semantic validation without changing the Plan-Criticize-Revise-Implement workflow.",
+                "id": "P7"
+              }
+            ],
+            "summary": "Refine will replace planning's ad hoc best-effort JSON parsing with one bounded structured-output capability for agent responses: it will extract supported transport shapes, unwrap completion envelopes and stringified values, deserialize with exact path-aware diagnostics, and then apply strict phase-specific semantic validation. Planning prompts and completion contracts will use the same canonical typed shapes, including a concrete revise resolution, so schema drift cannot silently exhaust repairs; deliberate compatibility aliases will cover equivalent historical spellings without accepting ambiguous or incomplete plans, and the resulting behavior will be reusable by other agent-output consumers instead of accumulating one-off parsers."
+          },
+          "started_at": "2026-08-15T23:35:38Z"
+        },
         "schema_version": 2,
         "started_at": "2026-08-15T23:35:38Z",
         "state": "in_progress",
-        "updated_at": "2026-08-15T23:35:38Z"
+        "updated_at": "2026-08-15T23:39:04Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -125,7 +172,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T23:35:38Z",
+      "updated": "2026-08-15T23:39:04Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T23:35:38Z",
         "round_idx": 0,
@@ -137,6 +184,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-15T23:35:38Z",
-  "workflow_revision": 7
+  "updated": "2026-08-15T23:39:04Z",
+  "workflow_revision": 9
 }
