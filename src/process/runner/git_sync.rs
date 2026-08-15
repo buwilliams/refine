@@ -70,16 +70,21 @@ pub(super) fn run_git_sync_worker(
                 let remote_fetch_due = next_remote_fetch.is_some_and(|deadline| now >= deadline);
                 if demand_due || remote_fetch_due {
                     let node_id = state_sync_node_id(runtime_root, &target_root)?;
-                    record_state_sync_attempt(runtime_root, &target_root, &node_id)?;
+                    let source = if remote_fetch_due {
+                        "background_remote_fetch"
+                    } else {
+                        "background_publish"
+                    };
+                    let attempt_id =
+                        record_state_sync_attempt(runtime_root, &target_root, &node_id, source)?;
                     let result = match run_background_repository_operation(
                         runtime_root,
                         GIT_SYNC_RUNNER,
                         || {
-                            if remote_fetch_due {
-                                service.try_sync()
-                            } else {
-                                service.try_sync_state()
-                            }
+                            service.try_sync_with_attempt(
+                                remote_fetch_due,
+                                StateSyncAttemptContext::new(attempt_id.to_string(), source),
+                            )
                         },
                     )? {
                         BackgroundOperationOutcome::Completed(result) => result,
@@ -91,6 +96,8 @@ pub(super) fn run_git_sync_worker(
                                 runtime_root,
                                 &target_root,
                                 &node_id,
+                                attempt_id,
+                                source,
                                 &result,
                             )?;
                             last_observed_fingerprint = service
@@ -115,6 +122,8 @@ pub(super) fn run_git_sync_worker(
                                 runtime_root,
                                 &target_root,
                                 &node_id,
+                                attempt_id,
+                                source,
                                 &result,
                             )?;
                             next_attempt = now + GIT_RECONCILE_RETRY_INTERVAL;
@@ -124,6 +133,8 @@ pub(super) fn run_git_sync_worker(
                                 runtime_root,
                                 &target_root,
                                 &node_id,
+                                attempt_id,
+                                source,
                                 &error,
                             )?;
                             next_attempt = now + GIT_RECONCILE_RETRY_INTERVAL;

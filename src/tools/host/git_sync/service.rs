@@ -12,18 +12,42 @@ impl FileGitSyncService {
     /// `refine/state` branch. The application branch, index, and worktree are
     /// never checked out, staged, pulled, or pushed by this service.
     pub fn sync(&self) -> RefineResult<GitSyncResult> {
-        with_repository_git_lock(&self.target_root, || self.sync_locked(GitFetchScope::All))
+        self.sync_with_attempt(StateSyncAttemptContext::direct())
+    }
+
+    pub fn sync_with_attempt(
+        &self,
+        attempt: StateSyncAttemptContext,
+    ) -> RefineResult<GitSyncResult> {
+        with_repository_git_lock(&self.target_root, || {
+            self.sync_locked(GitFetchScope::All, &attempt)
+        })
     }
 
     /// Attempt a best-effort background sync without delaying foreground work.
     pub fn try_sync(&self) -> RefineResult<GitSyncResult> {
-        self.try_sync_with(GitFetchScope::All)
+        self.try_sync_with(GitFetchScope::All, &StateSyncAttemptContext::direct())
     }
 
     /// Publish local Refine state without turning state mutations into full
     /// application-branch fetches. The project update pulse owns that cadence.
     pub fn try_sync_state(&self) -> RefineResult<GitSyncResult> {
-        self.try_sync_with(GitFetchScope::State)
+        self.try_sync_with(GitFetchScope::State, &StateSyncAttemptContext::direct())
+    }
+
+    pub fn try_sync_with_attempt(
+        &self,
+        fetch_all: bool,
+        attempt: StateSyncAttemptContext,
+    ) -> RefineResult<GitSyncResult> {
+        self.try_sync_with(
+            if fetch_all {
+                GitFetchScope::All
+            } else {
+                GitFetchScope::State
+            },
+            &attempt,
+        )
     }
 
     /// Remove state-worktree files that synchronized state no longer admits and
@@ -52,7 +76,11 @@ impl FileGitSyncService {
             .collect())
     }
 
-    pub(super) fn try_sync_with(&self, fetch_scope: GitFetchScope) -> RefineResult<GitSyncResult> {
+    pub(super) fn try_sync_with(
+        &self,
+        fetch_scope: GitFetchScope,
+        attempt: &StateSyncAttemptContext,
+    ) -> RefineResult<GitSyncResult> {
         let lock = repository_git_lock(&self.target_root)?;
         let _guard = match lock.try_lock() {
             Ok(guard) => guard,
@@ -75,7 +103,7 @@ impl FileGitSyncService {
                 ));
             }
         };
-        self.sync_locked(fetch_scope)
+        self.sync_locked(fetch_scope, attempt)
     }
 
     /// Fingerprint durable Refine state without touching the user's checkout.
@@ -96,8 +124,12 @@ impl FileGitSyncService {
         Ok(hasher.finish())
     }
 
-    pub(super) fn sync_locked(&self, fetch_scope: GitFetchScope) -> RefineResult<GitSyncResult> {
-        let result = self.sync_locked_inner(fetch_scope);
+    pub(super) fn sync_locked(
+        &self,
+        fetch_scope: GitFetchScope,
+        attempt: &StateSyncAttemptContext,
+    ) -> RefineResult<GitSyncResult> {
+        let result = self.sync_locked_inner(fetch_scope, attempt);
         if result.is_err() {
             // Sync owns only the managed state worktree. Any failure must leave
             // that checkout clean so a later retry starts from durable Git
@@ -107,7 +139,11 @@ impl FileGitSyncService {
         result
     }
 
-    fn sync_locked_inner(&self, fetch_scope: GitFetchScope) -> RefineResult<GitSyncResult> {
+    fn sync_locked_inner(
+        &self,
+        fetch_scope: GitFetchScope,
+        attempt: &StateSyncAttemptContext,
+    ) -> RefineResult<GitSyncResult> {
         if !self.target_root.join(".git").exists() {
             return Ok(skipped("Target app is not a Git repository."));
         }
@@ -171,9 +207,11 @@ impl FileGitSyncService {
                     .to_string(),
             );
         }
+        let mut observed_remote_head = before.clone();
         if remote_exists {
             let remote_ref = format!("{remote}/{REFINE_STATE_BRANCH}");
             let remote_head = self.git_stdout(&["rev-parse", &remote_ref])?;
+            observed_remote_head = remote_head.clone();
             pulled |= before != remote_head;
             let rebase = self.git_at(&state_root, &["rebase", &remote_ref])?;
             append_output_detail(&mut details, &rebase);
@@ -212,10 +250,20 @@ impl FileGitSyncService {
         }
         let conflicts = state_conflicts(&base, &local, &remote_state, &resolved_paths);
         if !conflicts.is_empty() {
-            return Err(RefineError::Conflict(format!(
-                "Refine state changed on multiple nodes: {}",
-                conflicts.join(", ")
-            )));
+            let summary = self.record_conflict_report(
+                StateSyncConflictPhase::FirstPass,
+                attempt,
+                &remote,
+                &base,
+                &live_refine,
+                &local,
+                &state_refine,
+                &remote_state,
+                self.local_state_head()?,
+                observed_remote_head.clone(),
+                &conflicts,
+            )?;
+            return Err(RefineError::Conflict(summary.to_string()));
         }
         // Retirement mutates the managed checkout, so it follows every
         // fail-closed validation. Successful sync still records the intended
@@ -253,7 +301,7 @@ impl FileGitSyncService {
 
         let mut pushed = false;
         if remote_configured && (!remote_exists || committed || setup.local_ahead) {
-            for attempt in 1..=PUSH_RETRY_LIMIT {
+            for push_attempt in 1..=PUSH_RETRY_LIMIT {
                 let push =
                     self.git_at(&state_root, &["push", "-u", &remote, REFINE_STATE_BRANCH])?;
                 append_output_detail(&mut details, &push);
@@ -261,11 +309,12 @@ impl FileGitSyncService {
                     pushed = true;
                     break;
                 }
-                if attempt == PUSH_RETRY_LIMIT || !push_rejected_by_race(&push) {
+                if push_attempt == PUSH_RETRY_LIMIT || !push_rejected_by_race(&push) {
                     return Err(command_failed("git push", &push));
                 }
                 self.fetch_state_branch(&remote)?;
                 let remote_ref = format!("{remote}/{REFINE_STATE_BRANCH}");
+                let retry_remote_head = self.git_stdout(&["rev-parse", &remote_ref])?;
                 self.git_at_checked(&state_root, &["reset", "--hard", &remote_ref])?;
                 let retry_removed_excluded =
                     self.retire_excluded_tracked_state(&state_root, &state_refine)?;
@@ -299,10 +348,20 @@ impl FileGitSyncService {
                     &retry_resolved_paths,
                 );
                 if !retry_conflicts.is_empty() {
-                    return Err(RefineError::Conflict(format!(
-                        "Refine state changed on multiple nodes during push retry: {}",
-                        retry_conflicts.join(", ")
-                    )));
+                    let summary = self.record_conflict_report(
+                        StateSyncConflictPhase::PushRetry,
+                        attempt,
+                        &remote,
+                        &base,
+                        &live_refine,
+                        &retry_local,
+                        &state_refine,
+                        &retry_remote_state,
+                        self.local_state_head()?,
+                        retry_remote_head,
+                        &retry_conflicts,
+                    )?;
+                    return Err(RefineError::Conflict(summary.to_string()));
                 }
                 write_reconciled_goal_changes(&state_refine, &retry_reconciled_goals)?;
                 apply_local_state_delta(
@@ -365,7 +424,7 @@ impl FileGitSyncService {
         })
     }
 
-    fn reconcile_non_overlapping_goal_changes(
+    pub(super) fn reconcile_non_overlapping_goal_changes(
         &self,
         state_root: &std::path::Path,
         live_refine: &std::path::Path,

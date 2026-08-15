@@ -8,6 +8,23 @@ impl FileGitSyncService {
         authority: StateRecoveryAuthority,
         preview: StateRecoveryPreview,
     ) -> RefineResult<StateRecoveryResult> {
+        self.apply_state_recovery_decision(StateRecoveryDecision::uniform(authority), preview)
+    }
+
+    pub fn apply_state_recovery_decision(
+        &self,
+        decision: StateRecoveryDecision,
+        preview: StateRecoveryPreview,
+    ) -> RefineResult<StateRecoveryResult> {
+        if preview.baseline_status == "valid_conflict" {
+            return self.apply_reported_state_recovery(decision, preview);
+        }
+        if !decision.overrides.is_empty() {
+            return Err(RefineError::InvalidInput(
+                "Per-path overrides require a valid-baseline conflict report.".to_string(),
+            ));
+        }
+        let authority = decision.default_authority;
         let lock = repository_git_lock(&self.target_root)?;
         let _guard = match lock.try_lock() {
             Ok(guard) => guard,
@@ -143,6 +160,8 @@ impl FileGitSyncService {
             version: 1,
             evidence_id: preview.evidence_id.clone(),
             authority,
+            decision_id: String::new(),
+            overrides: Vec::new(),
             node: FileNodeRegistryService::with_active_root(&live_refine, &self.runtime_root)
                 .active_node_id()
                 .unwrap_or_else(|_| "default".to_string()),
@@ -152,12 +171,17 @@ impl FileGitSyncService {
             local_state_head_before: preview.local_state_head.clone(),
             remote_state_head_before: preview.remote_state_head.clone(),
             live_snapshot_before: preview.live_snapshot.clone(),
+            baseline_snapshot_before: None,
+            conflict_report_id: None,
             local_state_head_after: None,
             remote_state_head_after: None,
+            target_snapshot: None,
+            target_location: None,
             path_counts: preview.path_counts.clone(),
             started_at: recovery_timestamp(),
             completed_at: None,
             outcome: StateRecoveryOutcome::Started,
+            stage: StateRecoveryStage::Started,
             recovery_location: recovery_ref.clone(),
             message: "Recovery started; no baseline has been created.".to_string(),
         });
@@ -357,6 +381,7 @@ impl FileGitSyncService {
         Ok(StateRecoveryResult {
             ok: true,
             authority,
+            overrides: Vec::new(),
             baseline_created: true,
             local_state_head: manifest.local_state_head_after,
             remote_state_head: final_remote,
@@ -425,6 +450,7 @@ impl FileGitSyncService {
         Ok(Some(StateRecoveryResult {
             ok: true,
             authority,
+            overrides: Vec::new(),
             baseline_created: true,
             local_state_head: completed.local_state_head_after,
             remote_state_head: expected_remote.to_string(),
@@ -448,7 +474,7 @@ impl FileGitSyncService {
         Ok(())
     }
 
-    fn validate_managed_state_worktree(&self) -> RefineResult<()> {
+    pub(super) fn validate_managed_state_worktree(&self) -> RefineResult<()> {
         let path = state_worktree_for_target_root(&self.target_root)?;
         if !path.exists() {
             return Ok(());
@@ -466,7 +492,7 @@ impl FileGitSyncService {
         Ok(())
     }
 
-    fn reject_foreign_git_operation(&self) -> RefineResult<()> {
+    pub(super) fn reject_foreign_git_operation(&self) -> RefineResult<()> {
         let common = git_common_dir(&self.target_root)?;
         let markers = [
             "MERGE_HEAD",
@@ -515,7 +541,10 @@ impl FileGitSyncService {
         write_manifest(&path, &manifest)
     }
 
-    fn observe_repository_ref(&self, reference: &str) -> RefineResult<DisposableCheckout> {
+    pub(super) fn observe_repository_ref(
+        &self,
+        reference: &str,
+    ) -> RefineResult<DisposableCheckout> {
         let checkout = self.disposable_checkout("owned-recovery")?;
         let path = checkout.path.display().to_string();
         let source = self.target_root.display().to_string();
@@ -528,7 +557,7 @@ impl FileGitSyncService {
         Ok(checkout)
     }
 
-    fn preserve_live_snapshot(
+    pub(super) fn preserve_live_snapshot(
         &self,
         preview: &StateRecoveryPreview,
         live_refine: &std::path::Path,

@@ -16,7 +16,9 @@ use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationHandle, OperationRegistry, OperationState,
 };
 use crate::tools::host::checkout::RefineCheckoutPaths;
-use crate::tools::host::git_sync::{FileGitSyncService, GitSyncResult};
+use crate::tools::host::git_sync::{
+    FileGitSyncService, GitSyncResult, StateSyncAttemptContext, latest_state_sync_conflict_report,
+};
 use crate::tools::host::project_layout::{prepare_refine_dir, refine_dir_for_target_root};
 use crate::tools::host::state_sync_health::{FileStateSyncHealthService, StateSyncHealthActivity};
 use crate::tools::observability::activity::{ActivityService, FileActivityService};

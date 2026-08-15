@@ -107,8 +107,7 @@ pub enum ProjectAction {
         #[arg(long)]
         cache_dir: Option<PathBuf>,
     },
-    /// Inspect or apply explicit recovery when refine/state exists but the
-    /// persisted three-way synchronization baseline is missing.
+    /// Inspect or apply stale-fenced recovery for missing-baseline or reported conflicts.
     StateRecovery {
         #[command(subcommand)]
         action: ProjectStateRecoveryAction,
@@ -160,6 +159,12 @@ pub enum ProjectStateRecoveryAction {
         /// JSON file containing the complete preview returned by `preview`.
         #[arg(long)]
         preview_file: PathBuf,
+        /// Reported conflict path that should use live authority instead of the default.
+        #[arg(long = "live-path")]
+        live_paths: Vec<PathBuf>,
+        /// Reported conflict path that should use remote authority instead of the default.
+        #[arg(long = "remote-path")]
+        remote_paths: Vec<PathBuf>,
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,

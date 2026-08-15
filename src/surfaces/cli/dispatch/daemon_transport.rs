@@ -34,6 +34,99 @@ pub(super) fn daemon_json(
     parse_daemon_response(&response)
 }
 
+/// Follow a daemon-routed durable operation to its terminal record. Sync CLI
+/// commands are operator diagnostics as well as triggers, so returning the
+/// initial `running` receipt would hide the reconciliation result that matters.
+pub(super) fn follow_daemon_operation(
+    initial: serde_json::Value,
+) -> RefineResult<serde_json::Value> {
+    let timeout = std::env::var("REFINE_OPERATION_TIMEOUT_SECONDS")
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .filter(|seconds| *seconds > 0)
+        .unwrap_or(120);
+    follow_daemon_operation_with(
+        initial,
+        std::time::Duration::from_secs(timeout),
+        |operation_id| daemon_json("GET", &format!("/operations/{operation_id}"), None),
+    )
+}
+
+pub(in crate::surfaces::cli) fn follow_daemon_operation_with(
+    initial: serde_json::Value,
+    timeout: std::time::Duration,
+    mut fetch_status: impl FnMut(&str) -> RefineResult<serde_json::Value>,
+) -> RefineResult<serde_json::Value> {
+    let operation = initial.get("operation").cloned().ok_or_else(|| {
+        RefineError::Serialization("daemon operation response is missing operation".to_string())
+    })?;
+    let operation_id = operation
+        .get("id")
+        .and_then(serde_json::Value::as_str)
+        .filter(|id| !id.is_empty())
+        .ok_or_else(|| {
+            RefineError::Serialization("daemon operation response is missing id".to_string())
+        })?
+        .to_string();
+    let deadline = std::time::Instant::now() + timeout;
+    let mut current = operation;
+    loop {
+        let operation_status = current
+            .get("status")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("unknown");
+        match operation_status {
+            "complete" => {
+                return Ok(current.get("result").cloned().unwrap_or_else(|| json!({})));
+            }
+            "failed" | "cancelled" | "interrupted" => {
+                let structured = json!({
+                    "state": operation_status,
+                    "operation_id": operation_id,
+                    "error": current.get("error").cloned().unwrap_or_else(|| json!({
+                        "code": format!("operation_{operation_status}"),
+                        "message": format!("Operation {operation_id} ended {operation_status}")
+                    })),
+                    "operation": current
+                });
+                let message = serde_json::to_string_pretty(&structured).unwrap();
+                return if operation_status == "failed" {
+                    Err(RefineError::Conflict(message))
+                } else {
+                    Err(RefineError::Degraded(message))
+                };
+            }
+            "pending" | "running" | "cancelling" => {}
+            other => {
+                return Err(RefineError::Serialization(format!(
+                    "daemon operation {operation_id} has unknown status {other:?}"
+                )));
+            }
+        }
+        if std::time::Instant::now() >= deadline {
+            return Err(RefineError::Degraded(
+                serde_json::to_string_pretty(&json!({
+                    "state": "timed_out",
+                    "operation_id": operation_id,
+                    "error": {
+                        "code": "operation_timed_out",
+                        "message": format!("Operation {operation_id} did not settle within {}ms", timeout.as_millis())
+                    },
+                    "operation": current
+                }))
+                .unwrap(),
+            ));
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        let response = fetch_status(&operation_id)?;
+        current = response.get("operation").cloned().ok_or_else(|| {
+            RefineError::Serialization(format!(
+                "daemon operation status for {operation_id} is missing operation"
+            ))
+        })?;
+    }
+}
+
 pub(super) fn daemon_port() -> u16 {
     std::env::var("REFINE_DAEMON_PORT")
         .ok()

@@ -49,19 +49,25 @@ test("degraded state sync labels aggregate counts and exposes freshness metadata
     state_sync_health: {
       status: "failed",
       last_attempt_at: "2026-08-15T12:00:00Z",
+      last_attempt_id: 42,
+      last_attempt_source: "project_sync_operation",
       last_success_at: "2026-08-14T12:00:00Z",
       failure_since: "2026-08-15T11:55:00Z",
       stale_since: "2026-08-14T12:15:00Z",
       last_error: "git fetch failed",
+      last_conflict_report_id: "report-42",
+      last_conflict_report_location: "/run/8082/state-sync-conflicts/latest.json",
     },
   });
 
   assert.match(html, /data-state-sync-status="failed"/);
   assert.match(html, /All-node counts: local projection; non-authoritative/);
   assert.match(html, /Last attempt.*2026-08-15T12:00:00Z/);
+  assert.match(html, /Attempt.*42 \(project_sync_operation\)/);
   assert.match(html, /Last success.*2026-08-14T12:00:00Z/);
   assert.match(html, /Failure since.*2026-08-15T11:55:00Z/);
   assert.match(html, /Stale since.*2026-08-14T12:15:00Z/);
+  assert.match(html, /Complete conflict report report-42/);
 });
 
 test("dashboard state sync health renders below the workflow status grid", () => {

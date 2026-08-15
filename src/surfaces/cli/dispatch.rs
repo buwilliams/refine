@@ -15,6 +15,8 @@ mod system;
 mod todos;
 mod website;
 mod workflow;
+#[cfg(test)]
+pub(super) use daemon_transport::follow_daemon_operation_with;
 use daemon_transport::*;
 use system::{port_status_with_processes, selected_process_ports, stop_system_process};
 

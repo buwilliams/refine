@@ -65,16 +65,8 @@ pub(crate) fn fleet_local_registry_commands(fixture: &IntegrationFixture) {
     let sync = fixture.run_refine(&["fleet", "sync"]);
     fixture.assert_success("fleet sync", &sync);
     let sync_payload = fixture.json_stdout(&sync);
-    assert_eq!(
-        sync_payload["operation"]["owner"], "project:sync",
-        "{sync_payload:#}"
-    );
-    assert!(
-        sync_payload["operation"]["id"]
-            .as_str()
-            .is_some_and(|id| !id.is_empty()),
-        "{sync_payload:#}"
-    );
+    assert_eq!(sync_payload["ok"], true, "{sync_payload:#}");
+    assert_eq!(sync_payload["git_sync"]["ok"], true, "{sync_payload:#}");
     let maintenance = fixture.run_refine(&["fleet", "maintenance"]);
     fixture.assert_success("fleet maintenance", &maintenance);
     let maintenance_payload = fixture.json_stdout(&maintenance);

@@ -1,5 +1,27 @@
 use super::*;
 
+fn valid_goal_record(id: &str, node_id: &str, status: &str, title: &str, updated: &str) -> Vec<u8> {
+    let mut bytes = serde_json::to_vec_pretty(&serde_json::json!({
+        "id": id,
+        "name": id,
+        "title": title,
+        "status": status,
+        "priority": "low",
+        "reporter": null,
+        "branch_name": null,
+        "feature_id": null,
+        "feature_order": null,
+        "node_id": node_id,
+        "created": "2026-08-03T18:00:00Z",
+        "updated": updated,
+        "notes": [],
+        "rounds": []
+    }))
+    .unwrap();
+    bytes.push(b'\n');
+    bytes
+}
+
 #[test]
 fn sync_rebases_disjoint_state_when_nodes_race() {
     let fixture = SyncFixture::new("race");
@@ -135,10 +157,11 @@ fn sync_reports_same_record_multi_node_conflicts() {
     fixture.service(&fixture.a).sync().unwrap();
 
     let error = fixture.service(&fixture.b).sync().unwrap_err();
-    assert!(
-        error.to_string().contains("goals/GOALA/goal.json"),
-        "{error}"
-    );
+    assert!(error.to_string().contains("1 unresolved path"), "{error}");
+    let report = latest_state_sync_conflict_report(&fixture.b.join("run"))
+        .unwrap()
+        .unwrap();
+    assert_eq!(report.unresolved_paths, vec!["goals/GOALA/goal.json"]);
 }
 
 #[test]
@@ -150,8 +173,7 @@ fn sync_merges_disjoint_goal_changes_without_blocking_remote_records() {
         .join("goals/GOALA/goal.json");
     fs::write(
         &goal_a,
-        r#"{"id":"GOALA","node_id":"node-a","status":"review","updated":"2026-08-03T18:20:00Z"}
-"#,
+        valid_goal_record("GOALA", "node-a", "review", "Base", "2026-08-03T18:20:00Z"),
     )
     .unwrap();
     fixture.service(&fixture.a).sync().unwrap();
@@ -159,8 +181,7 @@ fn sync_merges_disjoint_goal_changes_without_blocking_remote_records() {
 
     fs::write(
         &goal_a,
-        r#"{"id":"GOALA","node_id":"node-b","status":"review","updated":"2026-08-03T18:21:00Z"}
-"#,
+        valid_goal_record("GOALA", "node-b", "review", "Base", "2026-08-03T18:21:00Z"),
     )
     .unwrap();
     write_goal(&fixture.a, "REMOTE_ONLY");
@@ -171,8 +192,7 @@ fn sync_merges_disjoint_goal_changes_without_blocking_remote_records() {
         .join("goals/GOALA/goal.json");
     fs::write(
         &goal_b,
-        r#"{"id":"GOALA","node_id":"node-b","status":"done","updated":"2026-08-03T18:22:00Z"}
-"#,
+        valid_goal_record("GOALA", "node-b", "done", "Base", "2026-08-03T18:22:00Z"),
     )
     .unwrap();
 
@@ -212,11 +232,23 @@ fn goal_merge_does_not_use_timestamps_to_hide_competing_lifecycle_changes() {
 
 #[test]
 fn goal_merge_keeps_the_authoritative_start_over_a_concurrent_reassignment_request() {
-    let base = br#"{"id":"GOALA","node_id":"node-a","status":"todo","title":"Base","updated":"2026-08-03T18:20:00Z"}"#;
-    let local = br#"{"id":"GOALA","node_id":"node-a","status":"in-progress","title":"Base","updated":"2026-08-03T18:21:00Z"}"#;
-    let remote = br#"{"id":"GOALA","node_id":"node-b","status":"todo","title":"Clarified","updated":"2026-08-03T18:22:00Z"}"#;
+    let base = valid_goal_record("GOALA", "node-a", "todo", "Base", "2026-08-03T18:20:00Z");
+    let local = valid_goal_record(
+        "GOALA",
+        "node-a",
+        "in-progress",
+        "Base",
+        "2026-08-03T18:21:00Z",
+    );
+    let remote = valid_goal_record(
+        "GOALA",
+        "node-b",
+        "todo",
+        "Clarified",
+        "2026-08-03T18:22:00Z",
+    );
 
-    let merged = merge_goal_record(base, local, remote).unwrap();
+    let merged = merge_goal_record(&base, &local, &remote).unwrap();
     let merged: serde_json::Value = serde_json::from_slice(&merged).unwrap();
     assert_eq!(merged["status"], "in-progress");
     assert_eq!(merged["node_id"], "node-a");
@@ -236,6 +268,101 @@ fn goal_merge_still_rejects_competing_non_start_lifecycle_changes() {
 }
 
 #[test]
+fn goal_merge_combines_notes_by_stable_id_and_validates_the_goal_schema() {
+    let base = valid_goal_record("GOALA", "node-a", "todo", "Base", "2026-08-03T18:20:00Z");
+    let mut local: serde_json::Value = serde_json::from_slice(&base).unwrap();
+    let mut remote = local.clone();
+    local["notes"] = serde_json::json!([{
+        "id": "NOTE-A",
+        "author": "A",
+        "body": "local",
+        "created": "2026-08-03T18:21:00Z",
+        "updated": "2026-08-03T18:21:00Z"
+    }]);
+    local["updated"] = serde_json::json!("2026-08-03T18:21:00Z");
+    remote["notes"] = serde_json::json!([{
+        "id": "NOTE-B",
+        "author": "B",
+        "body": "remote",
+        "created": "2026-08-03T18:22:00Z",
+        "updated": "2026-08-03T18:22:00Z"
+    }]);
+    remote["updated"] = serde_json::json!("2026-08-03T18:22:00Z");
+    let local = serde_json::to_vec(&local).unwrap();
+    let remote = serde_json::to_vec(&remote).unwrap();
+
+    let merged = merge_goal_record(&base, &local, &remote).unwrap();
+    let goal: crate::model::goal::Goal = serde_json::from_slice(&merged).unwrap();
+    assert_eq!(
+        goal.notes
+            .iter()
+            .map(|note| note.id.as_str())
+            .collect::<Vec<_>>(),
+        vec!["NOTE-A", "NOTE-B"]
+    );
+}
+
+#[test]
+fn goal_merge_keeps_rounds_atomic_across_workflow_authority_changes() {
+    let base = valid_goal_record("GOALA", "node-a", "todo", "Base", "2026-08-03T18:20:00Z");
+    let mut local: serde_json::Value = serde_json::from_slice(&base).unwrap();
+    let mut remote = local.clone();
+    local["rounds"] = serde_json::json!([{
+        "reporter": "A",
+        "prompt": "Implement",
+        "created": "2026-08-03T18:21:00Z",
+        "updated": "2026-08-03T18:21:00Z",
+        "guidance_decision": null,
+        "governance": null,
+        "quality": null,
+        "logs": []
+    }]);
+    remote["status"] = serde_json::json!("plan");
+    assert!(
+        merge_goal_record(
+            &base,
+            &serde_json::to_vec(&local).unwrap(),
+            &serde_json::to_vec(&remote).unwrap(),
+        )
+        .is_none()
+    );
+}
+
+#[test]
+fn goal_merge_rejects_cross_field_invalid_round_evidence() {
+    let base = valid_goal_record("GOALA", "node-a", "todo", "Base", "2026-08-03T18:20:00Z");
+    let mut local: serde_json::Value = serde_json::from_slice(&base).unwrap();
+    let mut remote = local.clone();
+    local["rounds"] = serde_json::json!([{
+        "reporter": "A",
+        "prompt": "Implement",
+        "created": "2026-08-03T18:21:00Z",
+        "updated": "2026-08-03T18:21:00Z",
+        "guidance_decision": null,
+        "implementation_report": "completed without its timestamp",
+        "governance": null,
+        "quality": null,
+        "logs": []
+    }]);
+    remote["notes"] = serde_json::json!([{
+        "id": "NOTE-A",
+        "author": "A",
+        "body": "remote",
+        "created": "2026-08-03T18:22:00Z",
+        "updated": "2026-08-03T18:22:00Z"
+    }]);
+
+    assert!(
+        merge_goal_record(
+            &base,
+            &serde_json::to_vec(&local).unwrap(),
+            &serde_json::to_vec(&remote).unwrap(),
+        )
+        .is_none()
+    );
+}
+
+#[test]
 fn unresolved_goal_conflict_does_not_write_other_prepared_merges() {
     let fixture = SyncFixture::new("mixed-goal-conflicts");
     for id in ["GOALA", "GOALB"] {
@@ -244,9 +371,7 @@ fn unresolved_goal_conflict_does_not_write_other_prepared_merges() {
             refine_dir_for_target_root(&fixture.a)
                 .unwrap()
                 .join(format!("goals/{id}/goal.json")),
-            format!(
-                "{{\"id\":\"{id}\",\"node_id\":\"node-a\",\"status\":\"backlog\",\"updated\":\"2026-08-03T18:20:00Z\"}}\n"
-            ),
+            valid_goal_record(id, "node-a", "backlog", "Base", "2026-08-03T18:20:00Z"),
         )
         .unwrap();
     }
@@ -256,12 +381,12 @@ fn unresolved_goal_conflict_does_not_write_other_prepared_merges() {
     let refine_a = refine_dir_for_target_root(&fixture.a).unwrap();
     fs::write(
         refine_a.join("goals/GOALA/goal.json"),
-        "{\"id\":\"GOALA\",\"node_id\":\"node-b\",\"status\":\"backlog\",\"updated\":\"2026-08-03T18:21:00Z\"}\n",
+        valid_goal_record("GOALA", "node-b", "backlog", "Base", "2026-08-03T18:21:00Z"),
     )
     .unwrap();
     fs::write(
         refine_a.join("goals/GOALB/goal.json"),
-        "{\"id\":\"GOALB\",\"node_id\":\"node-a\",\"status\":\"todo\",\"updated\":\"2026-08-03T18:21:00Z\"}\n",
+        valid_goal_record("GOALB", "node-a", "todo", "Base", "2026-08-03T18:21:00Z"),
     )
     .unwrap();
     fixture.service(&fixture.a).sync().unwrap();
@@ -270,16 +395,21 @@ fn unresolved_goal_conflict_does_not_write_other_prepared_merges() {
     for id in ["GOALA", "GOALB"] {
         fs::write(
             refine_b.join(format!("goals/{id}/goal.json")),
-            format!(
-                "{{\"id\":\"{id}\",\"node_id\":\"node-b\",\"status\":\"done\",\"updated\":\"2026-08-03T18:22:00Z\"}}\n"
-            ),
+            valid_goal_record(id, "node-b", "done", "Base", "2026-08-03T18:22:00Z"),
         )
         .unwrap();
     }
 
-    let error = fixture.service(&fixture.b).sync().unwrap_err();
+    let _error = fixture.service(&fixture.b).sync().unwrap_err();
 
-    assert!(error.to_string().contains("goals/GOALB/goal.json"));
+    let report = latest_state_sync_conflict_report(&fixture.b.join("run"))
+        .unwrap()
+        .unwrap();
+    assert!(
+        report
+            .unresolved_paths
+            .contains(&"goals/GOALB/goal.json".to_string())
+    );
     assert_eq!(
         git_stdout(
             &state_worktree_for_target_root(&fixture.b).unwrap(),

@@ -3,6 +3,8 @@ use super::*;
 mod contracts;
 mod hydration;
 mod inspection;
+mod reported;
+mod reported_support;
 mod service;
 mod storage;
 #[cfg(test)]
@@ -13,6 +15,7 @@ pub use contracts::*;
 pub(super) use hydration::hydrate_remote_with_recovery_cas;
 #[cfg(not(test))]
 use hydration::*;
+pub(super) use hydration::{hydrate_recovery_target_from_map, hydrate_recovery_target_with_cas};
 use storage::*;
 #[cfg(test)]
 use test_hooks::*;
@@ -24,6 +27,7 @@ pub(super) use test_hooks::{
 const RECOVERY_PATH_LIMIT: usize = 100;
 const RECOVERY_MANIFEST_DIR: &str = "refine-state-recoveries";
 const RECOVERY_REF_PREFIX: &str = "refs/refine/state-recovery";
+const REPORTED_RECOVERY_VERSION: u32 = 2;
 
 #[cfg(test)]
 pub(in crate::tools::host::git_sync) fn preview_evidence_id_for_test(

@@ -32,6 +32,9 @@ Runbooks:
   identity and work while the agent owns the machines.
 - [Distribute and converge work](distribute-and-converge.md) — move Goals to
   workers and bring reviewable work home.
+- [Recover a state-sync conflict](state-sync-recovery.md) — inspect a complete
+  valid-baseline conflict report and apply stale-fenced default and per-path
+  authority without editing synchronized state by hand.
 - [Migrate Gap state to Goals](migrate-gap-state.md) — preserve intent through
   the agent-operated schema migration.
 - [Migrate a Refine v2 project to current v4](v2-to-v4-migration-runbook.md) —

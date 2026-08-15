@@ -11,8 +11,9 @@ mod system;
 mod todos;
 
 use super::dispatch::{
-    absolute_cli_path, dispatch, dispatch_config, explicit_target_root_path, plan_goal_draft_body,
-    resolve_merged_daemon_route, run_system_start, system_ps_response, system_status_response,
+    absolute_cli_path, dispatch, dispatch_config, explicit_target_root_path,
+    follow_daemon_operation_with, plan_goal_draft_body, resolve_merged_daemon_route,
+    run_system_start, system_ps_response, system_status_response,
 };
 use super::*;
 
@@ -48,7 +49,7 @@ use std::net::{IpAddr, Ipv4Addr, TcpListener};
 use std::path::PathBuf;
 use std::process::Command;
 use std::thread;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 #[cfg(not(windows))]
 fn cli_operation_helper_process_spec(operation_id: &str) -> ManagedProcessSpec {

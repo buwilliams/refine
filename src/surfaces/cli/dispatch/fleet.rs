@@ -407,7 +407,9 @@ pub(super) fn dispatch_fleet_daemon(action: FleetAction) -> RefineResult<()> {
                 "fleet": fleet
             })
         }
-        FleetAction::Sync { target_root: None } => daemon_json("POST", "/project/sync", None)?,
+        FleetAction::Sync { target_root: None } => {
+            follow_daemon_operation(daemon_json("POST", "/project/sync", None)?)?
+        }
         other => {
             return Err(RefineError::NotImplemented(format!(
                 "Fleet command is not available through the daemon API yet: {other:?}"

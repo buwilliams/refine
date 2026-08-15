@@ -123,8 +123,15 @@ fn is_local_read_only_git_command(args: &[&str]) -> bool {
         // for the stall budget.
         [command, ..] => matches!(
             *command,
-            "cat-file" | "diff" | "log" | "ls-files" | "merge-base" | "rev-list" | "rev-parse"
-                | "show" | "status"
+            "cat-file"
+                | "diff"
+                | "log"
+                | "ls-files"
+                | "merge-base"
+                | "rev-list"
+                | "rev-parse"
+                | "show"
+                | "status"
         ),
         [] => false,
     }

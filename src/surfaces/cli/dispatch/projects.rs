@@ -169,7 +169,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                 target_root: None, ..
             },
         } => {
-            let response = daemon_json("POST", "/project/sync", None)?;
+            let response = follow_daemon_operation(daemon_json("POST", "/project/sync", None)?)?;
             print_json(&response);
             Ok(())
         }
@@ -195,6 +195,8 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                         ProjectStateRecoveryAction::Apply {
                             authority,
                             preview_file,
+                            live_paths,
+                            remote_paths,
                             target_root: Some(target_root),
                         },
                 },
@@ -202,7 +204,10 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
             let preview = read_state_recovery_preview(&preview_file)?;
             let runtime_root = refine_dir_for_target_root(&target_root)?.join("runtime");
             let result = FileGitSyncService::new(target_root, runtime_root)
-                .apply_state_recovery(recovery_authority(authority), preview)?;
+                .apply_state_recovery_decision(
+                    recovery_decision(authority, live_paths, remote_paths),
+                    preview,
+                )?;
             print_json(&serde_json::to_value(result).unwrap());
             Ok(())
         }
@@ -223,6 +228,8 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                         ProjectStateRecoveryAction::Apply {
                             authority,
                             preview_file,
+                            live_paths,
+                            remote_paths,
                             target_root: None,
                         },
                 },
@@ -232,7 +239,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                 "POST",
                 "/project/state-recovery/apply",
                 Some(json!({
-                    "authority": recovery_authority(authority),
+                    "decision": recovery_decision(authority, live_paths, remote_paths),
                     "preview": preview
                 })),
             )?;
@@ -320,7 +327,9 @@ pub(super) fn dispatch_project_daemon(action: ProjectAction) -> RefineResult<()>
             daemon_json("DELETE", "/apps", Some(json!({ "name": name })))?
         }
         ProjectAction::Migrate { .. } => daemon_json("POST", "/project/migrate", None)?,
-        ProjectAction::Sync { .. } => daemon_json("POST", "/project/sync", None)?,
+        ProjectAction::Sync { .. } => {
+            follow_daemon_operation(daemon_json("POST", "/project/sync", None)?)?
+        }
         ProjectAction::StateRecovery { action } => match action {
             ProjectStateRecoveryAction::Preview { .. } => {
                 daemon_json("GET", "/project/state-recovery/preview", None)?
@@ -328,6 +337,8 @@ pub(super) fn dispatch_project_daemon(action: ProjectAction) -> RefineResult<()>
             ProjectStateRecoveryAction::Apply {
                 authority,
                 preview_file,
+                live_paths,
+                remote_paths,
                 ..
             } => {
                 let preview = read_state_recovery_preview(&preview_file)?;
@@ -335,7 +346,7 @@ pub(super) fn dispatch_project_daemon(action: ProjectAction) -> RefineResult<()>
                     "POST",
                     "/project/state-recovery/apply",
                     Some(json!({
-                        "authority": recovery_authority(authority),
+                        "decision": recovery_decision(authority, live_paths, remote_paths),
                         "preview": preview
                     })),
                 )?
@@ -386,5 +397,28 @@ fn recovery_authority(
         CliStateRecoveryAuthority::Remote => {
             crate::tools::host::git_sync::StateRecoveryAuthority::Remote
         }
+    }
+}
+
+fn recovery_decision(
+    authority: CliStateRecoveryAuthority,
+    live_paths: Vec<PathBuf>,
+    remote_paths: Vec<PathBuf>,
+) -> crate::tools::host::git_sync::StateRecoveryDecision {
+    use crate::tools::host::git_sync::{StateRecoveryDecision, StateRecoveryOverride};
+    let mut overrides = live_paths
+        .into_iter()
+        .map(|path| StateRecoveryOverride {
+            path: path.to_string_lossy().replace('\\', "/"),
+            authority: crate::tools::host::git_sync::StateRecoveryAuthority::Live,
+        })
+        .collect::<Vec<_>>();
+    overrides.extend(remote_paths.into_iter().map(|path| StateRecoveryOverride {
+        path: path.to_string_lossy().replace('\\', "/"),
+        authority: crate::tools::host::git_sync::StateRecoveryAuthority::Remote,
+    }));
+    StateRecoveryDecision {
+        default_authority: recovery_authority(authority),
+        overrides,
     }
 }

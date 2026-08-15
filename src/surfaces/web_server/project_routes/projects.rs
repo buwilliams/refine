@@ -279,13 +279,25 @@ impl InProcessWebServer {
             Err(error) => return error_response(error),
         };
         let body = request.body.unwrap_or_else(|| json!({}));
-        let authority = match body.get("authority").cloned().map(serde_json::from_value) {
-            Some(Ok(authority)) => authority,
-            _ => {
+        let decision = match body.get("decision").cloned().map(serde_json::from_value) {
+            Some(Ok(decision)) => decision,
+            Some(Err(_)) => {
                 return error_response(RefineError::InvalidInput(
-                    "authority must be either live or remote".to_string(),
+                    "decision must contain default_authority and optional path overrides"
+                        .to_string(),
                 ));
             }
+            None => match body.get("authority").cloned().map(serde_json::from_value) {
+                Some(Ok(authority)) => {
+                    crate::tools::host::git_sync::StateRecoveryDecision::uniform(authority)
+                }
+                _ => {
+                    return error_response(RefineError::InvalidInput(
+                        "decision.default_authority (or legacy authority) must be live or remote"
+                            .to_string(),
+                    ));
+                }
+            },
         };
         let preview = match body.get("preview").cloned().map(serde_json::from_value) {
             Some(Ok(preview)) => preview,
@@ -295,7 +307,7 @@ impl InProcessWebServer {
                 ));
             }
         };
-        match service.apply_state_recovery(authority, preview) {
+        match service.apply_state_recovery_decision(decision, preview) {
             Ok(result) => ApiResponse::json(200, serde_json::to_value(result).unwrap()),
             Err(error) => error_response(error),
         }
