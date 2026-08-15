@@ -767,9 +767,9 @@
       "assignee": "Buddy Williams",
       "constitution_state": "unclassified",
       "created": "2026-08-15T16:23:50Z",
-      "failure_at": "",
-      "failure_category": "",
-      "failure_message": "",
+      "failure_at": "2026-08-15T16:36:58Z",
+      "failure_category": "agent",
+      "failure_message": "failed to read Goal Agent command channel /home/buddy/projects/refine/run/8082/processes/goal-agent-7cb2a161-ab43-45ed-b595-8b1fd41629df.commands.jsonl: No such file or directory (os error 2)",
       "governance_candidate_commit": "",
       "governance_checked_at": "",
       "governance_details": "",
@@ -814,6 +814,12 @@
             "summary": "Add an explicit recovery-fidelity and verification step before implementation."
           },
           "started_at": "2026-08-15T16:25:23Z"
+        },
+        "failure": {
+          "category": "provider",
+          "failed_at": "2026-08-15T16:36:58Z",
+          "message": "failed to read Goal Agent command channel /home/buddy/projects/refine/run/8082/processes/goal-agent-7cb2a161-ab43-45ed-b595-8b1fd41629df.commands.jsonl: No such file or directory (os error 2)",
+          "phase": "implement"
         },
         "final_plan": {
           "completed_at": "2026-08-15T16:29:15Z",
@@ -939,8 +945,8 @@
         },
         "schema_version": 2,
         "started_at": "2026-08-15T16:23:52Z",
-        "state": "in_progress",
-        "updated_at": "2026-08-15T16:29:16Z"
+        "state": "failed",
+        "updated_at": "2026-08-15T16:36:58Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -954,7 +960,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T16:29:16Z",
+      "updated": "2026-08-15T16:36:58Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T16:23:51Z",
         "round_idx": 1,
@@ -964,8 +970,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-08-15T16:29:16Z",
-  "workflow_revision": 46
+  "updated": "2026-08-15T16:36:58Z",
+  "workflow_revision": 48
 }
