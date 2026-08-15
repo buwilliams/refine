@@ -1,7 +1,7 @@
 {
   "base_commit": "f50b1571672da4a7c308d47918746eac3931bfaa",
   "branch_name": "refine/DRB4C53A0CA76FFE4042A58438/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "ab002c58d5fff91dae79ac5ad9e2456c0988908e",
   "created": "2026-08-15T15:06:54Z",
   "feature_id": null,
   "feature_order": null,
@@ -94,7 +94,28 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-15T15:30:36Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "f50b1571672da4a7c308d47918746eac3931bfaa",
@@ -105,6 +126,7 @@
           "round_idx": 0,
           "target_branch": "main"
         },
+        "completed_at": "2026-08-15T15:30:36Z",
         "criticism": {
           "completed_at": "2026-08-15T15:10:50Z",
           "git_after": {
@@ -165,6 +187,54 @@
           },
           "started_at": "2026-08-15T15:10:50Z"
         },
+        "implementation": {
+          "completed_at": "2026-08-15T15:30:36Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "SignalReader now returns Pending, Valid, or Rejected outcomes; changing byte fingerprints restart the legacy 2-second grace, stable parse failures become actionable, valid JSON is decoded through a typed AgentSessionState schema, and process exit forces a final read instead of waiting out the grace.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Each rejected active payload is renamed byte-for-byte to <process_id>.signal.invalid.<attempt>.json and its parser/schema diagnostic is retained beside it as <process_id>.signal.invalid.<attempt>.error.txt; ordinary session cleanup does not remove either artifact.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "The live session writes a concise diagnostic and same-shape rewrite request through its managed PTY input writer, the reader resets rejection observation, the active path is cleared by archival, and the first valid replacement completes in the same session.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Recovery permits three replacement attempts after the initial rejection within the unchanged session timeout. A fourth rejected payload fails with its archived payload/diagnostic paths, and both immediate agent exit and exit while a replacement is outstanding return the retained final diagnostic.",
+                "id": "P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Plan, criticize, revise, and implement completion contracts retain their existing result schemas and now require writing <signal>.tmp, parse-checking it with jq or another JSON parser, and atomically replacing the active signal with mv or an equivalent rename.",
+                "id": "P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "docs/intent/03-capabilities/02-agents/10-goal-agents.md now documents atomic signal publication, bounded same-session recovery, terminal behavior, and attempt-numbered inspectable evidence.",
+                "id": "P6",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "cargo test --quiet --lib --bins agent_sessions -- --test-threads=1 -> passed: 20 passed, 0 failed, 832 filtered out; covers changing partial writes, immediate typed-schema rejection, same-session malformed JSON recovery, three rejected replacements, both exit paths, audit artifacts, and every phase contract.",
+              "rustfmt --edition 2024 --config skip_children=true --check src/process/agent_sessions.rs src/process/agent_sessions/codec.rs src/process/agent_sessions/session_runtime.rs src/process/agent_sessions/signal_recovery.rs src/process/agent_sessions/tests.rs src/process/agent_sessions/recovery_tests.rs -> passed with no output.",
+              "cargo clippy --lib --bins -- -A clippy::needless_pub_self -A clippy::unnecessary_sort_by -D warnings -> passed; the allowances are limited to three unchanged baseline lints identified by the strict run.",
+              "git diff --check -> passed with no output.",
+              "cargo test --quiet --lib --bins -- --test-threads=1 -> baseline failure only: 845 passed, 1 failed, 6 ignored; unchanged prompts::tests::agent_prompts_keep_only_task_specific_contracts reports implementation_planning/plan.md is too prescriptive at 95 words.",
+              "cargo clippy --lib --bins -- -D warnings -> baseline failure only: unchanged src/tools/product/project_projection/store.rs lines 46 and 54 trigger needless_pub_self and unchanged src/surfaces/web_server/http/background_loops.rs line 213 triggers unnecessary_sort_by.",
+              "git diff --exit-code -- src/prompts/implementation_planning/plan.md src/prompts/mod.rs -> exit 0, confirming the full-suite baseline failure files are unchanged by this Round."
+            ]
+          },
+          "report": "Implemented bounded in-session recovery for malformed Goal Agent completion signals, retained attempt-scoped payload and diagnostic evidence, strengthened every completion contract for parse-checked atomic replacement, documented the behavior, and verified the focused path. Repository-wide tests and strict clippy reproduce only unchanged baseline failures, reported in verification.",
+          "started_at": "2026-08-15T15:12:17Z"
+        },
         "phase": "implement",
         "phase_started_at": "2026-08-15T15:12:17Z",
         "proposal": {
@@ -212,11 +282,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-08-15T15:06:55Z",
-        "state": "in_progress",
-        "updated_at": "2026-08-15T15:12:17Z"
+        "state": "completed",
+        "updated_at": "2026-08-15T15:30:36Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Implemented bounded in-session recovery for malformed Goal Agent completion signals, retained attempt-scoped payload and diagnostic evidence, strengthened every completion contract for parse-checked atomic replacement, documented the behavior, and verified the focused path. Repository-wide tests and strict clippy reproduce only unchanged baseline failures, reported in verification.",
+      "implementation_reported_at": "2026-08-15T15:30:36Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -227,7 +297,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-15T15:12:17Z",
+      "updated": "2026-08-15T15:30:36Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-15T15:06:55Z",
         "round_idx": 0,
@@ -237,8 +307,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-15T15:12:17Z",
-  "workflow_revision": 15
+  "updated": "2026-08-15T15:30:36Z",
+  "workflow_revision": 20
 }
