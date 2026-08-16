@@ -133,6 +133,9 @@ pub(super) fn append_error_context(error: RefineError, context: &str) -> RefineE
         RefineError::Degraded(message) => RefineError::Degraded(append(message)),
         RefineError::Io(message) => RefineError::Io(append(message)),
         RefineError::Serialization(message) => RefineError::Serialization(append(message)),
+        structured @ RefineError::StructuredOutput(_) => {
+            RefineError::Serialization(append(structured.to_string()))
+        }
         RefineError::NotImplemented(message) => RefineError::NotImplemented(append(message)),
     }
 }

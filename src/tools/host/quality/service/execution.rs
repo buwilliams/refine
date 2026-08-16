@@ -86,7 +86,7 @@ impl QualityService for FileQualityService {
                     let session_id = attempt.provider_session_id.clone();
                     provider_attempts.push(attempt);
                     if attempt_number
-                        > crate::tools::host::structured_output::DIAGNOSTIC_REPAIR_ATTEMPTS
+                        > crate::structured_output::DIAGNOSTIC_REPAIR_ATTEMPTS
                     {
                         return Err(exhausted_quality_output_contract(
                             &error,
@@ -95,7 +95,7 @@ impl QualityService for FileQualityService {
                     }
                     let attempt_label = format!(
                         "{attempt_number}/{}",
-                        crate::tools::host::structured_output::DIAGNOSTIC_REPAIR_ATTEMPTS
+                        crate::structured_output::DIAGNOSTIC_REPAIR_ATTEMPTS
                     );
                     let repair_prompt = render(
                         PromptTemplate::QualityStructuredOutputRepair,

@@ -49,6 +49,8 @@ pub enum RefineError {
     Io(String),
     #[error("{0}")]
     Serialization(String),
+    #[error(transparent)]
+    StructuredOutput(#[from] crate::structured_output::StructuredOutputError),
     #[error("{0}")]
     NotImplemented(String),
 }
@@ -80,7 +82,7 @@ impl RefineError {
             | Self::QualityCandidateInfrastructure(_) => ErrorCategory::Conflict,
             Self::Degraded(_) => ErrorCategory::Degraded,
             Self::Io(_) => ErrorCategory::Io,
-            Self::Serialization(_) => ErrorCategory::Serialization,
+            Self::Serialization(_) | Self::StructuredOutput(_) => ErrorCategory::Serialization,
             Self::NotImplemented(_) => ErrorCategory::NotImplemented,
         }
     }

@@ -10,7 +10,7 @@ use crate::model::goal::{
     ImplementationPlanState, ImplementationPlanningOutputAttempt, ProposedImplementationPlan,
 };
 use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::tools::host::structured_output::DIAGNOSTIC_REPAIR_ATTEMPTS;
+use crate::structured_output::DIAGNOSTIC_REPAIR_ATTEMPTS;
 use crate::workflow::{goal_agent_prompt, now_timestamp};
 
 use super::context::WorkflowContext;

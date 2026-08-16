@@ -12,5 +12,4 @@ pub mod quality;
 pub mod release;
 pub mod source_promotion;
 pub mod state_sync_health;
-pub mod structured_output;
 pub mod target_apps;

@@ -4,17 +4,18 @@ use serde_json::{Map, Value};
 
 use crate::model::goal::{ImplementationCriticism, ProposedImplementationPlan};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::tools::host::structured_output::decode_bounded;
+use crate::structured_output::{DecodeOptions, StructuredOutputError, decode_structured};
 
 const MAX_CRITICISM_FINDINGS: usize = 3;
 const MAX_SUMMARY_CHARS: usize = 20_000;
 const MAX_ITEM_CHARS: usize = 28_000;
 
+const COMPLETION_ENVELOPE_FIELDS: &[&str] = &["planning_result", "result"];
+
 pub(super) fn decode_plan(output: &str) -> RefineResult<ProposedImplementationPlan> {
-    let plan: ProposedImplementationPlan = decode_bounded(
+    let plan: ProposedImplementationPlan = decode_structured(
         output,
-        "implementation plan JSON",
-        &["planning_result", "result"],
+        &DecodeOptions::with_envelopes("implementation plan JSON", COMPLETION_ENVELOPE_FIELDS),
         normalize_criticism_resolution_ids,
     )?;
     validate_plan(&plan)?;
@@ -22,10 +23,12 @@ pub(super) fn decode_plan(output: &str) -> RefineResult<ProposedImplementationPl
 }
 
 pub(super) fn decode_criticism(output: &str) -> RefineResult<ImplementationCriticism> {
-    let criticism: ImplementationCriticism = decode_bounded(
+    let criticism: ImplementationCriticism = decode_structured(
         output,
-        "implementation criticism JSON",
-        &["planning_result", "result"],
+        &DecodeOptions::with_envelopes(
+            "implementation criticism JSON",
+            COMPLETION_ENVELOPE_FIELDS,
+        ),
         |_| Ok(()),
     )?;
     validate_compact_text(
@@ -194,7 +197,7 @@ fn validate_compact_text(label: &str, value: &str, max_chars: usize) -> RefineRe
     Ok(())
 }
 
-fn normalize_criticism_resolution_ids(value: &mut Value) -> RefineResult<()> {
+fn normalize_criticism_resolution_ids(value: &mut Value) -> Result<(), StructuredOutputError> {
     let Some(resolutions) = value
         .as_object_mut()
         .and_then(|plan| plan.get_mut("criticism_resolutions"))
@@ -211,7 +214,10 @@ fn normalize_criticism_resolution_ids(value: &mut Value) -> RefineResult<()> {
     Ok(())
 }
 
-fn normalize_resolution_id(resolution: &mut Map<String, Value>, index: usize) -> RefineResult<()> {
+fn normalize_resolution_id(
+    resolution: &mut Map<String, Value>,
+    index: usize,
+) -> Result<(), StructuredOutputError> {
     const ALIASES: [&str; 3] = ["criticismId", "finding_id", "id"];
     let aliases = ALIASES
         .into_iter()
@@ -221,10 +227,11 @@ fn normalize_resolution_id(resolution: &mut Map<String, Value>, index: usize) ->
         let mut fields = Vec::from(["criticism_id"]);
         fields.retain(|field| resolution.contains_key(*field));
         fields.extend(aliases);
-        return Err(RefineError::Serialization(format!(
-            "agent returned invalid structured implementation plan JSON: field `criticism_resolutions[{index}]` has ambiguous identifier fields: {}",
-            fields.join(", ")
-        )));
+        return Err(StructuredOutputError::schema(
+            "implementation plan JSON",
+            Some(format!("criticism_resolutions[{index}]")),
+            format!("has ambiguous identifier fields: {}", fields.join(", ")),
+        ));
     }
     if let Some(alias) = aliases.first() {
         let id = resolution
