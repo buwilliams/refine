@@ -114,18 +114,24 @@ impl FileGitWorktreeService {
             ));
         }
         let previous = self.resolve_commit("refs/stash").ok();
-        if untracked_residue.is_empty() {
-            self.git_output(&["stash", "push", "-m", message])?;
-        } else {
-            // A bare `--include-untracked` would sweep every untracked path,
-            // including a user's unrelated files; pathspecs confine the stash
-            // to all tracked changes plus exactly the attributed residue.
-            let tracked = self.inspect("")?.dirty_paths;
-            let mut args = vec!["stash", "push", "--include-untracked", "-m", message, "--"];
-            args.extend(tracked.iter().map(String::as_str));
-            args.extend(untracked_residue.iter().map(String::as_str));
+        if !untracked_residue.is_empty() {
+            // Stage exactly the attributed residue so the plain stash below
+            // captures it alongside the tracked changes, while a user's other
+            // untracked files stay in place. Staging instead of passing
+            // `--include-untracked` with pathspecs, because `stash push`
+            // pathspecs cannot express a staged rename (the vanished source
+            // path matches no file, which aborts the stash mid-way).
+            // `:(literal)` disables fnmatch interpretation so a residue name
+            // like `foo[1].txt` cannot match a user's unrelated `foo1.txt`.
+            let mut args = vec!["add", "--"];
+            let residue: Vec<String> = untracked_residue
+                .iter()
+                .map(|path| format!(":(literal){path}"))
+                .collect();
+            args.extend(residue.iter().map(String::as_str));
             self.git_output(&args)?;
         }
+        self.git_output(&["stash", "push", "-m", message])?;
         let commit = self.resolve_commit("refs/stash")?;
         if previous.as_deref() == Some(commit.as_str()) {
             return Err(RefineError::Conflict(

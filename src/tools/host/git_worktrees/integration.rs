@@ -532,20 +532,7 @@ impl FileGitWorktreeService {
         }
         let valid = path.exists() && self.service_rooted_at(path).is_inside_work_tree()?;
         if !valid {
-            // A stale registration may still be locked, and both `worktree
-            // remove` and `worktree prune` skip locked entries, so unlock
-            // best-effort before tearing the remnants down.
-            let _ = self.git_raw(&["worktree", "unlock", &target]);
-            let _ = self.git_raw(&["worktree", "remove", "--force", "--force", &target]);
-            if path.exists() {
-                fs::remove_dir_all(path).map_err(|error| {
-                    RefineError::Io(format!(
-                        "failed to remove stale worktree {}: {error}",
-                        path.display()
-                    ))
-                })?;
-            }
-            self.git_output(&["worktree", "prune"])?;
+            self.purge_worktree(path)?;
             create_worktree_parent(path)?;
             self.git_output(&["worktree", "add", "--detach", &target, commit])?;
         }
@@ -566,15 +553,35 @@ impl FileGitWorktreeService {
         )
     }
 
-    pub fn unlock_worktree(&self, path: &Path) -> RefineResult<()> {
+    /// Tear a worktree down even when its registration is broken — a crash
+    /// mid `worktree add` before the `.git` link exists, or a pruned
+    /// registration with the directory left behind — states in which a single
+    /// `git worktree remove --force` refuses ("is not a working tree") and
+    /// would wedge the caller. The unlock and Git-side remove are
+    /// best-effort; the directory removal and registration prune are
+    /// authoritative.
+    pub fn purge_worktree(&self, path: &Path) -> RefineResult<()> {
         let target = path.to_str().unwrap_or("").trim().to_string();
         if target.is_empty() {
             return Err(RefineError::InvalidInput(
                 "worktree path is required".to_string(),
             ));
         }
-        self.git_output(&["worktree", "unlock", &target])?;
-        self.audit("worktree_unlock", "ok", json!({"target": target}))
+        // A stale registration may still be locked, and both `worktree
+        // remove` and `worktree prune` skip locked entries, so unlock
+        // best-effort before tearing the remnants down.
+        let _ = self.git_raw(&["worktree", "unlock", &target]);
+        let _ = self.git_raw(&["worktree", "remove", "--force", "--force", &target]);
+        if path.exists() {
+            fs::remove_dir_all(path).map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to remove stale worktree {}: {error}",
+                    path.display()
+                ))
+            })?;
+        }
+        self.git_output(&["worktree", "prune"])?;
+        self.audit("worktree_purge", "ok", json!({"target": target}))
     }
 
     /// Detach the service's worktree at `commit`. Run this with the service

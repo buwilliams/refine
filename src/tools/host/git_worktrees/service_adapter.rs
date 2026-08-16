@@ -22,21 +22,36 @@ impl GitWorktreeService for FileGitWorktreeService {
         } else {
             None
         };
-        let status = stdout(service.git_output(&["status", "--porcelain=v1"])?).unwrap_or_default();
+        // `-z` yields literal NUL-separated paths — no C-quoting for spaces or
+        // non-ASCII — so the recorded paths can feed back to Git as exact
+        // pathspecs. A rename/copy entry names the destination and is followed
+        // by one extra NUL-separated field holding the source path.
+        let status =
+            stdout(service.git_output(&["status", "--porcelain=v1", "-z"])?).unwrap_or_default();
         let mut refine_owned_artifacts = Vec::new();
         let mut dirty_paths = Vec::new();
         let mut untracked_paths = Vec::new();
-        for line in status.lines() {
-            let path = line.get(3..).unwrap_or("").trim();
-            if path.is_empty() {
+        let mut entries = status.split('\0');
+        while let Some(entry) = entries.next() {
+            let (Some(code), Some(path)) = (entry.get(..2), entry.get(3..)) else {
                 continue;
-            }
-            if is_refine_owned_artifact(path) {
-                refine_owned_artifacts.push(path.to_string());
-            } else if line.get(..2) == Some("??") {
-                untracked_paths.push(path.to_string());
+            };
+            let rename_source = if code.contains('R') || code.contains('C') {
+                entries.next().filter(|source| !source.is_empty())
             } else {
-                dirty_paths.push(path.to_string());
+                None
+            };
+            for path in std::iter::once(path).chain(rename_source) {
+                if path.is_empty() {
+                    continue;
+                }
+                if is_refine_owned_artifact(path) {
+                    refine_owned_artifacts.push(path.to_string());
+                } else if code == "??" {
+                    untracked_paths.push(path.to_string());
+                } else {
+                    dirty_paths.push(path.to_string());
+                }
             }
         }
         Ok(GitStatus {
