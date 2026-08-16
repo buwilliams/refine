@@ -114,18 +114,29 @@ fn select_json_candidate(output: &str, label: &str) -> RefineResult<Value> {
     if output.is_empty() {
         return Err(contract_error(label, "is empty"));
     }
-    if let Ok(value) = serde_json::from_str(output) {
-        return Ok(value);
-    }
+    let full_output_error = match serde_json::from_str(output) {
+        Ok(value) => return Ok(value),
+        Err(error) => error,
+    };
 
     let fenced = fenced_contents(output);
     let spans = balanced_json_spans(output);
+    let likely_suffix = likely_json_suffix(output);
     let mut candidates = Vec::new();
     for candidate in fenced.iter().chain(spans.iter()) {
         if let Ok(value) = serde_json::from_str::<Value>(candidate.trim())
             && !candidates.contains(&value)
         {
             candidates.push(value);
+        }
+    }
+    if candidates.is_empty() {
+        for candidate in stringified_json_spans(output) {
+            if let Ok(value) = serde_json::from_str::<Value>(candidate)
+                && !candidates.contains(&value)
+            {
+                candidates.push(value);
+            }
         }
     }
     match candidates.len() {
@@ -142,11 +153,13 @@ fn select_json_candidate(output: &str, label: &str) -> RefineResult<Value> {
     let likely = fenced
         .first()
         .copied()
-        .or_else(|| likely_json_suffix(output))
+        .or(likely_suffix)
         .unwrap_or(output)
         .trim();
-    let error = serde_json::from_str::<Value>(likely)
-        .expect_err("no successful structured-output candidate");
+    let error = match serde_json::from_str::<Value>(likely) {
+        Err(error) => error,
+        Ok(_) => full_output_error,
+    };
     Err(contract_error(
         label,
         format!("contains invalid JSON: {error}"),
@@ -222,6 +235,37 @@ fn balanced_json_spans(output: &str) -> Vec<&str> {
             }
             _ => {}
         }
+    }
+    spans
+}
+
+fn stringified_json_spans(output: &str) -> Vec<&str> {
+    let mut spans = Vec::new();
+    let mut offset = 0;
+    while let Some(relative_start) = output[offset..].find('"') {
+        let start = offset + relative_start;
+        let mut escaped = false;
+        let mut end = None;
+        for (relative_index, ch) in output[start + 1..].char_indices() {
+            if escaped {
+                escaped = false;
+            } else if ch == '\\' {
+                escaped = true;
+            } else if ch == '"' {
+                end = Some(start + 1 + relative_index + ch.len_utf8());
+                break;
+            }
+        }
+        let Some(end) = end else {
+            break;
+        };
+        let candidate = &output[start..end];
+        if let Ok(Value::String(encoded)) = serde_json::from_str(candidate)
+            && serde_json::from_str::<Value>(&encoded).is_ok()
+        {
+            spans.push(candidate);
+        }
+        offset = end;
     }
     spans
 }
@@ -303,6 +347,7 @@ mod tests {
             r#"{"state":"completed","planning_result":{"name":"ready","count":2}}"#,
             r#"{"planning_result":"{\"name\":\"ready\",\"count\":2}"}"#,
             r#""{\"planning_result\":\"{\\\"name\\\":\\\"ready\\\",\\\"count\\\":2}\"}""#,
+            r#"The stringified result follows: "{\"name\":\"ready\",\"count\":2}" done."#,
         ] {
             assert_eq!(decode(output).unwrap(), expected, "output: {output}");
         }
@@ -325,6 +370,15 @@ mod tests {
                 .unwrap_err()
                 .to_string()
                 .contains("ambiguous completion envelope fields")
+        );
+
+        let stringified =
+            r#"first "{\"name\":\"one\",\"count\":1}" then "{\"name\":\"two\",\"count\":2}""#;
+        assert!(
+            decode(stringified)
+                .unwrap_err()
+                .to_string()
+                .contains("2 distinct JSON candidates")
         );
     }
 
