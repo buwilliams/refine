@@ -506,6 +506,170 @@ impl FileGitWorktreeService {
         )
     }
 
+    /// True when the service root is inside a valid Git work tree.
+    ///
+    /// `rev-parse --is-inside-work-tree` prints `false` while still exiting 0
+    /// from a path inside a `.git` directory, so the printed value is the
+    /// answer, not the exit code.
+    pub fn is_inside_work_tree(&self) -> RefineResult<bool> {
+        let output = self.git_raw(&["rev-parse", "--is-inside-work-tree"])?;
+        Ok(output.success && String::from_utf8_lossy(&output.stdout).trim() == "true")
+    }
+
+    /// Ensure a locked, detached worktree exists at `path` checked out at
+    /// `commit`. Detached because Git refuses to check out a branch that is
+    /// already checked out in another worktree; locked so `worktree prune` and
+    /// cleanup sweeps never reclaim it. Idempotent: a valid existing
+    /// registration is kept (and re-locked), a broken registration or stale
+    /// directory is recreated.
+    pub fn ensure_detached_worktree(&self, path: &Path, commit: &str) -> RefineResult<()> {
+        validate_commitish(commit)?;
+        let target = path.to_str().unwrap_or("").trim().to_string();
+        if target.is_empty() {
+            return Err(RefineError::InvalidInput(
+                "worktree path is required".to_string(),
+            ));
+        }
+        let valid = path.exists() && self.service_rooted_at(path).is_inside_work_tree()?;
+        if !valid {
+            // A stale registration may still be locked, and both `worktree
+            // remove` and `worktree prune` skip locked entries, so unlock
+            // best-effort before tearing the remnants down.
+            let _ = self.git_raw(&["worktree", "unlock", &target]);
+            let _ = self.git_raw(&["worktree", "remove", "--force", "--force", &target]);
+            if path.exists() {
+                fs::remove_dir_all(path).map_err(|error| {
+                    RefineError::Io(format!(
+                        "failed to remove stale worktree {}: {error}",
+                        path.display()
+                    ))
+                })?;
+            }
+            self.git_output(&["worktree", "prune"])?;
+            create_worktree_parent(path)?;
+            self.git_output(&["worktree", "add", "--detach", &target, commit])?;
+        }
+        let lock = self.git_raw(&[
+            "worktree",
+            "lock",
+            "--reason",
+            "refine integration workspace",
+            &target,
+        ])?;
+        if !lock.success && !trimmed_command_text(&lock).contains("already locked") {
+            return Err(RefineError::Conflict(trimmed_command_text(&lock)));
+        }
+        self.audit(
+            "worktree_detached_ensure",
+            "ok",
+            json!({"target": target, "commit": commit, "created": !valid}),
+        )
+    }
+
+    pub fn unlock_worktree(&self, path: &Path) -> RefineResult<()> {
+        let target = path.to_str().unwrap_or("").trim().to_string();
+        if target.is_empty() {
+            return Err(RefineError::InvalidInput(
+                "worktree path is required".to_string(),
+            ));
+        }
+        self.git_output(&["worktree", "unlock", &target])?;
+        self.audit("worktree_unlock", "ok", json!({"target": target}))
+    }
+
+    /// Detach the service's worktree at `commit`. Run this with the service
+    /// rooted at the worktree being repositioned, not the primary checkout.
+    pub fn checkout_detached(&self, commit: &str) -> RefineResult<()> {
+        validate_commitish(commit)?;
+        self.git_output(&["checkout", "--detach", commit])?;
+        self.audit("checkout_detached", "ok", json!({"commit": commit}))
+    }
+
+    /// Compare-and-swap advance of a fully qualified branch ref.
+    ///
+    /// Unlike `branch -f`, `update-ref` moves a branch even while it is
+    /// checked out in another worktree, which is what lets a detached
+    /// integration worktree advance the target branch of the shared human
+    /// checkout. Losing the race maps to `Conflict` naming the current commit
+    /// so callers can rejoin their refresh loop.
+    pub fn update_ref_cas(
+        &self,
+        reference: &str,
+        to_commit: &str,
+        expected_old: &str,
+    ) -> RefineResult<()> {
+        validate_head_branch_ref(reference)?;
+        validate_commitish(to_commit)?;
+        validate_commitish(expected_old)?;
+        let output = self.git_raw(&["update-ref", reference, to_commit, expected_old])?;
+        if output.success {
+            return self.audit(
+                "update_ref_cas",
+                "ok",
+                json!({
+                    "reference": reference,
+                    "to_commit": to_commit,
+                    "expected_old": expected_old,
+                    "exact_sha_fence": true
+                }),
+            );
+        }
+        let message = trimmed_command_text(&output);
+        let expected = self.resolve_commit(expected_old)?;
+        if let Ok(current) = self.resolve_commit(reference)
+            && current != expected
+        {
+            let _ = self.audit(
+                "update_ref_cas",
+                "conflict",
+                json!({"reference": reference, "expected_old": expected, "current": current}),
+            );
+            return Err(RefineError::Conflict(format!(
+                "target advanced: {reference} moved from {expected} to {current} before the update"
+            )));
+        }
+        Err(RefineError::Conflict(message))
+    }
+
+    /// Two-tree merge of the `from`→`to` delta into the index and working
+    /// tree. Git refuses atomically when a working-tree file collides with the
+    /// delta; the collision detail from stderr is carried in the returned
+    /// error because callers surface it.
+    pub fn read_tree_merge_update(&self, from_commit: &str, to_commit: &str) -> RefineResult<()> {
+        validate_commitish(from_commit)?;
+        validate_commitish(to_commit)?;
+        self.git_output(&["read-tree", "-m", "-u", from_commit, to_commit])?;
+        self.audit(
+            "read_tree_merge_update",
+            "ok",
+            json!({"from_commit": from_commit, "to_commit": to_commit}),
+        )
+    }
+
+    /// The fully qualified branch HEAD points at, or `None` when detached.
+    /// Detached HEAD makes `rev-parse` exit nonzero or print the literal
+    /// `HEAD` depending on the Git version, so both are handled.
+    pub fn symbolic_head_branch(&self) -> RefineResult<Option<String>> {
+        let output = self.git_raw(&["rev-parse", "--symbolic-full-name", "HEAD"])?;
+        if !output.success {
+            return Ok(None);
+        }
+        let reference = stdout(output)?.trim().to_string();
+        if reference.is_empty() || reference == "HEAD" {
+            return Ok(None);
+        }
+        Ok(Some(reference))
+    }
+
+    fn service_rooted_at(&self, path: &Path) -> FileGitWorktreeService {
+        FileGitWorktreeService {
+            root: path.to_path_buf(),
+            runtime_root: self.runtime_root.clone(),
+            operation_id: self.operation_id.clone(),
+            process_metadata: self.process_metadata.clone(),
+        }
+    }
+
     pub(super) fn conflicts(&self) -> RefineResult<Vec<String>> {
         let output = self.git_output(&["diff", "--name-only", "--diff-filter=U"])?;
         Ok(stdout(output)?

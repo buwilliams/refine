@@ -346,6 +346,15 @@ fn validate_branch_name(branch: &str) -> RefineResult<()> {
     Ok(())
 }
 
+fn validate_head_branch_ref(reference: &str) -> RefineResult<()> {
+    let Some(branch) = reference.trim().strip_prefix("refs/heads/") else {
+        return Err(RefineError::InvalidInput(
+            "reference must be a fully qualified refs/heads/ branch".to_string(),
+        ));
+    };
+    validate_branch_name(branch)
+}
+
 fn is_read_only_git_command(args: &[&str]) -> bool {
     match args {
         ["branch", "--show-current"] => true,

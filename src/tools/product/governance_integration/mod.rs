@@ -17,6 +17,10 @@ use crate::tools::host::project_layout::target_root_for_refine_dir;
 use crate::tools::product::project_projection::GoalSummaryProjection;
 use crate::tools::product::work_items::FileWorkItemService;
 
+// Not yet wired into the integration lane; exercised by tests until the
+// behavior rewiring lands.
+#[allow(dead_code)]
+mod integration_worktree;
 mod reconciliation;
 
 pub use reconciliation::{AlreadyMergedResolution, AlreadyMergedResolutionDisposition};

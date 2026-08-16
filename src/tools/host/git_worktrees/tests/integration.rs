@@ -192,6 +192,158 @@ fn file_git_worktree_service_reports_dirty_worktree_merge_failure() {
 }
 
 #[test]
+fn ensure_detached_worktree_is_idempotent_and_locked() {
+    let temp_root = unique_temp_dir("git-detached-worktree");
+    let repo = temp_root.join("repo");
+    fs::create_dir_all(&repo).unwrap();
+    init_repo(&repo);
+    commit_file(&repo, "app.txt", "base\n", "initial");
+    let head = git_stdout(&repo, &["rev-parse", "HEAD"]);
+    let path = temp_root.join("integration");
+
+    let service = FileGitWorktreeService::new(&repo);
+    service.ensure_detached_worktree(&path, &head).unwrap();
+    assert!(path.join("app.txt").exists());
+    assert_eq!(git_stdout(&path, &["rev-parse", "HEAD"]), head);
+    assert_eq!(current_branch(&path), "", "worktree must stay detached");
+
+    service.ensure_detached_worktree(&path, &head).unwrap();
+    assert_eq!(git_stdout(&path, &["rev-parse", "HEAD"]), head);
+
+    assert!(
+        !git_succeeds(&repo, &["worktree", "remove", path.to_str().unwrap()]),
+        "lock must refuse removal without force"
+    );
+    assert!(path.join("app.txt").exists());
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn update_ref_cas_advances_and_loses_when_the_ref_moved() {
+    let temp_root = unique_temp_dir("git-update-ref-cas");
+    let repo = temp_root.join("repo");
+    fs::create_dir_all(&repo).unwrap();
+    init_repo(&repo);
+    commit_file(&repo, "app.txt", "one\n", "initial");
+    let first = git_stdout(&repo, &["rev-parse", "HEAD"]);
+    commit_file(&repo, "app.txt", "two\n", "second");
+    let second = git_stdout(&repo, &["rev-parse", "HEAD"]);
+    git(&repo, &["branch", "target", &first]).unwrap();
+
+    let service = FileGitWorktreeService::new(&repo);
+    service
+        .update_ref_cas("refs/heads/target", &second, &first)
+        .unwrap();
+    assert_eq!(
+        git_stdout(&repo, &["rev-parse", "refs/heads/target"]),
+        second
+    );
+
+    let error = service
+        .update_ref_cas("refs/heads/target", &first, &first)
+        .unwrap_err();
+    let message = error.to_string();
+    assert!(message.contains("target advanced"), "{message}");
+    assert!(message.contains(&second), "{message}");
+    assert_eq!(
+        git_stdout(&repo, &["rev-parse", "refs/heads/target"]),
+        second,
+        "losing the race must not move the ref"
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn update_ref_cas_moves_a_branch_checked_out_in_the_main_worktree() {
+    let temp_root = unique_temp_dir("git-update-ref-checked-out");
+    let repo = temp_root.join("repo");
+    fs::create_dir_all(&repo).unwrap();
+    init_repo(&repo);
+    commit_file(&repo, "app.txt", "base\n", "initial");
+    let base = git_stdout(&repo, &["rev-parse", "HEAD"]);
+    git(&repo, &["switch", "-c", "side"]).unwrap();
+    commit_file(&repo, "side.txt", "side\n", "side");
+    let advanced = git_stdout(&repo, &["rev-parse", "HEAD"]);
+    git(&repo, &["switch", "main"]).unwrap();
+
+    // `branch -f main` would refuse here because main is checked out; the
+    // detached-worktree integration lane depends on update-ref not refusing.
+    FileGitWorktreeService::new(&repo)
+        .update_ref_cas("refs/heads/main", &advanced, &base)
+        .unwrap();
+    assert_eq!(
+        git_stdout(&repo, &["rev-parse", "refs/heads/main"]),
+        advanced
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn read_tree_merge_update_applies_clean_delta_and_refuses_collision() {
+    let temp_root = unique_temp_dir("git-read-tree-merge");
+    let repo = temp_root.join("repo");
+    fs::create_dir_all(&repo).unwrap();
+    init_repo(&repo);
+    commit_file(&repo, "app.txt", "base\n", "initial");
+    let base = git_stdout(&repo, &["rev-parse", "HEAD"]);
+    commit_file(&repo, "delta.txt", "delta\n", "delta");
+    let delta = git_stdout(&repo, &["rev-parse", "HEAD"]);
+
+    let clean = temp_root.join("clean");
+    let repo_service = FileGitWorktreeService::new(&repo);
+    repo_service
+        .ensure_detached_worktree(&clean, &base)
+        .unwrap();
+    FileGitWorktreeService::new(&clean)
+        .read_tree_merge_update(&base, &delta)
+        .unwrap();
+    assert_eq!(
+        fs::read_to_string(clean.join("delta.txt")).unwrap(),
+        "delta\n"
+    );
+
+    let colliding = temp_root.join("colliding");
+    repo_service
+        .ensure_detached_worktree(&colliding, &base)
+        .unwrap();
+    fs::write(colliding.join("delta.txt"), "untracked collision\n").unwrap();
+    let error = FileGitWorktreeService::new(&colliding)
+        .read_tree_merge_update(&base, &delta)
+        .unwrap_err();
+    assert!(error.to_string().contains("delta.txt"), "{error}");
+    assert_eq!(
+        fs::read_to_string(colliding.join("delta.txt")).unwrap(),
+        "untracked collision\n",
+        "refusal must leave the colliding file untouched"
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn symbolic_head_branch_distinguishes_a_branch_from_detachment() {
+    let temp_root = unique_temp_dir("git-symbolic-head");
+    let repo = temp_root.join("repo");
+    fs::create_dir_all(&repo).unwrap();
+    init_repo(&repo);
+    commit_file(&repo, "app.txt", "base\n", "initial");
+
+    let service = FileGitWorktreeService::new(&repo);
+    assert_eq!(
+        service.symbolic_head_branch().unwrap().as_deref(),
+        Some("refs/heads/main")
+    );
+
+    git(&repo, &["checkout", "--detach"]).unwrap();
+    assert_eq!(service.symbolic_head_branch().unwrap(), None);
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn file_git_worktree_service_revert_conflict_and_recover_preserves_history() {
     let temp_root = unique_temp_dir("git-revert-conflict");
     let repo = temp_root.join("repo");
