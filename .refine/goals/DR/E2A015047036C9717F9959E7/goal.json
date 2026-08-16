@@ -889,11 +889,11 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-08-16T00:23:25Z",
+      "updated": "2026-08-16T02:35:58Z",
       "workflow_attempt_authority": {
-        "claimed_at": "2026-08-16T00:20:12Z",
+        "claimed_at": "2026-08-16T02:35:58Z",
         "round_idx": 1,
-        "workflow_revision": 24
+        "workflow_revision": 36
       },
       "workflow_reconciliation": null,
       "workflow_recovery": null
@@ -901,6 +901,6 @@
   ],
   "status": "implement",
   "target_branch": "main",
-  "updated": "2026-08-16T00:23:25Z",
-  "workflow_revision": 36
+  "updated": "2026-08-16T02:36:00Z",
+  "workflow_revision": 38
 }
