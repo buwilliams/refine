@@ -1,6 +1,6 @@
 use super::*;
 
-pub(super) fn signal_os_process(
+pub(crate) fn signal_os_process(
     pid: u32,
     signal: &str,
     process_group: bool,

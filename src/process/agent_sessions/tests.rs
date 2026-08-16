@@ -845,6 +845,336 @@ fn workflow_goal_agent_early_exec_failure_preserves_errno_and_cleans_channels() 
     fs::remove_dir_all(root).unwrap();
 }
 
+/// Scripted PTY stand-in for the reader loop: plays back the given reads, then
+/// raises `child_exited` and reads zero forever, the shape of a child that was
+/// reaped after its last output.
+struct ScriptedPty {
+    steps: std::collections::VecDeque<std::io::Result<Vec<u8>>>,
+    child_exited: std::sync::Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl Read for ScriptedPty {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        match self.steps.pop_front() {
+            Some(Ok(bytes)) => {
+                buf[..bytes.len()].copy_from_slice(&bytes);
+                Ok(bytes.len())
+            }
+            Some(Err(error)) => Err(error),
+            None => {
+                self.child_exited
+                    .store(true, std::sync::atomic::Ordering::SeqCst);
+                Ok(0)
+            }
+        }
+    }
+}
+
+/// Drives `pump_pty_output` over a scripted read sequence and reports the pump
+/// result, the captured transcript, and whether the activity clock advanced.
+fn pump_scripted_pty(steps: Vec<std::io::Result<Vec<u8>>>) -> (RefineResult<()>, String, bool) {
+    let dir = unique_temp_dir("pty-pump");
+    fs::create_dir_all(&dir).unwrap();
+    let transcript_path = dir.join("transcript.log");
+    let mut transcript = fs::File::create(&transcript_path).unwrap();
+    let child_exited = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let mut reader = ScriptedPty {
+        steps: steps.into(),
+        child_exited: std::sync::Arc::clone(&child_exited),
+    };
+    let started = std::time::Instant::now();
+    let activity = std::sync::Mutex::new(started);
+    let result = pump_pty_output(
+        &mut reader,
+        &mut transcript,
+        &transcript_path,
+        &activity,
+        &child_exited,
+    );
+    let advanced = *activity.lock().unwrap() > started;
+    let contents = fs::read_to_string(&transcript_path).unwrap();
+    fs::remove_dir_all(dir).unwrap();
+    (result, contents, advanced)
+}
+
+#[test]
+fn pty_pump_retries_zero_reads_until_the_child_is_confirmed_gone() {
+    // Output arrives only after several zero-byte reads: treating the first
+    // Ok(0) as EOF (the production incident) would end the pump with an empty
+    // transcript instead of capturing it.
+    let (result, transcript, advanced) = pump_scripted_pty(vec![
+        Ok(Vec::new()),
+        Ok(Vec::new()),
+        Ok(Vec::new()),
+        Ok(b"alive-after-transient-eio".to_vec()),
+        Ok(Vec::new()),
+    ]);
+
+    result.unwrap();
+    assert_eq!(transcript, "alive-after-transient-eio");
+    assert!(advanced, "PTY output must reset the activity clock");
+}
+
+#[test]
+fn pty_pump_treats_a_zero_read_as_eof_once_the_child_is_reaped() {
+    let (result, transcript, advanced) = pump_scripted_pty(Vec::new());
+
+    result.unwrap();
+    assert_eq!(transcript, "");
+    assert!(!advanced);
+}
+
+#[test]
+fn pty_pump_retries_interrupted_reads() {
+    let (result, transcript, _) = pump_scripted_pty(vec![
+        Err(std::io::Error::new(
+            std::io::ErrorKind::Interrupted,
+            "interrupted",
+        )),
+        Ok(b"resumed".to_vec()),
+    ]);
+
+    result.unwrap();
+    assert_eq!(transcript, "resumed");
+}
+
+#[test]
+fn pty_pump_propagates_hard_read_errors() {
+    let (result, transcript, _) = pump_scripted_pty(vec![Err(std::io::Error::new(
+        std::io::ErrorKind::BrokenPipe,
+        "master torn down",
+    ))]);
+
+    let message = result.unwrap_err().to_string();
+    assert!(
+        message.contains("Goal Agent output stream failed"),
+        "{message}"
+    );
+    assert!(message.contains("master torn down"), "{message}");
+    assert_eq!(transcript, "");
+}
+
+#[test]
+fn reader_death_while_the_agent_runs_names_capture_failure_not_idleness() {
+    let failed = transcript_capture_failure(Ok(Err(RefineError::Io(
+        "Goal Agent output stream failed: boom".to_string(),
+    ))))
+    .to_string();
+    assert!(
+        failed.contains("transcript capture failed while the agent was still running"),
+        "{failed}"
+    );
+    assert!(failed.contains("boom"), "{failed}");
+    assert!(!failed.contains("produced no output"), "{failed}");
+
+    let silent = transcript_capture_failure(Ok(Ok(()))).to_string();
+    assert!(
+        silent.contains("transcript reader stopped without an error"),
+        "{silent}"
+    );
+    assert!(!silent.contains("produced no output"), "{silent}");
+}
+
+#[cfg(unix)]
+#[test]
+fn goal_agent_survives_transient_pty_eio_while_writing_its_signal_slowly() {
+    let _env_guard = crate::tools::host::agent_providers::smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let root = unique_temp_dir("goal-agent-eio-liveness");
+    let runtime_root = root.join("run/8082");
+    let app_root = root.join("app");
+    let provider = root.join("smoke-ai");
+    fs::create_dir_all(&app_root).unwrap();
+    // The production incident's shape: the agent drops every PTY fd (making
+    // master reads return EIO while it keeps running), then works quietly,
+    // its only observable progress being chunked signal-file writes spread
+    // over more than three idle budgets. Pre-fix the reader thread died on
+    // the first EIO, froze the activity clock, and the watchdog killed a
+    // live agent.
+    fs::write(
+        &provider,
+        concat!(
+            "#!/bin/sh\n",
+            "echo booted\n",
+            "exec </dev/null >/dev/null 2>&1\n",
+            "sig=\"$REFINE_AGENT_SIGNAL_PATH\"\n",
+            "printf '%s' '{\"state\":\"comp' > \"$sig\"\n",
+            "sleep 0.3\n",
+            "printf '%s' 'leted\",' >> \"$sig\"\n",
+            "sleep 0.3\n",
+            "printf '%s' '\"message\"' >> \"$sig\"\n",
+            "sleep 0.3\n",
+            "printf '%s' ':\"surv' >> \"$sig\"\n",
+            "sleep 0.3\n",
+            "printf '%s' 'ived-' >> \"$sig\"\n",
+            "sleep 0.3\n",
+            "printf '%s' 'eio\"' >> \"$sig\"\n",
+            "sleep 0.3\n",
+            "printf '%s' '}' >> \"$sig\"\n",
+            "sleep 10\n",
+        ),
+    )
+    .unwrap();
+    let mut permissions = fs::metadata(&provider).unwrap().permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(&provider, permissions).unwrap();
+    let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
+    unsafe {
+        std::env::set_var("REFINE_SMOKE_AI_PATH", &provider);
+    }
+
+    let result = run_goal_agent(
+        GoalAgentLaunch {
+            provider_session: None,
+            runtime_root,
+            cwd: app_root,
+            provider: "smoke-ai".to_string(),
+            prompt: "test EIO liveness".to_string(),
+            metadata: Map::from_iter([("goal_id".to_string(), json!("GOAL-EIO"))]),
+            completion_timeout: Some(Duration::from_secs(30)),
+            idle_timeout: Some(Duration::from_millis(500)),
+        },
+        |_| {},
+    )
+    .unwrap();
+
+    assert_eq!(result.output, "survived-eio");
+
+    unsafe {
+        if let Some(previous) = previous {
+            std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
+        } else {
+            std::env::remove_var("REFINE_SMOKE_AI_PATH");
+        }
+    }
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn goal_agent_ansi_only_output_keeps_the_session_alive() {
+    let _env_guard = crate::tools::host::agent_providers::smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let root = unique_temp_dir("goal-agent-ansi-liveness");
+    let runtime_root = root.join("run/8082");
+    let app_root = root.join("app");
+    let provider = root.join("smoke-ai");
+    fs::create_dir_all(&app_root).unwrap();
+    // A spinner repainting one cell — carriage return, erase-line, one glyph —
+    // is real PTY activity even though it never adds a printable line. The
+    // loop spans more than two idle budgets before completing.
+    fs::write(
+        &provider,
+        concat!(
+            "#!/bin/sh\n",
+            "i=0\n",
+            "while [ \"$i\" -lt 12 ]; do\n",
+            "  printf '\\r\u{1b}[K|'\n",
+            "  sleep 0.1\n",
+            "  i=$((i+1))\n",
+            "done\n",
+            "printf '%s\\n' '{\"state\":\"completed\",\"message\":\"ansi-alive\"}' > \"$REFINE_AGENT_SIGNAL_PATH\"\n",
+            "sleep 10\n",
+        ),
+    )
+    .unwrap();
+    let mut permissions = fs::metadata(&provider).unwrap().permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(&provider, permissions).unwrap();
+    let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
+    unsafe {
+        std::env::set_var("REFINE_SMOKE_AI_PATH", &provider);
+    }
+
+    let result = run_goal_agent(
+        GoalAgentLaunch {
+            provider_session: None,
+            runtime_root,
+            cwd: app_root,
+            provider: "smoke-ai".to_string(),
+            prompt: "test ANSI liveness".to_string(),
+            metadata: Map::from_iter([("goal_id".to_string(), json!("GOAL-ANSI"))]),
+            completion_timeout: Some(Duration::from_secs(30)),
+            idle_timeout: Some(Duration::from_millis(500)),
+        },
+        |_| {},
+    )
+    .unwrap();
+
+    assert_eq!(result.output, "ansi-alive");
+
+    unsafe {
+        if let Some(previous) = previous {
+            std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
+        } else {
+            std::env::remove_var("REFINE_SMOKE_AI_PATH");
+        }
+    }
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn goal_agent_idle_kill_takes_the_whole_process_group_down() {
+    let _env_guard = crate::tools::host::agent_providers::smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let root = unique_temp_dir("goal-agent-group-kill");
+    let runtime_root = root.join("run/8082");
+    let app_root = root.join("app");
+    let provider = root.join("smoke-ai");
+    fs::create_dir_all(&app_root).unwrap();
+    // The background descendant inherits the PTY slave. Killing only the
+    // session leader would leave it holding the terminal, and joining the
+    // reader would block on its 30-second timer instead of the idle budget.
+    fs::write(&provider, "#!/bin/sh\necho started\nsleep 30 &\nsleep 30\n").unwrap();
+    let mut permissions = fs::metadata(&provider).unwrap().permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(&provider, permissions).unwrap();
+    let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
+    unsafe {
+        std::env::set_var("REFINE_SMOKE_AI_PATH", &provider);
+    }
+
+    let started_at = std::time::Instant::now();
+    let error = run_goal_agent(
+        GoalAgentLaunch {
+            provider_session: None,
+            runtime_root,
+            cwd: app_root,
+            provider: "smoke-ai".to_string(),
+            prompt: "test group kill".to_string(),
+            metadata: Map::from_iter([("goal_id".to_string(), json!("GOAL-GROUP-KILL"))]),
+            completion_timeout: Some(Duration::from_secs(60)),
+            idle_timeout: Some(Duration::from_millis(400)),
+        },
+        |_| {},
+    )
+    .unwrap_err();
+
+    let message = error.to_string();
+    assert!(message.contains("produced no output for"), "{message}");
+    assert!(message.contains("transcript preserved at"), "{message}");
+    // Idle budget plus kill/join/preserve overhead — nowhere near the
+    // descendant's 30-second timer that a leader-only kill would wait out.
+    assert!(
+        started_at.elapsed() < Duration::from_secs(5),
+        "idle kill waited on the agent's descendants: {:?}",
+        started_at.elapsed()
+    );
+
+    unsafe {
+        if let Some(previous) = previous {
+            std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
+        } else {
+            std::env::remove_var("REFINE_SMOKE_AI_PATH");
+        }
+    }
+    fs::remove_dir_all(root).unwrap();
+}
+
 #[test]
 fn silent_goal_agent_remains_autonomous_without_requesting_input() {
     let _env_guard = crate::tools::host::agent_providers::smoke_ai_env_lock()

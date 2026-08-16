@@ -327,6 +327,7 @@ mod workflow_registration;
 use command_spec::*;
 pub(crate) use identity_persistence::write_json_atomically;
 use identity_persistence::*;
+pub(crate) use os_signals::signal_os_process;
 use os_signals::*;
 #[cfg(test)]
 pub(crate) use test_hooks::install_after_process_enumeration_hook;
