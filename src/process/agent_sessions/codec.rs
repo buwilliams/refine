@@ -190,6 +190,8 @@ pub(super) struct SignalReader {
     incomplete: Option<IncompleteSignal>,
     write_grace_period: Duration,
     requires_planning_result: bool,
+    last_seen_fingerprint: Option<u64>,
+    observed_change: bool,
 }
 
 #[derive(Debug)]
@@ -211,7 +213,16 @@ impl SignalReader {
             incomplete: None,
             write_grace_period,
             requires_planning_result: false,
+            last_seen_fingerprint: None,
+            observed_change: false,
         }
+    }
+
+    /// True when any signal-file content change was observed since the last
+    /// call. The session poll loop counts such writes — valid, partial, and
+    /// invalid alike — as agent activity for the idle watchdog.
+    pub(super) fn take_observed_change(&mut self) -> bool {
+        std::mem::take(&mut self.observed_change)
     }
 
     /// Reject completed signals that omit `planning_result` instead of letting
@@ -244,13 +255,17 @@ impl SignalReader {
                 )));
             }
         };
+        let fingerprint = signal_fingerprint(&bytes);
+        if self.last_seen_fingerprint != Some(fingerprint) {
+            self.last_seen_fingerprint = Some(fingerprint);
+            self.observed_change = true;
+        }
         let value = match serde_json::from_slice::<Value>(&bytes) {
             Ok(value) => {
                 self.incomplete = None;
                 value
             }
             Err(error) => {
-                let fingerprint = signal_fingerprint(&bytes);
                 let now = std::time::Instant::now();
                 match &mut self.incomplete {
                     Some(incomplete) if incomplete.fingerprint == fingerprint => {

@@ -14,7 +14,7 @@ use uuid::Uuid;
 use crate::model::goal::ImplementationExecutionEvidence;
 use crate::process::subprocess::{
     FileProcessSupervisor, ManagedProcess, ManagedProcessSpec, ProcessOwner, ProcessResourceLimits,
-    ProcessSupervisor,
+    ProcessSupervisor, signal_os_process,
 };
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::prompts::{PromptTemplate, render};
@@ -124,7 +124,7 @@ mod session_runtime;
 mod signal_recovery;
 
 #[cfg(test)]
-use session_runtime::run_goal_agent_session;
+use session_runtime::{pump_pty_output, run_goal_agent_session, transcript_capture_failure};
 pub use session_runtime::{run_goal_agent, run_goal_agent_with_settlement};
 
 use codec::*;

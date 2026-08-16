@@ -1,5 +1,12 @@
 use super::*;
 
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::Instant;
+
+const PTY_EOF_RETRY_INITIAL: Duration = Duration::from_millis(20);
+const PTY_EOF_RETRY_MAX: Duration = Duration::from_millis(500);
+
 /// Move a failed session's transcript out of the artifact set that supervisor
 /// cleanup deletes. Renamed in place (same directory, `.failed` suffix) so the
 /// evidence stays node-local under the runtime tree.
@@ -8,6 +15,79 @@ fn preserve_failed_transcript(stdout_path: &Path) -> Option<PathBuf> {
     let preserved = stdout_path.with_file_name(format!("{file_name}.failed"));
     fs::rename(stdout_path, &preserved).ok()?;
     Some(preserved)
+}
+
+/// Copy PTY output into the transcript until the child is confirmed gone.
+///
+/// A zero-byte read is not trusted as EOF: on Linux the master reads EIO —
+/// which the vendored PTY surfaces as `Ok(0)` — whenever no process
+/// momentarily holds the slave side, and the agent spawns and reaps its own
+/// subprocesses. Treating that transient state as EOF once froze the activity
+/// clock and let the idle watchdog kill a live agent, so zero-byte reads are
+/// retried with capped backoff until the poll loop confirms via `child_exited`
+/// that the child was actually reaped.
+pub(super) fn pump_pty_output(
+    reader: &mut dyn Read,
+    transcript: &mut fs::File,
+    transcript_path: &Path,
+    activity: &Mutex<Instant>,
+    child_exited: &AtomicBool,
+) -> RefineResult<()> {
+    let mut buffer = [0_u8; 4096];
+    let mut eof_retry = PTY_EOF_RETRY_INITIAL;
+    loop {
+        match reader.read(&mut buffer) {
+            Ok(0) => {
+                if child_exited.load(Ordering::SeqCst) {
+                    return Ok(());
+                }
+                thread::sleep(eof_retry);
+                eof_retry = (eof_retry * 2).min(PTY_EOF_RETRY_MAX);
+            }
+            Ok(count) => {
+                eof_retry = PTY_EOF_RETRY_INITIAL;
+                *activity.lock().expect("Goal Agent activity clock poisoned") = Instant::now();
+                transcript.write_all(&buffer[..count]).map_err(|error| {
+                    RefineError::Io(format!(
+                        "failed to append Goal Agent transcript {}: {error}",
+                        transcript_path.display()
+                    ))
+                })?;
+                transcript.flush().map_err(|error| {
+                    RefineError::Io(format!(
+                        "failed to flush Goal Agent transcript {}: {error}",
+                        transcript_path.display()
+                    ))
+                })?;
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                thread::sleep(Duration::from_millis(10));
+            }
+            Err(error) => {
+                return Err(RefineError::Io(format!(
+                    "Goal Agent output stream failed: {error}"
+                )));
+            }
+        }
+    }
+}
+
+/// The distinct failure for a reader thread that died while the child was
+/// still running. The activity clock is frozen from that moment, so letting
+/// the idle watchdog speak would blame a live agent for the harness's own
+/// capture fault.
+pub(super) fn transcript_capture_failure(
+    join_result: std::thread::Result<RefineResult<()>>,
+) -> RefineError {
+    let cause = match join_result {
+        Ok(Err(error)) => error.to_string(),
+        Ok(Ok(())) => "transcript reader stopped without an error".to_string(),
+        Err(_) => "transcript reader panicked".to_string(),
+    };
+    RefineError::Io(format!(
+        "Goal Agent transcript capture failed while the agent was still running: {cause}"
+    ))
 }
 
 /// The PTY is owned by the workflow runner, while its process record, transcript,
@@ -312,9 +392,14 @@ where
     // Written by the reader thread on every PTY chunk and read by the poll
     // loop's idle watchdog; the transcript is the liveness signal, so "no
     // chunk for the idle budget" means the agent has stalled.
-    let last_activity = std::sync::Arc::new(std::sync::Mutex::new(std::time::Instant::now()));
-    let reader_activity = std::sync::Arc::clone(&last_activity);
-    let reader_thread = thread::spawn(move || -> RefineResult<()> {
+    let last_activity = Arc::new(Mutex::new(Instant::now()));
+    let reader_activity = Arc::clone(&last_activity);
+    // Raised by the poll loop once `child.try_wait()` or `child.wait()` has
+    // reaped the child; only then may the reader treat a zero-byte read as EOF
+    // instead of a transient PTY EIO.
+    let child_exited = Arc::new(AtomicBool::new(false));
+    let reader_child_exited = Arc::clone(&child_exited);
+    let mut reader_thread = Some(thread::spawn(move || -> RefineResult<()> {
         let mut output = OpenOptions::new()
             .append(true)
             .open(&reader_path)
@@ -324,35 +409,14 @@ where
                     reader_path.display()
                 ))
             })?;
-        let mut buffer = [0_u8; 4096];
-        loop {
-            match reader.read(&mut buffer) {
-                Ok(0) => return Ok(()),
-                Ok(count) => {
-                    *reader_activity
-                        .lock()
-                        .expect("Goal Agent activity clock poisoned") = std::time::Instant::now();
-                    output.write_all(&buffer[..count]).map_err(|error| {
-                        RefineError::Io(format!(
-                            "failed to append Goal Agent transcript {}: {error}",
-                            reader_path.display()
-                        ))
-                    })?;
-                    output.flush().map_err(|error| {
-                        RefineError::Io(format!(
-                            "failed to flush Goal Agent transcript {}: {error}",
-                            reader_path.display()
-                        ))
-                    })?;
-                }
-                Err(error) => {
-                    return Err(RefineError::Io(format!(
-                        "Goal Agent output stream failed: {error}"
-                    )));
-                }
-            }
-        }
-    });
+        pump_pty_output(
+            &mut reader,
+            &mut output,
+            &reader_path,
+            &reader_activity,
+            &reader_child_exited,
+        )
+    }));
 
     let mut command_offset = 0_u64;
     let mut completed_by_signal = false;
@@ -392,6 +456,12 @@ where
                         }
                     }
                     AgentSessionCommand::Resize { cols, rows } => {
+                        // A resize is a human at the attached terminal, which
+                        // counts as activity just like typed input.
+                        *last_activity
+                            .lock()
+                            .expect("Goal Agent activity clock poisoned") =
+                            std::time::Instant::now();
                         pair.master.resize(pty_size(cols, rows)).map_err(|error| {
                             RefineError::Io(format!("failed to resize Goal Agent PTY: {error}"))
                         })?;
@@ -402,6 +472,9 @@ where
             let process_exit = child.try_wait().map_err(|error| {
                 RefineError::Io(format!("failed to inspect Goal Agent process: {error}"))
             })?;
+            if process_exit.is_some() {
+                child_exited.store(true, Ordering::SeqCst);
+            }
             let signal_read = if process_exit.is_some() {
                 signal_reader.finish(&signal_path)?
             } else {
@@ -449,6 +522,12 @@ where
                             metadata.remove("attention_message");
                             process.details = Some(encode_metadata(&metadata)?);
                             supervisor.register(process.clone())?;
+                            // The PTY child is a setsid session leader; kill
+                            // its whole group first so descendants holding the
+                            // slave die with it and the reader sees EOF.
+                            if let Some(pid) = pid {
+                                let _ = signal_os_process(pid, "kill", true);
+                            }
                             let _ = child.kill();
                         }
                         AgentSessionState::NeedsInput => {
@@ -468,9 +547,31 @@ where
                     }
                 }
             }
+            // Signal-file writes are the agent demonstrably working even
+            // before the payload parses, so they reset the idle clock; a
+            // provider streaming its completion signal must not be idle-killed
+            // for quiet PTY output.
+            if signal_reader.take_observed_change() {
+                *last_activity
+                    .lock()
+                    .expect("Goal Agent activity clock poisoned") = std::time::Instant::now();
+            }
 
             if let Some(status) = process_exit {
                 break Ok(status);
+            }
+            // The child is still running here. If the reader thread is gone,
+            // the activity clock is frozen and an idle verdict would blame a
+            // live agent for the harness's capture failure — name that fault
+            // instead of ever reaching the idle branch.
+            if reader_thread
+                .as_ref()
+                .is_some_and(|handle| handle.is_finished())
+            {
+                let handle = reader_thread
+                    .take()
+                    .expect("reader thread handle observed finished");
+                return Err(transcript_capture_failure(handle.join()));
             }
             if let Some(timeout) =
                 completion_timeout.filter(|timeout| completion_started_at.elapsed() >= *timeout)
@@ -503,9 +604,33 @@ where
     let status = match status_result {
         Ok(status) => status,
         Err(error) => {
+            // Kill the whole process group first: the PTY child is a setsid
+            // session leader, and killing only the leader leaves descendants
+            // holding the slave, so the reader would block on the terminal
+            // until they finished on their own.
+            if let Some(pid) = pid {
+                let _ = signal_os_process(pid, "kill", true);
+            }
             let _ = child.kill();
             let _ = child.wait();
-            let _ = reader_thread.join();
+            child_exited.store(true, Ordering::SeqCst);
+            let capture_error = reader_thread.take().and_then(|handle| match handle.join() {
+                Ok(Ok(())) => None,
+                Ok(Err(error)) => Some(error.to_string()),
+                Err(_) => Some("transcript reader panicked".to_string()),
+            });
+            let error = match capture_error {
+                Some(capture) => match error {
+                    RefineError::Degraded(message) => RefineError::Degraded(format!(
+                        "{message}; transcript capture error: {capture}"
+                    )),
+                    RefineError::Io(message) => {
+                        RefineError::Io(format!("{message}; transcript capture error: {capture}"))
+                    }
+                    other => other,
+                },
+                None => error,
+            };
             // Preserve the transcript before artifact cleanup deletes it: for
             // a timed-out or stalled agent it is the only evidence of what the
             // session actually did, and the failure record points here.
@@ -532,6 +657,8 @@ where
         }
     };
     let reader_result = reader_thread
+        .take()
+        .expect("Goal Agent reader was joined before the session settled")
         .join()
         .map_err(|_| RefineError::Io("Goal Agent output reader panicked".to_string()))
         .and_then(|result| result);
