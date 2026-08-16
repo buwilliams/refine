@@ -207,8 +207,7 @@ impl HostAgentProviderService {
     /// Whether the provider's interactive CLI can pin and resume a
     /// caller-chosen session, allowing workflow steps to share one session.
     pub fn provider_supports_interactive_session_continuity(provider: &str) -> bool {
-        Self::spec(provider)
-            .is_some_and(|spec| spec.supports_interactive_session_continuity())
+        Self::spec(provider).is_some_and(|spec| spec.supports_interactive_session_continuity())
     }
 
     fn prepare_provider_launch(

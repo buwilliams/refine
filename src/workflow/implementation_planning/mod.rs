@@ -56,9 +56,7 @@ impl PlanningPhaseSession {
                 Some(ProviderSessionContinuity::Resume(session_id.clone()))
             }
             Self::Pin(session_id) => Some(ProviderSessionContinuity::Pin(session_id.clone())),
-            Self::Resume(session_id) => {
-                Some(ProviderSessionContinuity::Resume(session_id.clone()))
-            }
+            Self::Resume(session_id) => Some(ProviderSessionContinuity::Resume(session_id.clone())),
         }
     }
 }
@@ -341,9 +339,7 @@ fn ensure_plan_governance_precheck(
     }
     loop {
         match plan.governance_precheck.clone() {
-            Some(precheck)
-                if precheck.status == "passed" || precheck.status == "inconclusive" =>
-            {
+            Some(precheck) if precheck.status == "passed" || precheck.status == "inconclusive" => {
                 return Ok(());
             }
             Some(precheck) if precheck.status == "failed" && precheck.attempt >= 2 => {
@@ -361,7 +357,14 @@ fn ensure_plan_governance_precheck(
                 ));
             }
             Some(precheck) if precheck.status == "failed" => {
-                revise_plan_for_governance(ctx, plan, agent_cwd, implementation_branch, spec, &precheck)?;
+                revise_plan_for_governance(
+                    ctx,
+                    plan,
+                    agent_cwd,
+                    implementation_branch,
+                    spec,
+                    &precheck,
+                )?;
             }
             _ => {
                 let attempt = plan
@@ -623,8 +626,8 @@ fn governance_precheck_criticism(precheck: &PlanGovernancePrecheck) -> Implement
                 .clone()
                 .unwrap_or_else(|| "Governance rule violation".to_string())
                 .replace(['\n', '\r'], " "),
-            recommendation:
-                "Revise the plan so every checklist item complies with governance.".to_string(),
+            recommendation: "Revise the plan so every checklist item complies with governance."
+                .to_string(),
         });
     }
     ImplementationCriticism {

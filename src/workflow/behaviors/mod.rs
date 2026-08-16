@@ -67,7 +67,9 @@ enum GovernanceIntegrationStep {
     },
     /// The target tip moved between the refresh hold and the integrate hold;
     /// the pass must refresh again before it may merge.
-    TargetAdvanced { expected_target: String },
+    TargetAdvanced {
+        expected_target: String,
+    },
 }
 
 /// How many refresh → prove → integrate passes may observe the target
@@ -2048,7 +2050,10 @@ fn handle_governance_finding(
     let detail = ctx.work_items.show_goal_detail(&ctx.goal_id)?;
     if let Some(source_signature) = source_governance_failure_signature(&detail, ctx.round_idx) {
         let current_signature = governance_failure_signature(
-            evaluation.details.get("failed_actions").and_then(Value::as_array),
+            evaluation
+                .details
+                .get("failed_actions")
+                .and_then(Value::as_array),
         );
         if !current_signature.is_empty() && current_signature == source_signature {
             return fail(

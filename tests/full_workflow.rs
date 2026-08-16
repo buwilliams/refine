@@ -223,6 +223,9 @@ fn deterministic_provider_script() -> std::path::PathBuf {
          *\"Post-implementation Quality evaluation\"*)\n\
            printf '%s\\n' '{\"ok\":true,\"summary\":\"Quality planned.\",\"results\":[{\"test\":\"Migrated Quality command passes: printf target-tests-ok\",\"status\":\"passed\",\"evidence\":\"legacy command selected\",\"command\":\"printf target-tests-ok\"}]}'\n\
            ;;\n\
+         *\"Plan-stage governance pre-check\"*)\n\
+           printf '%s\\n' '{\"status\":\"passed\",\"message\":\"Plan pre-check passed.\",\"violations\":[]}'\n\
+           ;;\n\
          *\"Post-implementation governance review\"*)\n\
            printf '%s\\n' '{\"status\":\"passed\",\"message\":\"Governance passed.\",\"violations\":[]}'\n\
            ;;\n\

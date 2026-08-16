@@ -143,9 +143,7 @@ fn interactive_session_continuity_pins_and_resumes_only_where_the_cli_supports_i
         runtime_root: Some(temp_root.join("run/8080")),
     };
 
-    assert!(
-        HostAgentProviderService::provider_supports_interactive_session_continuity("claude")
-    );
+    assert!(HostAgentProviderService::provider_supports_interactive_session_continuity("claude"));
     for provider in ["codex", "gemini", "copilot", "smoke-ai", "custom-cli"] {
         assert!(
             !HostAgentProviderService::provider_supports_interactive_session_continuity(provider),

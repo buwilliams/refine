@@ -85,20 +85,21 @@ pub(super) fn run_observational_phase(
             output,
         });
     }
-    let launch_with_session = |provider_session: Option<ProviderSessionContinuity>| GoalAgentLaunch {
-        provider_session,
-        runtime_root: ctx.runtime_root.to_path_buf(),
-        cwd: agent_cwd.to_path_buf(),
-        provider: ctx.provider.clone(),
-        prompt: prompt.clone(),
-        metadata: metadata.clone(),
-        completion_timeout: Some(Duration::from_secs(setting_usize(
-            &ctx.settings,
-            "agent_hard_cap_seconds",
-            7200,
-        ) as u64)),
-        idle_timeout: crate::workflow::agent_idle_timeout(&ctx.settings),
-    };
+    let launch_with_session =
+        |provider_session: Option<ProviderSessionContinuity>| GoalAgentLaunch {
+            provider_session,
+            runtime_root: ctx.runtime_root.to_path_buf(),
+            cwd: agent_cwd.to_path_buf(),
+            provider: ctx.provider.clone(),
+            prompt: prompt.clone(),
+            metadata: metadata.clone(),
+            completion_timeout: Some(Duration::from_secs(setting_usize(
+                &ctx.settings,
+                "agent_hard_cap_seconds",
+                7200,
+            ) as u64)),
+            idle_timeout: crate::workflow::agent_idle_timeout(&ctx.settings),
+        };
     let on_attention = |attention: crate::process::agent_sessions::GoalAgentAttention| {
         let _ = ctx.log(
             "implementation_planning",
@@ -120,10 +121,8 @@ pub(super) fn run_observational_phase(
         // read-only, so a fresh launch preserves the phase instead of failing
         // the Round over lost provider-side session state.
         Err(resume_error)
-            if matches!(
-                provider_session,
-                Some(ProviderSessionContinuity::Resume(_))
-            ) && git.implementation_planning_observation()? == git_before =>
+            if matches!(provider_session, Some(ProviderSessionContinuity::Resume(_)))
+                && git.implementation_planning_observation()? == git_before =>
         {
             let _ = ctx.log(
                 "implementation_planning",
