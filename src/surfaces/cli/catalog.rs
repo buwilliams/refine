@@ -340,7 +340,9 @@ mod tests {
                     !character.is_ascii_alphanumeric() && !matches!(character, '-' | '_')
                 })
             });
-            if group_name == "system" && matches!(documented_subcommand, Some("build" | "clean")) {
+            if group_name == "system"
+                && matches!(documented_subcommand, Some("build" | "clean" | "update"))
+            {
                 assert_eq!(
                     line_tokens[command_index],
                     "./r",
