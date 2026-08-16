@@ -157,6 +157,7 @@ fn planning_session_returns_the_structured_result_from_its_completion_signal() {
             prompt: "plan".to_string(),
             metadata,
             completion_timeout: None,
+            idle_timeout: None,
         },
         |_| {},
     )
@@ -213,6 +214,7 @@ fn goal_agent_hard_cap_terminates_a_session_without_a_completion_signal() {
             prompt: "test timeout".to_string(),
             metadata: Map::from_iter([("goal_id".to_string(), json!("GOAL-TIMEOUT"))]),
             completion_timeout: Some(Duration::from_millis(200)),
+            idle_timeout: None,
         },
         |_| {},
     )
@@ -230,6 +232,134 @@ fn goal_agent_hard_cap_terminates_a_session_without_a_completion_signal() {
             .unwrap()
             .is_empty()
     );
+
+    unsafe {
+        if let Some(previous) = previous {
+            std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
+        } else {
+            std::env::remove_var("REFINE_SMOKE_AI_PATH");
+        }
+    }
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn goal_agent_idle_timeout_fails_fast_and_preserves_the_transcript() {
+    let _env_guard = crate::tools::host::agent_providers::smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let root = unique_temp_dir("goal-agent-idle-timeout");
+    let runtime_root = root.join("run/8082");
+    let app_root = root.join("app");
+    let provider = root.join("smoke-ai");
+    fs::create_dir_all(&app_root).unwrap();
+    // Produces output once, then stalls silently: the shape of a hung agent
+    // that previously burned the whole completion cap with no evidence left.
+    fs::write(&provider, "#!/bin/sh\necho still-alive-once\nsleep 10\n").unwrap();
+    let mut permissions = fs::metadata(&provider).unwrap().permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(&provider, permissions).unwrap();
+    let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
+    unsafe {
+        std::env::set_var("REFINE_SMOKE_AI_PATH", &provider);
+    }
+
+    let started_at = std::time::Instant::now();
+    let error = run_goal_agent(
+        GoalAgentLaunch {
+            runtime_root: runtime_root.clone(),
+            cwd: app_root,
+            provider: "smoke-ai".to_string(),
+            prompt: "test idle watchdog".to_string(),
+            metadata: Map::from_iter([("goal_id".to_string(), json!("GOAL-IDLE"))]),
+            completion_timeout: Some(Duration::from_secs(30)),
+            idle_timeout: Some(Duration::from_millis(300)),
+        },
+        |_| {},
+    )
+    .unwrap_err();
+
+    let message = error.to_string();
+    assert!(
+        message.contains("produced no output for"),
+        "expected an idle-timeout failure, got: {message}"
+    );
+    assert!(
+        message.contains("transcript preserved at"),
+        "expected the failure to point at preserved evidence, got: {message}"
+    );
+    // Failed fast on the idle budget, nowhere near the completion cap.
+    assert!(started_at.elapsed() < Duration::from_secs(10));
+    let preserved = fs::read_dir(runtime_root.join("processes"))
+        .unwrap()
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .find(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.ends_with(".stdout.log.failed"))
+        })
+        .expect("preserved transcript missing");
+    assert!(
+        fs::read_to_string(&preserved)
+            .unwrap()
+            .contains("still-alive-once"),
+        "preserved transcript lost the agent's output"
+    );
+
+    unsafe {
+        if let Some(previous) = previous {
+            std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
+        } else {
+            std::env::remove_var("REFINE_SMOKE_AI_PATH");
+        }
+    }
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn goal_agent_survives_a_deleted_command_channel() {
+    let _env_guard = crate::tools::host::agent_providers::smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let root = unique_temp_dir("goal-agent-missing-commands");
+    let runtime_root = root.join("run/8082");
+    let app_root = root.join("app");
+    let provider = root.join("smoke-ai");
+    fs::create_dir_all(&app_root).unwrap();
+    // Delete the attach channel mid-run — the reaper race that killed whole
+    // sessions — then complete normally. The channel is a convenience input
+    // path for humans; losing it must not fail an autonomous run.
+    fs::write(
+        &provider,
+        "#!/bin/sh\nrm -f \"${REFINE_AGENT_SIGNAL_PATH%.signal.json}.commands.jsonl\"\nsleep 0.3\nprintf '%s\\n' '{\"state\":\"completed\",\"message\":\"survived\"}' > \"$REFINE_AGENT_SIGNAL_PATH\"\nsleep 10\n",
+    )
+    .unwrap();
+    let mut permissions = fs::metadata(&provider).unwrap().permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(&provider, permissions).unwrap();
+    let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
+    unsafe {
+        std::env::set_var("REFINE_SMOKE_AI_PATH", &provider);
+    }
+
+    let result = run_goal_agent(
+        GoalAgentLaunch {
+            runtime_root: runtime_root.clone(),
+            cwd: app_root,
+            provider: "smoke-ai".to_string(),
+            prompt: "test deleted command channel".to_string(),
+            metadata: Map::from_iter([("goal_id".to_string(), json!("GOAL-NOCMD"))]),
+            completion_timeout: Some(Duration::from_secs(30)),
+            idle_timeout: None,
+        },
+        |_| {},
+    )
+    .unwrap();
+
+    assert_eq!(result.output, "survived");
 
     unsafe {
         if let Some(previous) = previous {
@@ -332,6 +462,7 @@ fn workflow_goal_agent_is_discoverable_and_attachable_while_running() {
                 prompt: "test".to_string(),
                 metadata,
                 completion_timeout: None,
+                idle_timeout: None,
             },
             |_| {},
         )
@@ -382,6 +513,7 @@ fn workflow_goal_agent_is_discoverable_and_attachable_while_running() {
             prompt: "duplicate".to_string(),
             metadata: duplicate_metadata,
             completion_timeout: None,
+            idle_timeout: None,
         },
         |_| {},
     );
@@ -446,6 +578,7 @@ fn workflow_goal_agent_surfaces_needs_input_and_continues_same_session() {
                 prompt: "test".to_string(),
                 metadata,
                 completion_timeout: None,
+                idle_timeout: None,
             },
             |attention| {
                 let _ = attention_tx.send(attention);
@@ -514,6 +647,7 @@ fn workflow_goal_agent_handoff_survives_dead_process_recovery() {
             prompt: "test".to_string(),
             metadata,
             completion_timeout: None,
+            idle_timeout: None,
         },
         |_| {},
         |supervisor, process, settlement| {
@@ -630,6 +764,7 @@ fn workflow_goal_agent_pty_uses_configured_final_environment_for_file_transport(
             prompt,
             metadata: Map::from_iter([("goal_id".to_string(), json!("GOAL-FINAL-ENV"))]),
             completion_timeout: None,
+            idle_timeout: None,
         },
         |_| {},
     )
@@ -681,6 +816,7 @@ fn workflow_goal_agent_early_exec_failure_preserves_errno_and_cleans_channels() 
             prompt: "large launch failure ".to_string() + &"x".repeat(158_078),
             metadata: Map::from_iter([("goal_id".to_string(), json!("GOAL-EXEC-FAIL"))]),
             completion_timeout: None,
+            idle_timeout: None,
         },
         |_| {},
     )
@@ -747,6 +883,7 @@ fn silent_goal_agent_remains_autonomous_without_requesting_input() {
             prompt: "test".to_string(),
             metadata,
             completion_timeout: None,
+            idle_timeout: None,
         },
         |request| attention.push(request),
     )

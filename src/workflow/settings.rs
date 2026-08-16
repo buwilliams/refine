@@ -12,6 +12,16 @@ pub(super) fn setting_usize(settings: &JsonObject, key: &str, fallback: usize) -
         .unwrap_or(fallback)
 }
 
+/// The Goal Agent stall budget from `agent_idle_timeout_seconds`. Distinct
+/// from `agent_hard_cap_seconds`: the idle budget resets on every sign of
+/// agent activity, so a hung session fails in minutes while a slow-but-working
+/// one runs up to the hard cap.
+pub(super) fn agent_idle_timeout(settings: &JsonObject) -> Option<std::time::Duration> {
+    Some(std::time::Duration::from_secs(
+        setting_usize(settings, "agent_idle_timeout_seconds", 900) as u64,
+    ))
+}
+
 pub(super) fn setting_cap_with_default_values(
     settings: &JsonObject,
     key: &str,

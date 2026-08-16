@@ -138,12 +138,21 @@ pub(super) fn read_commands_since(
     path: &Path,
     offset: &mut u64,
 ) -> RefineResult<Vec<AgentSessionCommand>> {
-    let mut file = fs::File::open(path).map_err(|error| {
-        RefineError::Io(format!(
-            "failed to read Goal Agent command channel {}: {error}",
-            path.display()
-        ))
-    })?;
+    // The command channel is the attach path for a human typing into a live
+    // agent; an autonomous run does not need it. Absence is treated like the
+    // signal reader treats a not-yet-written signal — nothing to read — because
+    // failing here killed whole sessions when a reaper removed the file
+    // mid-run. If a writer recreates it later, reads resume from the offset.
+    let mut file = match fs::File::open(path) {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(error) => {
+            return Err(RefineError::Io(format!(
+                "failed to read Goal Agent command channel {}: {error}",
+                path.display()
+            )));
+        }
+    };
     file.seek(SeekFrom::Start(*offset)).map_err(|error| {
         RefineError::Io(format!(
             "failed to seek Goal Agent command channel {}: {error}",

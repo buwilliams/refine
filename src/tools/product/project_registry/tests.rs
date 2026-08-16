@@ -171,8 +171,10 @@ fn project_status_uses_authoritative_identity_across_attach_switch_and_restart()
     let service = FileProjectRegistryService::new(&registry_root, None)
         .with_active_node_root(&active_node_root);
 
-    // Initialize app A, then deliberately split the stale shared selection from
-    // the authoritative port-local selection.
+    // Initialize app A, then activate through two differently-constructed
+    // resolvers. The selection is project-scoped now, so both converge on the
+    // same canonical file — the stale-shared vs port-local split that once let
+    // two parts of one process disagree about identity cannot exist.
     service.attach(app_a.to_str().unwrap()).unwrap();
     let refine_a = refine_dir_for_target_root(&app_a).unwrap();
     let shared_nodes = FileNodeRegistryService::with_active_root(&refine_a, &registry_root);
@@ -191,13 +193,16 @@ fn project_status_uses_authoritative_identity_across_attach_switch_and_restart()
     assert_project_status_identity(&attached_a, "port-a", "Port A");
     let active_a = service.status().unwrap();
     assert_project_status_identity(&active_a, "port-a", "Port A");
-    assert_eq!(shared_nodes.active_node_id().unwrap(), "stale-base");
+    // The last activation wins for every resolver of this project.
+    assert_eq!(shared_nodes.active_node_id().unwrap(), "port-a");
 
     service
         .register_path(Some("app-b"), app_b.to_str().unwrap(), false)
         .unwrap();
+    // A freshly attached project has no selection of its own and starts as
+    // `default` with no diagnostics; app A's identity cannot leak into it.
     let switched_b = service.switch_with_migration("app-b").unwrap();
-    assert_project_status_project_mismatch(&switched_b);
+    assert_project_status_default(&switched_b);
     let refine_b = refine_dir_for_target_root(&app_b).unwrap();
     let port_nodes_b = FileNodeRegistryService::with_active_root(&refine_b, &active_node_root);
     port_nodes_b.create("port-b").unwrap();
@@ -206,9 +211,10 @@ fn project_status_uses_authoritative_identity_across_attach_switch_and_restart()
     let inspected_b = service.inspect(app_b.to_str().unwrap()).unwrap();
     assert_project_status_identity(&inspected_b, "port-b", "Port B");
 
+    // Switching back finds app A's own selection intact — no re-activation
+    // ritual, which is what previously polluted ownership records.
     let switched_a = service.switch_with_migration("app-a").unwrap();
-    assert_project_status_project_mismatch(&switched_a);
-    port_nodes_a.activate("port-a").unwrap();
+    assert_project_status_identity(&switched_a, "port-a", "Port A");
     let inspected_a = service.inspect(app_a.to_str().unwrap()).unwrap();
     assert_project_status_identity(&inspected_a, "port-a", "Port A");
 
@@ -220,7 +226,7 @@ fn project_status_uses_authoritative_identity_across_attach_switch_and_restart()
             true,
         )
         .unwrap();
-    assert_project_status_project_mismatch(&cloned);
+    assert_project_status_default(&cloned);
     let clone_refine_dir = refine_dir_for_target_root(&clone_destination).unwrap();
     assert!(clone_refine_dir.join("refine.json").exists());
     let port_nodes_clone =
@@ -239,9 +245,6 @@ fn project_status_uses_authoritative_identity_across_attach_switch_and_restart()
     assert!(detached.active_node.is_none());
     assert!(detached.active_node_diagnostics.is_empty());
 
-    let mismatched_attach = service.attach(app_a.to_str().unwrap()).unwrap();
-    assert_project_status_project_mismatch(&mismatched_attach);
-    port_nodes_a.activate("port-a").unwrap();
     let reattached_a = service.attach(app_a.to_str().unwrap()).unwrap();
     assert_project_status_identity(&reattached_a, "port-a", "Port A");
 
@@ -271,18 +274,11 @@ fn assert_project_status_identity(status: &ProjectStatus, id: &str, display_name
     assert_ne!(status.active_node.as_deref(), Some("Stale Base Node"));
 }
 
-fn assert_project_status_project_mismatch(status: &ProjectStatus) {
+fn assert_project_status_default(status: &ProjectStatus) {
     assert!(status.attached);
     assert_eq!(status.active_node_id.as_deref(), Some("default"));
     assert_eq!(status.active_node.as_deref(), Some("Default"));
-    assert!(
-        status
-            .active_node_diagnostics
-            .iter()
-            .any(|diagnostic| diagnostic.code == "active_node_selection_project_mismatch")
-    );
-    assert_ne!(status.active_node_id.as_deref(), Some("stale-base"));
-    assert_ne!(status.active_node.as_deref(), Some("Stale Base Node"));
+    assert!(status.active_node_diagnostics.is_empty());
 }
 
 fn unique_temp_dir(prefix: &str) -> PathBuf {

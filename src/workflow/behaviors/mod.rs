@@ -501,6 +501,7 @@ impl WorkflowBehavior for WorkflowImplementation {
                     "agent_hard_cap_seconds",
                     7200,
                 ) as u64)),
+                idle_timeout: crate::workflow::agent_idle_timeout(&ctx.settings),
             },
             |attention| {
                 let _ = ctx.log(
@@ -1240,6 +1241,7 @@ fn run_quality_correction_agent(ctx: &mut WorkflowContext<'_>) -> RefineResult<(
                     "agent_hard_cap_seconds",
                     7200,
                 ) as u64)),
+                idle_timeout: crate::workflow::agent_idle_timeout(&ctx.settings),
             },
             |attention| {
                 let _ = ctx.log(

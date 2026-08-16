@@ -60,7 +60,7 @@ impl QualityOperationRunner {
         let active_node =
             FileNodeRegistryService::with_active_root(&self.refine_dir, &self.runtime_root)
                 .active_node_id()?;
-        if goal_node != active_node {
+        if !crate::tools::product::nodes::node_ids_match(goal_node, &active_node) {
             return Err(RefineError::Conflict(format!(
                 "Goal {} is owned by node {goal_node}, not active node {active_node}",
                 summary.goal.id
@@ -120,7 +120,7 @@ impl QualityOperationRunner {
         let summary = work_items.show_goal_summary(goal_id)?;
         let node_id = summary.goal.node_id.as_deref().unwrap_or("default");
         if let Some(expected_node_id) = expected_node_id
-            && node_id != expected_node_id
+            && !crate::tools::product::nodes::node_ids_match(node_id, expected_node_id)
         {
             return Err(RefineError::Conflict(format!(
                 "Goal {goal_id} is owned by node {node_id}, not active node {expected_node_id}"

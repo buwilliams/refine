@@ -117,6 +117,15 @@ pub(super) fn is_runtime_only_refine_path(path: &std::path::Path) -> bool {
     {
         return true;
     }
+    // The active-node selection is machine identity and must never replicate:
+    // one synced copy pins the whole fleet to a single node id, and the
+    // ownership guards then refuse every other node's goals at Quality. The
+    // canonical selection lives under `runtime/` (excluded above); this rule
+    // covers the legacy root-level location so an already-replicated copy is
+    // purged from live state on the next sync instead of poisoning identity.
+    if path == std::path::Path::new(crate::tools::product::nodes::ACTIVE_NODE_FILE) {
+        return true;
+    }
     // Chat sessions are node-local conversation evidence: the record embeds
     // its full transcript and is rewritten on every provider output line, so
     // synchronizing it committed a fresh full blob of each active session per

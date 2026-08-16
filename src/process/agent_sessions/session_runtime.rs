@@ -1,5 +1,15 @@
 use super::*;
 
+/// Move a failed session's transcript out of the artifact set that supervisor
+/// cleanup deletes. Renamed in place (same directory, `.failed` suffix) so the
+/// evidence stays node-local under the runtime tree.
+fn preserve_failed_transcript(stdout_path: &Path) -> Option<PathBuf> {
+    let file_name = stdout_path.file_name()?.to_str()?;
+    let preserved = stdout_path.with_file_name(format!("{file_name}.failed"));
+    fs::rename(stdout_path, &preserved).ok()?;
+    Some(preserved)
+}
+
 /// The PTY is owned by the workflow runner, while its process record, transcript,
 /// command queue, and signal file are ordinary runtime artifacts. That split lets
 /// the daemon, browser, and CLI attach to the same Goal Agent without making a
@@ -145,6 +155,7 @@ where
         return Err(error);
     }
     let completion_timeout = launch.completion_timeout;
+    let idle_timeout = launch.idle_timeout;
     let mut metadata = launch.metadata;
     metadata.insert("kind".to_string(), json!("interactive_session"));
     metadata.insert("profile".to_string(), json!("goal"));
@@ -297,6 +308,11 @@ where
     drop(launch_lock);
 
     let reader_path = stdout_path.clone();
+    // Written by the reader thread on every PTY chunk and read by the poll
+    // loop's idle watchdog; the transcript is the liveness signal, so "no
+    // chunk for the idle budget" means the agent has stalled.
+    let last_activity = std::sync::Arc::new(std::sync::Mutex::new(std::time::Instant::now()));
+    let reader_activity = std::sync::Arc::clone(&last_activity);
     let reader_thread = thread::spawn(move || -> RefineResult<()> {
         let mut output = OpenOptions::new()
             .append(true)
@@ -312,6 +328,9 @@ where
             match reader.read(&mut buffer) {
                 Ok(0) => return Ok(()),
                 Ok(count) => {
+                    *reader_activity
+                        .lock()
+                        .expect("Goal Agent activity clock poisoned") = std::time::Instant::now();
                     output.write_all(&buffer[..count]).map_err(|error| {
                         RefineError::Io(format!(
                             "failed to append Goal Agent transcript {}: {error}",
@@ -349,6 +368,10 @@ where
             for command in read_commands_since(&command_path, &mut command_offset)? {
                 match command {
                     AgentSessionCommand::Input { data } => {
+                        *last_activity
+                            .lock()
+                            .expect("Goal Agent activity clock poisoned") =
+                            std::time::Instant::now();
                         writer
                             .write_all(data.as_bytes())
                             .and_then(|_| writer.flush())
@@ -456,6 +479,23 @@ where
                     timeout.as_secs()
                 )));
             }
+            // The idle watchdog is suspended while the agent has signalled it
+            // is waiting on a human: silence there is expected, and killing it
+            // would punish exactly the session that behaved correctly.
+            if metadata.get("attention_state").and_then(Value::as_str) != Some("needs_input")
+                && let Some(idle) = idle_timeout.filter(|idle| {
+                    last_activity
+                        .lock()
+                        .expect("Goal Agent activity clock poisoned")
+                        .elapsed()
+                        >= *idle
+                })
+            {
+                return Err(RefineError::Degraded(format!(
+                    "Goal Agent produced no output for {} seconds; failing fast instead of waiting out the completion cap",
+                    idle.as_secs()
+                )));
+            }
             thread::sleep(COMMAND_POLL_INTERVAL);
         }
     })();
@@ -465,6 +505,22 @@ where
             let _ = child.kill();
             let _ = child.wait();
             let _ = reader_thread.join();
+            // Preserve the transcript before artifact cleanup deletes it: for
+            // a timed-out or stalled agent it is the only evidence of what the
+            // session actually did, and the failure record points here.
+            let error = match preserve_failed_transcript(&stdout_path) {
+                Some(preserved) => {
+                    let note = format!("transcript preserved at {}", preserved.display());
+                    match error {
+                        RefineError::Degraded(message) => {
+                            RefineError::Degraded(format!("{message}; {note}"))
+                        }
+                        RefineError::Io(message) => RefineError::Io(format!("{message}; {note}")),
+                        other => other,
+                    }
+                }
+                None => error,
+            };
             process.state = "failed".to_string();
             let _ = supervisor.finish_artifact_handoff(artifact_handoff);
             let process_id = process.id.clone();

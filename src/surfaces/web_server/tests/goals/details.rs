@@ -373,7 +373,7 @@ fn web_server_manages_nodes_and_transfers_goal_ownership() {
     });
     assert_eq!(activated.status, 200);
     assert_eq!(activated.body["active_node_id"], "remote-qa");
-    assert!(runtime_root.join("active-node.json").exists());
+    assert!(refine_dir.join("runtime/active-node.json").exists());
     assert!(!refine_dir.join("active-node.json").exists());
 
     let transfer = server.handle(ApiRequest {

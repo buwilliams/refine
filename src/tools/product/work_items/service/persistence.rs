@@ -90,7 +90,7 @@ impl FileWorkItemService {
             .filter(|node_id| !node_id.is_empty())
             .unwrap_or("default");
         let active = self.active_node_id()?;
-        if owner == active {
+        if crate::tools::product::nodes::node_ids_match(owner, &active) {
             Ok(())
         } else {
             Err(RefineError::Conflict(format!(
@@ -111,7 +111,7 @@ impl FileWorkItemService {
             .filter(|node_id| !node_id.is_empty())
             .unwrap_or("default");
         let active = self.active_node_id()?;
-        if owner == active {
+        if crate::tools::product::nodes::node_ids_match(owner, &active) {
             Ok(())
         } else {
             Err(RefineError::Conflict(format!(

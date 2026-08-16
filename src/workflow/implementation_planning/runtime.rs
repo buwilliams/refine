@@ -94,6 +94,7 @@ pub(super) fn run_observational_phase(
                 "agent_hard_cap_seconds",
                 7200,
             ) as u64)),
+            idle_timeout: crate::workflow::agent_idle_timeout(&ctx.settings),
         },
         |attention| {
             let _ = ctx.log(
@@ -155,7 +156,30 @@ pub(super) fn run_observational_phase(
         Some(result) => serde_json::to_string(&result).map_err(|error| {
             RefineError::Serialization(format!("failed to encode planning result: {error}"))
         })?,
-        None => result.output,
+        // An accepted completed signal always carries `planning_result`, so its
+        // absence means the agent exited without ever signalling completion.
+        // Decoding the terminal transcript in its place is guaranteed to fail
+        // the structured-output contract with a misleading plan-JSON diagnostic
+        // and burns every repair attempt reproducing the same shape; fail as
+        // the infrastructure fault it is instead.
+        None => {
+            let error = RefineError::Degraded(format!(
+                "implementation {phase} agent exited without a structured completion signal; its terminal transcript is not a plan and was not decoded"
+            ));
+            let failure_result = record_failure(
+                ctx,
+                plan,
+                ImplementationPlanningFailure {
+                    phase: phase_state,
+                    category: "provider".to_string(),
+                    message: error.to_string(),
+                    failed_at: now_timestamp(),
+                    git_before: Some(git_before),
+                    git_after: Some(git_after),
+                },
+            );
+            return Err(failure_or_persistence_error(error, failure_result));
+        }
     };
     Ok(PlanningPhaseRun {
         started_at,

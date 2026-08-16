@@ -79,10 +79,23 @@ impl FileNodeRegistryService {
         &self,
         nodes: &[Node],
     ) -> RefineResult<(String, Vec<NodeIdentityDiagnostic>)> {
-        let path = self.active_path();
-        if !path.exists() {
-            return Ok((DEFAULT_NODE_ID.to_string(), Vec::new()));
-        }
+        let canonical = self.active_path();
+        let mut diagnostics = Vec::new();
+        // The canonical machine-local selection is the only authority. A
+        // pre-canonical daemon port root is read once as a migration source;
+        // a root-level file in the synchronized state tree is never read —
+        // git sync replicated exactly such a file fleet-wide, pinning every
+        // node to one machine's identity.
+        let (path, migrating) = if canonical.exists() {
+            (canonical, false)
+        } else if let Some(legacy) = self.legacy_active_path().filter(|path| path.exists()) {
+            (legacy, true)
+        } else {
+            if self.refine_dir.join(super::ACTIVE_NODE_FILE).exists() {
+                diagnostics.push(synced_selection_diagnostic());
+            }
+            return Ok((DEFAULT_NODE_ID.to_string(), diagnostics));
+        };
         let bytes = fs::read(&path).map_err(|error| {
             RefineError::Io(format!(
                 "failed to read active node {}: {error}",
@@ -96,7 +109,6 @@ impl FileNodeRegistryService {
             ))
         })?;
 
-        let mut diagnostics = Vec::new();
         let selected =
             if let Ok(selection) = serde_json::from_value::<ActiveNodeSelection>(value.clone()) {
                 if !same_refine_dir(&self.refine_dir, Path::new(&selection.refine_dir)) {
@@ -116,18 +128,25 @@ impl FileNodeRegistryService {
                     .filter(|id| !id.trim().is_empty())
                     .unwrap_or(DEFAULT_NODE_ID)
                     .to_string();
-                if self.active_root.is_some() && legacy_id != DEFAULT_NODE_ID {
+                if legacy_id != DEFAULT_NODE_ID {
                     diagnostics.push(legacy_selection_diagnostic(&legacy_id));
                     DEFAULT_NODE_ID.to_string()
                 } else {
                     legacy_id
                 }
             };
+        let selected = selected.trim().to_ascii_lowercase();
 
         if nodes
             .iter()
             .any(|node| node.id == selected && !node.archived)
         {
+            if migrating && diagnostics.is_empty() {
+                // Adopt the port-root selection into the canonical location so
+                // every later resolution — daemonless CLI included — agrees.
+                // Best-effort: resolution must stay read-only on failure.
+                let _ = self.save_active_node_id(&selected);
+            }
             return Ok((selected, diagnostics));
         }
         diagnostics.push(invalid_selection_diagnostic(&selected));
@@ -187,6 +206,14 @@ fn project_mismatch_diagnostic(
             current_refine_dir.display()
         ),
         recovery_action: "Run `refine node activate <node-id>` while this project is attached to establish its local active identity.".to_string(),
+    }
+}
+
+fn synced_selection_diagnostic() -> NodeIdentityDiagnostic {
+    NodeIdentityDiagnostic {
+        code: "synced_active_node_selection_ignored".to_string(),
+        message: "Ignored an active-node selection at the synchronized state root: that location replicates between fleet nodes, so it cannot identify this machine. This project is using node id \"default\" until a local selection is recorded.".to_string(),
+        recovery_action: "Run `refine node activate <node-id>` on this machine to record its machine-local active identity.".to_string(),
     }
 }
 

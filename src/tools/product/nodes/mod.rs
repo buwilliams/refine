@@ -11,14 +11,29 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 
 pub const NODE_REGISTRY_FILE: &str = "nodes.json";
 pub const ACTIVE_NODE_FILE: &str = "active-node.json";
+/// Subdirectory of the live state tree that `refine/state` synchronization
+/// excludes as node-local runtime data.
+const RUNTIME_LOCAL_DIR: &str = "runtime";
 
 mod identity;
 use identity::identity_for_node;
 pub use identity::{ActiveNodeIdentity, NodeIdentity};
 
+/// Compare node identifiers. Ids are canonically lowercase (`clean_node_id`),
+/// but fleet registries and stamped goal records predating that validation
+/// carry ids like `BO2LNXIPSAPP01`; a byte-exact comparison makes such an
+/// owner invisible to its own node, so authority checks match
+/// case-insensitively.
+pub fn node_ids_match(a: &str, b: &str) -> bool {
+    a.trim().eq_ignore_ascii_case(b.trim())
+}
+
 #[derive(Clone, Debug)]
 pub struct FileNodeRegistryService {
     pub refine_dir: PathBuf,
+    /// Pre-canonical location of the active selection (a daemon port root).
+    /// Read only to migrate an existing selection into `active_path()`; every
+    /// resolution and write uses the canonical path.
     pub active_root: Option<PathBuf>,
 }
 
@@ -50,11 +65,25 @@ impl FileNodeRegistryService {
         self.refine_dir.join(NODE_REGISTRY_FILE)
     }
 
+    /// The single authoritative location of this machine's active-node
+    /// selection. It lives under `runtime/`, the subtree `refine/state`
+    /// synchronization excludes, because node identity is the one fact that
+    /// must never replicate between fleet nodes: a synced selection pins every
+    /// node to one identity and the ownership guards then refuse all other
+    /// nodes' work. Every constructor resolves the same path, so daemon and
+    /// daemonless CLI can never disagree about who the active node is.
     pub fn active_path(&self) -> PathBuf {
+        self.refine_dir
+            .join(RUNTIME_LOCAL_DIR)
+            .join(ACTIVE_NODE_FILE)
+    }
+
+    /// Where a pre-canonical daemon recorded the selection, if this service
+    /// was given that root. Used only as a one-time migration source.
+    fn legacy_active_path(&self) -> Option<PathBuf> {
         self.active_root
             .as_ref()
-            .unwrap_or(&self.refine_dir)
-            .join(ACTIVE_NODE_FILE)
+            .map(|root| root.join(ACTIVE_NODE_FILE))
     }
 
     pub fn active_node_id(&self) -> RefineResult<String> {
@@ -285,6 +314,19 @@ impl FileNodeRegistryService {
         if !registry.nodes.iter().any(|node| node.id == "default") {
             registry.nodes.insert(0, default_node("default", "Default"));
         }
+        // Registries are plain serde-parsed, so hand-edited entries bypass
+        // `clean_node_id` and ids like `BO2LNXIPSAPP01` reach every byte-exact
+        // comparison. Normalize to the canonical lowercase form unless that
+        // would collide with an id the registry already holds.
+        let mut taken: std::collections::BTreeSet<String> =
+            registry.nodes.iter().map(|node| node.id.clone()).collect();
+        for node in &mut registry.nodes {
+            let normalized = node.id.trim().to_ascii_lowercase();
+            if normalized != node.id && !normalized.is_empty() && !taken.contains(&normalized) {
+                taken.insert(normalized.clone());
+                node.id = normalized;
+            }
+        }
         Ok(registry)
     }
 
@@ -300,7 +342,15 @@ impl FileNodeRegistryService {
                 "refine_dir": self.refine_dir.display().to_string(),
                 "updated_at": now_timestamp()
             }),
-        )
+        )?;
+        // Retire superseded copies so they can neither be migrated later nor
+        // read by a pre-canonical binary that would resurrect a stale identity.
+        // The root-level copy is the one git sync used to replicate fleet-wide.
+        let _ = fs::remove_file(self.refine_dir.join(ACTIVE_NODE_FILE));
+        if let Some(legacy) = self.legacy_active_path() {
+            let _ = fs::remove_file(legacy);
+        }
+        Ok(())
     }
 }
 

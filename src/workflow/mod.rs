@@ -149,4 +149,6 @@ use implementation_planning::{
 use quality_recovery::{
     QualityRecoveryInvestigation, parse_quality_recovery_provider_output, quality_recovery_prompt,
 };
-use settings::{setting_cap_with_default_values, setting_string, setting_usize};
+use settings::{
+    agent_idle_timeout, setting_cap_with_default_values, setting_string, setting_usize,
+};

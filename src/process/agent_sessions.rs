@@ -36,6 +36,12 @@ pub struct GoalAgentLaunch {
     pub prompt: String,
     pub metadata: Map<String, Value>,
     pub completion_timeout: Option<Duration>,
+    /// Fail the session after this long without any PTY output, attached
+    /// input, or signal activity — unless the agent has signalled that it is
+    /// waiting for user input. A stalled agent then fails in minutes with its
+    /// transcript preserved instead of silently burning the whole
+    /// `completion_timeout`.
+    pub idle_timeout: Option<Duration>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
