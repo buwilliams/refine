@@ -963,17 +963,13 @@
       "reporter": "Refine",
       "rule_state": "unclassified",
       "updated": "2026-08-16T02:40:56Z",
-      "workflow_attempt_authority": {
-        "claimed_at": "2026-08-16T02:35:58Z",
-        "round_idx": 1,
-        "workflow_revision": 36
-      },
+      "workflow_attempt_authority": null,
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "quality",
+  "status": "cancelled",
   "target_branch": "main",
-  "updated": "2026-08-16T02:40:56Z",
-  "workflow_revision": 43
+  "updated": "2026-08-16T02:43:18Z",
+  "workflow_revision": 44
 }
