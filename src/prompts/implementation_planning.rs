@@ -5,7 +5,7 @@ use crate::model::goal::{
 /// A populated revise result serialized from the durable planning model.
 pub fn revision_result_contract_json() -> String {
     serde_json::to_string(&ProposedImplementationPlan {
-        summary: "one plain-language paragraph explaining what will change and why".to_string(),
+        summary: "one single-line plain-language summary of what will change and why".to_string(),
         checklist: vec![ImplementationChecklistItem {
             id: "P1".to_string(),
             description: "one implementation step that clearly advances the plan".to_string(),

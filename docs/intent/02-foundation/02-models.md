@@ -36,7 +36,7 @@ Current implementation details that matter to intent:
   and implementation discrepancies to the exact Round, pinned context digest,
   Goal/Round context, implementation and target branches, and base commit.
   The proposal and final plan remain human-readable: one plain-language,
-  top-down paragraph explaining what will change and why, followed by any
+  top-down, single-line summary explaining what will change and why, followed by any
   number of stable, one-line checklist items that clearly advance that plan and
   capture concerns that cannot safely be ignored. Detailed verification belongs
   to execution evidence. Missing planning evidence remains valid for legacy
