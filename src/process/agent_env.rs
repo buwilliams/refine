@@ -8,25 +8,24 @@
 //!
 //! Refine therefore acquires that configuration itself rather than asking the
 //! user to declare it a second time: it reads the environment the user's shell
-//! produces from both startup conventions, and an explicit `agent.env` file when
-//! one exists. Precedence, lowest to highest:
+//! produces from both startup conventions. Refine deliberately owns no
+//! configuration files outside the synchronized project state and the
+//! node-local `run/` tree, so the host shell is the only outside source.
+//! Precedence, lowest to highest:
 //!
 //! 1. the environment the daemon itself inherited
 //! 2. the user's login-shell environment (this module)
-//! 3. `<config>/refine/agent.env`, the explicit override (this module)
-//! 4. per-process variables refine sets itself, which always win
+//! 3. per-process variables refine sets itself, which always win
 //!
 //! Nothing here can fail a spawn. Every failure path yields an empty map, which
 //! leaves behaviour exactly as it was before this module existed.
 
 use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::{Command, Stdio};
 use std::sync::OnceLock;
 use std::sync::mpsc;
 use std::time::Duration;
-
-pub const AGENT_ENV_FILE: &str = "refine/agent.env";
 
 /// How long the login shell gets to print its environment. A user's rc files are
 /// arbitrary code; a daemon must not hang on first agent spawn because one of
@@ -53,75 +52,6 @@ static LOGIN_SHELL_ENV: OnceLock<BTreeMap<String, String>> = OnceLock::new();
 /// files are picked up on daemon restart rather than immediately.
 pub fn login_shell_env() -> &'static BTreeMap<String, String> {
     LOGIN_SHELL_ENV.get_or_init(capture_login_shell_env)
-}
-
-/// Variables the user declared explicitly for agents, if the file exists.
-///
-/// Read on every call rather than cached: this file exists so a user can change
-/// agent configuration, and having to restart the daemon to apply an edit would
-/// be a poor answer to the problem this module solves.
-pub fn configured_agent_env(config_root: Option<&Path>) -> BTreeMap<String, String> {
-    let Some(path) = agent_env_path(config_root) else {
-        return BTreeMap::new();
-    };
-    let Ok(contents) = std::fs::read_to_string(&path) else {
-        return BTreeMap::new();
-    };
-    parse_env_file(&contents)
-}
-
-pub fn agent_env_path(config_root: Option<&Path>) -> Option<PathBuf> {
-    let root = match config_root {
-        Some(root) => root.to_path_buf(),
-        None => match std::env::var_os("XDG_CONFIG_HOME") {
-            Some(value) if !value.is_empty() => PathBuf::from(value),
-            _ => PathBuf::from(std::env::var_os("HOME")?).join(".config"),
-        },
-    };
-    Some(root.join(AGENT_ENV_FILE))
-}
-
-/// The environment additions for one agent spawn, in precedence order.
-pub fn agent_env_overlay(config_root: Option<&Path>) -> BTreeMap<String, String> {
-    let mut overlay = login_shell_env().clone();
-    overlay.extend(configured_agent_env(config_root));
-    overlay
-}
-
-/// `KEY=VALUE` per line. Blank lines and `#` comments are skipped, as are lines
-/// without a separator, so a malformed file degrades to the lines that do parse
-/// rather than to nothing.
-fn parse_env_file(contents: &str) -> BTreeMap<String, String> {
-    let mut parsed = BTreeMap::new();
-    for line in contents.lines() {
-        let line = line.trim();
-        if line.is_empty() || line.starts_with('#') {
-            continue;
-        }
-        // `export FOO=bar` is what a user copying from their rc file will write.
-        let line = line.strip_prefix("export ").unwrap_or(line).trim_start();
-        let Some((key, value)) = line.split_once('=') else {
-            continue;
-        };
-        let key = key.trim();
-        if key.is_empty() {
-            continue;
-        }
-        parsed.insert(key.to_string(), unquote(value.trim()).to_string());
-    }
-    parsed
-}
-
-fn unquote(value: &str) -> &str {
-    for quote in ['"', '\''] {
-        if let Some(inner) = value
-            .strip_prefix(quote)
-            .and_then(|rest| rest.strip_suffix(quote))
-        {
-            return inner;
-        }
-    }
-    value
 }
 
 fn capture_login_shell_env() -> BTreeMap<String, String> {
@@ -284,43 +214,18 @@ pub fn auth_failure_hint(output: &str) -> Option<String> {
     {
         return None;
     }
-    let env_path = agent_env_path(None)
-        .map(|path| path.display().to_string())
-        .unwrap_or_else(|| format!("<config>/{AGENT_ENV_FILE}"));
-    Some(format!(
+    Some(
         "the agent CLI is not authenticated. Refine imports the environment your \
          shell exports, but a daemon does not read your shell startup files while \
-         it is already running: restart the daemon after changing them, or declare \
-         the variables your CLI needs in {env_path}"
-    ))
+         it is already running: export the variables your CLI needs from your \
+         shell startup files, then restart the daemon"
+            .to_string(),
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn env_file_parsing_accepts_what_a_user_copies_out_of_an_rc_file() {
-        let parsed = parse_env_file(
-            "# site auth\n\
-             \n\
-             CLAUDE_CODE_USE_FOUNDRY=1\n\
-             export ANTHROPIC_FOUNDRY_RESOURCE=\"nevoclaudecode01\"\n\
-             QUOTED='single'\n\
-             SPACED = padded \n\
-             not-an-assignment\n",
-        );
-
-        assert_eq!(parsed.get("CLAUDE_CODE_USE_FOUNDRY").unwrap(), "1");
-        assert_eq!(
-            parsed.get("ANTHROPIC_FOUNDRY_RESOURCE").unwrap(),
-            "nevoclaudecode01"
-        );
-        assert_eq!(parsed.get("QUOTED").unwrap(), "single");
-        assert_eq!(parsed.get("SPACED").unwrap(), "padded");
-        assert!(!parsed.contains_key("not-an-assignment"));
-        assert_eq!(parsed.len(), 4);
-    }
 
     #[test]
     fn a_nul_separated_environment_keeps_multi_line_values_and_drops_shell_locals() {
@@ -334,29 +239,6 @@ mod tests {
         assert!(!captured.contains_key("PWD"));
         assert!(!captured.contains_key("SHLVL"));
         assert!(!captured.contains_key("_"));
-    }
-
-    #[test]
-    fn the_explicit_file_overrides_the_shell_and_a_missing_file_contributes_nothing() {
-        let temp = std::env::temp_dir().join(format!("refine-agent-env-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&temp);
-
-        assert!(configured_agent_env(Some(&temp)).is_empty());
-
-        std::fs::create_dir_all(temp.join("refine")).unwrap();
-        std::fs::write(
-            temp.join(AGENT_ENV_FILE),
-            "ANTHROPIC_FOUNDRY_RESOURCE=explicit\n",
-        )
-        .unwrap();
-        assert_eq!(
-            configured_agent_env(Some(&temp))
-                .get("ANTHROPIC_FOUNDRY_RESOURCE")
-                .unwrap(),
-            "explicit"
-        );
-
-        let _ = std::fs::remove_dir_all(&temp);
     }
 
     // Runs a real shell against a synthetic HOME, so it does not depend on how the
@@ -390,7 +272,7 @@ mod tests {
     fn an_auth_failure_is_explained_and_other_failures_are_left_alone() {
         let hint = auth_failure_hint("Not logged in · Please run /login").unwrap();
         assert!(hint.contains("not authenticated"), "{hint}");
-        assert!(hint.contains("agent.env"), "{hint}");
+        assert!(hint.contains("restart the daemon"), "{hint}");
         // Case and surrounding output do not matter.
         assert!(auth_failure_hint("...\nERROR: Invalid API key\n").is_some());
         assert!(auth_failure_hint("HTTP 401 Unauthorized").is_some());
@@ -498,7 +380,5 @@ mod tests {
         // Nothing in this module returns Result: a spawn must never fail because
         // the environment could not be read.
         assert!(parse_nul_env(b"").is_empty());
-        assert!(parse_env_file("").is_empty());
-        assert!(parse_env_file("#only a comment\n").is_empty());
     }
 }

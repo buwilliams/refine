@@ -44,8 +44,8 @@ impl EffectiveLaunchEnvironment {
             insert_checked(&mut entries, key, value)?;
         }
         if *owner == ProcessOwner::Agent {
-            for (key, value) in crate::process::agent_env::agent_env_overlay(None) {
-                insert_checked(&mut entries, key.into(), value.into())?;
+            for (key, value) in crate::process::agent_env::login_shell_env() {
+                insert_checked(&mut entries, key.clone().into(), value.clone().into())?;
             }
         }
         for (key, value) in overrides {

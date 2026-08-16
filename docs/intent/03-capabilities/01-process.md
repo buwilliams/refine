@@ -32,6 +32,13 @@ Workers and direct lifecycle handoffs inherit that active executable; only
 installed service registration, deployed update, and source activation require
 the stable `bin/refine` path.
 
+Refine owns no configuration or state files outside the synchronized project
+state and `<product-home>/run`. Agent credentials and toolchain configuration
+belong to the host: Refine invokes agents with the host's shell environment —
+captured from the login shell because a daemonized Refine does not inherit it —
+and never reads Refine-owned files from the user home, XDG paths, or anywhere
+else to assemble it.
+
 ## Expected Role
 
 Managed processes record local facts such as owner, pid, state, label, output paths, limits, start time, exit code, Goal, Round, workflow state, provider, and target app. Node-local identifiers may connect local logs, sessions, operations, and child processes, and evidence may cite them as provenance. They do not grant permission to mutate a Goal or act as resumable workflow state.
