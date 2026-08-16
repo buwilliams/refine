@@ -343,10 +343,10 @@ impl Drop for AlreadyMergedQualityFixture {
     }
 }
 
-struct SmokeAiOverride(Option<OsString>);
+pub(super) struct SmokeAiOverride(Option<OsString>);
 
 impl SmokeAiOverride {
-    fn new(path: &Path) -> Self {
+    pub(super) fn new(path: &Path) -> Self {
         let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
         unsafe { std::env::set_var("REFINE_SMOKE_AI_PATH", path) };
         Self(previous)
@@ -398,7 +398,7 @@ fn assert_first_failure_details(details: &Value, candidate: &str, operation_id: 
     );
 }
 
-fn behavior_test_temp_dir(prefix: &str) -> PathBuf {
+pub(super) fn behavior_test_temp_dir(prefix: &str) -> PathBuf {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
@@ -406,7 +406,7 @@ fn behavior_test_temp_dir(prefix: &str) -> PathBuf {
     std::env::temp_dir().join(format!("refine-{prefix}-{}-{nanos}", std::process::id()))
 }
 
-fn behavior_test_git(repo: &Path, args: &[&str]) -> String {
+pub(super) fn behavior_test_git(repo: &Path, args: &[&str]) -> String {
     let output = Command::new("git")
         .args(args)
         .current_dir(repo)

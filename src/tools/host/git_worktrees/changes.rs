@@ -13,24 +13,32 @@ impl FileGitWorktreeService {
         validate_commitish(commit)?;
         let resolved_commit = self.resolve_commit(commit)?;
         if let Some(existing) = self.worktree_for_branch(branch)? {
-            let existing_git = FileGitWorktreeService {
-                root: existing.clone(),
-                runtime_root: self.runtime_root.clone(),
-                operation_id: self.operation_id.clone(),
-                process_metadata: self.process_metadata.clone(),
-            };
-            let head = existing_git.head_ref()?;
-            let status = existing_git.inspect("")?;
-            if head.commit.as_deref() != Some(resolved_commit.as_str())
-                || status.dirty_user_changes
-                || !status.refine_owned_artifacts.is_empty()
-            {
-                return Err(RefineError::Conflict(format!(
-                    "managed exact-candidate checkout {} no longer names clean commit {resolved_commit}; existing work was preserved",
-                    existing.display()
-                )));
+            if existing.exists() {
+                let existing_git = FileGitWorktreeService {
+                    root: existing.clone(),
+                    runtime_root: self.runtime_root.clone(),
+                    operation_id: self.operation_id.clone(),
+                    process_metadata: self.process_metadata.clone(),
+                };
+                let head = existing_git.head_ref()?;
+                let status = existing_git.inspect("")?;
+                if head.commit.as_deref() != Some(resolved_commit.as_str())
+                    || status.dirty_user_changes
+                    || !status.refine_owned_artifacts.is_empty()
+                {
+                    return Err(RefineError::Conflict(format!(
+                        "managed exact-candidate checkout {} no longer names clean commit {resolved_commit}; existing work was preserved",
+                        existing.display()
+                    )));
+                }
+                return Ok(existing.display().to_string());
             }
-            return Ok(existing.display().to_string());
+            // The registration outlived its directory (external cleanup); without a
+            // prune, `git worktree add` refuses because the branch is still "checked out".
+            // A candidate lock would also keep the stale registration alive through the
+            // prune, so release it first.
+            self.unlock_worktree_tolerant(&existing);
+            self.prune_stale_worktrees()?;
         }
         if self.branch_exists(branch)? {
             let existing_commit = self.resolve_commit(branch)?;

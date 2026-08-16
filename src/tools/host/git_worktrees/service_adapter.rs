@@ -92,12 +92,20 @@ impl GitWorktreeService for FileGitWorktreeService {
     fn ensure_worktree(&self, branch: &str, target: &Path) -> RefineResult<String> {
         validate_branch_name(branch)?;
         if let Some(existing) = self.worktree_for_branch(branch)? {
-            self.audit(
-                "worktree",
-                "ok",
-                json!({"branch": branch, "target": existing.display().to_string(), "reused": true}),
-            )?;
-            return Ok(existing.display().to_string());
+            if existing.exists() {
+                self.audit(
+                    "worktree",
+                    "ok",
+                    json!({"branch": branch, "target": existing.display().to_string(), "reused": true}),
+                )?;
+                return Ok(existing.display().to_string());
+            }
+            // The registration outlived its directory (external cleanup); without a
+            // prune, `git worktree add` refuses because the branch is still "checked out".
+            // A candidate lock would also keep the stale registration alive through the
+            // prune, so release it first.
+            self.unlock_worktree_tolerant(&existing);
+            self.prune_stale_worktrees()?;
         }
         let target = if target.is_absolute() {
             target.to_path_buf()
@@ -117,6 +125,9 @@ impl GitWorktreeService for FileGitWorktreeService {
         } else {
             self.git_output(&["worktree", "add", target.to_str().unwrap_or(""), branch])?;
         }
+        // Candidate worktrees must survive the repo-wide `git worktree prune` sweeps
+        // run by state sync and source promotion; locked worktrees are exempt.
+        self.lock_worktree(&target)?;
         self.audit(
             "worktree",
             "ok",

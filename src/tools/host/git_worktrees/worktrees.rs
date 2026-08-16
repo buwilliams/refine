@@ -123,6 +123,38 @@ impl FileGitWorktreeService {
         Ok(Some(commit))
     }
 
+    /// Drop worktree registrations whose directories no longer exist on disk.
+    ///
+    /// A stale registration keeps its branch "checked out", so `git worktree add`
+    /// refuses to recreate the checkout until the registration is pruned.
+    pub fn prune_stale_worktrees(&self) -> RefineResult<()> {
+        self.git_output(&["worktree", "prune"])?;
+        self.audit("worktree_prune", "ok", json!({}))
+    }
+
+    /// Lock a managed candidate worktree so repo-wide `git worktree prune` sweeps
+    /// (state sync, source promotion) cannot drop its registration.
+    pub(super) fn lock_worktree(&self, path: &Path) -> RefineResult<()> {
+        self.git_output(&[
+            "worktree",
+            "lock",
+            "--reason",
+            "refine candidate worktree",
+            path.to_str().unwrap_or(""),
+        ])?;
+        self.audit(
+            "worktree_lock",
+            "ok",
+            json!({"target": path.display().to_string()}),
+        )
+    }
+
+    /// Best-effort unlock before a registration is removed or pruned. Worktrees created
+    /// before locking existed, or by other tooling, are simply not locked.
+    pub(super) fn unlock_worktree_tolerant(&self, path: &Path) {
+        let _ = self.git_raw(&["worktree", "unlock", path.to_str().unwrap_or("")]);
+    }
+
     pub fn remove_worktree(&self, path: &Path, force: bool) -> RefineResult<()> {
         let target = path.to_str().unwrap_or("");
         if target.trim().is_empty() {
@@ -130,6 +162,9 @@ impl FileGitWorktreeService {
                 "worktree path is required".to_string(),
             ));
         }
+        // `worktree remove --force` on a locked tree demands a second --force; release
+        // the candidate lock first so every removal site keeps working unchanged.
+        self.unlock_worktree_tolerant(path);
         let mut args = vec!["worktree", "remove"];
         if force {
             args.push("--force");

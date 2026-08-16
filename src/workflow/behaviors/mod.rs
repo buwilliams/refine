@@ -861,9 +861,33 @@ impl WorkflowBehavior for WorkflowQuality {
         if ctx.reconciliation.is_some() {
             return resolve_already_merged_quality(ctx);
         }
-        let (quality_report, quality_commit) = match run_quality_correction_agent(ctx) {
-            Ok(result) => result,
+        match reuse_durable_quality_proof(ctx) {
+            Ok(Some(outcome)) => return Ok(outcome),
+            Ok(None) => {}
             Err(error) => return fail(ctx, "quality", error),
+        }
+        let reusable_correction = match persisted_quality_correction_evidence(ctx) {
+            Ok(evidence) => evidence.filter(|(_, commit)| {
+                ctx.commit.as_deref() == Some(commit.as_str())
+                    && FileGitWorktreeService::with_runtime_root(ctx.target_root, ctx.runtime_root)
+                        .resolve_commit(commit)
+                        .is_ok()
+            }),
+            Err(error) => return fail(ctx, "quality", error),
+        };
+        let (quality_report, quality_commit) = match reusable_correction {
+            Some((report, commit)) => {
+                ctx.log(
+                    "quality",
+                    "Reused persisted Quality correction evidence; re-running only the gate",
+                    Some(json_object(json!({"candidate_commit": commit}))),
+                )?;
+                (report, commit)
+            }
+            None => match run_quality_correction_agent(ctx) {
+                Ok(result) => result,
+                Err(error) => return fail(ctx, "quality", error),
+            },
         };
         ctx.commit = Some(quality_commit.clone());
         if let Err(error) = ctx
@@ -917,6 +941,76 @@ impl WorkflowBehavior for WorkflowQuality {
             reason: "Quality checks passed".to_string(),
         })
     }
+}
+
+/// Resume skip for a fully completed Quality phase: a durable proof for the exact current
+/// candidate means the phase already succeeded, so an interrupted attempt only has to replay
+/// the Quality -> Governance transition instead of re-running the correction agent and gate.
+/// The predicate is the canonical proof check — never anything weaker.
+fn reuse_durable_quality_proof(
+    ctx: &mut WorkflowContext<'_>,
+) -> RefineResult<Option<WorkflowAdvanceOutcome>> {
+    let Some(candidate) = ctx.commit.clone() else {
+        return Ok(None);
+    };
+    if ctx
+        .work_items
+        .current_round_quality_proof(&ctx.goal_id, ctx.round_idx, &candidate)?
+        .is_none()
+    {
+        return Ok(None);
+    }
+    let app_git = FileGitWorktreeService::with_runtime_root(ctx.target_root, ctx.runtime_root);
+    if app_git.resolve_commit(&candidate).is_err() {
+        return Ok(None);
+    }
+    ctx.log(
+        "quality",
+        "Reused durable Quality proof on resume",
+        Some(json_object(json!({"candidate_commit": candidate}))),
+    )?;
+    ctx.request_transition(GoalStatus::Quality, GoalStatus::Governance)?;
+    if let Some(handoff) = find_candidate_handoff(
+        ctx.runtime_root,
+        ctx.target_root,
+        &ctx.goal_id,
+        ctx.round_idx,
+    )? {
+        record_candidate_handoff_governance(ctx.runtime_root, &handoff.id, &candidate)?;
+    }
+    Ok(Some(WorkflowAdvanceOutcome::Transition {
+        from: GoalStatus::Quality,
+        to: GoalStatus::Governance,
+        reason: "Reused durable Quality proof from an interrupted attempt".to_string(),
+    }))
+}
+
+/// Resume skip for a completed correction agent: `quality_agent_report` and
+/// `quality_candidate_commit` are persisted before the gate runs, so their presence proves
+/// the expensive correction agent finished even when no gate proof exists yet.
+fn persisted_quality_correction_evidence(
+    ctx: &WorkflowContext<'_>,
+) -> RefineResult<Option<(String, String)>> {
+    let detail = ctx.work_items.show_goal_detail(&ctx.goal_id)?;
+    let Some(round) = detail
+        .get("rounds")
+        .and_then(Value::as_array)
+        .and_then(|rounds| rounds.get(ctx.round_idx))
+    else {
+        return Ok(None);
+    };
+    let report = round
+        .get("quality_agent_report")
+        .and_then(Value::as_str)
+        .filter(|value| !value.trim().is_empty());
+    let commit = round
+        .get("quality_candidate_commit")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    Ok(report
+        .zip(commit)
+        .map(|(report, commit)| (report.to_string(), commit.to_string())))
 }
 
 fn resolve_already_merged_quality(

@@ -2,6 +2,8 @@ use super::*;
 
 #[cfg(unix)]
 mod already_merged_quality_failure;
+#[cfg(unix)]
+mod quality_resume;
 
 #[test]
 fn goal_agent_context_pins_governance_and_only_enabled_guidance() {
