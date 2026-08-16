@@ -116,6 +116,9 @@ impl GitWorktreeService for FileGitWorktreeService {
         validate_branch_name(branch)?;
         if let Some(existing) = self.worktree_for_branch(branch)? {
             if existing.exists() {
+                // Re-lock on reuse so worktrees created before locking existed
+                // self-migrate to prune protection on first touch.
+                self.lock_worktree(&existing, CANDIDATE_WORKTREE_LOCK_REASON)?;
                 self.audit(
                     "worktree",
                     "ok",
@@ -150,7 +153,7 @@ impl GitWorktreeService for FileGitWorktreeService {
         }
         // Candidate worktrees must survive the repo-wide `git worktree prune` sweeps
         // run by state sync and source promotion; locked worktrees are exempt.
-        self.lock_worktree(&target)?;
+        self.lock_worktree(&target, CANDIDATE_WORKTREE_LOCK_REASON)?;
         self.audit(
             "worktree",
             "ok",

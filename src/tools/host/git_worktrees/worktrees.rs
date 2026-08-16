@@ -160,20 +160,25 @@ impl FileGitWorktreeService {
         self.audit("worktree_prune", "ok", json!({}))
     }
 
-    /// Lock a managed candidate worktree so repo-wide `git worktree prune` sweeps
-    /// (state sync, source promotion) cannot drop its registration.
-    pub(super) fn lock_worktree(&self, path: &Path) -> RefineResult<()> {
-        self.git_output(&[
+    /// Lock a managed worktree so repo-wide `git worktree prune` sweeps
+    /// (state sync, source promotion) cannot drop its registration. Tolerates
+    /// an already-locked registration so re-locking an existing worktree is a
+    /// no-op rather than a failure.
+    pub(super) fn lock_worktree(&self, path: &Path, reason: &str) -> RefineResult<()> {
+        let lock = self.git_raw(&[
             "worktree",
             "lock",
             "--reason",
-            "refine candidate worktree",
+            reason,
             path.to_str().unwrap_or(""),
         ])?;
+        if !lock.success && !trimmed_command_text(&lock).contains("already locked") {
+            return Err(RefineError::Conflict(trimmed_command_text(&lock)));
+        }
         self.audit(
             "worktree_lock",
             "ok",
-            json!({"target": path.display().to_string()}),
+            json!({"target": path.display().to_string(), "reason": reason}),
         )
     }
 
@@ -184,12 +189,7 @@ impl FileGitWorktreeService {
     }
 
     pub fn remove_worktree(&self, path: &Path, force: bool) -> RefineResult<()> {
-        let target = path.to_str().unwrap_or("");
-        if target.trim().is_empty() {
-            return Err(RefineError::InvalidInput(
-                "worktree path is required".to_string(),
-            ));
-        }
+        let target = require_worktree_target(path)?;
         // `worktree remove --force` on a locked tree demands a second --force; release
         // the candidate lock first so every removal site keeps working unchanged.
         self.unlock_worktree_tolerant(path);
@@ -197,7 +197,7 @@ impl FileGitWorktreeService {
         if force {
             args.push("--force");
         }
-        args.push(target);
+        args.push(&target);
         self.git_output(&args)?;
         self.audit(
             "worktree_remove",

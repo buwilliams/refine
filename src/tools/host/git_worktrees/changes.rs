@@ -29,6 +29,9 @@ impl FileGitWorktreeService {
                         existing.display()
                     )));
                 }
+                // Re-lock on reuse so worktrees created before locking existed
+                // self-migrate to prune protection on first touch.
+                self.lock_worktree(&existing, CANDIDATE_WORKTREE_LOCK_REASON)?;
                 return Ok(existing.display().to_string());
             }
             // The registration outlived its directory (external cleanup); without a

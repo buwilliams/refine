@@ -16,6 +16,8 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::tools::host::host_resources::HostResources;
 
 pub const GIT_AUDIT_FILE: &str = "refine-audit.jsonl";
+/// Lock reason marking a managed candidate worktree in `git worktree list`.
+const CANDIDATE_WORKTREE_LOCK_REASON: &str = "refine candidate worktree";
 /// How long a Git command may go without output before it is stopped.
 ///
 /// Generous, because this only has to catch a genuinely wedged command: Git
@@ -116,6 +118,20 @@ pub enum GitRemoteRefDeleteOutcome {
 pub struct GitCommitOutcome {
     pub commit: String,
     pub has_changes_since_base: bool,
+}
+
+/// Outcome of `read_tree_merge_update`: the delta applied, or Git refused
+/// atomically because working-tree or index content collides with it.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ReadTreeMergeOutcome {
+    Applied,
+    /// Git's refusal for a working-tree or index collision, with the stderr
+    /// detail carried because callers surface it. Every other failure —
+    /// `index.lock` contention, missing objects, repository corruption — is a
+    /// real error and arrives as `Err` instead.
+    Collision {
+        detail: String,
+    },
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -344,6 +360,17 @@ fn validate_branch_name(branch: &str) -> RefineResult<()> {
         ));
     }
     Ok(())
+}
+
+/// The non-empty worktree path every registration-mutating command targets.
+fn require_worktree_target(path: &Path) -> RefineResult<String> {
+    let target = path.to_str().unwrap_or("").trim().to_string();
+    if target.is_empty() {
+        return Err(RefineError::InvalidInput(
+            "worktree path is required".to_string(),
+        ));
+    }
+    Ok(target)
 }
 
 fn validate_head_branch_ref(reference: &str) -> RefineResult<()> {

@@ -297,9 +297,12 @@ fn read_tree_merge_update_applies_clean_delta_and_refuses_collision() {
     repo_service
         .ensure_detached_worktree(&clean, &base)
         .unwrap();
-    FileGitWorktreeService::new(&clean)
-        .read_tree_merge_update(&base, &delta)
-        .unwrap();
+    assert_eq!(
+        FileGitWorktreeService::new(&clean)
+            .read_tree_merge_update(&base, &delta)
+            .unwrap(),
+        ReadTreeMergeOutcome::Applied
+    );
     assert_eq!(
         fs::read_to_string(clean.join("delta.txt")).unwrap(),
         "delta\n"
@@ -310,10 +313,13 @@ fn read_tree_merge_update_applies_clean_delta_and_refuses_collision() {
         .ensure_detached_worktree(&colliding, &base)
         .unwrap();
     fs::write(colliding.join("delta.txt"), "untracked collision\n").unwrap();
-    let error = FileGitWorktreeService::new(&colliding)
+    let outcome = FileGitWorktreeService::new(&colliding)
         .read_tree_merge_update(&base, &delta)
-        .unwrap_err();
-    assert!(error.to_string().contains("delta.txt"), "{error}");
+        .unwrap();
+    let ReadTreeMergeOutcome::Collision { detail } = outcome else {
+        panic!("expected a working-tree collision, got {outcome:?}");
+    };
+    assert!(detail.contains("delta.txt"), "{detail}");
     assert_eq!(
         fs::read_to_string(colliding.join("delta.txt")).unwrap(),
         "untracked collision\n",

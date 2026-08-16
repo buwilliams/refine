@@ -222,6 +222,15 @@ pub(super) fn goal_status(object: &Map<String, Value>) -> GoalStatus {
         .unwrap_or(GoalStatus::Backlog)
 }
 
+/// True when a Round's persisted `workflow_attempt_authority` claim names
+/// exactly this attempt. The single decoder of the claim JSON written by
+/// `claim_workflow_attempt`, so the persisted shape is compared in one place.
+pub(super) fn claim_matches_authority(claim: &Value, authority: WorkflowAttemptAuthority) -> bool {
+    claim.get("round_idx").and_then(Value::as_u64) == u64::try_from(authority.round_idx).ok()
+        && claim.get("workflow_revision").and_then(Value::as_u64)
+            == Some(authority.workflow_revision)
+}
+
 pub(super) fn require_current_attempt(
     goal_id: &str,
     object: &Map<String, Value>,
@@ -231,20 +240,11 @@ pub(super) fn require_current_attempt(
         .get("rounds")
         .and_then(Value::as_array)
         .ok_or_else(|| RefineError::Conflict(format!("Goal {goal_id} has no Round array")))?;
-    let current = rounds
+    let claim_matches = rounds
         .get(authority.round_idx)
-        .and_then(|round| round.get("workflow_attempt_authority"));
-    let current_round_idx = current
-        .and_then(|attempt| attempt.get("round_idx"))
-        .and_then(Value::as_u64)
-        .and_then(|value| usize::try_from(value).ok());
-    let current_revision = current
-        .and_then(|attempt| attempt.get("workflow_revision"))
-        .and_then(Value::as_u64);
-    if rounds.len() != authority.round_idx + 1
-        || current_round_idx != Some(authority.round_idx)
-        || current_revision != Some(authority.workflow_revision)
-    {
+        .and_then(|round| round.get("workflow_attempt_authority"))
+        .is_some_and(|claim| claim_matches_authority(claim, authority));
+    if rounds.len() != authority.round_idx + 1 || !claim_matches {
         return Err(RefineError::Conflict(format!(
             "Goal {goal_id} workflow attempt for Round {} revision {} was superseded",
             authority.round_idx + 1,

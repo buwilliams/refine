@@ -290,6 +290,39 @@ capability for the current node. Manual sync is queued in a supervised runner
 process, and the UI reports its progress and any terminal error without
 blocking the daemon.
 
+### Refine-owned durable state
+
+Beyond `refine-live-state/` and `refine-state-worktree/`, Refine keeps these
+artifacts under the target repository's Git common directory and runtime root.
+Each is normal to encounter; only the first is safe to delete by hand.
+
+- `refine-integration/target` (in the Git common directory): a permanent
+  detached worktree where integration porcelain runs, so the shared human
+  checkout never has to be clean for an integration. It is invisible to
+  `git status`, appears in `git worktree list` locked with reason
+  "refine integration workspace", and persists between integrations because
+  recreating a large checkout is expensive. Safe to purge when Refine is not
+  integrating: it self-recreates on the next integration.
+- `refine-checkout-sync-pending.json` (in the Git common directory): records a
+  checkout sync that a working-tree collision (or other sync failure) skipped.
+  While it exists, the target branch ref already points at the integrated
+  commit but the checkout's index and files still hold the pre-integration
+  content, so the checkout shows the integration delta as staged-reverse —
+  this file is the explanation. Do not delete it: it encodes the unapplied ref
+  delta, and Refine retries the sync and clears the record once the colliding
+  files are committed, stashed, or restored.
+- `refine-integrated-target-transaction.json` (in the Git common directory):
+  marks an integrated-target transaction in progress so an interrupted one is
+  recovered on the next pass. Do not delete it: it encodes which Goal owns the
+  interruption. Recovery recreates the Refine-owned integration worktree
+  instead of quarantining its residue, replays any pending checkout sync, and
+  appends what it did to `refine-integrated-target-recoveries.jsonl` alongside
+  it; only legacy shared-checkout markers still quarantine residue to a stash.
+- `refine-live-state/runtime/scheduler-holds.jsonl` (node-local, never
+  published): one JSONL line per change in why a Goal was excluded from a
+  scheduling pass (and when the hold cleared). Read it to answer "why isn't
+  this Goal scheduling".
+
 Worker machine creation is agent-operated rather than part of the Refine
 binary. Follow `docs/runbooks/manage-fleet.md` when a fleet needs another
 worker.

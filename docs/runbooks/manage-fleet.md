@@ -176,6 +176,13 @@ state appears on it before distributing work.
 - Fleet state does not appear: inspect `refine system status` and the System
   process diagnostics. Reconciliation retries automatically; users should not
   edit, stash, commit, or force-push application files to repair Refine state.
+- A Goal never schedules on its owning node: read that node's
+  `refine-live-state/runtime/scheduler-holds.jsonl` (node-local, under the
+  target repository's Git common directory). Each line records why the
+  scheduler last excluded the Goal — or that the hold cleared — so the reason
+  is never silent. See "Refine-owned durable state" in
+  `docs/runbooks/install.md` for the other Refine-owned artifacts an operator
+  may encounter.
 
 ## Recover a missing synchronization baseline
 

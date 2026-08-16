@@ -89,10 +89,7 @@ pub(super) fn last_round_is_unstarted_recovery(
     let unclaimed_or_retiring = match round.get("workflow_attempt_authority") {
         None | Some(Value::Null) => true,
         Some(claim) => retiring_authority.is_some_and(|authority| {
-            claim.get("round_idx").and_then(Value::as_u64)
-                == u64::try_from(authority.round_idx).ok()
-                && claim.get("workflow_revision").and_then(Value::as_u64)
-                    == Some(authority.workflow_revision)
+            super::workflow_attempts::claim_matches_authority(claim, authority)
         }),
     };
     automation_appended && never_logged && never_worked && unclaimed_or_retiring

@@ -7,7 +7,7 @@ use serde_json::Value;
 
 use crate::process::subprocess::write_json_atomically;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::tools::host::git_worktrees::FileGitWorktreeService;
+use crate::tools::host::git_worktrees::{FileGitWorktreeService, ReadTreeMergeOutcome};
 
 const CHECKOUT_SYNC_PENDING: &str = "refine-checkout-sync-pending.json";
 
@@ -33,16 +33,6 @@ pub(crate) enum CheckoutSyncOutcome {
     SkippedDirtyCollision { detail: String },
 }
 
-/// True only for `git read-tree -m -u`'s refusal messages for working-tree or
-/// index collisions. Every other failure — `index.lock` contention from the
-/// human's own tooling, missing objects, repository corruption — is a real
-/// error: reporting it as a collision would tell the human to commit or stash
-/// files that do not collide, and success-with-marker would hide it forever.
-fn is_working_tree_collision(detail: &str) -> bool {
-    let lower = detail.to_ascii_lowercase();
-    lower.contains("would be overwritten") || lower.contains("not uptodate")
-}
-
 /// Mirror an already-applied target ref advance into the shared human
 /// checkout's index and working tree.
 ///
@@ -63,8 +53,8 @@ pub(crate) fn sync_human_checkout_after_ref_move(
         return Ok(CheckoutSyncOutcome::NotOnTarget);
     }
     match repo_git.read_tree_merge_update(from_commit, to_commit) {
-        Ok(()) => Ok(CheckoutSyncOutcome::Synced),
-        Err(RefineError::Conflict(detail)) if is_working_tree_collision(&detail) => {
+        Ok(ReadTreeMergeOutcome::Applied) => Ok(CheckoutSyncOutcome::Synced),
+        Ok(ReadTreeMergeOutcome::Collision { detail }) => {
             record_pending_sync(
                 repo_git,
                 &reference,
@@ -134,10 +124,11 @@ pub(crate) fn repair_pending_checkout_sync(
     // points now so one repair covers every advance the collision blocked.
     let current_tip = repo_git.resolve_commit(&record.reference)?;
     match repo_git.read_tree_merge_update(&record.from_commit, &current_tip) {
-        Ok(()) => remove_pending_record(repo_git, &head),
+        Ok(ReadTreeMergeOutcome::Applied) => remove_pending_record(repo_git, &head),
         // Still colliding: keep the record and retry later. Any other
-        // failure surfaces instead of silently retrying forever.
-        Err(RefineError::Conflict(detail)) if is_working_tree_collision(&detail) => Ok(()),
+        // failure surfaces instead of silently retrying forever — a hidden
+        // failure would leave the staged-reverse checkout unexplained.
+        Ok(ReadTreeMergeOutcome::Collision { .. }) => Ok(()),
         Err(error) => Err(error),
     }
 }

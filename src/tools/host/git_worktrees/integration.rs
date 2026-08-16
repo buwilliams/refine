@@ -524,28 +524,14 @@ impl FileGitWorktreeService {
     /// directory is recreated.
     pub fn ensure_detached_worktree(&self, path: &Path, commit: &str) -> RefineResult<()> {
         validate_commitish(commit)?;
-        let target = path.to_str().unwrap_or("").trim().to_string();
-        if target.is_empty() {
-            return Err(RefineError::InvalidInput(
-                "worktree path is required".to_string(),
-            ));
-        }
+        let target = require_worktree_target(path)?;
         let valid = path.exists() && self.service_rooted_at(path).is_inside_work_tree()?;
         if !valid {
             self.purge_worktree(path)?;
             create_worktree_parent(path)?;
             self.git_output(&["worktree", "add", "--detach", &target, commit])?;
         }
-        let lock = self.git_raw(&[
-            "worktree",
-            "lock",
-            "--reason",
-            "refine integration workspace",
-            &target,
-        ])?;
-        if !lock.success && !trimmed_command_text(&lock).contains("already locked") {
-            return Err(RefineError::Conflict(trimmed_command_text(&lock)));
-        }
+        self.lock_worktree(path, "refine integration workspace")?;
         self.audit(
             "worktree_detached_ensure",
             "ok",
@@ -561,16 +547,11 @@ impl FileGitWorktreeService {
     /// best-effort; the directory removal and registration prune are
     /// authoritative.
     pub fn purge_worktree(&self, path: &Path) -> RefineResult<()> {
-        let target = path.to_str().unwrap_or("").trim().to_string();
-        if target.is_empty() {
-            return Err(RefineError::InvalidInput(
-                "worktree path is required".to_string(),
-            ));
-        }
+        let target = require_worktree_target(path)?;
         // A stale registration may still be locked, and both `worktree
         // remove` and `worktree prune` skip locked entries, so unlock
         // best-effort before tearing the remnants down.
-        let _ = self.git_raw(&["worktree", "unlock", &target]);
+        self.unlock_worktree_tolerant(path);
         let _ = self.git_raw(&["worktree", "remove", "--force", "--force", &target]);
         if path.exists() {
             fs::remove_dir_all(path).map_err(|error| {
@@ -642,17 +623,36 @@ impl FileGitWorktreeService {
 
     /// Two-tree merge of the `from`→`to` delta into the index and working
     /// tree. Git refuses atomically when a working-tree file collides with the
-    /// delta; the collision detail from stderr is carried in the returned
-    /// error because callers surface it.
-    pub fn read_tree_merge_update(&self, from_commit: &str, to_commit: &str) -> RefineResult<()> {
+    /// delta; that refusal is classified here — next to the invocation, where
+    /// knowledge of Git's exact refusal wordings belongs — and returned as the
+    /// typed `Collision` outcome. Every other failure is an error.
+    pub fn read_tree_merge_update(
+        &self,
+        from_commit: &str,
+        to_commit: &str,
+    ) -> RefineResult<ReadTreeMergeOutcome> {
         validate_commitish(from_commit)?;
         validate_commitish(to_commit)?;
-        self.git_output(&["read-tree", "-m", "-u", from_commit, to_commit])?;
+        let output = self.git_raw(&["read-tree", "-m", "-u", from_commit, to_commit])?;
+        if !output.success {
+            let detail = trimmed_command_text(&output);
+            // Only `read-tree -m -u`'s refusal messages for working-tree or
+            // index collisions. Reporting any other failure — `index.lock`
+            // contention from the human's own tooling, missing objects,
+            // repository corruption — as a collision would tell the human to
+            // commit or stash files that do not collide.
+            let lower = detail.to_ascii_lowercase();
+            if lower.contains("would be overwritten") || lower.contains("not uptodate") {
+                return Ok(ReadTreeMergeOutcome::Collision { detail });
+            }
+            return Err(RefineError::Conflict(detail));
+        }
         self.audit(
             "read_tree_merge_update",
             "ok",
             json!({"from_commit": from_commit, "to_commit": to_commit}),
-        )
+        )?;
+        Ok(ReadTreeMergeOutcome::Applied)
     }
 
     /// The fully qualified branch HEAD points at, or `None` when detached.
