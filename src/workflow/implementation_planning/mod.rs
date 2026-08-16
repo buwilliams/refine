@@ -311,12 +311,10 @@ fn load_or_initialize_plan(
         .get("implementation_plan")
         .filter(|value| !value.is_null())
     {
-        let mut plan: ImplementationPlan =
-            serde_json::from_value(raw.clone()).map_err(|error| {
-                RefineError::Serialization(format!(
-                    "invalid implementation planning evidence: {error}"
-                ))
-            })?;
+        let mut plan: ImplementationPlan = crate::structured_output::decode_persisted(
+            raw.clone(),
+            "implementation planning evidence",
+        )?;
         if plan.binding != binding {
             return Err(RefineError::Conflict(format!(
                 "Goal {} round {} implementation planning binding changed",

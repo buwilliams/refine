@@ -1,4 +1,55 @@
+use serde::{Deserialize, Serialize};
+
+use crate::structured_output::Contract;
+
 use super::*;
+
+/// The canonical Feature-import shape shown to extraction agents. The draft
+/// parser deliberately accepts more spellings (see `import_draft_from_value`),
+/// but the prompt teaches exactly this one.
+#[derive(Debug, Deserialize, Serialize)]
+pub(super) struct ImportFeatureContract {
+    feature: ImportFeatureMetaContract,
+    drafts: Vec<ImportDraftContract>,
+    implementation_goals: Vec<ImportDraftContract>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct ImportFeatureMetaContract {
+    name: String,
+    description: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct ImportDraftContract {
+    name: String,
+    prompt: String,
+    reporter: String,
+    priority: String,
+    depends_on: Vec<String>,
+}
+
+impl Contract for ImportFeatureContract {
+    const LABEL: &'static str = "Feature import JSON";
+
+    fn example() -> Self {
+        let draft = |priority: &str| ImportDraftContract {
+            name: "...".to_string(),
+            prompt: "...".to_string(),
+            reporter: String::new(),
+            priority: priority.to_string(),
+            depends_on: Vec::new(),
+        };
+        ImportFeatureContract {
+            feature: ImportFeatureMetaContract {
+                name: "...".to_string(),
+                description: "...".to_string(),
+            },
+            drafts: vec![draft("low")],
+            implementation_goals: vec![draft("medium")],
+        }
+    }
+}
 
 pub fn import_extraction_prompt(text: &str, purpose: &str) -> String {
     let template = match purpose {
@@ -10,6 +61,13 @@ pub fn import_extraction_prompt(text: &str, purpose: &str) -> String {
         "standalone_goal" => PromptTemplate::ImportStandaloneGoal,
         _ => PromptTemplate::ImportNotes,
     };
+    if matches!(template, PromptTemplate::ImportFeature) {
+        let feature_contract = ImportFeatureContract::contract_json();
+        return render(
+            template,
+            &[("text", text), ("feature_contract", &feature_contract)],
+        );
+    }
     render(template, &[("text", text)])
 }
 
@@ -33,14 +91,14 @@ pub fn parse_structured_import_result(
     output: &str,
     reporter: Option<&str>,
 ) -> Option<ImportExtractionResult> {
-    if let Ok(value) = serde_json::from_str::<Value>(output)
-        && let Some(result) = import_extraction_from_json_value(value, reporter)
-    {
-        return Some(result);
-    }
-
-    if let Some(result) = embedded_json_import_extraction(output, reporter) {
-        return Some(result);
+    let candidates = crate::structured_output::json_candidates(
+        output,
+        &crate::structured_output::DecodeOptions::new("import drafts JSON"),
+    );
+    for value in candidates {
+        if let Some(result) = import_extraction_from_json_value(value, reporter) {
+            return Some(result);
+        }
     }
 
     let json_lines = output
@@ -64,24 +122,6 @@ pub fn parse_structured_import_result(
     None
 }
 
-pub(super) fn embedded_json_import_extraction(
-    output: &str,
-    reporter: Option<&str>,
-) -> Option<ImportExtractionResult> {
-    for (idx, ch) in output.char_indices() {
-        if ch != '{' && ch != '[' {
-            continue;
-        }
-        let mut values = serde_json::Deserializer::from_str(&output[idx..]).into_iter::<Value>();
-        let Some(Ok(value)) = values.next() else {
-            continue;
-        };
-        if let Some(result) = import_extraction_from_json_value(value, reporter) {
-            return Some(result);
-        }
-    }
-    None
-}
 
 pub(super) fn import_extraction_from_json_value(
     value: Value,
@@ -162,5 +202,19 @@ pub(super) fn collect_import_draft_values(
             }
         }
         _ => {}
+    }
+}
+
+#[cfg(test)]
+mod contract_tests {
+    use super::*;
+
+    #[test]
+    fn feature_import_contract_example_roundtrips_and_yields_drafts() {
+        crate::structured_output::assert_contract_roundtrip::<ImportFeatureContract>();
+        let result =
+            parse_structured_import_result(&ImportFeatureContract::contract_json(), Some("QA"))
+                .expect("contract example must parse as an import");
+        assert_eq!(result.drafts.len(), 2);
     }
 }

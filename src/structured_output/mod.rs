@@ -11,13 +11,15 @@
 pub mod contract;
 pub mod error;
 pub mod extract;
+pub mod persisted;
 pub mod repair;
 
 #[cfg(test)]
 pub use contract::assert_contract_roundtrip;
 pub use contract::Contract;
 pub use error::{StructuredOutputError, StructuredOutputErrorKind};
-pub use extract::{DecodeOptions, Selection, decode_structured, select_value};
+pub use extract::{DecodeOptions, Selection, decode_structured, json_candidates, select_value};
+pub use persisted::decode_persisted;
 pub use repair::{
     AttemptOutcome, DIAGNOSTIC_REPAIR_ATTEMPTS, MAX_INVALID_SIGNAL_REPLACEMENTS, RepairDirective,
     RepairPolicy, run_with_repair,

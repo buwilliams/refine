@@ -133,18 +133,98 @@ fn dashboard_active_node(
     service.active_identity()
 }
 
+/// The canonical generated-rules shape shown to the agent. The parser also
+/// accepts `items`, bare arrays, `{rule}` objects, bare strings, and plain
+/// text lines.
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+struct GeneratedGovernanceRulesContract {
+    rules: Vec<String>,
+}
+
+impl crate::structured_output::Contract for GeneratedGovernanceRulesContract {
+    const LABEL: &'static str = "generated Governance rules JSON";
+
+    fn example() -> Self {
+        GeneratedGovernanceRulesContract {
+            rules: vec!["one concise rule".to_string()],
+        }
+    }
+}
+
+/// The canonical target-app config shape shown to the agent. The parser also
+/// accepts legacy command spellings and string-typed timeouts.
+#[derive(Debug, serde::Deserialize, serde::Serialize)]
+struct TargetAppConfigContract {
+    start_instructions: String,
+    stop_instructions: String,
+    build_instructions: String,
+    test_command: String,
+    status_command: String,
+    cwd: String,
+    env: serde_json::Map<String, Value>,
+    start_timeout_seconds: u64,
+    stop_timeout_seconds: u64,
+    build_timeout_seconds: u64,
+    test_timeout_seconds: u64,
+    status_timeout_seconds: u64,
+    log_path: String,
+    http_check_url: String,
+    tcp_check_host: String,
+    tcp_check_port: String,
+    process_check_command: String,
+    notes: String,
+}
+
+impl crate::structured_output::Contract for TargetAppConfigContract {
+    const LABEL: &'static str = "target-app config JSON";
+
+    fn example() -> Self {
+        TargetAppConfigContract {
+            start_instructions: "...".to_string(),
+            stop_instructions: "...".to_string(),
+            build_instructions: "...".to_string(),
+            test_command: "...".to_string(),
+            status_command: "...".to_string(),
+            cwd: ".".to_string(),
+            env: serde_json::Map::new(),
+            start_timeout_seconds: 120,
+            stop_timeout_seconds: 60,
+            build_timeout_seconds: 300,
+            test_timeout_seconds: 600,
+            status_timeout_seconds: 10,
+            log_path: "".to_string(),
+            http_check_url: "".to_string(),
+            tcp_check_host: "".to_string(),
+            tcp_check_port: "".to_string(),
+            process_check_command: "".to_string(),
+            notes: "".to_string(),
+        }
+    }
+}
+
 fn governance_generation_prompt(product: &str, constitution: &str) -> String {
+    let rules_contract =
+        <GeneratedGovernanceRulesContract as crate::structured_output::Contract>::contract_json();
     render(
         PromptTemplate::GovernanceGeneration,
-        &[("product", product), ("constitution", constitution)],
+        &[
+            ("product", product),
+            ("constitution", constitution),
+            ("rules_contract", &rules_contract),
+        ],
     )
 }
 
 fn target_app_generation_prompt(target_root: &std::path::Path) -> String {
     let target_root = target_root.display().to_string();
+    let target_app_contract =
+        <TargetAppConfigContract as crate::structured_output::Contract>::contract_json();
     render(
         PromptTemplate::TargetAppGeneration,
-        &[("target_root", &target_root)],
+        &[
+            ("target_root", &target_root),
+            ("target_app_contract", &target_app_contract),
+        ],
     )
 }
 
@@ -181,7 +261,14 @@ fn target_config_u64(value: &Value, key: &str, fallback: u64) -> u64 {
 }
 
 fn parse_generated_target_app_config(output: &str) -> Option<TargetAppGeneratedConfig> {
-    let value = serde_json::from_str::<Value>(output).ok()?;
+    let value = crate::structured_output::json_candidates(
+        output,
+        &crate::structured_output::DecodeOptions::new(
+            <TargetAppConfigContract as crate::structured_output::Contract>::LABEL,
+        ),
+    )
+    .into_iter()
+    .next()?;
     let cfg = value.get("config").unwrap_or(&value);
     let env = cfg
         .get("env")
@@ -279,7 +366,12 @@ fn generated_governance_rule(text: &str, index: usize) -> Value {
 }
 
 fn parse_generated_governance_rules(output: &str) -> Vec<Value> {
-    if let Ok(value) = serde_json::from_str::<Value>(output) {
+    for value in crate::structured_output::json_candidates(
+        output,
+        &crate::structured_output::DecodeOptions::new(
+            <GeneratedGovernanceRulesContract as crate::structured_output::Contract>::LABEL,
+        ),
+    ) {
         let rules = value
             .get("rules")
             .or_else(|| value.get("items"))

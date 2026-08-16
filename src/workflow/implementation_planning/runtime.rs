@@ -225,9 +225,7 @@ pub(super) fn current_plan(ctx: &WorkflowContext<'_>) -> RefineResult<Implementa
 }
 
 fn decode_plan(value: Value) -> RefineResult<ImplementationPlan> {
-    serde_json::from_value(value).map_err(|error| {
-        RefineError::Serialization(format!("invalid implementation planning evidence: {error}"))
-    })
+    crate::structured_output::decode_persisted(value, "implementation planning evidence")
 }
 
 pub(in crate::workflow) fn persist_plan(

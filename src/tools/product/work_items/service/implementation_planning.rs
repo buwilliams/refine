@@ -122,12 +122,13 @@ impl FileWorkItemService {
             .get("implementation_plan")
             .filter(|value| !value.is_null())
             .map(|value| {
-                serde_json::from_value::<ImplementationPlan>(value.clone()).map_err(|error| {
-                    RefineError::Serialization(format!(
-                        "Goal {goal_id} round {} has invalid implementation planning evidence: {error}",
+                crate::structured_output::decode_persisted::<ImplementationPlan>(
+                    value.clone(),
+                    &format!(
+                        "Goal {goal_id} round {} implementation planning evidence",
                         round_idx + 1
-                    ))
-                })
+                    ),
+                )
             })
             .transpose()?;
         match (expected, observed.as_ref()) {

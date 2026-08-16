@@ -252,6 +252,41 @@ fn select_json_candidate(
     ))
 }
 
+/// Every parseable JSON candidate in the output, in document order: the whole
+/// value when it parses, else fenced and balanced spans, else stringified
+/// spans. For lenient sites that probe each candidate with their own
+/// shape-specific derivation instead of one schema.
+pub fn json_candidates(output: &str, options: &DecodeOptions<'_>) -> Vec<Value> {
+    if output.len() > options.max_bytes {
+        return Vec::new();
+    }
+    let output = output.trim();
+    if let Ok(value) = serde_json::from_str::<Value>(output) {
+        return vec![value];
+    }
+    let mut candidates = Vec::new();
+    for candidate in fenced_contents(output)
+        .iter()
+        .chain(balanced_json_spans(output).iter())
+    {
+        if let Ok(value) = serde_json::from_str::<Value>(candidate.trim())
+            && !candidates.contains(&value)
+        {
+            candidates.push(value);
+        }
+    }
+    if candidates.is_empty() {
+        for candidate in stringified_json_spans(output) {
+            if let Ok(value) = serde_json::from_str::<Value>(candidate)
+                && !candidates.contains(&value)
+            {
+                candidates.push(value);
+            }
+        }
+    }
+    candidates
+}
+
 fn last_matching(
     candidates: Vec<Value>,
     matches: &dyn Fn(&Value) -> bool,
