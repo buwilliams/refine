@@ -125,9 +125,7 @@ mod governance;
 mod implementation_planning;
 mod policy;
 mod quality_recovery;
-// Crate-visible so Governance integration can stamp the checkout-sync window
-// onto the integrated-target transaction marker.
-pub(crate) mod reconciliation;
+mod reconciliation;
 mod settings;
 #[cfg(test)]
 mod tests;

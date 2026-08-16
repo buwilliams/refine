@@ -16,18 +16,16 @@ use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeServi
 use crate::tools::host::project_layout::target_root_for_refine_dir;
 use crate::tools::product::project_projection::GoalSummaryProjection;
 use crate::tools::product::work_items::FileWorkItemService;
-use crate::workflow::reconciliation::{
-    CheckoutSyncWindow, clear_checkout_sync_window, record_checkout_sync_window,
-};
-
-// Both modules are crate-visible so the integrated-target workflow lease can
-// repair pending syncs and recreate the worktree during interruption recovery.
-pub(crate) mod checkout_sync;
-pub(crate) mod integration_worktree;
+mod checkout_sync;
+mod integration_worktree;
 mod reconciliation;
+// Crate-visible so the integrated-target workflow lease can delegate the
+// durable transaction lifecycle (recovery, marker, checkout-sync window) here.
+pub(crate) mod transaction;
 
 use checkout_sync::{CheckoutSyncOutcome, sync_human_checkout_after_ref_move};
 use integration_worktree::ensure_integration_worktree;
+use transaction::{CheckoutSyncWindow, clear_checkout_sync_window, record_checkout_sync_window};
 
 pub use reconciliation::{AlreadyMergedResolution, AlreadyMergedResolutionDisposition};
 
