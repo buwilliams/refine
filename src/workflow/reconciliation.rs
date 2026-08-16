@@ -50,8 +50,12 @@ struct IntegratedTargetTransaction {
     /// lane acquired the checkout. They are a user's files and stay untouched;
     /// any untracked path beyond this baseline appeared inside the marker
     /// window and is therefore Refine residue that quarantine must capture.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    untracked_baseline: Vec<String>,
+    /// `None` — the shape every marker from pre-baseline builds decodes to —
+    /// is NOT an empty baseline: those builds acquired the lane with a user's
+    /// untracked files present and never recorded them, so recovery must not
+    /// attribute any untracked path to the interrupted lane.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    untracked_baseline: Option<Vec<String>>,
     /// Open only while the post-CAS human-checkout sync runs, so an
     /// interruption there is attributed to the sync phase — the one moment the
     /// integration-worktree lane touches the shared checkout — and recovery
@@ -127,7 +131,7 @@ impl IntegratedTargetWorkflowLease {
             commit: String::new(),
             started_at: now_timestamp(),
             workspace: TransactionWorkspace::IntegrationWorktree,
-            untracked_baseline: Vec::new(),
+            untracked_baseline: None,
             checkout_sync: None,
         };
         let encoded = serde_json::to_vec_pretty(&transaction).map_err(|error| {
@@ -226,26 +230,39 @@ fn recover_interrupted_transaction(
     };
     let details = match interrupted.workspace {
         TransactionWorkspace::IntegrationWorktree => {
-            // An interruption inside the post-CAS sync window left the human
-            // checkout behind the already-moved ref: re-attempt exactly that
-            // sync. A collision leaves the durable pending-sync marker for
+            // An interruption inside the checkout-sync window may have left
+            // the human checkout behind the ref: re-attempt that sync. The
+            // window opens before the CAS and the lane may have been dead for
+            // an arbitrary interval, so the recorded `to` proves nothing about
+            // the ref anymore — the CAS may never have happened, or a human
+            // may have committed or reset the branch since. Replaying toward
+            // the branch's CURRENT tip (exactly like
+            // `repair_pending_checkout_sync`) makes a never-applied CAS a
+            // no-op and never forces a stale `to` over newer human work. A
+            // collision leaves the durable pending-sync marker for
             // `repair_pending_checkout_sync` instead of blocking recovery.
             let checkout_sync = interrupted
                 .checkout_sync
                 .as_ref()
                 .map(|window| -> RefineResult<Value> {
+                    let current_tip =
+                        git.resolve_commit(&format!("refs/heads/{}", window.branch))?;
                     let resolution = match sync_human_checkout_after_ref_move(
                         git,
                         target_root,
                         &window.branch,
                         &window.from,
-                        &window.to,
+                        &current_tip,
                     )? {
                         CheckoutSyncOutcome::Synced => "synced",
                         CheckoutSyncOutcome::NotOnTarget => "not_on_target",
                         CheckoutSyncOutcome::SkippedDirtyCollision { .. } => "pending_sync_marker",
                     };
-                    Ok(json!({"window": window, "resolution": resolution}))
+                    Ok(json!({
+                        "window": window,
+                        "current_tip": current_tip,
+                        "resolution": resolution
+                    }))
                 })
                 .transpose()?;
             // The integration worktree is Refine-owned: interrupted residue in
@@ -266,8 +283,15 @@ fn recover_interrupted_transaction(
             // baseline included. Fleet-migration path: remove one release
             // after every node writes only integration-worktree markers.
             let status = git.inspect("")?;
-            let untracked_residue =
-                untracked_beyond_baseline(&status, &interrupted.untracked_baseline);
+            // Markers from builds that predate baseline recording decode to a
+            // `None` baseline: those builds accepted a user's untracked files
+            // at acquire and preserved them in place, so recovery of their
+            // markers quarantines only tracked changes, exactly as those
+            // builds themselves did.
+            let untracked_residue = match &interrupted.untracked_baseline {
+                Some(baseline) => untracked_beyond_baseline(&status, baseline),
+                None => Vec::new(),
+            };
             let stash_commit = if status.dirty_user_changes || !untracked_residue.is_empty() {
                 git.quarantine_worktree_changes(
                     &format!(
@@ -477,22 +501,34 @@ mod tests {
     /// The exact marker shape written while integration porcelain still ran
     /// in the shared checkout: no `workspace` field.
     fn write_legacy_marker(root: &Path, goal_id: &str, untracked_baseline: &[&str]) -> PathBuf {
+        write_legacy_marker_value(root, goal_id, Some(untracked_baseline))
+    }
+
+    /// The marker shape the deployed pre-baseline fleet builds wrote: no
+    /// `workspace` field AND no `untracked_baseline` field at all.
+    fn write_legacy_marker_without_baseline(root: &Path, goal_id: &str) -> PathBuf {
+        write_legacy_marker_value(root, goal_id, None)
+    }
+
+    fn write_legacy_marker_value(
+        root: &Path,
+        goal_id: &str,
+        untracked_baseline: Option<&[&str]>,
+    ) -> PathBuf {
         let marker = FileGitWorktreeService::new(root)
             .git_path(INTEGRATED_TARGET_TRANSACTION)
             .unwrap();
-        fs::write(
-            &marker,
-            serde_json::json!({
-                "goal_id": goal_id,
-                "round_idx": 0,
-                "branch": "main",
-                "commit": git_stdout(root, &["rev-parse", "HEAD"]),
-                "started_at": "2026-08-16T00:00:00Z",
-                "untracked_baseline": untracked_baseline
-            })
-            .to_string(),
-        )
-        .unwrap();
+        let mut fields = serde_json::json!({
+            "goal_id": goal_id,
+            "round_idx": 0,
+            "branch": "main",
+            "commit": git_stdout(root, &["rev-parse", "HEAD"]),
+            "started_at": "2026-08-16T00:00:00Z"
+        });
+        if let Some(baseline) = untracked_baseline {
+            fields["untracked_baseline"] = serde_json::json!(baseline);
+        }
+        fs::write(&marker, fields.to_string()).unwrap();
         marker
     }
 
@@ -660,6 +696,101 @@ mod tests {
         fs::remove_dir_all(root).unwrap();
     }
 
+    #[test]
+    fn pre_baseline_legacy_marker_never_attributes_untracked_files_to_the_lane() {
+        // Deployed pre-baseline builds acquired the lane with a user's
+        // untracked files present and recorded no baseline. Their markers
+        // decode with untracked_baseline: None, which must quarantine only
+        // tracked changes — exactly what those builds themselves did — not
+        // sweep every untracked file into the stash.
+        let root = repository("pre-baseline-recovery");
+        fs::write(root.join("app.txt"), "interrupted mutation\n").unwrap();
+        fs::write(root.join("scratch-notes.txt"), "human scratch file\n").unwrap();
+        write_legacy_marker_without_baseline(&root, "GOAL1");
+
+        let mut successor = IntegratedTargetWorkflowLease::acquire(&root, "GOAL2", 1).unwrap();
+
+        assert_eq!(fs::read_to_string(root.join("app.txt")).unwrap(), "base\n");
+        assert_eq!(
+            fs::read_to_string(root.join("scratch-notes.txt")).unwrap(),
+            "human scratch file\n"
+        );
+        let event = last_recovery_event(&root);
+        assert!(event["stash_commit"].as_str().is_some());
+        assert_eq!(event["untracked_residue"], serde_json::json!([]));
+        successor.finish().unwrap();
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn pre_baseline_legacy_marker_with_only_untracked_files_stashes_nothing() {
+        let root = repository("pre-baseline-untracked-only");
+        fs::write(root.join("scratch-notes.txt"), "human scratch file\n").unwrap();
+        write_legacy_marker_without_baseline(&root, "GOAL1");
+
+        let mut successor = IntegratedTargetWorkflowLease::acquire(&root, "GOAL2", 1).unwrap();
+
+        assert_eq!(
+            fs::read_to_string(root.join("scratch-notes.txt")).unwrap(),
+            "human scratch file\n"
+        );
+        let event = last_recovery_event(&root);
+        assert!(event["stash_commit"].is_null());
+        successor.finish().unwrap();
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn legacy_recovery_handles_renames_special_names_and_glob_shaped_residue() {
+        let root = repository("legacy-pathspec-recovery");
+        // A staged rename, a space-named residue file (C-quoted by porcelain
+        // v1 without -z), and a glob-shaped residue name whose fnmatch
+        // pattern would match the user's unrelated file.
+        git(&root, &["mv", "app.txt", "app2.txt"]);
+        fs::write(root.join("New Document.txt"), "interrupted residue\n").unwrap();
+        fs::write(root.join("foo[1].txt"), "interrupted residue\n").unwrap();
+        fs::write(root.join("foo1.txt"), "user file\n").unwrap();
+        write_legacy_marker(&root, "GOAL1", &["foo1.txt"]);
+
+        let mut successor = IntegratedTargetWorkflowLease::acquire(&root, "GOAL2", 1).unwrap();
+
+        assert_eq!(fs::read_to_string(root.join("app.txt")).unwrap(), "base\n");
+        assert!(!root.join("app2.txt").exists());
+        assert!(!root.join("New Document.txt").exists());
+        assert!(!root.join("foo[1].txt").exists());
+        assert_eq!(
+            fs::read_to_string(root.join("foo1.txt")).unwrap(),
+            "user file\n",
+            "a glob-shaped residue name must not sweep the user's file"
+        );
+        let event = last_recovery_event(&root);
+        assert!(event["stash_commit"].as_str().is_some());
+        successor.finish().unwrap();
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn recovery_purges_a_half_created_integration_worktree() {
+        let root = repository("broken-worktree-recovery");
+        {
+            let _interrupted = IntegratedTargetWorkflowLease::acquire(&root, "GOAL1", 0).unwrap();
+            // A crash mid `worktree add`: the directory exists but no `.git`
+            // link was written, so `git worktree remove --force` refuses it.
+            let worktree = integration_worktree(&root);
+            fs::create_dir_all(&worktree).unwrap();
+            fs::write(worktree.join("partial.txt"), "partial checkout\n").unwrap();
+        }
+
+        let mut successor = IntegratedTargetWorkflowLease::acquire(&root, "GOAL2", 1).unwrap();
+
+        assert!(
+            !integration_worktree(&root).exists(),
+            "recovery must purge a worktree with a broken registration"
+        );
+        successor.finish().unwrap();
+        fs::remove_dir_all(root).unwrap();
+    }
+
     /// The state between the ref CAS and the checkout sync: the branch ref at
     /// `to`, the index and working tree still at `from`.
     fn open_sync_window(root: &Path) -> (String, String) {
@@ -710,6 +841,56 @@ mod tests {
         assert_eq!(event["checkout_sync"]["resolution"], "synced");
         assert_eq!(event["checkout_sync"]["window"]["from"], from);
         assert_eq!(event["checkout_sync"]["window"]["to"], to);
+        successor.finish().unwrap();
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn sync_window_replay_respects_a_human_commit_made_after_the_crash() {
+        let root = repository("sync-window-human-commit");
+        let (from, to) = open_sync_window(&root);
+        // While the lane was dead, the human committed the staged-reverse
+        // state the desync displayed — deliberately reverting the
+        // integration. Replaying the recorded window verbatim would silently
+        // re-stage the integration delta on top of that revert; syncing
+        // toward the branch's current tip must leave the checkout alone.
+        git(
+            &root,
+            &["commit", "-q", "-am", "human revert of the desync"],
+        );
+        let human_commit = git_stdout(&root, &["rev-parse", "HEAD"]);
+        write_marker_with_sync_window(&root, &from, &to);
+
+        let mut successor = IntegratedTargetWorkflowLease::acquire(&root, "GOAL2", 1).unwrap();
+
+        assert_eq!(fs::read_to_string(root.join("app.txt")).unwrap(), "base\n");
+        assert!(git_stdout(&root, &["status", "--porcelain"]).is_empty());
+        assert_eq!(git_stdout(&root, &["rev-parse", "HEAD"]), human_commit);
+        let event = last_recovery_event(&root);
+        assert_eq!(event["checkout_sync"]["resolution"], "synced");
+        assert_eq!(event["checkout_sync"]["current_tip"], human_commit);
+        successor.finish().unwrap();
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn sync_window_whose_cas_never_happened_replays_as_a_noop() {
+        // The window opens before the compare-and-swap, so a death in between
+        // leaves a recorded window while the ref never moved. Replay against
+        // the current tip must not force the never-installed `to` content.
+        let root = repository("sync-window-no-cas");
+        let (from, to) = open_sync_window(&root);
+        git(&root, &["update-ref", "refs/heads/main", &from]);
+        write_marker_with_sync_window(&root, &from, &to);
+
+        let mut successor = IntegratedTargetWorkflowLease::acquire(&root, "GOAL2", 1).unwrap();
+
+        assert_eq!(fs::read_to_string(root.join("app.txt")).unwrap(), "base\n");
+        assert!(git_stdout(&root, &["status", "--porcelain"]).is_empty());
+        assert_eq!(git_stdout(&root, &["rev-parse", "main"]), from);
+        let event = last_recovery_event(&root);
+        assert_eq!(event["checkout_sync"]["resolution"], "synced");
+        assert_eq!(event["checkout_sync"]["current_tip"], from);
         successor.finish().unwrap();
         fs::remove_dir_all(root).unwrap();
     }

@@ -694,14 +694,22 @@ impl FileGovernanceIntegrationService {
         }
 
         let current_target = git.resolve_commit(&target_branch)?;
-        let merge = if git.commit_is_ancestor(&candidate_commit, &current_target)? {
-            MergeResult {
+        // The evidence must record the exact commit this integration proved or
+        // installed — never a fresh resolve of the ref, which a concurrent
+        // human commit in the shared checkout could move to a single-parent
+        // commit and permanently break the two-parent merge identification
+        // the already-merged revert machinery depends on.
+        let (merge, target_commit) = if git
+            .commit_is_ancestor(&candidate_commit, &current_target)?
+        {
+            let merge = MergeResult {
                 ok: true,
                 conflicts: Vec::new(),
                 message: Some(
                     "Exact candidate was already present in the local target branch".to_string(),
                 ),
-            }
+            };
+            (merge, current_target)
         } else {
             let worktree = ensure_integration_worktree(&git, &self.runtime_root, &current_target)?;
             let merge = worktree.git().merge_commit_no_ff(&candidate_commit)?;
@@ -720,9 +728,8 @@ impl FileGovernanceIntegrationService {
                 &current_target,
                 &merge_commit,
             )?;
-            merge
+            (merge, merge_commit)
         };
-        let target_commit = git.resolve_commit(&target_branch)?;
         if remote_configured {
             git.push(&remote, &target_branch)?;
         }
@@ -783,17 +790,15 @@ impl FileGovernanceIntegrationService {
             return Ok(TargetAdvanceOutcome::Applied);
         }
         let reference = format!("refs/heads/{target_branch}");
-        match git.update_ref_cas(&reference, to_commit, from_commit) {
-            Ok(()) => {}
-            Err(RefineError::TargetAdvanced { current, .. }) => {
-                return Ok(TargetAdvanceOutcome::CasLost { current });
-            }
-            Err(error) => return Err(error),
-        }
-        // Attribute an interruption inside the sync window to this exact
-        // phase on the integrated-target transaction marker (a no-op when no
-        // lane marker is open); recovery then re-attempts the sync instead of
-        // touching the shared checkout blindly.
+        // Attribute an interruption anywhere in the CAS-to-sync publication to
+        // this exact phase on the integrated-target transaction marker (a
+        // no-op when no lane marker is open); recovery then re-attempts the
+        // sync instead of touching the shared checkout blindly. The window
+        // MUST open before the ref moves: a death between the CAS and a later
+        // record would leave the ref advanced with no durable trace of the
+        // unsynced checkout. Recovery replays the window against the branch's
+        // current tip, so a window whose CAS never happened degrades to a
+        // no-op sync.
         record_checkout_sync_window(
             target_root,
             CheckoutSyncWindow {
@@ -802,6 +807,17 @@ impl FileGovernanceIntegrationService {
                 to: to_commit.to_string(),
             },
         )?;
+        match git.update_ref_cas(&reference, to_commit, from_commit) {
+            Ok(()) => {}
+            Err(RefineError::TargetAdvanced { current, .. }) => {
+                clear_checkout_sync_window(target_root)?;
+                return Ok(TargetAdvanceOutcome::CasLost { current });
+            }
+            // An unclassified CAS failure leaves it unknown whether the ref
+            // moved; the window stays open so recovery's replay-to-current-tip
+            // resolves either way.
+            Err(error) => return Err(error),
+        }
         let outcome = sync_human_checkout_after_ref_move(
             git,
             target_root,

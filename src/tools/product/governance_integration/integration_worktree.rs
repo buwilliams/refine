@@ -43,10 +43,9 @@ pub(crate) fn ensure_integration_worktree(
             return Ok(IntegrationWorktree { path, git });
         }
         // This tree is Refine-owned, so residue is never user work: recreate
-        // instead of quarantining. `worktree remove --force` refuses a locked
-        // worktree, hence the unlock first.
-        let _ = repo_git.unlock_worktree(&path);
-        repo_git.remove_worktree(&path, true)?;
+        // instead of quarantining. Purge tolerates the locked-by-creation
+        // state as well as a broken registration.
+        repo_git.purge_worktree(&path)?;
     }
     repo_git.ensure_detached_worktree(&path, anchor_commit)?;
     Ok(IntegrationWorktree { path, git })
@@ -70,9 +69,10 @@ pub(crate) fn remove_integration_worktree(
     if !path.exists() {
         return Ok(None);
     }
-    // `worktree remove --force` refuses a locked worktree, hence the
-    // best-effort unlock first.
-    let _ = repo_git.unlock_worktree(&path);
-    repo_git.remove_worktree(&path, true)?;
+    // Purge rather than a single `worktree remove --force`: recovery runs
+    // against trees whose registration may be broken (a crash mid `worktree
+    // add`), and a failing removal here would wedge every subsequent lease
+    // acquire on this checkout.
+    repo_git.purge_worktree(&path)?;
     Ok(Some(path))
 }

@@ -1,5 +1,7 @@
 use super::*;
-use crate::tools::product::governance_integration::integration_worktree::ensure_integration_worktree;
+use crate::tools::product::governance_integration::integration_worktree::{
+    ensure_integration_worktree, remove_integration_worktree,
+};
 use crate::tools::product::worktree_cleanup::{FileWorktreeCleanupService, WorktreeCleanupOptions};
 
 struct IntegrationWorktreeFixture {
@@ -98,6 +100,33 @@ fn ensure_integration_worktree_creates_reuses_and_recreates() {
             &["worktree", "remove", recreated.path.to_str().unwrap()]
         ),
         "recreated worktree must be locked again"
+    );
+
+    fs::remove_dir_all(fixture.temp_root).unwrap();
+}
+
+#[test]
+fn remove_integration_worktree_purges_a_broken_registration() {
+    let fixture = IntegrationWorktreeFixture::new("integration-worktree-broken");
+    let repo_git = fixture.repo_git();
+    // A crash mid `worktree add`: the directory exists with content but no
+    // `.git` link, so a plain `git worktree remove --force` would refuse it
+    // ("is not a working tree") and wedge recovery forever.
+    let path = fixture.repo.join(".git/refine-integration/target");
+    fs::create_dir_all(&path).unwrap();
+    fs::write(path.join("partial.txt"), "partial checkout\n").unwrap();
+
+    let removed = remove_integration_worktree(&repo_git).unwrap();
+
+    assert_eq!(removed.as_deref(), Some(path.as_path()));
+    assert!(!path.exists());
+    // The purge leaves the repository able to create the tree again.
+    let recreated =
+        ensure_integration_worktree(&repo_git, &fixture.runtime_root, &fixture.base_commit)
+            .unwrap();
+    assert_eq!(
+        git_stdout(&recreated.path, &["rev-parse", "HEAD"]),
+        fixture.base_commit
     );
 
     fs::remove_dir_all(fixture.temp_root).unwrap();

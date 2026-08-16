@@ -1,5 +1,7 @@
 use super::*;
-use crate::tools::product::governance_integration::checkout_sync::repair_pending_checkout_sync;
+use crate::tools::product::governance_integration::checkout_sync::{
+    CheckoutSyncOutcome, repair_pending_checkout_sync, sync_human_checkout_after_ref_move,
+};
 
 const GOAL: &str = "GOAL1";
 const BRANCH: &str = "refine/GOAL1/round-1";
@@ -423,7 +425,10 @@ fn colliding_dirt_skips_the_sync_and_repair_clears_the_marker() {
         "human edit in flight\n"
     );
     let marker_path = fixture.repo.join(MARKER);
-    let marker: Value = serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
+    let records: Value = serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
+    let records = records.as_array().unwrap();
+    assert_eq!(records.len(), 1, "one record per target branch");
+    let marker = &records[0];
     assert_eq!(marker["reference"], "refs/heads/main");
     assert_eq!(marker["from_commit"], fixture.base_commit);
     assert_eq!(marker["to_commit"], integration.target_commit);
@@ -462,5 +467,123 @@ fn colliding_dirt_skips_the_sync_and_repair_clears_the_marker() {
 
     // A repeated repair with no marker is a no-op.
     repair_pending_checkout_sync(&fixture.repo_git(), &fixture.repo).unwrap();
+    fixture.finish();
+}
+
+#[test]
+fn pending_sync_records_for_different_branches_coexist_and_repair_independently() {
+    let temp_root = unique_temp_dir("pending-sync-per-branch");
+    let repo = temp_root.join("repo");
+    fs::create_dir_all(&repo).unwrap();
+    init_repo(&repo);
+    commit_file(&repo, "app.txt", "base\n", "base");
+    let base = git_stdout(&repo, &["rev-parse", "HEAD"]);
+    git(&repo, &["branch", "alpha"]).unwrap();
+    let repo_git = FileGitWorktreeService::new(&repo);
+    let marker_path = repo.join(MARKER);
+
+    // Desync a branch: advance its ref past the checkout, then collide.
+    let open_collision = |branch: &str, content: &str| {
+        git(&repo, &["switch", branch]).unwrap();
+        commit_file(
+            &repo,
+            "app.txt",
+            content,
+            &format!("integrated on {branch}"),
+        );
+        let to = git_stdout(&repo, &["rev-parse", "HEAD"]);
+        git(&repo, &["reset", "-q", "--hard", &base]).unwrap();
+        git(&repo, &["update-ref", &format!("refs/heads/{branch}"), &to]).unwrap();
+        fs::write(repo.join("app.txt"), "human edit in flight\n").unwrap();
+        let outcome =
+            sync_human_checkout_after_ref_move(&repo_git, &repo, branch, &base, &to).unwrap();
+        assert!(matches!(
+            outcome,
+            CheckoutSyncOutcome::SkippedDirtyCollision { .. }
+        ));
+        git(&repo, &["checkout", "--", "app.txt"]).unwrap();
+        to
+    };
+    let main_to = open_collision("main", "integrated on main\n");
+    let alpha_to = open_collision("alpha", "integrated on alpha\n");
+
+    // A collision on alpha must not discard main's still-pending record.
+    let records: Value = serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
+    let references: Vec<&str> = records
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|record| record["reference"].as_str().unwrap())
+        .collect();
+    assert_eq!(references, vec!["refs/heads/main", "refs/heads/alpha"]);
+
+    // Repair on alpha clears only alpha's record.
+    repair_pending_checkout_sync(&repo_git, &repo).unwrap();
+    assert_eq!(git_stdout(&repo, &["rev-parse", "HEAD"]), alpha_to);
+    assert!(git_stdout(&repo, &["status", "--porcelain"]).is_empty());
+    let records: Value = serde_json::from_str(&fs::read_to_string(&marker_path).unwrap()).unwrap();
+    let records = records.as_array().unwrap();
+    assert_eq!(records.len(), 1);
+    assert_eq!(records[0]["reference"], "refs/heads/main");
+
+    // Back on main, repair replays main's record and removes the file.
+    git(&repo, &["switch", "main"]).unwrap();
+    repair_pending_checkout_sync(&repo_git, &repo).unwrap();
+    assert_eq!(git_stdout(&repo, &["rev-parse", "HEAD"]), main_to);
+    assert_eq!(
+        fs::read_to_string(repo.join("app.txt")).unwrap(),
+        "integrated on main\n"
+    );
+    assert!(!marker_path.exists());
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn non_collision_sync_failure_surfaces_and_repair_replays_the_missed_sync() {
+    let fixture = DetachedIntegrationFixture::new("detached-index-lock", |worktree| {
+        commit_file(worktree, "feature.txt", "candidate\n", "candidate");
+    });
+    // The human's own tooling holds the shared checkout's index lock, so the
+    // post-CAS `read-tree` fails without any working-tree collision. That must
+    // surface as an error — not masquerade as a dirty-file collision telling
+    // the human to commit files that do not collide — while still leaving a
+    // durable pending record so the missed sync heals once the lock is gone.
+    let index_lock = fixture.repo.join(".git/index.lock");
+    fs::write(&index_lock, "").unwrap();
+
+    let error = fixture.integrate().unwrap_err();
+    assert!(error.to_string().contains("index.lock"), "{error}");
+    let advanced = git_stdout(&fixture.repo, &["rev-parse", "main"]);
+    assert_ne!(
+        advanced, fixture.base_commit,
+        "the ref advance already happened"
+    );
+    assert!(!fixture.repo.join("feature.txt").exists());
+    let records: Value =
+        serde_json::from_str(&fs::read_to_string(fixture.repo.join(MARKER)).unwrap()).unwrap();
+    let reason = records[0]["reason"].as_str().unwrap();
+    assert!(
+        reason.contains("without a working-tree collision"),
+        "{reason}"
+    );
+    assert!(
+        !reason.contains("colliding files are committed"),
+        "a lock failure must not instruct the human to fix a collision: {reason}"
+    );
+
+    fs::remove_file(&index_lock).unwrap();
+    repair_pending_checkout_sync(&fixture.repo_git(), &fixture.repo).unwrap();
+    assert!(!fixture.repo.join(MARKER).exists());
+    assert_eq!(
+        fs::read_to_string(fixture.repo.join("feature.txt")).unwrap(),
+        "candidate\n"
+    );
+    assert!(git_stdout(&fixture.repo, &["status", "--porcelain"]).is_empty());
+
+    // The retried integration recognizes the already-advanced target and
+    // records the merge commit that is actually on the branch.
+    let integration = fixture.integrate().unwrap();
+    assert_eq!(integration.target_commit, advanced);
     fixture.finish();
 }

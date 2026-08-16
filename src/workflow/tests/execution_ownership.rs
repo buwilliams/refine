@@ -52,8 +52,7 @@ fn tracked_dirt_in_the_shared_checkout_no_longer_holds_the_goal() {
     // Integration porcelain runs in the detached integration worktree, so
     // shared-checkout dirt no longer parks the Goal behind a workspace hold,
     // and the human's edit stayed untouched.
-    let holds =
-        fs::read_to_string(runtime_root.join("scheduler-holds.jsonl")).unwrap_or_default();
+    let holds = fs::read_to_string(runtime_root.join("scheduler-holds.jsonl")).unwrap_or_default();
     assert!(
         !holds
             .lines()
