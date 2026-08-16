@@ -123,6 +123,15 @@ impl FileGitWorktreeService {
         Ok(Some(commit))
     }
 
+    /// Drop worktree registrations whose directories no longer exist on disk.
+    ///
+    /// A stale registration keeps its branch "checked out", so `git worktree add`
+    /// refuses to recreate the checkout until the registration is pruned.
+    pub fn prune_stale_worktrees(&self) -> RefineResult<()> {
+        self.git_output(&["worktree", "prune"])?;
+        self.audit("worktree_prune", "ok", json!({}))
+    }
+
     pub fn remove_worktree(&self, path: &Path, force: bool) -> RefineResult<()> {
         let target = path.to_str().unwrap_or("");
         if target.trim().is_empty() {

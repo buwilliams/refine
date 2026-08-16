@@ -5,6 +5,7 @@ mod failure_settlement;
 mod governance;
 mod planning_repair;
 mod quality_recovery;
+mod worktree_resume;
 
 use super::*;
 use crate::model::workflow::GoalStatus;

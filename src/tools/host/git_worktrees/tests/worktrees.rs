@@ -165,6 +165,41 @@ fn file_git_worktree_service_branches_worktrees_diffs_commits_pathspecs_and_push
 }
 
 #[test]
+fn ensure_worktree_recreates_checkout_after_its_directory_was_removed() {
+    let temp_root = unique_temp_dir("git-worktree-stale-registration");
+    let repo = temp_root.join("repo");
+    let target = temp_root.join("candidate");
+    fs::create_dir_all(&repo).unwrap();
+    init_repo(&repo);
+    commit_file(&repo, "base.txt", "base\n", "initial");
+
+    let service = FileGitWorktreeService::new(&repo);
+    let created = PathBuf::from(
+        service
+            .ensure_worktree("refine/stale/round-1", &target)
+            .unwrap(),
+    );
+    let tip = git_stdout(&created, &["rev-parse", "HEAD"]);
+    // External cleanup removes only the directory; the registration stays behind
+    // and keeps the branch "checked out".
+    fs::remove_dir_all(&created).unwrap();
+
+    let recreated = PathBuf::from(
+        service
+            .ensure_worktree("refine/stale/round-1", &target)
+            .unwrap(),
+    );
+    assert_eq!(recreated, target);
+    assert!(recreated.join(".git").exists());
+    assert_eq!(current_branch(&recreated), "refine/stale/round-1");
+    assert_eq!(git_stdout(&recreated, &["rev-parse", "HEAD"]), tip);
+    let audit = fs::read_to_string(service.audit_path().unwrap()).unwrap();
+    assert!(audit.contains("\"action\":\"worktree_prune\""));
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn file_git_worktree_service_bootstraps_unborn_repo_for_worktree() {
     let temp_root = unique_temp_dir("git-worktree-unborn");
     let repo = temp_root.join("repo");

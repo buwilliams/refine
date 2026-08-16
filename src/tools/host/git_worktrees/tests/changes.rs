@@ -1,6 +1,38 @@
 use super::*;
 
 #[test]
+fn ensure_worktree_at_commit_recreates_checkout_after_its_directory_was_removed() {
+    let temp_root = unique_temp_dir("git-exact-worktree-stale-registration");
+    let repo = temp_root.join("repo");
+    let target = temp_root.join("exact");
+    fs::create_dir_all(&repo).unwrap();
+    init_repo(&repo);
+    commit_file(&repo, "base.txt", "base\n", "initial");
+    let commit = git_stdout(&repo, &["rev-parse", "HEAD"]);
+
+    let service = FileGitWorktreeService::new(&repo);
+    let created = PathBuf::from(
+        service
+            .ensure_worktree_at_commit("refine/exact/round-1", &target, &commit)
+            .unwrap(),
+    );
+    // External cleanup removes only the directory; the registration stays behind
+    // and keeps the branch "checked out".
+    fs::remove_dir_all(&created).unwrap();
+
+    let recreated = PathBuf::from(
+        service
+            .ensure_worktree_at_commit("refine/exact/round-1", &target, &commit)
+            .unwrap(),
+    );
+    assert_eq!(recreated, target);
+    assert_eq!(current_branch(&recreated), "refine/exact/round-1");
+    assert_eq!(git_stdout(&recreated, &["rev-parse", "HEAD"]), commit);
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn changes_between_many_maps_multiple_ranges_from_one_commit_graph() {
     let temp_root = unique_temp_dir("git-change-ranges");
     let repo = temp_root.join("repo");

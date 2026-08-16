@@ -92,12 +92,17 @@ impl GitWorktreeService for FileGitWorktreeService {
     fn ensure_worktree(&self, branch: &str, target: &Path) -> RefineResult<String> {
         validate_branch_name(branch)?;
         if let Some(existing) = self.worktree_for_branch(branch)? {
-            self.audit(
-                "worktree",
-                "ok",
-                json!({"branch": branch, "target": existing.display().to_string(), "reused": true}),
-            )?;
-            return Ok(existing.display().to_string());
+            if existing.exists() {
+                self.audit(
+                    "worktree",
+                    "ok",
+                    json!({"branch": branch, "target": existing.display().to_string(), "reused": true}),
+                )?;
+                return Ok(existing.display().to_string());
+            }
+            // The registration outlived its directory (external cleanup); without a
+            // prune, `git worktree add` refuses because the branch is still "checked out".
+            self.prune_stale_worktrees()?;
         }
         let target = if target.is_absolute() {
             target.to_path_buf()

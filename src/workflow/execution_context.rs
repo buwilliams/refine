@@ -39,11 +39,7 @@ pub(super) fn hydrate_retry_context(
                 ctx.round_idx + 1
             ))
         })?;
-    let worktree = FileGitWorktreeService::with_runtime_root(ctx.target_root, ctx.runtime_root)
-        .existing_worktree_for_branch(&branch)?;
     ctx.branch = Some(branch.clone());
-    ctx.worktree_path = worktree.as_ref().map(|path| path.display().to_string());
-    ctx.agent_cwd = worktree;
     ctx.provider_output = Some(
         round
             .get("implementation_report")
@@ -166,6 +162,18 @@ pub(super) fn hydrate_retry_context(
             ctx.reconciliation_state = Some("detected".to_string());
         }
     }
+    if ctx.reconciliation_state.is_none() || current == GoalStatus::Governance {
+        ensure_resumed_candidate_worktree(ctx, &branch, &candidate, &base)?;
+    } else {
+        // The Quality-reconciliation lane materializes its own exact-candidate checkout
+        // inside the quality runner; a stale worktree registration must not surface as a
+        // phantom path here.
+        let worktree = FileGitWorktreeService::with_runtime_root(ctx.target_root, ctx.runtime_root)
+            .existing_worktree_for_branch(&branch)?
+            .filter(|path| path.exists());
+        ctx.worktree_path = worktree.as_ref().map(|path| path.display().to_string());
+        ctx.agent_cwd = worktree;
+    }
     ctx.start_status = current.clone();
     ctx.log(
         "workflow",
@@ -175,6 +183,85 @@ pub(super) fn hydrate_retry_context(
             "branch": branch,
             "candidate_commit": candidate,
             "round": ctx.round_idx + 1
+        }))),
+    )
+}
+
+/// Rebuilds the candidate worktree for a resumed Goal when external cleanup removed it.
+///
+/// The Round branch and recorded candidate commit are the durable contract; the worktree
+/// directory is disposable scratch space. Resume therefore re-materializes the checkout the
+/// same way `hydrate_plan_or_implement_context` does instead of failing terminally on the
+/// missing directory, and fails closed only when the branch no longer contains the recorded
+/// candidate.
+fn ensure_resumed_candidate_worktree(
+    ctx: &mut WorkflowContext<'_>,
+    branch: &str,
+    candidate: &str,
+    base: &str,
+) -> RefineResult<()> {
+    let git = FileGitWorktreeService::with_runtime_root(ctx.target_root, ctx.runtime_root);
+    let prior_handoff = find_candidate_handoff(
+        ctx.runtime_root,
+        ctx.target_root,
+        &ctx.goal_id,
+        ctx.round_idx,
+    )?;
+    // Reuse the active handoff's exact identity so its validation keeps matching the
+    // re-registered operation, even after a candidate refresh moved the Goal's base.
+    let target = match prior_handoff.as_ref().and_then(|operation| {
+        operation
+            .request
+            .get("worktree_path")
+            .and_then(Value::as_str)
+    }) {
+        Some(path) => PathBuf::from(path),
+        None => git
+            .git_path("refine-worktrees")?
+            .join(branch.replace('/', "-")),
+    };
+    let base = prior_handoff
+        .as_ref()
+        .and_then(|operation| operation.request.get("base_commit").and_then(Value::as_str))
+        .unwrap_or(base);
+    let (worktree, handoff) = with_repository_git_lock(ctx.target_root, || {
+        let worktree = match git.resolve_commit(&format!("refs/heads/{branch}")) {
+            Ok(tip) => {
+                if tip != candidate && !matches!(git.commit_is_ancestor(candidate, &tip), Ok(true))
+                {
+                    return Err(RefineError::Conflict(format!(
+                        "Goal {} cannot resume: branch {branch} names {tip}, which does not contain recorded candidate {candidate}; existing work was preserved",
+                        ctx.goal_id
+                    )));
+                }
+                git.ensure_worktree(branch, &target)?
+            }
+            // The branch ref is gone (external cleanup): pin the exact recorded candidate
+            // without moving any other ref.
+            Err(_) => git.ensure_worktree_at_commit(branch, &target, candidate)?,
+        };
+        let handoff = register_candidate_handoff(
+            ctx.runtime_root,
+            ctx.target_root,
+            &ctx.goal_id,
+            ctx.round_idx,
+            &ctx.node_id,
+            branch,
+            &worktree,
+            base,
+        )?;
+        Ok((worktree, handoff))
+    })?;
+    ctx.worktree_path = Some(worktree.clone());
+    ctx.candidate_handoff_operation_id = Some(handoff.id);
+    ctx.agent_cwd = Some(PathBuf::from(&worktree));
+    ctx.log(
+        "workflow",
+        "Ensured candidate worktree while resuming",
+        Some(json_object(json!({
+            "branch": branch,
+            "worktree": worktree,
+            "candidate_commit": candidate
         }))),
     )
 }
