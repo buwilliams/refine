@@ -25,6 +25,7 @@ impl FileWorkItemService {
         &self,
         goal_id: &str,
         round_idx: usize,
+        retiring_authority: Option<WorkflowAttemptAuthority>,
         attempt: u32,
         analysis: &str,
         prompt: &str,
@@ -32,6 +33,7 @@ impl FileWorkItemService {
         self.queue_automatic_recovery_summary(
             goal_id,
             round_idx,
+            retiring_authority,
             attempt,
             &GoalStatus::Governance,
             "governance",
@@ -44,6 +46,7 @@ impl FileWorkItemService {
         &self,
         goal_id: &str,
         round_idx: usize,
+        retiring_authority: Option<WorkflowAttemptAuthority>,
         attempt: u32,
         analysis: &str,
         prompt: &str,
@@ -51,6 +54,7 @@ impl FileWorkItemService {
         self.queue_automatic_recovery_summary(
             goal_id,
             round_idx,
+            retiring_authority,
             attempt,
             &GoalStatus::Quality,
             "quality",
@@ -64,6 +68,7 @@ impl FileWorkItemService {
         &self,
         goal_id: &str,
         round_idx: usize,
+        retiring_authority: Option<WorkflowAttemptAuthority>,
         attempt: u32,
         source_status: &GoalStatus,
         kind: &str,
@@ -94,7 +99,7 @@ impl FileWorkItemService {
                 "Goal {goal_id} round changed before automatic {kind} recovery"
             )));
         }
-        let reuse_inert = last_round_is_unstarted_recovery(rounds);
+        let reuse_inert = last_round_is_unstarted_recovery(rounds, retiring_authority);
         let now = now_timestamp();
         let source = rounds
             .get_mut(round_idx)
@@ -125,6 +130,7 @@ impl FileWorkItemService {
         &self,
         goal_id: &str,
         round_idx: usize,
+        retiring_authority: Option<WorkflowAttemptAuthority>,
         recorded_reconciliation_state: &str,
         candidate_commit: &str,
         target_branch: &str,
@@ -170,7 +176,7 @@ impl FileWorkItemService {
                 rounds.len()
             )));
         }
-        let reuse_inert = last_round_is_unstarted_recovery(rounds);
+        let reuse_inert = last_round_is_unstarted_recovery(rounds, retiring_authority);
 
         let now = now_timestamp();
         let source_round = rounds

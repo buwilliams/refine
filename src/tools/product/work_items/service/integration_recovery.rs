@@ -141,7 +141,9 @@ impl FileWorkItemService {
                 "Goal {goal_id} Round changed before integration recovery"
             )));
         }
-        let reuse_inert = last_round_is_unstarted_recovery(rounds);
+        // `require_current_attempt` above proved the trailing Round carries
+        // this caller's claim, so the claim alone must not disqualify reuse.
+        let reuse_inert = last_round_is_unstarted_recovery(rounds, Some(authority));
         let current_attempt = rounds[authority.round_idx]
             .get("automatic_retry")
             .and_then(|retry| retry.get("attempt"))

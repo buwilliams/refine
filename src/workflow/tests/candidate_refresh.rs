@@ -100,6 +100,7 @@ impl RefreshFixture {
                 .queue_quality_recovery_summary(
                     "GOAL1",
                     0,
+                    None,
                     attempt,
                     "seed shared automatic retry lineage",
                     "Continue the recovery lineage.",
@@ -428,11 +429,15 @@ fn integration_recovery_uses_the_next_shared_automatic_retry_attempt() {
         CandidateRefreshOutcome::RecoveryQueued { .. }
     ));
     let detail = fixture.work_items.show_goal_detail("GOAL1").unwrap();
-    assert_eq!(detail["rounds"].as_array().unwrap().len(), 3);
+    // The claimed trailing Round was itself an unworked automation-appended
+    // recovery Round, so the queued recovery reuses it in place instead of
+    // growing an unbounded chain of inert Rounds; the shared attempt counter
+    // still advances and lineage keeps naming the worked source Round.
+    assert_eq!(detail["rounds"].as_array().unwrap().len(), 2);
     assert_eq!(
-        detail["rounds"][2]["automatic_retry"]["kind"],
+        detail["rounds"][1]["automatic_retry"]["kind"],
         "integration"
     );
-    assert_eq!(detail["rounds"][2]["automatic_retry"]["attempt"], 5);
-    assert_eq!(detail["rounds"][2]["automatic_retry"]["source_round"], 2);
+    assert_eq!(detail["rounds"][1]["automatic_retry"]["attempt"], 5);
+    assert_eq!(detail["rounds"][1]["automatic_retry"]["source_round"], 1);
 }

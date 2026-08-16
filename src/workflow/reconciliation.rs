@@ -8,7 +8,7 @@ use serde_json::json;
 
 use crate::process::subprocess::write_json_atomically;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
+use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitStatus, GitWorktreeService};
 use crate::workflow::now_timestamp;
 
 const INTEGRATED_TARGET_RECONCILIATION_LOCK: &str = "refine-reconciliation.lock";
@@ -22,6 +22,14 @@ struct IntegratedTargetTransaction {
     branch: String,
     commit: String,
     started_at: String,
+    /// Untracked paths already present when the lane acquired the checkout.
+    /// They are a user's files and stay untouched; any untracked path beyond
+    /// this baseline appeared inside the marker window and is therefore
+    /// Refine residue that quarantine must capture. Markers written before
+    /// this field existed decode to an empty baseline, which errs toward
+    /// quarantining (into a recoverable stash) rather than leaking.
+    #[serde(default)]
+    untracked_baseline: Vec<String>,
 }
 
 /// A repository-wide lease for integration, build, Quality, and settlement against the shared
@@ -35,6 +43,7 @@ pub(super) struct IntegratedTargetWorkflowLease {
     file: File,
     target_root: std::path::PathBuf,
     marker_path: std::path::PathBuf,
+    untracked_baseline: Vec<String>,
     finished: bool,
 }
 
@@ -84,6 +93,7 @@ impl IntegratedTargetWorkflowLease {
             branch: head.branch.unwrap_or_default(),
             commit: head.commit.unwrap_or_default(),
             started_at: now_timestamp(),
+            untracked_baseline: status.untracked_paths.clone(),
         };
         let encoded = serde_json::to_vec_pretty(&transaction).map_err(|error| {
             RefineError::Serialization(format!(
@@ -95,6 +105,7 @@ impl IntegratedTargetWorkflowLease {
             file,
             target_root: target_root.to_path_buf(),
             marker_path,
+            untracked_baseline: transaction.untracked_baseline,
             finished: false,
         })
     }
@@ -105,7 +116,11 @@ impl IntegratedTargetWorkflowLease {
         }
         let git = FileGitWorktreeService::new(&self.target_root);
         let status = git.inspect(self.target_root.to_str().unwrap_or(""))?;
-        if status.dirty_user_changes {
+        // Untracked files beyond the acquire-time baseline appeared inside
+        // the marker window, so they are lane residue even though they never
+        // reached the index.
+        let untracked_residue = untracked_beyond_baseline(&status, &self.untracked_baseline);
+        if status.dirty_user_changes || !untracked_residue.is_empty() {
             return Err(RefineError::Conflict(format!(
                 "integrated-target workflow left a dirty index or worktree at {} ({}); residue remains attributed to the owning Goal for recovery",
                 self.target_root.display(),
@@ -160,12 +175,20 @@ fn recover_interrupted_transaction(
             ))
         })?;
     let status = git.inspect("")?;
-    let stash_commit = if status.dirty_user_changes {
-        git.quarantine_worktree_changes(&format!(
-            "Refine quarantined interrupted integrated-target residue from Goal {} round {}",
-            interrupted.goal_id,
-            interrupted.round_idx + 1
-        ))?
+    // The marker proves the dirt window belonged to the interrupted Goal, so
+    // untracked files beyond its acquire-time baseline are Refine residue and
+    // must be quarantined alongside tracked changes — not silently
+    // reattributed to the user.
+    let untracked_residue = untracked_beyond_baseline(&status, &interrupted.untracked_baseline);
+    let stash_commit = if status.dirty_user_changes || !untracked_residue.is_empty() {
+        git.quarantine_worktree_changes(
+            &format!(
+                "Refine quarantined interrupted integrated-target residue from Goal {} round {}",
+                interrupted.goal_id,
+                interrupted.round_idx + 1
+            ),
+            &untracked_residue,
+        )?
     } else {
         None
     };
@@ -192,6 +215,7 @@ fn recover_interrupted_transaction(
         "recovered_at": now_timestamp(),
         "interrupted": interrupted,
         "stash_commit": stash_commit,
+        "untracked_residue": untracked_residue,
         "next_owner": {"goal_id": next_goal_id, "round_idx": next_round_idx}
     });
     serde_json::to_writer(&mut recoveries, &event).map_err(|error| {
@@ -212,6 +236,17 @@ fn recover_interrupted_transaction(
         ))
     })?;
     remove_marker(marker_path)
+}
+
+/// Untracked paths that appeared after the recorded acquire-time baseline:
+/// the lane's own residue, as opposed to a user's pre-existing files.
+fn untracked_beyond_baseline(status: &GitStatus, baseline: &[String]) -> Vec<String> {
+    status
+        .untracked_paths
+        .iter()
+        .filter(|path| !baseline.contains(path))
+        .cloned()
+        .collect()
 }
 
 fn remove_marker(marker_path: &Path) -> RefineResult<()> {
@@ -372,6 +407,89 @@ mod tests {
         assert_eq!(event["next_owner"]["goal_id"], "GOAL2");
         assert!(event["stash_commit"].as_str().is_some());
         successor.finish().unwrap();
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn next_lane_quarantines_untracked_residue_but_preserves_the_users_files() {
+        let root = repository("untracked-recovery");
+        let git = FileGitWorktreeService::new(&root);
+        let recoveries = git.git_path(INTEGRATED_TARGET_RECOVERIES).unwrap();
+        fs::write(root.join("scratch-notes.txt"), "human scratch file\n").unwrap();
+        {
+            let _interrupted = IntegratedTargetWorkflowLease::acquire(&root, "GOAL1", 0).unwrap();
+            // The interrupted lane wrote a file it never `git add`ed: the
+            // marker attributes it to GOAL1, so it must be quarantined, not
+            // silently reattributed to the user.
+            fs::write(root.join("residue.txt"), "interrupted untracked residue\n").unwrap();
+        }
+
+        let mut successor = IntegratedTargetWorkflowLease::acquire(&root, "GOAL2", 1).unwrap();
+
+        assert!(!root.join("residue.txt").exists());
+        assert_eq!(
+            fs::read_to_string(root.join("scratch-notes.txt")).unwrap(),
+            "human scratch file\n"
+        );
+        let event: Value = serde_json::from_str(
+            fs::read_to_string(&recoveries)
+                .unwrap()
+                .lines()
+                .last()
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(event["interrupted"]["goal_id"], "GOAL1");
+        assert!(event["stash_commit"].as_str().is_some());
+        assert_eq!(
+            event["untracked_residue"],
+            serde_json::json!(["residue.txt"])
+        );
+        successor.finish().unwrap();
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn next_lane_quarantines_mixed_tracked_and_untracked_residue_together() {
+        let root = repository("mixed-recovery");
+        let git = FileGitWorktreeService::new(&root);
+        {
+            let _interrupted = IntegratedTargetWorkflowLease::acquire(&root, "GOAL1", 0).unwrap();
+            fs::write(root.join("app.txt"), "interrupted mutation\n").unwrap();
+            fs::write(root.join("residue.txt"), "interrupted untracked residue\n").unwrap();
+        }
+
+        let mut successor = IntegratedTargetWorkflowLease::acquire(&root, "GOAL2", 1).unwrap();
+
+        assert_eq!(fs::read_to_string(root.join("app.txt")).unwrap(), "base\n");
+        assert!(!root.join("residue.txt").exists());
+        let status = git.inspect("").unwrap();
+        assert!(!status.dirty_user_changes);
+        assert!(status.untracked_paths.is_empty(), "{status:?}");
+        successor.finish().unwrap();
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn finish_keeps_the_marker_when_the_lane_leaves_untracked_residue() {
+        let root = repository("finish-residue");
+        let marker = FileGitWorktreeService::new(&root)
+            .git_path(INTEGRATED_TARGET_TRANSACTION)
+            .unwrap();
+        let mut lane = IntegratedTargetWorkflowLease::acquire(&root, "GOAL1", 0).unwrap();
+        fs::write(root.join("residue.txt"), "lane residue\n").unwrap();
+
+        let error = lane.finish().unwrap_err();
+
+        match &error {
+            RefineError::Conflict(message) => {
+                assert!(message.contains("residue.txt"), "{message}");
+            }
+            other => panic!("expected Conflict, got {other:?}"),
+        }
+        // The marker survives so the next acquire quarantines the residue
+        // while it is still attributed to this Goal.
+        assert!(marker.exists());
         fs::remove_dir_all(root).unwrap();
     }
 }

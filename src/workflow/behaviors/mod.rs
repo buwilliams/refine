@@ -408,10 +408,12 @@ fn prepare_already_merged_reconciliation(
         let Some(recorded_state) = recorded_reconciliation_state.as_deref() else {
             return Ok(None);
         };
-        ctx.work_items
+        let recovered = ctx
+            .work_items
             .queue_missing_reconciled_candidate_recovery_summary(
                 &ctx.goal_id,
                 ctx.round_idx,
+                Some(ctx.attempt_authority),
                 recorded_state,
                 candidate,
                 &integration.target_branch,
@@ -425,7 +427,9 @@ fn prepare_already_merged_reconciliation(
                 "candidate_commit": candidate,
                 "target_branch": integration.target_branch,
                 "target_commit": target_commit,
-                "successor_round": ctx.round_idx + 2
+                // A reused inert trailing Round keeps its index, so the
+                // successor is wherever the queue actually left it.
+                "successor_round": recovered.goal.round_count
             }))),
         )?;
         ctx.branch = detail
@@ -1990,6 +1994,7 @@ fn handle_quality_finding(
     ctx.work_items.queue_quality_recovery_summary(
         &ctx.goal_id,
         ctx.round_idx,
+        Some(ctx.attempt_authority),
         next_attempt,
         &recovery.analysis,
         &recovery.round_prompt,
@@ -2079,6 +2084,7 @@ fn handle_governance_finding(
     ctx.work_items.queue_governance_recovery_summary(
         &ctx.goal_id,
         ctx.round_idx,
+        Some(ctx.attempt_authority),
         next_attempt,
         analysis,
         prompt,
