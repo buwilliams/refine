@@ -95,6 +95,15 @@ pub(super) fn last_round_is_unstarted_recovery(
     automation_appended && never_logged && never_worked && unclaimed_or_retiring
 }
 
+/// The 1-based number of the Round a queued recovery will occupy, given the
+/// source Round's index and whether `append_or_reuse_recovery_round` will
+/// reuse the inert trailing Round (keeping its index) or append a new one.
+/// Every persisted `successor_round` pointer must come from here so reuse and
+/// append can never disagree about where the recovery actually landed.
+pub(super) fn successor_round_number(source_round_idx: usize, reuse_inert: bool) -> usize {
+    source_round_idx + if reuse_inert { 1 } else { 2 }
+}
+
 /// Only the last Round of a Goal is claimable (`claim_workflow_attempt`
 /// requires `rounds.len() == round_idx + 1`), so appending a recovery Round
 /// past an unclaimed one strands the earlier Round forever: it can never be
@@ -115,15 +124,6 @@ pub(super) fn last_round_is_unstarted_recovery(
 /// read the source Round's failure evidence, and a self-reference would make
 /// them compare a fresh failure against itself. The reuse therefore keeps the
 /// inert Round's original lineage pointer.
-/// The 1-based number of the Round a queued recovery will occupy, given the
-/// source Round's index and whether `append_or_reuse_recovery_round` will
-/// reuse the inert trailing Round (keeping its index) or append a new one.
-/// Every persisted `successor_round` pointer must come from here so reuse and
-/// append can never disagree about where the recovery actually landed.
-pub(super) fn successor_round_number(source_round_idx: usize, reuse_inert: bool) -> usize {
-    source_round_idx + if reuse_inert { 1 } else { 2 }
-}
-
 pub(super) fn append_or_reuse_recovery_round(
     rounds: &mut Vec<Value>,
     successor: Value,
