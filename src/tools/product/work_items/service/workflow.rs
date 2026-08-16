@@ -221,7 +221,7 @@ impl FileWorkItemService {
                 "candidate_commit": candidate_commit,
                 "target_branch": target_branch,
                 "target_commit": target_commit,
-                "successor_round": round_idx + 2,
+                "successor_round": successor_round_number(round_idx, reuse_inert),
                 "updated_at": now
             }),
         );

@@ -318,10 +318,6 @@ Each is normal to encounter; only the first is safe to delete by hand.
   instead of quarantining its residue, replays any pending checkout sync, and
   appends what it did to `refine-integrated-target-recoveries.jsonl` alongside
   it; only legacy shared-checkout markers still quarantine residue to a stash.
-- `refine-live-state/runtime/scheduler-holds.jsonl` (node-local, never
-  published): one JSONL line per change in why a Goal was excluded from a
-  scheduling pass (and when the hold cleared). Read it to answer "why isn't
-  this Goal scheduling".
 
 Worker machine creation is agent-operated rather than part of the Refine
 binary. Follow `docs/runbooks/manage-fleet.md` when a fleet needs another

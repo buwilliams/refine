@@ -161,9 +161,7 @@ impl FileWorkItemService {
             "successor_round": if exhausted {
                 Value::Null
             } else {
-                // A reused inert Round keeps its index, so the successor
-                // pointer must not skip ahead.
-                json!(authority.round_idx + if reuse_inert { 1 } else { 2 })
+                json!(successor_round_number(authority.round_idx, reuse_inert))
             },
             "attempt": if exhausted { current_attempt } else { next_attempt },
             "max_automatic_round_retries": max_automatic_round_retries,

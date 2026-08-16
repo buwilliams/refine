@@ -131,7 +131,7 @@ fn file_git_worktree_service_reports_literal_paths_for_renames_and_special_names
 }
 
 #[test]
-fn quarantine_handles_renames_and_confines_glob_shaped_residue_names() {
+fn quarantine_handles_renames_and_preserves_untracked_special_names() {
     let temp_root = unique_temp_dir("git-quarantine-literal");
     let repo = temp_root.join("repo");
     fs::create_dir_all(&repo).unwrap();
@@ -139,16 +139,13 @@ fn quarantine_handles_renames_and_confines_glob_shaped_residue_names() {
     commit_file(&repo, "app.txt", "committed\n", "initial");
 
     git(&repo, &["mv", "app.txt", "app2.txt"]).unwrap();
-    fs::write(repo.join("New Document.txt"), "residue\n").unwrap();
-    fs::write(repo.join("foo[1].txt"), "residue\n").unwrap();
+    fs::write(repo.join("New Document.txt"), "spaced\n").unwrap();
+    fs::write(repo.join("foo[1].txt"), "glob-shaped\n").unwrap();
     fs::write(repo.join("foo1.txt"), "user file\n").unwrap();
 
     let service = FileGitWorktreeService::new(&repo);
     let stash = service
-        .quarantine_worktree_changes(
-            "quarantine literal pathspecs",
-            &["New Document.txt".to_string(), "foo[1].txt".to_string()],
-        )
+        .quarantine_worktree_changes("quarantine tracked changes")
         .unwrap();
 
     assert!(stash.is_some());
@@ -158,14 +155,20 @@ fn quarantine_handles_renames_and_confines_glob_shaped_residue_names() {
         "the staged rename must be quarantined, restoring the source path"
     );
     assert!(!repo.join("app2.txt").exists());
-    assert!(!repo.join("New Document.txt").exists());
-    assert!(!repo.join("foo[1].txt").exists());
+    // Untracked files — glob-shaped and space-bearing names included — are a
+    // user's business and stay in place untouched.
+    assert_eq!(
+        fs::read_to_string(repo.join("New Document.txt")).unwrap(),
+        "spaced\n"
+    );
+    assert_eq!(
+        fs::read_to_string(repo.join("foo[1].txt")).unwrap(),
+        "glob-shaped\n"
+    );
     assert_eq!(
         fs::read_to_string(repo.join("foo1.txt")).unwrap(),
-        "user file\n",
-        "`foo[1].txt` interpreted as fnmatch would sweep the user's foo1.txt"
+        "user file\n"
     );
-    assert!(git_stdout(&repo, &["status", "--porcelain"]).contains("?? foo1.txt"));
 
     fs::remove_dir_all(temp_root).unwrap();
 }

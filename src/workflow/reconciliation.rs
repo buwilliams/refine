@@ -8,7 +8,7 @@ use serde_json::{Value, json};
 
 use crate::process::subprocess::write_json_atomically;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitStatus, GitWorktreeService};
+use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
 use crate::tools::product::governance_integration::checkout_sync::{
     CheckoutSyncOutcome, repair_pending_checkout_sync, sync_human_checkout_after_ref_move,
 };
@@ -46,16 +46,6 @@ struct IntegratedTargetTransaction {
     started_at: String,
     #[serde(default)]
     workspace: TransactionWorkspace,
-    /// Legacy only: untracked paths already present when a shared-checkout
-    /// lane acquired the checkout. They are a user's files and stay untouched;
-    /// any untracked path beyond this baseline appeared inside the marker
-    /// window and is therefore Refine residue that quarantine must capture.
-    /// `None` — the shape every marker from pre-baseline builds decodes to —
-    /// is NOT an empty baseline: those builds acquired the lane with a user's
-    /// untracked files present and never recorded them, so recovery must not
-    /// attribute any untracked path to the interrupted lane.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    untracked_baseline: Option<Vec<String>>,
     /// Open only while the post-CAS human-checkout sync runs, so an
     /// interruption there is attributed to the sync phase — the one moment the
     /// integration-worktree lane touches the shared checkout — and recovery
@@ -131,7 +121,6 @@ impl IntegratedTargetWorkflowLease {
             commit: String::new(),
             started_at: now_timestamp(),
             workspace: TransactionWorkspace::IntegrationWorktree,
-            untracked_baseline: None,
             checkout_sync: None,
         };
         let encoded = serde_json::to_vec_pretty(&transaction).map_err(|error| {
@@ -278,36 +267,25 @@ fn recover_interrupted_transaction(
         TransactionWorkspace::SharedCheckout => {
             // Legacy markers were written while integration porcelain still
             // ran in the shared checkout, so their residue window really can
-            // hold shared-checkout mutations that the marker attributes to the
-            // interrupted Goal — untracked files beyond the acquire-time
-            // baseline included. Fleet-migration path: remove one release
-            // after every node writes only integration-worktree markers.
+            // hold shared-checkout mutations that the marker attributes to
+            // the interrupted Goal. Those builds accepted a user's untracked
+            // files at acquire and preserved them in place, so recovery
+            // quarantines only tracked changes, exactly as those builds
+            // themselves did. Fleet-migration path: remove one release after
+            // every node writes only integration-worktree markers.
             let status = git.inspect("")?;
-            // Markers from builds that predate baseline recording decode to a
-            // `None` baseline: those builds accepted a user's untracked files
-            // at acquire and preserved them in place, so recovery of their
-            // markers quarantines only tracked changes, exactly as those
-            // builds themselves did.
-            let untracked_residue = match &interrupted.untracked_baseline {
-                Some(baseline) => untracked_beyond_baseline(&status, baseline),
-                None => Vec::new(),
-            };
-            let stash_commit = if status.dirty_user_changes || !untracked_residue.is_empty() {
-                git.quarantine_worktree_changes(
-                    &format!(
-                        "Refine quarantined interrupted integrated-target residue from Goal {} round {}",
-                        interrupted.goal_id,
-                        interrupted.round_idx + 1
-                    ),
-                    &untracked_residue,
-                )?
+            let stash_commit = if status.dirty_user_changes {
+                git.quarantine_worktree_changes(&format!(
+                    "Refine quarantined interrupted integrated-target residue from Goal {} round {}",
+                    interrupted.goal_id,
+                    interrupted.round_idx + 1
+                ))?
             } else {
                 None
             };
             json!({
                 "workspace": "shared_checkout",
-                "stash_commit": stash_commit,
-                "untracked_residue": untracked_residue
+                "stash_commit": stash_commit
             })
         }
     };
@@ -390,17 +368,6 @@ fn integration_worktree_dirt(repo_git: &FileGitWorktreeService) -> RefineResult<
     } else {
         Ok(Some(status.describe_dirt()))
     }
-}
-
-/// Untracked paths that appeared after the recorded acquire-time baseline:
-/// the lane's own residue, as opposed to a user's pre-existing files.
-fn untracked_beyond_baseline(status: &GitStatus, baseline: &[String]) -> Vec<String> {
-    status
-        .untracked_paths
-        .iter()
-        .filter(|path| !baseline.contains(path))
-        .cloned()
-        .collect()
 }
 
 fn remove_marker(marker_path: &Path) -> RefineResult<()> {
@@ -498,36 +465,20 @@ mod tests {
         .unwrap()
     }
 
-    /// The exact marker shape written while integration porcelain still ran
-    /// in the shared checkout: no `workspace` field.
-    fn write_legacy_marker(root: &Path, goal_id: &str, untracked_baseline: &[&str]) -> PathBuf {
-        write_legacy_marker_value(root, goal_id, Some(untracked_baseline))
-    }
-
-    /// The marker shape the deployed pre-baseline fleet builds wrote: no
-    /// `workspace` field AND no `untracked_baseline` field at all.
-    fn write_legacy_marker_without_baseline(root: &Path, goal_id: &str) -> PathBuf {
-        write_legacy_marker_value(root, goal_id, None)
-    }
-
-    fn write_legacy_marker_value(
-        root: &Path,
-        goal_id: &str,
-        untracked_baseline: Option<&[&str]>,
-    ) -> PathBuf {
+    /// The exact marker shape the deployed fleet builds wrote while
+    /// integration porcelain still ran in the shared checkout: no `workspace`
+    /// field.
+    fn write_legacy_marker(root: &Path, goal_id: &str) -> PathBuf {
         let marker = FileGitWorktreeService::new(root)
             .git_path(INTEGRATED_TARGET_TRANSACTION)
             .unwrap();
-        let mut fields = serde_json::json!({
+        let fields = serde_json::json!({
             "goal_id": goal_id,
             "round_idx": 0,
             "branch": "main",
             "commit": git_stdout(root, &["rev-parse", "HEAD"]),
             "started_at": "2026-08-16T00:00:00Z"
         });
-        if let Some(baseline) = untracked_baseline {
-            fields["untracked_baseline"] = serde_json::json!(baseline);
-        }
         fs::write(&marker, fields.to_string()).unwrap();
         marker
     }
@@ -634,7 +585,7 @@ mod tests {
         let root = repository("legacy-recovery");
         fs::write(root.join("app.txt"), "interrupted mutation\n").unwrap();
         git(&root, &["add", "app.txt"]);
-        write_legacy_marker(&root, "GOAL1", &[]);
+        write_legacy_marker(&root, "GOAL1");
 
         let mut successor = IntegratedTargetWorkflowLease::acquire(&root, "GOAL2", 1).unwrap();
 
@@ -651,62 +602,15 @@ mod tests {
     }
 
     #[test]
-    fn legacy_recovery_quarantines_untracked_residue_but_preserves_the_users_files() {
-        let root = repository("legacy-untracked-recovery");
-        fs::write(root.join("scratch-notes.txt"), "human scratch file\n").unwrap();
-        // The interrupted legacy lane wrote a file it never `git add`ed: the
-        // marker's baseline attributes it to GOAL1, so it must be quarantined,
-        // not silently reattributed to the user.
-        fs::write(root.join("residue.txt"), "interrupted untracked residue\n").unwrap();
-        write_legacy_marker(&root, "GOAL1", &["scratch-notes.txt"]);
-
-        let mut successor = IntegratedTargetWorkflowLease::acquire(&root, "GOAL2", 1).unwrap();
-
-        assert!(!root.join("residue.txt").exists());
-        assert_eq!(
-            fs::read_to_string(root.join("scratch-notes.txt")).unwrap(),
-            "human scratch file\n"
-        );
-        let event = last_recovery_event(&root);
-        assert_eq!(event["interrupted"]["goal_id"], "GOAL1");
-        assert!(event["stash_commit"].as_str().is_some());
-        assert_eq!(
-            event["untracked_residue"],
-            serde_json::json!(["residue.txt"])
-        );
-        successor.finish().unwrap();
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn legacy_recovery_quarantines_mixed_tracked_and_untracked_residue_together() {
-        let root = repository("legacy-mixed-recovery");
-        fs::write(root.join("app.txt"), "interrupted mutation\n").unwrap();
-        fs::write(root.join("residue.txt"), "interrupted untracked residue\n").unwrap();
-        write_legacy_marker(&root, "GOAL1", &[]);
-
-        let mut successor = IntegratedTargetWorkflowLease::acquire(&root, "GOAL2", 1).unwrap();
-
-        assert_eq!(fs::read_to_string(root.join("app.txt")).unwrap(), "base\n");
-        assert!(!root.join("residue.txt").exists());
-        let status = FileGitWorktreeService::new(&root).inspect("").unwrap();
-        assert!(!status.dirty_user_changes);
-        assert!(status.untracked_paths.is_empty(), "{status:?}");
-        successor.finish().unwrap();
-        fs::remove_dir_all(root).unwrap();
-    }
-
-    #[test]
-    fn pre_baseline_legacy_marker_never_attributes_untracked_files_to_the_lane() {
-        // Deployed pre-baseline builds acquired the lane with a user's
-        // untracked files present and recorded no baseline. Their markers
-        // decode with untracked_baseline: None, which must quarantine only
-        // tracked changes — exactly what those builds themselves did — not
-        // sweep every untracked file into the stash.
-        let root = repository("pre-baseline-recovery");
+    fn legacy_marker_recovery_never_attributes_untracked_files_to_the_lane() {
+        // Deployed legacy builds acquired the lane with a user's untracked
+        // files present and never recorded them, so recovery quarantines only
+        // tracked changes — exactly what those builds themselves did — and
+        // must not sweep any untracked file into the stash.
+        let root = repository("legacy-untracked-preserved");
         fs::write(root.join("app.txt"), "interrupted mutation\n").unwrap();
         fs::write(root.join("scratch-notes.txt"), "human scratch file\n").unwrap();
-        write_legacy_marker_without_baseline(&root, "GOAL1");
+        write_legacy_marker(&root, "GOAL1");
 
         let mut successor = IntegratedTargetWorkflowLease::acquire(&root, "GOAL2", 1).unwrap();
 
@@ -717,16 +621,15 @@ mod tests {
         );
         let event = last_recovery_event(&root);
         assert!(event["stash_commit"].as_str().is_some());
-        assert_eq!(event["untracked_residue"], serde_json::json!([]));
         successor.finish().unwrap();
         fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
-    fn pre_baseline_legacy_marker_with_only_untracked_files_stashes_nothing() {
-        let root = repository("pre-baseline-untracked-only");
+    fn legacy_marker_with_only_untracked_files_stashes_nothing() {
+        let root = repository("legacy-untracked-only");
         fs::write(root.join("scratch-notes.txt"), "human scratch file\n").unwrap();
-        write_legacy_marker_without_baseline(&root, "GOAL1");
+        write_legacy_marker(&root, "GOAL1");
 
         let mut successor = IntegratedTargetWorkflowLease::acquire(&root, "GOAL2", 1).unwrap();
 
@@ -741,27 +644,32 @@ mod tests {
     }
 
     #[test]
-    fn legacy_recovery_handles_renames_special_names_and_glob_shaped_residue() {
+    fn legacy_recovery_handles_renames_and_preserves_special_named_untracked_files() {
         let root = repository("legacy-pathspec-recovery");
-        // A staged rename, a space-named residue file (C-quoted by porcelain
-        // v1 without -z), and a glob-shaped residue name whose fnmatch
-        // pattern would match the user's unrelated file.
+        // A staged rename (both sides tracked), plus untracked files with a
+        // space-bearing name and a glob-shaped name: the rename must be
+        // quarantined via literal paths while every untracked file stays put.
         git(&root, &["mv", "app.txt", "app2.txt"]);
-        fs::write(root.join("New Document.txt"), "interrupted residue\n").unwrap();
-        fs::write(root.join("foo[1].txt"), "interrupted residue\n").unwrap();
+        fs::write(root.join("New Document.txt"), "human scratch file\n").unwrap();
+        fs::write(root.join("foo[1].txt"), "human scratch file\n").unwrap();
         fs::write(root.join("foo1.txt"), "user file\n").unwrap();
-        write_legacy_marker(&root, "GOAL1", &["foo1.txt"]);
+        write_legacy_marker(&root, "GOAL1");
 
         let mut successor = IntegratedTargetWorkflowLease::acquire(&root, "GOAL2", 1).unwrap();
 
         assert_eq!(fs::read_to_string(root.join("app.txt")).unwrap(), "base\n");
         assert!(!root.join("app2.txt").exists());
-        assert!(!root.join("New Document.txt").exists());
-        assert!(!root.join("foo[1].txt").exists());
+        assert_eq!(
+            fs::read_to_string(root.join("New Document.txt")).unwrap(),
+            "human scratch file\n"
+        );
+        assert_eq!(
+            fs::read_to_string(root.join("foo[1].txt")).unwrap(),
+            "human scratch file\n"
+        );
         assert_eq!(
             fs::read_to_string(root.join("foo1.txt")).unwrap(),
-            "user file\n",
-            "a glob-shaped residue name must not sweep the user's file"
+            "user file\n"
         );
         let event = last_recovery_event(&root);
         assert!(event["stash_commit"].as_str().is_some());

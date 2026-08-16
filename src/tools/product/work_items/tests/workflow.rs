@@ -572,6 +572,9 @@ fn reconciliation_recovery_clears_source_authority_and_requeues_todo() {
         rounds[0]["failure_category"],
         "reconciliation_candidate_absent"
     );
+    // The claimed source Round was worked, so the successor is appended and
+    // the recorded pointer names the appended Round.
+    assert_eq!(rounds[0]["workflow_recovery"]["successor_round"], 2);
     assert_eq!(rounds[1]["workflow_recovery"]["state"], "queued");
     fs::remove_dir_all(temp_root).unwrap();
 }

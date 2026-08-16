@@ -115,6 +115,15 @@ pub(super) fn last_round_is_unstarted_recovery(
 /// read the source Round's failure evidence, and a self-reference would make
 /// them compare a fresh failure against itself. The reuse therefore keeps the
 /// inert Round's original lineage pointer.
+/// The 1-based number of the Round a queued recovery will occupy, given the
+/// source Round's index and whether `append_or_reuse_recovery_round` will
+/// reuse the inert trailing Round (keeping its index) or append a new one.
+/// Every persisted `successor_round` pointer must come from here so reuse and
+/// append can never disagree about where the recovery actually landed.
+pub(super) fn successor_round_number(source_round_idx: usize, reuse_inert: bool) -> usize {
+    source_round_idx + if reuse_inert { 1 } else { 2 }
+}
+
 pub(super) fn append_or_reuse_recovery_round(
     rounds: &mut Vec<Value>,
     successor: Value,
@@ -242,9 +251,9 @@ mod tests {
         let reuse_inert = last_round_is_unstarted_recovery(&rounds, None);
         assert!(reuse_inert);
 
-        // Mirrors queue_integration_recovery_summary's successor arithmetic.
+        // The one owner of successor arithmetic used by every queue site.
         let round_idx = 1usize;
-        let successor_round = round_idx + if reuse_inert { 1 } else { 2 };
+        let successor_round = successor_round_number(round_idx, reuse_inert);
         let successor = json!({
             "created": "2026-01-03T00:00:00Z",
             "prompt": "recover integration",
