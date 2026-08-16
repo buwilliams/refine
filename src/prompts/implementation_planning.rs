@@ -1,24 +1,29 @@
 use crate::model::goal::{
-    CriticismResolution, ImplementationChecklistItem, ProposedImplementationPlan,
+    ImplementationCriticism, ImplementationExecutionEvidence, ProposedImplementationPlan,
 };
+use crate::structured_output::Contract;
+
+/// The plan-phase result contract: the shared example without revise-only
+/// criticism resolutions.
+pub fn plan_result_contract_json() -> String {
+    let mut example = ProposedImplementationPlan::example();
+    example.criticism_resolutions.clear();
+    serde_json::to_string(&example).expect("typed plan contract must serialize")
+}
+
+/// The criticize-phase result contract with one populated material finding.
+pub fn criticism_result_contract_json() -> String {
+    ImplementationCriticism::contract_json()
+}
 
 /// A populated revise result serialized from the durable planning model.
 pub fn revision_result_contract_json() -> String {
-    serde_json::to_string(&ProposedImplementationPlan {
-        summary: "one single-line plain-language summary of what will change and why".to_string(),
-        checklist: vec![ImplementationChecklistItem {
-            id: "P1".to_string(),
-            description: "one implementation step that clearly advances the plan".to_string(),
-            affected_behavior: Vec::new(),
-            governance_rationale: None,
-            verification: Vec::new(),
-        }],
-        criticism_resolutions: vec![CriticismResolution {
-            criticism_id: "C1".to_string(),
-            resolution: "how the revised plan resolves this material finding".to_string(),
-        }],
-    })
-    .expect("typed revise planning contract must serialize")
+    ProposedImplementationPlan::contract_json()
+}
+
+/// The implement-phase execution evidence contract.
+pub fn implementation_evidence_contract_json() -> String {
+    ImplementationExecutionEvidence::contract_json()
 }
 
 #[cfg(test)]
@@ -26,12 +31,23 @@ mod tests {
     use super::*;
 
     #[test]
-    fn revision_contract_uses_the_canonical_typed_resolution_shape() {
-        let encoded = revision_result_contract_json();
-        let decoded: ProposedImplementationPlan = serde_json::from_str(&encoded).unwrap();
+    fn phase_contracts_render_from_the_durable_planning_types() {
+        let plan = plan_result_contract_json();
+        assert!(plan.contains(r#""id":"P1""#));
+        assert!(!plan.contains("criticism_resolutions"));
+        assert!(!plan.contains("affected_behavior"));
 
-        assert_eq!(decoded.criticism_resolutions[0].criticism_id, "C1");
-        assert!(encoded.contains(r#""criticism_id":"C1""#));
-        assert!(encoded.contains(r#""resolution":"how the revised plan resolves"#));
+        let criticism = criticism_result_contract_json();
+        assert!(criticism.contains(r#""id":"C1""#));
+        assert!(criticism.contains(r#""material":true"#));
+        assert!(criticism.contains(r#""checklist_item_ids":["P1"]"#));
+
+        let revision = revision_result_contract_json();
+        assert!(revision.contains(r#""criticism_id":"C1""#));
+        assert!(revision.contains(r#""resolution":"how the revised plan resolves"#));
+
+        let evidence = implementation_evidence_contract_json();
+        assert!(evidence.contains(r#""outcome":"completed""#));
+        assert!(evidence.contains(r#""verification":["exact command and result"]"#));
     }
 }

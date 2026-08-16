@@ -2,13 +2,16 @@ use serde_json::to_string_pretty;
 
 use crate::model::goal::{ImplementationCriticism, ProposedImplementationPlan};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::prompts::implementation_planning::revision_result_contract_json;
+use crate::prompts::implementation_planning::{
+    criticism_result_contract_json, plan_result_contract_json, revision_result_contract_json,
+};
 use crate::prompts::{PromptTemplate, render};
 
 pub(super) fn planning_prompt(spec: &str) -> String {
+    let plan_contract = plan_result_contract_json();
     render(
         PromptTemplate::ImplementationPlanningPlan,
-        &[("spec", spec)],
+        &[("spec", spec), ("plan_contract", &plan_contract)],
     )
 }
 
@@ -17,9 +20,14 @@ pub(super) fn criticism_prompt(
     proposal: &ProposedImplementationPlan,
 ) -> RefineResult<String> {
     let proposal = to_string_pretty(proposal).map_err(encode_error)?;
+    let criticism_contract = criticism_result_contract_json();
     Ok(render(
         PromptTemplate::ImplementationPlanningCriticize,
-        &[("spec", spec), ("proposal", &proposal)],
+        &[
+            ("spec", spec),
+            ("proposal", &proposal),
+            ("criticism_contract", &criticism_contract),
+        ],
     ))
 }
 

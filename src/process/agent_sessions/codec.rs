@@ -324,12 +324,20 @@ fn completion_contract(signal_path: &Path, implementation_phase: Option<&str>) -
         "Write the complete JSON to `{destination}.tmp`, parse-check that temporary file with `jq .` or another JSON parser, and only after it parses atomically replace `{destination}` with `mv` or an equivalent rename. Never write the completion payload directly to `{destination}`."
     );
     match implementation_phase {
-        Some("plan") => format!(
-            "Choose applicable Guidance. On completion, produce one JSON object with `state`, a brief `message`, `guidance_applied`, and the required `planning_result`. `guidance_applied` must contain zero-based integer indexes, such as `[0]`, for applicable Guidance candidates; use `[]` when none apply, and never use names. `planning_result` must be a JSON object, never omitted or quoted as a string. Use this complete signal shape: `{{\"state\":\"completed\",\"message\":\"brief planning summary\",\"guidance_applied\":[0],\"planning_result\":{{\"summary\":\"one single-line plain-language summary of what will change and why\",\"checklist\":[{{\"id\":\"P1\",\"description\":\"one implementation step that clearly advances the plan\"}}]}}}}`. {write_protocol}"
-        ),
-        Some("criticize") => format!(
-            "Choose applicable Guidance. On completion, produce one JSON object with `state`, a brief `message`, `guidance_applied`, and the required `planning_result`. `guidance_applied` must contain zero-based integer indexes, such as `[0]`, for applicable Guidance candidates; use `[]` when none apply, and never use names. `planning_result` must be a JSON object, never omitted or quoted as a string. Use this complete signal shape: `{{\"state\":\"completed\",\"message\":\"brief criticism summary\",\"guidance_applied\":[0],\"planning_result\":{{\"summary\":\"one short sentence\",\"findings\":[]}}}}`. {write_protocol}"
-        ),
+        Some("plan") => {
+            let planning_result =
+                crate::prompts::implementation_planning::plan_result_contract_json();
+            format!(
+                "Choose applicable Guidance. On completion, produce one JSON object with `state`, a brief `message`, `guidance_applied`, and the required `planning_result`. `guidance_applied` must contain zero-based integer indexes, such as `[0]`, for applicable Guidance candidates; use `[]` when none apply, and never use names. `planning_result` must be a JSON object, never omitted or quoted as a string. Use this complete signal shape: `{{\"state\":\"completed\",\"message\":\"brief planning summary\",\"guidance_applied\":[0],\"planning_result\":{planning_result}}}`. {write_protocol}"
+            )
+        }
+        Some("criticize") => {
+            let planning_result =
+                crate::prompts::implementation_planning::criticism_result_contract_json();
+            format!(
+                "Choose applicable Guidance. On completion, produce one JSON object with `state`, a brief `message`, `guidance_applied`, and the required `planning_result`. `guidance_applied` must contain zero-based integer indexes, such as `[0]`, for applicable Guidance candidates; use `[]` when none apply, and never use names. `planning_result` must be a JSON object, never omitted or quoted as a string. Use this complete signal shape, with `findings` empty when nothing material was found: `{{\"state\":\"completed\",\"message\":\"brief criticism summary\",\"guidance_applied\":[0],\"planning_result\":{planning_result}}}`. {write_protocol}"
+            )
+        }
         Some("revise") => {
             let planning_result =
                 crate::prompts::implementation_planning::revision_result_contract_json();
@@ -337,9 +345,13 @@ fn completion_contract(signal_path: &Path, implementation_phase: Option<&str>) -
                 "Choose applicable Guidance. On completion, produce one JSON object with `state`, a brief `message`, `guidance_applied`, and the required `planning_result`. `guidance_applied` must contain zero-based integer indexes, such as `[0]`, for applicable Guidance candidates; use `[]` when none apply, and never use names. `planning_result` must be a JSON object, never omitted or quoted as a string. Use this complete signal shape with one populated canonical `criticism_id` and `resolution` entry per material finding: `{{\"state\":\"completed\",\"message\":\"brief revision summary\",\"guidance_applied\":[0],\"planning_result\":{planning_result}}}`. {write_protocol}"
             )
         }
-        _ => format!(
-            "Report changes and exact verification. Choose applicable Guidance. On completion, produce `{{\"state\":\"completed\",\"message\":\"changes and exact verification\",\"guidance_applied\":[0],\"implementation_evidence\":{{\"checklist\":[{{\"id\":\"stable checklist ID\",\"outcome\":\"completed|deviated|rejected|blocked\",\"evidence\":\"what happened\"}}],\"verification\":[\"exact command and result\"]}}}}`, replacing `[0]` with applicable indexes. Guidance makes the field required, though it may be empty. A governed implementation checklist requires evidence for every stable ID without altering the accepted plan. {write_protocol}"
-        ),
+        _ => {
+            let implementation_evidence =
+                crate::prompts::implementation_planning::implementation_evidence_contract_json();
+            format!(
+                "Report changes and exact verification. Choose applicable Guidance. On completion, produce `{{\"state\":\"completed\",\"message\":\"changes and exact verification\",\"guidance_applied\":[0],\"implementation_evidence\":{implementation_evidence}}}`, replacing `[0]` with applicable indexes and each checklist `outcome` with one of `completed|deviated|rejected|blocked`. Guidance makes the field required, though it may be empty. A governed implementation checklist requires evidence for every stable ID without altering the accepted plan. {write_protocol}"
+            )
+        }
     }
 }
 

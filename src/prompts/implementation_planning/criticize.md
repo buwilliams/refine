@@ -12,4 +12,4 @@ Independently inspect the repository and pinned scenario without mutating them. 
 
 Put this JSON object, not a quoted string, in the completion signal's `planning_result`:
 
-{"summary":"one short sentence","findings":[{"id":"C1","material":true,"checklist_item_ids":["P1"],"description":"one material omission","recommendation":"one concise correction"}]}
+{{criticism_contract}}

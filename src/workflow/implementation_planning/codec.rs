@@ -1,87 +1,22 @@
 use std::collections::BTreeSet;
 
-use serde_json::{Map, Value};
-
 use crate::model::goal::{ImplementationCriticism, ProposedImplementationPlan};
-use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::structured_output::{DecodeOptions, StructuredOutputError, decode_structured};
-
-const MAX_CRITICISM_FINDINGS: usize = 3;
-const MAX_SUMMARY_CHARS: usize = 20_000;
-const MAX_ITEM_CHARS: usize = 28_000;
-
-const COMPLETION_ENVELOPE_FIELDS: &[&str] = &["planning_result", "result"];
+use crate::process::supervisor::errors::RefineResult;
+use crate::structured_output::{Contract, StructuredOutputError};
 
 pub(super) fn decode_plan(output: &str) -> RefineResult<ProposedImplementationPlan> {
-    let plan: ProposedImplementationPlan = decode_structured(
-        output,
-        &DecodeOptions::with_envelopes("implementation plan JSON", COMPLETION_ENVELOPE_FIELDS),
-        normalize_criticism_resolution_ids,
-    )?;
-    validate_plan(&plan)?;
-    Ok(plan)
+    Ok(ProposedImplementationPlan::decode(output)?)
 }
 
 pub(super) fn decode_criticism(output: &str) -> RefineResult<ImplementationCriticism> {
-    let criticism: ImplementationCriticism = decode_structured(
-        output,
-        &DecodeOptions::with_envelopes(
-            "implementation criticism JSON",
-            COMPLETION_ENVELOPE_FIELDS,
-        ),
-        |_| Ok(()),
-    )?;
-    validate_compact_text(
-        "implementation criticism summary",
-        &criticism.summary,
-        MAX_SUMMARY_CHARS,
-    )?;
-    if criticism.findings.len() > MAX_CRITICISM_FINDINGS {
-        return Err(RefineError::Serialization(format!(
-            "implementation criticism must contain at most {MAX_CRITICISM_FINDINGS} material findings"
-        )));
-    }
-    let mut ids = BTreeSet::new();
-    for finding in &criticism.findings {
-        if finding.id.trim().is_empty()
-            || finding.description.trim().is_empty()
-            || finding.recommendation.trim().is_empty()
-        {
-            return Err(RefineError::Serialization(
-                "implementation criticism findings require an id, description, and recommendation"
-                    .to_string(),
-            ));
-        }
-        validate_compact_text(
-            "implementation criticism finding description",
-            &finding.description,
-            MAX_ITEM_CHARS,
-        )?;
-        validate_compact_text(
-            "implementation criticism finding recommendation",
-            &finding.recommendation,
-            MAX_ITEM_CHARS,
-        )?;
-        if !finding.material {
-            return Err(RefineError::Serialization(
-                "implementation criticism may include only material findings".to_string(),
-            ));
-        }
-        if !ids.insert(finding.id.as_str()) {
-            return Err(RefineError::Serialization(format!(
-                "implementation criticism repeats finding id {}",
-                finding.id
-            )));
-        }
-    }
-    Ok(criticism)
+    Ok(ImplementationCriticism::decode(output)?)
 }
 
 pub(super) fn validate_revised_plan(
     plan: &ProposedImplementationPlan,
     criticism: &ImplementationCriticism,
 ) -> RefineResult<()> {
-    validate_plan(plan)?;
+    plan.validate()?;
     let resolved = plan
         .criticism_resolutions
         .iter()
@@ -95,10 +30,14 @@ pub(super) fn validate_revised_plan(
         .collect::<BTreeSet<_>>();
     let unrelated = resolved.difference(&material).copied().collect::<Vec<_>>();
     if !unrelated.is_empty() {
-        return Err(RefineError::Serialization(format!(
+        return Err(StructuredOutputError::validation(
+            ProposedImplementationPlan::LABEL,
+            format!(
             "revised implementation plan resolved unknown or non-material criticism: {}",
             unrelated.join(", ")
-        )));
+        ),
+        )
+        .into());
     }
     let unresolved = criticism
         .findings
@@ -107,137 +46,14 @@ pub(super) fn validate_revised_plan(
         .map(|finding| finding.id.clone())
         .collect::<Vec<_>>();
     if !unresolved.is_empty() {
-        return Err(RefineError::Serialization(format!(
+        return Err(StructuredOutputError::validation(
+            ProposedImplementationPlan::LABEL,
+            format!(
             "revised implementation plan did not resolve material criticism: {}",
             unresolved.join(", ")
-        )));
-    }
-    Ok(())
-}
-
-fn validate_plan(plan: &ProposedImplementationPlan) -> RefineResult<()> {
-    if plan.summary.trim().is_empty() || plan.checklist.is_empty() {
-        return Err(RefineError::Serialization(
-            "implementation plan requires a summary and at least one checklist item".to_string(),
-        ));
-    }
-    validate_compact_text(
-        "implementation plan summary",
-        &plan.summary,
-        MAX_SUMMARY_CHARS,
-    )?;
-    let mut ids = BTreeSet::new();
-    for item in &plan.checklist {
-        if item.id.trim().is_empty() || item.description.trim().is_empty() {
-            return Err(RefineError::Serialization(
-                "implementation checklist items require stable ids and descriptions".to_string(),
-            ));
-        }
-        validate_compact_text(
-            "implementation checklist item description",
-            &item.description,
-            MAX_ITEM_CHARS,
-        )?;
-        if !item.affected_behavior.is_empty()
-            || item.governance_rationale.is_some()
-            || !item.verification.is_empty()
-        {
-            return Err(RefineError::Serialization(
-                "implementation checklist items must be compact id/description pairs; affected behavior, Governance rationale, and verification belong in execution evidence"
-                    .to_string(),
-            ));
-        }
-        if !ids.insert(item.id.as_str()) {
-            return Err(RefineError::Serialization(format!(
-                "implementation checklist repeats id {}",
-                item.id
-            )));
-        }
-    }
-    let mut resolution_ids = BTreeSet::new();
-    for resolution in &plan.criticism_resolutions {
-        if resolution.criticism_id.trim().is_empty() || resolution.resolution.trim().is_empty() {
-            return Err(RefineError::Serialization(
-                "implementation criticism resolutions require an id and concise resolution"
-                    .to_string(),
-            ));
-        }
-        validate_compact_text(
-            "implementation criticism resolution",
-            &resolution.resolution,
-            MAX_ITEM_CHARS,
-        )?;
-        if !resolution_ids.insert(resolution.criticism_id.as_str()) {
-            return Err(RefineError::Serialization(format!(
-                "implementation plan repeats criticism resolution {}",
-                resolution.criticism_id
-            )));
-        }
-    }
-    Ok(())
-}
-
-fn validate_compact_text(label: &str, value: &str, max_chars: usize) -> RefineResult<()> {
-    if value.trim().is_empty() {
-        return Err(RefineError::Serialization(format!(
-            "{label} must not be empty"
-        )));
-    }
-    if value.contains(['\n', '\r']) {
-        return Err(RefineError::Serialization(format!(
-            "{label} must be one line"
-        )));
-    }
-    let length = value.chars().count();
-    if length > max_chars {
-        return Err(RefineError::Serialization(format!(
-            "{label} must be concise (at most {max_chars} characters, observed {length})"
-        )));
-    }
-    Ok(())
-}
-
-fn normalize_criticism_resolution_ids(value: &mut Value) -> Result<(), StructuredOutputError> {
-    let Some(resolutions) = value
-        .as_object_mut()
-        .and_then(|plan| plan.get_mut("criticism_resolutions"))
-        .and_then(Value::as_array_mut)
-    else {
-        return Ok(());
-    };
-    for (index, resolution) in resolutions.iter_mut().enumerate() {
-        let Some(resolution) = resolution.as_object_mut() else {
-            continue;
-        };
-        normalize_resolution_id(resolution, index)?;
-    }
-    Ok(())
-}
-
-fn normalize_resolution_id(
-    resolution: &mut Map<String, Value>,
-    index: usize,
-) -> Result<(), StructuredOutputError> {
-    const ALIASES: [&str; 3] = ["criticismId", "finding_id", "id"];
-    let aliases = ALIASES
-        .into_iter()
-        .filter(|alias| resolution.contains_key(*alias))
-        .collect::<Vec<_>>();
-    if resolution.contains_key("criticism_id") && !aliases.is_empty() || aliases.len() > 1 {
-        let mut fields = Vec::from(["criticism_id"]);
-        fields.retain(|field| resolution.contains_key(*field));
-        fields.extend(aliases);
-        return Err(StructuredOutputError::schema(
-            "implementation plan JSON",
-            Some(format!("criticism_resolutions[{index}]")),
-            format!("has ambiguous identifier fields: {}", fields.join(", ")),
-        ));
-    }
-    if let Some(alias) = aliases.first() {
-        let id = resolution
-            .remove(*alias)
-            .expect("present resolution id alias");
-        resolution.insert("criticism_id".to_string(), id);
+        ),
+        )
+        .into());
     }
     Ok(())
 }
@@ -245,6 +61,7 @@ fn normalize_resolution_id(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::goal::{MAX_ITEM_CHARS, MAX_SUMMARY_CHARS};
 
     #[test]
     fn plan_decoding_accepts_completion_signal_wrappers_and_stringified_results() {

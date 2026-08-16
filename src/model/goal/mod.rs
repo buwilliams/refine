@@ -4,9 +4,11 @@ use crate::model::log::RoundLogEntry;
 use crate::model::workflow::GoalStatus;
 use crate::model::{JsonObject, Timestamp};
 
+mod implementation_contracts;
 mod implementation_plan;
 mod quality_proof;
 
+pub use implementation_contracts::*;
 pub use implementation_plan::*;
 pub use quality_proof::*;
 
