@@ -784,8 +784,51 @@
           },
           "started_at": "2026-08-16T00:21:35Z"
         },
-        "phase": "revise",
-        "phase_started_at": "2026-08-16T00:22:40Z",
+        "final_plan": {
+          "completed_at": "2026-08-16T00:23:24Z",
+          "git_after": {
+            "branch": "refine/DRE2A015047036C9717F9959E7/round-2",
+            "head_commit": "6d284fb82c3a8bb999558fcebb3c7f0cfe9eb083",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRE2A015047036C9717F9959E7/round-2",
+            "head_commit": "6d284fb82c3a8bb999558fcebb3c7f0cfe9eb083",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Selectively recover the accepted Round 1 model, session, prompt, workflow, shared-decoder, regression-test, and planning-intent changes from candidate 43fa2224, including f10db75d, onto the fresh current base while preserving unrelated current-main behavior.",
+                "id": "P1"
+              },
+              {
+                "description": "Restructure structured-output discovery around standalone top-level candidate ownership so direct, fenced, and quoted or recursively stringified values are collected before selection, deduplicated by decoded value, and rejected with the existing 2 distinct JSON candidates diagnostic when they differ.",
+                "id": "P2"
+              },
+              {
+                "description": "Keep JSON-like strings nested inside a valid object or completion envelope subordinate to that candidate so bounded transport unwrapping can decode them without double-counting them as peer candidates.",
+                "id": "P3"
+              },
+              {
+                "description": "Preserve payload-size, JSON-depth, and transport-layer limits, recursive envelope and string decoding, ambiguous-envelope rejection, parse and path-aware schema diagnostics, strict phase validation, and panic-free malformed-input handling.",
+                "id": "P4"
+              },
+              {
+                "description": "Add committed structured-output unit regressions using the exact Rust literals for mixed direct-plus-stringified candidates in both orders and nested-string false-positive protection, while retaining the successful and malformed transport coverage.",
+                "id": "P5"
+              },
+              {
+                "description": "Retain the recovered Plan, Criticize, and Revise routing, canonical revise-resolution aliases and rejection rules, typed prompt examples, planning-session completion contract, and affected intent documentation without broadening the change.",
+                "id": "P6"
+              }
+            ],
+            "summary": "Refine will selectively recover the accepted Round 1 planning changes onto the fresh current base and correct the shared structured-output decoder so it discovers every standalone top-level candidate across direct, fenced, and quoted or recursively stringified forms before selection. This makes mixed distinct values fail consistently in either order without counting strings nested inside a valid object or envelope as peers, while preserving bounded unwrapping, precise diagnostics, strict phase semantics, canonical criticism-resolution handling, prompt contracts, and the documented planning intent."
+          },
+          "started_at": "2026-08-16T00:22:40Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-16T00:23:25Z",
         "proposal": {
           "completed_at": "2026-08-16T00:21:34Z",
           "git_after": {
@@ -832,7 +875,7 @@
         "schema_version": 2,
         "started_at": "2026-08-16T00:20:13Z",
         "state": "in_progress",
-        "updated_at": "2026-08-16T00:22:40Z"
+        "updated_at": "2026-08-16T00:23:25Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -846,7 +889,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-08-16T00:22:40Z",
+      "updated": "2026-08-16T00:23:25Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-16T00:20:12Z",
         "round_idx": 1,
@@ -856,8 +899,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-08-16T00:22:40Z",
-  "workflow_revision": 33
+  "updated": "2026-08-16T00:23:25Z",
+  "workflow_revision": 36
 }
