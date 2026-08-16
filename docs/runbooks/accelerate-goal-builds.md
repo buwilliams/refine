@@ -2,9 +2,9 @@
 
 Use this runbook when Goal Rounds on a node spend most of their implementation
 and Quality time compiling. Every Round works in an isolated worktree, so
-without a cache each Round pays a cold build of the target app. Refine already
-injects the variables you declare in `~/.config/refine/agent.env` into every
-agent it spawns — no Refine configuration changes are needed.
+without a cache each fresh Round pays a cold build of the target app. Refine
+captures the node user's login-shell environment and hands it to every agent
+it spawns — ordinary shell configuration is all this needs.
 
 Recovery Rounds drafted from Quality or Governance findings already reuse the
 source Round's worktree and its warm build state automatically. This runbook
@@ -25,36 +25,31 @@ adds cache sharing for fresh Rounds and across Goals.
    cargo install sccache --locked
    ```
 
-2. Declare it for every Refine-spawned agent by appending to
-   `~/.config/refine/agent.env` (create the file if absent):
+2. Export it from the shell startup files of the user that runs the node
+   (for example `~/.bashrc`):
 
    ```text
-   RUSTC_WRAPPER=sccache
-   SCCACHE_CACHE_SIZE=20G
+   export RUSTC_WRAPPER=sccache
+   export SCCACHE_CACHE_SIZE=20G
    ```
 
-   `agent.env` is read on every agent launch, so no daemon restart is needed.
+3. Restart the Refine daemon. Refine reads the login-shell environment once
+   per daemon lifetime, so the restart is what picks the exports up — for both
+   the agents Refine spawns and the Quality gate's supervised proof commands,
+   which inherit the daemon's own environment.
+
    Each worktree keeps its own `target/` directory — cargo's own locking is
    untouched — while compiled artifacts are shared through the cache.
-
-3. Optional, for full coverage: `agent.env` reaches agent CLIs and every
-   command those agents run, which is where most compile time lives. The
-   Quality gate's supervised proof commands run outside the agent environment
-   and inherit the daemon's own environment instead, so to cache those too,
-   export the same variables in the environment that starts the Refine daemon
-   (its systemd unit or launching shell profile) and restart the daemon.
 
 ## Verify
 
 Let one Goal Round complete, then run `sccache --show-stats`. Cache hits should
-climb on the second and subsequent Rounds that touch the same dependencies.
-With the daemon-environment step applied, the Quality gate's supervised test
-commands hit the same cache; the gate re-runs tests in the worktree the
-implementation agent already built, so most of its compile work short-circuits
-either way.
+climb on the second and subsequent Rounds that touch the same dependencies. The
+Quality gate re-runs tests in the worktree the implementation agent already
+built, so most of its compile work short-circuits as well.
 
 ## Undo
 
-Remove the two lines from `~/.config/refine/agent.env`. The next agent launch
-reverts to plain compiler invocations; caches under `~/.cache/sccache` can be
-deleted at any time.
+Remove the two exports from the shell startup files and restart the daemon.
+The next agent launch reverts to plain compiler invocations; caches under
+`~/.cache/sccache` can be deleted at any time.
