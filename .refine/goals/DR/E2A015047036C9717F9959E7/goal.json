@@ -767,8 +767,25 @@
           "round_idx": 1,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-08-16T00:21:34Z",
+        "criticism": {
+          "completed_at": "2026-08-16T00:22:40Z",
+          "git_after": {
+            "branch": "refine/DRE2A015047036C9717F9959E7/round-2",
+            "head_commit": "6d284fb82c3a8bb999558fcebb3c7f0cfe9eb083",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRE2A015047036C9717F9959E7/round-2",
+            "head_commit": "6d284fb82c3a8bb999558fcebb3c7f0cfe9eb083",
+            "status_porcelain": []
+          },
+          "result": {
+            "summary": "The plan fully addresses mixed-candidate ambiguity while preserving the accepted bounded planning contracts."
+          },
+          "started_at": "2026-08-16T00:21:35Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-08-16T00:22:40Z",
         "proposal": {
           "completed_at": "2026-08-16T00:21:34Z",
           "git_after": {
@@ -815,7 +832,7 @@
         "schema_version": 2,
         "started_at": "2026-08-16T00:20:13Z",
         "state": "in_progress",
-        "updated_at": "2026-08-16T00:21:34Z"
+        "updated_at": "2026-08-16T00:22:40Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -829,7 +846,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-08-16T00:21:35Z",
+      "updated": "2026-08-16T00:22:40Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-16T00:20:12Z",
         "round_idx": 1,
@@ -841,6 +858,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-16T00:21:35Z",
-  "workflow_revision": 31
+  "updated": "2026-08-16T00:22:40Z",
+  "workflow_revision": 33
 }
