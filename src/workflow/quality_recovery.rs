@@ -4,9 +4,12 @@ use serde_json::{Value, json};
 use crate::model::JsonObject;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::prompts::{PromptTemplate, render};
+use crate::structured_output::{
+    Contract, DecodeOptions, Selection, StructuredOutputError, select_value,
+};
 use crate::tools::host::quality::QualityCheckResult;
 
-use super::{json_object, json_object_candidates};
+use super::json_object;
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub(super) struct QualityRecoveryInvestigation {
@@ -32,6 +35,7 @@ pub(super) fn quality_recovery_prompt(
     let quality_json = serde_json::to_string_pretty(quality).map_err(|error| {
         RefineError::Serialization(format!("failed to encode Quality recovery result: {error}"))
     })?;
+    let investigation_contract = QualityRecoveryVerdict::contract_json();
     Ok(render(
         PromptTemplate::GoalWorkflowQualityRecovery,
         &[
@@ -41,30 +45,68 @@ pub(super) fn quality_recovery_prompt(
             ("context_json", &context_json),
             ("quality_agent_report", quality_agent_report),
             ("quality_json", &quality_json),
+            ("investigation_contract", &investigation_contract),
         ],
     ))
+}
+
+/// The canonical investigation shape shown to and required from the agent.
+#[derive(Debug, Deserialize, Serialize)]
+pub(super) struct QualityRecoveryVerdict {
+    recovery_analysis: String,
+    recovery_round_prompt: String,
+}
+
+impl Contract for QualityRecoveryVerdict {
+    const LABEL: &'static str = "Quality recovery investigation JSON";
+
+    fn example() -> Self {
+        QualityRecoveryVerdict {
+            recovery_analysis: "concise evidence-based cause and required correction".to_string(),
+            recovery_round_prompt: "complete actionable request for the next implementation Round"
+                .to_string(),
+        }
+    }
+
+    fn validate(&self) -> Result<(), StructuredOutputError> {
+        for (key, value) in [
+            ("recovery_analysis", &self.recovery_analysis),
+            ("recovery_round_prompt", &self.recovery_round_prompt),
+        ] {
+            if value.trim().is_empty() {
+                return Err(StructuredOutputError::validation(
+                    Self::LABEL,
+                    format!("Quality recovery investigation omitted {key}"),
+                ));
+            }
+        }
+        Ok(())
+    }
 }
 
 pub(super) fn parse_quality_recovery_provider_output(
     output: &str,
 ) -> RefineResult<QualityRecoveryInvestigation> {
-    let value = json_object_candidates(output)
-        .into_iter()
-        .rev()
-        .find(|value| {
-            value.get("recovery_analysis").is_some() || value.get("recovery_round_prompt").is_some()
-        })
-        .ok_or_else(|| {
-            RefineError::Serialization(
-                "Quality recovery investigation did not return the required JSON object"
-                    .to_string(),
+    let shaped: &dyn Fn(&Value) -> bool = &|value| {
+        value.get("recovery_analysis").is_some() || value.get("recovery_round_prompt").is_some()
+    };
+    let value = select_value(
+        output,
+        &DecodeOptions::new(QualityRecoveryVerdict::LABEL)
+            .selecting(Selection::LastMatching(shaped)),
+    )?;
+    let verdict: QualityRecoveryVerdict =
+        serde_path_to_error::deserialize(value.clone()).map_err(|error| {
+            StructuredOutputError::schema(
+                QualityRecoveryVerdict::LABEL,
+                Some(error.path().to_string()).filter(|path| !path.is_empty()),
+                error.inner().to_string(),
             )
         })?;
-    let analysis = required_string(&value, "recovery_analysis")?;
-    let round_prompt = required_string(&value, "recovery_round_prompt")?;
+    verdict.validate()?;
     Ok(QualityRecoveryInvestigation {
-        analysis,
-        round_prompt,
+        analysis: verdict.recovery_analysis.trim().to_string(),
+        round_prompt: verdict.recovery_round_prompt.trim().to_string(),
         details: json_object(json!({
             "phase": "quality_recovery",
             "raw_output": output,
@@ -73,21 +115,14 @@ pub(super) fn parse_quality_recovery_provider_output(
     })
 }
 
-fn required_string(value: &Value, key: &str) -> RefineResult<String> {
-    value
-        .get(key)
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(ToString::to_string)
-        .ok_or_else(|| {
-            RefineError::Serialization(format!("Quality recovery investigation omitted {key}"))
-        })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn quality_recovery_contract_example_roundtrips() {
+        crate::structured_output::assert_contract_roundtrip::<QualityRecoveryVerdict>();
+    }
 
     #[test]
     fn quality_recovery_reads_the_last_structured_investigation() {

@@ -13,9 +13,10 @@ pub enum Selection<'a> {
     /// Exactly one distinct JSON candidate; ambiguity is a transport error.
     /// This is the default and the right posture for repair-guarded contracts.
     Single,
-    /// The last balanced candidate satisfying the predicate. For lenient
-    /// no-retry sites (Governance verdicts, Quality recovery) whose agents
-    /// legitimately quote JSON while reasoning before the final value.
+    /// The last balanced candidate satisfying the predicate, in document
+    /// order; candidates that are arrays are searched one element deep. For
+    /// lenient no-retry sites (Governance verdicts, Quality recovery) whose
+    /// agents legitimately quote JSON while reasoning before the final value.
     LastMatching(&'a dyn Fn(&Value) -> bool),
 }
 
@@ -174,9 +175,8 @@ fn select_json_candidate(
     let full_output_error = match serde_json::from_str::<Value>(output) {
         Ok(value) => match options.selection {
             Selection::Single => return Ok(value),
-            Selection::LastMatching(matches) if matches(&value) => return Ok(value),
-            Selection::LastMatching(_) => {
-                return Err(no_matching_candidate(label));
+            Selection::LastMatching(matches) => {
+                return last_matching(vec![value], matches, label);
             }
         },
         Err(error) => error,
@@ -185,31 +185,48 @@ fn select_json_candidate(
     let fenced = fenced_contents(output);
     let spans = balanced_json_spans(output);
     let likely_suffix = likely_json_suffix(output);
-    let mut candidates = Vec::new();
+    let mut candidates: Vec<(&str, Value)> = Vec::new();
     for candidate in fenced.iter().chain(spans.iter()) {
-        if let Ok(value) = serde_json::from_str::<Value>(candidate.trim())
-            && !candidates.contains(&value)
+        let candidate = candidate.trim();
+        if let Ok(value) = serde_json::from_str::<Value>(candidate)
+            && !candidates.iter().any(|(_, seen)| *seen == value)
         {
-            candidates.push(value);
+            candidates.push((candidate, value));
         }
     }
     if candidates.is_empty() {
         for candidate in stringified_json_spans(output) {
             if let Ok(value) = serde_json::from_str::<Value>(candidate)
-                && !candidates.contains(&value)
+                && !candidates.iter().any(|(_, seen)| *seen == value)
             {
-                candidates.push(value);
+                candidates.push((candidate, value));
             }
         }
     }
     if let Selection::LastMatching(matches) = options.selection {
-        return match candidates.into_iter().filter(|value| matches(value)).next_back() {
-            Some(value) => Ok(value),
-            None => Err(no_matching_candidate(label)),
-        };
+        return last_matching(
+            candidates.into_iter().map(|(_, value)| value).collect(),
+            matches,
+            label,
+        );
     }
     match candidates.len() {
-        1 => return Ok(candidates.remove(0)),
+        1 => {
+            let (span, value) = candidates.remove(0);
+            // When the output itself begins as a JSON value that failed to
+            // parse, a single embedded candidate is salvage from the broken
+            // wrapper, not the response; the wrapper's parse error is the
+            // actionable diagnostic.
+            if matches!(output.as_bytes().first(), Some(b'{' | b'[' | b'"'))
+                && !output.starts_with(span)
+            {
+                return Err(StructuredOutputError::transport(
+                    label,
+                    format!("contains invalid JSON: {full_output_error}"),
+                ));
+            }
+            return Ok(value);
+        }
         count if count > 1 => {
             return Err(StructuredOutputError::transport(
                 label,
@@ -235,8 +252,34 @@ fn select_json_candidate(
     ))
 }
 
-fn no_matching_candidate(label: &str) -> StructuredOutputError {
-    StructuredOutputError::transport(label, "contains no JSON value matching the required shape")
+fn last_matching(
+    candidates: Vec<Value>,
+    matches: &dyn Fn(&Value) -> bool,
+    label: &str,
+) -> Result<Value, StructuredOutputError> {
+    let mut selected = None;
+    for candidate in candidates {
+        match candidate {
+            Value::Array(items) => {
+                for item in items {
+                    if matches(&item) {
+                        selected = Some(item);
+                    }
+                }
+            }
+            value => {
+                if matches(&value) {
+                    selected = Some(value);
+                }
+            }
+        }
+    }
+    selected.ok_or_else(|| {
+        StructuredOutputError::transport(
+            label,
+            "contains no JSON value matching the required shape",
+        )
+    })
 }
 
 fn fenced_contents(output: &str) -> Vec<&str> {
@@ -258,27 +301,38 @@ fn fenced_contents(output: &str) -> Vec<&str> {
     contents
 }
 
+/// Every parseable balanced JSON span in `output`, in document order. An
+/// opener that never balances, closes mismatched, or spans text that is not
+/// actually JSON only costs the scan that opener: it resumes right after it
+/// instead of swallowing the rest of the text, so values nested in prose
+/// braces are still found.
 fn balanced_json_spans(output: &str) -> Vec<&str> {
     let mut spans = Vec::new();
-    let mut start = None;
-    let mut closers = Vec::new();
+    let mut search_from = 0usize;
+    while let Some(relative) = output[search_from..].find(['{', '[']) {
+        let start = search_from + relative;
+        match balanced_span_end(output, start) {
+            Some(end) => {
+                let span = &output[start..=end];
+                if serde_json::from_str::<Value>(span).is_ok() {
+                    spans.push(span);
+                    search_from = end + 1;
+                } else {
+                    search_from = start + 1;
+                }
+            }
+            None => search_from = start + 1,
+        }
+    }
+    spans
+}
+
+/// Byte index of the closer balancing the opener at `start`, when one exists.
+fn balanced_span_end(output: &str, start: usize) -> Option<usize> {
+    let mut closers: Vec<char> = Vec::new();
     let mut in_string = false;
     let mut escaped = false;
-    for (index, ch) in output.char_indices() {
-        if start.is_none() {
-            match ch {
-                '{' => {
-                    start = Some(index);
-                    closers.push('}');
-                }
-                '[' => {
-                    start = Some(index);
-                    closers.push(']');
-                }
-                _ => {}
-            }
-            continue;
-        }
+    for (offset, ch) in output[start..].char_indices() {
         if in_string {
             if escaped {
                 escaped = false;
@@ -293,23 +347,18 @@ fn balanced_json_spans(output: &str) -> Vec<&str> {
             '"' => in_string = true,
             '{' => closers.push('}'),
             '[' => closers.push(']'),
-            '}' | ']' if closers.last() == Some(&ch) => {
-                closers.pop();
-                if closers.is_empty() {
-                    let span_start = start.take().expect("started JSON span");
-                    spans.push(&output[span_start..index + ch.len_utf8()]);
-                }
-            }
             '}' | ']' => {
-                start = None;
-                closers.clear();
-                in_string = false;
-                escaped = false;
+                if closers.pop() != Some(ch) {
+                    return None;
+                }
+                if closers.is_empty() {
+                    return Some(start + offset);
+                }
             }
             _ => {}
         }
     }
-    spans
+    None
 }
 
 fn stringified_json_spans(output: &str) -> Vec<&str> {
@@ -526,6 +575,20 @@ mod tests {
                 .unwrap_err()
                 .to_string()
                 .contains("no JSON value matching the required shape")
+        );
+
+        // Prose braces that never balance, and balanced-but-non-JSON spans
+        // hiding a nested value, must not swallow the verdict after them.
+        let stray = "Reviewed code containing { braces.\n{\"name\":\"after\",\"count\":4}";
+        assert_eq!(select_value(stray, &options).unwrap()["name"], "after");
+        let shadowed = "{ prose {\"name\":\"nested\",\"count\":5} }";
+        assert_eq!(select_value(shadowed, &options).unwrap()["name"], "nested");
+
+        // A verdict wrapped one level deep in an array is still found.
+        let array_wrapped = "verdicts: [{\"scratch\":true},{\"name\":\"boxed\",\"count\":6}]";
+        assert_eq!(
+            select_value(array_wrapped, &options).unwrap()["name"],
+            "boxed"
         );
     }
 }

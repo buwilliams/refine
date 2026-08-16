@@ -167,9 +167,9 @@ if test -f "$0.count"; then count=$(sed -n '1p' "$0.count"); fi
 count=$((count + 1))
 printf '%s\n' "$count" > "$0.count"
 if test "$count" -eq 1; then
-  printf '%s\n' '{"summary":"first exact-candidate evaluation failed","diagnostics":["first provider verdict"],"results":[{"test":"Outcome works","status":"failed","evidence":"first failure","command":"false"}]}'
+  printf '%s\n' '{"summary":"first exact-candidate evaluation failed","results":[{"test":"Outcome works","status":"failed","evidence":"first failure","command":"false"}]}'
 else
-  printf '%s\n' '{"summary":"later evaluation passed","diagnostics":[],"results":[{"test":"Outcome works","status":"passed","evidence":"later pass","command":"true"}]}'
+  printf '%s\n' '{"summary":"later evaluation passed","results":[{"test":"Outcome works","status":"passed","evidence":"later pass","command":"true"}]}'
 fi
 "#,
         )

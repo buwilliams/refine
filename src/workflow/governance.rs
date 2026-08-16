@@ -5,6 +5,7 @@ use serde_json::{Value, json};
 
 use crate::model::JsonObject;
 use crate::prompts::{PromptTemplate, render};
+use crate::structured_output::{Contract, DecodeOptions, Selection, select_value};
 
 use super::json_object;
 
@@ -38,6 +39,7 @@ pub(super) fn post_implementation_governance_prompt(
     let guidance_json = serde_json::to_string_pretty(guidance).unwrap_or_else(|_| "[]".to_string());
     let round_number = (round_idx + 1).to_string();
     let provider_cwd = provider_cwd.display().to_string();
+    let verdict_contract = GovernanceVerdictExample::contract_json();
     render(
         PromptTemplate::PostImplementationGovernance,
         &[
@@ -49,8 +51,47 @@ pub(super) fn post_implementation_governance_prompt(
             ("constitution", constitution),
             ("rules_json", &rules_json),
             ("guidance_json", &guidance_json),
+            ("verdict_contract", &verdict_contract),
         ],
     )
+}
+
+/// The canonical verdict shape shown to review agents. The lenient derivation
+/// in [`governance_evaluation_from_json`] accepts more spellings, but the
+/// prompt teaches exactly this one.
+#[derive(Debug, Deserialize, Serialize)]
+pub(super) struct GovernanceVerdictExample {
+    status: String,
+    message: String,
+    violations: Vec<GovernanceViolationExample>,
+    recovery_analysis: String,
+    recovery_round_prompt: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct GovernanceViolationExample {
+    rule_id: String,
+    rule: String,
+    message: String,
+}
+
+impl Contract for GovernanceVerdictExample {
+    const LABEL: &'static str = "Governance verdict JSON";
+
+    fn example() -> Self {
+        GovernanceVerdictExample {
+            status: "passed|failed".to_string(),
+            message: "short human-readable result".to_string(),
+            violations: vec![GovernanceViolationExample {
+                rule_id: "...".to_string(),
+                rule: "...".to_string(),
+                message: "...".to_string(),
+            }],
+            recovery_analysis: "required when failed".to_string(),
+            recovery_round_prompt: "complete actionable Round request required when failed"
+                .to_string(),
+        }
+    }
 }
 
 /// Keys that only a governance verdict object carries. A JSON object quoted in
@@ -109,20 +150,15 @@ fn unparsable_governance_evaluation(
 
 /// Find the review's verdict, not merely the first brace in its prose. Reviews
 /// routinely quote code and JSON while reasoning about rules, so scan every
-/// balanced object and take the last one that actually looks like a verdict.
+/// balanced value and take the last one that actually looks like a verdict.
 fn parse_governance_verdict(raw: &str) -> Option<Value> {
-    let candidates = json_object_candidates(raw);
-    candidates
-        .iter()
-        .rev()
-        .find(|value| has_any_key(value, &GOVERNANCE_VERDICT_KEYS))
-        .or_else(|| {
-            candidates
-                .iter()
-                .rev()
-                .find(|value| has_any_key(value, &GOVERNANCE_VERDICT_FALLBACK_KEYS))
-        })
-        .cloned()
+    let strong: &dyn Fn(&Value) -> bool = &|value| has_any_key(value, &GOVERNANCE_VERDICT_KEYS);
+    let fallback: &dyn Fn(&Value) -> bool =
+        &|value| has_any_key(value, &GOVERNANCE_VERDICT_FALLBACK_KEYS);
+    let options = DecodeOptions::new(GovernanceVerdictExample::LABEL);
+    select_value(raw, &options.selecting(Selection::LastMatching(strong)))
+        .or_else(|_| select_value(raw, &options.selecting(Selection::LastMatching(fallback))))
+        .ok()
 }
 
 fn has_any_key(value: &Value, keys: &[&str]) -> bool {
@@ -131,6 +167,16 @@ fn has_any_key(value: &Value, keys: &[&str]) -> bool {
         .is_some_and(|object| keys.iter().any(|key| object.contains_key(*key)))
 }
 
+/// Derive the evaluation from a verdict object with deliberate leniency — this
+/// is a fail-closed, no-retry gate, so absorbing shape diversity beats failing
+/// it. Accepted aliases beyond the canonical contract:
+///
+/// | Canonical    | Also accepted                              |
+/// |--------------|--------------------------------------------|
+/// | `violations` | `rule_violations`, `failed_actions`        |
+/// | `status`     | `verdict`, `result`                        |
+/// | (derived)    | `ok: bool`, `failed`/`violates`/`violation`|
+/// | `message`    | `reason`, `summary`                        |
 fn governance_evaluation_from_json(
     value: Value,
     raw_output: &str,
@@ -205,58 +251,6 @@ fn governance_evaluation_from_json(
     }
 }
 
-/// Every top-level balanced object in `raw` that parses as JSON, in the order
-/// they appear. An opening brace that never balances (unclosed code in prose)
-/// only costs the scan that brace: it resumes right after it instead of
-/// swallowing the rest of the text.
-pub(super) fn json_object_candidates(raw: &str) -> Vec<Value> {
-    let mut candidates = Vec::new();
-    let mut search_from = 0usize;
-    while let Some(relative_start) = raw[search_from..].find('{') {
-        let start = search_from + relative_start;
-        if let Some(end) = balanced_object_end(raw, start)
-            && let Ok(value) = serde_json::from_str::<Value>(&raw[start..=end])
-        {
-            candidates.push(value);
-            search_from = end + 1;
-            continue;
-        }
-        search_from = start + 1;
-    }
-    candidates
-}
-
-/// Byte index of the `}` closing the object that opens at `start`.
-fn balanced_object_end(raw: &str, start: usize) -> Option<usize> {
-    let mut depth = 0usize;
-    let mut in_string = false;
-    let mut escaped = false;
-    for (offset, ch) in raw[start..].char_indices() {
-        if in_string {
-            if escaped {
-                escaped = false;
-            } else if ch == '\\' {
-                escaped = true;
-            } else if ch == '"' {
-                in_string = false;
-            }
-            continue;
-        }
-        match ch {
-            '"' => in_string = true,
-            '{' => depth += 1,
-            '}' => {
-                depth = depth.saturating_sub(1);
-                if depth == 0 {
-                    return Some(start + offset);
-                }
-            }
-            _ => {}
-        }
-    }
-    None
-}
-
 fn violation_message_from_actions(actions: &[Value]) -> String {
     actions
         .iter()
@@ -283,5 +277,18 @@ fn governance_violation_message(message: &str) -> String {
         message.to_string()
     } else {
         format!("Governance rule violation: {message}")
+    }
+}
+
+#[cfg(test)]
+mod contract_tests {
+    use super::*;
+
+    #[test]
+    fn verdict_contract_example_roundtrips_and_parses_as_a_verdict() {
+        crate::structured_output::assert_contract_roundtrip::<GovernanceVerdictExample>();
+        let evaluation =
+            parse_governance_provider_output(&GovernanceVerdictExample::contract_json(), 1);
+        assert!(evaluation.details.get("verdict_parse_error").is_none());
     }
 }

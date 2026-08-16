@@ -20,6 +20,7 @@ use crate::process::supervisor::operations::{
 };
 use crate::process::supervisor::security::{FileSecurityService, SecurityService};
 use crate::prompts::{PromptEngine, PromptTemplate, render};
+use crate::structured_output::Contract;
 use crate::tools::host::agent_providers::{HostAgentProviderService, ProviderInvocation};
 use crate::tools::host::git_sync::with_repository_git_lock;
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
@@ -41,8 +42,10 @@ mod runner;
 mod settings;
 mod settlement;
 mod summary;
+mod wire;
 
 use cancellation::*;
+use wire::*;
 pub(crate) use provider_output::parse_quality_provider_output;
 use provider_output::*;
 pub(crate) use provider_output::{is_quality_harness_fault, is_quality_output_contract_fault};

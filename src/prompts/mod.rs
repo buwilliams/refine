@@ -55,7 +55,6 @@ prompt_templates! {
     ImportStandaloneGoal => "imports/standalone-goal.md",
     ImportNotes => "imports/notes.md",
     PostImplementationQuality => "quality/post-implementation.md",
-    QualityStructuredOutputRepair => "quality/structured-output-repair.md",
     StructuredOutputRepair => "structured_output/repair.md",
     GoalWorkflowQualityAgent => "quality/agent.md",
     GoalWorkflowQualityRecovery => "quality/recovery.md",

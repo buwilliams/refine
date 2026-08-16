@@ -13,7 +13,12 @@ fn quality_operation_settles_parsing_failure_and_persists_the_same_goal_evidence
         .runner()
         .run_goal_checks("GOAL1", "smoke-ai", Default::default())
         .unwrap_err();
-    assert!(error.to_string().contains("required JSON evaluation"));
+    assert!(
+        error
+            .to_string()
+            .contains("invalid structured Quality evaluation JSON"),
+        "error: {error}"
+    );
     let operation = FileOperationRegistry::new(&fixture.runtime_root)
         .recover()
         .unwrap()
@@ -42,7 +47,7 @@ fn quality_operation_settles_parsing_failure_and_persists_the_same_goal_evidence
         operation.error.unwrap()["message"]
             .as_str()
             .unwrap()
-            .contains("required JSON evaluation")
+            .contains("invalid structured Quality evaluation JSON")
     );
     let detail = FileWorkItemService::new(&fixture.refine_dir)
         .show_goal_detail("GOAL1")
@@ -55,7 +60,7 @@ fn quality_operation_settles_parsing_failure_and_persists_the_same_goal_evidence
         detail["rounds"][0]["quality_message"]
             .as_str()
             .unwrap()
-            .contains("required JSON evaluation")
+            .contains("invalid structured Quality evaluation JSON")
     );
     restore_smoke_ai(previous);
     fs::remove_dir_all(fixture.temp_root).unwrap();

@@ -61,7 +61,6 @@ impl ObservedExecution {
 }
 
 const QUALITY_COMMAND_HARNESS_FAULT_PREFIX: &str = "Quality command harness fault:";
-const QUALITY_OUTPUT_CONTRACT_FAULT_PREFIX: &str = "Quality output contract fault:";
 
 pub(super) fn quality_command_harness_fault(
     command: &str,
@@ -85,19 +84,11 @@ pub(crate) fn is_quality_harness_fault(error: &RefineError) -> bool {
 pub(crate) fn is_quality_output_contract_fault(error: &RefineError) -> bool {
     matches!(
         error,
-        RefineError::Serialization(message)
-            if message.starts_with(QUALITY_OUTPUT_CONTRACT_FAULT_PREFIX)
+        RefineError::StructuredOutput(inner)
+            if inner.label() == QualityEvaluationWire::LABEL
     )
 }
 
-pub(super) fn exhausted_quality_output_contract(
-    error: &RefineError,
-    attempts: usize,
-) -> RefineError {
-    RefineError::Serialization(format!(
-        "{QUALITY_OUTPUT_CONTRACT_FAULT_PREFIX} exhausted {attempts} structured response attempt(s): {error}"
-    ))
-}
 
 pub(super) fn record_quality_provider_attempt(
     request: &QualityCheckRequest,
@@ -140,25 +131,16 @@ pub(crate) fn parse_quality_provider_output(
     configured_tests: &[String],
     output: &str,
 ) -> RefineResult<QualityCheckResult> {
-    let value = parse_json_value(output).ok_or_else(|| {
-        RefineError::Serialization(
-            "Quality agent did not return the required JSON evaluation".to_string(),
-        )
-    })?;
-    let returned = value
-        .get("results")
-        .and_then(Value::as_array)
-        .ok_or_else(|| {
-            RefineError::Serialization(
-                "Quality agent response is missing a results array".to_string(),
-            )
-        })?;
+    // Transport and schema faults are repairable contract errors; everything
+    // past this decode is fail-safe coercion that never rejects the response.
+    let evaluation = QualityEvaluationWire::decode(output)?;
+    let returned = &evaluation.results;
     let mut results = Vec::with_capacity(configured_tests.len());
     let mut diagnostics = Vec::new();
     for test in configured_tests {
         let matches = returned
             .iter()
-            .filter(|item| item.get("test").and_then(Value::as_str) == Some(test.as_str()))
+            .filter(|item| item.test == *test)
             .collect::<Vec<_>>();
         if matches.len() != 1 {
             let evidence = if matches.is_empty() {
@@ -178,24 +160,9 @@ pub(crate) fn parse_quality_provider_output(
             continue;
         }
         let item = matches[0];
-        let status = item
-            .get("status")
-            .and_then(Value::as_str)
-            .unwrap_or("")
-            .trim()
-            .to_ascii_lowercase();
-        let evidence = item
-            .get("evidence")
-            .and_then(Value::as_str)
-            .unwrap_or("")
-            .trim()
-            .to_string();
-        let command = item
-            .get("command")
-            .and_then(Value::as_str)
-            .unwrap_or("")
-            .trim()
-            .to_string();
+        let status = item.status.trim().to_ascii_lowercase();
+        let evidence = item.evidence.trim().to_string();
+        let command = item.command.trim().to_string();
         let valid_status = matches!(status.as_str(), "passed" | "failed");
         if !valid_status {
             diagnostics.push(format!(
@@ -238,12 +205,7 @@ pub(crate) fn parse_quality_provider_output(
     Ok(QualityCheckResult {
         owner_id: owner_id.to_string(),
         ok: false,
-        summary: value
-            .get("summary")
-            .and_then(Value::as_str)
-            .unwrap_or("")
-            .trim()
-            .to_string(),
+        summary: evaluation.summary.trim().to_string(),
         results,
         diagnostics,
         candidate_commit: String::new(),
@@ -339,13 +301,6 @@ pub(super) fn legacy_quality_enabled(settings: &Map<String, Value>) -> bool {
     }
 }
 
-fn parse_json_value(raw: &str) -> Option<Value> {
-    serde_json::from_str::<Value>(raw.trim()).ok().or_else(|| {
-        let start = raw.find('{')?;
-        let end = raw.rfind('}')?;
-        serde_json::from_str::<Value>(&raw[start..=end]).ok()
-    })
-}
 
 pub(super) fn normalize_tests(tests: Vec<String>) -> Vec<String> {
     let mut normalized = Vec::new();
