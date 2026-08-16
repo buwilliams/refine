@@ -8,7 +8,11 @@ use super::context::WorkflowContext;
 
 #[derive(Clone, Debug)]
 pub(super) enum CandidateRefreshOutcome {
-    Unchanged,
+    Unchanged {
+        /// The target tip the refresh observed, so integration can prove the
+        /// target has not advanced between the refresh and the merge.
+        target_commit: String,
+    },
     Refreshed {
         original_candidate: String,
         replacement_candidate: String,
@@ -52,14 +56,14 @@ pub(super) fn refresh_candidate_for_target_advancement(
         .as_ref()
         .is_ok_and(|resolved| resolved == &target_commit)
     {
-        return Ok(CandidateRefreshOutcome::Unchanged);
+        return Ok(CandidateRefreshOutcome::Unchanged { target_commit });
     }
     if resolved_candidate
         .as_ref()
         .is_ok_and(|resolved| resolved == &original_candidate)
         && target_git.commit_is_ancestor(&original_candidate, &target_commit)?
     {
-        return Ok(CandidateRefreshOutcome::Unchanged);
+        return Ok(CandidateRefreshOutcome::Unchanged { target_commit });
     }
 
     let head = worktree_git.head_ref()?;

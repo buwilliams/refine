@@ -177,6 +177,7 @@ fn quality_service_uses_agent_to_evaluate_every_plain_text_test() {
 
     let result = service
         .run_checks(QualityCheckRequest {
+            stall_timeout_seconds: None,
             owner_id: "GOAL1".to_string(),
             round_idx: 0,
             node_id: "default".to_string(),
@@ -319,6 +320,7 @@ fn quality_rejects_agent_pass_without_successful_observed_execution() {
         .unwrap();
     let result = service
         .run_checks(QualityCheckRequest {
+            stall_timeout_seconds: None,
             owner_id: "GOAL1".to_string(),
             round_idx: 0,
             node_id: "default".to_string(),
@@ -370,6 +372,7 @@ fn quality_runs_supervised_commands_with_bash_process_substitution() {
 
     let result = service
         .run_checks(QualityCheckRequest {
+            stall_timeout_seconds: None,
             owner_id: "GOAL1".to_string(),
             round_idx: 0,
             node_id: "default".to_string(),
@@ -460,6 +463,7 @@ fn quality_accepts_no_match_evidence_when_command_encodes_pass_semantics() {
 
     let result = service
         .run_checks(QualityCheckRequest {
+            stall_timeout_seconds: None,
             owner_id: "GOAL1".to_string(),
             round_idx: 0,
             node_id: "default".to_string(),
@@ -514,6 +518,7 @@ fn quality_detects_candidate_mutation_and_preserves_it() {
         .unwrap();
     let error = service
         .run_checks(QualityCheckRequest {
+            stall_timeout_seconds: None,
             owner_id: "GOAL1".to_string(),
             round_idx: 0,
             node_id: "default".to_string(),

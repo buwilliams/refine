@@ -127,9 +127,10 @@ where
             signal_path.display().to_string(),
         ),
     ];
-    let command = match provider_service.interactive_command_with_environment(
+    let command = match provider_service.interactive_command_with_session_and_environment(
         &launch.provider,
         &protocol_prompt,
+        launch.provider_session.as_ref(),
         &launch_env_overrides,
     ) {
         Ok(command) => command,

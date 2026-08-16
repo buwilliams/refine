@@ -56,6 +56,48 @@ pub(super) fn post_implementation_governance_prompt(
     )
 }
 
+/// Advisory verdict on a finalized implementation plan, before any
+/// implementation spend. Shares the post-implementation verdict contract and
+/// parsing so both gates speak one language.
+#[allow(clippy::too_many_arguments)]
+pub(super) fn plan_governance_precheck_prompt(
+    governance: &Value,
+    rules: &[Value],
+    guidance: &[Value],
+    provider_cwd: &Path,
+    goal_id: &str,
+    round_idx: usize,
+    plan_json: &str,
+) -> String {
+    let product = governance
+        .get("product")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let constitution = governance
+        .get("constitution")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let rules_json = serde_json::to_string_pretty(rules).unwrap_or_else(|_| "[]".to_string());
+    let guidance_json = serde_json::to_string_pretty(guidance).unwrap_or_else(|_| "[]".to_string());
+    let round_number = (round_idx + 1).to_string();
+    let provider_cwd = provider_cwd.display().to_string();
+    let verdict_contract = GovernanceVerdictExample::contract_json();
+    render(
+        PromptTemplate::PlanGovernancePrecheck,
+        &[
+            ("goal_id", goal_id),
+            ("round_number", &round_number),
+            ("provider_cwd", &provider_cwd),
+            ("plan_json", plan_json),
+            ("product", product),
+            ("constitution", constitution),
+            ("rules_json", &rules_json),
+            ("guidance_json", &guidance_json),
+            ("verdict_contract", &verdict_contract),
+        ],
+    )
+}
+
 /// The canonical verdict shape shown to review agents. The lenient derivation
 /// in [`governance_evaluation_from_json`] accepts more spellings, but the
 /// prompt teaches exactly this one.

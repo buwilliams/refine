@@ -159,6 +159,7 @@ impl FileChatService {
             };
             let result = provider.invoke_detailed_with_output(
                 ProviderInvocation {
+                    stall_timeout_seconds: None,
                     provider: record.provider.clone(),
                     prompt: self.chat_prompt(&record, &message),
                     session_id: record.provider_session_id.clone(),

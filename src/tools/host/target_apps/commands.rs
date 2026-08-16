@@ -60,6 +60,7 @@ impl FileTargetAppService {
             target_app_lifecycle_prompt(kind, instructions, settings, &self.target_root, &cwd);
         let result = HostAgentProviderService::with_runtime_root(self.runtime_root.join("agents"))
             .invoke(ProviderInvocation {
+                stall_timeout_seconds: None,
                 provider,
                 prompt,
                 session_id: None,

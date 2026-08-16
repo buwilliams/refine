@@ -140,13 +140,16 @@ use goal_agent_spec::goal_agent_prompt;
 #[cfg(test)]
 use governance::GOVERNANCE_VERDICT_UNPARSABLE;
 use governance::{
-    GovernanceEvaluation, parse_governance_provider_output, post_implementation_governance_prompt,
+    GovernanceEvaluation, parse_governance_provider_output, plan_governance_precheck_prompt,
+    post_implementation_governance_prompt,
 };
 use implementation_planning::{
     complete_implementation_planning, fail_implementation_phase, governed_implementation_prompt,
-    run_governed_implementation_planning,
+    implementation_resume_session, run_governed_implementation_planning,
 };
 use quality_recovery::{
     QualityRecoveryInvestigation, parse_quality_recovery_provider_output, quality_recovery_prompt,
 };
-use settings::{setting_cap_with_default_values, setting_string, setting_usize};
+use settings::{
+    agent_stall_timeout_seconds, setting_cap_with_default_values, setting_string, setting_usize,
+};

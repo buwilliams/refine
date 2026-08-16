@@ -11,6 +11,7 @@ use crate::model::goal::{
 use crate::model::workflow::GoalStatus;
 use crate::process::agent_sessions::{GoalAgentLaunch, run_goal_agent_with_settlement};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::tools::host::agent_providers::ProviderSessionContinuity;
 use crate::tools::host::git_worktrees::FileGitWorktreeService;
 use crate::tools::product::work_items::FileWorkItemService;
 use crate::workflow::{now_timestamp, setting_usize};
@@ -25,6 +26,7 @@ pub(super) struct PlanningPhaseRun {
     pub output: String,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn run_observational_phase(
     ctx: &WorkflowContext<'_>,
     plan: &mut ImplementationPlan,
@@ -33,6 +35,7 @@ pub(super) fn run_observational_phase(
     phase_state: ImplementationPlanPhase,
     phase: &str,
     prompt: String,
+    provider_session: Option<ProviderSessionContinuity>,
 ) -> RefineResult<PlanningPhaseRun> {
     ctx.revalidate_authority(GoalStatus::Plan)?;
     let git = FileGitWorktreeService::with_runtime_root(agent_cwd, ctx.runtime_root);
@@ -82,31 +85,59 @@ pub(super) fn run_observational_phase(
             output,
         });
     }
+    let launch_with_session = |provider_session: Option<ProviderSessionContinuity>| GoalAgentLaunch {
+        provider_session,
+        runtime_root: ctx.runtime_root.to_path_buf(),
+        cwd: agent_cwd.to_path_buf(),
+        provider: ctx.provider.clone(),
+        prompt: prompt.clone(),
+        metadata: metadata.clone(),
+        completion_timeout: Some(Duration::from_secs(setting_usize(
+            &ctx.settings,
+            "agent_hard_cap_seconds",
+            7200,
+        ) as u64)),
+    };
+    let on_attention = |attention: crate::process::agent_sessions::GoalAgentAttention| {
+        let _ = ctx.log(
+            "implementation_planning",
+            &format!("Implementation {phase} agent is waiting for user input"),
+            Some(crate::workflow::json_object(json!({
+                "phase": phase,
+                "message": attention.message
+            }))),
+        );
+    };
     let invocation = run_goal_agent_with_settlement(
-        GoalAgentLaunch {
-            runtime_root: ctx.runtime_root.to_path_buf(),
-            cwd: agent_cwd.to_path_buf(),
-            provider: ctx.provider.clone(),
-            prompt,
-            metadata,
-            completion_timeout: Some(Duration::from_secs(setting_usize(
-                &ctx.settings,
-                "agent_hard_cap_seconds",
-                7200,
-            ) as u64)),
-        },
-        |attention| {
-            let _ = ctx.log(
-                "implementation_planning",
-                &format!("Implementation {phase} agent is waiting for user input"),
-                Some(crate::workflow::json_object(json!({
-                    "phase": phase,
-                    "message": attention.message
-                }))),
-            );
-        },
+        launch_with_session(provider_session.clone()),
+        on_attention,
         |_| Ok(()),
     );
+    let invocation = match invocation {
+        // The pinned provider session can be gone by now — pruned by the CLI
+        // or created in an earlier daemon lifetime. Observational phases are
+        // read-only, so a fresh launch preserves the phase instead of failing
+        // the Round over lost provider-side session state.
+        Err(resume_error)
+            if matches!(
+                provider_session,
+                Some(ProviderSessionContinuity::Resume(_))
+            ) && git.implementation_planning_observation()? == git_before =>
+        {
+            let _ = ctx.log(
+                "implementation_planning",
+                &format!(
+                    "Implementation {phase} agent could not resume its provider session; retrying fresh"
+                ),
+                Some(crate::workflow::json_object(json!({
+                    "phase": phase,
+                    "resume_error": resume_error.to_string()
+                }))),
+            );
+            run_goal_agent_with_settlement(launch_with_session(None), on_attention, |_| Ok(()))
+        }
+        other => other,
+    };
     let git_after = git.implementation_planning_observation()?;
     // A provider may finish after cancellation, node transfer, Undo, or a replacement Round.
     // Observe its checkout for audit purposes, but never persist or repair a superseded result.
@@ -201,7 +232,7 @@ pub(super) fn record_failure(
     persist_plan(ctx, Some(&previous), plan)
 }
 
-fn failure_or_persistence_error(
+pub(super) fn failure_or_persistence_error(
     original: RefineError,
     persistence: RefineResult<()>,
 ) -> RefineError {

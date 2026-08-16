@@ -239,6 +239,8 @@ fn implementation_plan_round_trips_and_rejects_stale_or_rebound_updates() {
         implementation: None,
         failure: None,
         invalid_output_attempts: Vec::new(),
+        provider_session_id: None,
+        governance_precheck: None,
     };
     service
         .replace_goal_round_implementation_plan("GOAL1", 0, None, &initial)

@@ -67,6 +67,7 @@ fn stateful_provider_launch_without_port_runtime_fails_closed() {
 
     let error = service
         .invoke(ProviderInvocation {
+            stall_timeout_seconds: None,
             provider: "smoke-ai".to_string(),
             prompt: "runtime ownership".to_string(),
             session_id: None,
@@ -128,6 +129,86 @@ fn interactive_provider_commands_keep_the_native_cli_conversation_mode() {
 }
 
 #[test]
+fn interactive_session_continuity_pins_and_resumes_only_where_the_cli_supports_it() {
+    let temp_root = unique_temp_dir("interactive-session-continuity");
+    let bin_dir = temp_root.join("bin");
+    fs::create_dir_all(&bin_dir).unwrap();
+    for binary in ["claude", "codex", "gemini", "copilot"] {
+        let path = bin_dir.join(binary);
+        fs::write(&path, "#!/bin/sh\n").unwrap();
+        make_executable(&path);
+    }
+    let service = HostAgentProviderService {
+        path_override: Some(bin_dir.display().to_string()),
+        runtime_root: Some(temp_root.join("run/8080")),
+    };
+
+    assert!(
+        HostAgentProviderService::provider_supports_interactive_session_continuity("claude")
+    );
+    for provider in ["codex", "gemini", "copilot", "smoke-ai", "custom-cli"] {
+        assert!(
+            !HostAgentProviderService::provider_supports_interactive_session_continuity(provider),
+            "{provider} must not claim interactive session continuity"
+        );
+    }
+
+    let pinned = service
+        .interactive_command_with_session_and_environment(
+            "claude",
+            "initial context",
+            Some(&ProviderSessionContinuity::Pin("session-1".to_string())),
+            &[],
+        )
+        .unwrap();
+    assert_eq!(
+        pinned.args,
+        vec![
+            "--session-id",
+            "session-1",
+            "--dangerously-skip-permissions",
+            "initial context"
+        ]
+    );
+    let resumed = service
+        .interactive_command_with_session_and_environment(
+            "claude",
+            "revise the plan",
+            Some(&ProviderSessionContinuity::Resume("session-1".to_string())),
+            &[],
+        )
+        .unwrap();
+    assert_eq!(
+        resumed.args,
+        vec![
+            "--resume",
+            "session-1",
+            "--dangerously-skip-permissions",
+            "revise the plan"
+        ]
+    );
+    // A provider without the capability launches exactly as it always has.
+    let codex = service
+        .interactive_command_with_session_and_environment(
+            "codex",
+            "initial context",
+            Some(&ProviderSessionContinuity::Resume("session-1".to_string())),
+            &[],
+        )
+        .unwrap();
+    assert_eq!(
+        codex.args,
+        vec![
+            "--dangerously-bypass-approvals-and-sandbox",
+            "initial context"
+        ]
+    );
+    assert!(!codex.args.iter().any(|arg| arg.contains("session-1")));
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn claude_noninteractive_chat_commands_skip_permissions() {
     let spec = ProviderSpec::new(
         "claude",
@@ -182,6 +263,7 @@ fn host_provider_service_invokes_smoke_ai_and_extracts_json_final_text() {
     };
     let output = service
         .invoke(ProviderInvocation {
+            stall_timeout_seconds: None,
             provider: "smoke-ai".to_string(),
             prompt: "hello".to_string(),
             session_id: None,
@@ -252,6 +334,7 @@ fn supervised_launch_uses_final_environment_for_file_fallback_and_child_parity()
     let result = service
         .invoke_detailed_with_environment_and_output(
             ProviderInvocation {
+                stall_timeout_seconds: None,
                 provider: "smoke-ai".to_string(),
                 prompt,
                 session_id: None,
@@ -309,6 +392,7 @@ fn effective_environment_rejects_before_supervised_spawn_without_prompt_disclosu
     let error = service
         .invoke_detailed_with_environment_and_output(
             ProviderInvocation {
+                stall_timeout_seconds: None,
                 provider: "smoke-ai".to_string(),
                 prompt,
                 session_id: None,
@@ -353,6 +437,7 @@ fn host_provider_service_sends_large_codex_prompts_over_stdin() {
     for session_id in [None, Some("session-1".to_string())] {
         let result = service
             .invoke_detailed(ProviderInvocation {
+                stall_timeout_seconds: None,
                 provider: "codex".to_string(),
                 prompt: "x".repeat(1024 * 1024),
                 session_id,
@@ -399,6 +484,7 @@ fn oversized_argv_provider_uses_exact_prompt_file_without_metadata_disclosure() 
     };
     let result = service
         .invoke_detailed(ProviderInvocation {
+            stall_timeout_seconds: None,
             provider: "smoke-ai".to_string(),
             prompt,
             session_id: None,

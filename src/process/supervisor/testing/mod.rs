@@ -193,6 +193,7 @@ mod tests {
 
         let provider = FakeProvider::new("fake-ai").with_output("done");
         let result = provider.invoke(ProviderInvocation {
+            stall_timeout_seconds: None,
             provider: "fake-ai".to_string(),
             prompt: "ship it".to_string(),
             cwd: None,

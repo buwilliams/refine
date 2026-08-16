@@ -76,7 +76,9 @@ pub struct ProcessResourceLimits {
     /// supervised work is legitimately slow or quiet for long stretches, so a
     /// total deadline would kill healthy work on a slow host. Commands that
     /// hold a lock while talking to a repository — where hanging forever
-    /// stalls everything waiting behind them — set this; agent runs do not.
+    /// stalls everything waiting behind them — set this, as do unattended
+    /// non-interactive agent verdicts (`agent_idle_timeout_seconds`);
+    /// interactive agent sessions keep their separate wall-clock hard cap.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub stall_timeout_seconds: Option<u64>,
 }

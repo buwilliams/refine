@@ -124,6 +124,7 @@ impl InProcessWebServer {
         }
         let cwd = self.target_root().map(|path| path.display().to_string());
         let output = match self.agent_provider_service().invoke(ProviderInvocation {
+            stall_timeout_seconds: None,
             provider: provider.clone(),
             prompt: import_extraction_prompt(&text, purpose),
             session_id: None,

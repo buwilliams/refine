@@ -151,6 +151,7 @@ fn planning_session_returns_the_structured_result_from_its_completion_signal() {
     metadata.insert("implementation_phase".to_string(), json!("plan"));
     let result = run_goal_agent(
         GoalAgentLaunch {
+            provider_session: None,
             runtime_root,
             cwd: app_root,
             provider: "smoke-ai".to_string(),
@@ -207,6 +208,7 @@ fn goal_agent_hard_cap_terminates_a_session_without_a_completion_signal() {
     let started_at = std::time::Instant::now();
     let error = run_goal_agent(
         GoalAgentLaunch {
+            provider_session: None,
             runtime_root: runtime_root.clone(),
             cwd: app_root,
             provider: "smoke-ai".to_string(),
@@ -326,6 +328,7 @@ fn workflow_goal_agent_is_discoverable_and_attachable_while_running() {
         metadata.insert("goal_id".to_string(), json!("GOAL1"));
         run_goal_agent(
             GoalAgentLaunch {
+                provider_session: None,
                 runtime_root: runtime_for_thread,
                 cwd: app_for_thread,
                 provider: "smoke-ai".to_string(),
@@ -376,6 +379,7 @@ fn workflow_goal_agent_is_discoverable_and_attachable_while_running() {
     duplicate_metadata.insert("goal_id".to_string(), json!("GOAL1"));
     let duplicate = run_goal_agent(
         GoalAgentLaunch {
+            provider_session: None,
             runtime_root: runtime_root.clone(),
             cwd: app_root.clone(),
             provider: "smoke-ai".to_string(),
@@ -440,6 +444,7 @@ fn workflow_goal_agent_surfaces_needs_input_and_continues_same_session() {
         metadata.insert("goal_id".to_string(), json!("GOAL2"));
         run_goal_agent(
             GoalAgentLaunch {
+                provider_session: None,
                 runtime_root: runtime_for_thread,
                 cwd: app_for_thread,
                 provider: "smoke-ai".to_string(),
@@ -508,6 +513,7 @@ fn workflow_goal_agent_handoff_survives_dead_process_recovery() {
     metadata.insert("goal_id".to_string(), json!("GOAL-RECOVERY"));
     let result = run_goal_agent_session(
         GoalAgentLaunch {
+            provider_session: None,
             runtime_root: runtime_root.clone(),
             cwd: app_root,
             provider: "smoke-ai".to_string(),
@@ -624,6 +630,7 @@ fn workflow_goal_agent_pty_uses_configured_final_environment_for_file_transport(
     let prompt = format!("{secret}{}", "p".repeat(60_000 - secret.len()));
     let result = run_goal_agent(
         GoalAgentLaunch {
+            provider_session: None,
             runtime_root,
             cwd: app_root,
             provider: "smoke-ai".to_string(),
@@ -675,6 +682,7 @@ fn workflow_goal_agent_early_exec_failure_preserves_errno_and_cleans_channels() 
 
     let error = run_goal_agent(
         GoalAgentLaunch {
+            provider_session: None,
             runtime_root: runtime_root.clone(),
             cwd: app_root,
             provider: "smoke-ai".to_string(),
@@ -741,6 +749,7 @@ fn silent_goal_agent_remains_autonomous_without_requesting_input() {
     let mut attention = Vec::new();
     let result = run_goal_agent(
         GoalAgentLaunch {
+            provider_session: None,
             runtime_root,
             cwd: app_root,
             provider: "smoke-ai".to_string(),

@@ -22,6 +22,15 @@ atomically rechecks Todo status, active-node ownership, exact Round count,
 request, and authored workflow revision while moving to plan. A changed
 authoring commitment remains Todo and produces no execution side effects.
 
+A Quality- or Governance-finding recovery Round continues on the source
+Round's retained candidate instead of a fresh repository copy. After the same
+atomic Todo admission, Refine verifies the retained worktree still names the
+exact recorded candidate and is clean, then creates the new Round branch at
+that commit in the same worktree — preserving its warm build state. Any failed
+precondition falls back to the ordinary fresh materialization, and
+integration-race recoveries always take the fresh path because their candidate
+itself is stale.
+
 ## Future Direction
 
 Todo selection should gain better dependency, risk, capability, node-health, and expected-impact reasoning while remaining understandable as the point where work becomes actionable.

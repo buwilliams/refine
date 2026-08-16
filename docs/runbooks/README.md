@@ -32,6 +32,9 @@ Runbooks:
   identity and work while the agent owns the machines.
 - [Distribute and converge work](distribute-and-converge.md) — move Goals to
   workers and bring reviewable work home.
+- [Accelerate Goal builds](accelerate-goal-builds.md) — share a compile cache
+  across Round worktrees through `agent.env` so fresh Rounds stop paying cold
+  builds.
 - [Recover a state-sync conflict](state-sync-recovery.md) — inspect a complete
   valid-baseline conflict report and apply stale-fenced default and per-path
   authority without editing synchronized state by hand.

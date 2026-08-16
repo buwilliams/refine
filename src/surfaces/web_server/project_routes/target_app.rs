@@ -188,6 +188,7 @@ impl InProcessWebServer {
                     body,
                 );
                 match self.agent_provider_service().invoke(ProviderInvocation {
+                    stall_timeout_seconds: None,
                     provider: provider.clone(),
                     prompt: target_app_generation_prompt(&service.target_root),
                     session_id: None,

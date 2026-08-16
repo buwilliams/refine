@@ -317,12 +317,25 @@ impl QualityOperationRunner {
                 branch.to_string(),
             )
         };
+        let stall_timeout_seconds =
+            FileSettingsService::with_active_root(&self.refine_dir, &self.runtime_root)
+                .load()
+                .ok()
+                .map(|settings| {
+                    settings
+                        .get("agent_idle_timeout_seconds")
+                        .and_then(Value::as_str)
+                        .and_then(|value| value.trim().parse::<u64>().ok())
+                        .filter(|value| *value > 0)
+                        .unwrap_or(900)
+                });
         let request = QualityCheckRequest {
             owner_id: goal_id.to_string(),
             round_idx,
             node_id: node_id.to_string(),
             provider: provider.to_string(),
             cwd: cwd.display().to_string(),
+            stall_timeout_seconds,
             source_candidate_commit: Some(source_candidate_commit.clone()),
             evaluation_scope: evaluation_scope.to_string(),
             candidate_commit: evaluated_commit.clone(),

@@ -101,6 +101,28 @@ fn file_automation_fails_after_the_shared_quality_recovery_budget_is_exhausted()
             .unwrap_or("")
             .contains("health check")
     );
+    // Recovery Rounds are scoped: planning is synthesized (no criticize pass),
+    // and the Round continues on the retained candidate branch lineage.
+    let recovery_plan = &goal["rounds"][1]["implementation_plan"];
+    assert_eq!(recovery_plan["state"], "completed");
+    assert!(
+        recovery_plan["final_plan"]["result"]["summary"]
+            .as_str()
+            .unwrap_or("")
+            .starts_with("Scoped quality recovery"),
+        "{recovery_plan}"
+    );
+    assert!(recovery_plan["criticism"].is_null());
+    assert_eq!(
+        recovery_plan["final_plan"]["result"]["checklist"][0]["id"],
+        "R1"
+    );
+    assert!(
+        goal["branch_name"]
+            .as_str()
+            .unwrap_or("")
+            .ends_with("round-6")
+    );
     unsafe {
         if let Some(previous) = previous_smoke_ai {
             std::env::set_var("REFINE_SMOKE_AI_PATH", previous);

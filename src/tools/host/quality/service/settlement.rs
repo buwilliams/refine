@@ -248,6 +248,7 @@ impl QualityOperationRunner {
         operation: &OperationHandle,
     ) -> RefineResult<OperationHandle> {
         let request = QualityCheckRequest {
+            stall_timeout_seconds: None,
             owner_id: required_operation_request_string(operation, "goal_id")?,
             round_idx: operation
                 .request

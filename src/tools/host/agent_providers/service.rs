@@ -9,11 +9,13 @@ struct ProviderCommandExecution<'a> {
     output_format: &'a str,
     process_metadata: Map<String, Value>,
     authorization_command: Option<String>,
+    stall_timeout_seconds: Option<u64>,
 }
 
 struct ProviderLaunchRequest<'a> {
     prompt: &'a str,
     session_id: Option<&'a str>,
+    interactive_session: Option<&'a ProviderSessionContinuity>,
     cwd: Option<&'a Path>,
     interactive: bool,
     environment: EffectiveLaunchEnvironment,
@@ -169,6 +171,21 @@ impl HostAgentProviderService {
         prompt: &str,
         environment_overrides: &[(String, String)],
     ) -> RefineResult<InteractiveProviderCommand> {
+        self.interactive_command_with_session_and_environment(
+            provider,
+            prompt,
+            None,
+            environment_overrides,
+        )
+    }
+
+    pub fn interactive_command_with_session_and_environment(
+        &self,
+        provider: &str,
+        prompt: &str,
+        interactive_session: Option<&ProviderSessionContinuity>,
+        environment_overrides: &[(String, String)],
+    ) -> RefineResult<InteractiveProviderCommand> {
         let _ = self.reap_orphan_prompt_artifacts()?;
         let (spec, binary) = self.resolve_binary_for_provider(provider)?;
         let environment =
@@ -179,11 +196,19 @@ impl HostAgentProviderService {
             ProviderLaunchRequest {
                 prompt,
                 session_id: None,
+                interactive_session,
                 cwd: None,
                 interactive: true,
                 environment,
             },
         )
+    }
+
+    /// Whether the provider's interactive CLI can pin and resume a
+    /// caller-chosen session, allowing workflow steps to share one session.
+    pub fn provider_supports_interactive_session_continuity(provider: &str) -> bool {
+        Self::spec(provider)
+            .is_some_and(|spec| spec.supports_interactive_session_continuity())
     }
 
     fn prepare_provider_launch(
@@ -205,7 +230,7 @@ impl HostAgentProviderService {
             |delivered| {
                 if request.interactive {
                     std::iter::once(binary.clone())
-                        .chain(spec.interactive_args(delivered))
+                        .chain(spec.interactive_args(delivered, request.interactive_session))
                         .collect()
                 } else {
                     spec.chat_args(&binary, delivered, request.session_id, request.cwd)
@@ -213,7 +238,7 @@ impl HostAgentProviderService {
             },
         )?;
         let args = if request.interactive {
-            spec.interactive_args(&prepared.delivered_prompt)
+            spec.interactive_args(&prepared.delivered_prompt, request.interactive_session)
         } else {
             spec.chat_args(
                 &binary,
@@ -278,6 +303,7 @@ impl HostAgentProviderService {
             ProviderLaunchRequest {
                 prompt: &invocation.prompt,
                 session_id: invocation.session_id.as_deref(),
+                interactive_session: None,
                 cwd,
                 interactive: false,
                 environment: launch_environment,
@@ -371,6 +397,7 @@ impl HostAgentProviderService {
             ProviderLaunchRequest {
                 prompt: &invocation.prompt,
                 session_id: invocation.session_id.as_deref(),
+                interactive_session: None,
                 cwd,
                 interactive: false,
                 environment: launch_environment,
@@ -399,6 +426,7 @@ impl HostAgentProviderService {
                 output_format: &spec.output_format,
                 process_metadata,
                 authorization_command: Some(prepared.authorization_command.clone()),
+                stall_timeout_seconds: invocation.stall_timeout_seconds,
             },
             on_output,
         )
@@ -464,6 +492,7 @@ impl HostAgentProviderService {
                 output_format: &spec.output_format,
                 process_metadata,
                 authorization_command: None,
+                stall_timeout_seconds: None,
             },
             on_output,
         )
@@ -495,6 +524,7 @@ impl HostAgentProviderService {
                     stdin: launch.stdin,
                     limits: Some(ProcessResourceLimits {
                         kill_on_parent_exit: true,
+                        stall_timeout_seconds: launch.stall_timeout_seconds,
                         ..Default::default()
                     }),
                     authorization_command: launch

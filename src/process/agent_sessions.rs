@@ -19,7 +19,7 @@ use crate::process::subprocess::{
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::prompts::{PromptTemplate, render};
 use crate::structured_output::MAX_INVALID_SIGNAL_REPLACEMENTS;
-use crate::tools::host::agent_providers::HostAgentProviderService;
+use crate::tools::host::agent_providers::{HostAgentProviderService, ProviderSessionContinuity};
 
 const COMMAND_POLL_INTERVAL: Duration = Duration::from_millis(40);
 const SIGNAL_WRITE_GRACE_PERIOD: Duration = Duration::from_secs(2);
@@ -36,6 +36,9 @@ pub struct GoalAgentLaunch {
     pub prompt: String,
     pub metadata: Map<String, Value>,
     pub completion_timeout: Option<Duration>,
+    /// Pin or resume a provider-native session so consecutive workflow steps
+    /// can share one provider context instead of re-reading the repository.
+    pub provider_session: Option<ProviderSessionContinuity>,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

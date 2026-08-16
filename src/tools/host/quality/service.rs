@@ -18,6 +18,7 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationHandle, OperationRegistry, OperationState,
 };
+use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::security::{FileSecurityService, SecurityService};
 use crate::prompts::{PromptEngine, PromptTemplate, render};
 use crate::structured_output::Contract;
@@ -84,6 +85,9 @@ pub struct QualityCheckRequest {
     pub candidate_commit: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub identity_commitment: Option<QualityIdentityCommitment>,
+    /// No-output stall budget for the evaluation's provider invocations.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stall_timeout_seconds: Option<u64>,
     #[serde(default, skip_serializing_if = "Map::is_empty")]
     pub process_metadata: Map<String, Value>,
 }

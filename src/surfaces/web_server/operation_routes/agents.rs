@@ -65,6 +65,7 @@ impl InProcessWebServer {
             .filter(|value| !value.is_empty())
             .map(ToString::to_string);
         match self.agent_provider_service().invoke(ProviderInvocation {
+            stall_timeout_seconds: None,
             provider: provider.to_string(),
             prompt: prompt.to_string(),
             session_id: None,

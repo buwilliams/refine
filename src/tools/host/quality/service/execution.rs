@@ -82,6 +82,7 @@ impl QualityService for FileQualityService {
                     prompt: launch_prompt,
                     session_id: repair_session_id.borrow().clone(),
                     cwd: Some(request.cwd.clone()),
+                    stall_timeout_seconds: request.stall_timeout_seconds,
                     process_metadata: metadata,
                 })?;
                 self.ensure_operation_active(&request, settle_phase)?;

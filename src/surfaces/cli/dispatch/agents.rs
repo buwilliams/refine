@@ -85,6 +85,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                 },
         } => {
             let output = HostAgentProviderService::new().invoke(ProviderInvocation {
+                stall_timeout_seconds: None,
                 provider,
                 prompt,
                 session_id: None,

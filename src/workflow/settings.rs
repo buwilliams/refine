@@ -33,6 +33,15 @@ pub(super) fn setting_cap_with_default_values(
     }
 }
 
+/// The no-output stall budget for unattended non-interactive agent runs.
+///
+/// Backed by `agent_idle_timeout_seconds` so operators tune one idle knob for
+/// every verdict-producing invocation (governance, quality evaluation, quality
+/// recovery). PTY Goal Agent sessions keep the separate wall-clock hard cap.
+pub(super) fn agent_stall_timeout_seconds(settings: &JsonObject) -> u64 {
+    setting_usize(settings, "agent_idle_timeout_seconds", 900) as u64
+}
+
 pub(super) fn setting_string(settings: &JsonObject, key: &str, fallback: &str) -> String {
     settings
         .get(key)

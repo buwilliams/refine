@@ -37,12 +37,32 @@ pub enum ProviderPromptCapability {
     InlineOrFile,
 }
 
+/// Provider-native session continuity for interactive Goal Agent launches.
+///
+/// `Pin` starts a fresh provider session under a caller-chosen identifier so a
+/// later workflow step can reopen it; `Resume` reopens that session with a new
+/// prompt, carrying the provider's accumulated context across steps. Only
+/// providers whose CLI accepts a caller-chosen interactive session identifier
+/// participate — every other provider launches fresh, exactly as before.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ProviderSessionContinuity {
+    Pin(String),
+    Resume(String),
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct ProviderInvocation {
     pub provider: String,
     pub prompt: String,
     pub session_id: Option<String>,
     pub cwd: Option<String>,
+    /// Abort the supervised provider run after this long without output.
+    ///
+    /// Unattended workflow verdicts (governance, quality) must not hold a Goal
+    /// worker — or a repository lease — forever behind a hung CLI. Interactive
+    /// and operator-driven invocations leave this unset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stall_timeout_seconds: Option<u64>,
     #[serde(default, skip_serializing_if = "Map::is_empty")]
     pub process_metadata: Map<String, Value>,
 }

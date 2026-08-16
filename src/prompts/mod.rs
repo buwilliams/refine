@@ -44,6 +44,7 @@ prompt_templates! {
     GoalWorkflowRecoverReconciliation => "goal_workflow/recover-reconciliation.md",
     GoalWorkflowRecoverIntegration => "goal_workflow/recover-integration.md",
     GovernanceGeneration => "governance/generation.md",
+    PlanGovernancePrecheck => "governance/plan-precheck.md",
     PostImplementationGovernance => "governance/post-implementation.md",
     ImplementationPlanningPlan => "implementation_planning/plan.md",
     ImplementationPlanningCriticize => "implementation_planning/criticize.md",

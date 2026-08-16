@@ -550,6 +550,7 @@ fn installed_provider_fixture_conditionally_invokes_multiple_granular_capabiliti
     let process =
         crate::tools::host::agent_providers::HostAgentProviderService::with_runtime_root(&runtime)
             .launch_managed(crate::tools::host::agent_providers::ProviderInvocation {
+                stall_timeout_seconds: None,
                 provider: "smoke-ai".to_string(),
                 prompt: format!("CONTEXT {}", context.display()),
                 session_id: None,

@@ -177,6 +177,7 @@ impl FileSourcePromotionService {
         metadata.insert("provider".to_string(), json!(provider));
         let process = match HostAgentProviderService::with_runtime_root(&self.port_runtime_root)
             .launch_managed(ProviderInvocation {
+                stall_timeout_seconds: None,
                 provider: provider.to_string(),
                 prompt,
                 session_id: None,

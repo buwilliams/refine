@@ -87,10 +87,33 @@ impl ProviderSpec {
         }
     }
 
-    pub(super) fn interactive_args(&self, prompt: &str) -> Vec<String> {
+    /// Whether the interactive CLI accepts a caller-chosen session identifier,
+    /// which is what lets one workflow step resume another step's session.
+    pub(super) fn supports_interactive_session_continuity(&self) -> bool {
+        self.name == "claude"
+    }
+
+    pub(super) fn interactive_args(
+        &self,
+        prompt: &str,
+        session: Option<&ProviderSessionContinuity>,
+    ) -> Vec<String> {
+        let session_args = match (self.name.as_str(), session) {
+            ("claude", Some(ProviderSessionContinuity::Pin(session_id))) => {
+                vec!["--session-id".to_string(), session_id.clone()]
+            }
+            ("claude", Some(ProviderSessionContinuity::Resume(session_id))) => {
+                vec!["--resume".to_string(), session_id.clone()]
+            }
+            _ => Vec::new(),
+        };
         match self.name.as_str() {
             "claude" => with_initial_prompt(
-                vec!["--dangerously-skip-permissions".to_string()],
+                [
+                    session_args,
+                    vec!["--dangerously-skip-permissions".to_string()],
+                ]
+                .concat(),
                 prompt,
                 false,
             ),

@@ -147,6 +147,7 @@ impl InProcessWebServer {
             configured_provider_from_settings(&refine_dir, self.runtime_root.as_deref(), &body);
         let cwd = self.target_root().map(|path| path.display().to_string());
         let output = match self.agent_provider_service().invoke(ProviderInvocation {
+            stall_timeout_seconds: None,
             provider: provider.clone(),
             prompt: governance_generation_prompt(product, constitution),
             session_id: None,
