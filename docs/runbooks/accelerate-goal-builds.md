@@ -37,12 +37,21 @@ adds cache sharing for fresh Rounds and across Goals.
    Each worktree keeps its own `target/` directory — cargo's own locking is
    untouched — while compiled artifacts are shared through the cache.
 
+3. Optional, for full coverage: `agent.env` reaches agent CLIs and every
+   command those agents run, which is where most compile time lives. The
+   Quality gate's supervised proof commands run outside the agent environment
+   and inherit the daemon's own environment instead, so to cache those too,
+   export the same variables in the environment that starts the Refine daemon
+   (its systemd unit or launching shell profile) and restart the daemon.
+
 ## Verify
 
 Let one Goal Round complete, then run `sccache --show-stats`. Cache hits should
-climb on the second and subsequent Rounds that touch the same dependencies. A
-Round's Quality phase re-runs the project's tests in the same worktree the
-implementation built, so its compile time should also drop.
+climb on the second and subsequent Rounds that touch the same dependencies.
+With the daemon-environment step applied, the Quality gate's supervised test
+commands hit the same cache; the gate re-runs tests in the worktree the
+implementation agent already built, so most of its compile work short-circuits
+either way.
 
 ## Undo
 
