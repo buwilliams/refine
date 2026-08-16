@@ -6,28 +6,6 @@ use crate::process::supervisor::operations::{
 use crate::tools::host::quality::{FileQualityService, QualitySettingsPatch};
 use serde_json::Value;
 
-struct SmokeAiGuard(Option<std::ffi::OsString>);
-
-impl SmokeAiGuard {
-    fn set(path: &Path) -> Self {
-        let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
-        unsafe { std::env::set_var("REFINE_SMOKE_AI_PATH", path) };
-        Self(previous)
-    }
-}
-
-impl Drop for SmokeAiGuard {
-    fn drop(&mut self) {
-        unsafe {
-            if let Some(previous) = self.0.take() {
-                std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
-            } else {
-                std::env::remove_var("REFINE_SMOKE_AI_PATH");
-            }
-        }
-    }
-}
-
 /// A Goal durably in Quality with its Round branch, candidate commit, and managed worktree
 /// intact — exactly the state an interrupted attempt leaves behind.
 struct QualityResumeFixture {

@@ -180,6 +180,146 @@ fn daemon_automation_runs_full_goal_workflow_through_git_worktree() {
     }
 }
 
+/// The disruption doctrine, end to end at the riskiest phase: the daemon is
+/// SIGKILLed mid-Governance — integrated-target transaction marker written,
+/// governance review agent in flight — and a fresh daemon over the same
+/// durable state must carry the Goal to Review with no manual intervention.
+#[test]
+#[ignore]
+fn daemon_sigkill_mid_governance_recovers_to_review_without_manual_intervention() {
+    let control_dir = std::env::temp_dir().join(format!(
+        "refine-sigkill-governance-{}-{}",
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    fs::create_dir_all(&control_dir).unwrap();
+    let provider = stalling_governance_provider_script(&control_dir);
+    let previous_provider = std::env::var_os("REFINE_SMOKE_AI_PATH");
+    unsafe {
+        std::env::set_var("REFINE_SMOKE_AI_PATH", &provider);
+    }
+
+    let mut fixture = IntegrationFixture::start_with_agent_automation("sigkill-governance");
+    fixture.api_json(
+        "PATCH",
+        "/api/settings",
+        serde_json::json!({
+            "agent_cli": "smoke-ai",
+            "quality_enabled": "1",
+            "target_app_test_command": "printf target-tests-ok",
+            "branch_name_pattern": "refine/{goal_id}"
+        }),
+    );
+    fixture.api_json(
+        "PATCH",
+        "/api/governance",
+        serde_json::json!({
+            "product": "Disposable automation workflow test app",
+            "constitution": "Allow deterministic smoke workflow changes.",
+            "rules": [{"text": "Allow deterministic smoke workflow changes.", "source": "test"}]
+        }),
+    );
+
+    let goal_id = fixture.create_goal("sigkill mid-governance goal");
+    let round = fixture.run_refine(&[
+        "goal",
+        "round",
+        &goal_id,
+        "--reporter",
+        "refine-smoke",
+        "--prompt",
+        "Implement the deterministic full workflow provider change.",
+    ]);
+    fixture.assert_success("author workflow round", &round);
+    let start = fixture.run_refine(&["goal", "start", &goal_id]);
+    fixture.assert_success("start goal workflow", &start);
+
+    // The first governance review invocation signals and stalls; catching the
+    // sentinel means the daemon is inside the integrated-target transaction.
+    let sentinel = control_dir.join("governance-invoked");
+    let deadline = Instant::now() + Duration::from_secs(60);
+    while !sentinel.exists() {
+        assert!(
+            Instant::now() < deadline,
+            "governance review was never invoked; latest status was {}",
+            fixture.goal_field(&goal_id, "status")
+        );
+        thread::sleep(Duration::from_millis(100));
+    }
+    let marker = fixture
+        .app_root
+        .join(".git/refine-integrated-target-transaction.json");
+    assert!(
+        marker.exists(),
+        "the integrated-target transaction marker must be open mid-Governance"
+    );
+    let quality_operation_id =
+        fixture.goal_field(&goal_id, "rounds")[0]["quality_details"]["operation_id"]
+            .as_str()
+            .expect("quality proof recorded before governance")
+            .to_string();
+
+    fixture.kill_daemon_hard();
+    fixture.restart_daemon();
+
+    // No manual intervention: the restarted runner's own recovery pass and
+    // scheduler must finish the Goal.
+    let deadline = Instant::now() + Duration::from_secs(120);
+    loop {
+        let status = fixture.goal_field(&goal_id, "status");
+        if status.as_str() == Some("review") {
+            break;
+        }
+        assert!(
+            status.as_str() != Some("failed"),
+            "Goal {goal_id} failed after the restart instead of recovering"
+        );
+        assert!(
+            Instant::now() < deadline,
+            "Goal {goal_id} did not reach review after restart; latest status was {status}"
+        );
+        thread::sleep(Duration::from_millis(200));
+    }
+
+    let shown = fixture.run_refine(&["goal", "show", &goal_id]);
+    fixture.assert_success("goal show after recovery", &shown);
+    let goal = fixture.json_stdout(&shown);
+    let latest = &goal["goal"]["rounds"][0];
+    assert_eq!(goal["goal"]["status"], "review", "{goal:#}");
+    let candidate = goal["goal"]["candidate_commit"].as_str().unwrap();
+    assert_eq!(
+        latest["workflow_integration"]["candidate_commit"], candidate,
+        "{goal:#}"
+    );
+    // The Quality proof survived the kill and was reused, not regenerated.
+    assert_eq!(
+        latest["quality_details"]["operation_id"], quality_operation_id,
+        "{goal:#}"
+    );
+    assert_eq!(latest["rule_state"], "passed", "{goal:#}");
+    assert!(
+        !marker.exists(),
+        "the interrupted transaction marker must be recovered and closed"
+    );
+    let app_py = fs::read_to_string(fixture.app_root.join("app.py")).unwrap();
+    assert!(
+        app_py.contains("full workflow provider edit"),
+        "recovered review did not contain the integrated provider edit:\n{app_py}"
+    );
+
+    unsafe {
+        if let Some(previous) = previous_provider {
+            std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
+        } else {
+            std::env::remove_var("REFINE_SMOKE_AI_PATH");
+        }
+    }
+    let _ = fs::remove_dir_all(&control_dir);
+}
+
 fn wait_for_goal_status(fixture: &IntegrationFixture, goal_id: &str, expected: &str) {
     let deadline = Instant::now() + Duration::from_secs(20);
     loop {
@@ -234,6 +374,69 @@ fn deterministic_provider_script() -> std::path::PathBuf {
            printf '%s\\n' '{\"state\":\"completed\",\"message\":\"full workflow provider completed\",\"guidance_applied\":[],\"implementation_evidence\":{\"checklist\":[{\"id\":\"P1\",\"outcome\":\"completed\",\"evidence\":\"Applied the deterministic app.py change.\"}],\"verification\":[\"provider fixture completed\"]}}' > \"$REFINE_AGENT_SIGNAL_PATH\"\n\
            ;;\n\
          esac\n",
+    )
+    .unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut permissions = fs::metadata(&path).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(&path, permissions).unwrap();
+    }
+    path
+}
+
+/// The deterministic provider, except the FIRST post-implementation
+/// governance review drops a sentinel and stalls so the test can land a
+/// SIGKILL mid-Governance; every later review passes.
+fn stalling_governance_provider_script(control_dir: &std::path::Path) -> std::path::PathBuf {
+    let path = std::env::temp_dir().join(format!(
+        "refine-sigkill-governance-provider-{}-{}",
+        std::process::id(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let control = control_dir.display();
+    fs::write(
+        &path,
+        format!(
+            "#!/bin/sh\n\
+             case \"$*\" in\n\
+             *\"# Current Workflow Phase: Plan\"*)\n\
+               printf '%s\\n' '{{\"state\":\"completed\",\"message\":\"Plan proposed.\",\"guidance_applied\":[],\"planning_result\":{{\"summary\":\"Implement and verify the deterministic provider change through the governed workflow.\",\"checklist\":[{{\"id\":\"P1\",\"description\":\"Apply and verify the requested deterministic provider change.\"}}]}}}}' > \"$REFINE_AGENT_SIGNAL_PATH\"\n\
+               ;;\n\
+             *\"# Current Workflow Phase: Criticize\"*)\n\
+               printf '%s\\n' '{{\"state\":\"completed\",\"message\":\"Plan criticized.\",\"guidance_applied\":[],\"planning_result\":{{\"summary\":\"No material omissions found.\",\"findings\":[]}}}}' > \"$REFINE_AGENT_SIGNAL_PATH\"\n\
+               ;;\n\
+             *\"# Current Workflow Phase: Revise\"*)\n\
+               printf '%s\\n' '{{\"state\":\"completed\",\"message\":\"Plan finalized.\",\"guidance_applied\":[],\"planning_result\":{{\"summary\":\"Implement and verify the deterministic provider change through the governed workflow.\",\"checklist\":[{{\"id\":\"P1\",\"description\":\"Apply and verify the requested deterministic provider change.\"}}],\"criticism_resolutions\":[]}}}}' > \"$REFINE_AGENT_SIGNAL_PATH\"\n\
+               ;;\n\
+             *\"# Goal Workflow Quality\"*)\n\
+               printf '%s\\n' '{{\"state\":\"completed\",\"message\":\"Quality reviewed the candidate and retained the passing test.\",\"guidance_applied\":[]}}' > \"$REFINE_AGENT_SIGNAL_PATH\"\n\
+               ;;\n\
+             *\"Post-implementation Quality evaluation\"*)\n\
+               printf '%s\\n' '{{\"ok\":true,\"summary\":\"Quality planned.\",\"results\":[{{\"test\":\"Migrated Quality command passes: printf target-tests-ok\",\"status\":\"passed\",\"evidence\":\"legacy command selected\",\"command\":\"printf target-tests-ok\"}}]}}'\n\
+               ;;\n\
+             *\"Plan-stage governance pre-check\"*)\n\
+               printf '%s\\n' '{{\"status\":\"passed\",\"message\":\"Plan pre-check passed.\",\"violations\":[]}}'\n\
+               ;;\n\
+             *\"Post-implementation governance review\"*)\n\
+               if [ -f \"{control}/governance-stalled\" ]; then\n\
+                 printf '%s\\n' '{{\"status\":\"passed\",\"message\":\"Governance passed.\",\"violations\":[]}}'\n\
+               else\n\
+                 : > \"{control}/governance-stalled\"\n\
+                 : > \"{control}/governance-invoked\"\n\
+                 sleep 600\n\
+               fi\n\
+               ;;\n\
+             *)\n\
+               printf '\\n# full workflow provider edit\\n' >> app.py\n\
+               printf '%s\\n' '{{\"state\":\"completed\",\"message\":\"full workflow provider completed\",\"guidance_applied\":[],\"implementation_evidence\":{{\"checklist\":[{{\"id\":\"P1\",\"outcome\":\"completed\",\"evidence\":\"Applied the deterministic app.py change.\"}}],\"verification\":[\"provider fixture completed\"]}}}}' > \"$REFINE_AGENT_SIGNAL_PATH\"\n\
+               ;;\n\
+             esac\n"
+        ),
     )
     .unwrap();
     #[cfg(unix)]

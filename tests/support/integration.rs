@@ -178,6 +178,29 @@ impl IntegrationFixture {
         self.wait_for_daemon();
     }
 
+    /// Simulates the operator's force-stop: SIGKILL, no shutdown hooks, no
+    /// settlement — exactly what a production redeploy does to in-flight work.
+    #[allow(dead_code)]
+    pub fn kill_daemon_hard(&mut self) {
+        self.copy_runtime_diagnostics("before-hard-kill");
+        if let Some(mut child) = self.daemon.take() {
+            let _ = child.kill();
+            let _ = child.wait();
+        }
+    }
+
+    /// Starts a fresh daemon over the same durable state, as a redeploy does.
+    #[allow(dead_code)]
+    pub fn restart_daemon(&mut self) {
+        assert!(
+            self.daemon.is_none(),
+            "restart_daemon requires the previous daemon to be gone"
+        );
+        let static_root = self.repo_root.join("src/surfaces/web/static");
+        self.start_daemon(&static_root);
+        self.wait_for_attached_project();
+    }
+
     fn attach_app(&self) {
         let app = self.app_root.display().to_string();
         let output = self.run_refine(&["project", "attach", &app]);

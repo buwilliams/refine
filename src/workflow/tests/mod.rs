@@ -1,5 +1,6 @@
 mod already_merged;
 mod candidate_refresh;
+mod disruption;
 mod execution_ownership;
 mod failure_settlement;
 mod governance;
@@ -18,6 +19,30 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
+
+/// Points the smoke-ai provider at a fixture script for the duration of a test.
+/// Callers must hold `smoke_ai_env_lock` first.
+struct SmokeAiGuard(Option<std::ffi::OsString>);
+
+impl SmokeAiGuard {
+    fn set(path: &Path) -> Self {
+        let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
+        unsafe { std::env::set_var("REFINE_SMOKE_AI_PATH", path) };
+        Self(previous)
+    }
+}
+
+impl Drop for SmokeAiGuard {
+    fn drop(&mut self) {
+        unsafe {
+            if let Some(previous) = self.0.take() {
+                std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
+            } else {
+                std::env::remove_var("REFINE_SMOKE_AI_PATH");
+            }
+        }
+    }
+}
 
 fn test_refine_dir(target_root: &Path) -> PathBuf {
     fs::create_dir_all(target_root).unwrap();
