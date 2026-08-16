@@ -767,12 +767,55 @@
           "round_idx": 1,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-08-16T00:20:13Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-08-16T00:21:34Z",
+        "proposal": {
+          "completed_at": "2026-08-16T00:21:34Z",
+          "git_after": {
+            "branch": "refine/DRE2A015047036C9717F9959E7/round-2",
+            "head_commit": "6d284fb82c3a8bb999558fcebb3c7f0cfe9eb083",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRE2A015047036C9717F9959E7/round-2",
+            "head_commit": "6d284fb82c3a8bb999558fcebb3c7f0cfe9eb083",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Selectively recover the accepted Round 1 model, session, prompt, workflow, shared decoder, test, and planning-intent changes onto the fresh current base while preserving unrelated current-main behavior.",
+                "id": "P1"
+              },
+              {
+                "description": "Restructure structured-output discovery around standalone top-level candidate ownership so direct, fenced, and quoted or recursively stringified values are collected in one order-independent pass, deduplicated by decoded value, and distinct mixed forms are rejected with the existing candidate-count diagnostic.",
+                "id": "P2"
+              },
+              {
+                "description": "Keep nested JSON-like strings inside a valid object or completion envelope subordinate to that candidate so they are unwrapped only through the bounded transport path and never double-counted as peer candidates.",
+                "id": "P3"
+              },
+              {
+                "description": "Preserve payload, JSON-depth, and transport-layer limits, recursive envelope and string decoding, ambiguous-envelope rejection, parse and path-aware schema diagnostics, strict phase validation, and panic-free handling of malformed input.",
+                "id": "P4"
+              },
+              {
+                "description": "Add committed structured-output regressions using the exact Rust literals for mixed direct-plus-stringified candidates in both orders, nested-string false-positive protection, and the retained successful and malformed transport cases.",
+                "id": "P5"
+              },
+              {
+                "description": "Retain the recovered Plan, Criticize, and Revise phase routing, canonical revise resolution aliases and rejection rules, typed prompt examples, planning-session completion contract, and affected intent documentation without broadening the change.",
+                "id": "P6"
+              }
+            ],
+            "summary": "Refine will selectively recover the accepted Round 1 planning behavior onto the fresh current base, then correct the shared structured-output boundary so every standalone top-level candidate is discovered consistently across direct, fenced, and quoted or stringified forms before exactly one value is selected. The decoder will reject mixed distinct candidates without mistaking strings nested inside a valid object or completion envelope for separate candidates, while preserving bounded recursive unwrapping, precise diagnostics, strict revise semantics, canonical criticism resolution handling, prompt contracts, and the documented planning intent."
+          },
+          "started_at": "2026-08-16T00:20:13Z"
+        },
         "schema_version": 2,
         "started_at": "2026-08-16T00:20:13Z",
         "state": "in_progress",
-        "updated_at": "2026-08-16T00:20:13Z"
+        "updated_at": "2026-08-16T00:21:34Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -786,7 +829,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-08-16T00:20:13Z",
+      "updated": "2026-08-16T00:21:35Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-16T00:20:12Z",
         "round_idx": 1,
@@ -798,6 +841,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-16T00:20:13Z",
-  "workflow_revision": 29
+  "updated": "2026-08-16T00:21:35Z",
+  "workflow_revision": 31
 }
