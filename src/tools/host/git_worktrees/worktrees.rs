@@ -178,6 +178,31 @@ impl FileGitWorktreeService {
         )
     }
 
+    /// Point `branch` at this worktree's HEAD and check it out here, tolerating a
+    /// branch left behind by a superseded attempt of the same Round. Recovery
+    /// Rounds are reused in place, so their branch name can already exist; redo
+    /// semantics make the old tip disposable (it stays reachable via reflog).
+    pub fn ensure_branch_at_head(&self, branch: &str) -> RefineResult<String> {
+        validate_branch_name(branch)?;
+        if !self.branch_exists(branch)? {
+            self.git_output(&["switch", "-c", branch])?;
+            self.audit("branch", "ok", json!({"name": branch, "reused": false}))?;
+            return Ok(branch.to_string());
+        }
+        if self.head_ref()?.branch.as_deref() == Some(branch) {
+            self.audit("branch", "ok", json!({"name": branch, "reused": true}))?;
+            return Ok(branch.to_string());
+        }
+        let superseded_tip = self.resolve_commit(branch)?;
+        self.git_output(&["switch", "-C", branch])?;
+        self.audit(
+            "branch",
+            "ok",
+            json!({"name": branch, "reused": true, "reset_from": superseded_tip}),
+        )?;
+        Ok(branch.to_string())
+    }
+
     pub fn delete_branch(&self, branch: &str, force: bool) -> RefineResult<()> {
         validate_branch_name(branch)?;
         self.git_output(&["branch", if force { "-D" } else { "-d" }, branch])?;

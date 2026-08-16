@@ -34,6 +34,53 @@ fn file_git_worktree_service_lists_status_and_reverts_commits() {
 }
 
 #[test]
+fn ensure_branch_at_head_tolerates_a_superseded_recovery_attempts_branch() {
+    let temp_root = unique_temp_dir("git-branch-reuse");
+    let repo = temp_root.join("repo");
+    fs::create_dir_all(&repo).unwrap();
+    git(&repo, &["init", "-b", "main"]).unwrap();
+    git(&repo, &["config", "user.email", "test@example.com"]).unwrap();
+    git(&repo, &["config", "user.name", "Test User"]).unwrap();
+    fs::write(repo.join("app.txt"), "one\n").unwrap();
+    git(&repo, &["add", "app.txt"]).unwrap();
+    git(&repo, &["commit", "-m", "initial"]).unwrap();
+
+    let service = FileGitWorktreeService::new(&repo);
+    let head = service.head_ref().unwrap().commit.unwrap();
+
+    // Fresh creation checks the branch out at HEAD.
+    service
+        .ensure_branch_at_head("refine/goal/round-2")
+        .unwrap();
+    assert_eq!(
+        service.head_ref().unwrap().branch.as_deref(),
+        Some("refine/goal/round-2")
+    );
+
+    // A reused recovery Round re-enters with the branch already checked out.
+    service
+        .ensure_branch_at_head("refine/goal/round-2")
+        .unwrap();
+    assert_eq!(service.head_ref().unwrap().commit.unwrap(), head);
+
+    // A superseded attempt moved the branch; re-entry from the retained
+    // candidate resets it to HEAD instead of dying on "already exists".
+    fs::write(repo.join("app.txt"), "superseded\n").unwrap();
+    git(&repo, &["commit", "-am", "superseded attempt work"]).unwrap();
+    let superseded_tip = service.head_ref().unwrap().commit.unwrap();
+    git(&repo, &["switch", "main"]).unwrap();
+    service
+        .ensure_branch_at_head("refine/goal/round-2")
+        .unwrap();
+    let after = service.head_ref().unwrap();
+    assert_eq!(after.branch.as_deref(), Some("refine/goal/round-2"));
+    assert_eq!(after.commit.unwrap(), head);
+    assert_ne!(superseded_tip, head);
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn file_git_worktree_service_reports_primary_worktree_refine_state_as_untracked() {
     let temp_root = unique_temp_dir("git-status");
     let repo = temp_root.join("repo");
@@ -224,7 +271,7 @@ fn file_git_worktree_service_branches_worktrees_diffs_commits_pathspecs_and_push
 
     let service = FileGitWorktreeService::new(&repo);
     assert_eq!(
-        service.branch("feature/pathspec").unwrap(),
+        service.ensure_branch_at_head("feature/pathspec").unwrap(),
         "feature/pathspec"
     );
     assert_eq!(current_branch(&repo), "feature/pathspec");
@@ -461,7 +508,7 @@ fn file_git_worktree_service_rejects_invalid_names_and_reports_git_failures() {
 
     for name in ["", "-bad", "bad..name", "bad//name", "bad name"] {
         assert!(matches!(
-            service.branch(name),
+            service.ensure_branch_at_head(name),
             Err(RefineError::InvalidInput(_))
         ));
         assert!(matches!(
@@ -488,10 +535,6 @@ fn file_git_worktree_service_rejects_invalid_names_and_reports_git_failures() {
     assert!(matches!(
         service.revert_commit("bad ref!"),
         Err(RefineError::InvalidInput(_))
-    ));
-    assert!(matches!(
-        service.branch("main"),
-        Err(RefineError::Conflict(_))
     ));
     assert!(matches!(
         service.worktree("main"),

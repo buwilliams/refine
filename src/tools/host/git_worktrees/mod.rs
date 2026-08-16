@@ -144,7 +144,6 @@ pub struct MergedBranchCleanup {
 
 pub trait GitWorktreeService {
     fn inspect(&self, path: &str) -> RefineResult<GitStatus>;
-    fn branch(&self, name: &str) -> RefineResult<String>;
     fn switch(&self, branch: &str) -> RefineResult<String>;
     fn worktree(&self, branch: &str) -> RefineResult<String>;
     fn ensure_branch_from_head(&self, name: &str) -> RefineResult<String>;

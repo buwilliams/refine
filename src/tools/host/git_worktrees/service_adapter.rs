@@ -64,13 +64,6 @@ impl GitWorktreeService for FileGitWorktreeService {
         })
     }
 
-    fn branch(&self, name: &str) -> RefineResult<String> {
-        validate_branch_name(name)?;
-        self.git_output(&["switch", "-c", name])?;
-        self.audit("branch", "ok", json!({"name": name}))?;
-        Ok(name.to_string())
-    }
-
     fn switch(&self, branch: &str) -> RefineResult<String> {
         validate_branch_name(branch)?;
         self.git_output(&["switch", branch])?;

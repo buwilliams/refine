@@ -255,7 +255,9 @@ fn begin_scoped_recovery_round(
                 ctx.goal_id
             )));
         }
-        worktree_git.branch(&branch)?;
+        // The recovery Round may be a reused slot whose previous attempt already
+        // created this branch; reuse or reset it instead of demanding a fresh name.
+        worktree_git.ensure_branch_at_head(&branch)?;
         register_candidate_handoff(
             ctx.runtime_root,
             ctx.target_root,
