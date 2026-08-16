@@ -161,29 +161,6 @@ pub(super) fn run_observational_phase(
     })
 }
 
-pub(super) fn persist_run_failure(
-    ctx: &WorkflowContext<'_>,
-    plan: &mut ImplementationPlan,
-    phase: ImplementationPlanPhase,
-    category: &str,
-    run: &PlanningPhaseRun,
-    error: RefineError,
-) -> RefineError {
-    let failure_result = record_failure(
-        ctx,
-        plan,
-        ImplementationPlanningFailure {
-            phase,
-            category: category.to_string(),
-            message: error.to_string(),
-            failed_at: now_timestamp(),
-            git_before: Some(run.git_before.clone()),
-            git_after: Some(run.git_after.clone()),
-        },
-    );
-    failure_or_persistence_error(error, failure_result)
-}
-
 pub(super) fn persist_phase_failure(
     ctx: &WorkflowContext<'_>,
     plan: &mut ImplementationPlan,
@@ -206,7 +183,7 @@ pub(super) fn persist_phase_failure(
     failure_or_persistence_error(error, failure_result)
 }
 
-fn record_failure(
+pub(super) fn record_failure(
     ctx: &WorkflowContext<'_>,
     plan: &mut ImplementationPlan,
     failure: ImplementationPlanningFailure,

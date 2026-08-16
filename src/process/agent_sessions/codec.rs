@@ -180,6 +180,7 @@ struct IncompleteSignal {
 pub(super) struct SignalReader {
     incomplete: Option<IncompleteSignal>,
     write_grace_period: Duration,
+    requires_planning_result: bool,
 }
 
 #[derive(Debug)]
@@ -200,7 +201,16 @@ impl SignalReader {
         Self {
             incomplete: None,
             write_grace_period,
+            requires_planning_result: false,
         }
+    }
+
+    /// Reject completed signals that omit `planning_result` instead of letting
+    /// them settle as prose: planning phases require the structured object, and
+    /// an in-session rewrite is far cheaper than a downstream decode failure.
+    pub(super) fn requiring_planning_result(mut self, required: bool) -> Self {
+        self.requires_planning_result = required;
+        self
     }
 
     pub(super) fn take(&mut self, path: &Path) -> RefineResult<SignalRead> {
@@ -267,7 +277,7 @@ impl SignalReader {
             }
         };
         self.incomplete = None;
-        let signal = match serde_path_to_error::deserialize(value) {
+        let signal: AgentSessionSignal = match serde_path_to_error::deserialize(value) {
             Ok(signal) => signal,
             Err(error) => {
                 return Ok(SignalRead::Rejected(format!(
@@ -275,6 +285,14 @@ impl SignalReader {
                 )));
             }
         };
+        if self.requires_planning_result
+            && matches!(signal.state, AgentSessionState::Completed)
+            && signal.planning_result.is_none()
+        {
+            return Ok(SignalRead::Rejected(
+                "completion signal omitted the required planning_result object".to_string(),
+            ));
+        }
         fs::remove_file(path).map_err(|error| {
             RefineError::Io(format!(
                 "failed to consume Goal Agent signal {}: {error}",

@@ -112,6 +112,10 @@ where
         .metadata
         .get("implementation_phase")
         .and_then(Value::as_str);
+    let requires_planning_result = matches!(
+        implementation_phase,
+        Some("plan" | "criticize" | "revise")
+    );
     let protocol_prompt =
         goal_agent_protocol_prompt(&launch.prompt, &signal_path, implementation_phase);
     let launch_env_overrides = vec![
@@ -339,7 +343,8 @@ where
     let mut implementation_evidence = None;
     let mut planning_result = None;
     let completion_started_at = std::time::Instant::now();
-    let mut signal_reader = SignalReader::default();
+    let mut signal_reader =
+        SignalReader::default().requiring_planning_result(requires_planning_result);
     let mut invalid_signal_recovery = InvalidSignalRecovery::default();
     let status_result = (|| -> RefineResult<_> {
         loop {

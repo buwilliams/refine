@@ -18,4 +18,7 @@ pub use contract::assert_contract_roundtrip;
 pub use contract::Contract;
 pub use error::{StructuredOutputError, StructuredOutputErrorKind};
 pub use extract::{DecodeOptions, Selection, decode_structured, select_value};
-pub use repair::DIAGNOSTIC_REPAIR_ATTEMPTS;
+pub use repair::{
+    AttemptOutcome, DIAGNOSTIC_REPAIR_ATTEMPTS, MAX_INVALID_SIGNAL_REPLACEMENTS, RepairDirective,
+    RepairPolicy, run_with_repair,
+};

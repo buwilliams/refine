@@ -95,6 +95,33 @@ fn completion_signal_allows_partial_json_only_for_the_write_grace_period() {
     fs::remove_dir_all(root).unwrap();
 }
 
+#[test]
+fn planning_completion_signals_must_carry_the_planning_result_object() {
+    let root = unique_temp_dir("goal-agent-omitted-planning-result");
+    fs::create_dir_all(&root).unwrap();
+    let signal_path = root.join("goal-agent.signal.json");
+    fs::write(
+        &signal_path,
+        r#"{"state":"completed","message":"revised the plan","guidance_applied":[]}"#,
+    )
+    .unwrap();
+
+    let mut reader = SignalReader::new(Duration::ZERO).requiring_planning_result(true);
+    let SignalRead::Rejected(diagnostic) = reader.take(&signal_path).unwrap() else {
+        panic!("a planning completion without planning_result must be rejected");
+    };
+    assert!(diagnostic.contains("omitted the required planning_result object"));
+    // The rejected payload stays on disk for recovery to archive.
+    assert!(signal_path.is_file());
+
+    let mut lenient = SignalReader::new(Duration::ZERO);
+    assert!(matches!(
+        lenient.take(&signal_path).unwrap(),
+        SignalRead::Valid(_)
+    ));
+    fs::remove_dir_all(root).unwrap();
+}
+
 #[cfg(unix)]
 #[test]
 fn planning_session_returns_the_structured_result_from_its_completion_signal() {

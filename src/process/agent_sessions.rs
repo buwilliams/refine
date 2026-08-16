@@ -18,11 +18,11 @@ use crate::process::subprocess::{
 };
 use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::prompts::{PromptTemplate, render};
+use crate::structured_output::MAX_INVALID_SIGNAL_REPLACEMENTS;
 use crate::tools::host::agent_providers::HostAgentProviderService;
 
 const COMMAND_POLL_INTERVAL: Duration = Duration::from_millis(40);
 const SIGNAL_WRITE_GRACE_PERIOD: Duration = Duration::from_secs(2);
-const MAX_INVALID_SIGNAL_REPLACEMENTS: usize = 3;
 const DEFAULT_COLS: u16 = 120;
 const DEFAULT_ROWS: u16 = 36;
 const MAX_INPUT_BYTES: usize = 16_000;

@@ -7,10 +7,15 @@ use crate::model::goal::{
     IMPLEMENTATION_PLAN_SCHEMA_VERSION, ImplementationAgentEvidence,
     ImplementationCriticismArtifact, ImplementationExecutionEvidence, ImplementationPlan,
     ImplementationPlanArtifact, ImplementationPlanBinding, ImplementationPlanPhase,
-    ImplementationPlanState, ImplementationPlanningOutputAttempt, ProposedImplementationPlan,
+    ImplementationPlanState, ImplementationPlanningFailure, ImplementationPlanningOutputAttempt,
+    ProposedImplementationPlan,
 };
 use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::structured_output::DIAGNOSTIC_REPAIR_ATTEMPTS;
+use crate::prompts::implementation_planning::{
+    criticism_result_contract_json, plan_result_contract_json, revision_result_contract_json,
+};
+use crate::prompts::structured_output::repair_prompt;
+use crate::structured_output::{RepairPolicy, run_with_repair};
 use crate::workflow::{goal_agent_prompt, now_timestamp};
 
 use super::context::WorkflowContext;
@@ -52,6 +57,7 @@ pub(super) fn run_governed_implementation_planning(
             "plan",
             planning_prompt(&spec),
             "implementation plan",
+            &plan_result_contract_json(),
             decode_plan,
         )?;
         let previous = plan.clone();
@@ -84,6 +90,7 @@ pub(super) fn run_governed_implementation_planning(
             "criticize",
             prompt,
             "implementation criticism",
+            &criticism_result_contract_json(),
             decode_criticism,
         )?;
         let previous = plan.clone();
@@ -122,6 +129,7 @@ pub(super) fn run_governed_implementation_planning(
             "revise",
             prompt,
             "revised implementation plan",
+            &revision_result_contract_json(),
             |output| {
                 let result = decode_plan(output)?;
                 validate_revised_plan(&result, &criticism)?;
@@ -363,57 +371,71 @@ fn run_observational_phase_with_repair<T>(
     phase: &str,
     initial_prompt: String,
     output_label: &str,
+    contract_json: &str,
     decode: impl Fn(&str) -> RefineResult<T>,
 ) -> RefineResult<(PlanningPhaseRun, T)> {
-    let mut prompt = initial_prompt.clone();
-    for attempt in 1..=DIAGNOSTIC_REPAIR_ATTEMPTS + 1 {
-        let run = run_observational_phase(
-            ctx,
-            plan,
-            agent_cwd,
-            branch,
-            phase_state.clone(),
-            phase,
-            prompt,
-        )?;
-        match decode(&run.output) {
-            Ok(result) => return Ok((run, result)),
-            Err(error) => {
-                ctx.revalidate_authority(crate::model::workflow::GoalStatus::Plan)?;
-                let diagnostics = error.to_string();
-                let previous = plan.clone();
-                plan.invalid_output_attempts
-                    .push(ImplementationPlanningOutputAttempt {
-                        phase: phase_state.clone(),
-                        attempt,
-                        raw_output: run.output.clone(),
-                        diagnostics: diagnostics.clone(),
-                        recorded_at: now_timestamp(),
-                    });
-                plan.updated_at = now_timestamp();
-                persist_plan(ctx, Some(&previous), plan)?;
-                if attempt > DIAGNOSTIC_REPAIR_ATTEMPTS {
-                    return Err(persist_run_failure(
-                        ctx,
-                        plan,
-                        phase_state,
-                        "invalid_output_repair_exhausted",
-                        &run,
-                        error,
-                    ));
+    let plan = std::cell::RefCell::new(plan);
+    run_with_repair(
+        &RepairPolicy::default(),
+        |directive| {
+            let prompt = match directive {
+                None => initial_prompt.clone(),
+                Some(directive) => {
+                    repair_prompt(&initial_prompt, output_label, contract_json, directive)
                 }
-                prompt = structured_output_repair_prompt(
-                    &initial_prompt,
-                    output_label,
-                    attempt,
-                    DIAGNOSTIC_REPAIR_ATTEMPTS,
-                    &diagnostics,
-                    &run.output,
-                );
+            };
+            let mut plan = plan.borrow_mut();
+            run_observational_phase(
+                ctx,
+                &mut plan,
+                agent_cwd,
+                branch,
+                phase_state.clone(),
+                phase,
+                prompt,
+            )
+        },
+        |run| run.output.as_str(),
+        &decode,
+        |run, outcome| {
+            let Some(diagnostics) = outcome.diagnostics else {
+                return Ok(());
+            };
+            ctx.revalidate_authority(crate::model::workflow::GoalStatus::Plan)?;
+            let mut plan = plan.borrow_mut();
+            let plan = &mut **plan;
+            let previous = plan.clone();
+            plan.invalid_output_attempts
+                .push(ImplementationPlanningOutputAttempt {
+                    phase: phase_state.clone(),
+                    attempt: outcome.attempt,
+                    raw_output: outcome.raw_output.to_string(),
+                    diagnostics: diagnostics.to_string(),
+                    recorded_at: now_timestamp(),
+                });
+            plan.updated_at = now_timestamp();
+            persist_plan(ctx, Some(&previous), plan)?;
+            if outcome.exhausted
+                && let Err(persistence) = record_failure(
+                    ctx,
+                    plan,
+                    ImplementationPlanningFailure {
+                        phase: phase_state.clone(),
+                        category: "invalid_output_repair_exhausted".to_string(),
+                        message: diagnostics.to_string(),
+                        failed_at: now_timestamp(),
+                        git_before: Some(run.git_before.clone()),
+                        git_after: Some(run.git_after.clone()),
+                    },
+                )
+            {
+                return Err(RefineError::Conflict(format!(
+                    "{diagnostics}; additionally failed to persist implementation planning failure evidence: {persistence}"
+                )));
             }
-        }
-    }
-    unreachable!("bounded structured-output loop always returns")
+            Ok(())
+        },
+    )
 }
 
 fn plan_binding(

@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 
 pub mod implementation_planning;
+pub mod structured_output;
 
 macro_rules! prompt_templates {
     ($($variant:ident => $path:literal),+ $(,)?) => {
@@ -55,6 +56,7 @@ prompt_templates! {
     ImportNotes => "imports/notes.md",
     PostImplementationQuality => "quality/post-implementation.md",
     QualityStructuredOutputRepair => "quality/structured-output-repair.md",
+    StructuredOutputRepair => "structured_output/repair.md",
     GoalWorkflowQualityAgent => "quality/agent.md",
     GoalWorkflowQualityRecovery => "quality/recovery.md",
     QualityDefaultInstructions => "quality/default-instructions.md",

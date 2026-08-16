@@ -210,7 +210,7 @@ fn governed_planning_repair_diagnostics_name_ambiguity_and_schema_paths() {
     payload='{"state":"completed","message":"revised","guidance_applied":[],"planning_result":{"summary":"Cover the failure path.","checklist":[{"id":"P1","description":"Implement the behavior and its failure path."}],"criticism_resolutions":[{"criticism_id":"C1"}]}}'
     ;;
   *)
-    payload='{"state":"completed","message":"planned as {\"summary\":\"one\"} or {\"summary\":\"two\"}","guidance_applied":[]}'
+    payload='{"state":"completed","message":"planned","guidance_applied":[],"planning_result":"planned as {\"summary\":\"one\"} or {\"summary\":\"two\"}"}'
     ;;
 esac"#,
     );
@@ -222,13 +222,13 @@ esac"#,
         .unwrap();
     assert_eq!(attempts.len(), 2, "attempts: {attempts:?}");
 
-    // Plan attempt 1 omitted planning_result, so its prose message carrying two
-    // JSON objects reached the decoder; strictness must be named explicitly.
+    // Plan attempt 1 stringified prose instead of the required object; the
+    // transport fault must be named explicitly.
     assert_eq!(attempts[0]["phase"], "plan");
-    let ambiguity = attempts[0]["diagnostics"].as_str().unwrap();
+    let stringified = attempts[0]["diagnostics"].as_str().unwrap();
     assert!(
-        ambiguity.contains("2 distinct JSON candidates"),
-        "diagnostics: {ambiguity}"
+        stringified.contains("invalid recursively stringified JSON"),
+        "diagnostics: {stringified}"
     );
 
     // Revise attempt 1 dropped the resolution field; the repair prompt must
