@@ -68,9 +68,13 @@ impl IntegratedTargetWorkflowLease {
         recover_interrupted_transaction(&git, &marker_path, goal_id, round_idx)?;
         let status = git.inspect(target_root.to_str().unwrap_or(""))?;
         if status.dirty_user_changes {
-            return Err(RefineError::Conflict(format!(
-                "integrated-target workflow lane found an unattributed dirty index or worktree at {}; user work was preserved",
-                target_root.display()
+            // A hold, not a failure: a human's in-flight tracked changes in the
+            // shared checkout block integration only until they are committed
+            // or stashed, so the Goal must stay claimable rather than settle.
+            return Err(RefineError::WorkspaceHold(format!(
+                "integrated-target workflow lane found unattributed tracked changes at {} ({}); user work was preserved",
+                target_root.display(),
+                status.describe_dirt()
             )));
         }
         let head = git.head_ref()?;
@@ -103,8 +107,9 @@ impl IntegratedTargetWorkflowLease {
         let status = git.inspect(self.target_root.to_str().unwrap_or(""))?;
         if status.dirty_user_changes {
             return Err(RefineError::Conflict(format!(
-                "integrated-target workflow left a dirty index or worktree at {}; residue remains attributed to the owning Goal for recovery",
-                self.target_root.display()
+                "integrated-target workflow left a dirty index or worktree at {} ({}); residue remains attributed to the owning Goal for recovery",
+                self.target_root.display(),
+                status.describe_dirt()
             )));
         }
         remove_marker(&self.marker_path)?;
@@ -288,6 +293,46 @@ mod tests {
         lane.finish().unwrap();
 
         assert!(!marker.exists());
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn lane_acquires_despite_untracked_user_files_in_the_shared_checkout() {
+        let root = repository("untracked");
+        fs::write(root.join("scratch-notes.txt"), "human scratch file\n").unwrap();
+
+        let mut lane = IntegratedTargetWorkflowLease::acquire(&root, "GOAL1", 0).unwrap();
+        lane.finish().unwrap();
+
+        // The untracked file was neither integration-blocking nor touched.
+        assert_eq!(
+            fs::read_to_string(root.join("scratch-notes.txt")).unwrap(),
+            "human scratch file\n"
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn lane_holds_on_tracked_user_changes_and_names_the_blocking_path() {
+        let root = repository("tracked-dirt");
+        fs::write(root.join("app.txt"), "uncommitted human edit\n").unwrap();
+
+        let error = match IntegratedTargetWorkflowLease::acquire(&root, "GOAL1", 0) {
+            Ok(_) => panic!("acquire succeeded despite tracked user changes"),
+            Err(error) => error,
+        };
+
+        match &error {
+            RefineError::WorkspaceHold(message) => {
+                assert!(message.contains("app.txt"), "{message}");
+                assert!(message.ends_with("; user work was preserved"), "{message}");
+            }
+            other => panic!("expected WorkspaceHold, got {other:?}"),
+        }
+        assert_eq!(
+            fs::read_to_string(root.join("app.txt")).unwrap(),
+            "uncommitted human edit\n"
+        );
         fs::remove_dir_all(root).unwrap();
     }
 

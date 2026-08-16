@@ -129,6 +129,17 @@ impl WorkflowEngine {
                                         launched = true;
                                     }
                                     Err(failure) if is_stale_authority(&failure.error) => {}
+                                    Err(failure)
+                                        if matches!(
+                                            failure.error,
+                                            RefineError::WorkspaceHold(_)
+                                        ) =>
+                                    {
+                                        // Held, not failed: back off and retry
+                                        // without settling or failing the pass.
+                                        self.record_retry(&goal_id);
+                                        self.note_scheduling_hold(&goal_id, Some("workspace_hold"));
+                                    }
                                     Err(failure) => {
                                         if let Some(authority) = failure.authority {
                                             let _ = self.settle_goal_failure(
@@ -162,6 +173,13 @@ impl WorkflowEngine {
                             Ok(result) => {
                                 self.clear_retry(&goal_id);
                                 results.push((order, result));
+                            }
+                            Err(error) if matches!(error, RefineError::WorkspaceHold(_)) => {
+                                // Held, not failed: back off and retry without
+                                // failing the whole pass; the scheduler clears
+                                // the hold note when the Goal next launches.
+                                self.record_retry(&goal_id);
+                                self.note_scheduling_hold(&goal_id, Some("workspace_hold"));
                             }
                             Err(error) => {
                                 self.record_retry(&goal_id);
@@ -425,8 +443,17 @@ impl WorkflowEngine {
     ) -> RefineResult<WorkflowStepResult> {
         let start_status = ctx.start_status.clone();
         if let Err(error) = self.advance_behaviors(&mut ctx, start_status) {
-            let _ =
-                self.settle_goal_failure(&ctx.goal_id, ctx.attempt_authority, "workflow", &error);
+            // A workspace hold is not a Goal failure: the Goal keeps its
+            // durable status and claimed attempt so the next pass legally
+            // re-claims it once the shared checkout is clean.
+            if !matches!(error, RefineError::WorkspaceHold(_)) {
+                let _ = self.settle_goal_failure(
+                    &ctx.goal_id,
+                    ctx.attempt_authority,
+                    "workflow",
+                    &error,
+                );
+            }
             return Err(error);
         }
         Self::workflow_step_result(ctx)

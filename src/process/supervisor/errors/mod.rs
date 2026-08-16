@@ -43,6 +43,10 @@ pub enum RefineError {
     },
     #[error("{0}")]
     QualityCandidateInfrastructure(Box<QualityCandidateInfrastructureError>),
+    /// The shared workspace temporarily blocks integration; retry later,
+    /// never settle the Goal terminally.
+    #[error("{0}")]
+    WorkspaceHold(String),
     #[error("{0}")]
     Degraded(String),
     #[error("{0}")]
@@ -79,7 +83,8 @@ impl RefineError {
             | Self::StateSyncMissingBaseline(_)
             | Self::StateRecoveryConflict { .. }
             | Self::StaleCandidate { .. }
-            | Self::QualityCandidateInfrastructure(_) => ErrorCategory::Conflict,
+            | Self::QualityCandidateInfrastructure(_)
+            | Self::WorkspaceHold(_) => ErrorCategory::Conflict,
             Self::Degraded(_) => ErrorCategory::Degraded,
             Self::Io(_) => ErrorCategory::Io,
             Self::Serialization(_) | Self::StructuredOutput(_) => ErrorCategory::Serialization,

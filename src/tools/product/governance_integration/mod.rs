@@ -431,8 +431,9 @@ impl FileGovernanceIntegrationService {
             }
             if status.dirty_user_changes || !status.refine_owned_artifacts.is_empty() {
                 return Err(RefineError::Conflict(format!(
-                    "already-merged reconciliation found a dirty target index or worktree at {}; user work was preserved",
-                    target_root.display()
+                    "already-merged reconciliation found a dirty target index or worktree at {} ({}); user work was preserved",
+                    target_root.display(),
+                    status.describe_dirt()
                 )));
             }
             let current_target = git.resolve_commit(&integration.target_branch)?;

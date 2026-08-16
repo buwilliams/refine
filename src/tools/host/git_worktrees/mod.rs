@@ -27,8 +27,49 @@ const GIT_STALL_TIMEOUT_SECONDS: u64 = 300;
 pub struct GitStatus {
     pub root: String,
     pub branch: Option<String>,
+    /// True only for changes to tracked paths; untracked files are reported
+    /// separately so shared checkouts holding a user's new files are not
+    /// mistaken for integration-blocking dirt.
     pub dirty_user_changes: bool,
     pub refine_owned_artifacts: Vec<String>,
+    #[serde(default)]
+    pub dirty_paths: Vec<String>,
+    #[serde(default)]
+    pub untracked_paths: Vec<String>,
+}
+
+impl GitStatus {
+    /// Strict cleanliness for Refine-owned goal worktrees, where even
+    /// untracked residue violates step separation.
+    pub fn is_pristine(&self) -> bool {
+        !self.dirty_user_changes
+            && self.untracked_paths.is_empty()
+            && self.refine_owned_artifacts.is_empty()
+    }
+
+    /// Human-readable summary of what is dirty, capped so a pathological
+    /// checkout cannot flood an error message.
+    pub fn describe_dirt(&self) -> String {
+        const MAX_LISTED_PATHS: usize = 20;
+        let list = |paths: &[String]| {
+            let shown: Vec<&str> = paths
+                .iter()
+                .take(MAX_LISTED_PATHS)
+                .map(String::as_str)
+                .collect();
+            let elided = paths.len().saturating_sub(shown.len());
+            if elided > 0 {
+                format!("[{} … and {elided} more]", shown.join(", "))
+            } else {
+                format!("[{}]", shown.join(", "))
+            }
+        };
+        format!(
+            "tracked: {}; untracked: {}",
+            list(&self.dirty_paths),
+            list(&self.untracked_paths)
+        )
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

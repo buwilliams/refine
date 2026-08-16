@@ -227,7 +227,7 @@ pub(super) fn verify_candidate(
         )));
     }
     let status = git.inspect(root.to_str().unwrap_or(""))?;
-    if status.dirty_user_changes || !status.refine_owned_artifacts.is_empty() {
+    if !status.is_pristine() {
         return Err(RefineError::Conflict(format!(
             "Quality {phase} check found a dirty candidate index or worktree at {}; user work was preserved",
             root.display()

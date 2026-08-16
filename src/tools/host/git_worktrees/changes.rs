@@ -21,10 +21,7 @@ impl FileGitWorktreeService {
             };
             let head = existing_git.head_ref()?;
             let status = existing_git.inspect("")?;
-            if head.commit.as_deref() != Some(resolved_commit.as_str())
-                || status.dirty_user_changes
-                || !status.refine_owned_artifacts.is_empty()
-            {
+            if head.commit.as_deref() != Some(resolved_commit.as_str()) || !status.is_pristine() {
                 return Err(RefineError::Conflict(format!(
                     "managed exact-candidate checkout {} no longer names clean commit {resolved_commit}; existing work was preserved",
                     existing.display()

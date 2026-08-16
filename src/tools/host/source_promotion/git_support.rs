@@ -130,6 +130,7 @@ pub(super) fn append_error_context(error: RefineError, context: &str) -> RefineE
         infrastructure @ RefineError::QualityCandidateInfrastructure(_) => {
             RefineError::Conflict(append(infrastructure.to_string()))
         }
+        RefineError::WorkspaceHold(message) => RefineError::WorkspaceHold(append(message)),
         RefineError::Degraded(message) => RefineError::Degraded(append(message)),
         RefineError::Io(message) => RefineError::Io(append(message)),
         RefineError::Serialization(message) => RefineError::Serialization(append(message)),

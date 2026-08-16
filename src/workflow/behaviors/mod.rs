@@ -226,9 +226,7 @@ fn begin_scoped_recovery_round(
     let retained_candidate_intact = |worktree_git: &FileGitWorktreeService| -> RefineResult<bool> {
         let head = worktree_git.head_ref()?;
         let status = worktree_git.inspect("")?;
-        Ok(head.commit.as_deref() == Some(candidate.as_str())
-            && !status.dirty_user_changes
-            && status.refine_owned_artifacts.is_empty())
+        Ok(head.commit.as_deref() == Some(candidate.as_str()) && status.is_pristine())
     };
     if !retained_candidate_intact(&worktree_git)? {
         ctx.log(

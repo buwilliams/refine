@@ -24,20 +24,28 @@ impl GitWorktreeService for FileGitWorktreeService {
         };
         let status = stdout(service.git_output(&["status", "--porcelain=v1"])?).unwrap_or_default();
         let mut refine_owned_artifacts = Vec::new();
-        let mut dirty_user_changes = false;
+        let mut dirty_paths = Vec::new();
+        let mut untracked_paths = Vec::new();
         for line in status.lines() {
             let path = line.get(3..).unwrap_or("").trim();
+            if path.is_empty() {
+                continue;
+            }
             if is_refine_owned_artifact(path) {
                 refine_owned_artifacts.push(path.to_string());
-            } else if !path.is_empty() {
-                dirty_user_changes = true;
+            } else if line.get(..2) == Some("??") {
+                untracked_paths.push(path.to_string());
+            } else {
+                dirty_paths.push(path.to_string());
             }
         }
         Ok(GitStatus {
             root,
             branch,
-            dirty_user_changes,
+            dirty_user_changes: !dirty_paths.is_empty(),
             refine_owned_artifacts,
+            dirty_paths,
+            untracked_paths,
         })
     }
 

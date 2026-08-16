@@ -217,7 +217,7 @@ pub fn validate_quality_identity(
         ));
     }
     let status = committed_git.inspect("")?;
-    if status.dirty_user_changes || !status.refine_owned_artifacts.is_empty() {
+    if !status.is_pristine() {
         return Err(infrastructure_error(
             commitment,
             phase,

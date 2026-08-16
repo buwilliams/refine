@@ -88,7 +88,7 @@ pub(super) fn refresh_candidate_for_target_advancement(
         || head.commit.as_deref() != Some(original_candidate.as_str())
     {
         Some("clean candidate branch no longer names the exact recorded candidate")
-    } else if status.dirty_user_changes || !status.refine_owned_artifacts.is_empty() {
+    } else if !status.is_pristine() {
         Some("candidate checkout is dirty")
     } else {
         None
@@ -140,7 +140,7 @@ pub(super) fn refresh_candidate_for_target_advancement(
         ))
     })?;
     let refreshed_status = worktree_git.inspect("")?;
-    if refreshed_status.dirty_user_changes || !refreshed_status.refine_owned_artifacts.is_empty() {
+    if !refreshed_status.is_pristine() {
         return Err(RefineError::Conflict(format!(
             "Goal {} candidate refresh left a dirty worktree; replacement evidence was not persisted",
             ctx.goal_id
@@ -214,8 +214,7 @@ fn restore_unpersisted_refresh(
     let status = worktree_git.inspect("")?;
     if head.branch.as_deref() != Some(branch)
         || head.commit.as_deref() != Some(replacement)
-        || status.dirty_user_changes
-        || !status.refine_owned_artifacts.is_empty()
+        || !status.is_pristine()
     {
         return Err(RefineError::Conflict(
             "the refreshed checkout changed or became dirty after rebase; user work was preserved"
