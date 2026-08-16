@@ -140,8 +140,7 @@ use goal_agent_spec::goal_agent_prompt;
 #[cfg(test)]
 use governance::GOVERNANCE_VERDICT_UNPARSABLE;
 use governance::{
-    GovernanceEvaluation, parse_governance_provider_output,
-    post_implementation_governance_prompt,
+    GovernanceEvaluation, parse_governance_provider_output, post_implementation_governance_prompt,
 };
 use implementation_planning::{
     complete_implementation_planning, fail_implementation_phase, governed_implementation_prompt,

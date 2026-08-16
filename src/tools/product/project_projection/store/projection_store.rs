@@ -154,7 +154,10 @@ pub(super) fn derive_features(
     let mut goals_by_feature: BTreeMap<&str, Vec<&GoalIndexProjection>> = BTreeMap::new();
     for goal in goals.values() {
         if let Some(feature_id) = goal.goal.feature_id.as_deref() {
-            goals_by_feature.entry(feature_id).or_default().push(&goal.goal);
+            goals_by_feature
+                .entry(feature_id)
+                .or_default()
+                .push(&goal.goal);
         }
     }
     let mut features = BTreeMap::new();
@@ -195,9 +198,7 @@ pub(super) fn derive_features(
 /// — sixteen of eighteen megabytes on a mature project — and was re-serialized
 /// on every persist and re-cloned on every SSE rebuild. Complete history stays
 /// on disk in the activity log and sidecars.
-pub(super) fn cap_projected_activity(
-    activity: &mut BTreeMap<String, ActivitySummaryProjection>,
-) {
+pub(super) fn cap_projected_activity(activity: &mut BTreeMap<String, ActivitySummaryProjection>) {
     if activity.len() <= PROJECTED_ACTIVITY_LIMIT {
         return;
     }

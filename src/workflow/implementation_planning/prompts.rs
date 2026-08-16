@@ -135,5 +135,4 @@ mod tests {
         assert!(!prompt.contains("affected_behavior"));
         assert!(!prompt.contains("\"verification\""));
     }
-
 }

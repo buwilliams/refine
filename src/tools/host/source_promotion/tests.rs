@@ -469,7 +469,11 @@ fn stash_dirty_tree_preserves_work_in_a_named_stash_and_reports_it() {
         reference.contains("refine-update-"),
         "stash reference should carry the label: {reference}"
     );
-    assert!(git_text(&root, &["status", "--porcelain"]).unwrap().is_empty());
+    assert!(
+        git_text(&root, &["status", "--porcelain"])
+            .unwrap()
+            .is_empty()
+    );
     let stash_list = git_text(&root, &["stash", "list"]).unwrap();
     assert!(stash_list.contains("refine-update-"), "{stash_list}");
     assert!(!root.join("untracked.txt").exists());

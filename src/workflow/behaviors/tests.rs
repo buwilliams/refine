@@ -137,10 +137,11 @@ fn code_path_detection_fails_safe_for_unlisted_languages() {
 
 #[test]
 fn exhausted_quality_output_repair_keeps_a_distinct_workflow_failure_category() {
-    let error = RefineError::StructuredOutput(crate::structured_output::StructuredOutputError::transport(
-        "Quality evaluation JSON",
-        "contains invalid JSON: expected value at line 1 column 1",
-    ));
+    let error =
+        RefineError::StructuredOutput(crate::structured_output::StructuredOutputError::transport(
+            "Quality evaluation JSON",
+            "contains invalid JSON: expected value at line 1 column 1",
+        ));
 
     assert_eq!(quality_failure_category(&error), "quality_output_contract");
 }

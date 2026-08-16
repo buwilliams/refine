@@ -6,10 +6,7 @@ use crate::workflow::context::WorkflowContext;
 fn run_governed_planning_with_script(
     prefix: &str,
     script_body: &str,
-) -> (
-    RefineResult<ProposedImplementationPlan>,
-    serde_json::Value,
-) {
+) -> (RefineResult<ProposedImplementationPlan>, serde_json::Value) {
     use std::os::unix::fs::PermissionsExt;
 
     let temp_root = unique_temp_dir(prefix);

@@ -33,9 +33,9 @@ pub(super) fn validate_revised_plan(
         return Err(StructuredOutputError::validation(
             ProposedImplementationPlan::LABEL,
             format!(
-            "revised implementation plan resolved unknown or non-material criticism: {}",
-            unrelated.join(", ")
-        ),
+                "revised implementation plan resolved unknown or non-material criticism: {}",
+                unrelated.join(", ")
+            ),
         )
         .into());
     }
@@ -49,9 +49,9 @@ pub(super) fn validate_revised_plan(
         return Err(StructuredOutputError::validation(
             ProposedImplementationPlan::LABEL,
             format!(
-            "revised implementation plan did not resolve material criticism: {}",
-            unresolved.join(", ")
-        ),
+                "revised implementation plan did not resolve material criticism: {}",
+                unresolved.join(", ")
+            ),
         )
         .into());
     }

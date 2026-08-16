@@ -237,7 +237,8 @@ fn wrapper_system_build_and_clean_manage_the_production_binary() {
         .unwrap();
     assert!(rebuild.status.success());
     assert!(
-        String::from_utf8_lossy(&rebuild.stdout).contains("production binary is already up to date")
+        String::from_utf8_lossy(&rebuild.stdout)
+            .contains("production binary is already up to date")
     );
     assert!(cargo_log.exists(), "system build always runs the build");
 

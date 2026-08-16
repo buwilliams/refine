@@ -188,8 +188,8 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
         } => {
             let service = FileFleetService::new(refine_dir_for_target_root(&target_root)?);
             service.transfer(&item_id, &id)?;
-            let result = direct_work_item_service(&target_root)?
-                .transfer_item_to_node(&id, &item_id)?;
+            let result =
+                direct_work_item_service(&target_root)?.transfer_item_to_node(&id, &item_id)?;
             println!("{}", serde_json::to_string_pretty(&result).unwrap());
             Ok(())
         }

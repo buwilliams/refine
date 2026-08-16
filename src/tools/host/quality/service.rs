@@ -45,12 +45,12 @@ mod summary;
 mod wire;
 
 use cancellation::*;
-use wire::*;
 pub(crate) use provider_output::parse_quality_provider_output;
 use provider_output::*;
 pub(crate) use provider_output::{is_quality_harness_fault, is_quality_output_contract_fault};
 pub use runner::QualityOperationRunner;
 pub(crate) use summary::{quality_error_summary, quality_failure_summary};
+use wire::*;
 
 pub(super) const SETTINGS_MIGRATION_VERSION: u32 = 3;
 

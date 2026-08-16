@@ -203,13 +203,16 @@ impl InProcessWebServer {
         let Some(runtime_root) = &self.runtime_root else {
             return runtime_root_unavailable("undo Git changes");
         };
-        let linked_goal_id = self.current_projection_shared().ok().and_then(|projection| {
-            projection
-                .changes
-                .values()
-                .find(|change| change.commit == commit)
-                .and_then(|change| change.goal_id.clone())
-        });
+        let linked_goal_id = self
+            .current_projection_shared()
+            .ok()
+            .and_then(|projection| {
+                projection
+                    .changes
+                    .values()
+                    .find(|change| change.commit == commit)
+                    .and_then(|change| change.goal_id.clone())
+            });
         let registry = FileOperationRegistry::new(runtime_root);
         let operation_owner = format!("changes:undo:{commit}");
         let operation = match registry.register(&operation_owner) {

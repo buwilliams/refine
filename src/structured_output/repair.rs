@@ -160,7 +160,11 @@ mod tests {
             String::as_str,
             decode_ready,
             |_, outcome| {
-                attempts.push((outcome.attempt, outcome.diagnostics.is_some(), outcome.exhausted));
+                attempts.push((
+                    outcome.attempt,
+                    outcome.diagnostics.is_some(),
+                    outcome.exhausted,
+                ));
                 Ok(())
             },
         )

@@ -89,7 +89,6 @@ pub(crate) fn is_quality_output_contract_fault(error: &RefineError) -> bool {
     )
 }
 
-
 pub(super) fn record_quality_provider_attempt(
     request: &QualityCheckRequest,
     attempt: &QualityProviderAttempt,
@@ -300,7 +299,6 @@ pub(super) fn legacy_quality_enabled(settings: &Map<String, Value>) -> bool {
         _ => false,
     }
 }
-
 
 pub(super) fn normalize_tests(tests: Vec<String>) -> Vec<String> {
     let mut normalized = Vec::new();

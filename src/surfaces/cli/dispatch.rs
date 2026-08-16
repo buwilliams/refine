@@ -550,7 +550,9 @@ fn refine_dir_for_target_root(target_root: &Path) -> RefineResult<PathBuf> {
 fn direct_work_item_service(target_root: &Path) -> RefineResult<FileWorkItemService> {
     let refine_dir = refine_dir_for_target_root(target_root)?;
     let cache_dir = refine_dir.join("runtime/cache");
-    Ok(FileWorkItemService::with_snapshot_cache(refine_dir, cache_dir))
+    Ok(FileWorkItemService::with_snapshot_cache(
+        refine_dir, cache_dir,
+    ))
 }
 
 pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> {

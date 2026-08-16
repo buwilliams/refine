@@ -52,29 +52,34 @@ pub(super) fn run_observational_phase(
         && ctx.provider == "smoke-ai"
         && std::env::var("REFINE_SMOKE_AI_GOVERNED_PLANNING").as_deref() != Ok("1")
     {
+        // Fixtures are serialized from the durable contract types so they can
+        // never drift from what the decoder accepts.
         let output = match phase {
-            "criticize" => json!({
-                "summary": "Smoke AI fixture found no material omissions.",
-                "findings": []
+            "criticize" => serde_json::to_string(&crate::model::goal::ImplementationCriticism {
+                summary: "Smoke AI fixture found no material omissions.".to_string(),
+                findings: Vec::new(),
             }),
-            _ => json!({
-                "summary": "Smoke AI fixture implementation plan.",
-                "checklist": [{
-                    "id": "P1",
-                    "description": "Implement and verify the current Round request.",
-                    "affected_behavior": [],
-                    "governance_rationale": null,
-                    "verification": []
+            _ => serde_json::to_string(&crate::model::goal::ProposedImplementationPlan {
+                summary: "Smoke AI fixture implementation plan.".to_string(),
+                checklist: vec![crate::model::goal::ImplementationChecklistItem {
+                    id: "P1".to_string(),
+                    description: "Implement and verify the current Round request.".to_string(),
+                    affected_behavior: Vec::new(),
+                    governance_rationale: None,
+                    verification: Vec::new(),
                 }],
-                "criticism_resolutions": []
+                criticism_resolutions: Vec::new(),
             }),
-        };
+        }
+        .map_err(|error| {
+            RefineError::Serialization(format!("failed to encode smoke fixture: {error}"))
+        })?;
         return Ok(PlanningPhaseRun {
             started_at,
             completed_at: now_timestamp(),
             git_before: git_before.clone(),
             git_after: git_before,
-            output: output.to_string(),
+            output,
         });
     }
     let invocation = run_goal_agent_with_settlement(

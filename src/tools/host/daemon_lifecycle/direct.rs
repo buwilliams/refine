@@ -289,12 +289,7 @@ mod tests {
         .unwrap();
         assert_eq!(status.worker_state, "stopped");
         assert_eq!(
-            status
-                .lifecycle_evidence
-                .as_ref()
-                .unwrap()
-                .outcome
-                .as_str(),
+            status.lifecycle_evidence.as_ref().unwrap().outcome.as_str(),
             "direct_stop_confirmed"
         );
         fs::remove_dir_all(root).unwrap();

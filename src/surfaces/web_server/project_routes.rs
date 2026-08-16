@@ -503,16 +503,18 @@ fn contributor_ranking_rows(
     });
     rows.into_iter()
         .enumerate()
-        .map(|(index, (reporter, reported, delivered, delivery_rate, score))| {
-            json!({
-                "rank": index + 1,
-                "contributor": reporter,
-                "reported": reported,
-                "delivered": delivered,
-                "delivery_rate": delivery_rate * 100.0,
-                "score": score,
-            })
-        })
+        .map(
+            |(index, (reporter, reported, delivered, delivery_rate, score))| {
+                json!({
+                    "rank": index + 1,
+                    "contributor": reporter,
+                    "reported": reported,
+                    "delivered": delivered,
+                    "delivery_rate": delivery_rate * 100.0,
+                    "score": score,
+                })
+            },
+        )
         .collect()
 }
 
@@ -562,10 +564,7 @@ mod contributor_ranking_tests {
     fn volume_outranks_a_perfect_but_tiny_record() {
         let mut stats = BTreeMap::new();
         // Two filed, two delivered: perfect rate, little contribution.
-        stats.insert(
-            "reporter-a".to_string(),
-            counts(&[(GoalStatus::Done, 2)]),
-        );
+        stats.insert("reporter-a".to_string(), counts(&[(GoalStatus::Done, 2)]));
         // 120 filed, 40 delivered: far more shipped work despite the lower rate.
         stats.insert(
             "reporter-b".to_string(),

@@ -215,12 +215,14 @@ fn target_app_wrapper_turns_partial_ai_web_config_into_managed_server() {
         String::from_utf8_lossy(&start.stderr)
     );
     assert!(!target_root.join(".refine").exists());
-    let status = std::process::Command::new("sh").arg(&wrapper_path)
+    let status = std::process::Command::new("sh")
+        .arg(&wrapper_path)
         .arg("status")
         .current_dir(&target_root)
         .output()
         .unwrap();
-    let stop = std::process::Command::new("sh").arg(&wrapper_path)
+    let stop = std::process::Command::new("sh")
+        .arg(&wrapper_path)
         .arg("stop")
         .current_dir(&target_root)
         .output()

@@ -624,7 +624,11 @@ fn queueing_an_update_stashes_dirty_work_and_records_the_reference_durably() {
     let port = spawn_single_http_probe();
     let service = FileSourcePromotionService::new(&repo.checkout, &runtime, port);
     persist_cached_source(&service, &repo);
-    fs::write(repo.checkout.join("fixture.txt"), "uncommitted local edit\n").unwrap();
+    fs::write(
+        repo.checkout.join("fixture.txt"),
+        "uncommitted local edit\n",
+    )
+    .unwrap();
     fs::write(repo.checkout.join("scratch.txt"), "untracked local work\n").unwrap();
 
     let error = service
@@ -682,7 +686,11 @@ fn queueing_never_stashes_when_the_checkout_diverged_from_upstream() {
     let port = spawn_single_http_probe();
     let service = FileSourcePromotionService::new(&repo.checkout, &runtime, port);
     persist_cached_source(&service, &repo);
-    fs::write(repo.checkout.join("fixture.txt"), "uncommitted local edit\n").unwrap();
+    fs::write(
+        repo.checkout.join("fixture.txt"),
+        "uncommitted local edit\n",
+    )
+    .unwrap();
 
     let error = service
         .queue_agent_with("smoke-ai", Path::new("/mock/refine"))
@@ -695,7 +703,9 @@ fn queueing_never_stashes_when_the_checkout_diverged_from_upstream() {
         "the dirty diverged tree must be left untouched: {status}"
     );
     assert!(
-        git_text(&repo.checkout, &["stash", "list"]).unwrap().is_empty(),
+        git_text(&repo.checkout, &["stash", "list"])
+            .unwrap()
+            .is_empty(),
         "no stash may be created for a diverged checkout"
     );
 

@@ -303,12 +303,13 @@ pub(in crate::surfaces::web_server) fn recent_api_mutation_events(
     let seek_to = len.saturating_sub(API_EVENTS_TAIL_BYTES);
     if seek_to > 0 {
         use std::io::Seek;
-        file.seek(std::io::SeekFrom::Start(seek_to)).map_err(|error| {
-            RefineError::Io(format!(
-                "failed to seek API event log {}: {error}",
-                path.display()
-            ))
-        })?;
+        file.seek(std::io::SeekFrom::Start(seek_to))
+            .map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to seek API event log {}: {error}",
+                    path.display()
+                ))
+            })?;
     }
     let mut text = String::new();
     use std::io::Read;
@@ -458,7 +459,10 @@ pub(in crate::surfaces::web_server) fn recent_chat_sse_events(
         }
         seen.insert(path.clone());
         let metadata = entry.metadata().ok();
-        let len = metadata.as_ref().map(|metadata| metadata.len()).unwrap_or(0);
+        let len = metadata
+            .as_ref()
+            .map(|metadata| metadata.len())
+            .unwrap_or(0);
         let modified = metadata.and_then(|metadata| metadata.modified().ok());
         if let Some(cached) = cache.get(&path)
             && cached.len == len

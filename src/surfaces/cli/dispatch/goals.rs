@@ -41,8 +41,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let goal = direct_work_item_service(&target_root)?
-                .show_goal_detail(&id)?;
+            let goal = direct_work_item_service(&target_root)?.show_goal_detail(&id)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"goal": goal})).unwrap()
@@ -71,14 +70,13 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     priority,
                 },
         } => {
-            let goal = direct_work_item_service(&target_root)?
-                .update_goal_metadata_summary(
-                    &id,
-                    name.as_deref(),
-                    priority.as_deref(),
-                    None,
-                    None,
-                )?;
+            let goal = direct_work_item_service(&target_root)?.update_goal_metadata_summary(
+                &id,
+                name.as_deref(),
+                priority.as_deref(),
+                None,
+                None,
+            )?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"goal": goal.goal})).unwrap()
@@ -187,8 +185,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            direct_work_item_service(&target_root)?
-                .delete_goal_record(&id)?;
+            direct_work_item_service(&target_root)?.delete_goal_record(&id)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"deleted": true, "id": id})).unwrap()
@@ -202,8 +199,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let goal = direct_work_item_service(&target_root)?
-                .cancel_goal_summary(&id)?;
+            let goal = direct_work_item_service(&target_root)?.cancel_goal_summary(&id)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"goal": goal.goal})).unwrap()
@@ -217,8 +213,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let goal = direct_work_item_service(&target_root)?
-                .start_goal_workflow(&id)?;
+            let goal = direct_work_item_service(&target_root)?.start_goal_workflow(&id)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"goal": goal.goal})).unwrap()
@@ -303,8 +298,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let goal = direct_work_item_service(&target_root)?
-                .undo_goal_summary(&id)?;
+            let goal = direct_work_item_service(&target_root)?.undo_goal_summary(&id)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"goal": goal.goal})).unwrap()
@@ -319,8 +313,8 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let feature = direct_work_item_service(&target_root)?
-                .assign_goal_to_feature(&feature_id, &id)?;
+            let feature =
+                direct_work_item_service(&target_root)?.assign_goal_to_feature(&feature_id, &id)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({

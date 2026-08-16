@@ -589,8 +589,15 @@ fn print_performance_report(report: &Value) {
         .cloned()
         .unwrap_or_default();
     recent.sort_by(|a, b| {
-        let elapsed = |event: &Value| event.get("elapsed_ms").and_then(Value::as_f64).unwrap_or(0.0);
-        elapsed(b).partial_cmp(&elapsed(a)).unwrap_or(std::cmp::Ordering::Equal)
+        let elapsed = |event: &Value| {
+            event
+                .get("elapsed_ms")
+                .and_then(Value::as_f64)
+                .unwrap_or(0.0)
+        };
+        elapsed(b)
+            .partial_cmp(&elapsed(a))
+            .unwrap_or(std::cmp::Ordering::Equal)
     });
     if !recent.is_empty() {
         println!();
@@ -610,13 +617,23 @@ fn print_performance_report(report: &Value) {
                 });
             println!(
                 "{:>9.1}ms  {}  {}  {}",
-                event.get("elapsed_ms").and_then(Value::as_f64).unwrap_or(0.0),
-                if event.get("success").and_then(Value::as_bool).unwrap_or(true) {
+                event
+                    .get("elapsed_ms")
+                    .and_then(Value::as_f64)
+                    .unwrap_or(0.0),
+                if event
+                    .get("success")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(true)
+                {
                     "ok "
                 } else {
                     "ERR"
                 },
-                event.get("occurred_at").and_then(Value::as_str).unwrap_or(""),
+                event
+                    .get("occurred_at")
+                    .and_then(Value::as_str)
+                    .unwrap_or(""),
                 target,
             );
         }

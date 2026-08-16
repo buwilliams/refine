@@ -112,10 +112,8 @@ where
         .metadata
         .get("implementation_phase")
         .and_then(Value::as_str);
-    let requires_planning_result = matches!(
-        implementation_phase,
-        Some("plan" | "criticize" | "revise")
-    );
+    let requires_planning_result =
+        matches!(implementation_phase, Some("plan" | "criticize" | "revise"));
     let protocol_prompt =
         goal_agent_protocol_prompt(&launch.prompt, &signal_path, implementation_phase);
     let launch_env_overrides = vec![

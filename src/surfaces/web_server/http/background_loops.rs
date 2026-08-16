@@ -125,8 +125,8 @@ fn run_retention_sweep(server: &Arc<InProcessWebServer>) {
     let Some(runtime_root) = server.runtime_root.clone() else {
         return;
     };
-    let _ = crate::tools::observability::metrics::FileMetricsService::new(&runtime_root)
-        .cleanup(false);
+    let _ =
+        crate::tools::observability::metrics::FileMetricsService::new(&runtime_root).cleanup(false);
     let _ = crate::process::supervisor::operations::FileOperationRegistry::new(&runtime_root)
         .cleanup_terminal_operations(7 * RETENTION_DAY);
     remove_files_older_than(&runtime_root.join("idempotency"), IDEMPOTENCY_RETENTION);

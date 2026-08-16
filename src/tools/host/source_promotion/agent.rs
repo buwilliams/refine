@@ -99,7 +99,9 @@ impl FileSourcePromotionService {
         let with_stash_context = |error: RefineError| match &stashed_changes {
             Some(reference) => append_error_context(
                 error,
-                &format!("local changes were preserved in stash {reference} and are not reapplied automatically"),
+                &format!(
+                    "local changes were preserved in stash {reference} and are not reapplied automatically"
+                ),
             ),
             None => error,
         };
@@ -154,7 +156,8 @@ impl FileSourcePromotionService {
             .write_agent_context(&operation)
             .map_err(with_stash_context)?;
         operation.agent_context_path = Some(context_path.display().to_string());
-        self.save_operation(&operation).map_err(with_stash_context)?;
+        self.save_operation(&operation)
+            .map_err(with_stash_context)?;
 
         if failpoint.after_reservation() {
             return Err(RefineError::Degraded(

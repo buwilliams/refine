@@ -11,9 +11,9 @@ use serde_json::{Map, Value};
 use crate::structured_output::{Contract, StructuredOutputError};
 
 use super::implementation_plan::{
-    ImplementationChecklistItem, ImplementationChecklistOutcome, ImplementationChecklistResult,
-    ImplementationCriticism, ImplementationCriticismFinding, ImplementationExecutionEvidence,
-    CriticismResolution, ProposedImplementationPlan,
+    CriticismResolution, ImplementationChecklistItem, ImplementationChecklistOutcome,
+    ImplementationChecklistResult, ImplementationCriticism, ImplementationCriticismFinding,
+    ImplementationExecutionEvidence, ProposedImplementationPlan,
 };
 
 pub const MAX_CRITICISM_FINDINGS: usize = 3;
@@ -278,5 +278,19 @@ mod tests {
         assert_contract_roundtrip::<ProposedImplementationPlan>();
         assert_contract_roundtrip::<ImplementationCriticism>();
         assert_contract_roundtrip::<ImplementationExecutionEvidence>();
+    }
+
+    // Guard against `deny_unknown_fields` creep onto persisted artifact types:
+    // goal.json evidence written by a future version must keep re-decoding.
+    #[test]
+    fn persisted_plan_evidence_tolerates_unknown_fields_and_populated_resolutions() {
+        let mut value = serde_json::to_value(ProposedImplementationPlan::example()).unwrap();
+        value
+            .as_object_mut()
+            .unwrap()
+            .insert("future_field".to_string(), serde_json::json!("tolerated"));
+        let decoded: ProposedImplementationPlan =
+            crate::structured_output::decode_persisted(value, "test evidence").unwrap();
+        assert_eq!(decoded.criticism_resolutions[0].criticism_id, "C1");
     }
 }

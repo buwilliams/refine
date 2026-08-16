@@ -122,7 +122,6 @@ pub fn parse_structured_import_result(
     None
 }
 
-
 pub(super) fn import_extraction_from_json_value(
     value: Value,
     reporter: Option<&str>,

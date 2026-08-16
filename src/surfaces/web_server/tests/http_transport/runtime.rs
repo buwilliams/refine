@@ -117,9 +117,7 @@ fn startup_recovery_no_longer_blocks_on_cache_warming() {
     // every warmed cache rebuilds on demand, so holding the port closed for
     // warming only delayed boot. Recovery itself reports no warming steps.
     assert!(
-        messages
-            .iter()
-            .all(|message| !message.contains("warming")),
+        messages.iter().all(|message| !message.contains("warming")),
         "recovery emitted cache-warming steps: {messages:?}"
     );
 }
