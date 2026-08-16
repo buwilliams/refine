@@ -94,6 +94,7 @@ impl FileWorkItemService {
                 "Goal {goal_id} round changed before automatic {kind} recovery"
             )));
         }
+        let reuse_inert = last_round_is_unstarted_recovery(rounds);
         let now = now_timestamp();
         let source = rounds
             .get_mut(round_idx)
@@ -112,7 +113,7 @@ impl FileWorkItemService {
             "attempt": attempt,
             "generated_at": now
         });
-        rounds.push(successor);
+        append_or_reuse_recovery_round(rounds, successor, reuse_inert);
         object.insert("status".to_string(), json!(GoalStatus::Todo.as_str()));
         object.insert("updated".to_string(), json!(now));
         write_json_atomically(&goal_path, &value)?;
@@ -169,6 +170,7 @@ impl FileWorkItemService {
                 rounds.len()
             )));
         }
+        let reuse_inert = last_round_is_unstarted_recovery(rounds);
 
         let now = now_timestamp();
         let source_round = rounds
@@ -203,6 +205,7 @@ impl FileWorkItemService {
             Value::String(failure_message),
         );
         source_round.insert("failure_at".to_string(), Value::String(now.clone()));
+        source_round.insert("workflow_attempt_authority".to_string(), Value::Null);
         source_round.insert(
             "workflow_recovery".to_string(),
             json!({
@@ -240,7 +243,10 @@ impl FileWorkItemService {
             "target_commit": target_commit,
             "queued_at": now
         });
-        rounds.push(successor);
+        append_or_reuse_recovery_round(rounds, successor, reuse_inert);
+        // The recovery Round is only runnable from todo; restate it so a Goal
+        // whose status drifted repairs itself instead of stalling.
+        object.insert("status".to_string(), json!(GoalStatus::Todo.as_str()));
         object.insert("updated".to_string(), Value::String(now));
         write_json_atomically(&goal_path, &value)?;
         self.show_goal_summary(goal_id)

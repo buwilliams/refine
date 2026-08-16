@@ -19,13 +19,16 @@ use crate::workflow::context::WorkflowContext;
 use crate::workflow::policy::SchedulingEligibility;
 use crate::workflow::reconciliation::IntegratedTargetWorkflowLease;
 
+use serde_json::json;
+
 use super::{
     ACTIVE_WORK_REPLENISH_INTERVAL, WorkflowEngine, WorkflowPassResult, WorkflowStepResult,
     authored_workflow_commitment, hydrate_plan_or_implement_context, hydrate_retry_context,
-    missing_workflow_artifact, priority_rank, setting_string,
+    missing_workflow_artifact, now_timestamp, priority_rank, setting_string,
 };
 
 static RETRY_STATE: OnceLock<Mutex<BTreeMap<String, RetryState>>> = OnceLock::new();
+static HOLD_STATE: OnceLock<Mutex<BTreeMap<String, &'static str>>> = OnceLock::new();
 
 #[derive(Clone, Copy)]
 struct RetryState {
@@ -197,31 +200,41 @@ impl WorkflowEngine {
         let index = ActiveGoalIndex::load_or_rebuild(&refine_dir)?;
         let policy = self.policy()?;
         let eligibility = SchedulingEligibility::new(index.goals(), active);
-        let mut goals = index
-            .goals()
-            .filter(|goal| {
-                matches!(
-                    goal.status,
-                    GoalStatus::Todo
-                        | GoalStatus::Plan
-                        | GoalStatus::Implement
-                        | GoalStatus::Governance
-                        | GoalStatus::Quality
-                )
-            })
-            .filter(|goal| {
-                crate::tools::product::nodes::node_ids_match(
-                    goal.node_id.as_deref().unwrap_or("default"),
-                    &policy.active_node_id,
-                )
-            })
-            .filter(|goal| goal.round_count > 0)
-            .filter(|goal| !active.contains(&goal.id))
-            .filter(|goal| !self.retry_delayed(&goal.id))
-            .filter(|goal| eligibility.feature_eligible(&goal.id))
-            .filter(|goal| eligibility.priority_eligible(goal))
-            .cloned()
-            .collect::<Vec<_>>();
+        let mut goals = Vec::new();
+        for goal in index.goals() {
+            // Status and node mismatches and currently-active Goals are not
+            // scheduling holds; skip them without recording anything.
+            if !matches!(
+                goal.status,
+                GoalStatus::Todo
+                    | GoalStatus::Plan
+                    | GoalStatus::Implement
+                    | GoalStatus::Governance
+                    | GoalStatus::Quality
+            ) || !crate::tools::product::nodes::node_ids_match(
+                goal.node_id.as_deref().unwrap_or("default"),
+                &policy.active_node_id,
+            ) || active.contains(&goal.id)
+            {
+                continue;
+            }
+            let hold = if goal.round_count == 0 {
+                Some("no_rounds")
+            } else if self.retry_delayed(&goal.id) {
+                Some("retry_backoff")
+            } else if !eligibility.feature_eligible(&goal.id) {
+                Some("feature_head_of_line")
+            } else if !eligibility.priority_eligible(goal) {
+                Some("priority_fenced")
+            } else {
+                None
+            };
+            if let Some(reason) = hold {
+                self.note_scheduling_hold(&goal.id, Some(reason));
+                continue;
+            }
+            goals.push(goal.clone());
+        }
         goals.sort_by(|a, b| {
             priority_rank(&b.priority)
                 .cmp(&priority_rank(&a.priority))
@@ -238,16 +251,63 @@ impl WorkflowEngine {
                 &policy.provider,
                 &policy.target_app_id,
             ) {
-                break;
+                self.note_scheduling_hold(&goal.id, Some("capacity_exhausted"));
+                continue;
             }
             load.record(
                 &policy.active_node_id,
                 &policy.provider,
                 &policy.target_app_id,
             );
+            self.note_scheduling_hold(&goal.id, None);
             result.push(goal.id);
         }
         Ok(result)
+    }
+
+    /// Records why a Goal was excluded from a scheduling pass (or clears the
+    /// record with `None` when it launches). Silent scheduler drops left Goals
+    /// stuck with no trace; each reason transition appends one JSONL line to
+    /// `scheduler-holds.jsonl` under the runtime root, and unchanged reasons
+    /// are never re-logged.
+    fn note_scheduling_hold(&self, goal_id: &str, reason: Option<&'static str>) {
+        let key = self.retry_key(goal_id);
+        let previous = {
+            let Ok(mut holds) = HOLD_STATE.get_or_init(Default::default).lock() else {
+                return;
+            };
+            let previous = holds.get(&key).copied();
+            if previous == reason {
+                return;
+            }
+            match reason {
+                Some(reason) => holds.insert(key, reason),
+                None => holds.remove(&key),
+            };
+            previous
+        };
+        let line = match reason {
+            Some(reason) => json!({
+                "at": now_timestamp(),
+                "goal_id": goal_id,
+                "reason": reason
+            }),
+            None => json!({
+                "at": now_timestamp(),
+                "goal_id": goal_id,
+                "reason": "cleared",
+                "previous": previous
+            }),
+        };
+        let path = self.runtime_root.join("scheduler-holds.jsonl");
+        let _ = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&path)
+            .and_then(|mut file| {
+                use std::io::Write;
+                writeln!(file, "{line}")
+            });
     }
 
     fn prepare_goal<'a>(&'a self, goal_id: &str) -> Result<PreparedGoal<'a>, PreparedGoalError> {

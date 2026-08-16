@@ -61,6 +61,68 @@ pub(super) fn clear_latest_round_workflow_attempt(object: &mut Map<String, Value
     round.insert("workflow_attempt_authority".to_string(), Value::Null);
 }
 
+/// True when the trailing Round was appended by automation and never started:
+/// it carries recovery provenance (a non-null `automatic_retry` or
+/// `workflow_recovery`), has no logs, and was never claimed or worked (no
+/// attempt authority, agent context, or implementation report).
+pub(super) fn last_round_is_unstarted_recovery(rounds: &[Value]) -> bool {
+    let Some(round) = rounds.last().and_then(Value::as_object) else {
+        return false;
+    };
+    let automation_appended = ["automatic_retry", "workflow_recovery"]
+        .iter()
+        .any(|key| round.get(*key).is_some_and(|value| !value.is_null()));
+    let never_logged = round
+        .get("logs")
+        .and_then(Value::as_array)
+        .is_none_or(Vec::is_empty);
+    let never_worked = [
+        "workflow_attempt_authority",
+        "agent_context",
+        "implementation_report",
+    ]
+    .iter()
+    .all(|key| round.get(*key).is_none_or(Value::is_null));
+    automation_appended && never_logged && never_worked
+}
+
+/// Only the last Round of a Goal is claimable (`claim_workflow_attempt`
+/// requires `rounds.len() == round_idx + 1`), so appending a recovery Round
+/// past an unclaimed one strands the earlier Round forever: it can never be
+/// started and never receives logs explaining why. When the trailing Round is
+/// itself an unstarted automation-appended recovery Round, the new recovery
+/// replaces it in place instead of appending.
+///
+/// The reuse merges every key of `successor` over the trailing Round and
+/// restores only the original "created" value. The full merge deliberately
+/// resets `failure_*` to empty — the same rationale as
+/// `clear_latest_round_failure` above — while keys absent from `successor`,
+/// like `*_recovery_analysis`, survive. Returns the effective successor index.
+pub(super) fn append_or_reuse_recovery_round(
+    rounds: &mut Vec<Value>,
+    successor: Value,
+    reuse_inert: bool,
+) -> usize {
+    if reuse_inert {
+        let last_idx = rounds.len().saturating_sub(1);
+        if let (Some(reused), Some(successor)) = (
+            rounds.last_mut().and_then(Value::as_object_mut),
+            successor.as_object(),
+        ) {
+            let created = reused.get("created").cloned();
+            for (key, value) in successor {
+                reused.insert(key.clone(), value.clone());
+            }
+            if let Some(created) = created {
+                reused.insert("created".to_string(), created);
+            }
+            return last_idx;
+        }
+    }
+    rounds.push(successor);
+    rounds.len() - 1
+}
+
 pub(super) fn new_round_value(reporter: &str, assignee: &str, prompt: &str) -> Value {
     let now = now_timestamp();
     let mut round = Map::new();
@@ -128,4 +190,74 @@ pub(super) fn new_round_value(reporter: &str, assignee: &str, prompt: &str) -> V
     round.insert("failure_message".to_string(), Value::String(String::new()));
     round.insert("failure_at".to_string(), Value::String(String::new()));
     Value::Object(round)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn recovery_round_reuse_keeps_the_successor_pointer_truthful() {
+        let mut rounds = vec![
+            json!({"created": "2026-01-01T00:00:00Z", "logs": [{"message": "worked"}]}),
+            json!({
+                "created": "2026-01-02T00:00:00Z",
+                "logs": [],
+                "automatic_retry": {"kind": "integration", "attempt": 1},
+                "workflow_attempt_authority": null,
+                "agent_context": null,
+                "implementation_report": null
+            }),
+        ];
+        let reuse_inert = last_round_is_unstarted_recovery(&rounds);
+        assert!(reuse_inert);
+
+        // Mirrors queue_integration_recovery_summary's successor arithmetic.
+        let round_idx = 1usize;
+        let successor_round = round_idx + if reuse_inert { 1 } else { 2 };
+        let successor = json!({
+            "created": "2026-01-03T00:00:00Z",
+            "prompt": "recover integration",
+            "workflow_recovery": {"state": "queued", "successor_round": successor_round},
+            "automatic_retry": {"kind": "integration", "attempt": 2}
+        });
+        let effective = append_or_reuse_recovery_round(&mut rounds, successor, reuse_inert);
+
+        assert_eq!(effective, 1);
+        assert_eq!(rounds.len(), 2);
+        assert_eq!(
+            rounds[1]["workflow_recovery"]["successor_round"],
+            json!(effective + 1)
+        );
+        assert_eq!(rounds[1]["created"], "2026-01-02T00:00:00Z");
+        assert_eq!(rounds[1]["automatic_retry"]["attempt"], 2);
+    }
+
+    #[test]
+    fn a_worked_or_authored_round_is_never_treated_as_inert() {
+        for round in [
+            json!({"automatic_retry": {"attempt": 1}, "logs": [{"message": "started"}]}),
+            json!({
+                "automatic_retry": {"attempt": 1},
+                "logs": [],
+                "workflow_attempt_authority": {"round_idx": 0}
+            }),
+            json!({"automatic_retry": {"attempt": 1}, "logs": [], "agent_context": {"version": 1}}),
+            json!({"workflow_recovery": {"state": "queued"}, "implementation_report": "done"}),
+            json!({"prompt": "authored by a person", "logs": []}),
+        ] {
+            assert!(
+                !last_round_is_unstarted_recovery(&[round.clone()]),
+                "{round:#}"
+            );
+            let mut rounds = vec![round];
+            let successor = new_round_value("Refine", "Refine", "recover");
+            assert_eq!(
+                append_or_reuse_recovery_round(&mut rounds, successor, false),
+                1
+            );
+            assert_eq!(rounds.len(), 2);
+        }
+    }
 }

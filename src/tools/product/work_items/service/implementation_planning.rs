@@ -99,12 +99,15 @@ impl FileWorkItemService {
                     round_idx + 1
                 ))
             })?;
-        let context = round.get("agent_context").ok_or_else(|| {
-            RefineError::Conflict(format!(
-                "Goal {goal_id} round {} lost its pinned agent context",
-                round_idx + 1
-            ))
-        })?;
+        let context = round
+            .get("agent_context")
+            .filter(|value| !value.is_null())
+            .ok_or_else(|| {
+                RefineError::Conflict(format!(
+                    "Goal {goal_id} round {} lost its pinned agent context",
+                    round_idx + 1
+                ))
+            })?;
         let context_digest = format!(
             "{:x}",
             Sha256::digest(serde_json::to_vec(context).map_err(|error| {
