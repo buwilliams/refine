@@ -30,7 +30,7 @@ pub(crate) fn ensure_integration_worktree(
     runtime_root: &Path,
     anchor_commit: &str,
 ) -> RefineResult<IntegrationWorktree> {
-    let path = repo_git.git_path("refine-integration")?.join("target");
+    let path = integration_worktree_path(repo_git)?;
     let git = FileGitWorktreeService::with_runtime_root(&path, runtime_root);
     let valid = path.exists() && git.is_inside_work_tree().unwrap_or(false);
     if valid {
@@ -50,4 +50,29 @@ pub(crate) fn ensure_integration_worktree(
     }
     repo_git.ensure_detached_worktree(&path, anchor_commit)?;
     Ok(IntegrationWorktree { path, git })
+}
+
+/// Filesystem location of the persistent integration worktree.
+pub(crate) fn integration_worktree_path(
+    repo_git: &FileGitWorktreeService,
+) -> RefineResult<PathBuf> {
+    Ok(repo_git.git_path("refine-integration")?.join("target"))
+}
+
+/// Tear the integration worktree down so the next integration recreates it
+/// fresh. The tree is Refine-owned, so nothing in it is ever user work — no
+/// stash, no quarantine. Returns the removed path, or `None` when no tree
+/// existed.
+pub(crate) fn remove_integration_worktree(
+    repo_git: &FileGitWorktreeService,
+) -> RefineResult<Option<PathBuf>> {
+    let path = integration_worktree_path(repo_git)?;
+    if !path.exists() {
+        return Ok(None);
+    }
+    // `worktree remove --force` refuses a locked worktree, hence the
+    // best-effort unlock first.
+    let _ = repo_git.unlock_worktree(&path);
+    repo_git.remove_worktree(&path, true)?;
+    Ok(Some(path))
 }

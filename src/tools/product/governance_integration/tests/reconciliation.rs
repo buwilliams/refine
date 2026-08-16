@@ -161,6 +161,49 @@ impl Drop for ReconciliationFixture {
     }
 }
 
+/// Rewind local and published `main` to the recorded integration merge, the
+/// exact snapshot an already-merged revert expects.
+fn park_target_at_integration(fixture: &ReconciliationFixture) {
+    git(
+        &fixture.repo,
+        &["reset", "--hard", &fixture.integration_target],
+    )
+    .unwrap();
+    git(&fixture.repo, &["push", "--force", "origin", "main"]).unwrap();
+}
+
+fn install_hook(path: &Path, script: &str) {
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    fs::write(path, script).unwrap();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut permissions = fs::metadata(path).unwrap().permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(path, permissions).unwrap();
+    }
+}
+
+fn revert(
+    fixture: &ReconciliationFixture,
+    goal_id: &str,
+    expected_target_commit: &str,
+) -> RefineResult<ReconciliationRevert> {
+    fixture
+        .service()
+        .revert_reconciled_candidate_and_settle(
+            ReconciliationRequest {
+                goal_id,
+                round_idx: 0,
+                node_id: "default",
+                integration: &fixture.integration,
+                expected_target_commit,
+            },
+            |_| Ok(()),
+        )
+        .map(|(reverted, ())| reverted)
+}
+
 #[test]
 fn already_merged_resolution_allows_shared_target_descendants_and_is_concurrently_idempotent() {
     let fixture = ReconciliationFixture::new();
@@ -458,6 +501,187 @@ fn missing_published_ancestry_records_both_snapshots_and_fails_closed() {
             .as_str()
             .unwrap()
             .contains("Published target")
+    );
+}
+
+#[test]
+fn revert_runs_in_the_integration_worktree_and_syncs_the_human_checkout() {
+    let fixture = ReconciliationFixture::new();
+    fixture.create_goal("GOAL-REVERT-OK", json!({}), true);
+    park_target_at_integration(&fixture);
+
+    let reverted = revert(&fixture, "GOAL-REVERT-OK", &fixture.integration_target).unwrap();
+
+    assert_eq!(reverted.merge_commit, fixture.integration_target);
+    assert!(reverted.result.ok);
+    assert_eq!(
+        git_stdout(&fixture.repo, &["rev-parse", "main"]),
+        reverted.revert_commit
+    );
+    assert!(
+        git_stdout(&fixture.repo, &["ls-remote", "origin", "refs/heads/main"])
+            .starts_with(&reverted.revert_commit),
+        "the revert must be published"
+    );
+    // The human checkout was synced in place: still on main, clean, with the
+    // candidate delta unwound and no revert porcelain state.
+    assert_eq!(
+        git_stdout(&fixture.repo, &["branch", "--show-current"]),
+        "main"
+    );
+    assert_eq!(
+        git_stdout(&fixture.repo, &["rev-parse", "HEAD"]),
+        reverted.revert_commit
+    );
+    assert!(!fixture.repo.join("candidate.txt").exists());
+    assert!(git_stdout(&fixture.repo, &["status", "--porcelain"]).is_empty());
+    assert!(!git_succeeds(
+        &fixture.repo,
+        &["rev-parse", "--verify", "REVERT_HEAD"]
+    ));
+    // The porcelain ran in the detached integration worktree.
+    let worktree = fixture.repo.join(".git/refine-integration/target");
+    assert!(worktree.exists());
+    assert_eq!(
+        git_stdout(&worktree, &["rev-parse", "HEAD"]),
+        reverted.revert_commit
+    );
+    assert_eq!(git_stdout(&worktree, &["branch", "--show-current"]), "");
+}
+
+#[test]
+fn revert_succeeds_with_the_human_checkout_parked_on_another_branch() {
+    let fixture = ReconciliationFixture::new();
+    fixture.create_goal("GOAL-REVERT-PARKED", json!({}), true);
+    park_target_at_integration(&fixture);
+    git(&fixture.repo, &["switch", "-c", "parked"]).unwrap();
+
+    // The revert no longer asserts checkout position: the ref moves by CAS
+    // while the parked checkout stays byte-identical.
+    let reverted = revert(&fixture, "GOAL-REVERT-PARKED", &fixture.integration_target).unwrap();
+
+    assert_eq!(
+        git_stdout(&fixture.repo, &["rev-parse", "main"]),
+        reverted.revert_commit
+    );
+    assert_eq!(
+        git_stdout(&fixture.repo, &["branch", "--show-current"]),
+        "parked"
+    );
+    assert_eq!(
+        fs::read_to_string(fixture.repo.join("candidate.txt")).unwrap(),
+        "candidate\n"
+    );
+    assert!(git_stdout(&fixture.repo, &["status", "--porcelain"]).is_empty());
+}
+
+#[test]
+fn conflicted_revert_recovers_the_integration_worktree_and_moves_nothing() {
+    let fixture = ReconciliationFixture::new();
+    fixture.create_goal("GOAL-REVERT-CONFLICT", json!({}), true);
+    park_target_at_integration(&fixture);
+    // A later commit rewrote the candidate's file, so unwinding the merge
+    // conflicts instead of applying cleanly.
+    commit_file(
+        &fixture.repo,
+        "candidate.txt",
+        "mutated after integration\n",
+        "mutate candidate",
+    );
+    git(&fixture.repo, &["push", "origin", "main"]).unwrap();
+    let expected = git_stdout(&fixture.repo, &["rev-parse", "main"]);
+
+    let error = revert(&fixture, "GOAL-REVERT-CONFLICT", &expected).unwrap_err();
+
+    assert!(
+        error
+            .to_string()
+            .contains("already-merged reconciliation revert failed"),
+        "{error}"
+    );
+    assert_eq!(git_stdout(&fixture.repo, &["rev-parse", "main"]), expected);
+    assert_eq!(
+        fs::read_to_string(fixture.repo.join("candidate.txt")).unwrap(),
+        "mutated after integration\n"
+    );
+    let worktree = fixture.repo.join(".git/refine-integration/target");
+    assert!(
+        git_stdout(&worktree, &["status", "--porcelain"]).is_empty(),
+        "the integration worktree must be recovered after a revert conflict"
+    );
+    assert!(!git_succeeds(
+        &worktree,
+        &["rev-parse", "--verify", "REVERT_HEAD"]
+    ));
+}
+
+#[test]
+fn revert_push_failure_rolls_the_target_back_by_counter_cas() {
+    let fixture = ReconciliationFixture::new();
+    fixture.create_goal("GOAL-REVERT-PUSH", json!({}), true);
+    park_target_at_integration(&fixture);
+    install_hook(
+        &fixture.temp_root.join("remote.git/hooks/pre-receive"),
+        "#!/bin/sh\nexit 1\n",
+    );
+
+    let error = revert(&fixture, "GOAL-REVERT-PUSH", &fixture.integration_target).unwrap_err();
+
+    assert!(error.to_string().contains("could not be pushed"), "{error}");
+    assert!(
+        error
+            .to_string()
+            .contains("the clean local target was restored to"),
+        "{error}"
+    );
+    assert_eq!(
+        git_stdout(&fixture.repo, &["rev-parse", "main"]),
+        fixture.integration_target,
+        "the counter-CAS must restore the pre-revert target"
+    );
+    // The checkout sync was mirrored back too: the candidate delta returned.
+    assert_eq!(
+        fs::read_to_string(fixture.repo.join("candidate.txt")).unwrap(),
+        "candidate\n"
+    );
+    assert!(git_stdout(&fixture.repo, &["status", "--porcelain"]).is_empty());
+    assert!(
+        git_stdout(&fixture.repo, &["ls-remote", "origin", "refs/heads/main"])
+            .starts_with(&fixture.integration_target)
+    );
+}
+
+#[test]
+fn revert_push_failure_with_an_externally_moved_ref_reports_the_unrestored_leg() {
+    let fixture = ReconciliationFixture::new();
+    fixture.create_goal("GOAL-REVERT-PUSH-MOVED", json!({}), true);
+    park_target_at_integration(&fixture);
+    // The hook both fails the push and yanks the ref elsewhere, so the
+    // rollback counter-CAS must lose and say so.
+    install_hook(
+        &fixture.repo.join(".git/hooks/pre-push"),
+        &format!(
+            "#!/bin/sh\ngit update-ref refs/heads/main {}\nexit 1\n",
+            fixture.base_commit
+        ),
+    );
+
+    let error = revert(
+        &fixture,
+        "GOAL-REVERT-PUSH-MOVED",
+        &fixture.integration_target,
+    )
+    .unwrap_err();
+
+    assert!(error.to_string().contains("could not be pushed"), "{error}");
+    assert!(
+        error.to_string().contains("could not be restored to"),
+        "{error}"
+    );
+    assert_eq!(
+        git_stdout(&fixture.repo, &["rev-parse", "main"]),
+        fixture.base_commit,
+        "a lost rollback counter-CAS must leave the externally moved ref alone"
     );
 }
 

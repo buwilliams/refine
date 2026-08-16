@@ -16,9 +16,14 @@ use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeServi
 use crate::tools::host::project_layout::target_root_for_refine_dir;
 use crate::tools::product::project_projection::GoalSummaryProjection;
 use crate::tools::product::work_items::FileWorkItemService;
+use crate::workflow::reconciliation::{
+    CheckoutSyncWindow, clear_checkout_sync_window, record_checkout_sync_window,
+};
 
-mod checkout_sync;
-mod integration_worktree;
+// Both modules are crate-visible so the integrated-target workflow lease can
+// repair pending syncs and recreate the worktree during interruption recovery.
+pub(crate) mod checkout_sync;
+pub(crate) mod integration_worktree;
 mod reconciliation;
 
 use checkout_sync::{CheckoutSyncOutcome, sync_human_checkout_after_ref_move};
@@ -374,8 +379,9 @@ impl FileGovernanceIntegrationService {
     /// Automatic reconciliation is intentionally limited to integration evidence that identifies
     /// an exact two-parent merge commit whose first parent did not contain the candidate and whose
     /// second parent does. That proves which shared-branch delta belongs to this Goal. Any
-    /// ambiguity, dirty target, concurrent branch movement, or revert conflict is surfaced without
-    /// pushing or changing Goal status.
+    /// ambiguity, concurrent branch movement, or revert conflict is surfaced without pushing or
+    /// changing Goal status. The revert itself runs in the detached integration worktree, so the
+    /// shared human checkout needs no particular branch position or cleanliness.
     pub fn revert_reconciled_candidate_and_settle<T>(
         &self,
         request: ReconciliationRequest<'_>,
@@ -431,22 +437,6 @@ impl FileGovernanceIntegrationService {
         }
         with_repository_git_lock(&target_root, || {
             let git = FileGitWorktreeService::with_runtime_root(&target_root, &self.runtime_root);
-            let status = git.inspect(target_root.to_str().unwrap_or(""))?;
-            if status.branch.as_deref() != Some(integration.target_branch.as_str()) {
-                return Err(RefineError::Conflict(format!(
-                    "already-merged reconciliation requires target worktree {} to be on branch {}, found {}; user work was preserved",
-                    target_root.display(),
-                    integration.target_branch,
-                    status.branch.as_deref().unwrap_or("<detached>")
-                )));
-            }
-            if status.dirty_user_changes || !status.refine_owned_artifacts.is_empty() {
-                return Err(RefineError::Conflict(format!(
-                    "already-merged reconciliation found a dirty target index or worktree at {} ({}); user work was preserved",
-                    target_root.display(),
-                    status.describe_dirt()
-                )));
-            }
             let current_target = git.resolve_commit(&integration.target_branch)?;
             if current_target != expected_target_commit {
                 return Err(RefineError::Conflict(format!(
@@ -482,19 +472,53 @@ impl FileGovernanceIntegrationService {
                     integration.target_commit, integration.candidate_commit
                 )));
             }
-            let result = git.revert_merge_commit(&integration.target_commit, 1)?;
+            // The revert runs on detached HEAD in the Refine-owned integration
+            // worktree, so the shared human checkout needs no particular
+            // branch or cleanliness: the ref-only preconditions above already
+            // prove exactly which delta is being unwound.
+            let worktree =
+                ensure_integration_worktree(&git, &self.runtime_root, expected_target_commit)?;
+            let result = worktree
+                .git()
+                .revert_merge_commit(&integration.target_commit, 1)?;
             if !result.ok {
-                let _ = git.recover();
+                let _ = worktree.git().recover();
                 return Err(merge_failure(
                     "already-merged reconciliation revert",
                     result,
                 ));
             }
-            let revert_commit = git.resolve_commit(&integration.target_branch)?;
+            let revert_commit = worktree.git().resolve_commit("HEAD")?;
+            self.advance_target(
+                &git,
+                &target_root,
+                &integration.target_branch,
+                expected_target_commit,
+                &revert_commit,
+            )?;
             if integration.pushed
                 && let Err(error) = git.push(&integration.remote, &integration.target_branch)
             {
-                let rollback = git.reset_hard_to(expected_target_commit);
+                // Counter-CAS: restore the ref only while it still points at
+                // the unpublished revert, then mirror the restore into the
+                // human checkout the same way the advance was mirrored.
+                let rollback = match self.apply_target_advance(
+                    &git,
+                    &target_root,
+                    &integration.target_branch,
+                    &revert_commit,
+                    expected_target_commit,
+                ) {
+                    Ok(TargetAdvanceOutcome::Applied) => Ok(()),
+                    Ok(TargetAdvanceOutcome::CasLost { current }) => {
+                        Err(RefineError::TargetAdvanced {
+                            reference: format!("refs/heads/{}", integration.target_branch),
+                            expected: revert_commit.clone(),
+                            current,
+                        })
+                    }
+                    Err(rollback) => Err(rollback),
+                };
                 if let Err(rollback) = rollback {
                     return Err(RefineError::Conflict(format!(
                         "reconciliation revert {revert_commit} could not be pushed to {}/{} ({error}) and the clean local target could not be restored to {expected_target_commit} ({rollback})",
@@ -766,15 +790,27 @@ impl FileGovernanceIntegrationService {
             }
             Err(error) => return Err(error),
         }
-        if let CheckoutSyncOutcome::SkippedDirtyCollision { detail } =
-            sync_human_checkout_after_ref_move(
-                git,
-                target_root,
-                target_branch,
-                from_commit,
-                to_commit,
-            )?
-        {
+        // Attribute an interruption inside the sync window to this exact
+        // phase on the integrated-target transaction marker (a no-op when no
+        // lane marker is open); recovery then re-attempts the sync instead of
+        // touching the shared checkout blindly.
+        record_checkout_sync_window(
+            target_root,
+            CheckoutSyncWindow {
+                branch: target_branch.to_string(),
+                from: from_commit.to_string(),
+                to: to_commit.to_string(),
+            },
+        )?;
+        let outcome = sync_human_checkout_after_ref_move(
+            git,
+            target_root,
+            target_branch,
+            from_commit,
+            to_commit,
+        )?;
+        clear_checkout_sync_window(target_root)?;
+        if let CheckoutSyncOutcome::SkippedDirtyCollision { detail } = outcome {
             eprintln!(
                 "refine: a working-tree collision at {} skipped the checkout sync for {reference} ({detail}); \
                  the human checkout shows the integration delta as staged-reverse until repair_pending_checkout_sync succeeds",

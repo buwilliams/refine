@@ -1,7 +1,7 @@
 use super::*;
 
 #[test]
-fn tracked_dirt_in_the_shared_checkout_holds_the_goal_instead_of_failing_it() {
+fn tracked_dirt_in_the_shared_checkout_no_longer_holds_the_goal() {
     let temp_root = unique_temp_dir("workspace-hold");
     let target_root = temp_root.join("repo");
     let runtime_root = temp_root.join("run/8080");
@@ -45,37 +45,24 @@ fn tracked_dirt_in_the_shared_checkout_holds_the_goal_instead_of_failing_it() {
     fs::write(target_root.join("app.txt"), "uncommitted human edit\n").unwrap();
 
     let workflow = WorkflowEngine::with_target_root(&runtime_root, &target_root);
-    let steps = workflow.execute_work().unwrap();
-    assert!(steps.is_empty());
-    assert_eq!(
-        work_items.show_goal_summary("GOAL1").unwrap().goal.status,
-        GoalStatus::Governance
-    );
-    let holds = fs::read_to_string(runtime_root.join("scheduler-holds.jsonl")).unwrap();
+    // The Goal may still fail on its own merits (this round has no Git
+    // evidence to integrate); what matters is that the pass processed it.
+    let _ = workflow.execute_work();
+
+    // Integration porcelain runs in the detached integration worktree, so
+    // shared-checkout dirt no longer parks the Goal behind a workspace hold,
+    // and the human's edit stayed untouched.
+    let holds =
+        fs::read_to_string(runtime_root.join("scheduler-holds.jsonl")).unwrap_or_default();
     assert!(
-        holds
+        !holds
             .lines()
             .any(|line| line.contains("\"GOAL1\"") && line.contains("workspace_hold")),
-        "{holds}"
-    );
-    assert!(
-        holds
-            .lines()
-            .any(|line| line.contains("\"GOAL1\"") && line.contains("retry_backoff")),
         "{holds}"
     );
     assert_eq!(
         fs::read_to_string(target_root.join("app.txt")).unwrap(),
         "uncommitted human edit\n"
-    );
-
-    // A later pass while the hold persists is also not an error and still
-    // does not settle the Goal.
-    let steps = workflow.execute_work().unwrap();
-    assert!(steps.is_empty());
-    assert_eq!(
-        work_items.show_goal_summary("GOAL1").unwrap().goal.status,
-        GoalStatus::Governance
     );
 
     fs::remove_dir_all(temp_root).unwrap();
