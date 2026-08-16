@@ -70,13 +70,6 @@ pub(super) fn run_governed_implementation_planning(
 ) -> RefineResult<ProposedImplementationPlan> {
     let spec = goal_agent_prompt(&ctx.goal_id, agent_context)?;
     let mut plan = load_or_initialize_plan(ctx, goal, agent_context, implementation_branch)?;
-    if plan.state == ImplementationPlanState::Failed {
-        return Err(RefineError::Conflict(format!(
-            "Goal {} round {} implementation planning previously failed; its evidence was preserved",
-            ctx.goal_id,
-            ctx.round_idx + 1
-        )));
-    }
 
     if let Some(final_plan) = ensure_scoped_recovery_plan(ctx, goal, &mut plan, agent_cwd)? {
         return Ok(final_plan);
@@ -817,6 +810,27 @@ fn load_or_initialize_plan(
             raw.clone(),
             "implementation planning evidence",
         )?;
+        // A persisted failure never blocks re-entry: the workflow determines
+        // what happens, so a Goal re-queued after a planning failure enters
+        // this step again and does the work over. The failed plan is replaced
+        // wholesale rather than revived piecemeal — a retained governance
+        // pre-check verdict would instantly re-settle the Round it already
+        // failed, and a retained repair ledger would describe attempts this
+        // fresh pass never made.
+        if plan.state == ImplementationPlanState::Failed {
+            let failure = plan.failure.clone();
+            let fresh = initial_plan(binding);
+            persist_plan(ctx, Some(&plan), &fresh)?;
+            ctx.log(
+                "plan",
+                "Planning re-entry replaced the failed prior plan; the step is done over",
+                Some(json_object(serde_json::json!({
+                    "failed_phase": failure.as_ref().map(|failure| failure.phase.clone()),
+                    "failed_category": failure.as_ref().map(|failure| failure.category.clone())
+                }))),
+            )?;
+            return Ok(fresh);
+        }
         if plan.binding != binding {
             return Err(RefineError::Conflict(format!(
                 "Goal {} round {} implementation planning binding changed",
@@ -840,8 +854,14 @@ fn load_or_initialize_plan(
         }
         return Ok(plan);
     }
+    let plan = initial_plan(binding);
+    persist_plan(ctx, None, &plan)?;
+    Ok(plan)
+}
+
+fn initial_plan(binding: ImplementationPlanBinding) -> ImplementationPlan {
     let now = now_timestamp();
-    let plan = ImplementationPlan {
+    ImplementationPlan {
         schema_version: IMPLEMENTATION_PLAN_SCHEMA_VERSION,
         state: ImplementationPlanState::InProgress,
         phase: ImplementationPlanPhase::Plan,
@@ -858,9 +878,7 @@ fn load_or_initialize_plan(
         invalid_output_attempts: Vec::new(),
         provider_session_id: None,
         governance_precheck: None,
-    };
-    persist_plan(ctx, None, &plan)?;
-    Ok(plan)
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
