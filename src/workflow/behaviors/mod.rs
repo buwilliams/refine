@@ -1300,6 +1300,14 @@ impl WorkflowBehavior for WorkflowGovernance {
             })();
             let step = match step {
                 Ok(step) => step,
+                // Losing the target-ref compare-and-swap inside the
+                // integration is the same race as the pre-merge tip check:
+                // refresh against the moved target and try again.
+                Err(RefineError::TargetAdvanced { expected, .. }) => {
+                    GovernanceIntegrationStep::TargetAdvanced {
+                        expected_target: expected,
+                    }
+                }
                 Err(error)
                     if ctx
                         .work_items

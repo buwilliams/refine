@@ -14,6 +14,7 @@ pub(in crate::surfaces::web_server) fn error_response(error: RefineError) -> Api
         | RefineError::StateRecoveryConflict { .. } => (409, "conflict"),
         RefineError::WorkspaceHold(_) => (409, "workspace_hold"),
         RefineError::StaleCandidate { .. } => (409, "stale_candidate"),
+        RefineError::TargetAdvanced { .. } => (409, "target_advanced"),
         RefineError::QualityCandidateInfrastructure(_) => (409, "quality_candidate_infrastructure"),
         RefineError::Degraded(_) => (503, "degraded"),
         RefineError::Io(_) | RefineError::Serialization(_) | RefineError::StructuredOutput(_) => {

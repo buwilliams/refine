@@ -6,6 +6,8 @@ use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeServi
 /// Refine-owned detached worktree where integrated-target porcelain runs, so
 /// the shared human checkout never has to be clean for an integration.
 pub(crate) struct IntegrationWorktree {
+    // Production callers act through `git()`; tests locate the tree on disk.
+    #[cfg_attr(not(test), allow(dead_code))]
     pub path: PathBuf,
     git: FileGitWorktreeService,
 }

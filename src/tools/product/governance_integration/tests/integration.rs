@@ -96,6 +96,10 @@ fn governance_push_failure_retries_without_duplicate_merge() {
         "{error}"
     );
     let integrated_head = git_stdout(&repo, &["rev-parse", "HEAD"]);
+    assert!(
+        !git_succeeds(&repo, &["rev-parse", "--verify", "MERGE_HEAD"]),
+        "the human checkout must never carry the integration merge state"
+    );
     assert!(git_succeeds(
         &repo,
         &[
@@ -135,7 +139,14 @@ fn governance_push_failure_retries_without_duplicate_merge() {
             "origin/main"
         ]
     ));
-    let audit = fs::read_to_string(repo.join(".git/refine-audit.jsonl")).unwrap();
+    // Merge porcelain now runs in the detached integration worktree, so its
+    // audit trail lives in that worktree's private Git directory.
+    let integration_worktree = repo.join(".git/refine-integration/target");
+    let worktree_git_dir = PathBuf::from(git_stdout(
+        &integration_worktree,
+        &["rev-parse", "--absolute-git-dir"],
+    ));
+    let audit = fs::read_to_string(worktree_git_dir.join("refine-audit.jsonl")).unwrap();
     assert_eq!(
         audit
             .lines()

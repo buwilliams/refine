@@ -41,6 +41,14 @@ pub enum RefineError {
         target_branch: String,
         target_commit: String,
     },
+    /// A compare-and-swap ref advance observed the target moving underneath
+    /// it; the integration pass must refresh against the new tip and retry.
+    #[error("target advanced: {reference} moved from {expected} to {current} before the update")]
+    TargetAdvanced {
+        reference: String,
+        expected: String,
+        current: String,
+    },
     #[error("{0}")]
     QualityCandidateInfrastructure(Box<QualityCandidateInfrastructureError>),
     /// The shared workspace temporarily blocks integration; retry later,
@@ -83,6 +91,7 @@ impl RefineError {
             | Self::StateSyncMissingBaseline(_)
             | Self::StateRecoveryConflict { .. }
             | Self::StaleCandidate { .. }
+            | Self::TargetAdvanced { .. }
             | Self::QualityCandidateInfrastructure(_)
             | Self::WorkspaceHold(_) => ErrorCategory::Conflict,
             Self::Degraded(_) => ErrorCategory::Degraded,

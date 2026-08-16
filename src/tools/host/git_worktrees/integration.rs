@@ -590,8 +590,8 @@ impl FileGitWorktreeService {
     /// Unlike `branch -f`, `update-ref` moves a branch even while it is
     /// checked out in another worktree, which is what lets a detached
     /// integration worktree advance the target branch of the shared human
-    /// checkout. Losing the race maps to `Conflict` naming the current commit
-    /// so callers can rejoin their refresh loop.
+    /// checkout. Losing the race maps to `TargetAdvanced` naming the current
+    /// commit so callers can rejoin their refresh loop.
     pub fn update_ref_cas(
         &self,
         reference: &str,
@@ -624,9 +624,11 @@ impl FileGitWorktreeService {
                 "conflict",
                 json!({"reference": reference, "expected_old": expected, "current": current}),
             );
-            return Err(RefineError::Conflict(format!(
-                "target advanced: {reference} moved from {expected} to {current} before the update"
-            )));
+            return Err(RefineError::TargetAdvanced {
+                reference: reference.to_string(),
+                expected,
+                current,
+            });
         }
         Err(RefineError::Conflict(message))
     }

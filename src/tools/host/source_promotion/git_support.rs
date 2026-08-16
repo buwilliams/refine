@@ -127,6 +127,9 @@ pub(super) fn append_error_context(error: RefineError, context: &str) -> RefineE
         stale @ RefineError::StaleCandidate { .. } => {
             RefineError::Conflict(append(stale.to_string()))
         }
+        advanced @ RefineError::TargetAdvanced { .. } => {
+            RefineError::Conflict(append(advanced.to_string()))
+        }
         infrastructure @ RefineError::QualityCandidateInfrastructure(_) => {
             RefineError::Conflict(append(infrastructure.to_string()))
         }
