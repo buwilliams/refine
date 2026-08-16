@@ -34,7 +34,7 @@ fn file_git_worktree_service_lists_status_and_reverts_commits() {
 }
 
 #[test]
-fn file_git_worktree_service_treats_primary_worktree_refine_state_as_user_change() {
+fn file_git_worktree_service_reports_primary_worktree_refine_state_as_untracked() {
     let temp_root = unique_temp_dir("git-status");
     let repo = temp_root.join("repo");
     fs::create_dir_all(repo.join(".refine")).unwrap();
@@ -43,8 +43,129 @@ fn file_git_worktree_service_treats_primary_worktree_refine_state_as_user_change
     fs::write(repo.join("user.txt"), "user\n").unwrap();
 
     let status = FileGitWorktreeService::new(&repo).inspect("").unwrap();
-    assert!(status.dirty_user_changes);
+    assert!(!status.dirty_user_changes);
+    assert!(status.dirty_paths.is_empty());
+    assert!(
+        status
+            .untracked_paths
+            .iter()
+            .any(|path| path == ".refine/state.json" || path == ".refine/")
+    );
+    assert!(status.untracked_paths.iter().any(|path| path == "user.txt"));
     assert!(status.refine_owned_artifacts.is_empty());
+    assert!(!status.is_pristine());
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn file_git_worktree_service_splits_tracked_dirt_from_untracked_files() {
+    let temp_root = unique_temp_dir("git-status-split");
+    let repo = temp_root.join("repo");
+    fs::create_dir_all(&repo).unwrap();
+    init_repo(&repo);
+    commit_file(&repo, "app.txt", "committed\n", "initial");
+
+    fs::write(repo.join("notes.txt"), "scratch\n").unwrap();
+    let status = FileGitWorktreeService::new(&repo).inspect("").unwrap();
+    assert!(!status.dirty_user_changes);
+    assert!(status.dirty_paths.is_empty());
+    assert_eq!(status.untracked_paths, vec!["notes.txt".to_string()]);
+    assert!(!status.is_pristine());
+
+    fs::write(repo.join("app.txt"), "modified\n").unwrap();
+    fs::create_dir_all(repo.join("run/8080")).unwrap();
+    fs::write(repo.join("run/8080/state.json"), "{}\n").unwrap();
+    fs::create_dir_all(repo.join("target/tmp")).unwrap();
+    fs::write(repo.join("target/tmp/build.txt"), "build\n").unwrap();
+    let status = FileGitWorktreeService::new(&repo).inspect("").unwrap();
+    assert!(status.dirty_user_changes);
+    assert_eq!(status.dirty_paths, vec!["app.txt".to_string()]);
+    assert_eq!(status.untracked_paths, vec!["notes.txt".to_string()]);
+    assert!(status.refine_owned_artifacts.iter().any(|p| p == "run/"));
+    assert!(status.refine_owned_artifacts.iter().any(|p| p == "target/"));
+    let dirt = status.describe_dirt();
+    assert!(dirt.contains("tracked: [app.txt]"), "{dirt}");
+    assert!(dirt.contains("untracked: [notes.txt]"), "{dirt}");
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn file_git_worktree_service_reports_literal_paths_for_renames_and_special_names() {
+    let temp_root = unique_temp_dir("git-status-literal");
+    let repo = temp_root.join("repo");
+    fs::create_dir_all(&repo).unwrap();
+    init_repo(&repo);
+    commit_file(&repo, "app.txt", "committed\n", "initial");
+
+    git(&repo, &["mv", "app.txt", "app2.txt"]).unwrap();
+    fs::write(repo.join("New Document.txt"), "spaced\n").unwrap();
+    fs::write(repo.join("foo[1].txt"), "glob-shaped\n").unwrap();
+
+    let status = FileGitWorktreeService::new(&repo).inspect("").unwrap();
+    // A rename reports both sides as separate literal paths, never the
+    // porcelain display string "old -> new"; special names arrive without
+    // porcelain C-quoting. Both feed back to Git as exact pathspecs.
+    assert!(status.dirty_paths.iter().any(|path| path == "app.txt"));
+    assert!(status.dirty_paths.iter().any(|path| path == "app2.txt"));
+    assert_eq!(status.dirty_paths.len(), 2, "{:?}", status.dirty_paths);
+    assert!(
+        status
+            .untracked_paths
+            .iter()
+            .any(|path| path == "New Document.txt"),
+        "{:?}",
+        status.untracked_paths
+    );
+    assert!(
+        status
+            .untracked_paths
+            .iter()
+            .any(|path| path == "foo[1].txt"),
+        "{:?}",
+        status.untracked_paths
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn quarantine_handles_renames_and_confines_glob_shaped_residue_names() {
+    let temp_root = unique_temp_dir("git-quarantine-literal");
+    let repo = temp_root.join("repo");
+    fs::create_dir_all(&repo).unwrap();
+    init_repo(&repo);
+    commit_file(&repo, "app.txt", "committed\n", "initial");
+
+    git(&repo, &["mv", "app.txt", "app2.txt"]).unwrap();
+    fs::write(repo.join("New Document.txt"), "residue\n").unwrap();
+    fs::write(repo.join("foo[1].txt"), "residue\n").unwrap();
+    fs::write(repo.join("foo1.txt"), "user file\n").unwrap();
+
+    let service = FileGitWorktreeService::new(&repo);
+    let stash = service
+        .quarantine_worktree_changes(
+            "quarantine literal pathspecs",
+            &["New Document.txt".to_string(), "foo[1].txt".to_string()],
+        )
+        .unwrap();
+
+    assert!(stash.is_some());
+    assert_eq!(
+        fs::read_to_string(repo.join("app.txt")).unwrap(),
+        "committed\n",
+        "the staged rename must be quarantined, restoring the source path"
+    );
+    assert!(!repo.join("app2.txt").exists());
+    assert!(!repo.join("New Document.txt").exists());
+    assert!(!repo.join("foo[1].txt").exists());
+    assert_eq!(
+        fs::read_to_string(repo.join("foo1.txt")).unwrap(),
+        "user file\n",
+        "`foo[1].txt` interpreted as fnmatch would sweep the user's foo1.txt"
+    );
+    assert!(git_stdout(&repo, &["status", "--porcelain"]).contains("?? foo1.txt"));
 
     fs::remove_dir_all(temp_root).unwrap();
 }

@@ -141,6 +141,9 @@ impl FileWorkItemService {
                 "Goal {goal_id} Round changed before integration recovery"
             )));
         }
+        // `require_current_attempt` above proved the trailing Round carries
+        // this caller's claim, so the claim alone must not disqualify reuse.
+        let reuse_inert = last_round_is_unstarted_recovery(rounds, Some(authority));
         let current_attempt = rounds[authority.round_idx]
             .get("automatic_retry")
             .and_then(|retry| retry.get("attempt"))
@@ -158,7 +161,9 @@ impl FileWorkItemService {
             "successor_round": if exhausted {
                 Value::Null
             } else {
-                json!(authority.round_idx + 2)
+                // A reused inert Round keeps its index, so the successor
+                // pointer must not skip ahead.
+                json!(authority.round_idx + if reuse_inert { 1 } else { 2 })
             },
             "attempt": if exhausted { current_attempt } else { next_attempt },
             "max_automatic_round_retries": max_automatic_round_retries,
@@ -209,7 +214,7 @@ impl FileWorkItemService {
             "attempt": next_attempt,
             "generated_at": now
         });
-        rounds.push(successor);
+        append_or_reuse_recovery_round(rounds, successor, reuse_inert);
         object.insert("status".to_string(), json!(GoalStatus::Todo.as_str()));
         object.insert("updated".to_string(), json!(&now));
         write_json_atomically(&goal_path, &value)?;

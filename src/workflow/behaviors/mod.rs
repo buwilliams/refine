@@ -226,9 +226,7 @@ fn begin_scoped_recovery_round(
     let retained_candidate_intact = |worktree_git: &FileGitWorktreeService| -> RefineResult<bool> {
         let head = worktree_git.head_ref()?;
         let status = worktree_git.inspect("")?;
-        Ok(head.commit.as_deref() == Some(candidate.as_str())
-            && !status.dirty_user_changes
-            && status.refine_owned_artifacts.is_empty())
+        Ok(head.commit.as_deref() == Some(candidate.as_str()) && status.is_pristine())
     };
     if !retained_candidate_intact(&worktree_git)? {
         ctx.log(
@@ -370,20 +368,6 @@ fn prepare_already_merged_reconciliation(
             if !app_git.commit_is_ancestor(candidate, &target_commit)? {
                 return Ok((target_commit, None, false));
             }
-            let head = app_git.head_ref()?;
-            if head.branch.as_deref() != Some(integration.target_branch.as_str())
-                || head.commit.as_deref() != Some(target_commit.as_str())
-            {
-                return Err(RefineError::Conflict(format!(
-                    "Goal {} already-merged reconciliation requires target worktree {} at {} on branch {}, found {} at {}; user work was preserved",
-                    ctx.goal_id,
-                    ctx.target_root.display(),
-                    target_commit,
-                    integration.target_branch,
-                    head.branch.as_deref().unwrap_or("<detached>"),
-                    head.commit.as_deref().unwrap_or("<unborn>")
-                )));
-            }
             let published = if integration.pushed {
                 app_git.fetch_branch(&integration.remote, &integration.target_branch)?;
                 let published = app_git.resolve_commit(&format!(
@@ -410,10 +394,12 @@ fn prepare_already_merged_reconciliation(
         let Some(recorded_state) = recorded_reconciliation_state.as_deref() else {
             return Ok(None);
         };
-        ctx.work_items
+        let recovered = ctx
+            .work_items
             .queue_missing_reconciled_candidate_recovery_summary(
                 &ctx.goal_id,
                 ctx.round_idx,
+                Some(ctx.attempt_authority),
                 recorded_state,
                 candidate,
                 &integration.target_branch,
@@ -427,7 +413,9 @@ fn prepare_already_merged_reconciliation(
                 "candidate_commit": candidate,
                 "target_branch": integration.target_branch,
                 "target_commit": target_commit,
-                "successor_round": ctx.round_idx + 2
+                // A reused inert trailing Round keeps its index, so the
+                // successor is wherever the queue actually left it.
+                "successor_round": recovered.goal.round_count
             }))),
         )?;
         ctx.branch = detail
@@ -1392,6 +1380,14 @@ impl WorkflowBehavior for WorkflowGovernance {
             })();
             let step = match step {
                 Ok(step) => step,
+                // Losing the target-ref compare-and-swap inside the
+                // integration is the same race as the pre-merge tip check:
+                // refresh against the moved target and try again.
+                Err(RefineError::TargetAdvanced { expected, .. }) => {
+                    GovernanceIntegrationStep::TargetAdvanced {
+                        expected_target: expected,
+                    }
+                }
                 Err(error)
                     if ctx
                         .work_items
@@ -2086,6 +2082,7 @@ fn handle_quality_finding(
     ctx.work_items.queue_quality_recovery_summary(
         &ctx.goal_id,
         ctx.round_idx,
+        Some(ctx.attempt_authority),
         next_attempt,
         &recovery.analysis,
         &recovery.round_prompt,
@@ -2175,6 +2172,7 @@ fn handle_governance_finding(
     ctx.work_items.queue_governance_recovery_summary(
         &ctx.goal_id,
         ctx.round_idx,
+        Some(ctx.attempt_authority),
         next_attempt,
         analysis,
         prompt,

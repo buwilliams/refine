@@ -97,20 +97,6 @@ pub(super) fn hydrate_retry_context(
             if !app_git.commit_is_ancestor(&integration.candidate_commit, &target_commit)? {
                 return Ok(None);
             }
-            let head = app_git.head_ref()?;
-            if head.branch.as_deref() != Some(integration.target_branch.as_str())
-                || head.commit.as_deref() != Some(target_commit.as_str())
-            {
-                return Err(RefineError::Conflict(format!(
-                    "Goal {} already-merged reconciliation requires target worktree {} at {} on branch {}, found {} at {}; user work was preserved",
-                    ctx.goal_id,
-                    ctx.target_root.display(),
-                    target_commit,
-                    integration.target_branch,
-                    head.branch.as_deref().unwrap_or("<detached>"),
-                    head.commit.as_deref().unwrap_or("<unborn>")
-                )));
-            }
             let published = if integration.pushed {
                 app_git.fetch_branch(&integration.remote, &integration.target_branch)?;
                 let published = app_git.resolve_commit(&format!(

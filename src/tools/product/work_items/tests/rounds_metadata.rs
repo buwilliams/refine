@@ -322,6 +322,69 @@ fn implementation_plan_round_trips_and_rejects_stale_or_rebound_updates() {
 }
 
 #[test]
+fn implementation_plan_rejects_a_null_pinned_agent_context() {
+    let temp_root = unique_temp_dir("work-item-implementation-plan-null-context");
+    let refine_dir = temp_root.join(".refine");
+    let service = FileWorkItemService::new(&refine_dir);
+    service
+        .create_goal_summary("Planned Goal", Some("GOAL1"))
+        .unwrap();
+    service
+        .append_goal_round_summary("GOAL1", "Reporter", "Implement it")
+        .unwrap();
+    service
+        .transition_goal_status("GOAL1", GoalStatus::Todo)
+        .unwrap();
+    service
+        .advance_automated_goal_status("GOAL1", GoalStatus::Plan)
+        .unwrap();
+    service
+        .update_goal_git_refs("GOAL1", "refine/GOAL1/round-1", "main", "base123", None)
+        .unwrap();
+    // A no-signal decode can persist agent_context as literal null; planning
+    // must treat that as a lost pin, not hash the null.
+    service
+        .update_goal_round_evaluation_summary("GOAL1", 0, &json!({"agent_context": null}))
+        .unwrap();
+    let plan = ImplementationPlan {
+        schema_version: IMPLEMENTATION_PLAN_SCHEMA_VERSION,
+        state: ImplementationPlanState::InProgress,
+        phase: ImplementationPlanPhase::Plan,
+        binding: ImplementationPlanBinding {
+            goal_id: "GOAL1".to_string(),
+            round_idx: 0,
+            context_version: 1,
+            context_digest: format!("{:x}", Sha256::digest(b"null")),
+            implementation_branch: "refine/GOAL1/round-1".to_string(),
+            target_branch: "main".to_string(),
+            base_commit: "base123".to_string(),
+        },
+        started_at: "2026-08-11T10:00:00Z".to_string(),
+        phase_started_at: "2026-08-11T10:00:00Z".to_string(),
+        updated_at: "2026-08-11T10:00:00Z".to_string(),
+        completed_at: None,
+        proposal: None,
+        criticism: None,
+        final_plan: None,
+        implementation: None,
+        failure: None,
+        invalid_output_attempts: Vec::new(),
+        provider_session_id: None,
+        governance_precheck: None,
+    };
+
+    let error = service
+        .replace_goal_round_implementation_plan("GOAL1", 0, None, &plan)
+        .unwrap_err();
+
+    assert!(
+        error.to_string().contains("lost its pinned agent context"),
+        "{error}"
+    );
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn shared_goal_authoring_applies_latest_round_duplicate_decisions_in_parity() {
     let temp_root = unique_temp_dir("goal-authoring-duplicate-parity");
     let refine_dir = temp_root.join(".refine");

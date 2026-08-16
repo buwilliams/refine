@@ -1,6 +1,73 @@
 use super::*;
 
 #[test]
+fn tracked_dirt_in_the_shared_checkout_no_longer_holds_the_goal() {
+    let temp_root = unique_temp_dir("workspace-hold");
+    let target_root = temp_root.join("repo");
+    let runtime_root = temp_root.join("run/8080");
+    fs::create_dir_all(&target_root).unwrap();
+    git(&target_root, &["init", "-b", "main"]).unwrap();
+    git(
+        &target_root,
+        &["config", "user.email", "refine-test@example.invalid"],
+    )
+    .unwrap();
+    git(&target_root, &["config", "user.name", "Refine Test"]).unwrap();
+    fs::write(target_root.join("app.txt"), "base\n").unwrap();
+    git(&target_root, &["add", "app.txt"]).unwrap();
+    git(&target_root, &["commit", "-q", "-m", "base"]).unwrap();
+    let base = git_output(&target_root, &["rev-parse", "HEAD"])
+        .trim()
+        .to_string();
+
+    let refine_dir = test_refine_dir(&target_root);
+    let work_items = FileWorkItemService::new(&refine_dir);
+    work_items
+        .create_goal_summary("Held by user work", Some("GOAL1"))
+        .unwrap();
+    work_items
+        .append_goal_round_summary("GOAL1", "Reporter", "Prompt")
+        .unwrap();
+    work_items
+        .transition_goal_status("GOAL1", GoalStatus::Todo)
+        .unwrap();
+    work_items
+        .advance_automated_goal_status("GOAL1", GoalStatus::Quality)
+        .unwrap();
+    work_items
+        .advance_automated_goal_status("GOAL1", GoalStatus::Governance)
+        .unwrap();
+    work_items
+        .update_goal_git_refs("GOAL1", "refine/GOAL1", "main", &base, Some(&base))
+        .unwrap();
+
+    // A human's uncommitted tracked edit in the shared checkout.
+    fs::write(target_root.join("app.txt"), "uncommitted human edit\n").unwrap();
+
+    let workflow = WorkflowEngine::with_target_root(&runtime_root, &target_root);
+    // The Goal may still fail on its own merits (this round has no Git
+    // evidence to integrate); what matters is that the pass processed it.
+    let _ = workflow.execute_work();
+
+    // Integration porcelain runs in the detached integration worktree, so
+    // shared-checkout dirt no longer parks the Goal behind a workspace hold,
+    // and the human's edit stayed untouched.
+    let holds = fs::read_to_string(runtime_root.join("scheduler-holds.jsonl")).unwrap_or_default();
+    assert!(
+        !holds
+            .lines()
+            .any(|line| line.contains("\"GOAL1\"") && line.contains("workspace_hold")),
+        "{holds}"
+    );
+    assert_eq!(
+        fs::read_to_string(target_root.join("app.txt")).unwrap(),
+        "uncommitted human edit\n"
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn restart_recovery_preserves_goal_state_and_removes_retired_execution_files() {
     let temp_root = unique_temp_dir("execution-ownership-recovery");
     let target_root = temp_root.join("target");

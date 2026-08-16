@@ -90,16 +90,22 @@ impl DiagnosticsService for FileDiagnosticsService {
             FileGitWorktreeService::with_runtime_root(&self.repo_root, &self.runtime_root)
                 .inspect("")
                 .map(|status| {
-                    if status.dirty_user_changes {
-                        format!(
-                            "git worktree has user changes on {}",
-                            status.branch.unwrap_or_else(|| "detached".to_string())
-                        )
-                    } else {
-                        format!(
-                            "git worktree clean on {}",
-                            status.branch.unwrap_or_else(|| "detached".to_string())
-                        )
+                    let branch = status
+                        .branch
+                        .clone()
+                        .unwrap_or_else(|| "detached".to_string());
+                    match (
+                        status.dirty_user_changes,
+                        !status.untracked_paths.is_empty(),
+                    ) {
+                        (true, true) => format!(
+                            "git worktree has tracked user changes and untracked files on {branch}"
+                        ),
+                        (true, false) => {
+                            format!("git worktree has tracked user changes on {branch}")
+                        }
+                        (false, true) => format!("git worktree has untracked files on {branch}"),
+                        (false, false) => format!("git worktree clean on {branch}"),
                     }
                 })
                 .unwrap_or_else(|error| format!("git inspection unavailable: {error}"));

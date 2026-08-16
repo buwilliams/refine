@@ -94,11 +94,18 @@ impl FileGitWorktreeService {
             .collect())
     }
 
-    /// Preserve tracked work left in a Refine-owned shared checkout, then return
-    /// the exact stash commit that quarantines it. Callers must establish ownership before using
-    /// this: the Git capability intentionally does not guess whether dirty work belongs to Refine.
-    pub fn quarantine_worktree_changes(&self, message: &str) -> RefineResult<Option<String>> {
-        if self.is_clean()? {
+    /// Preserve tracked work — plus the caller-named untracked residue — left
+    /// in a Refine-owned shared checkout, then return the exact stash commit
+    /// that quarantines it. Callers must establish ownership before using
+    /// this: the Git capability intentionally does not guess whether dirty
+    /// work belongs to Refine, so untracked paths are only quarantined when
+    /// the caller attributes them explicitly.
+    pub fn quarantine_worktree_changes(
+        &self,
+        message: &str,
+        untracked_residue: &[String],
+    ) -> RefineResult<Option<String>> {
+        if self.is_clean()? && untracked_residue.is_empty() {
             return Ok(None);
         }
         if message.trim().is_empty() {
@@ -107,18 +114,39 @@ impl FileGitWorktreeService {
             ));
         }
         let previous = self.resolve_commit("refs/stash").ok();
+        if !untracked_residue.is_empty() {
+            // Stage exactly the attributed residue so the plain stash below
+            // captures it alongside the tracked changes, while a user's other
+            // untracked files stay in place. Staging instead of passing
+            // `--include-untracked` with pathspecs, because `stash push`
+            // pathspecs cannot express a staged rename (the vanished source
+            // path matches no file, which aborts the stash mid-way).
+            // `:(literal)` disables fnmatch interpretation so a residue name
+            // like `foo[1].txt` cannot match a user's unrelated `foo1.txt`.
+            let mut args = vec!["add", "--"];
+            let residue: Vec<String> = untracked_residue
+                .iter()
+                .map(|path| format!(":(literal){path}"))
+                .collect();
+            args.extend(residue.iter().map(String::as_str));
+            self.git_output(&args)?;
+        }
         self.git_output(&["stash", "push", "-m", message])?;
         let commit = self.resolve_commit("refs/stash")?;
         if previous.as_deref() == Some(commit.as_str()) {
             return Err(RefineError::Conflict(
-                "dirty integrated-target worktree had no tracked changes to quarantine; untracked work was preserved"
+                "dirty integrated-target worktree had no attributed changes to quarantine; untracked work was preserved"
                     .to_string(),
             ));
         }
         self.audit(
             "worktree_quarantine",
             "ok",
-            json!({"message": message, "stash_commit": commit}),
+            json!({
+                "message": message,
+                "stash_commit": commit,
+                "untracked_residue": untracked_residue
+            }),
         )?;
         Ok(Some(commit))
     }

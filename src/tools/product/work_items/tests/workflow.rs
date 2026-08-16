@@ -210,3 +210,368 @@ fn file_work_item_service_rejects_invalid_manual_transition() {
     );
     fs::remove_dir_all(temp_root).unwrap();
 }
+
+#[test]
+fn automatic_recovery_reuses_an_unstarted_recovery_round() {
+    let temp_root = unique_temp_dir("recovery-round-reuse");
+    let refine_dir = temp_root.join(".refine");
+    let service = FileWorkItemService::new(&refine_dir);
+    service
+        .create_goal_summary("Recovery reuse", Some("GOAL1"))
+        .unwrap();
+    service
+        .append_goal_round_summary("GOAL1", "Reporter", "Original work")
+        .unwrap();
+    service
+        .transition_goal_status("GOAL1", GoalStatus::Todo)
+        .unwrap();
+    service
+        .advance_automated_goal_status("GOAL1", GoalStatus::Quality)
+        .unwrap();
+    let queued = service
+        .queue_quality_recovery_summary(
+            "GOAL1",
+            0,
+            None,
+            1,
+            "first analysis",
+            "first recovery prompt",
+        )
+        .unwrap();
+    assert_eq!(queued.goal.status, GoalStatus::Todo);
+    assert_eq!(queued.goal.round_count, 2);
+
+    // Pin a distinct "created" on the queued recovery Round so reuse has to
+    // preserve it rather than coincidentally matching a fresh timestamp.
+    let goal_path = refine_dir.join(&queued.goal.json_path);
+    let mut durable: serde_json::Value =
+        serde_json::from_slice(&fs::read(&goal_path).unwrap()).unwrap();
+    durable["rounds"][1]["created"] = json!("2020-02-02T02:02:02Z");
+    fs::write(&goal_path, serde_json::to_vec_pretty(&durable).unwrap()).unwrap();
+
+    // No claim happened in between: the trailing recovery Round is still
+    // inert, so a second recovery must reuse it instead of stranding it.
+    service
+        .advance_automated_goal_status("GOAL1", GoalStatus::Quality)
+        .unwrap();
+    let requeued = service
+        .queue_quality_recovery_summary(
+            "GOAL1",
+            1,
+            None,
+            2,
+            "second analysis",
+            "second recovery prompt",
+        )
+        .unwrap();
+    assert_eq!(requeued.goal.status, GoalStatus::Todo);
+    assert_eq!(requeued.goal.round_count, 2);
+    let detail = service.show_goal_detail("GOAL1").unwrap();
+    let rounds = detail["rounds"].as_array().unwrap();
+    assert_eq!(rounds.len(), 2, "{detail:#}");
+    assert_eq!(rounds[1]["prompt"], "second recovery prompt");
+    assert_eq!(rounds[1]["automatic_retry"]["attempt"], 2);
+    // Lineage still names the worked Round, not the reused Round itself.
+    assert_eq!(rounds[1]["automatic_retry"]["source_round"], 1);
+    assert_eq!(rounds[1]["created"], "2020-02-02T02:02:02Z");
+    assert_eq!(rounds[1]["quality_recovery_analysis"], "second analysis");
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn automatic_recovery_reuses_a_round_claimed_by_the_retiring_attempt() {
+    let temp_root = unique_temp_dir("recovery-round-retiring-claim");
+    let refine_dir = temp_root.join(".refine");
+    let service = FileWorkItemService::new(&refine_dir);
+    service
+        .create_goal_summary("Recovery reuse under claim", Some("GOAL1"))
+        .unwrap();
+    service
+        .append_goal_round_summary("GOAL1", "Reporter", "Original work")
+        .unwrap();
+    service
+        .transition_goal_status("GOAL1", GoalStatus::Todo)
+        .unwrap();
+    service
+        .advance_automated_goal_status("GOAL1", GoalStatus::Quality)
+        .unwrap();
+    service
+        .queue_quality_recovery_summary(
+            "GOAL1",
+            0,
+            None,
+            1,
+            "first analysis",
+            "first recovery prompt",
+        )
+        .unwrap();
+
+    // The production shape: the engine claims the trailing recovery Round,
+    // hits another failure before any agent works it, and queues the next
+    // recovery from inside that claimed attempt.
+    let (round_idx, revision, request) = service.authored_goal_commitment("GOAL1").unwrap();
+    let authority = service
+        .claim_workflow_attempt("GOAL1", GoalStatus::Todo, round_idx, revision, &request)
+        .unwrap();
+    service
+        .advance_automated_goal_status("GOAL1", GoalStatus::Quality)
+        .unwrap();
+    let requeued = service
+        .queue_quality_recovery_summary(
+            "GOAL1",
+            round_idx,
+            Some(authority),
+            2,
+            "second analysis",
+            "second recovery prompt",
+        )
+        .unwrap();
+
+    assert_eq!(requeued.goal.status, GoalStatus::Todo);
+    assert_eq!(requeued.goal.round_count, 2);
+    let detail = service.show_goal_detail("GOAL1").unwrap();
+    let rounds = detail["rounds"].as_array().unwrap();
+    assert_eq!(rounds.len(), 2, "{detail:#}");
+    assert_eq!(rounds[1]["prompt"], "second recovery prompt");
+    assert_eq!(rounds[1]["automatic_retry"]["attempt"], 2);
+    // The reused Round must not name itself as the failure source: the
+    // Governance identical-signature early stop reads the source Round's
+    // evidence, and a self-reference would always compare a fresh failure
+    // against itself.
+    assert_eq!(rounds[1]["automatic_retry"]["source_round"], 1);
+    // The retiring claim was actually retired by the reuse.
+    assert!(rounds[1]["workflow_attempt_authority"].is_null());
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn automatic_recovery_appends_past_a_claimed_recovery_round() {
+    let temp_root = unique_temp_dir("recovery-round-claimed-append");
+    let refine_dir = temp_root.join(".refine");
+    let service = FileWorkItemService::new(&refine_dir);
+    service
+        .create_goal_summary("Recovery append", Some("GOAL1"))
+        .unwrap();
+    service
+        .append_goal_round_summary("GOAL1", "Reporter", "Original work")
+        .unwrap();
+    service
+        .transition_goal_status("GOAL1", GoalStatus::Todo)
+        .unwrap();
+    service
+        .advance_automated_goal_status("GOAL1", GoalStatus::Quality)
+        .unwrap();
+    service
+        .queue_quality_recovery_summary(
+            "GOAL1",
+            0,
+            None,
+            1,
+            "first analysis",
+            "first recovery prompt",
+        )
+        .unwrap();
+
+    // The recovery Round gets claimed by another attempt that this queue call
+    // is not retiring; it is no longer inert, so the next recovery must
+    // append a fresh Round.
+    let (round_idx, revision, request) = service.authored_goal_commitment("GOAL1").unwrap();
+    service
+        .claim_workflow_attempt("GOAL1", GoalStatus::Todo, round_idx, revision, &request)
+        .unwrap();
+    service
+        .advance_automated_goal_status("GOAL1", GoalStatus::Quality)
+        .unwrap();
+    let requeued = service
+        .queue_quality_recovery_summary(
+            "GOAL1",
+            1,
+            None,
+            2,
+            "second analysis",
+            "second recovery prompt",
+        )
+        .unwrap();
+    assert_eq!(requeued.goal.round_count, 3);
+    let detail = service.show_goal_detail("GOAL1").unwrap();
+    let rounds = detail["rounds"].as_array().unwrap();
+    assert_eq!(rounds.len(), 3, "{detail:#}");
+    assert_eq!(rounds[2]["prompt"], "second recovery prompt");
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn integration_recovery_records_truthful_successor_and_clears_authority() {
+    let temp_root = unique_temp_dir("integration-recovery-successor");
+    let refine_dir = temp_root.join(".refine");
+    let service = FileWorkItemService::new(&refine_dir);
+    service
+        .create_goal_summary("Integration recovery", Some("GOAL1"))
+        .unwrap();
+    service
+        .append_goal_round_summary("GOAL1", "Reporter", "Integrate it")
+        .unwrap();
+    service
+        .transition_goal_status("GOAL1", GoalStatus::Todo)
+        .unwrap();
+    service
+        .advance_automated_goal_status("GOAL1", GoalStatus::Quality)
+        .unwrap();
+    service
+        .advance_automated_goal_status("GOAL1", GoalStatus::Governance)
+        .unwrap();
+    let (round_idx, revision, request) = service.authored_goal_commitment("GOAL1").unwrap();
+    let authority = service
+        .claim_workflow_attempt(
+            "GOAL1",
+            GoalStatus::Governance,
+            round_idx,
+            revision,
+            &request,
+        )
+        .unwrap();
+
+    let recovered = service
+        .queue_integration_recovery_summary(
+            "GOAL1",
+            authority,
+            "default",
+            "merge failed",
+            json!({"kept": true}),
+            3,
+        )
+        .unwrap();
+
+    assert_eq!(recovered.goal.status, GoalStatus::Todo);
+    assert_eq!(recovered.goal.round_count, 2);
+    let detail = service.show_goal_detail("GOAL1").unwrap();
+    let rounds = detail["rounds"].as_array().unwrap();
+    assert_eq!(rounds.len(), 2, "{detail:#}");
+    assert!(rounds[0]["workflow_attempt_authority"].is_null());
+    // The claimed source Round was worked, so the successor is appended and
+    // the recorded pointer names the appended Round.
+    assert_eq!(rounds[1]["workflow_recovery"]["successor_round"], 2);
+    assert_eq!(rounds[1]["automatic_retry"]["attempt"], 1);
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn integration_recovery_reuses_its_own_claimed_unworked_recovery_round() {
+    let temp_root = unique_temp_dir("integration-recovery-reuse");
+    let refine_dir = temp_root.join(".refine");
+    let service = FileWorkItemService::new(&refine_dir);
+    service
+        .create_goal_summary("Integration recovery reuse", Some("GOAL1"))
+        .unwrap();
+    service
+        .append_goal_round_summary("GOAL1", "Reporter", "Integrate it")
+        .unwrap();
+    service
+        .transition_goal_status("GOAL1", GoalStatus::Todo)
+        .unwrap();
+    service
+        .advance_automated_goal_status("GOAL1", GoalStatus::Quality)
+        .unwrap();
+    service
+        .queue_quality_recovery_summary(
+            "GOAL1",
+            0,
+            None,
+            1,
+            "quality analysis",
+            "quality recovery prompt",
+        )
+        .unwrap();
+
+    // The engine claims the appended recovery Round and races integration
+    // again before any agent works it: the recovery must replace that Round
+    // in place instead of appending an unbounded chain of inert Rounds.
+    let (round_idx, revision, request) = service.authored_goal_commitment("GOAL1").unwrap();
+    let authority = service
+        .claim_workflow_attempt("GOAL1", GoalStatus::Todo, round_idx, revision, &request)
+        .unwrap();
+    service
+        .advance_automated_goal_status("GOAL1", GoalStatus::Quality)
+        .unwrap();
+    service
+        .advance_automated_goal_status("GOAL1", GoalStatus::Governance)
+        .unwrap();
+    let recovered = service
+        .queue_integration_recovery_summary(
+            "GOAL1",
+            authority,
+            "default",
+            "target branch advanced ahead of every integration attempt",
+            json!({"kept": true}),
+            3,
+        )
+        .unwrap();
+
+    assert_eq!(recovered.goal.status, GoalStatus::Todo);
+    assert_eq!(recovered.goal.round_count, 2);
+    let detail = service.show_goal_detail("GOAL1").unwrap();
+    let rounds = detail["rounds"].as_array().unwrap();
+    assert_eq!(rounds.len(), 2, "{detail:#}");
+    // The reused Round keeps its index, so the successor pointer names it.
+    assert_eq!(rounds[1]["workflow_recovery"]["successor_round"], 2);
+    assert_eq!(rounds[1]["automatic_retry"]["attempt"], 2);
+    // Lineage keeps naming the worked source Round, not the reused Round.
+    assert_eq!(rounds[1]["automatic_retry"]["source_round"], 1);
+    assert_eq!(rounds[1]["workflow_recovery"]["source_round"], 1);
+    assert!(rounds[1]["workflow_attempt_authority"].is_null());
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn reconciliation_recovery_clears_source_authority_and_requeues_todo() {
+    let temp_root = unique_temp_dir("reconciliation-recovery-authority");
+    let refine_dir = temp_root.join(".refine");
+    let service = FileWorkItemService::new(&refine_dir);
+    service
+        .create_goal_summary("Reconciliation recovery", Some("GOAL1"))
+        .unwrap();
+    service
+        .append_goal_round_summary("GOAL1", "Reporter", "Reconcile it")
+        .unwrap();
+    service
+        .transition_goal_status("GOAL1", GoalStatus::Todo)
+        .unwrap();
+    service
+        .update_goal_git_refs("GOAL1", "refine/GOAL1", "main", "base123", Some("cand123"))
+        .unwrap();
+    service
+        .update_goal_round_evaluation_summary(
+            "GOAL1",
+            0,
+            &json!({"workflow_reconciliation": {"state": "reconciled_pending_target"}}),
+        )
+        .unwrap();
+    let (round_idx, revision, request) = service.authored_goal_commitment("GOAL1").unwrap();
+    let authority = service
+        .claim_workflow_attempt("GOAL1", GoalStatus::Todo, round_idx, revision, &request)
+        .unwrap();
+
+    let recovered = service
+        .queue_missing_reconciled_candidate_recovery_summary(
+            "GOAL1",
+            0,
+            Some(authority),
+            "reconciled_pending_target",
+            "cand123",
+            "main",
+            "target999",
+        )
+        .unwrap();
+
+    assert_eq!(recovered.goal.status, GoalStatus::Todo);
+    assert_eq!(recovered.goal.round_count, 2);
+    let detail = service.show_goal_detail("GOAL1").unwrap();
+    let rounds = detail["rounds"].as_array().unwrap();
+    assert!(rounds[0]["workflow_attempt_authority"].is_null());
+    assert_eq!(
+        rounds[0]["failure_category"],
+        "reconciliation_candidate_absent"
+    );
+    assert_eq!(rounds[1]["workflow_recovery"]["state"], "queued");
+    fs::remove_dir_all(temp_root).unwrap();
+}
