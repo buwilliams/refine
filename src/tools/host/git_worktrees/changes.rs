@@ -35,6 +35,9 @@ impl FileGitWorktreeService {
             }
             // The registration outlived its directory (external cleanup); without a
             // prune, `git worktree add` refuses because the branch is still "checked out".
+            // A candidate lock would also keep the stale registration alive through the
+            // prune, so release it first.
+            self.unlock_worktree_tolerant(&existing);
             self.prune_stale_worktrees()?;
         }
         if self.branch_exists(branch)? {

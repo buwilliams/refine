@@ -102,6 +102,9 @@ impl GitWorktreeService for FileGitWorktreeService {
             }
             // The registration outlived its directory (external cleanup); without a
             // prune, `git worktree add` refuses because the branch is still "checked out".
+            // A candidate lock would also keep the stale registration alive through the
+            // prune, so release it first.
+            self.unlock_worktree_tolerant(&existing);
             self.prune_stale_worktrees()?;
         }
         let target = if target.is_absolute() {
@@ -122,6 +125,9 @@ impl GitWorktreeService for FileGitWorktreeService {
         } else {
             self.git_output(&["worktree", "add", target.to_str().unwrap_or(""), branch])?;
         }
+        // Candidate worktrees must survive the repo-wide `git worktree prune` sweeps
+        // run by state sync and source promotion; locked worktrees are exempt.
+        self.lock_worktree(&target)?;
         self.audit(
             "worktree",
             "ok",

@@ -200,6 +200,74 @@ fn ensure_worktree_recreates_checkout_after_its_directory_was_removed() {
 }
 
 #[test]
+fn locked_candidate_worktree_registration_survives_repo_wide_prune() {
+    let temp_root = unique_temp_dir("git-worktree-lock-prune");
+    let repo = temp_root.join("repo");
+    let target = temp_root.join("candidate");
+    fs::create_dir_all(&repo).unwrap();
+    init_repo(&repo);
+    commit_file(&repo, "base.txt", "base\n", "initial");
+
+    let service = FileGitWorktreeService::new(&repo);
+    let created = PathBuf::from(
+        service
+            .ensure_worktree("refine/locked/round-1", &target)
+            .unwrap(),
+    );
+    assert!(git_stdout(&repo, &["worktree", "list", "--porcelain"]).contains("locked"));
+
+    // Repo-wide prune sweeps (state sync, source promotion) must not drop the
+    // registration even after external cleanup removed the directory.
+    fs::remove_dir_all(&created).unwrap();
+    git(&repo, &["worktree", "prune"]).unwrap();
+    assert!(
+        git_stdout(&repo, &["worktree", "list", "--porcelain"])
+            .contains(&created.display().to_string())
+    );
+
+    // Self-healing still recreates the checkout past its own retained lock.
+    let recreated = PathBuf::from(
+        service
+            .ensure_worktree("refine/locked/round-1", &target)
+            .unwrap(),
+    );
+    assert_eq!(recreated, target);
+    assert_eq!(current_branch(&recreated), "refine/locked/round-1");
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn remove_worktree_unlocks_a_locked_candidate_worktree_first() {
+    let temp_root = unique_temp_dir("git-worktree-unlock-remove");
+    let repo = temp_root.join("repo");
+    fs::create_dir_all(&repo).unwrap();
+    init_repo(&repo);
+    commit_file(&repo, "base.txt", "base\n", "initial");
+
+    let service = FileGitWorktreeService::new(&repo);
+    let clean = PathBuf::from(
+        service
+            .ensure_worktree("refine/unlock/clean", &temp_root.join("clean"))
+            .unwrap(),
+    );
+    service.remove_worktree(&clean, false).unwrap();
+    assert!(!clean.exists());
+
+    let forced = PathBuf::from(
+        service
+            .ensure_worktree("refine/unlock/forced", &temp_root.join("forced"))
+            .unwrap(),
+    );
+    fs::write(forced.join("dirty.txt"), "dirty\n").unwrap();
+    service.remove_worktree(&forced, true).unwrap();
+    assert!(!forced.exists());
+    assert!(!git_stdout(&repo, &["worktree", "list", "--porcelain"]).contains("refine/unlock"));
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn file_git_worktree_service_bootstraps_unborn_repo_for_worktree() {
     let temp_root = unique_temp_dir("git-worktree-unborn");
     let repo = temp_root.join("repo");
