@@ -156,7 +156,7 @@ fn dashboard_uses_canonical_runtime_workflow_pause_state() {
 }
 
 #[test]
-fn project_status_uses_the_port_scoped_node_that_owns_and_filters_new_goals() {
+fn project_status_uses_the_project_scoped_node_that_owns_and_filters_new_goals() {
     let temp_root = unique_temp_dir("http-project-port-active-node");
     let app_root = temp_root.join("app");
     let app_registry_root = temp_root.join("run");
@@ -198,7 +198,9 @@ fn project_status_uses_the_port_scoped_node_that_owns_and_filters_new_goals() {
         })),
     });
     assert_eq!(other_goal.status, 201, "{:#}", other_goal.body);
-    assert_eq!(other_goal.body["goal"]["node_id"], "default");
+    // The selection is project-scoped: an activation through any resolver is
+    // immediately the server's identity too, so the goal is stamped with it.
+    assert_eq!(other_goal.body["goal"]["node_id"], "stale-base");
 
     let created_node = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -220,7 +222,8 @@ fn project_status_uses_the_port_scoped_node_that_owns_and_filters_new_goals() {
     assert_eq!(activated.status, 200, "{:#}", activated.body);
     assert_eq!(activated.body["active_node_id"], "port-owner");
     assert_eq!(activated.body["active_node"], "Port Owner");
-    assert_eq!(base_nodes.active_node_id().unwrap(), "stale-base");
+    // Every resolver of this project converges on the API's activation.
+    assert_eq!(base_nodes.active_node_id().unwrap(), "port-owner");
 
     let project_status = server.handle(ApiRequest {
         method: "GET".to_string(),

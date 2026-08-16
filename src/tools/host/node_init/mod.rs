@@ -291,7 +291,7 @@ mod tests {
         let nodes = fs::read_to_string(refine_dir.join("nodes.json")).unwrap();
         assert!(nodes.contains("fly-worker-1"));
         let active =
-            fs::read_to_string(runtime_root.join("8080").join("active-node.json")).unwrap();
+            fs::read_to_string(refine_dir.join("runtime").join("active-node.json")).unwrap();
         assert!(active.contains("fly-worker-1"));
         // idempotent second run
         let second = initialize_worker(WorkerInitOptions {

@@ -21,7 +21,7 @@ use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation, ProviderSessionContinuity,
 };
 use crate::workflow::{
-    agent_stall_timeout_seconds, goal_agent_prompt, json_object, now_timestamp,
+    agent_idle_timeout, goal_agent_prompt, json_object, now_timestamp,
     parse_governance_provider_output, plan_governance_precheck_prompt,
 };
 
@@ -434,7 +434,7 @@ fn run_plan_governance_verdict(
         prompt,
         session_id: None,
         cwd: Some(agent_cwd.display().to_string()),
-        stall_timeout_seconds: Some(agent_stall_timeout_seconds(&ctx.settings)),
+        stall_timeout_seconds: agent_idle_timeout(&ctx.settings).map(|timeout| timeout.as_secs()),
         process_metadata: metadata,
     });
     let git_after = git.implementation_planning_observation()?;

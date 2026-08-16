@@ -32,7 +32,7 @@ use crate::workflow::context::WorkflowContext;
 use crate::workflow::implementation_planning::begin_implementation_phase;
 use crate::workflow::{
     CandidateRefreshOutcome, GovernanceEvaluation, QualityRecoveryInvestigation,
-    agent_stall_timeout_seconds, agent_worktree_cwd, complete_implementation_planning,
+    agent_idle_timeout, agent_worktree_cwd, complete_implementation_planning,
     fail_implementation_phase, governed_implementation_prompt, implementation_branch_name,
     implementation_resume_session, json_object, now_timestamp, parse_governance_provider_output,
     parse_quality_recovery_provider_output, post_implementation_governance_prompt,
@@ -662,6 +662,7 @@ impl WorkflowBehavior for WorkflowImplementation {
                 "agent_hard_cap_seconds",
                 7200,
             ) as u64)),
+            idle_timeout: crate::workflow::agent_idle_timeout(&ctx.settings),
         };
         let on_attention = |attention: crate::process::agent_sessions::GoalAgentAttention| {
             let _ = ctx.log(
@@ -1499,6 +1500,7 @@ fn run_quality_correction_agent(ctx: &mut WorkflowContext<'_>) -> RefineResult<(
                     "agent_hard_cap_seconds",
                     7200,
                 ) as u64)),
+                idle_timeout: crate::workflow::agent_idle_timeout(&ctx.settings),
             },
             |attention| {
                 let _ = ctx.log(
@@ -1793,7 +1795,7 @@ fn investigate_quality_failure(
         prompt,
         session_id: None,
         cwd: Some(provider_cwd.display().to_string()),
-        stall_timeout_seconds: Some(agent_stall_timeout_seconds(&ctx.settings)),
+        stall_timeout_seconds: agent_idle_timeout(&ctx.settings).map(|timeout| timeout.as_secs()),
         process_metadata: ctx
             .workflow_process_metadata("quality_recovery", "WorkflowQualityRecovery"),
     })?;
@@ -1886,7 +1888,7 @@ fn evaluate_workflow_governance(
         prompt,
         session_id: None,
         cwd: Some(provider_cwd.display().to_string()),
-        stall_timeout_seconds: Some(agent_stall_timeout_seconds(&ctx.settings)),
+        stall_timeout_seconds: agent_idle_timeout(&ctx.settings).map(|timeout| timeout.as_secs()),
         process_metadata: ctx.workflow_process_metadata("governance", "WorkflowGovernance"),
     })?;
     let mut evaluation = parse_governance_provider_output(&output, rules.len());

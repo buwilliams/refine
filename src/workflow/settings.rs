@@ -12,6 +12,18 @@ pub(super) fn setting_usize(settings: &JsonObject, key: &str, fallback: usize) -
         .unwrap_or(fallback)
 }
 
+/// The Goal Agent stall budget from `agent_idle_timeout_seconds`. Distinct
+/// from `agent_hard_cap_seconds`: the idle budget resets on every sign of
+/// agent activity, so a hung session fails in minutes while a slow-but-working
+/// one runs up to the hard cap. Non-interactive verdict invocations
+/// (governance, quality evaluation, quality recovery) derive their supervised
+/// no-output stall budget from the same knob.
+pub(super) fn agent_idle_timeout(settings: &JsonObject) -> Option<std::time::Duration> {
+    Some(std::time::Duration::from_secs(
+        setting_usize(settings, "agent_idle_timeout_seconds", 900) as u64,
+    ))
+}
+
 pub(super) fn setting_cap_with_default_values(
     settings: &JsonObject,
     key: &str,
@@ -31,15 +43,6 @@ pub(super) fn setting_cap_with_default_values(
     } else {
         value
     }
-}
-
-/// The no-output stall budget for unattended non-interactive agent runs.
-///
-/// Backed by `agent_idle_timeout_seconds` so operators tune one idle knob for
-/// every verdict-producing invocation (governance, quality evaluation, quality
-/// recovery). PTY Goal Agent sessions keep the separate wall-clock hard cap.
-pub(super) fn agent_stall_timeout_seconds(settings: &JsonObject) -> u64 {
-    setting_usize(settings, "agent_idle_timeout_seconds", 900) as u64
 }
 
 pub(super) fn setting_string(settings: &JsonObject, key: &str, fallback: &str) -> String {

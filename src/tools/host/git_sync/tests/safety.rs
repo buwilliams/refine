@@ -102,6 +102,70 @@ fn sync_retires_goal_logs_already_published_to_state() {
     );
 }
 
+#[test]
+fn durable_state_ignores_active_node_selection() {
+    let root = unique_temp_dir("active-node-selection");
+    fs::create_dir_all(root.join("runtime")).unwrap();
+    fs::write(root.join("refine.json"), "{}\n").unwrap();
+    // Node identity is machine-local: one synced selection pins the whole
+    // fleet to a single node id and the ownership guards then refuse every
+    // other node's goals. Neither the canonical runtime-local file nor a
+    // legacy root-level copy may reach durable state.
+    fs::write(root.join("runtime/active-node.json"), "{}\n").unwrap();
+    fs::write(root.join("active-node.json"), "{}\n").unwrap();
+
+    let state = durable_state_map(&root).unwrap();
+
+    assert_eq!(
+        state.keys().cloned().collect::<Vec<_>>(),
+        vec![PathBuf::from("refine.json")]
+    );
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn sync_retires_active_node_selection_already_published_to_state() {
+    let fixture = SyncFixture::new("retire-active-node");
+    write_goal(&fixture.a, "GOALA");
+    fixture.service(&fixture.a).sync().unwrap();
+
+    // Stand in for a fleet poisoned before the exclusion: one machine's
+    // active-node selection committed to refine/state, which every syncing
+    // node then read as its own identity.
+    let state_worktree = state_worktree_for_target_root(&fixture.a).unwrap();
+    let tracked_selection = state_worktree.join(".refine/active-node.json");
+    fs::write(
+        &tracked_selection,
+        "{\"active_node_id\":\"BO2LNXIPSAPP01\"}\n",
+    )
+    .unwrap();
+    git(&state_worktree, &["add", "-f", "--", ".refine"]);
+    git(
+        &state_worktree,
+        &["commit", "-q", "-m", "publish active node"],
+    );
+    git(
+        &state_worktree,
+        &["push", "-q", "origin", "HEAD:refine/state"],
+    );
+    assert!(
+        git_stdout(&state_worktree, &["ls-files", "--", ".refine"]).contains("active-node.json"),
+        "fixture did not publish a tracked active-node selection"
+    );
+
+    fixture.service(&fixture.a).sync().unwrap();
+
+    let tracked = git_stdout(&state_worktree, &["ls-files", "--", ".refine"]);
+    assert!(
+        !tracked.contains("active-node.json"),
+        "active-node selection stayed tracked on refine/state: {tracked}"
+    );
+    assert!(
+        tracked.contains("goal.json"),
+        "retiring the selection must not drop Goal records: {tracked}"
+    );
+}
+
 // Synchronization compares content hashes across worktrees, so a memo that
 // returned a stale hash would make a changed record look untouched and let one
 // node's edit be silently dropped. Skipping re-reads is only safe if every real

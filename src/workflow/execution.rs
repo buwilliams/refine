@@ -209,7 +209,12 @@ impl WorkflowEngine {
                         | GoalStatus::Quality
                 )
             })
-            .filter(|goal| goal.node_id.as_deref().unwrap_or("default") == policy.active_node_id)
+            .filter(|goal| {
+                crate::tools::product::nodes::node_ids_match(
+                    goal.node_id.as_deref().unwrap_or("default"),
+                    &policy.active_node_id,
+                )
+            })
             .filter(|goal| goal.round_count > 0)
             .filter(|goal| !active.contains(&goal.id))
             .filter(|goal| !self.retry_delayed(&goal.id))

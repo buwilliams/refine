@@ -156,6 +156,31 @@ esac"#,
 
 #[cfg(unix)]
 #[test]
+fn governed_planning_fails_fast_when_the_agent_never_signals_completion() {
+    // A clean exit with no completion signal used to fall back to decoding the
+    // terminal transcript as plan JSON — a guaranteed contract failure with a
+    // misleading diagnostic that burned every repair attempt (two full agent
+    // runs) reproducing the same shape.
+    let (result, detail) =
+        run_governed_planning_with_script("governed-planning-no-signal", "exit 0");
+
+    let message = result.unwrap_err().to_string();
+    assert!(
+        message.contains("exited without a structured completion signal"),
+        "expected the no-signal infrastructure fault to be named, got: {message}"
+    );
+
+    let plan = &detail["rounds"][0]["implementation_plan"];
+    assert_eq!(plan["failure"]["category"], "provider");
+    let attempts = &plan["invalid_output_attempts"];
+    assert!(
+        attempts.as_array().is_none_or(Vec::is_empty),
+        "no repair attempts may be spent on a session that never signalled: {attempts:?}"
+    );
+}
+
+#[cfg(unix)]
+#[test]
 fn governed_revision_accepts_aliased_resolution_ids_without_a_repair_round() {
     let (result, detail) = run_governed_planning_with_script(
         "governed-revision-alias",

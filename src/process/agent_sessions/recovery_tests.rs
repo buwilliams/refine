@@ -244,6 +244,7 @@ fn run_test_provider(
             prompt: "test malformed completion recovery".to_string(),
             metadata: Map::from_iter([("goal_id".to_string(), json!(name))]),
             completion_timeout: Some(completion_timeout),
+            idle_timeout: None,
         },
         |_| {},
     );

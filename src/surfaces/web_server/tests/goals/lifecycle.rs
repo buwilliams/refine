@@ -219,6 +219,7 @@ fn web_server_open_agent_attaches_to_the_workflow_goal_agent() {
                 prompt: "Implement Goal GOAL1".to_string(),
                 metadata,
                 completion_timeout: None,
+                idle_timeout: None,
             },
             |_| {},
         )
@@ -670,6 +671,7 @@ fn browser_terminal_stop_fails_the_goal_after_stopping_its_local_agent() {
                 prompt: "Implement Goal GOAL-TERMINAL-STOP".to_string(),
                 metadata,
                 completion_timeout: None,
+                idle_timeout: None,
             },
             |_| {},
         )
@@ -920,7 +922,7 @@ fn goal_cancel_uses_port_scoped_active_node_and_preserves_foreign_goals() {
         GoalStatus::Backlog
     );
     assert!(!refine_dir.join("active-node.json").exists());
-    assert!(runtime_root.join("active-node.json").exists());
+    assert!(refine_dir.join("runtime/active-node.json").exists());
 
     remove_temp_dir(&temp_root);
 }
