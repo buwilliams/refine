@@ -23,6 +23,11 @@ impl StateSyncConflictPhase {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct StateSyncRecoveryMetadata {
     pub available: bool,
+    /// One-shot recovery that re-derives and applies evidence atomically with
+    /// bounded race retries. Reports written before this field existed
+    /// deserialize with an empty command.
+    #[serde(default)]
+    pub run_command: String,
     pub preview_command: String,
     pub apply_command: String,
 }
@@ -66,7 +71,7 @@ impl std::fmt::Display for StateSyncConflictSummary {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             formatter,
-            "Refine state changed on multiple nodes during {}: {} unresolved path(s){}; complete conflict report {} is at {}. Run `{}` to review a stale-fenced recovery.",
+            "Refine state changed on multiple nodes during {}: {} unresolved path(s){}; complete conflict report {} is at {}. Run `{}` for one-shot stale-fenced recovery, or `refine project state-recovery preview` to review the comparison first.",
             self.phase.as_str(),
             self.unresolved_count,
             if self.diagnostics.is_empty() {
@@ -162,6 +167,7 @@ impl FileGitSyncService {
             reconciliation_outcomes: reconciliation_outcomes.to_vec(),
             recovery: StateSyncRecoveryMetadata {
                 available: true,
+                run_command: "refine project state-recovery run --authority <live|remote> [--live-path <path> | --remote-path <path>]".to_string(),
                 preview_command: "refine project state-recovery preview".to_string(),
                 apply_command: "refine project state-recovery apply --authority <live|remote> --preview-file <preview.json> [--live-path <path> | --remote-path <path>]".to_string(),
             },
@@ -179,7 +185,7 @@ impl FileGitSyncService {
             phase,
             unresolved_count: report.unresolved_paths.len(),
             report_location: report.report_location,
-            recovery_command: report.recovery.preview_command,
+            recovery_command: report.recovery.run_command,
             diagnostics: report
                 .reconciliation_outcomes
                 .iter()

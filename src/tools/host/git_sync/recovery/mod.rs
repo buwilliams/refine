@@ -5,6 +5,7 @@ mod hydration;
 mod inspection;
 mod reported;
 mod reported_support;
+mod run;
 mod service;
 mod storage;
 #[cfg(test)]
@@ -60,5 +61,29 @@ fn git_busy_recovery() -> RefineError {
     RefineError::StateRecoveryConflict {
         reason: crate::process::supervisor::errors::StateRecoveryConflictReason::GitBusy,
         message: "Repository Git operations are busy; recovery was not started.".to_string(),
+    }
+}
+
+impl FileGitSyncService {
+    /// Take both repository locks without blocking, reporting typed Git-busy
+    /// contention. Every recovery mutation runs under this exclusive hold.
+    pub(in crate::tools::host::git_sync) fn with_exclusive_recovery_locks<T>(
+        &self,
+        action: impl FnOnce() -> RefineResult<T>,
+    ) -> RefineResult<T> {
+        let lock = repository_git_lock(&self.target_root)?;
+        let _guard = match lock.try_lock() {
+            Ok(guard) => guard,
+            Err(TryLockError::WouldBlock) => return Err(git_busy_recovery()),
+            Err(TryLockError::Poisoned(_)) => {
+                return Err(RefineError::Conflict(
+                    "Repository Git lock was poisoned".to_string(),
+                ));
+            }
+        };
+        let Some(_file_guard) = RepositoryFileLock::try_acquire(&self.target_root)? else {
+            return Err(git_busy_recovery());
+        };
+        action()
     }
 }

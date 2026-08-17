@@ -145,6 +145,22 @@ pub enum ProjectAction {
 
 #[derive(Debug, Subcommand)]
 pub enum ProjectStateRecoveryAction {
+    /// Synchronize and, if synchronization is rejected, preview and apply
+    /// stale-fenced recovery as one operation with bounded race retries.
+    Run {
+        /// Which side is authoritative for conflicting paths.
+        #[arg(long, value_enum, default_value = "remote")]
+        authority: CliStateRecoveryAuthority,
+        /// Reported conflict path that should use live authority instead of the default.
+        #[arg(long = "live-path")]
+        live_paths: Vec<PathBuf>,
+        /// Reported conflict path that should use remote authority instead of the default.
+        #[arg(long = "remote-path")]
+        remote_paths: Vec<PathBuf>,
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
+        target_root: Option<PathBuf>,
+    },
     /// Produce a read-only, bounded comparison suitable for operator review.
     Preview {
         #[cfg_attr(test, arg(long, hide = true))]

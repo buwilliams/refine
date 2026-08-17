@@ -106,8 +106,11 @@ pub(in crate::tools::host::git_sync) fn hydrate_remote_with_recovery_cas(
             })
             .map(|path| path.display().to_string())
             .unwrap_or_else(|| "unknown path".to_string());
-        return Err(RefineError::Conflict(format!(
-            "Live state changed at {path} during remote-authority recovery; no baseline was created."
+        // A concurrent live writer invalidated the reviewed snapshot mid-
+        // hydration. Nothing durable was created, so this is the same bounded
+        // retry class as a moving remote head.
+        return Err(stale_recovery(&format!(
+            "live state changed at {path} during remote-authority hydration; no baseline was created"
         )));
     }
     Ok(())

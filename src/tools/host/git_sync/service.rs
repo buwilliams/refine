@@ -179,7 +179,7 @@ impl FileGitSyncService {
         let local = durable_state_map(&live_refine)?;
         if stored_base.is_none() && remote_exists && !bootstrap_only_state(&local) {
             return Err(RefineError::StateSyncMissingBaseline(format!(
-                "Refine state synchronization baseline is missing while non-bootstrap live state and {remote}/{REFINE_STATE_BRANCH} both exist. Ordinary sync remains fail-closed. Run `refine project state-recovery preview`, review the bounded comparison, then apply it with explicit live or remote authority. Do not recover live state from an isolated candidate worktree."
+                "Refine state synchronization baseline is missing while non-bootstrap live state and {remote}/{REFINE_STATE_BRANCH} both exist. Ordinary sync remains fail-closed. Run `refine project state-recovery run --authority <live|remote>` for one-shot recovery, or `refine project state-recovery preview` to review the bounded comparison before applying it. Do not recover live state from an isolated candidate worktree."
             )));
         }
         let setup = self.ensure_state_worktree(&remote, remote_exists, &live_refine)?;

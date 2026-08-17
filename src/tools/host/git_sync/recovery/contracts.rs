@@ -127,6 +127,24 @@ pub struct StateRecoveryManifest {
     pub message: String,
 }
 
+/// Terminal outcome of a one-shot `state-recovery run`: synchronization,
+/// recovery evidence, authority application, and verification as a single
+/// operation. `recovered` is false when synchronization needed no recovery.
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct StateRecoveryRunResult {
+    pub ok: bool,
+    /// 1-based attempt that produced this result; earlier attempts lost a
+    /// bounded race against a moving remote or a concurrent live write.
+    pub attempts: u32,
+    pub recovered: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recovery: Option<StateRecoveryResult>,
+    /// The verifying synchronization (or the ordinary one when no recovery
+    /// was needed).
+    pub sync: GitSyncResult,
+    pub detail: String,
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct StateRecoveryResult {
     pub ok: bool,

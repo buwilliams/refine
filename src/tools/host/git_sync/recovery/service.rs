@@ -16,8 +16,25 @@ impl FileGitSyncService {
         decision: StateRecoveryDecision,
         preview: StateRecoveryPreview,
     ) -> RefineResult<StateRecoveryResult> {
+        self.with_exclusive_recovery_locks(|| {
+            self.apply_state_recovery_decision_locked(decision, preview)
+        })
+    }
+
+    /// Route an already-locked apply. `run_state_recovery` derives its preview
+    /// and consumes it here under one lock hold, which is what removes the
+    /// preview-to-apply stale window that separate invocations always carry.
+    pub(in crate::tools::host::git_sync) fn apply_state_recovery_decision_locked(
+        &self,
+        decision: StateRecoveryDecision,
+        preview: StateRecoveryPreview,
+    ) -> RefineResult<StateRecoveryResult> {
         if preview.baseline_status == "valid_conflict" {
-            return self.apply_reported_state_recovery(decision, preview);
+            let result = self.apply_reported_state_recovery_locked(&decision, &preview);
+            if result.is_err() {
+                let _ = self.restore_managed_state_worktree();
+            }
+            return result;
         }
         if !decision.overrides.is_empty() {
             return Err(RefineError::InvalidInput(
@@ -25,21 +42,6 @@ impl FileGitSyncService {
             ));
         }
         let authority = decision.default_authority;
-        let lock = repository_git_lock(&self.target_root)?;
-        let _guard = match lock.try_lock() {
-            Ok(guard) => guard,
-            Err(TryLockError::WouldBlock) => {
-                return Err(git_busy_recovery());
-            }
-            Err(TryLockError::Poisoned(_)) => {
-                return Err(RefineError::Conflict(
-                    "Repository Git lock was poisoned".to_string(),
-                ));
-            }
-        };
-        let Some(_file_guard) = RepositoryFileLock::try_acquire(&self.target_root)? else {
-            return Err(git_busy_recovery());
-        };
         let result = self.apply_state_recovery_locked(authority, &preview);
         if let Err(error) = &result {
             #[cfg(test)]
@@ -332,9 +334,12 @@ impl FileGitSyncService {
             StateRecoveryAuthority::Remote => {
                 hydrate_remote_with_recovery_cas(&preserved_refine, &remote_refine, &live_refine)?;
                 if durable_state_map(&live_refine)? != remote_state {
-                    return Err(RefineError::Conflict(
-                        "Live state changed during remote-authority recovery; no baseline was created and the apply is retryable."
-                            .to_string(),
+                    // A concurrent live writer is the same bounded race as a
+                    // moving remote: the preview no longer describes live
+                    // state, no baseline was created, and a fresh
+                    // preview-and-apply is the correct retry.
+                    return Err(stale_recovery(
+                        "live state changed during remote-authority hydration; no baseline was created",
                     ));
                 }
                 manifest.local_state_head_after = Some(observed_remote_head.clone());

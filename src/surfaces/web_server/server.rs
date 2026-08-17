@@ -519,6 +519,10 @@ impl InProcessWebServer {
             return self.handle_project_state_recovery_apply(request);
         }
 
+        if request.method == "POST" && request.path == "/project/state-recovery/run" {
+            return self.handle_project_state_recovery_run(request);
+        }
+
         if request.method == "POST" && request.path == "/project/worktrees/cleanup" {
             return self.handle_project_worktree_cleanup(request);
         }

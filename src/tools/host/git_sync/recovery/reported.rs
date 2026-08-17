@@ -91,34 +91,7 @@ impl FileGitSyncService {
         Ok(preview)
     }
 
-    pub(super) fn apply_reported_state_recovery(
-        &self,
-        decision: StateRecoveryDecision,
-        preview: StateRecoveryPreview,
-    ) -> RefineResult<StateRecoveryResult> {
-        let lock = repository_git_lock(&self.target_root)?;
-        let _guard = match lock.try_lock() {
-            Ok(guard) => guard,
-            Err(TryLockError::WouldBlock) => {
-                return Err(git_busy_recovery());
-            }
-            Err(TryLockError::Poisoned(_)) => {
-                return Err(RefineError::Conflict(
-                    "Repository Git lock was poisoned".to_string(),
-                ));
-            }
-        };
-        let Some(_file_guard) = RepositoryFileLock::try_acquire(&self.target_root)? else {
-            return Err(git_busy_recovery());
-        };
-        let result = self.apply_reported_state_recovery_locked(&decision, &preview);
-        if result.is_err() {
-            let _ = self.restore_managed_state_worktree();
-        }
-        result
-    }
-
-    fn apply_reported_state_recovery_locked(
+    pub(super) fn apply_reported_state_recovery_locked(
         &self,
         decision: &StateRecoveryDecision,
         preview: &StateRecoveryPreview,

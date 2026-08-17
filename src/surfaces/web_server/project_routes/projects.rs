@@ -338,6 +338,60 @@ impl InProcessWebServer {
         }
     }
 
+    pub(crate) fn handle_project_state_recovery_run(&self, request: ApiRequest) -> ApiResponse {
+        let (service, target_root) = match self.current_git_sync_service_with_target() {
+            Ok(Some(service_and_target)) => service_and_target,
+            Ok(None) => return target_root_unavailable("run state synchronization recovery"),
+            Err(error) => return error_response(error),
+        };
+        let body = request.body.unwrap_or_else(|| json!({}));
+        let decision = match body.get("decision").cloned().map(serde_json::from_value) {
+            Some(Ok(decision)) => decision,
+            Some(Err(_)) => {
+                return error_response(RefineError::InvalidInput(
+                    "decision must contain default_authority and optional path overrides"
+                        .to_string(),
+                ));
+            }
+            // The one-shot run prefers remote authority by default: live
+            // authority republishes this node's divergent state to the fleet
+            // and must be requested explicitly.
+            None => crate::tools::host::git_sync::StateRecoveryDecision::uniform(
+                crate::tools::host::git_sync::StateRecoveryAuthority::Remote,
+            ),
+        };
+        let recovery_health = self.current_state_sync_health().ok().flatten();
+        match service.run_state_recovery(decision) {
+            Ok(result) => {
+                let settlement = result
+                    .recovered
+                    .then_some(())
+                    .and(self.runtime_root.as_deref())
+                    .zip(recovery_health.as_ref())
+                    .and_then(|(runtime_root, expected_health)| {
+                        crate::process::runner::settle_state_recovery_success(
+                            runtime_root,
+                            &target_root,
+                            expected_health,
+                        )
+                        .ok()
+                    });
+                let health_settled = settlement.as_ref().is_some_and(|(settled, _)| *settled);
+                let state_sync_health = settlement.map(|(_, health)| health);
+                let mut value = serde_json::to_value(result).unwrap();
+                if let Value::Object(fields) = &mut value {
+                    fields.insert("health_settled".to_string(), json!(health_settled));
+                    fields.insert(
+                        "state_sync_health".to_string(),
+                        state_sync_health.map_or(Value::Null, |health| json!(health)),
+                    );
+                }
+                ApiResponse::json(200, value)
+            }
+            Err(error) => error_response(error),
+        }
+    }
+
     pub(crate) fn handle_project_worktree_cleanup(&self, request: ApiRequest) -> ApiResponse {
         let Some(runtime_root) = &self.runtime_root else {
             return runtime_root_unavailable("clean target-app worktrees");

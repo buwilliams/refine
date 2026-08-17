@@ -72,7 +72,7 @@ use recovery::hydrate_recovery_target_from_map;
 pub use recovery::{
     StateRecoveryAuthority, StateRecoveryDecision, StateRecoveryManifest, StateRecoveryOutcome,
     StateRecoveryOverride, StateRecoveryPathCounts, StateRecoveryPreview, StateRecoveryResult,
-    StateRecoveryStage,
+    StateRecoveryRunResult, StateRecoveryStage,
 };
 #[cfg(test)]
 use recovery::{

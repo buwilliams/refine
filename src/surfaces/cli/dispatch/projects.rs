@@ -177,6 +177,46 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
             action:
                 ProjectAction::StateRecovery {
                     action:
+                        ProjectStateRecoveryAction::Run {
+                            authority,
+                            live_paths,
+                            remote_paths,
+                            target_root: Some(target_root),
+                        },
+                },
+        } => {
+            let runtime_root = refine_dir_for_target_root(&target_root)?.join("runtime");
+            let result = FileGitSyncService::new(target_root, runtime_root)
+                .run_state_recovery(recovery_decision(authority, live_paths, remote_paths))?;
+            print_json(&serde_json::to_value(result).unwrap());
+            Ok(())
+        }
+        Commands::Project {
+            action:
+                ProjectAction::StateRecovery {
+                    action:
+                        ProjectStateRecoveryAction::Run {
+                            authority,
+                            live_paths,
+                            remote_paths,
+                            target_root: None,
+                        },
+                },
+        } => {
+            let response = daemon_json(
+                "POST",
+                "/project/state-recovery/run",
+                Some(json!({
+                    "decision": recovery_decision(authority, live_paths, remote_paths)
+                })),
+            )?;
+            print_json(&response);
+            Ok(())
+        }
+        Commands::Project {
+            action:
+                ProjectAction::StateRecovery {
+                    action:
                         ProjectStateRecoveryAction::Preview {
                             target_root: Some(target_root),
                         },
@@ -331,6 +371,18 @@ pub(super) fn dispatch_project_daemon(action: ProjectAction) -> RefineResult<()>
             follow_daemon_operation(daemon_json("POST", "/project/sync", None)?)?
         }
         ProjectAction::StateRecovery { action } => match action {
+            ProjectStateRecoveryAction::Run {
+                authority,
+                live_paths,
+                remote_paths,
+                ..
+            } => daemon_json(
+                "POST",
+                "/project/state-recovery/run",
+                Some(json!({
+                    "decision": recovery_decision(authority, live_paths, remote_paths)
+                })),
+            )?,
             ProjectStateRecoveryAction::Preview { .. } => {
                 daemon_json("GET", "/project/state-recovery/preview", None)?
             }

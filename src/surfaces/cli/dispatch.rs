@@ -595,7 +595,8 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
             | ProjectAction::Doctor { target_root, .. } => target_root.as_ref(),
             ProjectAction::StateRecovery { action } => match action {
                 ProjectStateRecoveryAction::Preview { target_root }
-                | ProjectStateRecoveryAction::Apply { target_root, .. } => target_root.as_ref(),
+                | ProjectStateRecoveryAction::Apply { target_root, .. }
+                | ProjectStateRecoveryAction::Run { target_root, .. } => target_root.as_ref(),
             },
         },
         Commands::Goal { action } => match action {

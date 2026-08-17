@@ -1083,3 +1083,141 @@ fn remote_hydration_retry_repairs_the_scheduler_index_after_files_settle() {
     );
     fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn run_synchronizes_without_recovery_when_nothing_conflicts() {
+    let fixture = SyncFixture::new("recovery-run-clean");
+    write_goal(&fixture.a, "REMOTE");
+    fixture.service(&fixture.a).sync().unwrap();
+
+    let result = fixture
+        .service(&fixture.b)
+        .run_state_recovery(StateRecoveryDecision::uniform(
+            StateRecoveryAuthority::Remote,
+        ))
+        .unwrap();
+
+    assert!(result.ok && !result.recovered, "{result:#?}");
+    assert_eq!(result.attempts, 1);
+    assert!(result.recovery.is_none());
+    assert!(result.sync.ok);
+    assert!(
+        refine_dir_for_target_root(&fixture.b)
+            .unwrap()
+            .join("goals/REMOTE/goal.json")
+            .is_file()
+    );
+}
+
+#[test]
+fn run_recovers_a_missing_baseline_with_remote_authority_in_one_call() {
+    let fixture = missing_baseline_fixture("recovery-run-missing-baseline");
+    let service = fixture.service(&fixture.b);
+
+    let result = service
+        .run_state_recovery(StateRecoveryDecision::uniform(
+            StateRecoveryAuthority::Remote,
+        ))
+        .unwrap();
+
+    assert!(result.ok && result.recovered, "{result:#?}");
+    assert_eq!(result.attempts, 1);
+    let recovery = result.recovery.expect("a recovery result");
+    assert!(recovery.baseline_created);
+    assert_eq!(recovery.authority, StateRecoveryAuthority::Remote);
+    assert!(result.sync.ok);
+    let live_refine = refine_dir_for_target_root(&fixture.b).unwrap();
+    assert!(live_refine.join("goals/REMOTE/goal.json").is_file());
+    assert!(!live_refine.join("goals/LIVE/goal.json").exists());
+    // The follow-up ordinary sync must stay clean: recovery converged the node.
+    fixture.service(&fixture.b).sync().unwrap();
+}
+
+#[test]
+fn run_recovers_a_reported_conflict_with_remote_authority_and_keeps_one_sided_changes() {
+    let fixture = valid_baseline_conflict_fixture("recovery-run-reported");
+    let service = fixture.service(&fixture.b);
+
+    let result = service
+        .run_state_recovery(StateRecoveryDecision::uniform(
+            StateRecoveryAuthority::Remote,
+        ))
+        .unwrap();
+
+    assert!(result.ok && result.recovered, "{result:#?}");
+    assert_eq!(result.attempts, 1);
+    let live_refine = refine_dir_for_target_root(&fixture.b).unwrap();
+    assert_eq!(
+        fs::read_to_string(live_refine.join("shared/state.json")).unwrap(),
+        "remote\n"
+    );
+    assert_eq!(
+        fs::read_to_string(live_refine.join("shared/live-only.json")).unwrap(),
+        "live-only\n"
+    );
+    assert_eq!(
+        fs::read_to_string(live_refine.join("shared/remote-only.json")).unwrap(),
+        "remote-only\n"
+    );
+    // The other node converges to the recovered remote head.
+    fixture.service(&fixture.a).sync().unwrap();
+    assert_eq!(
+        fs::read_to_string(
+            refine_dir_for_target_root(&fixture.a)
+                .unwrap()
+                .join("shared/state.json")
+        )
+        .unwrap(),
+        "remote\n"
+    );
+}
+
+#[test]
+fn run_retries_when_a_concurrent_live_write_makes_the_derived_preview_stale() {
+    let fixture = missing_baseline_fixture("recovery-run-stale-retry");
+    let service = fixture.service(&fixture.b);
+    let target = fixture.b.clone();
+    // Invalidate the first derived preview between its live snapshot capture
+    // and the apply, exactly like a daemon writing state mid-recovery.
+    install_during_recovery_preview_hook(&fixture.b, move || {
+        write_goal(&target, "MIDFLIGHT");
+    });
+
+    let result = service
+        .run_state_recovery(StateRecoveryDecision::uniform(
+            StateRecoveryAuthority::Remote,
+        ))
+        .unwrap();
+
+    assert!(result.ok && result.recovered, "{result:#?}");
+    assert_eq!(result.attempts, 2, "{result:#?}");
+    let live_refine = refine_dir_for_target_root(&fixture.b).unwrap();
+    assert!(live_refine.join("goals/REMOTE/goal.json").is_file());
+    assert!(!live_refine.join("goals/MIDFLIGHT/goal.json").exists());
+    fixture.service(&fixture.b).sync().unwrap();
+}
+
+#[test]
+fn run_surfaces_non_race_failures_immediately_without_retrying() {
+    let fixture = valid_baseline_conflict_fixture("recovery-run-non-race");
+    fs::write(
+        git_common_dir(&fixture.b).unwrap().join("MERGE_HEAD"),
+        "0000000000000000000000000000000000000000\n",
+    )
+    .unwrap();
+
+    let started = Instant::now();
+    let error = fixture
+        .service(&fixture.b)
+        .run_state_recovery(StateRecoveryDecision::uniform(
+            StateRecoveryAuthority::Remote,
+        ))
+        .unwrap_err();
+
+    let message = error.to_string();
+    assert!(message.contains("MERGE_HEAD"), "{message}");
+    assert!(
+        started.elapsed() < Duration::from_secs(2),
+        "a non-race failure must not consume bounded race retries"
+    );
+}

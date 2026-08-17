@@ -8,7 +8,9 @@ impl FileGitSyncService {
         with_repository_git_lock(&self.target_root, || self.preview_state_recovery_locked())
     }
 
-    fn preview_state_recovery_locked(&self) -> RefineResult<StateRecoveryPreview> {
+    pub(in crate::tools::host::git_sync) fn preview_state_recovery_locked(
+        &self,
+    ) -> RefineResult<StateRecoveryPreview> {
         self.validate_recovery_target()?;
         let live_refine =
             crate::tools::host::project_layout::refine_dir_for_target_root(&self.target_root)?;

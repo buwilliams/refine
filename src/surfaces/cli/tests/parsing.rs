@@ -142,6 +142,47 @@ fn project_state_recovery_requires_a_preview_file_and_explicit_authority() {
 }
 
 #[test]
+fn project_state_recovery_run_prefers_remote_authority_and_accepts_overrides() {
+    let run = Cli::try_parse_from(["refine", "project", "state-recovery", "run"]).unwrap();
+    assert!(matches!(
+        run.command,
+        Commands::Project {
+            action: ProjectAction::StateRecovery {
+                action: ProjectStateRecoveryAction::Run {
+                    authority: CliStateRecoveryAuthority::Remote,
+                    target_root: None,
+                    ..
+                }
+            }
+        }
+    ));
+
+    let overridden = Cli::try_parse_from([
+        "refine",
+        "project",
+        "state-recovery",
+        "run",
+        "--authority",
+        "live",
+        "--remote-path",
+        "shared/state.json",
+    ])
+    .unwrap();
+    assert!(matches!(
+        overridden.command,
+        Commands::Project {
+            action: ProjectAction::StateRecovery {
+                action: ProjectStateRecoveryAction::Run {
+                    authority: CliStateRecoveryAuthority::Live,
+                    remote_paths,
+                    ..
+                }
+            }
+        } if remote_paths == vec![std::path::PathBuf::from("shared/state.json")]
+    ));
+}
+
+#[test]
 fn todo_commands_parse_explicit_reporter_and_identifiers() {
     let parsed = Cli::try_parse_from([
         "refine",

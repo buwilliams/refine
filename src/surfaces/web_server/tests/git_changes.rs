@@ -448,6 +448,98 @@ fn web_server_state_recovery_preview_and_apply_use_the_shared_service() {
 }
 
 #[test]
+fn web_server_state_recovery_run_recovers_and_settles_health_in_one_request() {
+    let temp_root = unique_temp_dir("http-state-recovery-run");
+    let remote = temp_root.join("remote.git");
+    let seed = temp_root.join("seed");
+    let a = temp_root.join("a");
+    let b = temp_root.join("b");
+    fs::create_dir_all(&seed).unwrap();
+    git(&temp_root, &["init", "--bare", remote.to_str().unwrap()]).unwrap();
+    git(&seed, &["init", "-b", "main"]).unwrap();
+    git(&seed, &["config", "user.email", "test@example.com"]).unwrap();
+    git(&seed, &["config", "user.name", "Test User"]).unwrap();
+    fs::write(seed.join("app.txt"), "initial\n").unwrap();
+    git(&seed, &["add", "app.txt"]).unwrap();
+    git(&seed, &["commit", "-m", "initial"]).unwrap();
+    git(
+        &seed,
+        &["remote", "add", "origin", remote.to_str().unwrap()],
+    )
+    .unwrap();
+    git(&seed, &["push", "-u", "origin", "main"]).unwrap();
+    for root in [&a, &b] {
+        git(
+            &temp_root,
+            &[
+                "clone",
+                "--branch",
+                "main",
+                remote.to_str().unwrap(),
+                root.to_str().unwrap(),
+            ],
+        )
+        .unwrap();
+        git(root, &["config", "user.email", "test@example.com"]).unwrap();
+        git(root, &["config", "user.name", "Test User"]).unwrap();
+    }
+    let refine_a = refine_dir_for_target_root(&a).unwrap();
+    let refine_b = refine_dir_for_target_root(&b).unwrap();
+    fs::create_dir_all(refine_a.join("goals/REMOTE")).unwrap();
+    fs::write(
+        refine_a.join("goals/REMOTE/goal.json"),
+        "{\"id\":\"REMOTE\"}\n",
+    )
+    .unwrap();
+    crate::tools::host::git_sync::FileGitSyncService::new(&a, a.join("run"))
+        .sync()
+        .unwrap();
+    fs::create_dir_all(refine_b.join("goals/LIVE")).unwrap();
+    fs::write(refine_b.join("goals/LIVE/goal.json"), "{\"id\":\"LIVE\"}\n").unwrap();
+
+    let mut server = server_with_projection();
+    server.target_root = Some(b.clone());
+    let runtime_root = b.join("run");
+    server.runtime_root = Some(runtime_root.clone());
+    crate::tools::host::state_sync_health::FileStateSyncHealthService::new(&runtime_root)
+        .record_failure_with_recovery_kind(
+            &b,
+            "default",
+            "baseline missing",
+            Some(crate::tools::host::state_sync_health::StateSyncRecoveryKind::MissingBaseline),
+        )
+        .unwrap();
+
+    // No body: the one-shot run defaults to remote authority.
+    let run = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/project/state-recovery/run".to_string(),
+        body: None,
+    });
+    assert_eq!(run.status, 200, "{:#}", run.body);
+    assert_eq!(run.body["ok"], true);
+    assert_eq!(run.body["recovered"], true);
+    assert_eq!(run.body["recovery"]["baseline_created"], true);
+    assert_eq!(run.body["sync"]["ok"], true);
+    assert_eq!(run.body["health_settled"], true);
+    assert_eq!(run.body["state_sync_health"]["status"], "healthy");
+    assert!(refine_b.join("goals/REMOTE/goal.json").exists());
+    assert!(!refine_b.join("goals/LIVE/goal.json").exists());
+
+    // Re-running is idempotent and reports a clean synchronization.
+    let rerun = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/project/state-recovery/run".to_string(),
+        body: Some(json!({"decision": {"default_authority": "remote"}})),
+    });
+    assert_eq!(rerun.status, 200, "{:#}", rerun.body);
+    assert_eq!(rerun.body["recovered"], false);
+    assert_eq!(rerun.body["sync"]["ok"], true);
+
+    remove_temp_dir(&temp_root);
+}
+
+#[test]
 fn web_server_project_sync_returns_while_repository_worker_is_busy() {
     let temp_root = unique_temp_dir("http-project-sync-nonblocking");
     let app_root = temp_root.join("app");
