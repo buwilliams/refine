@@ -302,13 +302,15 @@
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
       "prompt": "The CLI subcommands 'system install' and 'system uninstall' are confusing people because they only manage systemctl (on Linux; I don't remember the one for macOS). The authority for updates is the 'system update' subcommand. Therefore, we need to rename install/uninstall to something that reflects what they actually do.",
+      "quality_agent_report": "Quality reviewed commit c182fda0ca5354ad58bdeb6676221631f2ec461f and found no material defect requiring correction; no additional code or test changes were made. Focused CLI, catalog/help, launcher, diagnostic, runbook, shell, and whitespace checks passed; production_binary_install passed 9/9; deterministic library verification passed 1000 tests with 6 ignored; and all-target compilation passed. Repository-wide fmt and Clippy remain blocked only by pre-existing findings in untouched files.",
+      "quality_candidate_commit": "c182fda0ca5354ad58bdeb6676221631f2ec461f",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-17T14:06:43Z",
+      "updated": "2026-08-17T14:14:27Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T13:45:41Z",
         "round_idx": 0,
@@ -320,6 +322,6 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-17T14:06:43Z",
-  "workflow_revision": 20
+  "updated": "2026-08-17T14:14:27Z",
+  "workflow_revision": 22
 }
