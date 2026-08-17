@@ -155,6 +155,32 @@ fn versioned_baseline_anchor_survives_interruption_and_legacy_metadata_still_loa
         git_stdout(&fixture.a, &["rev-parse", &original_ref]),
         original_oid
     );
+    let state_root = state_worktree_for_target_root(&fixture.a).unwrap();
+    let goal_a = Path::new("goals/GOALA/goal.json");
+    let original_fingerprints = service.load_state_baseline().unwrap().unwrap();
+    assert!(matches!(
+        service
+            .reconstruct_baseline_file(
+                &state_root,
+                goal_a,
+                *original_fingerprints.get(goal_a).unwrap(),
+            )
+            .unwrap(),
+        BaselineFileResolution::Loaded {
+            source: BaselineReconstructionSource::RetainedSnapshot,
+            ..
+        }
+    ));
+
+    git(&fixture.a, &["pack-refs", "--all"]);
+    assert!(
+        !git_common_dir(&fixture.a)
+            .unwrap()
+            .join(&original_ref)
+            .exists()
+    );
+    service.sync().unwrap();
+    assert_eq!(fs::read(&baseline_path).unwrap(), original_bytes);
 
     write_goal(&fixture.a, "GOALB");
     install_after_baseline_anchor_hook(&fixture.a);
@@ -198,13 +224,18 @@ fn versioned_baseline_anchor_survives_interruption_and_legacy_metadata_still_loa
     let loaded = service.load_state_baseline().unwrap().unwrap();
     assert_eq!(
         loaded,
-        durable_state_map(
-            &state_worktree_for_target_root(&fixture.a)
-                .unwrap()
-                .join(".refine")
-        )
-        .unwrap()
+        durable_state_map(&state_root.join(".refine")).unwrap()
     );
+    let goal_b = Path::new("goals/GOALB/goal.json");
+    assert!(matches!(
+        service
+            .reconstruct_baseline_file(&state_root, goal_b, *loaded.get(goal_b).unwrap())
+            .unwrap(),
+        BaselineFileResolution::Loaded {
+            source: BaselineReconstructionSource::LegacyHistory,
+            ..
+        }
+    ));
 }
 
 #[test]

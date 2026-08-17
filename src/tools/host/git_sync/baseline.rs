@@ -265,16 +265,41 @@ impl FileGitSyncService {
     }
 
     fn sync_retained_anchor(&self, snapshot_ref: &str) -> RefineResult<()> {
-        let path = git_common_dir(&self.target_root)?.join(snapshot_ref);
-        File::open(&path)
+        let common = git_common_dir(&self.target_root)?;
+        let loose_ref = common.join(snapshot_ref);
+        if loose_ref.is_file() {
+            return File::open(&loose_ref)
+                .and_then(|file| file.sync_all())
+                .map_err(|error| {
+                    RefineError::Io(format!(
+                        "failed to durably publish retained state-baseline anchor {}: {error}",
+                        loose_ref.display()
+                    ))
+                })
+                .and_then(|_| {
+                    sync_parent_directory(
+                        &loose_ref,
+                        "durably publish retained state-baseline anchor",
+                    )
+                });
+        }
+
+        // `git pack-refs` may already own an unchanged anchor. In that case
+        // `update-ref` legitimately leaves no loose file; sync the packed ref
+        // store and its directory before the caller verifies the exact OID.
+        let packed_refs = common.join("packed-refs");
+        File::open(&packed_refs)
             .and_then(|file| file.sync_all())
             .map_err(|error| {
                 RefineError::Io(format!(
-                    "failed to durably publish retained state-baseline anchor {}: {error}",
-                    path.display()
+                    "failed to durably publish packed retained state-baseline anchor {}: {error}",
+                    packed_refs.display()
                 ))
             })?;
-        sync_parent_directory(&path, "durably publish retained state-baseline anchor")
+        sync_parent_directory(
+            &packed_refs,
+            "durably publish packed retained state-baseline anchor",
+        )
     }
 
     fn retire_stale_baseline_anchors(&self, retained_ref: &str) -> RefineResult<()> {

@@ -140,6 +140,15 @@ pub(super) fn run_git_sync_worker(
                             next_attempt = now + GIT_RECONCILE_RETRY_INTERVAL;
                         }
                         Err(error) => {
+                            let conflict_report = latest_state_sync_conflict_report(runtime_root)
+                                .ok()
+                                .flatten()
+                                .filter(|report| {
+                                    report.attempt_id == attempt_id.to_string()
+                                        && report.attempt_source == source
+                                });
+                            let failure_context =
+                                git_sync_failure_context(&error, conflict_report.as_ref());
                             record_state_sync_failure(
                                 runtime_root,
                                 &target_root,
@@ -148,7 +157,7 @@ pub(super) fn run_git_sync_worker(
                                 source,
                                 &error,
                             )?;
-                            failure_backoff.record_failure(now, &error.to_string());
+                            failure_backoff.record_failure(now, &failure_context);
                             next_attempt = now;
                         }
                     }

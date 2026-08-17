@@ -39,7 +39,13 @@ impl FileGitSyncService {
         }
         let live = durable_state_map(&live_refine)?;
         if state_tree_digest(&live_refine, &live)? != report.local_snapshot {
-            return Err(stale_recovery("the live state snapshot changed"));
+            return Err(stale_recovery(
+                &super::inspection::stale_live_snapshot_reason(
+                    &live_refine,
+                    &report.local_fingerprints,
+                    &live,
+                ),
+            ));
         }
         let observation = self.observe_remote_state(&remote, &remote_head)?;
         let remote_refine = observation.path.join(".refine");

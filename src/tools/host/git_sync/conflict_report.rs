@@ -40,6 +40,8 @@ pub struct StateSyncConflictReport {
     pub configured_remote: String,
     pub baseline_snapshot: String,
     pub local_snapshot: String,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub local_fingerprints: BTreeMap<String, u64>,
     pub remote_snapshot: String,
     pub local_state_head: Option<String>,
     pub remote_state_head: String,
@@ -147,6 +149,12 @@ impl FileGitSyncService {
             configured_remote: remote.to_string(),
             baseline_snapshot: state_map_digest(baseline),
             local_snapshot: state_tree_digest_for_report(local_root, local)?,
+            local_fingerprints: local
+                .iter()
+                .map(|(path, fingerprint)| {
+                    (path.to_string_lossy().replace('\\', "/"), *fingerprint)
+                })
+                .collect(),
             remote_snapshot: state_tree_digest_for_report(remote_root, remote_state)?,
             local_state_head,
             remote_state_head,

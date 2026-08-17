@@ -322,6 +322,22 @@ fn valid_baseline_recovery_rejects_stale_preview_before_side_effects() {
 }
 
 #[test]
+fn valid_baseline_preview_reports_the_path_changed_since_the_conflict() {
+    let fixture = valid_baseline_conflict_fixture("reported-recovery-stale-before-preview");
+    let service = fixture.service(&fixture.b);
+    write_shared_state(&fixture.b, "shared/later.json", "later\n");
+
+    let error = service.preview_state_recovery().unwrap_err();
+
+    assert!(
+        error
+            .to_string()
+            .contains("live state snapshot changed at shared/later.json"),
+        "{error}"
+    );
+}
+
+#[test]
 fn valid_baseline_recovery_resumes_only_its_exact_manifest_and_owned_target() {
     let fixture = valid_baseline_conflict_fixture("reported-recovery-resume");
     let service = fixture.service(&fixture.b);
