@@ -85,15 +85,33 @@
         "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
       },
       "assignee": "Buddy Williams",
-      "constitution_state": null,
+      "constitution_state": "passed",
       "created": "2026-08-17T13:43:56Z",
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
-      "governance_candidate_commit": null,
-      "governance_checked_at": null,
-      "governance_details": null,
-      "governance_message": null,
+      "governance_candidate_commit": "94062ff01844fccee8a0a50741e38b5c66a4d643",
+      "governance_checked_at": "2026-08-17T14:47:05Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T03ZPY40KETBPRSEW2000-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "guidance_checked": 2,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No actual governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "No actual governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T03ZPY40KETBPRSEW2000-round-1"
+      },
+      "governance_message": "No actual governance rule violations found.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
       "governance_rule_actions": [],
       "guidance_decision": {
         "applied": [
@@ -307,8 +325,8 @@
       "implementation_report": "Implemented release-versus-source runtime classification with immutable executable provenance, fail-closed HEAD/upstream relationships, a structured shared upgrade API, the Node Processes banner, and affected intent documentation. Candidate verification passed. Repository-wide fmt and strict Clippy remain blocked only by confirmed unchanged baseline findings, reported separately below.",
       "implementation_reported_at": "2026-08-17T14:16:43Z",
       "logs": [],
-      "meta_rule_state": null,
-      "product_state": null,
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Node > Processes shows \"Running latest 4.2.0\" even though I'm not running from a release checkout, but from HEAD, which may or may not be behind the actual origin head. This causes confusion. A better path is that it says whether it is running from HEAD and whether it is up to date with origin or not, unless it is running from a release checkout, in which case the current signal is good.",
       "quality_agent_report": "Quality corrected the fail-closed source-runtime classifier so cached evidence is trusted only when it belongs to the owning checkout and its stored relationship agrees with its commit identities. Added user-facing unknown reasons and focused Rust and JavaScript regressions. Final Rust and JavaScript suites pass; repository-wide fmt and strict Clippy remain blocked only by verified unchanged baseline files.",
       "quality_candidate_commit": "94062ff01844fccee8a0a50741e38b5c66a4d643",
@@ -366,13 +384,9 @@
       "quality_message": "All Quality tests passed with observed supervised evidence.",
       "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": null,
-      "updated": "2026-08-17T14:44:45Z",
-      "workflow_attempt_authority": {
-        "claimed_at": "2026-08-17T13:43:57Z",
-        "round_idx": 0,
-        "workflow_revision": 2
-      },
+      "rule_state": "passed",
+      "updated": "2026-08-17T14:47:09Z",
+      "workflow_attempt_authority": null,
       "workflow_candidate_refresh": {
         "branch": "refine/00000T03ZPY40KETBPRSEW2000/round-1",
         "node_id": "default",
@@ -450,12 +464,26 @@
         "workflow_revision": 2,
         "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T03ZPY40KETBPRSEW2000-round-1"
       },
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "94062ff01844fccee8a0a50741e38b5c66a4d643",
+        "integrated_at": "2026-08-17T14:47:09.638742515+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n build.rs                                           |  94 +++++\n docs/intent/03-capabilities/01-process.md          |  11 +\n docs/intent/04-surfaces/03-browser/17-processes.md |   9 +\n docs/intent/04-surfaces/04-api.md                  |   9 +\n .../web/static/js/features/settings_runtime.js     |  43 +-\n src/surfaces/web_server/project_routes.rs          |   2 +-\n .../project_routes/settings_governance.rs          |  37 +-\n .../tests/operations_processes/events/project.rs   |  11 +-\n src/tools/host/mod.rs                              |   1 +\n src/tools/host/runtime_status.rs                   | 432 +++++++++++++++++++++\n src/tools/host/source_promotion.rs                 |   4 +\n .../source_promotion/handoff_protocol_tests.rs     |   1 +\n src/tools/host/source_promotion/host.rs            |   1 +\n src/tools/host/source_promotion/promotion_tests.rs |   1 +\n src/tools/host/source_promotion/service.rs         |  20 +\n src/tools/host/source_promotion/tests.rs           |  37 ++\n src/tools/host/source_promotion/update_check.rs    |   1 +\n tests/runtime_upgrade_banner.test.js               | 121 ++++++\n tests/web_screen_render.test.js                    |  53 ++-\n 19 files changed, 851 insertions(+), 37 deletions(-)\n create mode 100644 build.rs\n create mode 100644 src/tools/host/runtime_status.rs\n create mode 100644 tests/runtime_upgrade_banner.test.js",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "b6ead03fae9ae9a1770a90c3d7e8abef3b0e1111"
+      },
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "governance",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-08-17T14:44:45Z",
-  "workflow_revision": 26
+  "updated": "2026-08-17T14:47:10Z",
+  "workflow_revision": 30
 }
