@@ -10,7 +10,7 @@
   "node_id": "default",
   "notes": [],
   "priority": "low",
-  "reporter": "buddy.williams@insurity.com",
+  "reporter": "Buddy Williams",
   "rounds": [
     {
       "agent_context": {
@@ -84,7 +84,7 @@
         "version": 1,
         "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
       },
-      "assignee": "buddy.williams@insurity.com",
+      "assignee": "Buddy Williams",
       "constitution_state": "unclassified",
       "created": "2026-08-15T23:35:37Z",
       "failure_at": "",
@@ -383,7 +383,7 @@
       },
       "quality_recovery_round_prompt": "On the fresh current base, selectively recover the accepted behavior from candidate 43fa2224 (including f10db75d) and correct src/tools/host/structured_output.rs. Discover all standalone top-level candidates across direct, fenced, and quoted/stringified forms before selection; do not treat stringified candidates as fallback-only, and do not double-count nested strings inside a valid object or envelope. Reject mixed direct-plus-stringified distinct values with `2 distinct JSON candidates`, while preserving single stringified decoding, recursive envelope unwrapping, payload/depth/layer bounds, ambiguity diagnostics, path-aware schema errors, and panic-free malformed-input handling. Add committed unit regressions for mixed distinct candidates in both orders using exact Rust literals, plus protection against nested-string false positives. Preserve the candidate’s canonical revise resolution normalization, prompts, phase routing, diagnostics, and intent updates. Run the structured-output, implementation-planning, prompt-contract, and planning-session focused tests, cargo check --all-targets, changed-file rustfmt, and git diff --check; report unrelated repository-wide baseline findings separately.",
       "quality_state": "failed",
-      "reporter": "buddy.williams@insurity.com",
+      "reporter": "Buddy Williams",
       "rule_state": "unclassified",
       "updated": "2026-08-16T00:20:12Z",
       "workflow_attempt_authority": {
@@ -971,5 +971,5 @@
   "status": "cancelled",
   "target_branch": "main",
   "updated": "2026-08-16T02:43:18Z",
-  "workflow_revision": 44
+  "workflow_revision": 45
 }

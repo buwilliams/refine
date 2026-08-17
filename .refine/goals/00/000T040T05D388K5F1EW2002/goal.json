@@ -1,7 +1,7 @@
 {
   "base_commit": "9a4c1005fa5f9ee3de082faf6d8a9bc8c3694d97",
   "branch_name": "refine/00000T040T05D388K5F1EW2002/round-3",
-  "candidate_commit": null,
+  "candidate_commit": "8580cb927992bac499a1598ac3294d4a4c2e89ae",
   "created": "2026-08-17T14:22:14Z",
   "feature_id": null,
   "feature_order": null,
@@ -1385,7 +1385,28 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-17T15:19:46Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "9a4c1005fa5f9ee3de082faf6d8a9bc8c3694d97",
@@ -1396,6 +1417,7 @@
           "round_idx": 2,
           "target_branch": "main"
         },
+        "completed_at": "2026-08-17T15:19:45Z",
         "criticism": {
           "completed_at": "2026-08-17T15:11:43Z",
           "git_after": {
@@ -1472,6 +1494,47 @@
           "message": "The finalized plan does not require any governance violation.",
           "status": "passed"
         },
+        "implementation": {
+          "completed_at": "2026-08-17T15:19:45Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Cherry-picked retained single-parent candidate 88677acc657b36af7f0e270b49e5857e2819e5b4 onto pinned target 9a4c1005fa5f9ee3de082faf6d8a9bc8c3694d97, producing 8580cb927992bac499a1598ac3294d4a4c2e89ae. Direct-parent stable patch IDs match at 4816e4dbb10b252066f3549ec31acde06236206e. The retained Round 2 ref still resolves to 88677acc657b36af7f0e270b49e5857e2819e5b4 and its retained worktree is clean.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "The exact recovered browser delta conditionally renders Transfer to my node from nodeContextActiveNodeId() when ownership differs, closes the action menu, POSTs the displayed Goal ID and active node ID to /api/nodes/transfer-goals, surfaces server rejection through showActionError without reload, and reloads Goal detail only after success.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Carried forward tests/web_goal_transfer.test.js and the focused docs/intent/04-surfaces/03-browser/08-goal.md update. The tests cover conditional availability, legacy default ownership, case-insensitive IDs, exact request wiring, success refresh, and failure without refresh; the intent page records authoritative active-node context and shared server-owned constraints.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Recovered candidate 8580cb927992bac499a1598ac3294d4a4c2e89ae directly parents pinned target 9a4c1005fa5f9ee3de082faf6d8a9bc8c3694d97, has the exact intended three-file scope and matching stable patch ID, passes diff hygiene, focused and full browser suites, and the full Rust suite, and leaves both recovered and retained worktrees clean. Local main and origin/main remain at the pinned target, so no later drift was observed.",
+                "id": "P4",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "git cherry-pick 88677acc657b36af7f0e270b49e5857e2819e5b4 -> exit 0; created recovered candidate 8580cb927992bac499a1598ac3294d4a4c2e89ae with 3 files changed and 134 insertions",
+              "test $(git rev-parse HEAD) = 8580cb927992bac499a1598ac3294d4a4c2e89ae; test $(git rev-parse HEAD^) = 9a4c1005fa5f9ee3de082faf6d8a9bc8c3694d97; git merge-base --is-ancestor 9a4c1005fa5f9ee3de082faf6d8a9bc8c3694d97 HEAD -> exit 0",
+              "git diff --name-only 9a4c1005fa5f9ee3de082faf6d8a9bc8c3694d97..HEAD | LC_ALL=C sort -> exactly docs/intent/04-surfaces/03-browser/08-goal.md, src/surfaces/web/static/js/features/goals-detail.js, tests/web_goal_transfer.test.js",
+              "test $(git diff 88677acc657b36af7f0e270b49e5857e2819e5b4^ 88677acc657b36af7f0e270b49e5857e2819e5b4 | git patch-id --stable | cut -d' ' -f1) = $(git diff 9a4c1005fa5f9ee3de082faf6d8a9bc8c3694d97 8580cb927992bac499a1598ac3294d4a4c2e89ae | git patch-id --stable | cut -d' ' -f1) -> exit 0; both are 4816e4dbb10b252066f3549ec31acde06236206e",
+              "git diff --check 9a4c1005fa5f9ee3de082faf6d8a9bc8c3694d97..8580cb927992bac499a1598ac3294d4a4c2e89ae -> exit 0, no output",
+              "node --test tests/web_goal_transfer.test.js tests/web_goal_cancel.test.js tests/web_javascript_syntax.test.js -> exit 0; 5 passed, 0 failed, 0 skipped",
+              "node --test tests/web_*.test.js -> exit 0; 233 tests, 205 passed, 0 failed, 28 skipped because Playwright Chromium is unavailable",
+              "cargo test -> exit 0; src/lib.rs 1015 passed, 0 failed, 6 ignored; src/main.rs 0 passed, 0 failed",
+              "test -z $(git status --porcelain); test $(git -C /home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T040T05D388K5F1EW2002-round-1 rev-parse HEAD) = 88677acc657b36af7f0e270b49e5857e2819e5b4; test -z $(git -C /home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T040T05D388K5F1EW2002-round-1 status --porcelain) -> exit 0; both worktrees clean and retained candidate unchanged",
+              "test $(git rev-parse main) = 9a4c1005fa5f9ee3de082faf6d8a9bc8c3694d97; test $(git rev-parse origin/main) = 9a4c1005fa5f9ee3de082faf6d8a9bc8c3694d97 -> exit 0; no later local target drift observed"
+            ]
+          },
+          "report": "Recovered the retained Goal-modal Transfer to my node behavior onto pinned Round 3 target 9a4c1005fa5f9ee3de082faf6d8a9bc8c3694d97 as exact candidate 8580cb927992bac499a1598ac3294d4a4c2e89ae. The recovered commit directly parents the pinned target, changes only the intended documentation, browser surface, and focused regression test, and has stable patch ID 4816e4dbb10b252066f3549ec31acde06236206e matching retained candidate 88677acc657b36af7f0e270b49e5857e2819e5b4. The retained Round 2 branch and worktree remain unchanged and clean. Verification passed: git diff hygiene and exact scope; focused browser tests 5 passed, 0 failed, 0 skipped; full browser suite 205 passed, 0 failed, 28 skipped because Playwright Chromium is unavailable; full Rust suite 1015 passed, 0 failed, 6 ignored, plus src/main.rs with 0 tests; recovered and retained worktrees clean. Local main and origin/main remain at the pinned target, so no later integration race was observed.",
+          "started_at": "2026-08-17T15:12:29Z"
+        },
         "phase": "implement",
         "phase_started_at": "2026-08-17T15:12:29Z",
         "proposal": {
@@ -1507,11 +1570,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-08-17T15:09:22Z",
-        "state": "in_progress",
-        "updated_at": "2026-08-17T15:12:29Z"
+        "state": "completed",
+        "updated_at": "2026-08-17T15:19:45Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Recovered the retained Goal-modal Transfer to my node behavior onto pinned Round 3 target 9a4c1005fa5f9ee3de082faf6d8a9bc8c3694d97 as exact candidate 8580cb927992bac499a1598ac3294d4a4c2e89ae. The recovered commit directly parents the pinned target, changes only the intended documentation, browser surface, and focused regression test, and has stable patch ID 4816e4dbb10b252066f3549ec31acde06236206e matching retained candidate 88677acc657b36af7f0e270b49e5857e2819e5b4. The retained Round 2 branch and worktree remain unchanged and clean. Verification passed: git diff hygiene and exact scope; focused browser tests 5 passed, 0 failed, 0 skipped; full browser suite 205 passed, 0 failed, 28 skipped because Playwright Chromium is unavailable; full Rust suite 1015 passed, 0 failed, 6 ignored, plus src/main.rs with 0 tests; recovered and retained worktrees clean. Local main and origin/main remain at the pinned target, so no later integration race was observed.",
+      "implementation_reported_at": "2026-08-17T15:19:45Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -1522,7 +1585,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-08-17T15:12:29Z",
+      "updated": "2026-08-17T15:19:46Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T15:09:22Z",
         "round_idx": 2,
@@ -1563,8 +1626,8 @@
       }
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-17T15:12:29Z",
-  "workflow_revision": 56
+  "updated": "2026-08-17T15:19:46Z",
+  "workflow_revision": 61
 }
