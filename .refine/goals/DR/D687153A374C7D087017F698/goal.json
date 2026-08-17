@@ -123,6 +123,15 @@
           },
           "started_at": "2026-08-17T19:39:11Z"
         },
+        "invalid_output_attempts": [
+          {
+            "attempt": 1,
+            "diagnostics": "revised implementation plan resolved unknown or non-material criticism: C1",
+            "phase": "revise",
+            "raw_output": "{\"checklist\":[{\"description\":\"Remove the fixed desktop maximum width from the cohesive shared main browser container while preserving its existing horizontal gutters, full-width sizing, flex and scroll behavior, and narrow-screen rules so every routed page benefits consistently.\",\"id\":\"P1\"},{\"description\":\"Update the affected browser intent documentation in its established format to define full-width viewport use as the shared surface contract for dense operational content without changing unrelated page or table behavior.\",\"id\":\"P2\"}],\"criticism_resolutions\":[{\"criticism_id\":\"C1\",\"resolution\":\"Retain the accepted shared-container width-cap removal and focused intent-documentation update while explicitly preserving the existing layout behaviors and unrelated page and table behavior.\"}],\"summary\":\"Make Refine's shared browser content area use the available window width so wide screens provide more room for operational tables and columns such as Node instead of leaving large empty margins.\"}",
+            "recorded_at": "2026-08-17T19:41:05Z"
+          }
+        ],
         "phase": "revise",
         "phase_started_at": "2026-08-17T19:40:26Z",
         "proposal": {
@@ -155,7 +164,7 @@
         "schema_version": 2,
         "started_at": "2026-08-17T19:37:52Z",
         "state": "in_progress",
-        "updated_at": "2026-08-17T19:40:26Z"
+        "updated_at": "2026-08-17T19:41:05Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -169,7 +178,7 @@
       "quality_state": "unclassified",
       "reporter": "ethan.jacobson@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-17T19:40:26Z",
+      "updated": "2026-08-17T19:41:05Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T19:37:51Z",
         "round_idx": 0,
@@ -181,6 +190,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-17T19:40:26Z",
-  "workflow_revision": 11
+  "updated": "2026-08-17T19:41:05Z",
+  "workflow_revision": 12
 }
