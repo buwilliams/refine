@@ -157,6 +157,71 @@
           },
           "started_at": "2026-08-17T14:21:23Z"
         },
+        "final_plan": {
+          "completed_at": "2026-08-17T14:24:57Z",
+          "git_after": {
+            "branch": "refine/DR05060B5D11A47E115C6D1210/round-1",
+            "head_commit": "bd392b96216d26fa00b5ef5d307af5abb2bd398f",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR05060B5D11A47E115C6D1210/round-1",
+            "head_commit": "bd392b96216d26fa00b5ef5d307af5abb2bd398f",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Refactor semantic reconciliation to distinguish a wholly absent synchronization baseline from unavailable bytes for a recorded path and carry structured baseline-reconstruction outcomes through both first-pass and push-retry handling.",
+                "id": "P1"
+              },
+              {
+                "description": "Add a nodes.json-only two-way fallback for unavailable recorded baseline bytes that validates both registries, retains the canonical node-id union, selects unequal versions only by comparable updated_at values, and leaves malformed data or equal-time disagreement unresolved without extending fallback authority to Goals or a wholly absent baseline.",
+                "id": "P2"
+              },
+              {
+                "description": "Version the backward-compatible baseline metadata with the exact immutable snapshot OID or ref that owns its fingerprint map, publish and durably validate the new anchor before atomically replacing the metadata, and retire the previous anchor only after the new pair is durable so interruption cannot misassociate or orphan evidence.",
+                "id": "P3"
+              },
+              {
+                "description": "Resolve recorded path bytes from the metadata-bound retained snapshot before the legacy history scan and report distinct structured outcomes when reconstruction fails, the safe node-registry fallback succeeds, or semantic reconciliation remains unresolved in sync details, health errors, and complete conflict reports.",
+                "id": "P4"
+              },
+              {
+                "description": "Add path-level stale-fence diagnostics and a reproducing concurrent-sync recovery case to identify the actual fenced input and writer, then serialize that verified writer with preview and apply snapshot capture or exclude only a proven node-local nonsynchronizable input while preserving every durable live-state, remote-state, head, identity, and decision fence.",
+                "id": "P5"
+              },
+              {
+                "description": "Introduce capped in-memory exponential backoff for repeated unchanged background sync failures, reset it on success or meaningful target, node, local-state, or failure-context change, and keep explicit project sync immediately available without emitting attempts or activity during suppressed intervals.",
+                "id": "P6"
+              },
+              {
+                "description": "Add focused regression coverage for first-pass and push-retry fallback success, malformed and equal-time rejection, retained-anchor interruption and legacy metadata loading, recovery concurrency and changed-path diagnostics, and deterministic backoff suppression, reset, cap, and explicit-sync bypass behavior.",
+                "id": "P7"
+              },
+              {
+                "description": "Update only the affected target-app, fleet, and activity-evidence intent pages to document the narrow base-less node-registry rule, versioned retained baseline anchor, recovery snapshot boundary, diagnostic outcomes, and background-failure backoff.",
+                "id": "P8"
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "P3 now makes the baseline fingerprint map and retained snapshot a versioned, validated pair, orders anchor publication before atomic metadata replacement, and keeps the previous anchor until the new pair is durable."
+              },
+              {
+                "criticism_id": "C2",
+                "resolution": "P5 no longer assumes activity logs are fenced; it requires changed-path evidence and a reproducing concurrent-sync case before coordinating the verified writer or narrowly excluding a proven node-local input while retaining all authoritative fences."
+              },
+              {
+                "criticism_id": "C3",
+                "resolution": "P7 adds focused regression coverage for both merge paths, rejection cases, interruption and legacy anchor behavior, recovery concurrency and diagnostics, and every scheduler backoff and manual-bypass contract."
+              }
+            ],
+            "summary": "Make node-registry synchronization converge safely when recorded baseline bytes are unavailable by adding a narrowly fail-closed two-way fallback, crash-consistent retained evidence, actionable diagnostics, stable recovery coordination, and bounded retry backoff."
+          },
+          "started_at": "2026-08-17T14:23:58Z"
+        },
         "phase": "revise",
         "phase_started_at": "2026-08-17T14:23:58Z",
         "proposal": {
@@ -209,7 +274,7 @@
         "schema_version": 2,
         "started_at": "2026-08-17T14:18:04Z",
         "state": "in_progress",
-        "updated_at": "2026-08-17T14:23:58Z"
+        "updated_at": "2026-08-17T14:24:57Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -223,7 +288,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-17T14:23:58Z",
+      "updated": "2026-08-17T14:24:57Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T14:18:03Z",
         "round_idx": 0,
@@ -235,6 +300,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-17T14:23:58Z",
-  "workflow_revision": 11
+  "updated": "2026-08-17T14:24:57Z",
+  "workflow_revision": 12
 }
