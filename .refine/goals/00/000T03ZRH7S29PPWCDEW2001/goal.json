@@ -106,12 +106,47 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-08-17T13:45:42Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-08-17T13:47:31Z",
+        "proposal": {
+          "completed_at": "2026-08-17T13:47:31Z",
+          "git_after": {
+            "branch": "refine/00000T03ZRH7S29PPWCDEW2001/round-1",
+            "head_commit": "5850e2fb336540fc41c8ab5ad2d7c934315353df",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T03ZRH7S29PPWCDEW2001/round-1",
+            "head_commit": "5850e2fb336540fc41c8ab5ad2d7c934315353df",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Replace the public CLI actions with `service-install` and `service-uninstall`, update their help and dispatch names, preserve their existing port-scoped systemd/launchd registration and removal behavior, and leave the ambiguous old spellings unparseable and unadvertised.",
+                "id": "P1"
+              },
+              {
+                "description": "Update the checkout launcher to recognize and delegate `system service-install`, retain only the release-binary bootstrap needed before first service registration, and keep Git/source update authority exclusively under `system update`.",
+                "id": "P2"
+              },
+              {
+                "description": "Revise affected process and CLI intent plus installation and update runbooks so they distinguish installing Refine, registering or removing its OS service, and updating Refine while preserving the established document format.",
+                "id": "P3"
+              },
+              {
+                "description": "Migrate CLI parsing, command-catalog, launcher, and service integration expectations to the new spellings and explicitly cover the removal of `system install` and `system uninstall` from the supported surface.",
+                "id": "P4"
+              }
+            ],
+            "summary": "Rename `system install` and `system uninstall` to `system service-install` and `system service-uninstall` so OS service registration is clearly separate from the launcher-owned `system update` path."
+          },
+          "started_at": "2026-08-17T13:45:42Z"
+        },
         "schema_version": 2,
         "started_at": "2026-08-17T13:45:42Z",
         "state": "in_progress",
-        "updated_at": "2026-08-17T13:45:42Z"
+        "updated_at": "2026-08-17T13:47:31Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -125,7 +160,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-17T13:45:42Z",
+      "updated": "2026-08-17T13:47:31Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T13:45:41Z",
         "round_idx": 0,
@@ -137,6 +172,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-17T13:45:42Z",
-  "workflow_revision": 7
+  "updated": "2026-08-17T13:47:31Z",
+  "workflow_revision": 9
 }
