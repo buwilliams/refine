@@ -1,6 +1,6 @@
 use super::*;
 
-const CONFLICT_REPORT_VERSION: u32 = 1;
+const CONFLICT_REPORT_VERSION: u32 = 2;
 const CONFLICT_REPORT_DIRECTORY: &str = "state-sync-conflicts";
 const CONFLICT_REPORT_FILE: &str = "latest.json";
 
@@ -40,10 +40,14 @@ pub struct StateSyncConflictReport {
     pub configured_remote: String,
     pub baseline_snapshot: String,
     pub local_snapshot: String,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub local_fingerprints: BTreeMap<String, u64>,
     pub remote_snapshot: String,
     pub local_state_head: Option<String>,
     pub remote_state_head: String,
     pub unresolved_paths: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub reconciliation_outcomes: Vec<StateSyncReconciliationOutcome>,
     pub recovery: StateSyncRecoveryMetadata,
     pub report_location: String,
 }
@@ -55,15 +59,21 @@ pub struct StateSyncConflictSummary {
     pub unresolved_count: usize,
     pub report_location: String,
     pub recovery_command: String,
+    pub diagnostics: Vec<String>,
 }
 
 impl std::fmt::Display for StateSyncConflictSummary {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             formatter,
-            "Refine state changed on multiple nodes during {}: {} unresolved path(s); complete conflict report {} is at {}. Run `{}` to review a stale-fenced recovery.",
+            "Refine state changed on multiple nodes during {}: {} unresolved path(s){}; complete conflict report {} is at {}. Run `{}` to review a stale-fenced recovery.",
             self.phase.as_str(),
             self.unresolved_count,
+            if self.diagnostics.is_empty() {
+                String::new()
+            } else {
+                format!(" ({})", self.diagnostics.join("; "))
+            },
             self.report_id,
             self.report_location,
             self.recovery_command
@@ -108,6 +118,7 @@ impl FileGitSyncService {
         local_state_head: Option<String>,
         remote_state_head: String,
         unresolved: &[String],
+        reconciliation_outcomes: &[StateSyncReconciliationOutcome],
     ) -> RefineResult<StateSyncConflictSummary> {
         use sha2::{Digest, Sha256};
 
@@ -138,10 +149,17 @@ impl FileGitSyncService {
             configured_remote: remote.to_string(),
             baseline_snapshot: state_map_digest(baseline),
             local_snapshot: state_tree_digest_for_report(local_root, local)?,
+            local_fingerprints: local
+                .iter()
+                .map(|(path, fingerprint)| {
+                    (path.to_string_lossy().replace('\\', "/"), *fingerprint)
+                })
+                .collect(),
             remote_snapshot: state_tree_digest_for_report(remote_root, remote_state)?,
             local_state_head,
             remote_state_head,
             unresolved_paths: unresolved.to_vec(),
+            reconciliation_outcomes: reconciliation_outcomes.to_vec(),
             recovery: StateSyncRecoveryMetadata {
                 available: true,
                 preview_command: "refine project state-recovery preview".to_string(),
@@ -162,6 +180,12 @@ impl FileGitSyncService {
             unresolved_count: report.unresolved_paths.len(),
             report_location: report.report_location,
             recovery_command: report.recovery.preview_command,
+            diagnostics: report
+                .reconciliation_outcomes
+                .iter()
+                .filter(|outcome| report.unresolved_paths.contains(&outcome.path))
+                .map(|outcome| outcome.detail.clone())
+                .collect(),
         })
     }
 }

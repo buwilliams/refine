@@ -30,6 +30,14 @@ Activity should not be only a UI feed. It is product memory. Future agents shoul
 
 Recurring state synchronization is operational evidence with a node-local boundary. The first failure in an outage records a redacted `state_sync` activity entry, continued failure produces bounded reminders rather than retry-cadence log storms, and the first successful reconciliation records recovery. Conflict activity carries a stable report id and local location while the atomically replaced report contains every path. Attempt ids and sources order overlapping results; lock deferrals, intentional pauses, and an unconfigured remote are neutral and cannot erase an active failure. These entries and reports remain queryable local evidence but are excluded from synchronized state so one node's outage evidence cannot create cross-node conflicts.
 
+Conflict evidence distinguishes unavailable recorded baseline bytes, a safe
+base-less node-registry reconciliation, and a still-unresolved semantic merge
+in sync details, health errors, and the complete report. Recovery stale fences
+name changed durable paths, and preview snapshot capture shares the
+repository-operation boundary with synchronization. Background failure
+backoff is intentionally evidence-neutral during suppressed intervals: only a
+launched attempt may advance health or append activity.
+
 ## Future Direction
 
 Future evidence should become richer and more structured: screenshots, traces, dependency graphs, provenance, risk classifications, test artifacts, review summaries, and agent reasoning summaries.

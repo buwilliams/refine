@@ -127,7 +127,7 @@ fn push_retry_rechecks_original_base_against_fresh_local_and_remote_state() {
 }
 
 #[test]
-fn push_retry_semantically_merges_node_registry_remote_advancement() {
+fn push_retry_uses_safe_node_registry_fallback_when_recorded_baseline_bytes_are_unavailable() {
     use std::os::unix::fs::PermissionsExt;
 
     let fixture = SyncFixture::new("push-retry-node-merge");
@@ -140,6 +140,8 @@ fn push_retry_semantically_merges_node_registry_remote_advancement() {
     );
     fixture.service(&fixture.a).sync().unwrap();
     fixture.service(&fixture.b).sync().unwrap();
+    rewrite_baseline_fingerprint(&fixture.a, "nodes.json", u64::MAX);
+    rewrite_baseline_fingerprint(&fixture.b, "nodes.json", u64::MAX);
     write_nodes(
         &fixture.a,
         &[
@@ -199,7 +201,9 @@ fn push_retry_semantically_merges_node_registry_remote_advancement() {
         [left.detail.as_deref(), right.detail.as_deref()]
             .into_iter()
             .flatten()
-            .any(|detail| detail.contains("Merged per-node registry changes during push retry")),
+            .any(|detail| detail.contains(
+                "Merged per-node registry changes during push retry with safe baseline-unavailable fallback"
+            )),
         "left={left:?}, right={right:?}"
     );
     git(&fixture.a, &["fetch", "-q", "origin", REFINE_STATE_BRANCH]);

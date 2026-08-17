@@ -241,8 +241,8 @@ impl FileGitSyncService {
             &local,
             &remote_state,
         )?;
-        let resolved_paths = reconciled.keys().cloned().collect::<BTreeSet<_>>();
-        append_reconciliation_details(&mut details, &resolved_paths, false);
+        let resolved_paths = reconciled.changes.keys().cloned().collect::<BTreeSet<_>>();
+        append_reconciliation_details(&mut details, &reconciled.outcomes, false);
         let conflicts = state_conflicts(&base, &local, &remote_state, &resolved_paths);
         if !conflicts.is_empty() {
             let summary = self.record_conflict_report(
@@ -257,6 +257,7 @@ impl FileGitSyncService {
                 self.local_state_head()?,
                 observed_remote_head.clone(),
                 &conflicts,
+                &reconciled.outcomes,
             )?;
             return Err(RefineError::Conflict(summary.to_string()));
         }
@@ -264,7 +265,7 @@ impl FileGitSyncService {
         // fail-closed validation. Successful sync still records the intended
         // deletions in the next state commit.
         let removed_excluded = self.retire_excluded_tracked_state(&state_root, &state_refine)?;
-        write_reconciled_state_changes(&state_refine, &reconciled)?;
+        write_reconciled_state_changes(&state_refine, &reconciled.changes)?;
         apply_local_state_delta(&live_refine, &state_refine, &base, &local, &resolved_paths)?;
 
         let updated = durable_state_map(&state_refine)?;
@@ -326,9 +327,12 @@ impl FileGitSyncService {
                     &retry_local,
                     &retry_remote_state,
                 )?;
-                let retry_resolved_paths =
-                    retry_reconciled.keys().cloned().collect::<BTreeSet<_>>();
-                append_reconciliation_details(&mut details, &retry_resolved_paths, true);
+                let retry_resolved_paths = retry_reconciled
+                    .changes
+                    .keys()
+                    .cloned()
+                    .collect::<BTreeSet<_>>();
+                append_reconciliation_details(&mut details, &retry_reconciled.outcomes, true);
                 let retry_conflicts = state_conflicts(
                     &base,
                     &retry_local,
@@ -348,10 +352,11 @@ impl FileGitSyncService {
                         self.local_state_head()?,
                         retry_remote_head,
                         &retry_conflicts,
+                        &retry_reconciled.outcomes,
                     )?;
                     return Err(RefineError::Conflict(summary.to_string()));
                 }
-                write_reconciled_state_changes(&state_refine, &retry_reconciled)?;
+                write_reconciled_state_changes(&state_refine, &retry_reconciled.changes)?;
                 apply_local_state_delta(
                     &live_refine,
                     &state_refine,
@@ -411,59 +416,6 @@ impl FileGitSyncService {
             deferred: concurrent_local_change,
         })
     }
-
-    pub(super) fn prepare_semantic_state_changes(
-        &self,
-        state_root: &std::path::Path,
-        live_refine: &std::path::Path,
-        state_refine: &std::path::Path,
-        base: &DurableStateMap,
-        local: &DurableStateMap,
-        remote: &DurableStateMap,
-    ) -> RefineResult<BTreeMap<PathBuf, Vec<u8>>> {
-        let unresolved = BTreeSet::new();
-        let mut reconciled = BTreeMap::new();
-        for relative in state_conflict_paths(base, local, remote, &unresolved) {
-            if relative != std::path::Path::new("nodes.json") && !is_goal_record(&relative) {
-                continue;
-            }
-            let (Some(base_fingerprint), Some(_), Some(_)) = (
-                base.get(&relative),
-                local.get(&relative),
-                remote.get(&relative),
-            ) else {
-                continue;
-            };
-            let Some(base_bytes) =
-                self.load_baseline_file(state_root, &relative, *base_fingerprint)?
-            else {
-                continue;
-            };
-            let local_path = live_refine.join(&relative);
-            let remote_path = state_refine.join(&relative);
-            let local_bytes = read_reconciliation_file(&local_path)?;
-            let remote_bytes = read_reconciliation_file(&remote_path)?;
-            let merged = if relative == std::path::Path::new("nodes.json") {
-                merge_node_registry(&base_bytes, &local_bytes, &remote_bytes)
-            } else {
-                merge_goal_record(&base_bytes, &local_bytes, &remote_bytes)
-            };
-            let Some(merged) = merged else {
-                continue;
-            };
-            reconciled.insert(relative, merged);
-        }
-        Ok(reconciled)
-    }
-}
-
-fn read_reconciliation_file(path: &std::path::Path) -> RefineResult<Vec<u8>> {
-    fs::read(path).map_err(|error| {
-        RefineError::Io(format!(
-            "failed to read conflicting Refine state {}: {error}",
-            path.display()
-        ))
-    })
 }
 
 fn display_state_paths(paths: &BTreeSet<PathBuf>) -> String {
@@ -476,9 +428,20 @@ fn display_state_paths(paths: &BTreeSet<PathBuf>) -> String {
 
 fn append_reconciliation_details(
     details: &mut Vec<String>,
-    resolved: &BTreeSet<PathBuf>,
+    outcomes: &[StateSyncReconciliationOutcome],
     push_retry: bool,
 ) {
+    let resolved = outcomes
+        .iter()
+        .filter(|outcome| {
+            matches!(
+                outcome.outcome,
+                StateSyncReconciliationKind::ThreeWayMerged
+                    | StateSyncReconciliationKind::BaselineUnavailableFallbackMerged
+            )
+        })
+        .map(|outcome| PathBuf::from(&outcome.path))
+        .collect::<BTreeSet<_>>();
     let goals = resolved
         .iter()
         .filter(|path| is_goal_record(path))
@@ -492,9 +455,18 @@ fn append_reconciliation_details(
         ));
     }
     if resolved.contains(std::path::Path::new("nodes.json")) {
+        let fallback = outcomes.iter().any(|outcome| {
+            outcome.path == "nodes.json"
+                && outcome.outcome == StateSyncReconciliationKind::BaselineUnavailableFallbackMerged
+        });
         details.push(format!(
-            "Merged per-node registry changes{}: nodes.json",
-            if push_retry { " during push retry" } else { "" }
+            "Merged per-node registry changes{}{}: nodes.json",
+            if push_retry { " during push retry" } else { "" },
+            if fallback {
+                " with safe baseline-unavailable fallback"
+            } else {
+                ""
+            }
         ));
     }
 }

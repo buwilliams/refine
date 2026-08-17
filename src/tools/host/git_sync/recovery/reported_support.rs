@@ -2,7 +2,7 @@ use super::*;
 use crate::tools::host::git_sync::conflict_report::{conflict_report_id, state_map_digest};
 
 pub(super) fn validate_report_identity(report: &StateSyncConflictReport) -> RefineResult<()> {
-    if report.version != 1
+    if !matches!(report.version, 1 | 2)
         || report.report_id.is_empty()
         || report.report_id != conflict_report_id(report)?
         || report.unresolved_paths.is_empty()

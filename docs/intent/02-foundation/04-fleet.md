@@ -37,7 +37,21 @@ duplicate identities, malformed timestamps, and equal-timestamp disagreement
 remain conflicts, and an unrelated unresolved path withholds the entire
 prepared reconciliation.
 
+If a valid recorded baseline exists but its exact bytes are no longer
+reconstructable, synchronization reports that condition distinctly. Only
+`nodes.json` may attempt a base-less reconcile, under the same canonical-id,
+record-union, strict timestamp, and atomic-application rules. The baseline's
+fingerprint map is paired with a retained immutable state snapshot so ordinary
+history rewriting or runtime-root changes do not silently discard merge
+evidence; missing whole-baseline authority remains a manual recovery.
+
 Sync health is bound to the serving daemon's active target and node and remains outside `refine/state`. Monotonic attempt ids and sources fence overlapping settlements: a late result cannot relabel a newer attempt, and a neutral lock deferral cannot clear an active failure episode or its report pointer. A daemon reports its active node from local evidence and reports other nodes as unknown unless it has direct evidence from those daemons. A stale or failed local reconciliation means that daemon's fleet-wide counts are a local projection, not an authoritative fleet total; surfaces must label that boundary instead of presenting divergent arithmetic as fact. Ordinary per-node heartbeat churn is semantically reconciled and does not by itself stale-fence synchronization or downgrade otherwise authoritative fleet counts.
+
+Repeated unchanged background failures use capped in-memory exponential
+backoff. A changed target, node, durable-state fingerprint, failure context, or
+successful sync resets suppression. Suppressed intervals create no attempt or
+activity evidence, while an explicit project sync always remains immediately
+available.
 
 Infrastructure and credentials remain outside Refine's core. The manage-fleet runbook guides agents through provisioning and authentication without placing secrets in shared state.
 

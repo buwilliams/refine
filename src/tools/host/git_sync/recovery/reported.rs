@@ -39,7 +39,13 @@ impl FileGitSyncService {
         }
         let live = durable_state_map(&live_refine)?;
         if state_tree_digest(&live_refine, &live)? != report.local_snapshot {
-            return Err(stale_recovery("the live state snapshot changed"));
+            return Err(stale_recovery(
+                &super::inspection::stale_live_snapshot_reason(
+                    &live_refine,
+                    &report.local_fingerprints,
+                    &live,
+                ),
+            ));
         }
         let observation = self.observe_remote_state(&remote, &remote_head)?;
         let remote_refine = observation.path.join(".refine");
@@ -55,7 +61,7 @@ impl FileGitSyncService {
             &live,
             &remote_state,
         )?;
-        let resolved_paths = resolved.keys().cloned().collect::<BTreeSet<_>>();
+        let resolved_paths = resolved.changes.keys().cloned().collect::<BTreeSet<_>>();
         let conflicts = state_conflicts(&baseline, &live, &remote_state, &resolved_paths);
         if conflicts != report.unresolved_paths {
             return Err(stale_recovery(
@@ -75,6 +81,7 @@ impl FileGitSyncService {
             conflict_report_id: Some(report.report_id.clone()),
             conflict_report_location: Some(report.report_location.clone()),
             live_snapshot: report.local_snapshot,
+            live_fingerprints: super::inspection::recovery_fingerprints(&live),
             remote_snapshot: report.remote_snapshot,
             path_counts: recovery_path_counts(&live, &remote_state),
             conflicting_paths: report.unresolved_paths,
@@ -235,7 +242,11 @@ impl FileGitSyncService {
                 ))
             } else {
                 Err(stale_recovery(
-                    "the live state snapshot changed before apply",
+                    &super::inspection::stale_live_snapshot_reason(
+                        &live_refine,
+                        &preview.live_fingerprints,
+                        &durable_state_map(&live_refine)?,
+                    ),
                 ))
             };
         }
@@ -248,7 +259,7 @@ impl FileGitSyncService {
             &original_live,
             &remote_state,
         )?;
-        let resolved_paths = resolved.keys().cloned().collect::<BTreeSet<_>>();
+        let resolved_paths = resolved.changes.keys().cloned().collect::<BTreeSet<_>>();
         let conflicts = state_conflicts(&baseline, &original_live, &remote_state, &resolved_paths);
         if conflicts != preview.conflicting_paths {
             return Err(stale_recovery("the exact conflict set changed"));
@@ -346,7 +357,7 @@ impl FileGitSyncService {
                 &baseline,
                 &original_live,
                 &remote_state,
-                &resolved,
+                &resolved.changes,
                 &target_ref,
             )?,
         };

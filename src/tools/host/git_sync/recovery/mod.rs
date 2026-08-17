@@ -22,6 +22,7 @@ use test_hooks::*;
 #[cfg(test)]
 pub(super) use test_hooks::{
     install_after_recovery_authority_hook, install_after_recovery_baseline_hook,
+    install_during_recovery_preview_hook,
 };
 
 const RECOVERY_PATH_LIMIT: usize = 100;

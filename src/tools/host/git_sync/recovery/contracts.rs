@@ -63,6 +63,8 @@ pub struct StateRecoveryPreview {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub conflict_report_location: Option<String>,
     pub live_snapshot: String,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub live_fingerprints: BTreeMap<String, u64>,
     pub remote_snapshot: String,
     pub path_counts: StateRecoveryPathCounts,
     pub conflicting_paths: Vec<String>,

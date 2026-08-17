@@ -14,6 +14,7 @@ pub(super) fn run_git_sync_worker(
     let mut pending_since: Option<Instant> = None;
     let mut next_remote_fetch = None;
     let mut active_schedule = None;
+    let mut failure_backoff = GitSyncFailureBackoff::default();
     let mut next_attempt = Instant::now();
     loop {
         if background_automation_is_paused(runtime_root)? {
@@ -37,16 +38,18 @@ pub(super) fn run_git_sync_worker(
                 // worker restart looked like a state change and scheduled a
                 // spurious sync.
                 last_observed_fingerprint = load_persisted_fingerprint(runtime_root, &root);
-                active_root = Some(root);
+                active_root = Some(root.clone());
                 active_node_id = Some(observed_node_id.clone());
                 pending_sync = None;
                 pending_since = None;
                 next_remote_fetch = None;
                 active_schedule = None;
+                failure_backoff.reset();
                 bind_state_sync_health(runtime_root, &target_root, &observed_node_id)?;
             }
             let service = FileGitSyncService::new(&target_root, runtime_root);
             if let Ok(fingerprint) = service.durable_state_fingerprint() {
+                failure_backoff.observe(&root, &observed_node_id, fingerprint);
                 let schedule = git_sync_schedule(runtime_root, &target_root).unwrap_or_default();
                 if active_schedule != Some(schedule) {
                     if pending_sync.is_some() {
@@ -70,6 +73,13 @@ pub(super) fn run_git_sync_worker(
                 let remote_fetch_due = next_remote_fetch.is_some_and(|deadline| now >= deadline);
                 if demand_due || remote_fetch_due {
                     let node_id = state_sync_node_id(runtime_root, &target_root)?;
+                    if !failure_backoff.allows_attempt(now, false) {
+                        // Suppression is deliberately silent: no health attempt
+                        // and no activity record exists for work not launched.
+                        next_attempt = now;
+                        thread::sleep(GIT_RECONCILE_POLL_INTERVAL);
+                        continue;
+                    }
                     let source = if remote_fetch_due {
                         "background_remote_fetch"
                     } else {
@@ -92,6 +102,7 @@ pub(super) fn run_git_sync_worker(
                     };
                     match result {
                         Ok(result) if !result.deferred => {
+                            failure_backoff.reset();
                             record_state_sync_result(
                                 runtime_root,
                                 &target_root,
@@ -129,6 +140,15 @@ pub(super) fn run_git_sync_worker(
                             next_attempt = now + GIT_RECONCILE_RETRY_INTERVAL;
                         }
                         Err(error) => {
+                            let conflict_report = latest_state_sync_conflict_report(runtime_root)
+                                .ok()
+                                .flatten()
+                                .filter(|report| {
+                                    report.attempt_id == attempt_id.to_string()
+                                        && report.attempt_source == source
+                                });
+                            let failure_context =
+                                git_sync_failure_context(&error, conflict_report.as_ref());
                             record_state_sync_failure(
                                 runtime_root,
                                 &target_root,
@@ -137,7 +157,8 @@ pub(super) fn run_git_sync_worker(
                                 source,
                                 &error,
                             )?;
-                            next_attempt = now + GIT_RECONCILE_RETRY_INTERVAL;
+                            failure_backoff.record_failure(now, &failure_context);
+                            next_attempt = now;
                         }
                     }
                 }

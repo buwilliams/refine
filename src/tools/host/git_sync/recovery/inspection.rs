@@ -5,6 +5,10 @@ impl FileGitSyncService {
     /// changing any target repository ref, index, worktree, live state,
     /// baseline, or remote.
     pub fn preview_state_recovery(&self) -> RefineResult<StateRecoveryPreview> {
+        with_repository_git_lock(&self.target_root, || self.preview_state_recovery_locked())
+    }
+
+    fn preview_state_recovery_locked(&self) -> RefineResult<StateRecoveryPreview> {
         self.validate_recovery_target()?;
         let live_refine =
             crate::tools::host::project_layout::refine_dir_for_target_root(&self.target_root)?;
@@ -17,6 +21,8 @@ impl FileGitSyncService {
             return self.preview_reported_state_recovery();
         }
         let live = durable_state_map(&live_refine)?;
+        #[cfg(test)]
+        run_during_recovery_preview_hook(&self.target_root);
         if live.is_empty() || bootstrap_only_state(&live) {
             return Err(RefineError::Conflict(
                 "State recovery requires non-bootstrap live Refine state.".to_string(),
@@ -59,6 +65,7 @@ impl FileGitSyncService {
             conflict_report_id: None,
             conflict_report_location: None,
             live_snapshot: state_tree_digest(&live_refine, &live)?,
+            live_fingerprints: recovery_fingerprints(&live),
             remote_snapshot: state_tree_digest(&observation.path.join(".refine"), &remote_state)?,
             path_counts,
             conflicting_paths,
@@ -164,6 +171,34 @@ impl FileGitSyncService {
         }
         Ok(DisposableCheckout { path })
     }
+}
+
+pub(super) fn recovery_fingerprints(state: &DurableStateMap) -> BTreeMap<String, u64> {
+    state
+        .iter()
+        .map(|(path, fingerprint)| (path.to_string_lossy().replace('\\', "/"), *fingerprint))
+        .collect()
+}
+
+pub(super) fn stale_live_snapshot_reason(
+    _live_refine: &std::path::Path,
+    expected: &BTreeMap<String, u64>,
+    current: &DurableStateMap,
+) -> String {
+    let current = recovery_fingerprints(current);
+    let changed = expected
+        .keys()
+        .chain(current.keys())
+        .cloned()
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .filter(|path| expected.get(path) != current.get(path))
+        .take(8)
+        .collect::<Vec<_>>();
+    if changed.is_empty() {
+        return "the live state snapshot changed while it was being read".to_string();
+    }
+    format!("the live state snapshot changed at {}", changed.join(", "))
 }
 
 pub(super) fn recovery_path_counts(

@@ -17,7 +17,8 @@ use crate::process::supervisor::operations::{
 };
 use crate::tools::host::checkout::RefineCheckoutPaths;
 use crate::tools::host::git_sync::{
-    FileGitSyncService, GitSyncResult, StateSyncAttemptContext, latest_state_sync_conflict_report,
+    FileGitSyncService, GitSyncResult, StateSyncAttemptContext, StateSyncConflictReport,
+    latest_state_sync_conflict_report,
 };
 use crate::tools::host::project_layout::{prepare_refine_dir, refine_dir_for_target_root};
 use crate::tools::host::state_sync_health::{FileStateSyncHealthService, StateSyncHealthActivity};
@@ -78,6 +79,7 @@ struct JiraExportOperationRequest {
 mod development_requests;
 mod dispatch;
 mod git_sync;
+mod git_sync_backoff;
 mod jira_export;
 mod project_sync;
 mod schedule;
@@ -92,6 +94,7 @@ pub use dispatch::run_worker;
 
 use development_requests::*;
 use git_sync::*;
+use git_sync_backoff::*;
 use jira_export::*;
 use project_sync::*;
 pub(crate) use schedule::state_sync_stale_threshold;
