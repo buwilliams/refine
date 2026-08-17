@@ -184,6 +184,7 @@ fn test_snapshot(checkout: &Path) -> SourcePromotionSnapshot {
         local_branch: "main".to_string(),
         branch: "main".to_string(),
         available_commit: "bbb".to_string(),
+        relationship: "behind".to_string(),
         clean: true,
         fast_forward: true,
         update_available: true,
@@ -310,6 +311,42 @@ fn assert_checked_out_commit(checkout: &Path, commit: &str, contents: &str) {
         contents
     );
     assert_eq!(git_text(checkout, &["status", "--porcelain"]).unwrap(), "");
+}
+
+#[test]
+fn cached_source_snapshot_classifies_current_behind_ahead_and_diverged() {
+    let repo = initialize_promotion_repository("source-relationships");
+    let service = FileSourcePromotionService::new(&repo.checkout, repo.root.join("run/8080"), 8080);
+
+    assert_eq!(service.inspect(false).unwrap().relationship, "behind");
+
+    git_ok(
+        &repo.checkout,
+        &["reset", "--hard", "--quiet", &repo.to_commit],
+    )
+    .unwrap();
+    assert_eq!(service.inspect(false).unwrap().relationship, "current");
+
+    fs::write(repo.checkout.join("fixture.txt"), "ahead fixture\n").unwrap();
+    git_ok(&repo.checkout, &["add", "fixture.txt"]).unwrap();
+    git_ok(&repo.checkout, &["commit", "--quiet", "-m", "ahead source"]).unwrap();
+    assert_eq!(service.inspect(false).unwrap().relationship, "ahead");
+
+    git_ok(
+        &repo.checkout,
+        &["reset", "--hard", "--quiet", &repo.from_commit],
+    )
+    .unwrap();
+    fs::write(repo.checkout.join("fixture.txt"), "diverged fixture\n").unwrap();
+    git_ok(&repo.checkout, &["add", "fixture.txt"]).unwrap();
+    git_ok(
+        &repo.checkout,
+        &["commit", "--quiet", "-m", "diverged source"],
+    )
+    .unwrap();
+    assert_eq!(service.inspect(false).unwrap().relationship, "diverged");
+
+    fs::remove_dir_all(repo.root).unwrap();
 }
 
 #[test]

@@ -83,9 +83,14 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
         body: None,
     });
     assert_eq!(upgrade.status, 200);
-    assert_eq!(upgrade.body["upgrade"]["available"], false);
-    assert_eq!(upgrade.body["upgrade"]["upgrade_available"], false);
-    assert_eq!(upgrade.body["upgrade"]["local_development"], true);
+    assert_eq!(upgrade.body["upgrade"]["runtime_kind"], "source");
+    assert!(upgrade.body["upgrade"]["source"]["executable"].is_object());
+    assert_eq!(upgrade.body["upgrade"]["source"]["relationship"], "unknown");
+    assert!(
+        upgrade.body["upgrade"]["source"]["unknown_reason"]
+            .as_str()
+            .is_some()
+    );
 
     let install = server.handle(ApiRequest {
         method: "POST".to_string(),

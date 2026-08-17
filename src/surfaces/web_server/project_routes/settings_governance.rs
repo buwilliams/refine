@@ -78,32 +78,19 @@ impl InProcessWebServer {
             .map(|value| value.trim().to_string())
             .filter(|value| !value.is_empty())
             .unwrap_or_else(|| current_version.to_string());
-        let upgrade_available = latest_version != current_version;
-        let local_development = !upgrade_available;
-        let command = std::env::current_exe()
-            .ok()
-            .map(|path| path.display().to_string())
-            .unwrap_or_else(|| "refine".to_string());
-        ApiResponse::json(
-            200,
-            json!({
-                "upgrade": {
-                    "available": upgrade_available,
-                    "upgrade_available": upgrade_available,
-                    "current_version": current_version,
-                    "latest_version": latest_version,
-                    "launch_mode": current_launch_mode(),
-                    "executable_path": current_launch_executable(),
-                    "local_development": local_development,
-                    "message": if upgrade_available {
-                        format!("Refine {latest_version} is available; current version is {current_version}.")
-                    } else {
-                        format!("Running native Refine {current_version}; remote release discovery is not configured for this build.")
-                    },
-                    "command": command
-                }
-            }),
+        let checkout = self
+            .product_paths
+            .as_ref()
+            .map(|paths| paths.checkout.clone())
+            .unwrap_or_default();
+        let upgrade = crate::tools::host::runtime_status::FileRuntimeStatusService::new(
+            checkout,
+            self.runtime_root.clone(),
+            self.status.port,
+            current_launch_executable(),
         )
+        .inspect(current_version, &latest_version);
+        ApiResponse::json(200, json!({"upgrade": upgrade}))
     }
 
     pub(crate) fn handle_governance_get(&self) -> ApiResponse {

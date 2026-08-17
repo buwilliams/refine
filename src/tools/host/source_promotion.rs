@@ -62,6 +62,10 @@ pub struct SourcePromotionSnapshot {
     pub local_branch: String,
     pub branch: String,
     pub available_commit: String,
+    /// Cached ancestry between `current_commit` and `available_commit`.
+    /// Values are current, behind, ahead, diverged, or unknown.
+    #[serde(default)]
+    pub relationship: String,
     pub clean: bool,
     pub fast_forward: bool,
     pub update_available: bool,

@@ -18,7 +18,7 @@ use crate::model::workflow::GoalStatus;
 use crate::process::runner::FileRunnerWorkerService;
 use crate::process::subprocess::{FileProcessSupervisor, ProcessOwner, ProcessSupervisor};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::process::supervisor::lifecycle::{current_launch_executable, current_launch_mode};
+use crate::process::supervisor::lifecycle::current_launch_executable;
 use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationRegistry, OperationState,
 };

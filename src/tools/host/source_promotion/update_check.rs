@@ -494,6 +494,7 @@ impl FileSourcePromotionService {
             local_branch: String::new(),
             branch: String::new(),
             available_commit: String::new(),
+            relationship: "unknown".to_string(),
             clean: false,
             fast_forward: false,
             update_available: false,

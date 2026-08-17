@@ -35,6 +35,17 @@ Workers and direct lifecycle handoffs inherit that active executable; only
 installed service registration, deployed update, and source activation require
 the stable `bin/refine` path.
 
+The running executable also carries immutable build provenance. A published
+release classification requires an exact source build whose commit has the
+semantic version tag matching the executable's package version. Every other
+executable is a source runtime. Source status compares that embedded commit
+with the owning checkout's live HEAD and with the local and upstream commit
+identities from the durable source-update cache. Refine claims that the
+executable is running from HEAD, or that HEAD is current, behind, ahead, or
+diverged from upstream, only when all identities agree and the cache is fresh;
+missing, stale, dirty-build, or mismatched provenance remains explicitly
+unknown.
+
 Refine owns no configuration or state files outside the synchronized project
 state and `<product-home>/run`. Agent credentials and toolchain configuration
 belong to the host: Refine invokes agents with the host's shell environment —

@@ -457,6 +457,7 @@ fn validation_rejects_dirty_diverged_active_and_current_snapshots() {
         local_branch: "main".to_string(),
         branch: "main".to_string(),
         available_commit: "bbb".to_string(),
+        relationship: "behind".to_string(),
         clean: true,
         fast_forward: true,
         update_available: true,

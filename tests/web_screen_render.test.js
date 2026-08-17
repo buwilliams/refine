@@ -1507,10 +1507,10 @@ test("settings refresh never clears the Upgrade banner while its read is pending
     if (pathname.startsWith("/api/upgrade")) {
       return {
         upgrade: {
+          runtime_kind: "published_release",
           current_version: "4.0.0",
           latest_version: "4.1.0",
           upgrade_available: true,
-          local_development: false,
         },
       };
     }
@@ -1558,10 +1558,10 @@ test("settings refresh never clears the Upgrade banner while its read is pending
         };
         releaseUpgrade({
           upgrade: {
+            runtime_kind: "published_release",
             current_version: "4.0.0",
             latest_version: "4.2.0",
             upgrade_available: true,
-            local_development: false,
           },
         });
         await pendingUpgradeRead;
@@ -1580,6 +1580,55 @@ test("settings refresh never clears the Upgrade banner while its read is pending
     assert.match(result.whilePending.text, /Upgrade available 4\.1\.0/);
     assert.equal(result.whilePending.mutations, 0);
     assert.match(result.afterRead, /Upgrade available 4\.2\.0/);
+    assert.deepEqual(app.pageErrors, []);
+  } finally {
+    await app.close();
+  }
+});
+
+test("runtime banner distinguishes trusted source relationships from unknown evidence", { skip: SKIP }, async () => {
+  const app = await openApp();
+  try {
+    const messages = await app.page.evaluate(() => {
+      const text = (upgrade) => {
+        const root = document.createElement("div");
+        root.innerHTML = renderRuntimeUpgradeBanner(upgrade);
+        return root.textContent.replace(/\s+/g, " ").trim();
+      };
+      return {
+        current: text({
+          runtime_kind: "source",
+          source: {
+            running_from_head: true,
+            relationship: "current",
+            upstream: { remote: "origin", branch: "main" },
+          },
+        }),
+        diverged: text({
+          runtime_kind: "source",
+          source: {
+            running_from_head: true,
+            relationship: "diverged",
+            upstream: { remote: "origin", branch: "main" },
+          },
+        }),
+        unknown: text({
+          runtime_kind: "source",
+          source: {
+            running_from_head: null,
+            relationship: "unknown",
+            unknown_reason: "executable_checkout_mismatch",
+            upstream: { freshness: "fresh" },
+          },
+        }),
+      };
+    });
+    assert.equal(messages.current, "Running from HEAD · Up to date with origin/main");
+    assert.equal(messages.diverged, "Running from HEAD · Diverged from origin/main");
+    assert.equal(
+      messages.unknown,
+      "Source runtime status unknown · the running executable does not match checkout HEAD",
+    );
     assert.deepEqual(app.pageErrors, []);
   } finally {
     await app.close();
