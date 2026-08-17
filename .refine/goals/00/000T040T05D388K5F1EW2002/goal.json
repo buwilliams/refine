@@ -106,8 +106,36 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-08-17T14:23:13Z",
+        "criticism": {
+          "completed_at": "2026-08-17T14:24:44Z",
+          "git_after": {
+            "branch": "refine/00000T040T05D388K5F1EW2002/round-1",
+            "head_commit": "bd392b96216d26fa00b5ef5d307af5abb2bd398f",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T040T05D388K5F1EW2002/round-1",
+            "head_commit": "bd392b96216d26fa00b5ef5d307af5abb2bd398f",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P1"
+                ],
+                "description": "The plan changes documented Goal surface behavior but does not update the affected Goal intent page, despite the configured documentation rule.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Add a checklist item to document the eligible transfer-to-active-node action and its shared server-side constraints in docs/intent/04-surfaces/03-browser/08-goal.md."
+              }
+            ],
+            "summary": "The implementation plan is sound except for one governance-relevant documentation omission."
+          },
+          "started_at": "2026-08-17T14:23:14Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-08-17T14:24:44Z",
         "proposal": {
           "completed_at": "2026-08-17T14:23:13Z",
           "git_after": {
@@ -142,7 +170,7 @@
         "schema_version": 2,
         "started_at": "2026-08-17T14:22:15Z",
         "state": "in_progress",
-        "updated_at": "2026-08-17T14:23:13Z"
+        "updated_at": "2026-08-17T14:24:44Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -156,7 +184,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-17T14:23:13Z",
+      "updated": "2026-08-17T14:24:44Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T14:22:15Z",
         "round_idx": 0,
@@ -168,6 +196,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-17T14:23:13Z",
-  "workflow_revision": 9
+  "updated": "2026-08-17T14:24:44Z",
+  "workflow_revision": 11
 }
