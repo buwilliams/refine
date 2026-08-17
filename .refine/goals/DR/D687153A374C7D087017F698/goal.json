@@ -106,8 +106,25 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-08-17T19:39:11Z",
+        "criticism": {
+          "completed_at": "2026-08-17T19:40:26Z",
+          "git_after": {
+            "branch": "refine/DRD687153A374C7D087017F698/round-1",
+            "head_commit": "71fc6d75497442c9ef28df879539dcfb3235e761",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRD687153A374C7D087017F698/round-1",
+            "head_commit": "71fc6d75497442c9ef28df879539dcfb3235e761",
+            "status_porcelain": []
+          },
+          "result": {
+            "summary": "The plan correctly removes the shared desktop width cap while preserving layout behavior and documenting the resulting browser surface contract."
+          },
+          "started_at": "2026-08-17T19:39:11Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-08-17T19:40:26Z",
         "proposal": {
           "completed_at": "2026-08-17T19:39:11Z",
           "git_after": {
@@ -138,7 +155,7 @@
         "schema_version": 2,
         "started_at": "2026-08-17T19:37:52Z",
         "state": "in_progress",
-        "updated_at": "2026-08-17T19:39:11Z"
+        "updated_at": "2026-08-17T19:40:26Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -152,7 +169,7 @@
       "quality_state": "unclassified",
       "reporter": "ethan.jacobson@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-17T19:39:11Z",
+      "updated": "2026-08-17T19:40:26Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T19:37:51Z",
         "round_idx": 0,
@@ -164,6 +181,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-17T19:39:11Z",
-  "workflow_revision": 9
+  "updated": "2026-08-17T19:40:26Z",
+  "workflow_revision": 11
 }
