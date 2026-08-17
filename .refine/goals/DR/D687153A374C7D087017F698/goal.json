@@ -253,13 +253,15 @@
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
       "prompt": "From: Ethan Jacobson <ethan.jacobson@insurity.com>\nSubject: Use full width of screen\n\nBody:\nOn a wide window, Refine wastes a lot of real estate, and I can't read the contents of the columns (e.g., Node still gets clipped).  If we ever add more columns (like a brief status detail) the is surely no room.  I would prefer if the layout of refine used the full window width.\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nEthan Jacobson\r\nEthan.Jacobson@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
+      "quality_agent_report": "Quality reviewed candidate 04eab0ddade6011daef8da0d4b97c03aa3393754 and found no defects requiring correction. The candidate removes only the shared main container's 1120px cap, preserves its gutters, width, flex, scroll, and narrow-screen declarations, documents the full-width browser Main contract, and adds focused static regression coverage. Exact verification: focused Rust test passed 1/1; full Rust unit suite passed 1026 with 6 ignored; browser JavaScript suite passed 207 with 28 Playwright cases skipped because Chromium is unavailable; changed Rust files passed rustfmt; candidate diff passed git diff --check and the worktree is clean. Repository-wide rustfmt remains blocked by an unchanged processes.rs difference, and strict Clippy remains blocked by six warnings in five unchanged candidate-external files.",
+      "quality_candidate_commit": "04eab0ddade6011daef8da0d4b97c03aa3393754",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "ethan.jacobson@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-17T19:49:52Z",
+      "updated": "2026-08-17T19:57:07Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T19:37:51Z",
         "round_idx": 0,
@@ -271,6 +273,6 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-17T19:49:52Z",
-  "workflow_revision": 21
+  "updated": "2026-08-17T19:57:07Z",
+  "workflow_revision": 23
 }
