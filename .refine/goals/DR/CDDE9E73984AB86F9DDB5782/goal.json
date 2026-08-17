@@ -123,6 +123,45 @@
           },
           "started_at": "2026-08-17T12:18:02Z"
         },
+        "final_plan": {
+          "completed_at": "2026-08-17T12:22:32Z",
+          "git_after": {
+            "branch": "refine/DRCDDE9E73984AB86F9DDB5782/round-1",
+            "head_commit": "333849baec66db01a61b6a9108cda0e697c9ac90",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRCDDE9E73984AB86F9DDB5782/round-1",
+            "head_commit": "333849baec66db01a61b6a9108cda0e697c9ac90",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Add a cohesive node-registry merge module beside the existing Goal merge that parses base, local, and remote snapshots through NodeRegistry, requires unique nonempty canonical node identities and comparable update timestamps, retains the union of records, preserves one-sided changes, chooses the later version of a concurrently changed record, and declines ambiguous ties or invalid input.",
+                "id": "P1"
+              },
+              {
+                "description": "Extend the existing semantic reconciliation boundary to prepare nodes.json and Goal results before generic conflict detection in both the initial pass and rejected-push retry, then carry all prepared paths through the established commit, live hydration, concurrent-write preservation, and baseline flow.",
+                "id": "P2"
+              },
+              {
+                "description": "Keep automatic resolution atomic and narrow by never inferring node deletion from an absent record, withholding every prepared merge when any unrelated path remains unresolved, and retaining complete conflict reporting for malformed registries, duplicate identities, timestamp ambiguity, or genuine shared-state divergence.",
+                "id": "P3"
+              },
+              {
+                "description": "Add focused unit and multi-node synchronization regressions covering disjoint heartbeat updates, record union, one-sided record changes, later-timestamp selection, equal-timestamp disagreement, malformed or duplicate registries, mixed unresolved paths, and remote advancement during a rejected push.",
+                "id": "P4"
+              },
+              {
+                "description": "Update the Target App and Fleet intent pages in their existing format to define nodes.json as semantically merged shared state whose heartbeat-only churn does not stale-fence sync health or downgrade fleet-count authority while ambiguous or genuine conflicts still fail closed.",
+                "id": "P5"
+              }
+            ],
+            "summary": "Make nodes.json a semantically reconciled per-node registry during ordinary Git state synchronization so independent heartbeat updates converge across active nodes while invalid or ambiguous registry changes and genuine shared-state conflicts remain fenced."
+          },
+          "started_at": "2026-08-17T12:20:51Z"
+        },
         "phase": "revise",
         "phase_started_at": "2026-08-17T12:20:51Z",
         "proposal": {
@@ -167,7 +206,7 @@
         "schema_version": 2,
         "started_at": "2026-08-17T12:14:32Z",
         "state": "in_progress",
-        "updated_at": "2026-08-17T12:20:51Z"
+        "updated_at": "2026-08-17T12:22:32Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -181,7 +220,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-17T12:20:51Z",
+      "updated": "2026-08-17T12:22:32Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T12:14:31Z",
         "round_idx": 0,
@@ -193,6 +232,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-17T12:20:51Z",
-  "workflow_revision": 11
+  "updated": "2026-08-17T12:22:32Z",
+  "workflow_revision": 12
 }
