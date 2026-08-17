@@ -1,7 +1,7 @@
 {
   "base_commit": "bd392b96216d26fa00b5ef5d307af5abb2bd398f",
   "branch_name": "refine/DR05060B5D11A47E115C6D1210/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "672f0c5bca306d3ebf9092c83e907f23eb4d8495",
   "created": "2026-08-17T14:18:03Z",
   "feature_id": null,
   "feature_order": null,
@@ -95,7 +95,28 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-17T14:49:13Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "bd392b96216d26fa00b5ef5d307af5abb2bd398f",
@@ -106,6 +127,7 @@
           "round_idx": 0,
           "target_branch": "main"
         },
+        "completed_at": "2026-08-17T14:49:13Z",
         "criticism": {
           "completed_at": "2026-08-17T14:23:57Z",
           "git_after": {
@@ -228,6 +250,65 @@
           "message": "The finalized plan does not require any governance or constitutional violation.",
           "status": "passed"
         },
+        "implementation": {
+          "completed_at": "2026-08-17T14:49:13Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Separated absent baseline metadata from unavailable recorded bytes and introduced structured per-path reconstruction and reconciliation outcomes used in first-pass and push-retry handling.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added a nodes.json-only two-way fallback that validates both NodeRegistry values, retains the canonical id union, requires strictly comparable updated_at ordering for unequal shared records, and rejects malformed or equal-time disagreement; missing whole-baseline and Goal paths remain fail closed.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Baseline metadata v2 binds fingerprints to an exact snapshot OID and unique refs/refine/state-baseline anchor; the anchor and owned state map are synced and validated before atomic metadata replacement, and stale anchors are retired only afterward while legacy maps remain readable.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Recorded bytes resolve from the metadata-bound retained snapshot before legacy history; sync details distinguish safe fallback success, health errors name unavailable bytes or semantic rejection, and versioned complete conflict reports persist structured outcomes.",
+                "id": "P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Recovery previews now capture under the repository operation lock already held by apply and sync, previews carry per-path fingerprints, and stale errors name changed durable paths. Regression evidence confirms concurrent sync-owned writes wait for preview; it also proves node-local state_sync activity logs were already excluded from the durable snapshot and require no new fence exception.",
+                "id": "P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added capped in-memory exponential background-failure backoff keyed by target, node, local fingerprint, and failure context; success and meaningful scope changes reset it, suppressed intervals launch no health attempt or activity, and explicit project sync remains outside and bypasses background suppression.",
+                "id": "P6",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added focused tests for first-pass and push-retry fallback, malformed/equal-time rejection, retained-anchor interruption and legacy load, recovery concurrency and exact changed paths, activity exclusion, and deterministic backoff growth, reset, cap, suppression, and explicit bypass.",
+                "id": "P7",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated only target-app, fleet, and activity-evidence intent pages for the fallback authority, retained snapshot pair, recovery boundary and diagnostics, structured outcomes, and background backoff.",
+                "id": "P8",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "cargo test -> exit 0; xtask test-unit reported 1009 passed, 0 failed, 6 ignored",
+              "cargo test --lib -> 1009 passed, 0 failed, 6 ignored",
+              "cargo test --lib tools::host::git_sync:: -- --nocapture -> 72 passed, 0 failed before the final activity-boundary regression; the added regression passed under cargo test and cargo test --lib",
+              "cargo test --lib process::runner:: -- --nocapture -> 19 passed, 0 failed",
+              "cargo clippy --lib --tests -- -D warnings -A clippy::needless-pub-self -A clippy::unnecessary-sort-by -> passed",
+              "rustfmt --edition 2024 --check on all changed Rust files -> passed",
+              "git diff --check -> passed",
+              "cargo fmt --all -- --check -> unchanged baseline failure only at src/tools/observability/processes.rs:387"
+            ]
+          },
+          "report": "Implemented narrow nodes.json convergence without reconstructable recorded bytes, versioned retained baseline anchors, structured conflict diagnostics, recovery snapshot coordination, capped background retry backoff, focused regressions, and affected intent updates. Verification: cargo test exited 0 through xtask test-unit with 1009 passed and 6 platform-gated ignored; cargo test --lib tools::host::git_sync:: passed 72 tests before the final activity-boundary regression, which also passed in the full suite; cargo test --lib process::runner:: passed 19 tests; cargo clippy --lib --tests -- -D warnings -A clippy::needless-pub-self -A clippy::unnecessary-sort-by passed; rustfmt --edition 2024 --check on every changed Rust file passed; git diff --check passed. Repository-wide cargo fmt --all -- --check remains blocked only by pre-existing untouched formatting in src/tools/observability/processes.rs:387, and unallowlisted strict Clippy remains blocked only by untouched needless_pub_self findings in src/tools/product/project_projection/store.rs:46 and :54 plus unnecessary_sort_by in src/surfaces/web_server/http/background_loops.rs:213.",
+          "started_at": "2026-08-17T14:25:04Z"
+        },
         "phase": "implement",
         "phase_started_at": "2026-08-17T14:25:04Z",
         "proposal": {
@@ -279,11 +360,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-08-17T14:18:04Z",
-        "state": "in_progress",
-        "updated_at": "2026-08-17T14:25:04Z"
+        "state": "completed",
+        "updated_at": "2026-08-17T14:49:13Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Implemented narrow nodes.json convergence without reconstructable recorded bytes, versioned retained baseline anchors, structured conflict diagnostics, recovery snapshot coordination, capped background retry backoff, focused regressions, and affected intent updates. Verification: cargo test exited 0 through xtask test-unit with 1009 passed and 6 platform-gated ignored; cargo test --lib tools::host::git_sync:: passed 72 tests before the final activity-boundary regression, which also passed in the full suite; cargo test --lib process::runner:: passed 19 tests; cargo clippy --lib --tests -- -D warnings -A clippy::needless-pub-self -A clippy::unnecessary-sort-by passed; rustfmt --edition 2024 --check on every changed Rust file passed; git diff --check passed. Repository-wide cargo fmt --all -- --check remains blocked only by pre-existing untouched formatting in src/tools/observability/processes.rs:387, and unallowlisted strict Clippy remains blocked only by untouched needless_pub_self findings in src/tools/product/project_projection/store.rs:46 and :54 plus unnecessary_sort_by in src/surfaces/web_server/http/background_loops.rs:213.",
+      "implementation_reported_at": "2026-08-17T14:49:13Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -294,7 +375,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-17T14:25:04Z",
+      "updated": "2026-08-17T14:49:13Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T14:18:03Z",
         "round_idx": 0,
@@ -304,8 +385,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-17T14:25:04Z",
-  "workflow_revision": 15
+  "updated": "2026-08-17T14:49:14Z",
+  "workflow_revision": 20
 }
