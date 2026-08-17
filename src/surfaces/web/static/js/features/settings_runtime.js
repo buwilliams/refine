@@ -63,6 +63,10 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
     ["1800", "30 minutes"],
     ["3600", "1 hour"],
   ];
+  const autoRecoveryOptions = [
+    ["remote", "Automatic (remote wins; this node's Goals stay live)"],
+    ["off",    "Off — hold conflicts for operator review"],
+  ];
   const providerOptions = [
     ["claude", "Claude Code (default)"],
     ["codex", "OpenAI Codex"],
@@ -78,6 +82,7 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
   const stateDebounce = String(s.state_sync_debounce_seconds ?? "5");
   const remoteFetchInterval = String(s.project_update_pulse_interval_seconds ?? "300");
   const staleThreshold = String(s.state_sync_stale_threshold_seconds ?? "900");
+  const autoRecovery = String(s.state_sync_auto_recovery ?? "remote");
   return `
     <section class="settings-section">
       <h3>Runtime configuration</h3>
@@ -219,6 +224,16 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
         valueLabel: optionLabel(staleThresholdOptions, staleThreshold),
         control: `<select id="s-state-sync-stale-threshold" data-testid="runtime-state-sync-stale-threshold">
           ${staleThresholdOptions.map(([v, lbl]) => `<option value="${v}" ${staleThreshold === v ? "selected" : ""}>${lbl}</option>`).join("")}
+        </select>`,
+      })}
+      ${renderSettingsEditableField({
+        id: "s-state-sync-auto-recovery",
+        label: "State sync conflict recovery",
+        guideItemId: "runtime-project-update-pulse",
+        description: "when nodes diverge, converge automatically: remote is authoritative except Goals this node owned at the last agreed state, which keep their local copy. The displaced side is always retained on a recovery ref.",
+        valueLabel: optionLabel(autoRecoveryOptions, autoRecovery),
+        control: `<select id="s-state-sync-auto-recovery" data-testid="runtime-state-sync-auto-recovery">
+          ${autoRecoveryOptions.map(([v, lbl]) => `<option value="${v}" ${autoRecovery === v ? "selected" : ""}>${lbl}</option>`).join("")}
         </select>`,
       })}
       ${renderSettingsEditableField({
@@ -385,6 +400,7 @@ async function autosaveSettingsRuntime(options = {}) {
     state_sync_debounce_seconds: $("#s-state-sync-debounce").value,
     project_update_pulse_interval_seconds: $("#s-project-update-pulse").value,
     state_sync_stale_threshold_seconds: $("#s-state-sync-stale-threshold").value,
+    state_sync_auto_recovery: $("#s-state-sync-auto-recovery").value,
     file_browser_ignore_patterns: $("#s-file-browser-ignore").value,
     agent_cli: chosen,
   });
@@ -398,7 +414,7 @@ function bindNodeRuntimeConfigControls() {
   const root = document.querySelector('[data-tab-pane="runtime"]');
   const autosaveRuntime = bindSettingsAutosave(
     root,
-    "#s-cap, #s-pattern, #s-idle, #s-hard, #s-worker-memory, #s-ui-memory, #s-worker-cpu-priority, #s-resource-isolation, #s-agent-limit-pause, #s-chat-idle, #s-backlog-promote, #s-worktree-cleanup-delay, #s-state-sync-debounce, #s-project-update-pulse, #s-state-sync-stale-threshold, #s-file-browser-ignore",
+    "#s-cap, #s-pattern, #s-idle, #s-hard, #s-worker-memory, #s-ui-memory, #s-worker-cpu-priority, #s-resource-isolation, #s-agent-limit-pause, #s-chat-idle, #s-backlog-promote, #s-worktree-cleanup-delay, #s-state-sync-debounce, #s-project-update-pulse, #s-state-sync-stale-threshold, #s-state-sync-auto-recovery, #s-file-browser-ignore",
     autosaveSettingsRuntime,
     { event: "settings-editable-commit" },
   );

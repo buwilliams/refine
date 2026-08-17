@@ -17,6 +17,7 @@ pub(super) use hydration::hydrate_remote_with_recovery_cas;
 #[cfg(not(test))]
 use hydration::*;
 pub(super) use hydration::{hydrate_recovery_target_from_map, hydrate_recovery_target_with_cas};
+pub use run::StateRecoveryRunPolicy;
 use storage::*;
 #[cfg(test)]
 use test_hooks::*;

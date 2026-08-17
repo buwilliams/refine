@@ -189,17 +189,19 @@ three-way baseline is missing while non-bootstrap live state and the configured
 remote's existing `refine/state` branch are both present. Ordinary sync remains
 fail-closed in this topology and does not choose either side.
 
-When the authority choice is already made — for fleet convergence that is
-normally `remote` — prefer the consolidated one-shot command and skip the rest
-of this procedure:
+The daemon normally converges this automatically (see
+`docs/runbooks/state-sync-recovery.md` for the decision ladder). On an
+opted-out node, prefer the consolidated one-shot command and skip the rest of
+this procedure:
 
 ```bash
-refine project state-recovery run --authority remote
+refine project state-recovery run
 ```
 
 It performs sync, preview, apply, and the verifying sync as one operation with
-bounded internal race retries (see `docs/runbooks/state-sync-recovery.md`). Do
-not wrap it in your own retry loop. Use the manual preview flow below when an
+bounded internal race retries, deciding per path by Goal ownership at the
+agreed baseline (explicit `--authority remote|live` forces one side). Do not
+wrap it in your own retry loop. Use the manual preview flow below when an
 operator needs to review the comparison before choosing authority.
 
 1. Run the preview through the daemon-backed CLI and save the complete JSON:

@@ -1221,3 +1221,72 @@ fn run_surfaces_non_race_failures_immediately_without_retrying() {
         "a non-race failure must not consume bounded race retries"
     );
 }
+
+fn write_owned_goal(root: &Path, id: &str, node_id: &str, name: &str) {
+    let goal = refine_dir_for_target_root(root)
+        .unwrap()
+        .join("goals")
+        .join(&id[..2])
+        .join(&id[2..]);
+    fs::create_dir_all(&goal).unwrap();
+    fs::write(
+        goal.join("goal.json"),
+        format!(
+            r#"{{"id":"{id}","name":"{name}","status":"todo","rounds":[],"node_id":"{node_id}"}}"#
+        ),
+    )
+    .unwrap();
+}
+
+#[test]
+fn run_ownership_policy_keeps_owned_goals_live_and_converges_the_rest() {
+    let fixture = SyncFixture::new("recovery-run-ownership");
+    // Node b's active identity resolves to "default"; AAOWNED0 is its goal at
+    // the agreed baseline, BBOTHER0 belongs to another node.
+    write_owned_goal(&fixture.a, "AAOWNED0", "default", "base");
+    write_owned_goal(&fixture.a, "BBOTHER0", "node-a", "base");
+    fixture.service(&fixture.a).sync().unwrap();
+    fixture.service(&fixture.b).sync().unwrap();
+    write_owned_goal(&fixture.a, "AAOWNED0", "default", "remote-edit");
+    write_owned_goal(&fixture.a, "BBOTHER0", "node-a", "remote-edit");
+    fixture.service(&fixture.a).sync().unwrap();
+    write_owned_goal(&fixture.b, "AAOWNED0", "default", "live-edit");
+    write_owned_goal(&fixture.b, "BBOTHER0", "node-a", "live-edit");
+
+    let result = fixture
+        .service(&fixture.b)
+        .run_state_recovery_with_policy(StateRecoveryRunPolicy::OwnershipPrefersRemote)
+        .unwrap();
+
+    assert!(result.ok && result.recovered, "{result:#?}");
+    let recovery = result.recovery.expect("a recovery result");
+    assert_eq!(
+        recovery.overrides,
+        vec![StateRecoveryOverride {
+            path: "goals/AA/OWNED0/goal.json".to_string(),
+            authority: StateRecoveryAuthority::Live,
+        }],
+        "only the owned goal keeps its live copy"
+    );
+    let read_name = |root: &Path, shard: &str, rest: &str| {
+        let bytes = fs::read(
+            refine_dir_for_target_root(root)
+                .unwrap()
+                .join("goals")
+                .join(shard)
+                .join(rest)
+                .join("goal.json"),
+        )
+        .unwrap();
+        serde_json::from_slice::<serde_json::Value>(&bytes).unwrap()["name"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    };
+    assert_eq!(read_name(&fixture.b, "AA", "OWNED0"), "live-edit");
+    assert_eq!(read_name(&fixture.b, "BB", "OTHER0"), "remote-edit");
+    // The fleet converges to the same per-path decision.
+    fixture.service(&fixture.a).sync().unwrap();
+    assert_eq!(read_name(&fixture.a, "AA", "OWNED0"), "live-edit");
+    assert_eq!(read_name(&fixture.a, "BB", "OTHER0"), "remote-edit");
+}

@@ -147,15 +147,19 @@ pub enum ProjectAction {
 pub enum ProjectStateRecoveryAction {
     /// Synchronize and, if synchronization is rejected, preview and apply
     /// stale-fenced recovery as one operation with bounded race retries.
+    ///
+    /// Without --authority, the ownership policy decides per path: remote is
+    /// authoritative except Goal records this node owned at the last agreed
+    /// baseline, which keep their live copy.
     Run {
-        /// Which side is authoritative for conflicting paths.
-        #[arg(long, value_enum, default_value = "remote")]
-        authority: CliStateRecoveryAuthority,
+        /// Force one side for every conflicting path instead of the ownership policy.
+        #[arg(long, value_enum)]
+        authority: Option<CliStateRecoveryAuthority>,
         /// Reported conflict path that should use live authority instead of the default.
-        #[arg(long = "live-path")]
+        #[arg(long = "live-path", requires = "authority")]
         live_paths: Vec<PathBuf>,
         /// Reported conflict path that should use remote authority instead of the default.
-        #[arg(long = "remote-path")]
+        #[arg(long = "remote-path", requires = "authority")]
         remote_paths: Vec<PathBuf>,
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]

@@ -186,8 +186,10 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                 },
         } => {
             let runtime_root = refine_dir_for_target_root(&target_root)?.join("runtime");
-            let result = FileGitSyncService::new(target_root, runtime_root)
-                .run_state_recovery(recovery_decision(authority, live_paths, remote_paths))?;
+            let result =
+                FileGitSyncService::new(target_root, runtime_root).run_state_recovery_with_policy(
+                    recovery_run_policy(authority, live_paths, remote_paths),
+                )?;
             print_json(&serde_json::to_value(result).unwrap());
             Ok(())
         }
@@ -206,9 +208,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
             let response = daemon_json(
                 "POST",
                 "/project/state-recovery/run",
-                Some(json!({
-                    "decision": recovery_decision(authority, live_paths, remote_paths)
-                })),
+                recovery_run_request_body(authority, live_paths, remote_paths),
             )?;
             print_json(&response);
             Ok(())
@@ -379,9 +379,7 @@ pub(super) fn dispatch_project_daemon(action: ProjectAction) -> RefineResult<()>
             } => daemon_json(
                 "POST",
                 "/project/state-recovery/run",
-                Some(json!({
-                    "decision": recovery_decision(authority, live_paths, remote_paths)
-                })),
+                recovery_run_request_body(authority, live_paths, remote_paths),
             )?,
             ProjectStateRecoveryAction::Preview { .. } => {
                 daemon_json("GET", "/project/state-recovery/preview", None)?
@@ -450,6 +448,35 @@ fn recovery_authority(
             crate::tools::host::git_sync::StateRecoveryAuthority::Remote
         }
     }
+}
+
+/// An explicit `--authority` forces a fixed decision; without one, the run
+/// resolves per-path authority from Goal ownership at the agreed baseline.
+fn recovery_run_policy(
+    authority: Option<CliStateRecoveryAuthority>,
+    live_paths: Vec<PathBuf>,
+    remote_paths: Vec<PathBuf>,
+) -> crate::tools::host::git_sync::StateRecoveryRunPolicy {
+    use crate::tools::host::git_sync::StateRecoveryRunPolicy;
+    match authority {
+        Some(authority) => {
+            StateRecoveryRunPolicy::Decision(recovery_decision(authority, live_paths, remote_paths))
+        }
+        None => StateRecoveryRunPolicy::OwnershipPrefersRemote,
+    }
+}
+
+/// No body asks the daemon for its ownership-policy default.
+fn recovery_run_request_body(
+    authority: Option<CliStateRecoveryAuthority>,
+    live_paths: Vec<PathBuf>,
+    remote_paths: Vec<PathBuf>,
+) -> Option<serde_json::Value> {
+    authority.map(|authority| {
+        json!({
+            "decision": recovery_decision(authority, live_paths, remote_paths)
+        })
+    })
 }
 
 fn recovery_decision(

@@ -24,6 +24,7 @@ pub(super) fn default_settings() -> JsonObject {
         ("worktree_cleanup_after_seconds", "0"),
         ("state_sync_debounce_seconds", "5"),
         ("state_sync_stale_threshold_seconds", "900"),
+        ("state_sync_auto_recovery", "remote"),
         ("project_update_pulse_interval_seconds", "300"),
         ("file_browser_ignore_patterns", ""),
         ("agent_subpath", ""),
@@ -80,6 +81,7 @@ pub(super) fn allowed_settings() -> BTreeSet<&'static str> {
         "worktree_cleanup_after_seconds",
         "state_sync_debounce_seconds",
         "state_sync_stale_threshold_seconds",
+        "state_sync_auto_recovery",
         "project_update_pulse_interval_seconds",
         "file_browser_ignore_patterns",
         "agent_subpath",
@@ -225,6 +227,18 @@ pub(super) fn normalize_setting(key: &str, value: &Value) -> RefineResult<String
             }
         }
         "state_sync_stale_threshold_seconds" => normalize_range(key, value, 1, 86_400),
+        // Automatic recovery never chooses live authority: republishing a
+        // node's divergent state to the fleet is always a deliberate act.
+        "state_sync_auto_recovery" => {
+            let choice = as_string(value).trim().to_ascii_lowercase();
+            if matches!(choice.as_str(), "remote" | "off") {
+                Ok(choice)
+            } else {
+                Err(RefineError::InvalidInput(
+                    "state_sync_auto_recovery must be remote or off".to_string(),
+                ))
+            }
+        }
         key if key.ends_with("_timeout_seconds")
             || matches!(
                 key,

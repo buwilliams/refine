@@ -344,24 +344,35 @@ impl InProcessWebServer {
             Ok(None) => return target_root_unavailable("run state synchronization recovery"),
             Err(error) => return error_response(error),
         };
+        use crate::tools::host::git_sync::{StateRecoveryDecision, StateRecoveryRunPolicy};
         let body = request.body.unwrap_or_else(|| json!({}));
-        let decision = match body.get("decision").cloned().map(serde_json::from_value) {
-            Some(Ok(decision)) => decision,
+        let policy = match body.get("decision").cloned().map(serde_json::from_value) {
+            Some(Ok(decision)) => StateRecoveryRunPolicy::Decision(decision),
             Some(Err(_)) => {
                 return error_response(RefineError::InvalidInput(
                     "decision must contain default_authority and optional path overrides"
                         .to_string(),
                 ));
             }
-            // The one-shot run prefers remote authority by default: live
-            // authority republishes this node's divergent state to the fleet
-            // and must be requested explicitly.
-            None => crate::tools::host::git_sync::StateRecoveryDecision::uniform(
-                crate::tools::host::git_sync::StateRecoveryAuthority::Remote,
-            ),
+            None => match body.get("authority").cloned().map(serde_json::from_value) {
+                Some(Ok(authority)) => {
+                    StateRecoveryRunPolicy::Decision(StateRecoveryDecision::uniform(authority))
+                }
+                Some(Err(_)) => {
+                    return error_response(RefineError::InvalidInput(
+                        "authority must be live or remote".to_string(),
+                    ));
+                }
+                // Without an explicit decision the ownership policy applies:
+                // remote wins except Goal records this node owned at the
+                // agreed baseline, which keep their live copy. Live authority
+                // for everything must be requested explicitly because it
+                // republishes this node's divergent state to the fleet.
+                None => StateRecoveryRunPolicy::OwnershipPrefersRemote,
+            },
         };
         let recovery_health = self.current_state_sync_health().ok().flatten();
-        match service.run_state_recovery(decision) {
+        match service.run_state_recovery_with_policy(policy) {
             Ok(result) => {
                 let settlement = result
                     .recovered

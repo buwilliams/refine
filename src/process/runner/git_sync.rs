@@ -158,6 +158,33 @@ pub(super) fn run_git_sync_worker(
                                 &error,
                             )?;
                             failure_backoff.record_failure(now, &failure_context);
+                            match attempt_automatic_state_recovery(
+                                runtime_root,
+                                &target_root,
+                                &node_id,
+                                &service,
+                                &error,
+                                conflict_report.is_some(),
+                            )? {
+                                AutoRecoveryOutcome::Recovered => {
+                                    failure_backoff.reset();
+                                    last_observed_fingerprint = service
+                                        .durable_state_fingerprint()
+                                        .ok()
+                                        .or(Some(fingerprint));
+                                    if let (Some(root), Some(fingerprint)) =
+                                        (active_root.as_ref(), last_observed_fingerprint)
+                                    {
+                                        persist_fingerprint(runtime_root, root, fingerprint);
+                                    }
+                                    pending_sync = None;
+                                    pending_since = None;
+                                    let _ = refresh_projection(runtime_root, &target_root);
+                                }
+                                AutoRecoveryOutcome::Paused => return Ok(()),
+                                AutoRecoveryOutcome::NotAttempted | AutoRecoveryOutcome::Failed => {
+                                }
+                            }
                             next_attempt = now;
                         }
                     }

@@ -142,14 +142,14 @@ fn project_state_recovery_requires_a_preview_file_and_explicit_authority() {
 }
 
 #[test]
-fn project_state_recovery_run_prefers_remote_authority_and_accepts_overrides() {
+fn project_state_recovery_run_defaults_to_the_ownership_policy() {
     let run = Cli::try_parse_from(["refine", "project", "state-recovery", "run"]).unwrap();
     assert!(matches!(
         run.command,
         Commands::Project {
             action: ProjectAction::StateRecovery {
                 action: ProjectStateRecoveryAction::Run {
-                    authority: CliStateRecoveryAuthority::Remote,
+                    authority: None,
                     target_root: None,
                     ..
                 }
@@ -173,13 +173,27 @@ fn project_state_recovery_run_prefers_remote_authority_and_accepts_overrides() {
         Commands::Project {
             action: ProjectAction::StateRecovery {
                 action: ProjectStateRecoveryAction::Run {
-                    authority: CliStateRecoveryAuthority::Live,
+                    authority: Some(CliStateRecoveryAuthority::Live),
                     remote_paths,
                     ..
                 }
             }
         } if remote_paths == vec![std::path::PathBuf::from("shared/state.json")]
     ));
+
+    // Path overrides only refine an explicit uniform decision; the ownership
+    // policy computes its own per-path authority.
+    assert!(
+        Cli::try_parse_from([
+            "refine",
+            "project",
+            "state-recovery",
+            "run",
+            "--live-path",
+            "goals/00/EXAMPLE/goal.json",
+        ])
+        .is_err()
+    );
 }
 
 #[test]

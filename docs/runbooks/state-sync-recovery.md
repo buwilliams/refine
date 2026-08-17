@@ -4,14 +4,45 @@ Use this runbook when `project sync` or `fleet sync` reports that Refine state
 changed on multiple nodes. Do not edit the live store, baseline, managed state
 worktree, recovery refs, or `refine/state` by hand.
 
-## One-Shot Recovery (default)
+## How Divergence Is Decided
 
-When the winning side is already decided — for fleet convergence that is almost
-always the remote — run recovery as a single command:
+Synchronization resolves almost everything before any of this applies, in
+order:
+
+1. **Semantic merge** — one-sided changes, disjoint members of the same Goal,
+   keyed Notes, later `updated` timestamps, and the per-node registry all
+   merge three-way with no conflict. A node pulling a queued Goal while its
+   owner concurrently starts it resolves in the starting owner's favor.
+2. **Ownership policy** — for paths the merge must reject (the same member
+   changed on both sides, or Round writes racing cross-node authority
+   changes), the Goal's owner at the last agreed baseline is authoritative
+   for its record; every other conflicting path converges to remote. A stale
+   local understanding is not a wrong one: staleness alone never discards
+   work only the owning node could have produced.
+3. **Recovery refs** — whichever side a path loses, its displaced copy is
+   committed to a retained recovery ref with a bounded manifest before
+   anything overwrites it. Nothing is silently destroyed.
+
+The daemon applies this ladder automatically: a background sync that fails
+with recoverable evidence triggers the same consolidated recovery an operator
+would run, records a `sync_auto_recovered` activity entry naming the retained
+ref, and settles health. Users never run CLI commands for ordinary syncing.
+Set `state_sync_auto_recovery: off` on a node doing deliberate divergence
+work to keep the fail-closed behavior instead.
+
+## One-Shot Recovery (manual)
+
+On an opted-out node, or to force one side everywhere, run recovery as a
+single command:
 
 ```text
-refine project state-recovery run --authority remote
+refine project state-recovery run
 ```
+
+Without `--authority` the run applies the same ownership policy as the
+daemon. `--authority remote` or `--authority live` forces one side for every
+conflicting path instead (`live` republishes this node's divergent state to
+the fleet — make sure that is deliberate).
 
 `run` synchronizes, and only when synchronization is rejected with recoverable
 evidence (a missing baseline, or the semantic conflict it just recorded) does
@@ -23,12 +54,10 @@ the command, bounded, before the last race surfaces as a `stale_preview`
 error. Never wrap `run` in a retry loop of your own — the bounded retry is the
 command's job, and a `run` that still fails is reporting a real condition.
 
-`--authority remote` is the default and the safe fleet choice: it preserves the
-node's pre-recovery live state on a recovery ref, then converges live state to
-the remote. `--authority live` republishes this node's divergent state to the
-fleet — use it only when this node is deliberately authoritative. Per-path
-exceptions (`--live-path`, `--remote-path`) apply to reported conflicts exactly
-as they do for `apply`.
+Per-path exceptions (`--live-path`, `--remote-path`) adjust an explicit
+`--authority` for reported conflicts exactly as they do for `apply`; the
+ownership policy computes its own per-path authority and takes no manual
+overrides.
 
 The result is one JSON document: `recovered` (false when sync needed no
 recovery), the attempt count, the recovery result with its manifest and

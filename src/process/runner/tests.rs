@@ -892,3 +892,142 @@ fn cleanup_runner_scans_every_registered_target_app_once() {
     assert_eq!(roots, vec![first, second]);
     std::fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn background_sync_conflict_auto_recovers_unless_the_node_opted_out() {
+    let temp_root = std::env::temp_dir().join(format!(
+        "refine-state-sync-auto-recovery-{}",
+        uuid::Uuid::new_v4()
+    ));
+    let remote = temp_root.join("remote.git");
+    let seed = temp_root.join("seed");
+    let a = temp_root.join("a");
+    let b = temp_root.join("b");
+    let runtime_root = temp_root.join("run/8082");
+    std::fs::create_dir_all(&seed).unwrap();
+    let git = |root: &Path, args: &[&str]| {
+        let output = std::process::Command::new("git")
+            .args(args)
+            .current_dir(root)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "git {} failed: {}",
+            args.join(" "),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    };
+    git(&temp_root, &["init", "--bare", remote.to_str().unwrap()]);
+    git(&seed, &["init", "-q", "-b", "main"]);
+    git(&seed, &["config", "user.email", "sync@test"]);
+    git(&seed, &["config", "user.name", "Sync Test"]);
+    std::fs::write(seed.join("app.txt"), "base\n").unwrap();
+    git(&seed, &["add", "app.txt"]);
+    git(&seed, &["commit", "-q", "-m", "initial"]);
+    git(
+        &seed,
+        &["remote", "add", "origin", remote.to_str().unwrap()],
+    );
+    git(&seed, &["push", "-q", "-u", "origin", "main"]);
+    for root in [&a, &b] {
+        git(
+            &temp_root,
+            &[
+                "clone",
+                "-q",
+                remote.to_str().unwrap(),
+                root.to_str().unwrap(),
+            ],
+        );
+        git(root, &["config", "user.email", "sync@test"]);
+        git(root, &["config", "user.name", "Sync Test"]);
+    }
+    let write_shared = |root: &Path, value: &str| {
+        let destination = refine_dir_for_target_root(root)
+            .unwrap()
+            .join("shared/state.json");
+        std::fs::create_dir_all(destination.parent().unwrap()).unwrap();
+        std::fs::write(destination, value).unwrap();
+    };
+    // Establish a shared baseline, then diverge the same member on both nodes
+    // so semantic reconciliation must fail closed.
+    write_shared(&a, "base\n");
+    FileGitSyncService::new(&a, a.join("run")).sync().unwrap();
+    let service = FileGitSyncService::new(&b, &runtime_root);
+    service.sync().unwrap();
+    write_shared(&a, "remote\n");
+    FileGitSyncService::new(&a, a.join("run")).sync().unwrap();
+    write_shared(&b, "live\n");
+
+    bind_state_sync_health(&runtime_root, &b, "default").unwrap();
+    let refine_b = refine_dir_for_target_root(&b).unwrap();
+    FileSettingsService::with_active_root(&refine_b, &runtime_root)
+        .update(&json!({"state_sync_auto_recovery": "off"}))
+        .unwrap();
+    let attempt =
+        record_state_sync_attempt(&runtime_root, &b, "default", "background_publish").unwrap();
+    let error = service.sync().unwrap_err();
+    record_state_sync_failure(
+        &runtime_root,
+        &b,
+        "default",
+        attempt,
+        "background_publish",
+        &error,
+    )
+    .unwrap();
+
+    // A non-recoverable failure never triggers recovery regardless of the setting.
+    let outcome = attempt_automatic_state_recovery(
+        &runtime_root,
+        &b,
+        "default",
+        &service,
+        &RefineError::Io("network unreachable".to_string()),
+        false,
+    )
+    .unwrap();
+    assert!(matches!(outcome, AutoRecoveryOutcome::NotAttempted));
+
+    // The opted-out node keeps its fail-closed conflict.
+    let outcome =
+        attempt_automatic_state_recovery(&runtime_root, &b, "default", &service, &error, true)
+            .unwrap();
+    assert!(matches!(outcome, AutoRecoveryOutcome::NotAttempted));
+    let health = FileStateSyncHealthService::new(&runtime_root)
+        .inspect(&b, "default", Duration::from_secs(900))
+        .unwrap();
+    assert!(health.failure_since.is_some(), "{health:#?}");
+
+    // With the default policy the same rejection converges on its own.
+    FileSettingsService::with_active_root(&refine_b, &runtime_root)
+        .update(&json!({"state_sync_auto_recovery": "remote"}))
+        .unwrap();
+    let outcome =
+        attempt_automatic_state_recovery(&runtime_root, &b, "default", &service, &error, true)
+            .unwrap();
+    assert!(matches!(outcome, AutoRecoveryOutcome::Recovered));
+    let health = FileStateSyncHealthService::new(&runtime_root)
+        .inspect(&b, "default", Duration::from_secs(900))
+        .unwrap();
+    assert!(health.failure_since.is_none(), "{health:#?}");
+    assert_eq!(
+        health.last_attempt_source,
+        Some(AUTO_RECOVERY_SOURCE.to_string())
+    );
+    assert_eq!(
+        std::fs::read_to_string(refine_b.join("shared/state.json")).unwrap(),
+        "remote\n"
+    );
+    let entries = FileActivityService::new(&refine_b).recent(10).unwrap();
+    assert!(
+        entries
+            .iter()
+            .any(|entry| entry.message.contains("auto-recovered")
+                && entry.message.contains("remote authority")),
+        "{entries:#?}"
+    );
+    service.sync().unwrap();
+    std::fs::remove_dir_all(temp_root).unwrap();
+}
