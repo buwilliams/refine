@@ -36,6 +36,36 @@ pub(super) fn merge_node_registry(base: &[u8], local: &[u8], remote: &[u8]) -> O
     Some(encoded)
 }
 
+/// Reconcile two validated registries when a recorded three-way baseline can
+/// no longer be reconstructed. This authority is deliberately narrower than
+/// the normal merge: every unequal shared record needs a strictly later,
+/// comparable `updated_at`; absent records are retained as a union.
+pub(super) fn merge_node_registry_without_base(local: &[u8], remote: &[u8]) -> Option<Vec<u8>> {
+    let local = validated_nodes(local)?;
+    let remote = validated_nodes(remote)?;
+    let ids = local
+        .keys()
+        .chain(remote.keys())
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    let mut nodes = Vec::with_capacity(ids.len());
+    for id in ids {
+        let merged = match (local.get(&id), remote.get(&id)) {
+            (Some(local), Some(remote)) if local.value == remote.value => local.value.clone(),
+            (Some(local), Some(remote)) => later_node(local, remote)?,
+            (Some(local), None) => local.value.clone(),
+            (None, Some(remote)) => remote.value.clone(),
+            (None, None) => unreachable!(),
+        };
+        nodes.push(merged);
+    }
+    let merged = serde_json::json!({ "nodes": nodes });
+    serde_json::from_value::<NodeRegistry>(merged.clone()).ok()?;
+    let mut encoded = serde_json::to_vec_pretty(&merged).ok()?;
+    encoded.push(b'\n');
+    Some(encoded)
+}
+
 fn validated_nodes(bytes: &[u8]) -> Option<BTreeMap<String, RegistryNode>> {
     let value = serde_json::from_slice::<serde_json::Value>(bytes).ok()?;
     let registry = serde_json::from_value::<NodeRegistry>(value.clone()).ok()?;
@@ -236,5 +266,39 @@ mod tests {
         for local in invalid {
             assert!(merge_node_registry(&valid, &local, &valid).is_none());
         }
+    }
+
+    #[test]
+    fn baseline_less_merge_keeps_union_and_uses_only_strictly_later_records() {
+        let local = registry(vec![
+            node("node-a", "2026-08-17T08:03:00Z", "local"),
+            node("node-b", "2026-08-17T08:00:00Z", "local-only"),
+        ]);
+        let remote = registry(vec![
+            node("node-a", "2026-08-17T08:02:00Z", "remote"),
+            node("node-c", "2026-08-17T08:00:00Z", "remote-only"),
+        ]);
+
+        let merged: NodeRegistry =
+            serde_json::from_slice(&merge_node_registry_without_base(&local, &remote).unwrap())
+                .unwrap();
+
+        assert_eq!(
+            merged
+                .nodes
+                .iter()
+                .map(|node| node.id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["node-a", "node-b", "node-c"]
+        );
+        assert_eq!(merged.nodes[0].health.as_ref().unwrap().status, "local");
+    }
+
+    #[test]
+    fn baseline_less_merge_rejects_equal_time_disagreement_and_malformed_input() {
+        let local = registry(vec![node("node-a", "2026-08-17T08:01:00Z", "local")]);
+        let remote = registry(vec![node("node-a", "2026-08-17T08:01:00Z", "remote")]);
+        assert!(merge_node_registry_without_base(&local, &remote).is_none());
+        assert!(merge_node_registry_without_base(b"not json", &remote).is_none());
     }
 }

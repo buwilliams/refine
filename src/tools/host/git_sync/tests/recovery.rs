@@ -269,13 +269,7 @@ fn valid_baseline_recovery_rejects_fabricated_decisions_and_preserves_post_apply
 fn valid_baseline_recovery_rejects_missing_baseline_bytes_before_owned_side_effects() {
     let fixture = valid_baseline_conflict_fixture("reported-recovery-missing-base-bytes");
     let service = fixture.service(&fixture.b);
-    let baseline_path = git_common_dir(&fixture.b)
-        .unwrap()
-        .join(STATE_BASELINE_FILE);
-    let mut stored: BTreeMap<String, u64> =
-        serde_json::from_slice(&fs::read(&baseline_path).unwrap()).unwrap();
-    stored.insert("shared/state.json".to_string(), u64::MAX);
-    fs::write(&baseline_path, serde_json::to_vec_pretty(&stored).unwrap()).unwrap();
+    rewrite_baseline_fingerprint(&fixture.b, "shared/state.json", u64::MAX);
     service.sync().unwrap_err();
     let preview = service.preview_state_recovery().unwrap();
     let refs_before = git_stdout(&fixture.b, &["show-ref"]);
@@ -317,7 +311,7 @@ fn valid_baseline_recovery_rejects_stale_preview_before_side_effects() {
     assert!(
         error
             .to_string()
-            .contains("live state snapshot changed before apply")
+            .contains("live state snapshot changed at shared/later.json")
     );
     assert!(
         !git_common_dir(&fixture.b)
@@ -498,6 +492,79 @@ fn missing_baseline_preview_is_bounded_and_does_not_mutate_target_state() {
             .join(STATE_BASELINE_FILE)
             .exists()
     );
+}
+
+#[test]
+fn concurrent_sync_owned_live_write_waits_for_preview_and_reports_the_changed_path() {
+    let fixture = missing_baseline_fixture("recovery-concurrent-sync-writer");
+    let service = fixture.service(&fixture.b);
+    let target = fixture.b.clone();
+    let (preview_locked_tx, preview_locked_rx) = std::sync::mpsc::channel();
+    let (release_preview_tx, release_preview_rx) = std::sync::mpsc::channel();
+    install_during_recovery_preview_hook(&target, move || {
+        preview_locked_tx.send(()).unwrap();
+        release_preview_rx.recv().unwrap();
+    });
+
+    let (writer_started_tx, writer_started_rx) = std::sync::mpsc::channel();
+    let (writer_done_tx, writer_done_rx) = std::sync::mpsc::channel();
+    let preview = thread::scope(|scope| {
+        let preview_handle = scope.spawn(|| service.preview_state_recovery().unwrap());
+        preview_locked_rx.recv().unwrap();
+        let writer_target = target.clone();
+        let writer = scope.spawn(move || {
+            writer_started_tx.send(()).unwrap();
+            with_repository_git_lock(&writer_target, || {
+                write_goal(&writer_target, "CONCURRENT");
+                Ok(())
+            })
+            .unwrap();
+            writer_done_tx.send(()).unwrap();
+        });
+        writer_started_rx.recv().unwrap();
+        assert!(
+            writer_done_rx
+                .recv_timeout(Duration::from_millis(50))
+                .is_err(),
+            "the verified writer must wait while preview owns snapshot capture"
+        );
+        release_preview_tx.send(()).unwrap();
+        let preview = preview_handle.join().unwrap();
+        writer.join().unwrap();
+        writer_done_rx.recv().unwrap();
+        preview
+    });
+
+    let error = service
+        .apply_state_recovery(StateRecoveryAuthority::Remote, preview)
+        .unwrap_err();
+    let message = error.to_string();
+    assert!(message.contains("goals/CONCURRENT/goal.json"), "{message}");
+}
+
+#[test]
+fn node_local_state_sync_activity_is_outside_the_recovery_snapshot_fence() {
+    use crate::tools::observability::activity::{ActivityService, FileActivityService};
+
+    let fixture = missing_baseline_fixture("recovery-state-sync-activity-boundary");
+    let service = fixture.service(&fixture.b);
+    let preview = service.preview_state_recovery().unwrap();
+    let activity = FileActivityService::new(refine_dir_for_target_root(&fixture.b).unwrap());
+    activity
+        .append(activity.new_entry(
+            "State sync remains unavailable",
+            "warn",
+            "state_sync",
+            None,
+            Some("refine".to_string()),
+        ))
+        .unwrap();
+
+    let result = service
+        .apply_state_recovery(StateRecoveryAuthority::Remote, preview)
+        .unwrap();
+
+    assert!(result.ok && result.baseline_created, "{result:#?}");
 }
 
 #[test]

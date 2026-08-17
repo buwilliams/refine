@@ -44,15 +44,20 @@ const REPOSITORY_LOCK_POLL_INTERVAL: Duration = Duration::from_millis(50);
 const REFINE_STATE_REF: &str = "refs/heads/refine/state";
 const DEFAULT_REMOTE: &str = "origin";
 const STATE_BASELINE_FILE: &str = "refine-state-baseline.json";
+const STATE_BASELINE_REF_PREFIX: &str = "refs/refine/state-baseline";
 static REPOSITORY_GIT_LOCKS: OnceLock<Mutex<BTreeMap<PathBuf, Arc<Mutex<()>>>>> = OnceLock::new();
 static STATE_COPY_COUNTER: AtomicU64 = AtomicU64::new(0);
 
+mod baseline;
+#[cfg(test)]
+use baseline::install_after_baseline_anchor_hook;
 mod conflict_report;
 mod git_commands;
 mod goal_merge;
 mod locks;
 mod node_registry_merge;
 mod recovery;
+mod semantic_merge;
 mod service;
 mod state_codec;
 mod state_files;
@@ -72,12 +77,16 @@ pub use recovery::{
 #[cfg(test)]
 use recovery::{
     hydrate_remote_with_recovery_cas, install_after_recovery_authority_hook,
-    install_after_recovery_baseline_hook,
+    install_after_recovery_baseline_hook, install_during_recovery_preview_hook,
 };
 
 use goal_merge::*;
 use locks::*;
 use node_registry_merge::*;
+use semantic_merge::BaselineFileResolution;
+pub use semantic_merge::{
+    BaselineReconstructionSource, StateSyncReconciliationKind, StateSyncReconciliationOutcome,
+};
 use state_codec::*;
 use state_files::*;
 

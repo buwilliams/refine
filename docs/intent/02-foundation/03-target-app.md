@@ -68,6 +68,22 @@ The current implementation details that matter to intent are:
   therefore converge without a stale fence, while malformed registries,
   duplicate or noncanonical identities, equal-time disagreement, and unrelated
   shared-state conflicts still fail closed without applying a partial merge.
+  A recorded baseline now binds its fingerprint map to an immutable retained
+  Git snapshot. Refine publishes and validates that anchor before atomically
+  replacing the metadata, and retires the prior anchor only after the new pair
+  is durable. Legacy fingerprint-only metadata remains readable. When a
+  recorded `nodes.json` fingerprint cannot be reconstructed from either the
+  retained snapshot or legacy history, only that registry may use a two-way
+  fallback: both sides must validate, the canonical node-id union is retained,
+  and unequal shared records require strictly ordered comparable timestamps.
+  Goals, a wholly absent baseline, malformed data, and equal-time disagreement
+  retain fail-closed recovery authority.
+
+State-recovery preview captures its live snapshot under the same repository
+coordination boundary as synchronization, while apply retains every existing
+snapshot, head, identity, decision, and hydration fence. Stale-preview errors
+name the changed durable paths. Runtime-only activity logs are not part of the
+durable snapshot and need no recovery-fence exception.
 
 The important boundary is source of truth. Caches, indexes, projections, and UI state are allowed and necessary for performance, but they should not replace durable target-app state. If a cache is wrong, the repair path should be refresh or rebuild, not manual database surgery.
 

@@ -139,7 +139,13 @@ impl FileGitSyncService {
         let prevalidated_live = if existing.is_none() {
             let live_now = durable_state_map(&live_refine)?;
             if state_tree_digest(&live_refine, &live_now)? != preview.live_snapshot {
-                return Err(stale_recovery("the live state snapshot changed"));
+                return Err(stale_recovery(
+                    &super::inspection::stale_live_snapshot_reason(
+                        &live_refine,
+                        &preview.live_fingerprints,
+                        &live_now,
+                    ),
+                ));
             }
             // Reject fabricated or internally inconsistent preview metadata
             // before journaling or preserving any recovery ref. The stable
@@ -197,7 +203,13 @@ impl FileGitSyncService {
         };
         let resume = self.git_success(&["show-ref", "--verify", "--quiet", &recovery_ref])?;
         if !resume && state_tree_digest(&live_refine, &live_now)? != preview.live_snapshot {
-            return Err(stale_recovery("the live state snapshot changed"));
+            return Err(stale_recovery(
+                &super::inspection::stale_live_snapshot_reason(
+                    &live_refine,
+                    &preview.live_fingerprints,
+                    &live_now,
+                ),
+            ));
         }
         if !resume {
             self.preserve_live_snapshot(preview, &live_refine, &recovery_ref)?;

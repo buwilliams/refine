@@ -78,6 +78,7 @@ struct JiraExportOperationRequest {
 mod development_requests;
 mod dispatch;
 mod git_sync;
+mod git_sync_backoff;
 mod jira_export;
 mod project_sync;
 mod schedule;
@@ -92,6 +93,7 @@ pub use dispatch::run_worker;
 
 use development_requests::*;
 use git_sync::*;
+use git_sync_backoff::*;
 use jira_export::*;
 use project_sync::*;
 pub(crate) use schedule::state_sync_stale_threshold;

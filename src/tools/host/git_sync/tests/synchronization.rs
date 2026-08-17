@@ -96,6 +96,147 @@ fn sync_converges_disjoint_node_heartbeats_without_a_conflict_report() {
 }
 
 #[test]
+fn sync_converges_nodes_with_unavailable_recorded_baseline_bytes_on_first_pass() {
+    let fixture = SyncFixture::new("node-baseline-unavailable-first-pass");
+    write_nodes(
+        &fixture.a,
+        &[
+            ("node-a", "2026-08-17T08:00:00Z", "unknown"),
+            ("node-b", "2026-08-17T08:00:00Z", "unknown"),
+        ],
+    );
+    fixture.service(&fixture.a).sync().unwrap();
+    fixture.service(&fixture.b).sync().unwrap();
+    rewrite_baseline_fingerprint(&fixture.b, "nodes.json", u64::MAX);
+
+    write_nodes(
+        &fixture.a,
+        &[
+            ("node-a", "2026-08-17T08:01:00Z", "healthy"),
+            ("node-b", "2026-08-17T08:00:00Z", "unknown"),
+        ],
+    );
+    fixture.service(&fixture.a).sync().unwrap();
+    write_nodes(
+        &fixture.b,
+        &[
+            ("node-a", "2026-08-17T08:00:00Z", "unknown"),
+            ("node-b", "2026-08-17T08:02:00Z", "healthy"),
+        ],
+    );
+
+    let result = fixture.service(&fixture.b).sync().unwrap();
+
+    assert!(
+        result.detail.as_deref().is_some_and(|detail| detail
+            .contains("Merged per-node registry changes with safe baseline-unavailable fallback")),
+        "{result:#?}"
+    );
+    let nodes = read_nodes(&fixture.b);
+    assert_eq!(nodes.nodes[0].updated_at, "2026-08-17T08:01:00Z");
+    assert_eq!(nodes.nodes[1].updated_at, "2026-08-17T08:02:00Z");
+}
+
+#[test]
+fn versioned_baseline_anchor_survives_interruption_and_legacy_metadata_still_loads() {
+    let fixture = SyncFixture::new("versioned-baseline-anchor-interruption");
+    write_goal(&fixture.a, "GOALA");
+    let service = fixture.service(&fixture.a);
+    service.sync().unwrap();
+    let baseline_path = git_common_dir(&fixture.a)
+        .unwrap()
+        .join(STATE_BASELINE_FILE);
+    let original_bytes = fs::read(&baseline_path).unwrap();
+    let original: serde_json::Value = serde_json::from_slice(&original_bytes).unwrap();
+    assert_eq!(original["version"], 2);
+    let original_ref = original["snapshot_ref"].as_str().unwrap().to_string();
+    let original_oid = original["snapshot_oid"].as_str().unwrap().to_string();
+    assert_eq!(
+        git_stdout(&fixture.a, &["rev-parse", &original_ref]),
+        original_oid
+    );
+
+    write_goal(&fixture.a, "GOALB");
+    install_after_baseline_anchor_hook(&fixture.a);
+    let interrupted = service.sync().unwrap_err();
+    assert!(
+        interrupted
+            .to_string()
+            .contains("retained state-baseline anchor")
+    );
+    assert_eq!(fs::read(&baseline_path).unwrap(), original_bytes);
+    let anchors_after_interruption = git_stdout(
+        &fixture.a,
+        &[
+            "for-each-ref",
+            "--format=%(refname)",
+            STATE_BASELINE_REF_PREFIX,
+        ],
+    );
+    assert!(anchors_after_interruption.lines().count() >= 2);
+
+    service.sync().unwrap();
+    let current: serde_json::Value =
+        serde_json::from_slice(&fs::read(&baseline_path).unwrap()).unwrap();
+    let current_ref = current["snapshot_ref"].as_str().unwrap();
+    assert_ne!(current_ref, original_ref);
+    assert!(
+        git_stdout(
+            &fixture.a,
+            &["for-each-ref", "--format=%(refname)", &original_ref]
+        )
+        .is_empty()
+    );
+
+    let fingerprints = current["fingerprints"].clone();
+    fs::write(
+        &baseline_path,
+        serde_json::to_vec_pretty(&fingerprints).unwrap(),
+    )
+    .unwrap();
+    git(&fixture.a, &["update-ref", "-d", current_ref]);
+    let loaded = service.load_state_baseline().unwrap().unwrap();
+    assert_eq!(
+        loaded,
+        durable_state_map(
+            &state_worktree_for_target_root(&fixture.a)
+                .unwrap()
+                .join(".refine")
+        )
+        .unwrap()
+    );
+}
+
+#[test]
+fn unavailable_baseline_rejects_equal_time_node_disagreement_with_diagnostics() {
+    let fixture = SyncFixture::new("node-baseline-unavailable-rejected");
+    write_nodes(&fixture.a, &[("node-a", "2026-08-17T08:00:00Z", "unknown")]);
+    fixture.service(&fixture.a).sync().unwrap();
+    fixture.service(&fixture.b).sync().unwrap();
+    rewrite_baseline_fingerprint(&fixture.b, "nodes.json", u64::MAX);
+    write_nodes(&fixture.a, &[("node-a", "2026-08-17T08:01:00Z", "remote")]);
+    fixture.service(&fixture.a).sync().unwrap();
+    write_nodes(&fixture.b, &[("node-a", "2026-08-17T08:01:00Z", "local")]);
+
+    let error = fixture.service(&fixture.b).sync().unwrap_err();
+    let report = latest_state_sync_conflict_report(&fixture.b.join("run"))
+        .unwrap()
+        .unwrap();
+
+    assert!(
+        error
+            .to_string()
+            .contains("recorded baseline bytes were unavailable"),
+        "{error}"
+    );
+    assert_eq!(report.unresolved_paths, vec!["nodes.json"]);
+    assert!(report.reconciliation_outcomes.iter().any(|outcome| {
+        outcome.path == "nodes.json"
+            && outcome.outcome == StateSyncReconciliationKind::BaselineBytesUnavailable
+    }));
+}
+
+#[test]
 fn unrelated_conflict_withholds_a_prepared_node_registry_merge() {
     let fixture = SyncFixture::new("node-merge-atomicity");
     write_nodes(
