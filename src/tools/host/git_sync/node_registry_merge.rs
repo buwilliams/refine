@@ -1,4 +1,5 @@
 use super::*;
+use crate::model::fleet::valid_node_id;
 use crate::model::node::NodeRegistry;
 
 #[derive(Clone)]
@@ -64,14 +65,7 @@ fn validated_nodes(bytes: &[u8]) -> Option<BTreeMap<String, RegistryNode>> {
 }
 
 fn canonical_node_id(id: &str) -> bool {
-    !id.is_empty()
-        && id == id.trim()
-        && id.chars().all(|character| {
-            character.is_ascii_lowercase()
-                || character.is_ascii_digit()
-                || character == '-'
-                || character == '_'
-        })
+    id == id.trim() && valid_node_id(id)
 }
 
 fn merge_node(
@@ -234,6 +228,8 @@ mod tests {
                 node("node-a", "2026-08-17T08:02:00Z", "two"),
             ]),
             registry(vec![node(" Node-A ", "2026-08-17T08:01:00Z", "bad")]),
+            registry(vec![node("-node-a", "2026-08-17T08:01:00Z", "bad")]),
+            registry(vec![node("_node-a", "2026-08-17T08:01:00Z", "bad")]),
             registry(vec![node("node-a", "later", "bad")]),
         ];
 
