@@ -1,7 +1,7 @@
 {
   "base_commit": "bd392b96216d26fa00b5ef5d307af5abb2bd398f",
   "branch_name": "refine/00000T040T05D388K5F1EW2002/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "0c20c1cf29c7159cf47ce4256d7e57c734d98145",
   "created": "2026-08-17T14:22:14Z",
   "feature_id": null,
   "feature_order": null,
@@ -95,7 +95,28 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-17T14:35:17Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "bd392b96216d26fa00b5ef5d307af5abb2bd398f",
@@ -106,6 +127,7 @@
           "round_idx": 0,
           "target_branch": "main"
         },
+        "completed_at": "2026-08-17T14:35:17Z",
         "criticism": {
           "completed_at": "2026-08-17T14:24:44Z",
           "git_after": {
@@ -177,6 +199,36 @@
           "message": "The finalized plan complies with the constitution and enabled governance guidance.",
           "status": "passed"
         },
+        "implementation": {
+          "completed_at": "2026-08-17T14:35:17Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "The Goal modal action menu now renders Transfer to my node only when nodeContextActiveNodeId() returns an authoritative target different from the displayed Goal's current node owner, including legacy default ownership and case-insensitive ID comparison.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "The action POSTs /api/nodes/transfer-goals with item_id equal to the displayed Goal ID and target_node_id equal to the active node ID, leaves Feature and automated-workflow eligibility to the server, surfaces rejection through showActionError, and reloads Goal detail only after success.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated docs/intent/04-surfaces/03-browser/08-goal.md to document eligibility from authoritative active-node context, the shared single-item capability, server-owned workflow and Feature constraints, and visible rejection behavior.",
+                "id": "P3",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "git diff --check -> exit 0, no output",
+              "node --test tests/web_goal_transfer.test.js tests/web_goal_cancel.test.js tests/web_javascript_syntax.test.js -> 5 passed, 0 failed, 0 skipped",
+              "node --test tests/web_*.test.js -> 232 tests: 205 passed, 0 failed, 27 skipped because Playwright Chromium is unavailable",
+              "cargo test --test test_all -> test result ok: 1000 passed, 0 failed, 6 ignored; src/main.rs 0 tests passed"
+            ]
+          },
+          "report": "Added an eligible Goal-modal Transfer to my node action backed by the authoritative active-node context and existing single-item transfer API, with success refresh, surfaced server failures, intent documentation, and regression coverage. Verification: focused browser tests passed 5/5; full browser suite passed 205 with 27 Playwright-unavailable skips and 0 failures; Rust/integration suite passed 1000 with 6 ignored and 0 failures; git diff --check passed.",
+          "started_at": "2026-08-17T14:25:40Z"
+        },
         "phase": "implement",
         "phase_started_at": "2026-08-17T14:25:40Z",
         "proposal": {
@@ -212,11 +264,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-08-17T14:22:15Z",
-        "state": "in_progress",
-        "updated_at": "2026-08-17T14:25:40Z"
+        "state": "completed",
+        "updated_at": "2026-08-17T14:35:17Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Added an eligible Goal-modal Transfer to my node action backed by the authoritative active-node context and existing single-item transfer API, with success refresh, surfaced server failures, intent documentation, and regression coverage. Verification: focused browser tests passed 5/5; full browser suite passed 205 with 27 Playwright-unavailable skips and 0 failures; Rust/integration suite passed 1000 with 6 ignored and 0 failures; git diff --check passed.",
+      "implementation_reported_at": "2026-08-17T14:35:17Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -227,7 +279,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-17T14:25:40Z",
+      "updated": "2026-08-17T14:35:17Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T14:22:15Z",
         "round_idx": 0,
@@ -237,8 +289,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-17T14:25:40Z",
-  "workflow_revision": 15
+  "updated": "2026-08-17T14:35:17Z",
+  "workflow_revision": 20
 }
