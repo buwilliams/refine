@@ -233,7 +233,7 @@ impl FileGitSyncService {
         } else {
             stored_base.unwrap_or_default()
         };
-        let reconciled_goals = self.reconcile_non_overlapping_goal_changes(
+        let reconciled = self.prepare_semantic_state_changes(
             &state_root,
             &live_refine,
             &state_refine,
@@ -241,13 +241,8 @@ impl FileGitSyncService {
             &local,
             &remote_state,
         )?;
-        let resolved_paths = reconciled_goals.keys().cloned().collect::<BTreeSet<_>>();
-        if !resolved_paths.is_empty() {
-            details.push(format!(
-                "Merged non-overlapping Goal changes: {}",
-                display_state_paths(&resolved_paths)
-            ));
-        }
+        let resolved_paths = reconciled.keys().cloned().collect::<BTreeSet<_>>();
+        append_reconciliation_details(&mut details, &resolved_paths, false);
         let conflicts = state_conflicts(&base, &local, &remote_state, &resolved_paths);
         if !conflicts.is_empty() {
             let summary = self.record_conflict_report(
@@ -269,7 +264,7 @@ impl FileGitSyncService {
         // fail-closed validation. Successful sync still records the intended
         // deletions in the next state commit.
         let removed_excluded = self.retire_excluded_tracked_state(&state_root, &state_refine)?;
-        write_reconciled_goal_changes(&state_refine, &reconciled_goals)?;
+        write_reconciled_state_changes(&state_refine, &reconciled)?;
         apply_local_state_delta(&live_refine, &state_refine, &base, &local, &resolved_paths)?;
 
         let updated = durable_state_map(&state_refine)?;
@@ -323,7 +318,7 @@ impl FileGitSyncService {
                 // since the original reconciliation. Re-evaluate the original observed base
                 // against both fresh sides before replaying any local delta.
                 let retry_local = durable_state_map(&live_refine)?;
-                let retry_reconciled_goals = self.reconcile_non_overlapping_goal_changes(
+                let retry_reconciled = self.prepare_semantic_state_changes(
                     &state_root,
                     &live_refine,
                     &state_refine,
@@ -331,16 +326,9 @@ impl FileGitSyncService {
                     &retry_local,
                     &retry_remote_state,
                 )?;
-                let retry_resolved_paths = retry_reconciled_goals
-                    .keys()
-                    .cloned()
-                    .collect::<BTreeSet<_>>();
-                if !retry_resolved_paths.is_empty() {
-                    details.push(format!(
-                        "Merged non-overlapping Goal changes during push retry: {}",
-                        display_state_paths(&retry_resolved_paths)
-                    ));
-                }
+                let retry_resolved_paths =
+                    retry_reconciled.keys().cloned().collect::<BTreeSet<_>>();
+                append_reconciliation_details(&mut details, &retry_resolved_paths, true);
                 let retry_conflicts = state_conflicts(
                     &base,
                     &retry_local,
@@ -363,7 +351,7 @@ impl FileGitSyncService {
                     )?;
                     return Err(RefineError::Conflict(summary.to_string()));
                 }
-                write_reconciled_goal_changes(&state_refine, &retry_reconciled_goals)?;
+                write_reconciled_state_changes(&state_refine, &retry_reconciled)?;
                 apply_local_state_delta(
                     &live_refine,
                     &state_refine,
@@ -424,7 +412,7 @@ impl FileGitSyncService {
         })
     }
 
-    pub(super) fn reconcile_non_overlapping_goal_changes(
+    pub(super) fn prepare_semantic_state_changes(
         &self,
         state_root: &std::path::Path,
         live_refine: &std::path::Path,
@@ -436,7 +424,7 @@ impl FileGitSyncService {
         let unresolved = BTreeSet::new();
         let mut reconciled = BTreeMap::new();
         for relative in state_conflict_paths(base, local, remote, &unresolved) {
-            if !is_goal_record(&relative) {
+            if relative != std::path::Path::new("nodes.json") && !is_goal_record(&relative) {
                 continue;
             }
             let (Some(base_fingerprint), Some(_), Some(_)) = (
@@ -455,7 +443,12 @@ impl FileGitSyncService {
             let remote_path = state_refine.join(&relative);
             let local_bytes = read_reconciliation_file(&local_path)?;
             let remote_bytes = read_reconciliation_file(&remote_path)?;
-            let Some(merged) = merge_goal_record(&base_bytes, &local_bytes, &remote_bytes) else {
+            let merged = if relative == std::path::Path::new("nodes.json") {
+                merge_node_registry(&base_bytes, &local_bytes, &remote_bytes)
+            } else {
+                merge_goal_record(&base_bytes, &local_bytes, &remote_bytes)
+            };
+            let Some(merged) = merged else {
                 continue;
             };
             reconciled.insert(relative, merged);
@@ -481,7 +474,32 @@ fn display_state_paths(paths: &BTreeSet<PathBuf>) -> String {
         .join(", ")
 }
 
-fn write_reconciled_goal_changes(
+fn append_reconciliation_details(
+    details: &mut Vec<String>,
+    resolved: &BTreeSet<PathBuf>,
+    push_retry: bool,
+) {
+    let goals = resolved
+        .iter()
+        .filter(|path| is_goal_record(path))
+        .cloned()
+        .collect::<BTreeSet<_>>();
+    if !goals.is_empty() {
+        details.push(format!(
+            "Merged non-overlapping Goal changes{}: {}",
+            if push_retry { " during push retry" } else { "" },
+            display_state_paths(&goals)
+        ));
+    }
+    if resolved.contains(std::path::Path::new("nodes.json")) {
+        details.push(format!(
+            "Merged per-node registry changes{}: nodes.json",
+            if push_retry { " during push retry" } else { "" }
+        ));
+    }
+}
+
+fn write_reconciled_state_changes(
     state_refine: &std::path::Path,
     reconciled: &BTreeMap<PathBuf, Vec<u8>>,
 ) -> RefineResult<()> {

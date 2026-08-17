@@ -127,6 +127,92 @@ fn push_retry_rechecks_original_base_against_fresh_local_and_remote_state() {
 }
 
 #[test]
+fn push_retry_semantically_merges_node_registry_remote_advancement() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let fixture = SyncFixture::new("push-retry-node-merge");
+    write_nodes(
+        &fixture.a,
+        &[
+            ("node-a", "2026-08-17T08:00:00Z", "unknown"),
+            ("node-b", "2026-08-17T08:00:00Z", "unknown"),
+        ],
+    );
+    fixture.service(&fixture.a).sync().unwrap();
+    fixture.service(&fixture.b).sync().unwrap();
+    write_nodes(
+        &fixture.a,
+        &[
+            ("node-a", "2026-08-17T08:01:00Z", "healthy"),
+            ("node-b", "2026-08-17T08:00:00Z", "unknown"),
+        ],
+    );
+    write_nodes(
+        &fixture.b,
+        &[
+            ("node-a", "2026-08-17T08:00:00Z", "unknown"),
+            ("node-b", "2026-08-17T08:02:00Z", "healthy"),
+        ],
+    );
+
+    let remote = fixture.root.join("remote.git");
+    let arrivals = fixture.root.join("node-push-arrivals");
+    fs::create_dir_all(&arrivals).unwrap();
+    let hook = remote.join("hooks/pre-receive");
+    fs::write(
+        &hook,
+        format!(
+            "#!/bin/sh\nwhile read old new ref; do\n  if test \"$ref\" = refs/heads/refine/state; then\n    touch \"{}/$$\"\n    while test \"$(find \"{}\" -type f | wc -l)\" -lt 2; do sleep 0.01; done\n  fi\ndone\n",
+            arrivals.display(),
+            arrivals.display()
+        ),
+    )
+    .unwrap();
+    let mut permissions = fs::metadata(&hook).unwrap().permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(&hook, permissions).unwrap();
+
+    let barrier = Arc::new(std::sync::Barrier::new(2));
+    let left_service = fixture.service(&fixture.a);
+    let right_service = fixture.service(&fixture.b);
+    let (left, right) = thread::scope(|scope| {
+        let left_barrier = Arc::clone(&barrier);
+        let left = scope.spawn(move || {
+            left_barrier.wait();
+            left_service.sync()
+        });
+        let right_barrier = Arc::clone(&barrier);
+        let right = scope.spawn(move || {
+            right_barrier.wait();
+            right_service.sync()
+        });
+        (left.join().unwrap(), right.join().unwrap())
+    });
+
+    let left = left.unwrap();
+    let right = right.unwrap();
+    assert!(
+        left.pushed && right.pushed,
+        "left={left:?}, right={right:?}"
+    );
+    assert!(
+        [left.detail.as_deref(), right.detail.as_deref()]
+            .into_iter()
+            .flatten()
+            .any(|detail| detail.contains("Merged per-node registry changes during push retry")),
+        "left={left:?}, right={right:?}"
+    );
+    git(&fixture.a, &["fetch", "-q", "origin", REFINE_STATE_BRANCH]);
+    let remote_nodes: crate::model::node::NodeRegistry = serde_json::from_str(&git_stdout(
+        &fixture.a,
+        &["show", "origin/refine/state:.refine/nodes.json"],
+    ))
+    .unwrap();
+    assert_eq!(remote_nodes.nodes[0].updated_at, "2026-08-17T08:01:00Z");
+    assert_eq!(remote_nodes.nodes[1].updated_at, "2026-08-17T08:02:00Z");
+}
+
+#[test]
 fn missing_first_reconciliation_requires_explicit_authority_without_deleting_remote_records() {
     let fixture = SyncFixture::new("failed-first-reconciliation");
     write_goal(&fixture.a, "GOALA");
