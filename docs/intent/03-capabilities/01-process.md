@@ -19,9 +19,12 @@ The product home is derived from the executable that was invoked, never from
 the caller's working directory, home directory, XDG state, or platform support
 directory. A source product home is the exact Git checkout or linked worktree;
 a published product home may be gitless when its release marker and
-`bin/refine` identify the deployed release. `./r system install` builds and
-atomically publishes those deployed artifacts before it registers or activates
-the service. Both modes own `<product-home>/run`, and
+`bin/refine` identify the deployed release. `./r system service-install`
+bootstraps those deployed artifacts when the production binary is missing,
+then registers and activates
+the port-scoped OS service. It does not acquire or update Refine source; that
+authority remains with the installation runbook and `./r system update`. Both
+modes own `<product-home>/run`, and
 port `P` owns only `<product-home>/run/P`. Stateful helpers and provider Agents
 must receive that exact port root. Relative `run` is compatibility syntax for
 the owning checkout, not an invitation to resolve against the caller's CWD.

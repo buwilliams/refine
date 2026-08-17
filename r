@@ -2,9 +2,10 @@
 set -euo pipefail
 
 # ./r always runs the production (release) binary at bin/refine — never a
-# debug build. `system start`, `system install`, and `system build` create or
-# refresh that binary. `system update` owns the stop, Git update, rebuild, and
-# start sequence. Every other command requires the binary to exist already.
+# debug build. `system start` and `system build` create or refresh that binary;
+# `system service-install` bootstraps it only when it is missing. `system update`
+# owns the stop, Git update, rebuild, and start sequence. Every other command
+# requires the binary to exist already.
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 RELEASE_BIN="${REFINE_RELEASE_BIN:-$ROOT/bin/refine}"
@@ -71,6 +72,13 @@ ensure_release_binary() {
   else
     return 0
   fi
+  install_release_binary
+}
+
+bootstrap_release_binary() {
+  local context="$1"
+  [ -x "$RELEASE_BIN" ] && return 0
+  printf 'refine: production binary is missing; building it before %s\n' "$context"
   install_release_binary
 }
 
@@ -333,8 +341,8 @@ if [ "${1:-}" = "system" ] && { [ "${2:-}" = "build" ] || [ "${2:-}" = "clean" ]
 fi
 
 if [ "${REFINE_R_DRY_RUN:-0}" != "1" ]; then
-  if system_command_requested install "$@"; then
-    ensure_release_binary "system install"
+  if system_command_requested service-install "$@"; then
+    bootstrap_release_binary "system service-install"
   elif system_command_requested start "$@"; then
     ensure_release_binary "system start"
   fi
@@ -353,7 +361,7 @@ fi
 
 if [ ! -x "$RELEASE_BIN" ]; then
   printf 'refine: production binary is missing: %s\n' "$RELEASE_BIN" >&2
-  printf 'refine: build it with ./r system build (system start and system install build it automatically)\n' >&2
+  printf 'refine: build it with ./r system build (system start and system service-install build it automatically)\n' >&2
   exit 127
 fi
 

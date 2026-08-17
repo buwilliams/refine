@@ -14,7 +14,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
         }
         Commands::System {
             action:
-                SystemAction::Install {
+                SystemAction::ServiceInstall {
                     port,
                     target,
                     runtime_root,
@@ -303,7 +303,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
         }
         Commands::System {
             action:
-                SystemAction::Uninstall {
+                SystemAction::ServiceUninstall {
                     port,
                     runtime_root,
                     version,

@@ -25,6 +25,46 @@ fn service_install_fails_before_registration_when_installed_binary_is_missing() 
 
     assert!(error.contains("installed Refine mode requires"), "{error}");
     assert!(error.contains("bin/refine"), "{error}");
+    assert!(
+        error.contains("./r system service-install --port 4557"),
+        "{error}"
+    );
+    assert!(!error.contains("system install"), "{error}");
+    assert!(!service.backend_path().exists());
+    assert!(!service.path().exists());
+    fs::remove_dir_all(temp_root).unwrap_or(());
+}
+
+#[cfg(unix)]
+#[test]
+fn service_install_recovery_for_invalid_binary_uses_current_command() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let temp_root = unique_temp_dir("installation-invalid-binary");
+    let runtime_root = temp_root.join("run");
+    let executable = temp_root.join("bin/refine");
+    fs::create_dir_all(executable.parent().unwrap()).unwrap();
+    fs::write(&executable, "not executable\n").unwrap();
+    let mut permissions = fs::metadata(&executable).unwrap().permissions();
+    permissions.set_mode(0o644);
+    fs::set_permissions(&executable, permissions).unwrap();
+    let service =
+        unprepared_test_installation_service_for_port(&runtime_root, "1.0.0", 4557, &temp_root);
+
+    let error = service
+        .install(InstallTarget::LinuxCliWeb)
+        .unwrap_err()
+        .to_string();
+
+    assert!(
+        error.contains("installed Refine binary is not executable"),
+        "{error}"
+    );
+    assert!(
+        error.contains("./r system service-install --port 4557"),
+        "{error}"
+    );
+    assert!(!error.contains("system install"), "{error}");
     assert!(!service.backend_path().exists());
     assert!(!service.path().exists());
     fs::remove_dir_all(temp_root).unwrap_or(());

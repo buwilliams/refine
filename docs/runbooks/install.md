@@ -52,11 +52,17 @@ tar -C "$tmp/refine" --exclude .git -cf - . | tar -C <refine-checkout> -xf -
 rm -rf "$tmp"
 ```
 
-5. Install Refine for the selected port. This command assumes the prerequisites above are available, builds the locked release binary, atomically publishes it as `bin/refine`, marks the checkout as deployed, and only then registers and activates the service:
+5. Register Refine's OS service for the selected port. Copying the release into
+   the product home installs Refine; service registration is a separate host
+   operation. This command assumes the prerequisites above are available,
+   bootstraps the locked release binary when it is missing, atomically publishes it as
+   `bin/refine`, marks the checkout as deployed, and only then registers and
+   activates the port-scoped systemd or launchd service. It does not fetch or
+   update Refine source:
 
 ```bash
 cd <refine-checkout>
-./r system install --port <port>
+./r system service-install --port <port>
 ```
 
 6. Configure the selected provider:
@@ -83,10 +89,12 @@ Do not offer `smoke-ai` during installation. It is reserved for deterministic te
 
 The directory selected above is the product home. `./r` always runs the
 stable production binary `<refine-checkout>/bin/refine` — never a debug
-build. `./r system start`, `./r system install`, and `./r system build`
-create or refresh that binary (rebuilding only when the source has changed
-since the last production build) and say so on stdout; every other command
-requires it to already exist. The base runtime is `<refine-checkout>/run`,
+build. `./r system start` and `./r system build` create or refresh that binary
+(rebuilding only when the source has changed since the last production build)
+and say so on stdout. `./r system service-install` bootstraps the binary only
+when it is missing; it does not rebuild an existing binary as a side effect of
+service registration. Every other command requires it to already exist. The
+base runtime is `<refine-checkout>/run`,
 and port `<port>` owns only `<refine-checkout>/run/<port>`. `./r` anchors the
 invocation to that product home; the directory from which a user launches it
 is not an ownership signal. Do not configure HOME, XDG, platform support
@@ -108,15 +116,29 @@ A published installation is intentionally gitless and is identified by
 provider, and published-update operations. Source status and source promotion
 require an actual Git checkout and will fail closed for a gitless product home.
 
-`./r system install` is the complete fresh-install boundary; callers do not
-prebuild or copy the binary separately. Current service registrations launch the checkout-local binary with the exact
-port and checkout-local runtime and use the checkout as their working
-directory. The current targets are `macos_daemon`, `windows_daemon`, and
-`linux_cli_web`. The historical JSON values `mac_os_app_bundle` and
-`windows_installer` are accepted only when reading migration-era state; new
-state is always written with current names.
+Installing the product files, publishing the production binary, and managing
+the OS service are distinct operations. `./r system build` publishes the
+production binary without changing service registration. `./r system
+service-install` is the registration boundary; it also bootstraps a missing
+binary so first registration does not require a separate build. Current
+service registrations launch the checkout-local binary with the exact port and
+checkout-local runtime and use the checkout as their working directory. The
+current targets are `macos_daemon`, `windows_daemon`, and `linux_cli_web`. The
+historical JSON values `mac_os_app_bundle` and `windows_installer` are accepted
+only when reading migration-era state; new state is always written with current
+names.
 
-Ordinary install/status reports a conflicting legacy external runtime or
+Remove a selected port's OS service registration with:
+
+```bash
+./r system service-uninstall --port <port>
+```
+
+This stops and removes the port-scoped systemd or launchd registration. It is
+not a source update command and does not remove the Refine checkout or its
+published production binary.
+
+Ordinary service registration/status reports a conflicting legacy external runtime or
 registration without changing it. `./r system repair --port <port>` is the
 explicit migration boundary: it leaves external runtime and binary trees
 untouched, stores the exact original registration bytes, SHA-256, parsed
@@ -127,8 +149,10 @@ exact original registration and retains the journal.
 
 ## Update Refine
 
-`./r system update` is the deterministic one-command update for a Git source
-checkout. It first fetches and checks the configured upstream. If there are no
+`./r system update` is the deterministic one-command source update for a Git
+checkout. It is distinct from installing the product files and from registering
+or removing the OS service. It first fetches and checks the configured
+upstream. If there are no
 new upstream commits, it exits without stopping Refine or modifying the
 checkout. When an update is available, it runs these commands in order and
 stops immediately if any command fails:
@@ -238,6 +262,13 @@ Runtime lifecycle commands:
 ./r system restart --port <port>
 ./r system repair --port <port>
 ./r system update
+```
+
+OS service registration commands:
+
+```bash
+./r system service-install --port <port>
+./r system service-uninstall --port <port>
 ```
 
 Use `--runtime-root run` only as compatibility syntax for this checkout's

@@ -255,14 +255,14 @@ impl FileInstallationService {
         let executable = self.checkout_root.join("bin/refine");
         let metadata = fs::metadata(&executable).map_err(|error| {
             RefineError::NotFound(format!(
-                "installed Refine mode requires an executable at {}; run `./r system install --port {}` from the owning checkout to build the release before registering or repairing a service: {error}",
+                "installed Refine mode requires an executable at {}; run `./r system service-install --port {}` from the owning checkout to build the release before registering or repairing a service: {error}",
                 executable.display(),
                 self.port.unwrap_or(8082),
             ))
         })?;
         if !metadata.is_file() {
             return Err(RefineError::NotFound(format!(
-                "installed Refine mode requires a file at {}; run `./r system install --port {}` from the owning checkout to rebuild it before registering or repairing a service",
+                "installed Refine mode requires a file at {}; run `./r system service-install --port {}` from the owning checkout to rebuild it before registering or repairing a service",
                 executable.display(),
                 self.port.unwrap_or(8082),
             )));
@@ -272,9 +272,10 @@ impl FileInstallationService {
             use std::os::unix::fs::PermissionsExt;
             if metadata.permissions().mode() & 0o111 == 0 {
                 return Err(RefineError::InvalidInput(format!(
-                    "installed Refine binary is not executable: {}; run `chmod +x {}` or reinstall it",
+                    "installed Refine binary is not executable: {}; run `chmod +x {}` or `./r system service-install --port {}` from the owning checkout to rebuild it before registering or repairing a service",
                     executable.display(),
-                    executable.display()
+                    executable.display(),
+                    self.port.unwrap_or(8082),
                 )));
             }
         }

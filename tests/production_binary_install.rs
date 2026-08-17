@@ -38,16 +38,16 @@ fn wrapper_always_selects_the_production_binary() {
 }
 
 #[test]
-fn wrapper_system_install_builds_only_when_source_changed() {
-    let temp_root = wrapper_fixture("wrapper-system-install");
+fn wrapper_system_service_install_bootstraps_only_a_missing_binary() {
+    let temp_root = wrapper_fixture("wrapper-system-service-install");
     let cargo_log = temp_root.join("cargo.log");
     let path_env = fixture_path_env(&temp_root);
 
-    // First install: no production binary yet, so the wrapper builds and
+    // First registration: no production binary yet, so the wrapper builds and
     // publishes it before delegating to the installed binary.
     let output = Command::new("bash")
         .arg("r")
-        .args(["system", "install", "--port", "8082"])
+        .args(["system", "service-install", "--port", "8082"])
         .current_dir(&temp_root)
         .env("PATH", &path_env)
         .output()
@@ -59,9 +59,11 @@ fn wrapper_system_install_builds_only_when_source_changed() {
         String::from_utf8_lossy(&output.stderr)
     );
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.contains("production binary is missing; building it before system install"));
+    assert!(
+        stdout.contains("production binary is missing; building it before system service-install")
+    );
     assert!(stdout.contains("production binary updated"));
-    assert!(stdout.contains("installed-command=system install --port 8082"));
+    assert!(stdout.contains("installed-command=system service-install --port 8082"));
     assert_eq!(
         fs::read_to_string(&cargo_log).unwrap().trim(),
         format!(
@@ -76,11 +78,11 @@ fn wrapper_system_install_builds_only_when_source_changed() {
         "mode=deployed\nrelease_bin=bin/refine\n"
     );
 
-    // Second install with unchanged source: no rebuild, straight delegation.
+    // A later registration with unchanged source delegates without rebuilding.
     fs::remove_file(&cargo_log).unwrap();
     let unchanged = Command::new("bash")
         .arg("r")
-        .args(["system", "install", "--port", "8082"])
+        .args(["system", "service-install", "--port", "8082"])
         .current_dir(&temp_root)
         .env("PATH", &path_env)
         .output()
@@ -88,14 +90,14 @@ fn wrapper_system_install_builds_only_when_source_changed() {
     assert!(unchanged.status.success());
     assert_eq!(
         String::from_utf8_lossy(&unchanged.stdout).trim(),
-        "installed-command=system install --port 8082"
+        "installed-command=system service-install --port 8082"
     );
     assert!(!cargo_log.exists(), "unchanged source must not rebuild");
 
     // Dry runs and help never build.
     let dry_run = Command::new("bash")
         .arg("r")
-        .args(["system", "install", "--port", "8082"])
+        .args(["system", "service-install", "--port", "8082"])
         .current_dir(&temp_root)
         .env("REFINE_R_DRY_RUN", "1")
         .env("PATH", &path_env)
@@ -105,7 +107,7 @@ fn wrapper_system_install_builds_only_when_source_changed() {
     assert!(!cargo_log.exists(), "dry-run must not build the release");
     let help = Command::new("bash")
         .arg("r")
-        .args(["system", "install", "--port", "8082", "--help"])
+        .args(["system", "service-install", "--port", "8082", "--help"])
         .current_dir(&temp_root)
         .env("PATH", &path_env)
         .output()
@@ -113,24 +115,25 @@ fn wrapper_system_install_builds_only_when_source_changed() {
     assert!(help.status.success());
     assert!(!cargo_log.exists(), "help must not build the release");
 
-    // Changed source with a failing build: the failure propagates, service
-    // registration never runs, and the published binary is untouched.
+    // Changed source does not make service registration an implicit build or
+    // update operation. The existing published binary remains authoritative.
     let installed_before = fs::read(temp_root.join("bin/refine")).unwrap();
     let marker_before = fs::read(temp_root.join(".refine-deployed")).unwrap();
     fs::write(temp_root.join("Cargo.toml"), "[package]\nname='fixture'\n").unwrap();
     write_failing_fake_cargo(&temp_root, &cargo_log, 23);
-    let failed = Command::new("bash")
+    let changed = Command::new("bash")
         .arg("r")
-        .args(["system", "install", "--port", "8082"])
+        .args(["system", "service-install", "--port", "8082"])
         .current_dir(&temp_root)
         .env("PATH", &path_env)
         .output()
         .unwrap();
-    assert_eq!(failed.status.code(), Some(23));
-    assert!(
-        !String::from_utf8_lossy(&failed.stdout).contains("installed-command="),
-        "service registration must not run"
+    assert!(changed.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&changed.stdout).trim(),
+        "installed-command=system service-install --port 8082"
     );
+    assert!(!cargo_log.exists(), "service registration must not rebuild");
     assert_eq!(
         fs::read(temp_root.join("bin/refine")).unwrap(),
         installed_before
@@ -486,15 +489,18 @@ fn wrapper_test_command_routes_to_cargo_and_xtask_suites() {
 }
 
 #[test]
-fn install_runbook_uses_system_install_as_the_complete_build_and_registration_boundary() {
+fn install_runbook_distinguishes_product_installation_from_service_registration() {
     let repo = env!("CARGO_MANIFEST_DIR");
     let runbook = fs::read_to_string(format!("{repo}/docs/runbooks/install.md")).unwrap();
     let gitignore = fs::read_to_string(format!("{repo}/.gitignore")).unwrap();
 
     assert!(!runbook.contains("scripts/install.sh"));
     assert!(runbook.contains("## Update Refine"));
-    assert!(runbook.contains("./r system install --port <port>"));
-    assert!(runbook.contains("builds the locked release binary"));
+    assert!(runbook.contains("./r system service-install --port <port>"));
+    assert!(runbook.contains("./r system service-uninstall --port <port>"));
+    assert!(!runbook.contains("./r system install --port"));
+    assert!(!runbook.contains("./r system uninstall --port"));
+    assert!(runbook.contains("bootstraps the locked release binary"));
     assert!(runbook.contains("./r system start --port <port>"));
     assert!(runbook.contains("Default: `8082`"));
     assert!(runbook.contains("Do not offer `smoke-ai` during installation"));

@@ -690,7 +690,7 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
         Commands::Commands => None,
         Commands::System { action } => match action {
             SystemAction::Doctor { target_root, .. } => target_root.as_ref(),
-            SystemAction::Install { .. }
+            SystemAction::ServiceInstall { .. }
             | SystemAction::Performance { .. }
             | SystemAction::Repair { .. }
             | SystemAction::ReleasePlan { .. }
@@ -704,7 +704,7 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
             | SystemAction::DaemonLifecycleHelper { .. }
             | SystemAction::RunnerWorker { .. }
             | SystemAction::Rollback { .. }
-            | SystemAction::Uninstall { .. }
+            | SystemAction::ServiceUninstall { .. }
             | SystemAction::Start { .. }
             | SystemAction::Stop { .. }
             | SystemAction::Restart { .. }

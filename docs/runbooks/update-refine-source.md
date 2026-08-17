@@ -59,7 +59,9 @@ default daemon:
 ```
 
 This launcher command is intentionally separate from the restart-safe UI
-workflow and accepts no arguments.
+workflow and accepts no arguments. `./r system service-install` and
+`./r system service-uninstall` only register or remove the port-scoped systemd
+or launchd service; they never fetch, pull, or otherwise update Refine source.
 
 Inspect without fetching:
 

@@ -131,6 +131,18 @@ mod tests {
             system_names.contains(&"performance"),
             "current-main performance command was lost during recovery: {system_names:?}"
         );
+        for expected in ["service-install", "service-uninstall"] {
+            assert!(
+                system_names.contains(&expected),
+                "catalog omitted service command {expected}: {system_names:?}"
+            );
+        }
+        for retired in ["install", "uninstall"] {
+            assert!(
+                !system_names.contains(&retired),
+                "catalog advertised retired system command {retired}: {system_names:?}"
+            );
+        }
         for unadvertised in [
             "build",
             "clean",
@@ -158,6 +170,22 @@ mod tests {
             .unwrap()
             .render_long_help()
             .to_string();
+        for expected in ["service-install", "service-uninstall"] {
+            assert!(
+                system_help
+                    .lines()
+                    .any(|line| line.split_whitespace().next() == Some(expected)),
+                "{system_help}"
+            );
+        }
+        for retired in ["install", "uninstall"] {
+            assert!(
+                !system_help
+                    .lines()
+                    .any(|line| line.split_whitespace().next() == Some(retired)),
+                "{system_help}"
+            );
+        }
         for unadvertised in [
             "build",
             "clean",

@@ -1,16 +1,16 @@
 use super::*;
 
 #[test]
-fn system_install_repair_and_uninstall_use_installation_service() {
+fn system_service_install_repair_and_service_uninstall_use_installation_service() {
     let temp_root = unique_temp_dir("cli-installation");
     let runtime_root = temp_root.join("run");
     write_installed_binary(&temp_root);
 
     for argv in [
-        ["refine", "system", "install"],
+        ["refine", "system", "service-install"],
         ["refine", "system", "repair"],
         ["refine", "system", "rollback"],
-        ["refine", "system", "uninstall"],
+        ["refine", "system", "service-uninstall"],
     ] {
         assert!(Cli::try_parse_from(argv).is_err());
     }
@@ -19,7 +19,7 @@ fn system_install_repair_and_uninstall_use_installation_service() {
         vec![
             "refine",
             "system",
-            "install",
+            "service-install",
             "--port",
             "4557",
             "--target",
@@ -43,7 +43,7 @@ fn system_install_repair_and_uninstall_use_installation_service() {
         vec![
             "refine",
             "system",
-            "uninstall",
+            "service-uninstall",
             "--port",
             "4557",
             "--runtime-root",
@@ -64,6 +64,16 @@ fn system_install_repair_and_uninstall_use_installation_service() {
     assert_eq!(state["status"]["version"], "1.0.0");
 
     fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn retired_system_install_and_uninstall_commands_are_not_parseable() {
+    for retired in ["install", "uninstall"] {
+        assert!(
+            Cli::try_parse_from(["refine", "system", retired, "--port", "4557"]).is_err(),
+            "retired system {retired} command unexpectedly parsed"
+        );
+    }
 }
 
 #[test]
