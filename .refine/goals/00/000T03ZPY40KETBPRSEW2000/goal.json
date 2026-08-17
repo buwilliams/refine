@@ -106,12 +106,51 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-08-17T13:43:57Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-08-17T13:46:33Z",
+        "proposal": {
+          "completed_at": "2026-08-17T13:46:33Z",
+          "git_after": {
+            "branch": "refine/00000T03ZPY40KETBPRSEW2000/round-1",
+            "head_commit": "5850e2fb336540fc41c8ab5ad2d7c934315353df",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T03ZPY40KETBPRSEW2000/round-1",
+            "head_commit": "5850e2fb336540fc41c8ab5ad2d7c934315353df",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Introduce a cohesive runtime-status capability that classifies the bootstrap-owned Refine product home as a published release or Git source checkout and keeps the read responsive by reusing cached source-update evidence instead of fetching in the request.",
+                "id": "P1"
+              },
+              {
+                "description": "For source checkouts, expose the checkout HEAD identity, configured upstream identity, cache freshness, and an explicit current, behind, ahead or diverged relationship while treating missing or stale Git evidence as unknown rather than up to date.",
+                "id": "P2"
+              },
+              {
+                "description": "Update the shared upgrade API contract so published releases retain the existing version and upgrade fields while source checkouts return the structured HEAD and upstream status needed by every surface.",
+                "id": "P3"
+              },
+              {
+                "description": "Change the shared Node tab-strip banner to keep Running latest and Upgrade available messaging for published releases but show Running from HEAD together with the trustworthy upstream relationship for source checkouts.",
+                "id": "P4"
+              },
+              {
+                "description": "Update the affected Processes and API intent documentation to record the release-versus-source distinction, cached upstream-status boundary, and honest handling of unavailable evidence.",
+                "id": "P5"
+              }
+            ],
+            "summary": "Make Node > Processes distinguish published release runtimes from source-checkout runtimes, preserving the release-version message only for published releases and reporting whether a source runtime is running from HEAD and current with its configured upstream so a development build is never mislabeled as the latest release."
+          },
+          "started_at": "2026-08-17T13:43:57Z"
+        },
         "schema_version": 2,
         "started_at": "2026-08-17T13:43:57Z",
         "state": "in_progress",
-        "updated_at": "2026-08-17T13:43:57Z"
+        "updated_at": "2026-08-17T13:46:33Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -125,7 +164,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-17T13:43:57Z",
+      "updated": "2026-08-17T13:46:33Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T13:43:57Z",
         "round_idx": 0,
@@ -137,6 +176,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-17T13:43:57Z",
-  "workflow_revision": 7
+  "updated": "2026-08-17T13:46:33Z",
+  "workflow_revision": 9
 }
