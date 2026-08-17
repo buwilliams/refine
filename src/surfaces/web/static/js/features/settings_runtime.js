@@ -281,10 +281,12 @@ function renderRuntimeUpgradeBanner(upgrade) {
       upstream_cache_unavailable: "cached upstream evidence is unavailable",
       upstream_cache_unknown: "cached upstream evidence is unavailable",
       upstream_cache_stale: "cached upstream evidence is stale",
+      cached_checkout_path_mismatch: "cached evidence belongs to another checkout",
       cached_checkout_identity_unavailable: "cached checkout identity is unavailable",
       cached_checkout_identity_mismatch: "cached checkout identity does not match HEAD",
       cached_upstream_identity_unavailable: "cached upstream identity is unavailable",
       cached_upstream_identity_mismatch: "cached upstream identities disagree",
+      cached_relationship_identity_mismatch: "cached relationship contradicts its commit identities",
       cached_relationship_unavailable: "cached upstream relationship is unavailable",
     };
     const reason = unknownLabels[source.unknown_reason] || "runtime provenance is unavailable";

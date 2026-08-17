@@ -175,11 +175,10 @@ fn classify_source_runtime(
         .filter(|value| !value.is_empty());
 
     let unknown_reason = source_unknown_reason(
+        checkout_path,
         &executable,
         checkout_head.as_deref(),
         cached,
-        cached_checkout_commit.as_deref(),
-        upstream_commit.as_deref(),
         &freshness,
         &cached_relationship,
     );
@@ -215,11 +214,10 @@ fn classify_source_runtime(
 }
 
 fn source_unknown_reason(
+    checkout_path: &Path,
     executable: &RuntimeExecutableProvenance,
     checkout_head: Option<&str>,
     cached: Option<&CachedSourcePromotionStatus>,
-    cached_checkout_commit: Option<&str>,
-    upstream_commit: Option<&str>,
     freshness: &str,
     cached_relationship: &str,
 ) -> Option<String> {
@@ -235,16 +233,19 @@ fn source_unknown_reason(
     let Some(cached) = cached else {
         return Some("upstream_cache_unavailable".to_string());
     };
+    if Path::new(&cached.source.checkout_path) != checkout_path {
+        return Some("cached_checkout_path_mismatch".to_string());
+    }
     if freshness != "fresh" {
         return Some(format!("upstream_cache_{freshness}"));
     }
-    let Some(cached_checkout_commit) = cached_checkout_commit else {
+    let Some(cached_checkout_commit) = cached.check.current_source_identity.as_deref() else {
         return Some("cached_checkout_identity_unavailable".to_string());
     };
     if cached_checkout_commit != checkout_head || cached.source.current_commit != checkout_head {
         return Some("cached_checkout_identity_mismatch".to_string());
     }
-    let Some(upstream_commit) = upstream_commit else {
+    let Some(upstream_commit) = cached.check.available_source_identity.as_deref() else {
         return Some("cached_upstream_identity_unavailable".to_string());
     };
     if cached.source.available_commit != upstream_commit {
@@ -252,6 +253,9 @@ fn source_unknown_reason(
     }
     if cached_relationship == "unknown" {
         return Some("cached_relationship_unavailable".to_string());
+    }
+    if (cached_checkout_commit == upstream_commit) != (cached_relationship == "current") {
+        return Some("cached_relationship_identity_mismatch".to_string());
     }
     None
 }
@@ -398,6 +402,31 @@ mod tests {
         assert_eq!(
             inconsistent.unknown_reason.as_deref(),
             Some("cached_checkout_identity_mismatch")
+        );
+
+        let mut wrong_checkout = cached("aaa", "bbb", "fresh", "behind");
+        wrong_checkout.source.checkout_path = "/other-checkout".to_string();
+        let wrong_checkout_status = classify_source_runtime(
+            Path::new("/checkout"),
+            provenance("aaa"),
+            Some("aaa".to_string()),
+            Some(&wrong_checkout),
+        );
+        assert_eq!(
+            wrong_checkout_status.unknown_reason.as_deref(),
+            Some("cached_checkout_path_mismatch")
+        );
+
+        let contradictory = cached("aaa", "aaa", "fresh", "behind");
+        let contradictory_status = classify_source_runtime(
+            Path::new("/checkout"),
+            provenance("aaa"),
+            Some("aaa".to_string()),
+            Some(&contradictory),
+        );
+        assert_eq!(
+            contradictory_status.unknown_reason.as_deref(),
+            Some("cached_relationship_identity_mismatch")
         );
     }
 }

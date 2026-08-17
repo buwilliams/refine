@@ -106,4 +106,16 @@ test("source banner reports only trusted HEAD and upstream relationships", () =>
     }),
     "Source runtime status unknown · cached upstream evidence is stale",
   );
+  assert.equal(
+    message({
+      runtime_kind: "source",
+      source: {
+        running_from_head: null,
+        relationship: "unknown",
+        unknown_reason: "cached_relationship_identity_mismatch",
+        upstream: { freshness: "fresh" },
+      },
+    }),
+    "Source runtime status unknown · cached relationship contradicts its commit identities",
+  );
 });
