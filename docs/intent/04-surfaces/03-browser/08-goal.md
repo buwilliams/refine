@@ -36,6 +36,11 @@ Current implementation details that matter to intent:
 
 - Goals list uses URL-backed filters for status, reporter, assignee, Feature, rounds, node, severity, category, actor, sort, and page;
 - Goal details open as a modal over the current page;
+- a Goal owned by another node should offer **Transfer to my node** in the modal
+  action menu when the browser has an authoritative active-node context. The
+  action uses the shared single-item transfer capability; server-side workflow
+  and Feature-membership constraints remain authoritative, and rejected
+  transfers are surfaced without changing ownership;
 - failed Feature-blocking Goals should explain what they block and log user-visible notices to System;
 - new rounds can be submitted for failed or review states where shared rules allow it;
 - bulk operations should use shared work item behavior and preserve node/Feature constraints;
