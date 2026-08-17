@@ -1396,8 +1396,37 @@
           "round_idx": 2,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-08-17T15:10:16Z",
+        "criticism": {
+          "completed_at": "2026-08-17T15:11:43Z",
+          "git_after": {
+            "branch": "refine/00000T040T05D388K5F1EW2002/round-3",
+            "head_commit": "9a4c1005fa5f9ee3de082faf6d8a9bc8c3694d97",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T040T05D388K5F1EW2002/round-3",
+            "head_commit": "9a4c1005fa5f9ee3de082faf6d8a9bc8c3694d97",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P1",
+                  "P3"
+                ],
+                "description": "The checklist carries the regression artifacts forward but omits executing the pinned-target ancestry, exact three-file scope, diff-hygiene, and requested focused, full-browser, and Rust verification needed to establish a safe exact candidate before Quality and Governance.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Add a verification item covering the pinned target, clean exact scope, git diff --check, focused and full browser suites, Rust suite, clean worktree, and separate reporting of any later main drift."
+              }
+            ],
+            "summary": "Add explicit exact-scope and regression verification to the otherwise sound recovery plan."
+          },
+          "started_at": "2026-08-17T15:10:16Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-08-17T15:11:43Z",
         "proposal": {
           "completed_at": "2026-08-17T15:10:16Z",
           "git_after": {
@@ -1432,7 +1461,7 @@
         "schema_version": 2,
         "started_at": "2026-08-17T15:09:22Z",
         "state": "in_progress",
-        "updated_at": "2026-08-17T15:10:16Z"
+        "updated_at": "2026-08-17T15:11:43Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -1446,7 +1475,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-08-17T15:10:16Z",
+      "updated": "2026-08-17T15:11:43Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T15:09:22Z",
         "round_idx": 2,
@@ -1489,6 +1518,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-17T15:10:16Z",
-  "workflow_revision": 50
+  "updated": "2026-08-17T15:11:43Z",
+  "workflow_revision": 52
 }
