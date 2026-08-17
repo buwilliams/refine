@@ -1,7 +1,7 @@
 {
   "base_commit": "5850e2fb336540fc41c8ab5ad2d7c934315353df",
   "branch_name": "refine/00000T03ZRH7S29PPWCDEW2001/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "c182fda0ca5354ad58bdeb6676221631f2ec461f",
   "created": "2026-08-17T13:45:41Z",
   "feature_id": null,
   "feature_order": null,
@@ -95,7 +95,28 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-17T14:06:43Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "5850e2fb336540fc41c8ab5ad2d7c934315353df",
@@ -106,6 +127,7 @@
           "round_idx": 0,
           "target_branch": "main"
         },
+        "completed_at": "2026-08-17T14:06:43Z",
         "criticism": {
           "completed_at": "2026-08-17T13:49:18Z",
           "git_after": {
@@ -186,6 +208,52 @@
           "message": "The finalized plan does not require any governance violation.",
           "status": "passed"
         },
+        "implementation": {
+          "completed_at": "2026-08-17T14:06:43Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Replaced the public `SystemAction` variants with `ServiceInstall` and `ServiceUninstall`, updated help text to describe port-scoped systemd/launchd registration and removal, retained the existing installation-service dispatch, and added parser plus catalog/help assertions proving the retired spellings are absent.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated `r` to recognize and delegate `system service-install`; added a missing-only production-binary bootstrap so first registration works while an existing binary is never implicitly rebuilt; retained the fixed Git/source update sequence solely under launcher-owned `system update`; launcher integration tests cover missing, unchanged, and source-changed cases.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Changed missing, non-file, and non-executable installed-binary recovery guidance in `src/tools/host/installation/state.rs` to recommend `./r system service-install --port <port>`; focused missing and invalid executable tests assert the new command and reject the retired spelling.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated the Process and CLI intent pages and the install and source-update runbooks to distinguish product file installation, production-binary publication, OS service registration/removal, and source updates while preserving the existing document structure.",
+                "id": "P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Migrated CLI parsing/dispatch, command catalog/help, launcher, runtime diagnostics, production-binary integration, runbook validation, and real-systemd source-promotion fixtures. Explicit tests prove `service-install`/`service-uninstall` are advertised, recovery uses `service-install`, and `install`/`uninstall` no longer parse.",
+                "id": "P5",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "`cargo test surfaces::cli::tests::system::installation --lib && cargo test surfaces::cli::catalog::tests::catalog_and_interactive_help_only_advertise_supported_commands --lib && cargo test service_install --lib && cargo test surfaces::cli::catalog::tests::operational_runbooks_use_current_cli_and_layout_contracts --lib` -> passed 3/3, 1/1, 3/3, and 1/1 respectively; 0 failed.",
+              "`cargo test --test production_binary_install` -> passed 9/9; 0 failed, including missing-only `service-install` bootstrap and no implicit rebuild after a source change.",
+              "`cargo test --lib -- --test-threads=1` -> passed 1000; 0 failed; 6 ignored; deterministic complete library result.",
+              "`cargo test --all-targets` -> two parallel attempts each reached 999 passed and 6 ignored before the same unchanged timing test failed: `tools::host::source_promotion::tests::agent_tests::launched_upgrade_agent_is_adopted_without_projection_receipt_and_not_duplicated` observed `queued` instead of `running`.",
+              "`cargo test tools::host::source_promotion::tests::agent_tests::launched_upgrade_agent_is_adopted_without_projection_receipt_and_not_duplicated --lib -- --exact` -> passed 1/1 in isolation; 0 failed.",
+              "`rustfmt --edition 2024 --check src/surfaces/cli/actions.rs src/surfaces/cli/actions/system.rs src/surfaces/cli/catalog.rs src/surfaces/cli/dispatch.rs src/surfaces/cli/dispatch/system.rs src/surfaces/cli/tests/system/installation.rs src/tools/host/installation/state.rs src/tools/host/installation/tests.rs src/tools/host/source_promotion/systemd_tests.rs src/tools/host/source_promotion/systemd_upgrade_tests.rs tests/production_binary_install.rs` -> exit 0; all owned Rust files formatted.",
+              "`bash -n r` -> exit 0.",
+              "`git diff --check` -> exit 0.",
+              "`cargo fmt --all -- --check` -> baseline-only failure in untouched `src/tools/observability/processes.rs:387`; owned-file rustfmt check passes.",
+              "`cargo clippy --all-targets -- -D warnings` -> baseline-only failure: 5 existing lints in untouched `src/tools/product/project_projection/store.rs`, `src/surfaces/web_server/http/background_loops.rs`, `src/surfaces/cli/dispatch/config.rs`, and `src/tools/product/work_items/service/round_helpers.rs`; no changed file was named."
+            ]
+          },
+          "report": "Renamed the public OS service commands to `system service-install` and `system service-uninstall`; preserved port-scoped systemd/launchd behavior; made the launcher bootstrap a missing release binary only for first service registration without rebuilding an existing binary or taking Git/source update authority from `system update`; updated installed-binary recovery diagnostics, intent pages, and install/update runbooks; and migrated parsing, catalog/help, launcher, diagnostic, runbook, and systemd integration expectations. Exact verification: focused CLI/catalog/diagnostic/runbook tests passed; `cargo test --test production_binary_install` passed 9/9; deterministic full library verification passed 1000 tests with 6 ignored; owned Rust formatting, launcher syntax, and diff whitespace checks passed. Parallel `cargo test --all-targets` exposed one unchanged concurrency-sensitive source-promotion test failure (`queued` observed before `running`) in both attempts after 999 passes and 6 ignores; that exact test passed in isolation and the complete library suite passed single-threaded. Repository-wide fmt and Clippy remain blocked only by pre-existing findings in untouched files, recorded in verification.",
+          "started_at": "2026-08-17T13:51:07Z"
+        },
         "phase": "implement",
         "phase_started_at": "2026-08-17T13:51:07Z",
         "proposal": {
@@ -225,11 +293,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-08-17T13:45:42Z",
-        "state": "in_progress",
-        "updated_at": "2026-08-17T13:51:07Z"
+        "state": "completed",
+        "updated_at": "2026-08-17T14:06:43Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Renamed the public OS service commands to `system service-install` and `system service-uninstall`; preserved port-scoped systemd/launchd behavior; made the launcher bootstrap a missing release binary only for first service registration without rebuilding an existing binary or taking Git/source update authority from `system update`; updated installed-binary recovery diagnostics, intent pages, and install/update runbooks; and migrated parsing, catalog/help, launcher, diagnostic, runbook, and systemd integration expectations. Exact verification: focused CLI/catalog/diagnostic/runbook tests passed; `cargo test --test production_binary_install` passed 9/9; deterministic full library verification passed 1000 tests with 6 ignored; owned Rust formatting, launcher syntax, and diff whitespace checks passed. Parallel `cargo test --all-targets` exposed one unchanged concurrency-sensitive source-promotion test failure (`queued` observed before `running`) in both attempts after 999 passes and 6 ignores; that exact test passed in isolation and the complete library suite passed single-threaded. Repository-wide fmt and Clippy remain blocked only by pre-existing findings in untouched files, recorded in verification.",
+      "implementation_reported_at": "2026-08-17T14:06:43Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -240,7 +308,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-17T13:51:07Z",
+      "updated": "2026-08-17T14:06:43Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T13:45:41Z",
         "round_idx": 0,
@@ -250,8 +318,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-17T13:51:07Z",
-  "workflow_revision": 15
+  "updated": "2026-08-17T14:06:43Z",
+  "workflow_revision": 20
 }
