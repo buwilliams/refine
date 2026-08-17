@@ -106,8 +106,59 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-08-17T14:21:23Z",
+        "criticism": {
+          "completed_at": "2026-08-17T14:23:57Z",
+          "git_after": {
+            "branch": "refine/DR05060B5D11A47E115C6D1210/round-1",
+            "head_commit": "bd392b96216d26fa00b5ef5d307af5abb2bd398f",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR05060B5D11A47E115C6D1210/round-1",
+            "head_commit": "bd392b96216d26fa00b5ef5d307af5abb2bd398f",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P3"
+                ],
+                "description": "P3 does not define a crash-consistent versioned association between the fingerprint map and its retained Git snapshot, so a process stop between updating the ref and replacing the baseline file can pair fingerprints with the wrong commit or orphan the intended evidence.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Store and validate the exact snapshot OID or immutable ref in backward-compatible baseline metadata, publish the anchor before atomically replacing that metadata, and retire the previous anchor only after the new pair is durable."
+              },
+              {
+                "checklist_item_ids": [
+                  "P5"
+                ],
+                "description": "P5 assumes state-sync activity is inside the recovery stale fence, but current durable-state enumeration already excludes the entire logs namespace containing logs/activity.jsonl, so the plan has not identified the actual included path or writer that caused the observed three preview failures.",
+                "id": "C2",
+                "material": true,
+                "recommendation": "Add a reproducing test or path-level diagnostic that proves which fenced input changes, then serialize or exclude only that verified node-local input while preserving all durable live-state, head, identity, and decision fences."
+              },
+              {
+                "checklist_item_ids": [
+                  "P1",
+                  "P2",
+                  "P3",
+                  "P4",
+                  "P5",
+                  "P6"
+                ],
+                "description": "No checklist item requires regression verification for the new fallback, retained-anchor restart behavior, recovery concurrency, diagnostics, or scheduler backoff and manual bypass, leaving the high-risk fail-closed and crash-safety contracts unprotected.",
+                "id": "C3",
+                "material": true,
+                "recommendation": "Add focused first-pass and push-retry merge tests, malformed and equal-time rejection tests, interruption and legacy-baseline tests, concurrent preview tests, and deterministic backoff reset, suppression, cap, and explicit-sync bypass tests."
+              }
+            ],
+            "summary": "Close three safety gaps before implementing the otherwise well-scoped state-sync recovery plan."
+          },
+          "started_at": "2026-08-17T14:21:23Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-08-17T14:23:58Z",
         "proposal": {
           "completed_at": "2026-08-17T14:21:23Z",
           "git_after": {
@@ -158,7 +209,7 @@
         "schema_version": 2,
         "started_at": "2026-08-17T14:18:04Z",
         "state": "in_progress",
-        "updated_at": "2026-08-17T14:21:23Z"
+        "updated_at": "2026-08-17T14:23:58Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -172,7 +223,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-17T14:21:23Z",
+      "updated": "2026-08-17T14:23:58Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T14:18:03Z",
         "round_idx": 0,
@@ -184,6 +235,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-17T14:21:23Z",
-  "workflow_revision": 9
+  "updated": "2026-08-17T14:23:58Z",
+  "workflow_revision": 11
 }
