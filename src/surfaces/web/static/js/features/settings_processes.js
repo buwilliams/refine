@@ -156,7 +156,8 @@ function readableProcessDetails(details) {
 }
 
 function repositoryDiskUsageDetails(usage) {
-  if (!usage || !Number.isFinite(Number(usage.bytes))) return "";
+  // bytes is null while the background walk is pending; Number(null) is 0.
+  if (!usage || usage.bytes == null || !Number.isFinite(Number(usage.bytes))) return "";
   const worktrees = usage.includes_git_worktrees === true
     ? " (includes .git worktrees)"
     : "";

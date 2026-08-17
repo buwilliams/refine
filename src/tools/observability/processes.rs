@@ -16,13 +16,27 @@ use crate::tools::product::chat::{ChatAttachment, ChatSessionRecord, FileChatSer
 use crate::tools::product::project_projection::RuntimeProjection;
 
 const REPOSITORY_DISK_USAGE_REFRESH_INTERVAL: Duration = Duration::from_secs(30);
+/// A root nobody has asked about for this long stops being re-measured until
+/// the next request for it arrives.
+const REPOSITORY_DISK_USAGE_DEMAND_WINDOW: Duration = Duration::from_secs(300);
+/// Ceiling on the walk's share of the disk: a measurement that took T earns a
+/// pause of at least 20×T before that root is walked again, so a repository
+/// that costs minutes to measure is re-measured on the scale of an hour while
+/// a small one keeps the base interval.
+const REPOSITORY_DISK_USAGE_DUTY_FACTOR: u32 = 20;
 
-static REPOSITORY_DISK_USAGE_CACHE: OnceLock<Mutex<BTreeMap<PathBuf, (Instant, u64)>>> =
-    OnceLock::new();
+#[derive(Clone, Copy, Debug, Default)]
+struct RepositoryDiskUsageEntry {
+    bytes: Option<u64>,
+    last_requested: Option<Instant>,
+    next_measure_after: Option<Instant>,
+}
+
 /// Roots the background refresher keeps measured. Populated by the first
 /// request that asks about a root; bounded by the repositories a daemon
 /// serves.
-static REPOSITORY_DISK_USAGE_TARGETS: OnceLock<Mutex<BTreeSet<PathBuf>>> = OnceLock::new();
+static REPOSITORY_DISK_USAGE: OnceLock<Mutex<BTreeMap<PathBuf, RepositoryDiskUsageEntry>>> =
+    OnceLock::new();
 static REPOSITORY_DISK_USAGE_REFRESHER: OnceLock<()> = OnceLock::new();
 
 #[derive(Clone, Debug)]
@@ -321,10 +335,12 @@ pub fn repository_disk_usage_value(repository_root: &Path) -> Value {
     {
         measured_roots.push(common_dir.clone());
     }
-    let bytes = measured_roots
-        .iter()
-        .filter_map(|path| cached_directory_disk_usage_bytes(path))
-        .fold(0_u64, u64::saturating_add);
+    ensure_disk_usage_refresher();
+    // Null until every root has a background figure; a partial sum would
+    // present a confidently wrong number while the first walk is pending.
+    let bytes = measured_roots.iter().try_fold(0_u64, |total, path| {
+        cached_directory_disk_usage_bytes(path).map(|bytes| total.saturating_add(bytes))
+    });
     json!({
         "bytes": bytes,
         "repository_root": repository_root,
@@ -333,33 +349,22 @@ pub fn repository_disk_usage_value(repository_root: &Path) -> Value {
     })
 }
 
-/// Serves disk usage from a cache a background thread keeps fresh.
+fn repository_disk_usage_state() -> &'static Mutex<BTreeMap<PathBuf, RepositoryDiskUsageEntry>> {
+    REPOSITORY_DISK_USAGE.get_or_init(|| Mutex::new(BTreeMap::new()))
+}
+
+/// Serves disk usage from a cache the background refresher keeps fresh.
 ///
-/// A `du` walk over a repository with a build directory costs one to two
-/// hundred milliseconds, and the old time-to-live recomputed it inline
-/// whenever it expired — every fifteen seconds some process-list request drew
-/// the slow straw. Only the first request for a root ever measures inline;
-/// after that the refresher re-measures off the request path and staleness is
-/// bounded by its interval.
+/// The request path never walks the repository: once Git-owned worktree
+/// storage accumulates, a `du` walk can cost minutes of saturated I/O, and an
+/// inline measurement stalled the process list exactly when the disk was
+/// sickest. A root stays pending (`None`) until the refresher measures it off
+/// the request path; requests only read the figure and renew demand.
 fn cached_directory_disk_usage_bytes(path: &Path) -> Option<u64> {
-    if let Ok(mut targets) = REPOSITORY_DISK_USAGE_TARGETS
-        .get_or_init(|| Mutex::new(BTreeSet::new()))
-        .lock()
-    {
-        targets.insert(path.to_path_buf());
-    }
-    ensure_disk_usage_refresher();
-    let cache = REPOSITORY_DISK_USAGE_CACHE.get_or_init(|| Mutex::new(BTreeMap::new()));
-    if let Ok(cache) = cache.lock()
-        && let Some((_, bytes)) = cache.get(path)
-    {
-        return Some(*bytes);
-    }
-    let bytes = measure_directory_disk_usage_bytes(path)?;
-    if let Ok(mut cache) = cache.lock() {
-        cache.insert(path.to_path_buf(), (Instant::now(), bytes));
-    }
-    Some(bytes)
+    let mut state = repository_disk_usage_state().lock().ok()?;
+    let entry = state.entry(path.to_path_buf()).or_default();
+    entry.last_requested = Some(Instant::now());
+    entry.bytes
 }
 
 fn ensure_disk_usage_refresher() {
@@ -367,25 +372,45 @@ fn ensure_disk_usage_refresher() {
         std::thread::spawn(|| {
             loop {
                 std::thread::sleep(REPOSITORY_DISK_USAGE_REFRESH_INTERVAL);
-                let targets = REPOSITORY_DISK_USAGE_TARGETS
-                    .get_or_init(|| Mutex::new(BTreeSet::new()))
-                    .lock()
-                    .map(|targets| targets.iter().cloned().collect::<Vec<_>>())
-                    .unwrap_or_default();
-                for path in targets {
-                    // A failed measurement keeps the previous figure; stale
-                    // beats absent for a dashboard-style number.
-                    if let Some(bytes) = measure_directory_disk_usage_bytes(&path)
-                        && let Ok(mut cache) = REPOSITORY_DISK_USAGE_CACHE
-                            .get_or_init(|| Mutex::new(BTreeMap::new()))
-                            .lock()
-                    {
-                        cache.insert(path.clone(), (Instant::now(), bytes));
-                    }
-                }
+                refresh_repository_disk_usage_once();
             }
         });
     });
+}
+
+/// One refresher pass: walk every root somebody asked about within the demand
+/// window and whose duty-cycle pause has elapsed. Separate from the thread so
+/// tests can drive a pass synchronously.
+fn refresh_repository_disk_usage_once() {
+    let now = Instant::now();
+    let due = match repository_disk_usage_state().lock() {
+        Ok(state) => state
+            .iter()
+            .filter(|(_, entry)| {
+                entry.last_requested.is_some_and(|at| {
+                    now.duration_since(at) <= REPOSITORY_DISK_USAGE_DEMAND_WINDOW
+                }) && entry.next_measure_after.is_none_or(|after| now >= after)
+            })
+            .map(|(path, _)| path.clone())
+            .collect::<Vec<_>>(),
+        Err(_) => return,
+    };
+    for path in due {
+        let started = Instant::now();
+        // A failed measurement keeps the previous figure; stale beats absent
+        // for a dashboard-style number.
+        let measured = measure_directory_disk_usage_bytes(&path);
+        let pause = (started.elapsed() * REPOSITORY_DISK_USAGE_DUTY_FACTOR)
+            .max(REPOSITORY_DISK_USAGE_REFRESH_INTERVAL);
+        if let Ok(mut state) = repository_disk_usage_state().lock()
+            && let Some(entry) = state.get_mut(&path)
+        {
+            if measured.is_some() {
+                entry.bytes = measured;
+            }
+            entry.next_measure_after = Some(Instant::now() + pause);
+        }
+    }
 }
 
 fn measure_directory_disk_usage_bytes(path: &Path) -> Option<u64> {

@@ -297,6 +297,12 @@ fn repository_disk_usage_includes_git_owned_worktree_storage() {
     std::fs::create_dir_all(&worktree_storage).unwrap();
     std::fs::write(worktree_storage.join("build.bin"), vec![2_u8; 16 * 1024]).unwrap();
 
+    // The request path never walks the repository: the first ask registers
+    // demand and reports pending, a refresher pass measures off-path.
+    let pending = repository_disk_usage_value(&repository_root);
+    assert_eq!(pending["bytes"], Value::Null);
+    refresh_repository_disk_usage_once();
+
     let usage = repository_disk_usage_value(&repository_root);
     assert_eq!(usage["includes_git_worktrees"], true);
     assert!(usage["bytes"].as_u64().unwrap() >= 24 * 1024);
