@@ -638,7 +638,28 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-17T20:07:37Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "71fc6d75497442c9ef28df879539dcfb3235e761",
@@ -649,6 +670,7 @@
           "round_idx": 1,
           "target_branch": "main"
         },
+        "completed_at": "2026-08-17T20:07:37Z",
         "final_plan": {
           "completed_at": "2026-08-17T20:02:27Z",
           "git_after": {
@@ -670,6 +692,29 @@
             ],
             "summary": "Scoped quality recovery for Round 1: implement the current Round request directly on the retained candidate. Planning is skipped for this recovery; the full Quality and Governance gates still judge the result."
           },
+          "started_at": "2026-08-17T20:02:27Z"
+        },
+        "implementation": {
+          "completed_at": "2026-08-17T20:07:37Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Recovered the retained Round 1 candidate in place on refine/DRD687153A374C7D087017F698/round-2 at exact commit 04eab0ddade6011daef8da0d4b97c03aa3393754. No corrective edits were needed: the clean candidate contains exactly the reviewed four-file delta from base 71fc6d75497442c9ef28df879539dcfb3235e761 (Main intent, base.css width-cap removal, focused layout regression, and static_surface module registration). No package.json or source_promotion test was added or modified.",
+                "id": "R1",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "git status --short --branch && git rev-parse HEAD && git diff --name-status 71fc6d75497442c9ef28df879539dcfb3235e761...HEAD: clean refine/DRD687153A374C7D087017F698/round-2 at exact candidate 04eab0ddade6011daef8da0d4b97c03aa3393754 with exactly four reviewed paths.",
+              "cargo test --lib static_main_uses_available_viewport_width -- --nocapture: exit 0; 1 passed, 0 failed, 1031 filtered out.",
+              "cargo test --lib --bins -- --test-threads=1: exit 0; src/lib.rs 1026 passed, 0 failed, 6 ignored; src/main.rs 0 passed, 0 failed.",
+              "cargo run --manifest-path xtask/Cargo.toml -- test-browser: exit 0; 207 passed, 0 failed, 28 skipped because no Playwright Chromium build is available.",
+              "rustfmt --edition 2024 --check src/surfaces/web_server/tests/static_surface/mod.rs src/surfaces/web_server/tests/static_surface/layout.rs: exit 0.",
+              "git diff --check 71fc6d75497442c9ef28df879539dcfb3235e761...HEAD && git diff --check: exit 0.",
+              "Preliminary cargo test static_main_uses_available_viewport_width -- --exact --nocapture: exit 2 after the lib test filter selected 0 exact tests and tests/test_all.rs rejected the non-suite argument; this was an unscoped harness-selection invocation, and the repository-valid --lib focused command passed."
+            ]
+          },
+          "report": "Re-evaluated exact retained candidate 04eab0ddade6011daef8da0d4b97c03aa3393754 without source changes. The reviewed four-file delta removes main's 1120px width cap while preserving gutters, width, flex, scrolling, and narrow-screen rules; it retains the focused static regression and Main intent update. Repository-valid verification passed: the focused Rust test passed 1/1; cargo test --lib --bins -- --test-threads=1 passed 1026 tests with 0 failed and 6 ignored plus the binary target with 0 failed; browser tests passed 207 with 0 failed and skipped 28 because Playwright Chromium is unavailable; targeted rustfmt and git diff --check passed. A preliminary unscoped cargo test filter exited 2 because the repository's custom integration harness rejects non-suite arguments; rerunning with the repository-valid --lib selector passed and this harness-selection result is unrelated to the candidate.",
           "started_at": "2026-08-17T20:02:27Z"
         },
         "phase": "implement",
@@ -699,11 +744,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-08-17T20:02:27Z",
-        "state": "in_progress",
-        "updated_at": "2026-08-17T20:02:27Z"
+        "state": "completed",
+        "updated_at": "2026-08-17T20:07:37Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Re-evaluated exact retained candidate 04eab0ddade6011daef8da0d4b97c03aa3393754 without source changes. The reviewed four-file delta removes main's 1120px width cap while preserving gutters, width, flex, scrolling, and narrow-screen rules; it retains the focused static regression and Main intent update. Repository-valid verification passed: the focused Rust test passed 1/1; cargo test --lib --bins -- --test-threads=1 passed 1026 tests with 0 failed and 6 ignored plus the binary target with 0 failed; browser tests passed 207 with 0 failed and skipped 28 because Playwright Chromium is unavailable; targeted rustfmt and git diff --check passed. A preliminary unscoped cargo test filter exited 2 because the repository's custom integration harness rejects non-suite arguments; rerunning with the repository-valid --lib selector passed and this harness-selection result is unrelated to the candidate.",
+      "implementation_reported_at": "2026-08-17T20:07:37Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -714,7 +759,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-08-17T20:02:27Z",
+      "updated": "2026-08-17T20:07:37Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T20:02:26Z",
         "round_idx": 1,
@@ -724,8 +769,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-17T20:02:27Z",
-  "workflow_revision": 34
+  "updated": "2026-08-17T20:07:37Z",
+  "workflow_revision": 39
 }
