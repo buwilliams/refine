@@ -1,7 +1,7 @@
 {
-  "base_commit": "5850e2fb336540fc41c8ab5ad2d7c934315353df",
+  "base_commit": "bd392b96216d26fa00b5ef5d307af5abb2bd398f",
   "branch_name": "refine/00000T03ZPY40KETBPRSEW2000/round-1",
-  "candidate_commit": "c84c0cf699d88c90ef41d9c4661ea6ec9fa634b9",
+  "candidate_commit": "94062ff01844fccee8a0a50741e38b5c66a4d643",
   "created": "2026-08-17T13:43:56Z",
   "feature_id": null,
   "feature_order": null,
@@ -85,15 +85,15 @@
         "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
       },
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": null,
       "created": "2026-08-17T13:43:56Z",
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
-      "governance_candidate_commit": "",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_candidate_commit": null,
+      "governance_checked_at": null,
+      "governance_details": null,
+      "governance_message": null,
       "governance_rule_actions": [],
       "guidance_decision": {
         "applied": [
@@ -307,29 +307,106 @@
       "implementation_report": "Implemented release-versus-source runtime classification with immutable executable provenance, fail-closed HEAD/upstream relationships, a structured shared upgrade API, the Node Processes banner, and affected intent documentation. Candidate verification passed. Repository-wide fmt and strict Clippy remain blocked only by confirmed unchanged baseline findings, reported separately below.",
       "implementation_reported_at": "2026-08-17T14:16:43Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": null,
+      "product_state": null,
       "prompt": "Node > Processes shows \"Running latest 4.2.0\" even though I'm not running from a release checkout, but from HEAD, which may or may not be behind the actual origin head. This causes confusion. A better path is that it says whether it is running from HEAD and whether it is up to date with origin or not, unless it is running from a release checkout, in which case the current signal is good.",
       "quality_agent_report": "Quality corrected the fail-closed source-runtime classifier so cached evidence is trusted only when it belongs to the owning checkout and its stored relationship agrees with its commit identities. Added user-facing unknown reasons and focused Rust and JavaScript regressions. Final Rust and JavaScript suites pass; repository-wide fmt and strict Clippy remain blocked only by verified unchanged baseline files.",
-      "quality_candidate_commit": "c84c0cf699d88c90ef41d9c4661ea6ec9fa634b9",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_candidate_commit": null,
+      "quality_checked_at": null,
+      "quality_details": null,
+      "quality_message": null,
+      "quality_state": null,
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-08-17T14:36:22Z",
+      "rule_state": null,
+      "updated": "2026-08-17T14:40:22Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T13:43:57Z",
         "round_idx": 0,
         "workflow_revision": 2
       },
+      "workflow_candidate_refresh": {
+        "branch": "refine/00000T03ZPY40KETBPRSEW2000/round-1",
+        "node_id": "default",
+        "original_base_commit": "5850e2fb336540fc41c8ab5ad2d7c934315353df",
+        "original_candidate_commit": "c84c0cf699d88c90ef41d9c4661ea6ec9fa634b9",
+        "previous_gate_evidence": {
+          "constitution_state": "unclassified",
+          "governance_candidate_commit": "",
+          "governance_checked_at": "",
+          "governance_details": "",
+          "governance_message": "",
+          "meta_rule_state": "unclassified",
+          "product_state": "unclassified",
+          "quality_candidate_commit": "c84c0cf699d88c90ef41d9c4661ea6ec9fa634b9",
+          "quality_checked_at": "2026-08-17T14:40:21Z",
+          "quality_details": {
+            "candidate_commit": "c84c0cf699d88c90ef41d9c4661ea6ec9fa634b9",
+            "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T03ZPY40KETBPRSEW2000-round-1",
+            "diagnostics": [
+              "{\"ok\":true,\"summary\":\"Focused Quality evaluation passed at candidate c84c0cf699d88c90ef41d9c4661ea6ec9fa634b9.\",\"results\":[{\"test\":\"The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\",\"status\":\"passed\",\"evidence\":\"Final exit 0. Candidate and clean-worktree assertions passed; diff check was clean; 3 runtime-classification, 1 Git-relationship, 1 /api/upgrade, and 2 banner tests passed with no failures or skips. The locked release build succeeded and contained the exact candidate SHA. Relevant Process, Browser, and API intent contracts match the shared host capability and fail-closed surface behavior. Remaining uncertainty: no live remote fetch or Playwright run was needed; cached ancestry, API projection, and banner behavior were exercised deterministically.\",\"command\":\"bash -lc 'set -euo pipefail\\nbase=5850e2fb336540fc41c8ab5ad2d7c934315353df\\ncandidate=c84c0cf699d88c90ef41d9c4661ea6ec9fa634b9\\ntest \\\"$(git rev-parse HEAD)\\\" = \\\"$candidate\\\"\\ntest -z \\\"$(git status --porcelain)\\\"\\ngit diff --check \\\"$base..$candidate\\\"\\ncargo test --lib tools::host::runtime_status::tests -- --test-threads=1\\ncargo test --lib tools::host::source_promotion::tests::cached_source_snapshot_classifies_current_behind_ahead_and_diverged -- --exact --test-threads=1\\ncargo test --lib surfaces::web_server::tests::operations_processes::events::project::web_server_serves_project_utility_upgrade_health_and_sse_routes -- --exact --test-threads=1\\nnode --test tests/runtime_upgrade_banner.test.js\\ncargo build --release --locked\\nstrings target/release/refine | rg -F \\\"$candidate\\\"'\"}]}",
+              "Observed supervised process proc-1786977620493-613850-257 exited 0. stdout: ; cancellation remains fenced and recoverableSource update cancelled after helper ownership settledThe exact pre-upgrade workflow-admission intent was restored; retry starts a new fenced attemptsource_upgrade_cancellation_waiting_for_safe_settlementsource-upgrade cancellation is fenced but cannot terminate a helper during source or registration mutation; recovery will reconcile the same attemptSourceUpdateCheckStatechecksource_update_check_failedsource update-check workerjson.pendingsource-update-check.json.source-update-check.lockThe cached update check had no durable operation ownership; retry to register a new supervised checksource_update_check_interrupted_before_receiptNo correlated supervised worker survived durable reservation or launchThe supervised remote update check was interrupted before publishing a resultsource_update_check_duplicate_workerssource_update_checkcapabilitymaintenance:source-update-checksource_check_operationsource-check-worker--port-runtime-rootsource_update_check_launch_failedstaleclaimed handoff attempt disappearedlegacy restart-safe stage has no correlated attempt, receipt, or claimAdopted the exact live restart-safe helper after daemon restartno exact helper is liveHandoffLaunchReceiptmechanismmechanism_identitysubmitted_atargument_fingerprintpid4.2.0source-promote-helper`DateTime + TimeDelta` overflowedRestart-safe handoff reserved; helper liveness is not yet provenRestart-safe helper receipt accepted and handoff activatedport runtime root has no parentdefer_cancellation_terminalRestart-safe helper ownership could not be provenThe source checkout was left inspectable; retry creates a newly fenced attempt only after this one is terminalSourcePromotionSnapshotSourcePromotionOperationvisibleenabledstatetitleSourcePromotionRollbackEvidenceSource promotion queuedRunning Refine source checkout is not discoverableupstream is not a fast-forward; typed source-upgrade capabilities@You are the dedicated Refine source-upgrade Agent for operation stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `release` profile [optimized] target(s) in 0.08s"
+            ],
+            "evaluation_scope": "isolated_candidate",
+            "operation_id": "1a01026f44c95dda6",
+            "provider_attempts": [
+              {
+                "accepted": true,
+                "attempt": 1,
+                "process_id": "proc-1786977383852-613850-254",
+                "raw_output": "{\"ok\":true,\"summary\":\"Focused Quality evaluation passed at candidate c84c0cf699d88c90ef41d9c4661ea6ec9fa634b9.\",\"results\":[{\"test\":\"The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\",\"status\":\"passed\",\"evidence\":\"Final exit 0. Candidate and clean-worktree assertions passed; diff check was clean; 3 runtime-classification, 1 Git-relationship, 1 /api/upgrade, and 2 banner tests passed with no failures or skips. The locked release build succeeded and contained the exact candidate SHA. Relevant Process, Browser, and API intent contracts match the shared host capability and fail-closed surface behavior. Remaining uncertainty: no live remote fetch or Playwright run was needed; cached ancestry, API projection, and banner behavior were exercised deterministically.\",\"command\":\"bash -lc 'set -euo pipefail\\nbase=5850e2fb336540fc41c8ab5ad2d7c934315353df\\ncandidate=c84c0cf699d88c90ef41d9c4661ea6ec9fa634b9\\ntest \\\"$(git rev-parse HEAD)\\\" = \\\"$candidate\\\"\\ntest -z \\\"$(git status --porcelain)\\\"\\ngit diff --check \\\"$base..$candidate\\\"\\ncargo test --lib tools::host::runtime_status::tests -- --test-threads=1\\ncargo test --lib tools::host::source_promotion::tests::cached_source_snapshot_classifies_current_behind_ahead_and_diverged -- --exact --test-threads=1\\ncargo test --lib surfaces::web_server::tests::operations_processes::events::project::web_server_serves_project_utility_upgrade_health_and_sse_routes -- --exact --test-threads=1\\nnode --test tests/runtime_upgrade_banner.test.js\\ncargo build --release --locked\\nstrings target/release/refine | rg -F \\\"$candidate\\\"'\"}]}\n"
+              }
+            ],
+            "quality_proof": {
+              "checked_at": "2026-08-17T14:40:21Z",
+              "checked_candidate_commit": "c84c0cf699d88c90ef41d9c4661ea6ec9fa634b9",
+              "evaluation_scope": "isolated_candidate",
+              "goal_id": "00000T03ZPY40KETBPRSEW2000",
+              "operation_id": "1a01026f44c95dda6",
+              "results": [
+                {
+                  "command": "bash -lc 'set -euo pipefail\nbase=5850e2fb336540fc41c8ab5ad2d7c934315353df\ncandidate=c84c0cf699d88c90ef41d9c4661ea6ec9fa634b9\ntest \"$(git rev-parse HEAD)\" = \"$candidate\"\ntest -z \"$(git status --porcelain)\"\ngit diff --check \"$base..$candidate\"\ncargo test --lib tools::host::runtime_status::tests -- --test-threads=1\ncargo test --lib tools::host::source_promotion::tests::cached_source_snapshot_classifies_current_behind_ahead_and_diverged -- --exact --test-threads=1\ncargo test --lib surfaces::web_server::tests::operations_processes::events::project::web_server_serves_project_utility_upgrade_health_and_sse_routes -- --exact --test-threads=1\nnode --test tests/runtime_upgrade_banner.test.js\ncargo build --release --locked\nstrings target/release/refine | rg -F \"$candidate\"'",
+                  "evidence": "Observed supervised process proc-1786977620493-613850-257 exited 0. stdout: ; cancellation remains fenced and recoverableSource update cancelled after helper ownership settledThe exact pre-upgrade workflow-admission intent was restored; retry starts a new fenced attemptsource_upgrade_cancellation_waiting_for_safe_settlementsource-upgrade cancellation is fenced but cannot terminate a helper during source or registration mutation; recovery will reconcile the same attemptSourceUpdateCheckStatechecksource_update_check_failedsource update-check workerjson.pendingsource-update-check.json.source-update-check.lockThe cached update check had no durable operation ownership; retry to register a new supervised checksource_update_check_interrupted_before_receiptNo correlated supervised worker survived durable reservation or launchThe supervised remote update check was interrupted before publishing a resultsource_update_check_duplicate_workerssource_update_checkcapabilitymaintenance:source-update-checksource_check_operationsource-check-worker--port-runtime-rootsource_update_check_launch_failedstaleclaimed handoff attempt disappearedlegacy restart-safe stage has no correlated attempt, receipt, or claimAdopted the exact live restart-safe helper after daemon restartno exact helper is liveHandoffLaunchReceiptmechanismmechanism_identitysubmitted_atargument_fingerprintpid4.2.0source-promote-helper`DateTime + TimeDelta` overflowedRestart-safe handoff reserved; helper liveness is not yet provenRestart-safe helper receipt accepted and handoff activatedport runtime root has no parentdefer_cancellation_terminalRestart-safe helper ownership could not be provenThe source checkout was left inspectable; retry creates a newly fenced attempt only after this one is terminalSourcePromotionSnapshotSourcePromotionOperationvisibleenabledstatetitleSourcePromotionRollbackEvidenceSource promotion queuedRunning Refine source checkout is not discoverableupstream is not a fast-forward; typed source-upgrade capabilities@You are the dedicated Refine source-upgrade Agent for operation stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `release` profile [optimized] target(s) in 0.08s Agent report: Final exit 0. Candidate and clean-worktree assertions passed; diff check was clean; 3 runtime-classification, 1 Git-relationship, 1 /api/upgrade, and 2 banner tests passed with no failures or skips. The locked release build succeeded and contained the exact candidate SHA. Relevant Process, Browser, and API intent contracts match the shared host capability and fail-closed surface behavior. Remaining uncertainty: no live remote fetch or Playwright run was needed; cached ancestry, API projection, and banner behavior were exercised deterministically.",
+                  "exit_code": 0,
+                  "process_id": "proc-1786977620493-613850-257",
+                  "status": "passed",
+                  "test": "The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks."
+                }
+              ],
+              "round_idx": 0,
+              "schema_version": 1,
+              "source_candidate_commit": "c84c0cf699d88c90ef41d9c4661ea6ec9fa634b9",
+              "state": "passed"
+            },
+            "results": [
+              {
+                "command": "bash -lc 'set -euo pipefail\nbase=5850e2fb336540fc41c8ab5ad2d7c934315353df\ncandidate=c84c0cf699d88c90ef41d9c4661ea6ec9fa634b9\ntest \"$(git rev-parse HEAD)\" = \"$candidate\"\ntest -z \"$(git status --porcelain)\"\ngit diff --check \"$base..$candidate\"\ncargo test --lib tools::host::runtime_status::tests -- --test-threads=1\ncargo test --lib tools::host::source_promotion::tests::cached_source_snapshot_classifies_current_behind_ahead_and_diverged -- --exact --test-threads=1\ncargo test --lib surfaces::web_server::tests::operations_processes::events::project::web_server_serves_project_utility_upgrade_health_and_sse_routes -- --exact --test-threads=1\nnode --test tests/runtime_upgrade_banner.test.js\ncargo build --release --locked\nstrings target/release/refine | rg -F \"$candidate\"'",
+                "evidence": "Observed supervised process proc-1786977620493-613850-257 exited 0. stdout: ; cancellation remains fenced and recoverableSource update cancelled after helper ownership settledThe exact pre-upgrade workflow-admission intent was restored; retry starts a new fenced attemptsource_upgrade_cancellation_waiting_for_safe_settlementsource-upgrade cancellation is fenced but cannot terminate a helper during source or registration mutation; recovery will reconcile the same attemptSourceUpdateCheckStatechecksource_update_check_failedsource update-check workerjson.pendingsource-update-check.json.source-update-check.lockThe cached update check had no durable operation ownership; retry to register a new supervised checksource_update_check_interrupted_before_receiptNo correlated supervised worker survived durable reservation or launchThe supervised remote update check was interrupted before publishing a resultsource_update_check_duplicate_workerssource_update_checkcapabilitymaintenance:source-update-checksource_check_operationsource-check-worker--port-runtime-rootsource_update_check_launch_failedstaleclaimed handoff attempt disappearedlegacy restart-safe stage has no correlated attempt, receipt, or claimAdopted the exact live restart-safe helper after daemon restartno exact helper is liveHandoffLaunchReceiptmechanismmechanism_identitysubmitted_atargument_fingerprintpid4.2.0source-promote-helper`DateTime + TimeDelta` overflowedRestart-safe handoff reserved; helper liveness is not yet provenRestart-safe helper receipt accepted and handoff activatedport runtime root has no parentdefer_cancellation_terminalRestart-safe helper ownership could not be provenThe source checkout was left inspectable; retry creates a newly fenced attempt only after this one is terminalSourcePromotionSnapshotSourcePromotionOperationvisibleenabledstatetitleSourcePromotionRollbackEvidenceSource promotion queuedRunning Refine source checkout is not discoverableupstream is not a fast-forward; typed source-upgrade capabilities@You are the dedicated Refine source-upgrade Agent for operation stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `release` profile [optimized] target(s) in 0.08s Agent report: Final exit 0. Candidate and clean-worktree assertions passed; diff check was clean; 3 runtime-classification, 1 Git-relationship, 1 /api/upgrade, and 2 banner tests passed with no failures or skips. The locked release build succeeded and contained the exact candidate SHA. Relevant Process, Browser, and API intent contracts match the shared host capability and fail-closed surface behavior. Remaining uncertainty: no live remote fetch or Playwright run was needed; cached ancestry, API projection, and banner behavior were exercised deterministically.",
+                "exit_code": 0,
+                "process_id": "proc-1786977620493-613850-257",
+                "status": "passed",
+                "test": "The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks."
+              }
+            ],
+            "source_candidate_commit": "c84c0cf699d88c90ef41d9c4661ea6ec9fa634b9"
+          },
+          "quality_message": "All Quality tests passed with observed supervised evidence.",
+          "quality_state": "passed",
+          "rule_state": "unclassified"
+        },
+        "refreshed_at": "2026-08-17T14:40:22Z",
+        "replacement_base_commit": "bd392b96216d26fa00b5ef5d307af5abb2bd398f",
+        "replacement_candidate_commit": "94062ff01844fccee8a0a50741e38b5c66a4d643",
+        "round_idx": 0,
+        "state": "refreshed",
+        "workflow_revision": 2,
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T03ZPY40KETBPRSEW2000-round-1"
+      },
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "quality",
+  "status": "governance",
   "target_branch": "main",
-  "updated": "2026-08-17T14:36:22Z",
-  "workflow_revision": 22
+  "updated": "2026-08-17T14:40:22Z",
+  "workflow_revision": 25
 }
