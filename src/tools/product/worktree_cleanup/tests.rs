@@ -810,44 +810,22 @@ fn cleanup_retention_window_and_disable_setting_fail_closed() {
 }
 
 #[test]
-fn cleanup_preserves_inactive_worktree_with_unrecognized_ignored_content() {
-    let fixture = Fixture::new("ignored-user-content");
-    fixture.commit_files(&[(".gitignore", ".env\n")]);
-    fixture.create_goal("GOAL1", "refine/GOAL1/round-1", true);
-    let worktree = fixture.add_worktree("refine/GOAL1/round-1");
-    fs::write(worktree.join(".env"), "SECRET=preserve-me\n").unwrap();
-
-    let report = FileWorktreeCleanupService::new(&fixture.repo, &fixture.runtime_root)
-        .run(WorktreeCleanupOptions {
-            apply: true,
-            older_than_seconds: 0,
-        })
-        .unwrap();
-
-    assert_eq!(report.removed, 0);
-    assert_eq!(report.entries[0].reason, "ignored_worktree");
-    assert!(worktree.join(".env").is_file());
-}
-
-#[test]
-fn cleanup_removes_detected_generated_cache_before_inactive_worktree() {
-    let fixture = Fixture::new("generated-cache");
+fn cleanup_discards_ignored_content_when_hibernating_an_inactive_checkout() {
+    let fixture = Fixture::new("ignored-content");
     fixture.commit_files(&[
-        (".gitignore", "/target/\n"),
-        (
-            "Cargo.toml",
-            "[package]\nname = \"fixture\"\nversion = \"0.1.0\"\n",
-        ),
+        (".gitignore", ".env\n/target/\n"),
+        ("build/keep.txt", "tracked\n"),
     ]);
     fixture.create_goal("GOAL1", "refine/GOAL1/round-1", true);
     let worktree = fixture.add_worktree("refine/GOAL1/round-1");
+    fs::write(worktree.join(".env"), "RUNTIME=disposable\n").unwrap();
     fs::create_dir_all(worktree.join("target/debug")).unwrap();
     fs::write(worktree.join("target/debug/cache"), "generated\n").unwrap();
 
     let service = FileWorktreeCleanupService::new(&fixture.repo, &fixture.runtime_root);
     let preview = service.run(WorktreeCleanupOptions::default()).unwrap();
     assert_eq!(preview.eligible, 1);
-    assert_eq!(preview.entries[0].generated_paths, vec!["target"]);
+    assert_eq!(preview.entries[0].reason, "eligible");
     assert!(worktree.exists());
 
     let report = service
@@ -857,45 +835,11 @@ fn cleanup_removes_detected_generated_cache_before_inactive_worktree() {
         })
         .unwrap();
     assert_eq!(report.removed, 1);
-    assert_eq!(report.entries[0].generated_paths_removed, 1);
     assert!(!worktree.exists());
     assert!(git_succeeds(
         &fixture.repo,
         &["rev-parse", "--verify", "refs/heads/refine/GOAL1/round-1"]
     ));
-}
-
-#[test]
-fn cleanup_removes_only_ignored_descendants_of_a_configured_generated_root() {
-    let fixture = Fixture::new("configured-generated-descendant");
-    fixture.commit_files(&[
-        (".gitignore", "/build/cache/\n"),
-        ("build/keep.txt", "tracked\n"),
-    ]);
-    FileSettingsService::with_active_root(&fixture.refine_dir, &fixture.runtime_root)
-        .update(&json!({"worktree_cleanup_generated_paths": "build"}))
-        .unwrap();
-    fixture.create_goal("GOAL1", "refine/GOAL1/round-1", true);
-    let worktree = fixture.add_worktree("refine/GOAL1/round-1");
-    fs::create_dir_all(worktree.join("build/cache")).unwrap();
-    fs::write(worktree.join("build/cache/generated"), "generated\n").unwrap();
-
-    let service = FileWorktreeCleanupService::new(&fixture.repo, &fixture.runtime_root);
-    let preview = service.run(WorktreeCleanupOptions::default()).unwrap();
-    assert_eq!(preview.entries[0].generated_paths, vec!["build/cache"]);
-    assert_eq!(
-        fs::read_to_string(worktree.join("build/keep.txt")).unwrap(),
-        "tracked\n"
-    );
-
-    let report = service
-        .run(WorktreeCleanupOptions {
-            apply: true,
-            older_than_seconds: 0,
-        })
-        .unwrap();
-    assert_eq!(report.removed, 1);
-    assert_eq!(report.entries[0].generated_paths_removed, 1);
     assert_eq!(
         git_output(
             &fixture.repo,

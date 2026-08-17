@@ -38,10 +38,6 @@ pub struct WorktreeCleanupEntry {
     pub eligible: bool,
     pub removed: bool,
     pub reason: String,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub generated_paths: Vec<String>,
-    #[serde(default)]
-    pub generated_paths_removed: usize,
     #[serde(default)]
     pub local_branch_deleted: bool,
     #[serde(default)]
@@ -130,7 +126,6 @@ impl FileWorktreeCleanupService {
             .collect::<BTreeMap<_, _>>();
         let settings =
             FileSettingsService::with_active_root(&refine_dir, &self.runtime_root).load()?;
-        let configured_generated_paths = configured_generated_paths(&settings);
         let git = FileGitWorktreeService::with_runtime_root(&self.target_root, &self.runtime_root);
         let managed_root = git.git_path("refine-worktrees")?;
         let active_ownership = ActiveWorktreeOwnership {
@@ -151,38 +146,19 @@ impl FileWorktreeCleanupService {
                 &active_ownership,
                 now,
                 options.older_than_seconds,
-                &configured_generated_paths,
             );
             if options.apply && entry.eligible {
-                match remove_generated_paths(&worktree.path, &entry.generated_paths) {
-                    Ok(removed) => entry.generated_paths_removed = removed,
+                // Forced removal discards ignored content with the checkout: an
+                // inactive Goal resumes from durable state alone (round branch
+                // plus workflow state), so ignored build and runtime artifacts
+                // are reproducible by definition and may not hold disk hostage.
+                // The clean gate above already fenced tracked and untracked work.
+                match git.remove_worktree(&worktree.path, true) {
+                    Ok(()) => entry.removed = true,
                     Err(error) => {
                         entry.eligible = false;
-                        entry.reason = "generated_cleanup_failed".to_string();
+                        entry.reason = "removal_failed".to_string();
                         entry.error = Some(error.to_string());
-                    }
-                }
-                if entry.eligible {
-                    match git.worktree_ignored_paths(&worktree.path) {
-                        Ok(paths) if paths.is_empty() => {
-                            match git.remove_worktree(&worktree.path, false) {
-                                Ok(()) => entry.removed = true,
-                                Err(error) => {
-                                    entry.eligible = false;
-                                    entry.reason = "removal_failed".to_string();
-                                    entry.error = Some(error.to_string());
-                                }
-                            }
-                        }
-                        Ok(_) => {
-                            entry.eligible = false;
-                            entry.reason = "ignored_worktree".to_string();
-                        }
-                        Err(error) => {
-                            entry.eligible = false;
-                            entry.reason = "inspection_failed".to_string();
-                            entry.error = Some(error.to_string());
-                        }
                     }
                 }
             }
@@ -307,7 +283,6 @@ fn classify_worktree(
     active_ownership: &ActiveWorktreeOwnership,
     now: DateTime<Utc>,
     older_than_seconds: u64,
-    configured_generated_paths: &[PathBuf],
 ) -> WorktreeCleanupEntry {
     let mut entry = WorktreeCleanupEntry {
         path: worktree.path.display().to_string(),
@@ -317,8 +292,6 @@ fn classify_worktree(
         eligible: false,
         removed: false,
         reason: "goal_not_found".to_string(),
-        generated_paths: Vec::new(),
-        generated_paths_removed: 0,
         local_branch_deleted: false,
         remote_branch_deleted: false,
         branch_cleanup_reason: None,
@@ -366,31 +339,14 @@ fn classify_worktree(
         entry.reason = "active_process".to_string();
         return entry;
     }
+    // The clean gate covers tracked and untracked work; ignored content is
+    // deliberately not consulted. Hibernation discards it with the checkout.
     match git.worktree_is_clean(&worktree.path) {
-        Ok(true) => {}
-        Ok(false) => entry.reason = "dirty_worktree".to_string(),
-        Err(error) => {
-            entry.reason = "inspection_failed".to_string();
-            entry.error = Some(error.to_string());
-        }
-    }
-    if entry.reason == "dirty_worktree" || entry.error.is_some() {
-        return entry;
-    }
-    let generated_roots = existing_generated_paths(&worktree.path, configured_generated_paths);
-    match git.worktree_ignored_paths(&worktree.path) {
-        Ok(ignored)
-            if ignored
-                .iter()
-                .all(|path| ignored_path_is_generated(path, &generated_roots)) =>
-        {
-            // Remove the exact ignored entries Git reported, not an allowed
-            // ancestor that could also contain tracked files.
-            entry.generated_paths = ignored;
+        Ok(true) => {
             entry.eligible = true;
             entry.reason = "eligible".to_string();
         }
-        Ok(_) => entry.reason = "ignored_worktree".to_string(),
+        Ok(false) => entry.reason = "dirty_worktree".to_string(),
         Err(error) => {
             entry.reason = "inspection_failed".to_string();
             entry.error = Some(error.to_string());
@@ -423,90 +379,6 @@ fn setting_value<'a>(
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .unwrap_or(fallback)
-}
-
-fn configured_generated_paths(settings: &serde_json::Map<String, Value>) -> Vec<PathBuf> {
-    settings
-        .get("worktree_cleanup_generated_paths")
-        .and_then(Value::as_str)
-        .unwrap_or("")
-        .split([',', '\n'])
-        .filter_map(valid_generated_relative_path)
-        .collect()
-}
-
-fn valid_generated_relative_path(raw: &str) -> Option<PathBuf> {
-    let path = Path::new(raw.trim());
-    if path.as_os_str().is_empty()
-        || path.is_absolute()
-        || path
-            .components()
-            .any(|component| !matches!(component, std::path::Component::Normal(_)))
-    {
-        return None;
-    }
-    Some(path.to_path_buf())
-}
-
-fn existing_generated_paths(worktree: &Path, configured: &[PathBuf]) -> Vec<String> {
-    let mut candidates = configured.to_vec();
-    if worktree.join("Cargo.toml").is_file() {
-        candidates.push(PathBuf::from("target"));
-    }
-    if worktree.join("xtask/Cargo.toml").is_file() {
-        candidates.push(PathBuf::from("xtask/target"));
-    }
-    if worktree.join("package.json").is_file() {
-        candidates.push(PathBuf::from("node_modules"));
-    }
-    candidates.sort();
-    candidates.dedup();
-    candidates
-        .into_iter()
-        .filter(|relative| worktree.join(relative).exists())
-        .map(|relative| relative.to_string_lossy().replace('\\', "/"))
-        .collect()
-}
-
-fn ignored_path_is_generated(ignored: &str, generated: &[String]) -> bool {
-    generated.iter().any(|path| {
-        ignored == path
-            || ignored
-                .strip_prefix(path)
-                .is_some_and(|suffix| suffix.starts_with('/'))
-    })
-}
-
-fn remove_generated_paths(worktree: &Path, generated: &[String]) -> RefineResult<usize> {
-    let mut removed = 0;
-    for relative in generated {
-        let Some(relative) = valid_generated_relative_path(relative) else {
-            continue;
-        };
-        let path = worktree.join(relative);
-        if !path.exists() {
-            continue;
-        }
-        let metadata = fs::symlink_metadata(&path).map_err(|error| {
-            RefineError::Io(format!(
-                "failed to inspect generated path {}: {error}",
-                path.display()
-            ))
-        })?;
-        let result = if metadata.is_dir() && !metadata.file_type().is_symlink() {
-            fs::remove_dir_all(&path)
-        } else {
-            fs::remove_file(&path)
-        };
-        result.map_err(|error| {
-            RefineError::Io(format!(
-                "failed to remove generated path {}: {error}",
-                path.display()
-            ))
-        })?;
-        removed += 1;
-    }
-    Ok(removed)
 }
 
 fn branch_component_contains_goal_id(branch: &str, goal_id: &str) -> bool {

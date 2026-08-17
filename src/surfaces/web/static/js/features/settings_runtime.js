@@ -75,7 +75,6 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
   const agentLimitPause = String(s.agent_limit_pause_seconds ?? "60");
   const backlogPromote = String(s.backlog_promote_after_seconds ?? "3600");
   const worktreeCleanup = String(s.worktree_cleanup_after_seconds ?? "0");
-  const worktreeCleanupGeneratedPaths = String(s.worktree_cleanup_generated_paths ?? "");
   const stateDebounce = String(s.state_sync_debounce_seconds ?? "5");
   const remoteFetchInterval = String(s.project_update_pulse_interval_seconds ?? "300");
   const staleThreshold = String(s.state_sync_stale_threshold_seconds ?? "900");
@@ -186,22 +185,11 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
         id: "s-worktree-cleanup-delay",
         label: "Inactive worktree retention",
         guideItemId: "runtime-worktree-cleanup",
-        description: "hibernate clean Goal worktrees with no live process or operation after this delay. Dirty, standalone, state, and unrecognized ignored content remain protected.",
+        description: "hibernate clean Goal worktrees with no live process or operation after this delay. Ignored build and cache content is discarded with the checkout; dirty, standalone, and state worktrees remain protected.",
         valueLabel: optionLabel(worktreeCleanupOptions, worktreeCleanup),
         control: `<select id="s-worktree-cleanup-delay" data-testid="runtime-worktree-cleanup-delay">
           ${worktreeCleanupOptions.map(([v, lbl]) => `<option value="${v}" ${worktreeCleanup === v ? "selected" : ""}>${lbl}</option>`).join("")}
         </select>`,
-      })}
-      ${renderSettingsEditableField({
-        id: "s-worktree-cleanup-generated-paths",
-        label: "Additional generated worktree paths",
-        guideItemId: "runtime-worktree-cleanup",
-        description: "optional comma-delimited relative cache paths that may be deleted before an inactive worktree. Cargo target directories and Node node_modules are detected automatically; all other ignored content blocks cleanup.",
-        valueLabel: worktreeCleanupGeneratedPaths || "None",
-        control: `<input type="text" id="s-worktree-cleanup-generated-paths"
-                         data-testid="runtime-worktree-cleanup-generated-paths"
-                         placeholder=".venv, build"
-                         value="${htmlEscape(worktreeCleanupGeneratedPaths)}">`,
       })}
       ${renderSettingsEditableField({
         id: "s-state-sync-debounce",
@@ -363,7 +351,6 @@ async function autosaveSettingsRuntime(options = {}) {
     chat_idle_timeout_seconds: $("#s-chat-idle").value,
     backlog_promote_after_seconds: $("#s-backlog-promote").value,
     worktree_cleanup_after_seconds: $("#s-worktree-cleanup-delay").value,
-    worktree_cleanup_generated_paths: $("#s-worktree-cleanup-generated-paths").value,
     state_sync_debounce_seconds: $("#s-state-sync-debounce").value,
     project_update_pulse_interval_seconds: $("#s-project-update-pulse").value,
     state_sync_stale_threshold_seconds: $("#s-state-sync-stale-threshold").value,
@@ -380,7 +367,7 @@ function bindNodeRuntimeConfigControls() {
   const root = document.querySelector('[data-tab-pane="runtime"]');
   const autosaveRuntime = bindSettingsAutosave(
     root,
-    "#s-cap, #s-pattern, #s-idle, #s-hard, #s-worker-memory, #s-ui-memory, #s-worker-cpu-priority, #s-resource-isolation, #s-agent-limit-pause, #s-chat-idle, #s-backlog-promote, #s-worktree-cleanup-delay, #s-worktree-cleanup-generated-paths, #s-state-sync-debounce, #s-project-update-pulse, #s-state-sync-stale-threshold, #s-file-browser-ignore",
+    "#s-cap, #s-pattern, #s-idle, #s-hard, #s-worker-memory, #s-ui-memory, #s-worker-cpu-priority, #s-resource-isolation, #s-agent-limit-pause, #s-chat-idle, #s-backlog-promote, #s-worktree-cleanup-delay, #s-state-sync-debounce, #s-project-update-pulse, #s-state-sync-stale-threshold, #s-file-browser-ignore",
     autosaveSettingsRuntime,
     { event: "settings-editable-commit" },
   );

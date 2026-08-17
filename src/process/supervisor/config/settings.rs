@@ -153,6 +153,7 @@ impl ConfigService for FileSettingsService {
                 migrated = true;
             } else if key == "quality_timing"
                 || key == RETIRED_SUPERVISOR_STALL_KEY
+                || key == RETIRED_WORKTREE_GENERATED_PATHS_KEY
                 || is_retired_development_request_setting(&key)
             {
                 migrated = true;

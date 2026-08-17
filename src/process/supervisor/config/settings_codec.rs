@@ -22,7 +22,6 @@ pub(super) fn default_settings() -> JsonObject {
         ("chat_idle_timeout_seconds", "300"),
         ("backlog_promote_after_seconds", "3600"),
         ("worktree_cleanup_after_seconds", "0"),
-        ("worktree_cleanup_generated_paths", ""),
         ("state_sync_debounce_seconds", "5"),
         ("state_sync_stale_threshold_seconds", "900"),
         ("project_update_pulse_interval_seconds", "300"),
@@ -79,7 +78,6 @@ pub(super) fn allowed_settings() -> BTreeSet<&'static str> {
         "chat_idle_timeout_seconds",
         "backlog_promote_after_seconds",
         "worktree_cleanup_after_seconds",
-        "worktree_cleanup_generated_paths",
         "state_sync_debounce_seconds",
         "state_sync_stale_threshold_seconds",
         "project_update_pulse_interval_seconds",
@@ -205,7 +203,6 @@ pub(super) fn normalize_setting(key: &str, value: &Value) -> RefineResult<String
             Ok(parsed.to_string())
         }
         "target_app_test_commands" => normalize_target_app_test_commands(value),
-        "worktree_cleanup_generated_paths" => normalize_worktree_cleanup_generated_paths(value),
         // Empty hands the decision back to the host-capacity governor. Without
         // it the only way to unpin a cap was to hand-edit `nodes.json`, since
         // the range rejects every value the scheduler treats as unset.
@@ -244,29 +241,6 @@ pub(super) fn normalize_setting(key: &str, value: &Value) -> RefineResult<String
         }
         _ => Ok(as_string(value).trim().to_string()),
     }
-}
-
-fn normalize_worktree_cleanup_generated_paths(value: &Value) -> RefineResult<String> {
-    let mut paths = BTreeSet::new();
-    for raw in as_string(value).split([',', '\n']) {
-        let raw = raw.trim();
-        if raw.is_empty() {
-            continue;
-        }
-        let path = Path::new(raw);
-        if path.is_absolute()
-            || path
-                .components()
-                .any(|component| !matches!(component, std::path::Component::Normal(_)))
-        {
-            return Err(RefineError::InvalidInput(
-                "worktree_cleanup_generated_paths must contain only relative paths without . or .."
-                    .to_string(),
-            ));
-        }
-        paths.insert(raw.replace('\\', "/"));
-    }
-    Ok(paths.into_iter().collect::<Vec<_>>().join(", "))
 }
 
 pub(super) fn sync_target_app_test_settings(

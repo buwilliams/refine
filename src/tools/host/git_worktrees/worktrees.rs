@@ -72,28 +72,6 @@ impl FileGitWorktreeService {
         service.is_clean()
     }
 
-    pub fn worktree_ignored_paths(&self, path: &Path) -> RefineResult<Vec<String>> {
-        let service = FileGitWorktreeService {
-            root: path.to_path_buf(),
-            runtime_root: self.runtime_root.clone(),
-            operation_id: self.operation_id.clone(),
-            process_metadata: self.process_metadata.clone(),
-        };
-        let status = stdout(service.git_output(&[
-            "status",
-            "--porcelain=v1",
-            "-z",
-            "--untracked-files=all",
-            "--ignored=matching",
-        ])?)?;
-        Ok(status
-            .split('\0')
-            .filter_map(|entry| entry.strip_prefix("!! "))
-            .map(|path| path.trim_end_matches('/').replace('\\', "/"))
-            .filter(|path| !path.is_empty())
-            .collect())
-    }
-
     /// Preserve tracked work left in a Refine-owned shared checkout, then return
     /// the exact stash commit that quarantines it. Callers must establish ownership before using
     /// this: the Git capability intentionally does not guess whether dirty work belongs to Refine.

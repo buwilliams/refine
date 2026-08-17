@@ -90,27 +90,14 @@ fn file_settings_service_removes_retired_global_email_settings() {
 }
 
 #[test]
-fn file_settings_service_validates_generated_worktree_cleanup_paths() {
+fn file_settings_service_rejects_the_retired_generated_worktree_cleanup_paths_key() {
     let temp_root = unique_temp_dir("settings-worktree-cleanup-paths");
+    fs::create_dir_all(&temp_root).unwrap();
     let service = FileSettingsService::new(temp_root.join("state"));
 
-    let updated = service
-        .update(&json!({
-            "worktree_cleanup_generated_paths": " build, .venv\nbuild "
-        }))
-        .unwrap();
-    assert_eq!(
-        updated["settings"]["worktree_cleanup_generated_paths"],
-        ".venv, build"
-    );
     assert!(
         service
-            .update(&json!({"worktree_cleanup_generated_paths": "../outside"}))
-            .is_err()
-    );
-    assert!(
-        service
-            .update(&json!({"worktree_cleanup_generated_paths": "/absolute"}))
+            .update(&json!({"worktree_cleanup_generated_paths": "build"}))
             .is_err()
     );
 
@@ -142,7 +129,8 @@ fn file_settings_service_can_hold_one_resolved_non_default_node_identity() {
                         "agent_cli": "smoke-ai",
                         "parallel_run_cap": "1",
                         "paused": "1",
-                        "supervisor_agent_stall_seconds": "900"
+                        "supervisor_agent_stall_seconds": "900",
+                        "worktree_cleanup_generated_paths": "build"
                     }
                 }
             ]
@@ -158,9 +146,11 @@ fn file_settings_service_can_hold_one_resolved_non_default_node_identity() {
     assert_eq!(settings["parallel_run_cap"], "1");
     assert!(settings.get("paused").is_none());
     assert!(settings.get(RETIRED_SUPERVISOR_STALL_KEY).is_none());
+    assert!(settings.get(RETIRED_WORKTREE_GENERATED_PATHS_KEY).is_none());
     let written = fs::read_to_string(refine_dir.join("nodes.json")).unwrap();
     assert!(!written.contains("\"paused\""));
     assert!(!written.contains(RETIRED_SUPERVISOR_STALL_KEY));
+    assert!(!written.contains(RETIRED_WORKTREE_GENERATED_PATHS_KEY));
     fs::remove_dir_all(temp_root).unwrap();
 }
 

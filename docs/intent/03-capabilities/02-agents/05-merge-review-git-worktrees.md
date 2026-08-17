@@ -37,11 +37,12 @@ This capability should connect workflow with the user's source repository:
   should be hibernated by the shared maintenance capability after the configured
   retention delay when no live operation or process owns them. Automated-phase
   status remains a durable ownership fence across daemon settlement and restart
-  gaps; recoverable branches recreate inactive checkouts on demand. Dirty work,
-  ambiguous ownership, standalone worktrees, the state worktree, and
-  unrecognized ignored content remain protected.
-  Generated cache paths are removable only when recognized by Refine or
-  explicitly configured for the target app. After the same retention delay,
+  gaps; recoverable branches recreate inactive checkouts on demand. Hibernation
+  discards Git-ignored content with the checkout: an inactive Goal resumes from
+  durable state alone, so ignored build and runtime artifacts are reproducible
+  by definition and must not hold a checkout on disk. Dirty or untracked work,
+  ambiguous ownership, standalone worktrees, and the state worktree remain
+  protected. After the same retention delay,
   maintenance independently inventories exact `refine/<goal>/round-N` refs
   locally and on the configured remote. It may retire local and upstream ref
   names for done, cancelled, or deleted Goals only when each exact tip remains

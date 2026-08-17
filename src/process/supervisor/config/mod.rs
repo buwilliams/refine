@@ -27,6 +27,9 @@ pub const GUIDANCE_FILE: &str = "guidance.json";
 pub const REPORTERS_FILE: &str = "reporters.json";
 const REPORTER_CASCADE_FILE: &str = "reporter-cascade.json";
 const RETIRED_SUPERVISOR_STALL_KEY: &str = "supervisor_agent_stall_seconds";
+// Hibernation now discards all ignored content with an inactive checkout, so a
+// per-app allowlist of removable generated paths no longer means anything.
+const RETIRED_WORKTREE_GENERATED_PATHS_KEY: &str = "worktree_cleanup_generated_paths";
 
 mod governance;
 mod governance_codec;
