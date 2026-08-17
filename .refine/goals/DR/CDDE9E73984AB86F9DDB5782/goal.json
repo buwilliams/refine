@@ -106,8 +106,25 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-08-17T12:18:02Z",
+        "criticism": {
+          "completed_at": "2026-08-17T12:20:51Z",
+          "git_after": {
+            "branch": "refine/DRCDDE9E73984AB86F9DDB5782/round-1",
+            "head_commit": "333849baec66db01a61b6a9108cda0e697c9ac90",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRCDDE9E73984AB86F9DDB5782/round-1",
+            "head_commit": "333849baec66db01a61b6a9108cda0e697c9ac90",
+            "status_porcelain": []
+          },
+          "result": {
+            "summary": "The plan safely covers semantic node-registry convergence across both sync phases, fail-closed conflict boundaries, concurrency tests, and affected intent documentation."
+          },
+          "started_at": "2026-08-17T12:18:02Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-08-17T12:20:51Z",
         "proposal": {
           "completed_at": "2026-08-17T12:18:02Z",
           "git_after": {
@@ -150,7 +167,7 @@
         "schema_version": 2,
         "started_at": "2026-08-17T12:14:32Z",
         "state": "in_progress",
-        "updated_at": "2026-08-17T12:18:02Z"
+        "updated_at": "2026-08-17T12:20:51Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -164,7 +181,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-17T12:18:02Z",
+      "updated": "2026-08-17T12:20:51Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T12:14:31Z",
         "round_idx": 0,
@@ -176,6 +193,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-17T12:18:02Z",
-  "workflow_revision": 9
+  "updated": "2026-08-17T12:20:51Z",
+  "workflow_revision": 11
 }
