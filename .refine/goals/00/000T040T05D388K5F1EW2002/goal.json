@@ -134,6 +134,43 @@
           },
           "started_at": "2026-08-17T14:23:14Z"
         },
+        "final_plan": {
+          "completed_at": "2026-08-17T14:25:31Z",
+          "git_after": {
+            "branch": "refine/00000T040T05D388K5F1EW2002/round-1",
+            "head_commit": "bd392b96216d26fa00b5ef5d307af5abb2bd398f",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T040T05D388K5F1EW2002/round-1",
+            "head_commit": "bd392b96216d26fa00b5ef5d307af5abb2bd398f",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Extend the Goal modal dropdown's existing action responsibility with a Transfer to my node item whose target and availability come from the authoritative active-node context and the displayed Goal's current node ownership.",
+                "id": "P1"
+              },
+              {
+                "description": "Connect the action to the existing single-item transfer contract using the displayed Goal ID and active node ID, while retaining server-owned Feature and workflow eligibility boundaries, surfacing failures, and refreshing the modal after success.",
+                "id": "P2"
+              },
+              {
+                "description": "Update docs/intent/04-surfaces/03-browser/08-goal.md to describe the eligible transfer-to-active-node action and the shared server-side constraints that govern it.",
+                "id": "P3"
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "The revised plan adds P3 to update the affected Goal intent page with the new transfer action and its shared server-side constraints."
+              }
+            ],
+            "summary": "Add an eligible Transfer to my node action to the Goal modal so a Goal owned elsewhere can move to the browser's active node through the existing server-owned transfer contract, with the documented surface behavior kept current."
+          },
+          "started_at": "2026-08-17T14:24:44Z"
+        },
         "phase": "revise",
         "phase_started_at": "2026-08-17T14:24:44Z",
         "proposal": {
@@ -170,7 +207,7 @@
         "schema_version": 2,
         "started_at": "2026-08-17T14:22:15Z",
         "state": "in_progress",
-        "updated_at": "2026-08-17T14:24:44Z"
+        "updated_at": "2026-08-17T14:25:31Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -184,7 +221,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-17T14:24:44Z",
+      "updated": "2026-08-17T14:25:31Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T14:22:15Z",
         "round_idx": 0,
@@ -196,6 +233,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-17T14:24:44Z",
-  "workflow_revision": 11
+  "updated": "2026-08-17T14:25:31Z",
+  "workflow_revision": 12
 }
