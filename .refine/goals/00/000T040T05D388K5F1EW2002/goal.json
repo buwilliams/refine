@@ -796,13 +796,15 @@
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
       "prompt": "Create a fresh Round from the then-current main and selectively reapply candidate 0c20c1cf's three-file behavior: conditionally show `Transfer to my node` for a Goal owned by another node when authoritative active-node context exists; submit the displayed Goal ID and active node ID through POST `/api/nodes/transfer-goals`; close the menu, surface server-owned eligibility errors without refreshing, and refresh after success; retain the focused transfer regression tests and Goal intent documentation. Do not broaden the API or alter unrelated Rust formatting. Verify clean intended scope, `git diff --check`, focused and full browser suites, and the Rust suite. For ancestry evidence, capture and test against the Round's pinned starting-main SHA rather than mutable `main`; if main advances again, report that integration race separately instead of treating it as an implementation failure.",
+      "quality_agent_report": "Quality reviewed candidate 88677acc657b36af7f0e270b49e5857e2819e5b4 and found no material defect requiring correction. The retained three-file behavior conditionally exposes Transfer to my node from authoritative active-node context, submits the displayed Goal ID and active node ID through the existing single-item transfer endpoint, closes the menu, surfaces server-owned rejection without refresh, refreshes after success, and keeps the affected Goal intent documentation current. Exact verification passed with clean intended scope, stable patch equivalence to 0c20c1cf, pinned-base ancestry, no main drift, focused and full browser suites, and the full Rust suite.",
+      "quality_candidate_commit": "88677acc657b36af7f0e270b49e5857e2819e5b4",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-08-17T14:58:04Z",
+      "updated": "2026-08-17T15:03:51Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T14:50:32Z",
         "round_idx": 1,
@@ -814,6 +816,6 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-17T14:58:04Z",
-  "workflow_revision": 38
+  "updated": "2026-08-17T15:03:51Z",
+  "workflow_revision": 40
 }
