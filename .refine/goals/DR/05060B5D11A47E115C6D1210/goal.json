@@ -106,12 +106,59 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-08-17T14:18:04Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-08-17T14:21:23Z",
+        "proposal": {
+          "completed_at": "2026-08-17T14:21:23Z",
+          "git_after": {
+            "branch": "refine/DR05060B5D11A47E115C6D1210/round-1",
+            "head_commit": "bd392b96216d26fa00b5ef5d307af5abb2bd398f",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR05060B5D11A47E115C6D1210/round-1",
+            "head_commit": "bd392b96216d26fa00b5ef5d307af5abb2bd398f",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Refactor semantic reconciliation to distinguish a wholly missing synchronization baseline from unavailable bytes for a recorded path and carry structured baseline-reconstruction outcomes through first-pass and push-retry handling.",
+                "id": "P1"
+              },
+              {
+                "description": "Add a nodes.json-only two-way fallback for unavailable recorded baseline bytes that validates both registries, retains the canonical node-id union, selects unequal versions by comparable updated_at, and leaves malformed data or equal-time disagreement unresolved without extending fallback authority to Goals or a wholly absent baseline.",
+                "id": "P2"
+              },
+              {
+                "description": "Bind each successfully published baseline to a Git-common-dir snapshot reference and resolve recorded path bytes from that retained snapshot before the legacy history scan, rotating the reference only with successful baseline publication so runtime-root changes cannot orphan merge evidence.",
+                "id": "P3"
+              },
+              {
+                "description": "Record whether baseline reconstruction failed, a safe node-registry fallback succeeded, or reconciliation remained unresolved in sync details and the complete conflict report so health and operator-facing errors distinguish missing evidence from a genuine semantic conflict.",
+                "id": "P4"
+              },
+              {
+                "description": "Serialize recovery snapshot capture with repository synchronization and define its stale fence over synchronizable durable records only, allowing node-local state-sync activity evidence to change while continuing to reject any relevant live, remote, identity, head, or decision change.",
+                "id": "P5"
+              },
+              {
+                "description": "Introduce capped in-memory exponential backoff for repeated unchanged background sync failures, reset it on success or meaningful target, node, local-state, or failure-context change, and keep explicit project sync immediately available without emitting attempts or activity during suppressed intervals.",
+                "id": "P6"
+              },
+              {
+                "description": "Update only the affected target-app, fleet, and activity-evidence intent pages to document the narrow base-less node-registry rule, retained baseline snapshot, recovery snapshot boundary, diagnostic outcome, and background-failure backoff.",
+                "id": "P7"
+              }
+            ],
+            "summary": "Make node-registry synchronization safely converge when a recorded baseline version cannot be reconstructed, while retaining fail-closed ambiguity, stabilizing operator recovery, slowing persistent background failures, and preserving baseline evidence across runtime changes."
+          },
+          "started_at": "2026-08-17T14:18:04Z"
+        },
         "schema_version": 2,
         "started_at": "2026-08-17T14:18:04Z",
         "state": "in_progress",
-        "updated_at": "2026-08-17T14:18:04Z"
+        "updated_at": "2026-08-17T14:21:23Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -125,7 +172,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-17T14:18:04Z",
+      "updated": "2026-08-17T14:21:23Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T14:18:03Z",
         "round_idx": 0,
@@ -137,6 +184,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-17T14:18:04Z",
-  "workflow_revision": 7
+  "updated": "2026-08-17T14:21:23Z",
+  "workflow_revision": 9
 }
