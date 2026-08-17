@@ -1,7 +1,7 @@
 {
   "base_commit": "71fc6d75497442c9ef28df879539dcfb3235e761",
   "branch_name": "refine/DRD687153A374C7D087017F698/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "04eab0ddade6011daef8da0d4b97c03aa3393754",
   "created": "2026-08-17T19:37:50Z",
   "feature_id": null,
   "feature_order": null,
@@ -95,7 +95,28 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-17T19:49:52Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "71fc6d75497442c9ef28df879539dcfb3235e761",
@@ -106,6 +127,7 @@
           "round_idx": 0,
           "target_branch": "main"
         },
+        "completed_at": "2026-08-17T19:49:51Z",
         "criticism": {
           "completed_at": "2026-08-17T19:40:26Z",
           "git_after": {
@@ -156,6 +178,32 @@
           "message": "The finalized plan does not require any governance violation.",
           "status": "passed"
         },
+        "implementation": {
+          "completed_at": "2026-08-17T19:49:51Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Removed only max-width: 1120px from src/surfaces/web/static/css/base.css main while preserving padding: 24px 32px 48px, margin, width: 100%, flex: 1 1 auto, min-height: 0, overflow-y: auto, column flex layout, and the existing max-width: 700px main rule. Added static_surface/layout.rs to assert the full-width contract and retained layout declarations.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated docs/intent/04-surfaces/03-browser/04-main.md in its existing Key Ideas and Expected Role structure to define available-viewport width with consistent gutters as the shared shell contract, explicitly leaving route-specific table sizing, overflow, and narrow-screen behavior unchanged.",
+                "id": "P2",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "cargo test --lib --bins -- --test-threads=1: passed; 1026 passed, 0 failed, 6 ignored in src/lib.rs and 0 passed, 0 failed in src/main.rs.",
+              "cargo run --manifest-path xtask/Cargo.toml -- test-browser: passed; 207 passed, 0 failed, 28 skipped. Each skip reported that no Playwright Chromium build is available.",
+              "rustfmt --edition 2024 --check src/surfaces/web_server/tests/static_surface/mod.rs src/surfaces/web_server/tests/static_surface/layout.rs: passed with exit code 0.",
+              "git diff --check: passed with exit code 0.",
+              "cargo fmt --all -- --check: failed because unchanged src/tools/observability/processes.rs:387 has a pre-existing rustfmt difference; the command reported no formatting difference in Round files."
+            ]
+          },
+          "report": "Removed the shared main browser container's 1120px desktop width cap so routed pages use the available viewport while retaining existing gutters, full-width sizing, flex, scroll, and narrow-screen rules. Updated Main intent and added a focused static layout regression test. Rust unit and browser JavaScript suites passed; repository-wide formatting remains blocked only by a pre-existing difference in unchanged src/tools/observability/processes.rs.",
+          "started_at": "2026-08-17T19:41:50Z"
+        },
         "invalid_output_attempts": [
           {
             "attempt": 1,
@@ -196,11 +244,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-08-17T19:37:52Z",
-        "state": "in_progress",
-        "updated_at": "2026-08-17T19:41:50Z"
+        "state": "completed",
+        "updated_at": "2026-08-17T19:49:51Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Removed the shared main browser container's 1120px desktop width cap so routed pages use the available viewport while retaining existing gutters, full-width sizing, flex, scroll, and narrow-screen rules. Updated Main intent and added a focused static layout regression test. Rust unit and browser JavaScript suites passed; repository-wide formatting remains blocked only by a pre-existing difference in unchanged src/tools/observability/processes.rs.",
+      "implementation_reported_at": "2026-08-17T19:49:51Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -211,7 +259,7 @@
       "quality_state": "unclassified",
       "reporter": "ethan.jacobson@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-17T19:41:50Z",
+      "updated": "2026-08-17T19:49:52Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T19:37:51Z",
         "round_idx": 0,
@@ -221,8 +269,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-17T19:41:50Z",
-  "workflow_revision": 16
+  "updated": "2026-08-17T19:49:52Z",
+  "workflow_revision": 21
 }
