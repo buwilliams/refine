@@ -100,7 +100,7 @@ pub enum Commands {
         #[command(subcommand)]
         action: AgentAction,
     },
-    /// Install, update, and operate the Refine daemon and service on this machine.
+    /// Operate the Refine daemon and its port-scoped OS service on this machine.
     System {
         #[command(subcommand)]
         action: SystemAction,

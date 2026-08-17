@@ -61,7 +61,7 @@ fn real_systemd_installed_provider_upgrade_runs_registered_candidate_identity() 
         &refine,
         &[
             "system",
-            "install",
+            "service-install",
             "--port",
             &port.to_string(),
             "--runtime-root",
@@ -69,7 +69,7 @@ fn real_systemd_installed_provider_upgrade_runs_registered_candidate_identity() 
         ],
         &command_env,
     );
-    assert_command_succeeded("system install", &install);
+    assert_command_succeeded("system service-install", &install);
     wait_for_reachable(port, Duration::from_secs(20));
 
     let pause = run_refine_command(&refine, &["workflow", "pause"], &command_env);
