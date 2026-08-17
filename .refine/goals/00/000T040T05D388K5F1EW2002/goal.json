@@ -171,8 +171,14 @@
           },
           "started_at": "2026-08-17T14:24:44Z"
         },
-        "phase": "revise",
-        "phase_started_at": "2026-08-17T14:24:44Z",
+        "governance_precheck": {
+          "attempt": 1,
+          "checked_at": "2026-08-17T14:25:39Z",
+          "message": "The finalized plan complies with the constitution and enabled governance guidance.",
+          "status": "passed"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-17T14:25:40Z",
         "proposal": {
           "completed_at": "2026-08-17T14:23:13Z",
           "git_after": {
@@ -207,7 +213,7 @@
         "schema_version": 2,
         "started_at": "2026-08-17T14:22:15Z",
         "state": "in_progress",
-        "updated_at": "2026-08-17T14:25:31Z"
+        "updated_at": "2026-08-17T14:25:40Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -221,7 +227,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-17T14:25:31Z",
+      "updated": "2026-08-17T14:25:40Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T14:22:15Z",
         "round_idx": 0,
@@ -231,8 +237,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-08-17T14:25:31Z",
-  "workflow_revision": 12
+  "updated": "2026-08-17T14:25:40Z",
+  "workflow_revision": 15
 }
