@@ -11,6 +11,8 @@ pub enum BaselineReconstructionSource {
 #[serde(rename_all = "snake_case")]
 pub enum StateSyncReconciliationKind {
     ThreeWayMerged,
+    /// Contested members settled by the record's baseline owner.
+    OwnershipResolved,
     BaselineUnavailableFallbackMerged,
     BaselineBytesUnavailable,
     SemanticMergeRejected,
@@ -51,6 +53,15 @@ impl FileGitSyncService {
         let unresolved = BTreeSet::new();
         let mut changes = BTreeMap::new();
         let mut outcomes = Vec::new();
+        // Ownership arbitration always compares against this node's real
+        // identity, not the possibly-snapshotted refine dir handed in for
+        // comparison, so recovery replays decide exactly like ordinary sync.
+        let local_node_id = FileNodeRegistryService::with_active_root(
+            crate::tools::host::project_layout::refine_dir_for_target_root(&self.target_root)?,
+            &self.runtime_root,
+        )
+        .active_node_id()
+        .unwrap_or_else(|_| "default".to_string());
         for relative in state_conflict_paths(base, local, remote, &unresolved) {
             if relative != std::path::Path::new("nodes.json") && !is_goal_record(&relative) {
                 continue;
@@ -69,25 +80,43 @@ impl FileGitSyncService {
                 BaselineFileResolution::Loaded { bytes, source } => {
                     let merged = if relative == std::path::Path::new("nodes.json") {
                         merge_node_registry(&bytes, &local_bytes, &remote_bytes)
+                            .map(GoalRecordMerge::Merged)
                     } else {
-                        merge_goal_record(&bytes, &local_bytes, &remote_bytes)
+                        merge_goal_record(&bytes, &local_bytes, &remote_bytes, &local_node_id)
                     };
-                    if let Some(merged) = merged {
-                        changes.insert(relative, merged);
-                        outcomes.push(StateSyncReconciliationOutcome {
-                            path,
-                            outcome: StateSyncReconciliationKind::ThreeWayMerged,
-                            baseline_source: Some(source),
-                            detail: format!("three-way semantic merge used {source:?}"),
-                        });
-                    } else {
-                        outcomes.push(StateSyncReconciliationOutcome {
-                            path,
-                            outcome: StateSyncReconciliationKind::SemanticMergeRejected,
-                            baseline_source: Some(source),
-                            detail: "semantic merge rejected ambiguous or malformed state"
-                                .to_string(),
-                        });
+                    match merged {
+                        Some(GoalRecordMerge::Merged(merged)) => {
+                            changes.insert(relative, merged);
+                            outcomes.push(StateSyncReconciliationOutcome {
+                                path,
+                                outcome: StateSyncReconciliationKind::ThreeWayMerged,
+                                baseline_source: Some(source),
+                                detail: format!("three-way semantic merge used {source:?}"),
+                            });
+                        }
+                        Some(GoalRecordMerge::OwnershipResolved {
+                            bytes: merged,
+                            owner,
+                        }) => {
+                            changes.insert(relative, merged);
+                            outcomes.push(StateSyncReconciliationOutcome {
+                                path,
+                                outcome: StateSyncReconciliationKind::OwnershipResolved,
+                                baseline_source: Some(source),
+                                detail: format!(
+                                    "contested members resolved by baseline owner {owner}"
+                                ),
+                            });
+                        }
+                        None => {
+                            outcomes.push(StateSyncReconciliationOutcome {
+                                path,
+                                outcome: StateSyncReconciliationKind::SemanticMergeRejected,
+                                baseline_source: Some(source),
+                                detail: "semantic merge rejected unparseable or invalid state"
+                                    .to_string(),
+                            });
+                        }
                     }
                 }
                 BaselineFileResolution::Unavailable

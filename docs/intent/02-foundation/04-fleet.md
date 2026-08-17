@@ -21,26 +21,36 @@ Convergence is distribution pointed toward the review node. Strategies remain in
 
 State synchronizes symmetrically on `refine/state`; application branches remain separate. Goal records carry target branch, base commit, candidate branch, and exact candidate commit. Implementation, quality, and governance evidence are produced where work runs, and review and integration consume that durable evidence.
 
-Reconciliation never guesses a winner. When both sides changed the same
-record, the merge itself stops rather than picking a side from timestamps,
-recency, or which node happens to be running it; which side wins comes only
-from a declared policy or an explicit operator decision. The declared default
-policy is ownership: for a conflicting Goal record, the node that owned it at
-the last agreed baseline is authoritative — a stale local understanding is
-not a wrong one, so staleness alone never discards work only the owning node
-could produce — and every other conflicting path converges to remote. The daemon applies that policy automatically after a
-recoverable rejection (missing baseline stays uniformly remote), records the
+Reconciliation never guesses a winner from circumstance: timestamps, recency,
+and which node happens to run the merge decide nothing. Which side wins comes
+only from declared policy or an explicit operator decision. The declared
+policy is ownership, and the merge itself applies it: when both sides changed
+the same member of a Goal record and compatibility cannot be proven, the node
+that owned the record at the last agreed baseline is authoritative for the
+contested members — a stale local understanding is not a wrong one, so
+staleness alone never discards work only the owning node could produce —
+while the other side's compatible edits still merge and synchronization
+completes with an `ownership_resolved` reconciliation outcome instead of a
+conflict. Round evidence and workflow authority (status, assignment, branch)
+are one coupled unit under that arbitration, so Rounds are never split from
+the authority that produced them. Ownership is read from baseline bytes, so
+neither contested side can vote for itself and every node resolves the same
+contention identically. What the merge cannot arbitrate at all — unparseable
+or schema-invalid records, non-Goal shared state, delete contention — still
+fails closed, and the daemon then applies the same ownership policy through
+automatic recovery (missing baseline stays uniformly remote), records the
 auto-recovery with its retained ref in activity, and honors a node's
 `state_sync_auto_recovery: off` opt-out, so ordinary syncing requires no
 operator ceremony. A missing baseline remains a whole-side recovery. Unequal
-edits from a valid baseline produce an atomic, complete node-local conflict
-report while health and activity expose only its stable id, count, location,
-and guidance. The corresponding stale-fenced preview supports a default side
-and explicit per-path overrides. Recovery preserves one-sided and
-schema-proven changes, retains pre-recovery and target refs,
+unarbitratable edits from a valid baseline produce an atomic, complete
+node-local conflict report while health and activity expose only its stable
+id, count, location, and guidance. The corresponding stale-fenced preview
+supports a default side and explicit per-path overrides. Recovery preserves
+one-sided and schema-proven changes, retains pre-recovery and target refs,
 compare-and-swaps the remote head, and resumes only its exact manifest.
 Rounds and other identity-free ordered arrays remain atomic; compatible Goal
-merges are limited to object members and stable keyed collections. The shared
+merges are limited to object members and stable keyed collections, with
+baseline ownership arbitrating what compatibility cannot prove. The shared
 `nodes.json` registry is reconciled by canonical node id: records are retained
 as a union, one-sided changes survive, and concurrent versions use the later
 comparable record timestamp. Absence never implies node deletion. Invalid or

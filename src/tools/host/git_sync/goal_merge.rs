@@ -1,15 +1,44 @@
 use super::*;
 use crate::model::goal::Goal;
 
-/// Merge independently changed members in one Goal record without inventing
-/// identity for ordered workflow arrays.
+/// Which side of a three-way Goal merge belongs to this node's live state.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum GoalMergeSide {
+    Local,
+    Remote,
+}
+
+/// How a Goal record reconciled.
+pub(super) enum GoalRecordMerge {
+    /// Every changed member was provably compatible.
+    Merged(Vec<u8>),
+    /// Contested members were settled by the record's baseline owner.
+    OwnershipResolved { bytes: Vec<u8>, owner: String },
+}
+
+/// Merge one Goal record so that asynchronous nodes always converge.
 ///
 /// Goal persistence rewrites the complete JSON document even for a single
-/// mutation. This policy admits ordinary object-member changes and keyed Note
-/// changes, but treats Rounds and every other identity-free array as atomic.
-/// The result must still deserialize as a Goal and satisfy the workflow-family
-/// fence below before synchronization may call the path resolved.
-pub(super) fn merge_goal_record(base: &[u8], local: &[u8], remote: &[u8]) -> Option<Vec<u8>> {
+/// mutation, and nodes mutate constantly — including while offline. Ordinary
+/// object-member changes and keyed Note changes merge three-way; Rounds and
+/// every other identity-free array stay atomic. When both sides changed the
+/// same member and compatibility cannot be proven, the record's owner at the
+/// baseline — the last state both sides agreed on, so neither contested edit
+/// can vote for itself — is authoritative for the contested members, and the
+/// other side's compatible edits still merge. A stale local understanding is
+/// not a wrong one: staleness alone never discards work only the owning node
+/// could have produced.
+///
+/// `None` remains possible only for records that cannot be arbitrated at all:
+/// unparseable JSON, identity mismatches, or results that fail Goal schema
+/// validation even from the owner's own side. Those fall through to the
+/// fail-closed conflict report and its recovery path.
+pub(super) fn merge_goal_record(
+    base: &[u8],
+    local: &[u8],
+    remote: &[u8],
+    local_node_id: &str,
+) -> Option<GoalRecordMerge> {
     let base = serde_json::from_slice::<serde_json::Value>(base).ok()?;
     let local = serde_json::from_slice::<serde_json::Value>(local).ok()?;
     let remote = serde_json::from_slice::<serde_json::Value>(remote).ok()?;
@@ -20,35 +49,108 @@ pub(super) fn merge_goal_record(base: &[u8], local: &[u8], remote: &[u8]) -> Opt
     {
         return None;
     }
-    reject_cross_node_round_authority(&base, &local, &remote)?;
+    let owner = base
+        .get("node_id")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or("default")
+        .to_string();
     let (local, remote) = resolve_queued_reassignment_start_race(&base, local, remote)?;
-    let merged = merge_json_value(&base, &local, &remote, None)?;
-    validate_merged_goal(&merged, base_id)?;
-    let mut encoded = serde_json::to_vec_pretty(&merged).ok()?;
+
+    if round_authority_is_uncontested(&base, &local, &remote)
+        && let Some(merged) = merge_json_value(&base, &local, &remote, None, None)
+        && validate_merged_goal(&merged, base_id).is_some()
+    {
+        return Some(GoalRecordMerge::Merged(encode_goal(&merged)?));
+    }
+
+    let owner_side = if owner == local_node_id {
+        GoalMergeSide::Local
+    } else {
+        GoalMergeSide::Remote
+    };
+    let (mut local, mut remote) = (local, remote);
+    couple_round_authority_to_owner(&base, owner_side, &mut local, &mut remote);
+    if let Some(merged) = merge_json_value(&base, &local, &remote, None, Some(owner_side))
+        && validate_merged_goal(&merged, base_id).is_some()
+    {
+        return Some(GoalRecordMerge::OwnershipResolved {
+            bytes: encode_goal(&merged)?,
+            owner,
+        });
+    }
+    // Member mixing produced an invalid record (for example schema drift
+    // between node versions): the owner's whole record is the last coherent
+    // authority.
+    let whole = match owner_side {
+        GoalMergeSide::Local => &local,
+        GoalMergeSide::Remote => &remote,
+    };
+    validate_merged_goal(whole, base_id)?;
+    Some(GoalRecordMerge::OwnershipResolved {
+        bytes: encode_goal(whole)?,
+        owner,
+    })
+}
+
+fn encode_goal(value: &serde_json::Value) -> Option<Vec<u8>> {
+    let mut encoded = serde_json::to_vec_pretty(value).ok()?;
     encoded.push(b'\n');
     Some(encoded)
 }
 
-fn reject_cross_node_round_authority(
+const ROUND_AUTHORITY_FIELDS: [&str; 4] = ["status", "node_id", "branch_name", "rounds"];
+
+/// Rounds and workflow authority (status, assignment, branch) are one
+/// semantic unit: Round evidence is only coherent under the authority that
+/// produced it. A pure member merge is safe only while no side moves Rounds
+/// against the other side's authority change.
+fn round_authority_is_uncontested(
     base: &serde_json::Value,
     local: &serde_json::Value,
     remote: &serde_json::Value,
-) -> Option<()> {
+) -> bool {
     let local_rounds_changed = local.get("rounds") != base.get("rounds");
     let remote_rounds_changed = remote.get("rounds") != base.get("rounds");
-    let authority_fields = ["status", "node_id", "branch_name", "rounds"];
-    let local_authority_changed = authority_fields
+    let local_authority_changed = ROUND_AUTHORITY_FIELDS
         .iter()
         .any(|field| local.get(*field) != base.get(*field));
-    let remote_authority_changed = authority_fields
+    let remote_authority_changed = ROUND_AUTHORITY_FIELDS
         .iter()
         .any(|field| remote.get(*field) != base.get(*field));
-    if (local_rounds_changed && remote_authority_changed)
-        || (remote_rounds_changed && local_authority_changed)
-    {
-        return None;
+    !(local_rounds_changed && remote_authority_changed)
+        && !(remote_rounds_changed && local_authority_changed)
+}
+
+/// When Rounds race authority cross-node, the owner's coupled members win as
+/// one unit: overwrite the losing side's authority set with the owner's so
+/// the member merge cannot split Round evidence from the authority that
+/// produced it. Non-authority members still merge normally.
+fn couple_round_authority_to_owner(
+    base: &serde_json::Value,
+    owner_side: GoalMergeSide,
+    local: &mut serde_json::Value,
+    remote: &mut serde_json::Value,
+) {
+    if round_authority_is_uncontested(base, local, remote) {
+        return;
     }
-    Some(())
+    let (winner, loser) = match owner_side {
+        GoalMergeSide::Local => (local.clone(), remote),
+        GoalMergeSide::Remote => (remote.clone(), local),
+    };
+    let Some(loser) = loser.as_object_mut() else {
+        return;
+    };
+    for field in ROUND_AUTHORITY_FIELDS {
+        match winner.get(field) {
+            Some(value) => {
+                loser.insert(field.to_string(), value.clone());
+            }
+            None => {
+                loser.remove(field);
+            }
+        }
+    }
 }
 
 /// Resolve the one lifecycle race with an unambiguous authority rule: if one
@@ -97,11 +199,23 @@ fn resolve_queued_reassignment_start_race(
     Some((local, remote))
 }
 
+fn arbitrated<'a>(
+    arbiter: Option<GoalMergeSide>,
+    local: &'a serde_json::Value,
+    remote: &'a serde_json::Value,
+) -> Option<serde_json::Value> {
+    arbiter.map(|side| match side {
+        GoalMergeSide::Local => local.clone(),
+        GoalMergeSide::Remote => remote.clone(),
+    })
+}
+
 fn merge_json_value(
     base: &serde_json::Value,
     local: &serde_json::Value,
     remote: &serde_json::Value,
     field: Option<&str>,
+    arbiter: Option<GoalMergeSide>,
 ) -> Option<serde_json::Value> {
     if local == remote {
         return Some(local.clone());
@@ -113,23 +227,32 @@ fn merge_json_value(
         return Some(local.clone());
     }
     if field == Some("updated") {
-        return later_timestamp(local, remote);
+        return later_timestamp(local, remote).or_else(|| arbitrated(arbiter, local, remote));
     }
     if field == Some("notes") {
-        return merge_keyed_notes(base, local, remote);
+        return merge_keyed_notes(base, local, remote, arbiter)
+            .or_else(|| arbitrated(arbiter, local, remote));
     }
-    let (base, local, remote) = (base.as_object()?, local.as_object()?, remote.as_object()?);
+    let (Some(base), Some(local_object), Some(remote_object)) =
+        (base.as_object(), local.as_object(), remote.as_object())
+    else {
+        return arbitrated(arbiter, local, remote);
+    };
     let keys = base
         .keys()
-        .chain(local.keys())
-        .chain(remote.keys())
+        .chain(local_object.keys())
+        .chain(remote_object.keys())
         .cloned()
         .collect::<BTreeSet<_>>();
     let mut merged = serde_json::Map::new();
     for key in keys {
-        if let Some(value) =
-            merge_json_member(base.get(&key), local.get(&key), remote.get(&key), &key)?
-        {
+        if let Some(value) = merge_json_member(
+            base.get(&key),
+            local_object.get(&key),
+            remote_object.get(&key),
+            &key,
+            arbiter,
+        )? {
             merged.insert(key, value);
         }
     }
@@ -141,6 +264,7 @@ fn merge_json_member(
     local: Option<&serde_json::Value>,
     remote: Option<&serde_json::Value>,
     field: &str,
+    arbiter: Option<GoalMergeSide>,
 ) -> Option<Option<serde_json::Value>> {
     if local == remote {
         return Some(local.cloned());
@@ -151,13 +275,24 @@ fn merge_json_member(
     if remote == base {
         return Some(local.cloned());
     }
-    Some(Some(merge_json_value(base?, local?, remote?, Some(field))?))
+    match (base, local, remote) {
+        (Some(base), Some(local), Some(remote)) => {
+            merge_json_value(base, local, remote, Some(field), arbiter).map(Some)
+        }
+        // A contested addition or removal has no three-way form to merge;
+        // only an owner arbiter can settle it.
+        (_, local, remote) => arbiter.map(|side| match side {
+            GoalMergeSide::Local => local.cloned(),
+            GoalMergeSide::Remote => remote.cloned(),
+        }),
+    }
 }
 
 fn merge_keyed_notes(
     base: &serde_json::Value,
     local: &serde_json::Value,
     remote: &serde_json::Value,
+    arbiter: Option<GoalMergeSide>,
 ) -> Option<serde_json::Value> {
     let keyed = |value: &serde_json::Value| {
         let mut notes = BTreeMap::new();
@@ -180,9 +315,13 @@ fn merge_keyed_notes(
         .collect::<BTreeSet<_>>();
     let mut merged = Vec::new();
     for id in ids {
-        if let Some(note) =
-            merge_json_member(base.get(&id), local.get(&id), remote.get(&id), "note")?
-        {
+        if let Some(note) = merge_json_member(
+            base.get(&id),
+            local.get(&id),
+            remote.get(&id),
+            "note",
+            arbiter,
+        )? {
             merged.push(note);
         }
     }

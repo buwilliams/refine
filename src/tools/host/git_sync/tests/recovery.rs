@@ -1241,6 +1241,10 @@ fn write_owned_goal(root: &Path, id: &str, node_id: &str, name: &str) {
 #[test]
 fn run_ownership_policy_keeps_owned_goals_live_and_converges_the_rest() {
     let fixture = SyncFixture::new("recovery-run-ownership");
+    // These records deliberately omit required Goal schema fields, so the
+    // ownership-arbitrated semantic merge cannot validate a result and the
+    // contention falls through to recovery — the schema-drift fallback,
+    // where the same ownership policy decides from baseline bytes.
     // Node b's active identity resolves to "default"; AAOWNED0 is its goal at
     // the agreed baseline, BBOTHER0 belongs to another node.
     write_owned_goal(&fixture.a, "AAOWNED0", "default", "base");

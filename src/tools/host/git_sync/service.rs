@@ -454,6 +454,18 @@ fn append_reconciliation_details(
             display_state_paths(&goals)
         ));
     }
+    let ownership_resolved = outcomes
+        .iter()
+        .filter(|outcome| outcome.outcome == StateSyncReconciliationKind::OwnershipResolved)
+        .map(|outcome| PathBuf::from(&outcome.path))
+        .collect::<BTreeSet<_>>();
+    if !ownership_resolved.is_empty() {
+        details.push(format!(
+            "Resolved contested Goal records by baseline ownership{}: {}",
+            if push_retry { " during push retry" } else { "" },
+            display_state_paths(&ownership_resolved)
+        ));
+    }
     if resolved.contains(std::path::Path::new("nodes.json")) {
         let fallback = outcomes.iter().any(|outcome| {
             outcome.path == "nodes.json"

@@ -498,13 +498,38 @@ fn sync_merges_disjoint_goal_changes_without_blocking_remote_records() {
     );
 }
 
-#[test]
-fn goal_merge_does_not_use_timestamps_to_hide_competing_lifecycle_changes() {
-    let base = br#"{"id":"GOALA","status":"backlog","updated":"2026-08-03T18:20:00Z"}"#;
-    let local = br#"{"id":"GOALA","status":"done","updated":"2026-08-03T18:22:00Z"}"#;
-    let remote = br#"{"id":"GOALA","status":"todo","updated":"2026-08-03T18:21:00Z"}"#;
+fn merged_goal_value(merge: GoalRecordMerge) -> (serde_json::Value, bool) {
+    match merge {
+        GoalRecordMerge::Merged(bytes) => (serde_json::from_slice(&bytes).unwrap(), false),
+        GoalRecordMerge::OwnershipResolved { bytes, .. } => {
+            (serde_json::from_slice(&bytes).unwrap(), true)
+        }
+    }
+}
 
-    assert!(merge_goal_record(base, local, remote).is_none());
+#[test]
+fn goal_merge_settles_competing_lifecycle_changes_by_baseline_owner_not_timestamps() {
+    let base = valid_goal_record("GOALA", "node-a", "todo", "Base", "2026-08-03T18:20:00Z");
+    let local = valid_goal_record("GOALA", "node-a", "done", "Base", "2026-08-03T18:21:00Z");
+    // The remote side has the later timestamp; timestamps still decide
+    // nothing — ownership does.
+    let remote = valid_goal_record(
+        "GOALA",
+        "node-a",
+        "cancelled",
+        "Base",
+        "2026-08-03T18:22:00Z",
+    );
+
+    let (owner_local, ownership) =
+        merged_goal_value(merge_goal_record(&base, &local, &remote, "node-a").unwrap());
+    assert!(ownership);
+    assert_eq!(owner_local["status"], "done");
+
+    let (owner_elsewhere, ownership) =
+        merged_goal_value(merge_goal_record(&base, &local, &remote, "node-b").unwrap());
+    assert!(ownership);
+    assert_eq!(owner_elsewhere["status"], "cancelled");
 }
 
 #[test]
@@ -525,8 +550,12 @@ fn goal_merge_keeps_the_authoritative_start_over_a_concurrent_reassignment_reque
         "2026-08-03T18:22:00Z",
     );
 
-    let merged = merge_goal_record(&base, &local, &remote).unwrap();
-    let merged: serde_json::Value = serde_json::from_slice(&merged).unwrap();
+    let (merged, ownership) =
+        merged_goal_value(merge_goal_record(&base, &local, &remote, "node-a").unwrap());
+    assert!(
+        !ownership,
+        "the start-versus-reassignment rule needs no owner"
+    );
     assert_eq!(merged["status"], "in-progress");
     assert_eq!(merged["node_id"], "node-a");
     assert_eq!(merged["title"], "Clarified");
@@ -534,14 +563,31 @@ fn goal_merge_keeps_the_authoritative_start_over_a_concurrent_reassignment_reque
 }
 
 #[test]
-fn goal_merge_still_rejects_competing_non_start_lifecycle_changes() {
-    let base =
-        br#"{"id":"GOALA","node_id":"node-a","status":"todo","updated":"2026-08-03T18:20:00Z"}"#;
-    let local = br#"{"id":"GOALA","node_id":"node-a","status":"cancelled","updated":"2026-08-03T18:21:00Z"}"#;
-    let remote =
-        br#"{"id":"GOALA","node_id":"node-b","status":"done","updated":"2026-08-03T18:22:00Z"}"#;
+fn goal_merge_settles_competing_non_start_lifecycle_changes_by_owner() {
+    let base = valid_goal_record("GOALA", "node-a", "todo", "Base", "2026-08-03T18:20:00Z");
+    let local = valid_goal_record(
+        "GOALA",
+        "node-a",
+        "cancelled",
+        "Base",
+        "2026-08-03T18:21:00Z",
+    );
+    let remote = valid_goal_record("GOALA", "node-b", "done", "Base", "2026-08-03T18:22:00Z");
 
-    assert!(merge_goal_record(base, local, remote).is_none());
+    // Called on the owning node: its contested lifecycle change wins, while
+    // the one-sided reassignment still merges as an ordinary member change.
+    let (merged, ownership) =
+        merged_goal_value(merge_goal_record(&base, &local, &remote, "node-a").unwrap());
+    assert!(ownership);
+    assert_eq!(merged["status"], "cancelled");
+    assert_eq!(merged["node_id"], "node-b");
+
+    // Called anywhere else: the remote side carries fleet history and wins.
+    let (merged, ownership) =
+        merged_goal_value(merge_goal_record(&base, &local, &remote, "node-c").unwrap());
+    assert!(ownership);
+    assert_eq!(merged["status"], "done");
+    assert_eq!(merged["node_id"], "node-b");
 }
 
 #[test]
@@ -568,8 +614,10 @@ fn goal_merge_combines_notes_by_stable_id_and_validates_the_goal_schema() {
     let local = serde_json::to_vec(&local).unwrap();
     let remote = serde_json::to_vec(&remote).unwrap();
 
-    let merged = merge_goal_record(&base, &local, &remote).unwrap();
-    let goal: crate::model::goal::Goal = serde_json::from_slice(&merged).unwrap();
+    let (merged, ownership) =
+        merged_goal_value(merge_goal_record(&base, &local, &remote, "node-a").unwrap());
+    assert!(!ownership, "keyed note additions merge without an owner");
+    let goal: crate::model::goal::Goal = serde_json::from_value(merged).unwrap();
     assert_eq!(
         goal.notes
             .iter()
@@ -580,7 +628,7 @@ fn goal_merge_combines_notes_by_stable_id_and_validates_the_goal_schema() {
 }
 
 #[test]
-fn goal_merge_keeps_rounds_atomic_across_workflow_authority_changes() {
+fn goal_merge_couples_rounds_and_authority_to_the_owner_and_keeps_compatible_edits() {
     let base = valid_goal_record("GOALA", "node-a", "todo", "Base", "2026-08-03T18:20:00Z");
     let mut local: serde_json::Value = serde_json::from_slice(&base).unwrap();
     let mut remote = local.clone();
@@ -595,14 +643,25 @@ fn goal_merge_keeps_rounds_atomic_across_workflow_authority_changes() {
         "logs": []
     }]);
     remote["status"] = serde_json::json!("plan");
-    assert!(
-        merge_goal_record(
-            &base,
-            &serde_json::to_vec(&local).unwrap(),
-            &serde_json::to_vec(&remote).unwrap(),
-        )
-        .is_none()
-    );
+    remote["title"] = serde_json::json!("Clarified");
+    let local = serde_json::to_vec(&local).unwrap();
+    let remote = serde_json::to_vec(&remote).unwrap();
+
+    // On the owning node, Round evidence and workflow authority win as one
+    // unit; the other side's non-authority edit still merges.
+    let (merged, ownership) =
+        merged_goal_value(merge_goal_record(&base, &local, &remote, "node-a").unwrap());
+    assert!(ownership);
+    assert_eq!(merged["rounds"].as_array().unwrap().len(), 1);
+    assert_eq!(merged["status"], "todo");
+    assert_eq!(merged["title"], "Clarified");
+
+    // The same inputs seen from any other node (sides swapped: the owner's
+    // Round evidence arrives on the remote side) converge identically.
+    let (converged, ownership) =
+        merged_goal_value(merge_goal_record(&base, &remote, &local, "node-b").unwrap());
+    assert!(ownership);
+    assert_eq!(converged, merged);
 }
 
 #[test]
@@ -629,63 +688,59 @@ fn goal_merge_rejects_cross_field_invalid_round_evidence() {
         "updated": "2026-08-03T18:22:00Z"
     }]);
 
+    // Invalid Round evidence never merges, even from the owning side.
     assert!(
         merge_goal_record(
             &base,
             &serde_json::to_vec(&local).unwrap(),
             &serde_json::to_vec(&remote).unwrap(),
+            "node-a",
         )
         .is_none()
     );
 }
 
 #[test]
-fn unresolved_goal_conflict_does_not_write_other_prepared_merges() {
+fn unresolved_conflict_does_not_write_other_prepared_merges() {
     let fixture = SyncFixture::new("mixed-goal-conflicts");
-    for id in ["GOALA", "GOALB"] {
-        write_goal(&fixture.a, id);
-        fs::write(
-            refine_dir_for_target_root(&fixture.a)
-                .unwrap()
-                .join(format!("goals/{id}/goal.json")),
-            valid_goal_record(id, "node-a", "backlog", "Base", "2026-08-03T18:20:00Z"),
-        )
-        .unwrap();
-    }
-    fixture.service(&fixture.a).sync().unwrap();
-    fixture.service(&fixture.b).sync().unwrap();
-
+    write_goal(&fixture.a, "GOALA");
     let refine_a = refine_dir_for_target_root(&fixture.a).unwrap();
     fs::write(
         refine_a.join("goals/GOALA/goal.json"),
-        valid_goal_record("GOALA", "node-b", "backlog", "Base", "2026-08-03T18:21:00Z"),
+        valid_goal_record("GOALA", "node-a", "backlog", "Base", "2026-08-03T18:20:00Z"),
     )
     .unwrap();
+    fs::create_dir_all(refine_a.join("shared")).unwrap();
+    fs::write(refine_a.join("shared/state.json"), "base\n").unwrap();
+    fixture.service(&fixture.a).sync().unwrap();
+    fixture.service(&fixture.b).sync().unwrap();
+
     fs::write(
-        refine_a.join("goals/GOALB/goal.json"),
-        valid_goal_record("GOALB", "node-a", "todo", "Base", "2026-08-03T18:21:00Z"),
+        refine_a.join("goals/GOALA/goal.json"),
+        valid_goal_record("GOALA", "node-a", "todo", "Base", "2026-08-03T18:21:00Z"),
     )
     .unwrap();
+    fs::write(refine_a.join("shared/state.json"), "remote\n").unwrap();
     fixture.service(&fixture.a).sync().unwrap();
 
     let refine_b = refine_dir_for_target_root(&fixture.b).unwrap();
-    for id in ["GOALA", "GOALB"] {
-        fs::write(
-            refine_b.join(format!("goals/{id}/goal.json")),
-            valid_goal_record(id, "node-b", "done", "Base", "2026-08-03T18:22:00Z"),
-        )
-        .unwrap();
-    }
+    fs::write(
+        refine_b.join("goals/GOALA/goal.json"),
+        valid_goal_record("GOALA", "node-b", "done", "Base", "2026-08-03T18:22:00Z"),
+    )
+    .unwrap();
+    fs::write(refine_b.join("shared/state.json"), "live\n").unwrap();
 
+    // The Goal contention is ownership-resolvable, but the shared record is
+    // not; one unresolved path withholds the entire prepared reconciliation.
     let _error = fixture.service(&fixture.b).sync().unwrap_err();
 
     let report = latest_state_sync_conflict_report(&fixture.b.join("run"))
         .unwrap()
         .unwrap();
-    assert!(
-        report
-            .unresolved_paths
-            .contains(&"goals/GOALB/goal.json".to_string())
+    assert_eq!(
+        report.unresolved_paths,
+        vec!["shared/state.json".to_string()]
     );
     assert_eq!(
         git_stdout(
@@ -889,4 +944,61 @@ fn sync_requires_legacy_state_to_be_removed_from_application_branch() {
         )
         .contains("review")
     );
+}
+
+#[test]
+fn sync_settles_contested_goal_records_by_ownership_without_a_conflict() {
+    let fixture = SyncFixture::new("ownership-merge-sync");
+    let refine_a = refine_dir_for_target_root(&fixture.a).unwrap();
+    for (id, node) in [("GOALMINE", "default"), ("GOALOTHER", "node-a")] {
+        write_goal(&fixture.a, id);
+        fs::write(
+            refine_a.join(format!("goals/{id}/goal.json")),
+            valid_goal_record(id, node, "backlog", "Base", "2026-08-03T18:20:00Z"),
+        )
+        .unwrap();
+    }
+    fixture.service(&fixture.a).sync().unwrap();
+    fixture.service(&fixture.b).sync().unwrap();
+
+    for (id, node) in [("GOALMINE", "default"), ("GOALOTHER", "node-a")] {
+        fs::write(
+            refine_a.join(format!("goals/{id}/goal.json")),
+            valid_goal_record(id, node, "backlog", "remote-edit", "2026-08-03T18:21:00Z"),
+        )
+        .unwrap();
+    }
+    fixture.service(&fixture.a).sync().unwrap();
+    let refine_b = refine_dir_for_target_root(&fixture.b).unwrap();
+    for (id, node) in [("GOALMINE", "default"), ("GOALOTHER", "node-a")] {
+        fs::write(
+            refine_b.join(format!("goals/{id}/goal.json")),
+            valid_goal_record(id, node, "backlog", "live-edit", "2026-08-03T18:22:00Z"),
+        )
+        .unwrap();
+    }
+
+    // Same-member contention on both records: node b owns GOALMINE at the
+    // baseline and keeps its understanding; GOALOTHER converges to remote.
+    // No conflict report, no recovery, no operator.
+    let result = fixture.service(&fixture.b).sync().unwrap();
+    assert!(result.ok && result.pushed, "{result:#?}");
+
+    let read_title = |root: &Path, id: &str| {
+        let bytes = fs::read(
+            refine_dir_for_target_root(root)
+                .unwrap()
+                .join(format!("goals/{id}/goal.json")),
+        )
+        .unwrap();
+        serde_json::from_slice::<serde_json::Value>(&bytes).unwrap()["title"]
+            .as_str()
+            .unwrap()
+            .to_string()
+    };
+    assert_eq!(read_title(&fixture.b, "GOALMINE"), "live-edit");
+    assert_eq!(read_title(&fixture.b, "GOALOTHER"), "remote-edit");
+    fixture.service(&fixture.a).sync().unwrap();
+    assert_eq!(read_title(&fixture.a, "GOALMINE"), "live-edit");
+    assert_eq!(read_title(&fixture.a, "GOALOTHER"), "remote-edit");
 }

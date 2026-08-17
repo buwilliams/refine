@@ -13,22 +13,26 @@ order:
    keyed Notes, later `updated` timestamps, and the per-node registry all
    merge three-way with no conflict. A node pulling a queued Goal while its
    owner concurrently starts it resolves in the starting owner's favor.
-2. **Ownership policy** — for paths the merge must reject (the same member
-   changed on both sides, or Round writes racing cross-node authority
-   changes), the Goal's owner at the last agreed baseline is authoritative
-   for its record; every other conflicting path converges to remote. A stale
-   local understanding is not a wrong one: staleness alone never discards
-   work only the owning node could have produced.
-3. **Recovery refs** — whichever side a path loses, its displaced copy is
-   committed to a retained recovery ref with a bounded manifest before
-   anything overwrites it. Nothing is silently destroyed.
+2. **Ownership arbitration, inside the merge** — when both sides changed the
+   same member of a Goal record, the node that owned the record at the last
+   agreed baseline wins the contested members (Round evidence and workflow
+   authority move as one coupled unit), the other side's compatible edits
+   still merge, and sync completes with an `ownership_resolved` outcome — no
+   conflict, no health blip, no operator. A stale local understanding is not
+   a wrong one: staleness alone never discards work only the owning node
+   could have produced.
+3. **Automatic recovery** — what the merge cannot arbitrate at all
+   (unparseable or schema-invalid records, non-Goal shared state, delete
+   contention, a missing baseline) fails closed into a conflict report, and
+   the daemon immediately runs the consolidated recovery itself with the same
+   ownership policy, recording a `sync_auto_recovered` activity entry and
+   settling health. Set `state_sync_auto_recovery: off` on a node doing
+   deliberate divergence work to keep the fail-closed behavior instead.
+4. **Recovery refs** — whichever side a path loses in recovery, its displaced
+   copy is committed to a retained recovery ref with a bounded manifest
+   before anything overwrites it. Nothing is silently destroyed.
 
-The daemon applies this ladder automatically: a background sync that fails
-with recoverable evidence triggers the same consolidated recovery an operator
-would run, records a `sync_auto_recovered` activity entry naming the retained
-ref, and settles health. Users never run CLI commands for ordinary syncing.
-Set `state_sync_auto_recovery: off` on a node doing deliberate divergence
-work to keep the fail-closed behavior instead.
+Users never run CLI commands for ordinary syncing.
 
 ## One-Shot Recovery (manual)
 
