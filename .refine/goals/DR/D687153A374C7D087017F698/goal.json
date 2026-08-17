@@ -628,15 +628,33 @@
         "kind": "quality",
         "source_round": 1
       },
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-08-17T20:02:26Z",
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
-      "governance_candidate_commit": "",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_candidate_commit": "04eab0ddade6011daef8da0d4b97c03aa3393754",
+      "governance_checked_at": "2026-08-17T20:21:42Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRD687153A374C7D087017F698-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "guidance_checked": 2,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "No governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRD687153A374C7D087017F698-round-1"
+      },
+      "governance_message": "No governance rule violations found.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
       "governance_rule_actions": [],
       "guidance_decision": {
         "applied": [
@@ -750,8 +768,8 @@
       "implementation_report": "Re-evaluated exact retained candidate 04eab0ddade6011daef8da0d4b97c03aa3393754 without source changes. The reviewed four-file delta removes main's 1120px width cap while preserving gutters, width, flex, scrolling, and narrow-screen rules; it retains the focused static regression and Main intent update. Repository-valid verification passed: the focused Rust test passed 1/1; cargo test --lib --bins -- --test-threads=1 passed 1026 tests with 0 failed and 6 ignored plus the binary target with 0 failed; browser tests passed 207 with 0 failed and skipped 28 because Playwright Chromium is unavailable; targeted rustfmt and git diff --check passed. A preliminary unscoped cargo test filter exited 2 because the repository's custom integration harness rejects non-suite arguments; rerunning with the repository-valid --lib selector passed and this harness-selection result is unrelated to the candidate.",
       "implementation_reported_at": "2026-08-17T20:07:37Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "No corrective implementation Round should be generated solely from this Quality result. Re-evaluate exact candidate 04eab0ddade6011daef8da0d4b97c03aa3393754 with repository-valid commands: the focused static_main_uses_available_viewport_width test, cargo test --lib --bins -- --test-threads=1, cargo run --manifest-path xtask/Cargo.toml -- test-browser, targeted rustfmt for changed Rust files, and git diff --check. Do not add a package.json or modify unchanged source_promotion tests to satisfy the faulty predicate. If workflow mechanics require a fresh current-main Round, reapply only the reviewed four-file delta—remove main's max-width: 1120px while preserving gutters, width, flex, scrolling, and narrow-screen rules; retain the focused static regression and Main intent update—then run the valid checks above and report any unrelated baseline or harness failures separately.",
       "quality_agent_report": "Quality-reviewed exact retained candidate 04eab0ddade6011daef8da0d4b97c03aa3393754 and found no material defect, so no corrective source or test edits were required. The reviewed four-file delta removes only main's 1120px maximum width while preserving border-box gutters, width, flex, scrolling, and narrow-screen behavior; it retains the focused static regression and the Main intent update. Exact verification passed: focused static test 1 passed and 0 failed; serialized Rust suite 1026 passed, 0 failed, and 6 ignored plus the binary target with 0 failed; browser suite 207 passed, 0 failed, and 28 skipped because Playwright Chromium is unavailable; targeted rustfmt and git diff --check exited 0.",
       "quality_candidate_commit": "04eab0ddade6011daef8da0d4b97c03aa3393754",
@@ -809,19 +827,29 @@
       "quality_message": "All Quality tests passed with observed supervised evidence.",
       "quality_state": "passed",
       "reporter": "Refine",
-      "rule_state": "unclassified",
-      "updated": "2026-08-17T20:20:45Z",
-      "workflow_attempt_authority": {
-        "claimed_at": "2026-08-17T20:02:26Z",
-        "round_idx": 1,
-        "workflow_revision": 26
+      "rule_state": "passed",
+      "updated": "2026-08-17T20:21:46Z",
+      "workflow_attempt_authority": null,
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "04eab0ddade6011daef8da0d4b97c03aa3393754",
+        "integrated_at": "2026-08-17T20:21:46.111013902+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n docs/intent/04-surfaces/03-browser/04-main.md      |  3 +++\n src/surfaces/web/static/css/base.css               |  1 -\n .../web_server/tests/static_surface/layout.rs      | 28 ++++++++++++++++++++++\n .../web_server/tests/static_surface/mod.rs         |  1 +\n 4 files changed, 32 insertions(+), 1 deletion(-)\n create mode 100644 src/surfaces/web_server/tests/static_surface/layout.rs",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "cbbd87c3dbe298e3dc199a5433502ceddef6ed64"
       },
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "governance",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-08-17T20:20:45Z",
-  "workflow_revision": 43
+  "updated": "2026-08-17T20:21:46Z",
+  "workflow_revision": 47
 }
