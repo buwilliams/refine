@@ -753,13 +753,15 @@
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
       "prompt": "No corrective implementation Round should be generated solely from this Quality result. Re-evaluate exact candidate 04eab0ddade6011daef8da0d4b97c03aa3393754 with repository-valid commands: the focused static_main_uses_available_viewport_width test, cargo test --lib --bins -- --test-threads=1, cargo run --manifest-path xtask/Cargo.toml -- test-browser, targeted rustfmt for changed Rust files, and git diff --check. Do not add a package.json or modify unchanged source_promotion tests to satisfy the faulty predicate. If workflow mechanics require a fresh current-main Round, reapply only the reviewed four-file delta—remove main's max-width: 1120px while preserving gutters, width, flex, scrolling, and narrow-screen rules; retain the focused static regression and Main intent update—then run the valid checks above and report any unrelated baseline or harness failures separately.",
+      "quality_agent_report": "Quality-reviewed exact retained candidate 04eab0ddade6011daef8da0d4b97c03aa3393754 and found no material defect, so no corrective source or test edits were required. The reviewed four-file delta removes only main's 1120px maximum width while preserving border-box gutters, width, flex, scrolling, and narrow-screen behavior; it retains the focused static regression and the Main intent update. Exact verification passed: focused static test 1 passed and 0 failed; serialized Rust suite 1026 passed, 0 failed, and 6 ignored plus the binary target with 0 failed; browser suite 207 passed, 0 failed, and 28 skipped because Playwright Chromium is unavailable; targeted rustfmt and git diff --check exited 0.",
+      "quality_candidate_commit": "04eab0ddade6011daef8da0d4b97c03aa3393754",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-08-17T20:07:37Z",
+      "updated": "2026-08-17T20:12:47Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T20:02:26Z",
         "round_idx": 1,
@@ -771,6 +773,6 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-17T20:07:37Z",
-  "workflow_revision": 39
+  "updated": "2026-08-17T20:12:47Z",
+  "workflow_revision": 41
 }
