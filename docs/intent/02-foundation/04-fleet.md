@@ -29,9 +29,15 @@ preview supports a default side and explicit per-path overrides. Recovery
 preserves one-sided and schema-proven changes, retains pre-recovery and target
 refs, compare-and-swaps the remote head, and resumes only its exact manifest.
 Rounds and other identity-free ordered arrays remain atomic; compatible Goal
-merges are limited to object members and stable keyed collections.
+merges are limited to object members and stable keyed collections. The shared
+`nodes.json` registry is reconciled by canonical node id: records are retained
+as a union, one-sided changes survive, and concurrent versions use the later
+comparable record timestamp. Absence never implies node deletion. Invalid or
+duplicate identities, malformed timestamps, and equal-timestamp disagreement
+remain conflicts, and an unrelated unresolved path withholds the entire
+prepared reconciliation.
 
-Sync health is bound to the serving daemon's active target and node and remains outside `refine/state`. Monotonic attempt ids and sources fence overlapping settlements: a late result cannot relabel a newer attempt, and a neutral lock deferral cannot clear an active failure episode or its report pointer. A daemon reports its active node from local evidence and reports other nodes as unknown unless it has direct evidence from those daemons. A stale or failed local reconciliation means that daemon's fleet-wide counts are a local projection, not an authoritative fleet total; surfaces must label that boundary instead of presenting divergent arithmetic as fact.
+Sync health is bound to the serving daemon's active target and node and remains outside `refine/state`. Monotonic attempt ids and sources fence overlapping settlements: a late result cannot relabel a newer attempt, and a neutral lock deferral cannot clear an active failure episode or its report pointer. A daemon reports its active node from local evidence and reports other nodes as unknown unless it has direct evidence from those daemons. A stale or failed local reconciliation means that daemon's fleet-wide counts are a local projection, not an authoritative fleet total; surfaces must label that boundary instead of presenting divergent arithmetic as fact. Ordinary per-node heartbeat churn is semantically reconciled and does not by itself stale-fence synchronization or downgrade otherwise authoritative fleet counts.
 
 Infrastructure and credentials remain outside Refine's core. The manage-fleet runbook guides agents through provisioning and authentication without placing secrets in shared state.
 

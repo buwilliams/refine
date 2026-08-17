@@ -44,6 +44,111 @@ fn sync_rebases_disjoint_state_when_nodes_race() {
 }
 
 #[test]
+fn sync_converges_disjoint_node_heartbeats_without_a_conflict_report() {
+    let fixture = SyncFixture::new("node-heartbeat-merge");
+    write_nodes(
+        &fixture.a,
+        &[
+            ("node-a", "2026-08-17T08:00:00Z", "unknown"),
+            ("node-b", "2026-08-17T08:00:00Z", "unknown"),
+        ],
+    );
+    fixture.service(&fixture.a).sync().unwrap();
+    fixture.service(&fixture.b).sync().unwrap();
+
+    write_nodes(
+        &fixture.a,
+        &[
+            ("node-a", "2026-08-17T08:01:00Z", "healthy"),
+            ("node-b", "2026-08-17T08:00:00Z", "unknown"),
+        ],
+    );
+    fixture.service(&fixture.a).sync().unwrap();
+    write_nodes(
+        &fixture.b,
+        &[
+            ("node-a", "2026-08-17T08:00:00Z", "unknown"),
+            ("node-b", "2026-08-17T08:02:00Z", "healthy"),
+        ],
+    );
+
+    let result = fixture.service(&fixture.b).sync().unwrap();
+
+    assert!(
+        result.committed && result.pulled && result.pushed,
+        "{result:?}"
+    );
+    assert!(
+        result
+            .detail
+            .as_deref()
+            .is_some_and(|detail| detail.contains("Merged per-node registry changes")),
+        "{result:?}"
+    );
+    let nodes = read_nodes(&fixture.b);
+    assert_eq!(nodes.nodes[0].updated_at, "2026-08-17T08:01:00Z");
+    assert_eq!(nodes.nodes[1].updated_at, "2026-08-17T08:02:00Z");
+    assert!(
+        latest_state_sync_conflict_report(&fixture.b.join("run"))
+            .unwrap()
+            .is_none()
+    );
+}
+
+#[test]
+fn unrelated_conflict_withholds_a_prepared_node_registry_merge() {
+    let fixture = SyncFixture::new("node-merge-atomicity");
+    write_nodes(
+        &fixture.a,
+        &[
+            ("node-a", "2026-08-17T08:00:00Z", "unknown"),
+            ("node-b", "2026-08-17T08:00:00Z", "unknown"),
+        ],
+    );
+    let refine_a = refine_dir_for_target_root(&fixture.a).unwrap();
+    fs::write(refine_a.join("shared.json"), "base\n").unwrap();
+    fixture.service(&fixture.a).sync().unwrap();
+    fixture.service(&fixture.b).sync().unwrap();
+
+    write_nodes(
+        &fixture.a,
+        &[
+            ("node-a", "2026-08-17T08:01:00Z", "healthy"),
+            ("node-b", "2026-08-17T08:00:00Z", "unknown"),
+        ],
+    );
+    fs::write(refine_a.join("shared.json"), "remote\n").unwrap();
+    fixture.service(&fixture.a).sync().unwrap();
+
+    write_nodes(
+        &fixture.b,
+        &[
+            ("node-a", "2026-08-17T08:00:00Z", "unknown"),
+            ("node-b", "2026-08-17T08:02:00Z", "healthy"),
+        ],
+    );
+    let refine_b = refine_dir_for_target_root(&fixture.b).unwrap();
+    fs::write(refine_b.join("shared.json"), "local\n").unwrap();
+    let before = fs::read(refine_b.join("nodes.json")).unwrap();
+
+    let error = fixture.service(&fixture.b).sync().unwrap_err();
+
+    assert!(error.to_string().contains("1 unresolved path"), "{error}");
+    let report = latest_state_sync_conflict_report(&fixture.b.join("run"))
+        .unwrap()
+        .unwrap();
+    assert_eq!(report.unresolved_paths, vec!["shared.json"]);
+    assert_eq!(fs::read(refine_b.join("nodes.json")).unwrap(), before);
+    assert_eq!(
+        git_stdout(
+            &state_worktree_for_target_root(&fixture.b).unwrap(),
+            &["status", "--short"]
+        ),
+        ""
+    );
+}
+
+#[test]
 fn sync_recovers_completed_state_copy_interrupted_before_commit() {
     let fixture = SyncFixture::new("interrupted-copy-restart");
     write_goal(&fixture.a, "GOALA");

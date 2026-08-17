@@ -51,6 +51,7 @@ mod conflict_report;
 mod git_commands;
 mod goal_merge;
 mod locks;
+mod node_registry_merge;
 mod recovery;
 mod service;
 mod state_codec;
@@ -76,6 +77,7 @@ use recovery::{
 
 use goal_merge::*;
 use locks::*;
+use node_registry_merge::*;
 use state_codec::*;
 use state_files::*;
 

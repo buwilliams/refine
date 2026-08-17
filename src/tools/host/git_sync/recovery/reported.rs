@@ -47,7 +47,7 @@ impl FileGitSyncService {
         if state_tree_digest(&remote_refine, &remote_state)? != report.remote_snapshot {
             return Err(stale_recovery("the remote state snapshot changed"));
         }
-        let resolved = self.reconcile_non_overlapping_goal_changes(
+        let resolved = self.prepare_semantic_state_changes(
             &observation.path,
             &live_refine,
             &remote_refine,
@@ -240,7 +240,7 @@ impl FileGitSyncService {
             };
         }
 
-        let resolved = self.reconcile_non_overlapping_goal_changes(
+        let resolved = self.prepare_semantic_state_changes(
             &remote_preview.path,
             &comparison_refine,
             &remote_refine,

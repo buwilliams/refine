@@ -68,6 +68,39 @@ fn write_goal(root: &Path, id: &str) {
     fs::write(dir.join("goal.json"), format!("{{\"id\":\"{id}\"}}\n")).unwrap();
 }
 
+fn write_nodes(root: &Path, nodes: &[(&str, &str, &str)]) {
+    let refine_dir = refine_dir_for_target_root(root).unwrap();
+    fs::create_dir_all(&refine_dir).unwrap();
+    let nodes = nodes
+        .iter()
+        .map(|(id, updated_at, health)| {
+            serde_json::json!({
+                "id": id,
+                "display_name": id,
+                "created_at": "2026-08-17T08:00:00Z",
+                "updated_at": updated_at,
+                "health": {
+                    "status": health,
+                    "checked_at": updated_at,
+                    "details": null
+                }
+            })
+        })
+        .collect::<Vec<_>>();
+    fs::write(
+        refine_dir.join("nodes.json"),
+        serde_json::to_vec_pretty(&serde_json::json!({ "nodes": nodes })).unwrap(),
+    )
+    .unwrap();
+}
+
+fn read_nodes(root: &Path) -> crate::model::node::NodeRegistry {
+    serde_json::from_slice(
+        &fs::read(refine_dir_for_target_root(root).unwrap().join("nodes.json")).unwrap(),
+    )
+    .unwrap()
+}
+
 fn configure(root: &Path) {
     git(root, &["config", "user.email", "sync@test"]);
     git(root, &["config", "user.name", "Sync Test"]);

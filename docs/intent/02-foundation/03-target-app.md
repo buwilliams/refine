@@ -61,7 +61,13 @@ The current implementation details that matter to intent are:
   persists an owned target and manifest, publishes with remote-head
   compare-and-swap, hydrates records under their normal leases and preimage
   fences, preserves later writes as the next local delta, and creates the new
-  baseline only after those boundaries are durable.
+  baseline only after those boundaries are durable. Ordinary valid-baseline
+  synchronization treats `nodes.json` as a per-node registry instead of an
+  atomic blob: it retains the record union and uses each record's comparable
+  update timestamp to reconcile concurrent versions. Heartbeat-only churn can
+  therefore converge without a stale fence, while malformed registries,
+  duplicate or noncanonical identities, equal-time disagreement, and unrelated
+  shared-state conflicts still fail closed without applying a partial merge.
 
 The important boundary is source of truth. Caches, indexes, projections, and UI state are allowed and necessary for performance, but they should not replace durable target-app state. If a cache is wrong, the repair path should be refresh or rebuild, not manual database surgery.
 
