@@ -3,6 +3,7 @@
 ## Key Ideas
 
 - **Work Surface**: `main` is where the current route's primary work happens.
+- **Viewport Width**: the shared main container uses the available viewport width so dense operational content has room to remain readable.
 - **Context Preservation**: detail views should preserve the user's underlying list or dashboard context when possible.
 - **Route-Backed State**: filters and views should be shareable, reloadable, and recoverable through URL state.
 - **No Hidden Product Logic**: main content should render shared state and call shared capability.
@@ -16,6 +17,8 @@ It should give the user enough room to inspect and act without losing the global
 ## Expected Role
 
 The main surface should support dense, repeatable operational work. Lists should be filterable and sortable. Detail views should expose the state, evidence, logs, and actions needed to move work forward. Empty and detached states should be explicit rather than confusing.
+
+The shared main container should span the available viewport while preserving consistent horizontal gutters. This shell-level contract gives every route room for dense content without changing route-specific table sizing, overflow, or narrow-screen behavior.
 
 Current implementation details that matter to intent:
 

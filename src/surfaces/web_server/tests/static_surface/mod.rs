@@ -1,3 +1,4 @@
+mod layout;
 mod navigation;
 mod settings;
 mod terminal;
