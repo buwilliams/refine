@@ -1579,13 +1579,15 @@
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
       "prompt": "Recover the prior candidate from a shared-target integration race without discarding its evidence.\n\nReason: base-to-candidate delta contains merge commits and has no implicit replay mainline\n\nRetained integration evidence:\n```json\n{\n  \"attempt\": 2,\n  \"kind\": \"integration\",\n  \"max_automatic_round_retries\": 5,\n  \"node_id\": \"default\",\n  \"reason\": \"base-to-candidate delta contains merge commits and has no implicit replay mainline\",\n  \"recorded_at\": \"2026-08-17T15:09:22Z\",\n  \"retained_evidence\": {\n    \"branch\": \"refine/00000T040T05D388K5F1EW2002/round-2\",\n    \"candidate_head\": {\n      \"branch\": \"refine/00000T040T05D388K5F1EW2002/round-2\",\n      \"commit\": \"88677acc657b36af7f0e270b49e5857e2819e5b4\"\n    },\n    \"candidate_status\": {\n      \"branch\": \"refine/00000T040T05D388K5F1EW2002/round-2\",\n      \"dirty_paths\": [],\n      \"dirty_user_changes\": false,\n      \"refine_owned_artifacts\": [],\n      \"root\": \"/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T040T05D388K5F1EW2002-round-1\",\n      \"untracked_paths\": []\n    },\n    \"original_base_commit\": \"bd392b96216d26fa00b5ef5d307af5abb2bd398f\",\n    \"original_candidate_commit\": \"88677acc657b36af7f0e270b49e5857e2819e5b4\",\n    \"target_branch\": \"main\",\n    \"target_commit\": \"9a4c1005fa5f9ee3de082faf6d8a9bc8c3694d97\",\n    \"worktree\": \"/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T040T05D388K5F1EW2002-round-1\"\n  },\n  \"source_round\": 2,\n  \"state\": \"queued\",\n  \"successor_round\": 3,\n  \"workflow_revision\": 25\n}\n```\n\nRe-evaluate the current Round request from the current target branch. Reapply only the intended candidate delta, resolve conflicts deliberately, and rerun exact-candidate Quality and Governance before integration. Do not move, delete, or rewrite the retained original candidate or its evidence.",
+      "quality_agent_report": "Quality review found no defects requiring correction. Exact candidate 8580cb927992bac499a1598ac3294d4a4c2e89ae directly parents pinned target 9a4c1005fa5f9ee3de082faf6d8a9bc8c3694d97, carries only the intended three-file delta with stable patch ID 4816e4dbb10b252066f3549ec31acde06236206e matching retained candidate 88677acc657b36af7f0e270b49e5857e2819e5b4, and leaves both candidate worktrees clean. Focused browser checks passed 5/5, both focused server transfer tests passed, the full browser suite passed 205 with 28 Playwright-Chromium skips and no failures, and cargo test passed 1015 with 6 platform/helper ignores and no failures; src/main.rs had 0 tests. main and origin/main remained at the pinned target, so no later integration race was observed.",
+      "quality_candidate_commit": "8580cb927992bac499a1598ac3294d4a4c2e89ae",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-08-17T15:19:46Z",
+      "updated": "2026-08-17T15:26:05Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T15:09:22Z",
         "round_idx": 2,
@@ -1628,6 +1630,6 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-17T15:19:46Z",
-  "workflow_revision": 61
+  "updated": "2026-08-17T15:26:05Z",
+  "workflow_revision": 63
 }
