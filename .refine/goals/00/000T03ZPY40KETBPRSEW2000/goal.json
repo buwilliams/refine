@@ -1,7 +1,7 @@
 {
   "base_commit": "5850e2fb336540fc41c8ab5ad2d7c934315353df",
   "branch_name": "refine/00000T03ZPY40KETBPRSEW2000/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "e245f5d05dcee246297fefda5d2003becb7c003d",
   "created": "2026-08-17T13:43:56Z",
   "feature_id": null,
   "feature_order": null,
@@ -95,7 +95,28 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-17T14:16:44Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "5850e2fb336540fc41c8ab5ad2d7c934315353df",
@@ -106,6 +127,7 @@
           "round_idx": 0,
           "target_branch": "main"
         },
+        "completed_at": "2026-08-17T14:16:43Z",
         "criticism": {
           "completed_at": "2026-08-17T13:49:08Z",
           "git_after": {
@@ -187,6 +209,55 @@
           "message": "The finalized plan does not require any governance violation.",
           "status": "passed"
         },
+        "implementation": {
+          "completed_at": "2026-08-17T14:16:43Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Added build.rs metadata that embeds the observed Git commit, records exact-source status only for a clean matching checkout, and records a release tag only when that exact commit carries the package-version tag. Source-promotion candidate builds fence the requested commit through REFINE_BUILD_SOURCE_COMMIT. Added the cohesive src/tools/host/runtime_status.rs host capability so executable provenance remains separate from the bootstrap-owned live checkout.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Extended cached source snapshots with current, behind, ahead, and diverged ancestry. Runtime status permits Running from HEAD and an upstream relationship only when executable commit, live checkout HEAD, both cached identities, cached snapshot identities, recognized ancestry, and fresh cache all agree; stale, missing, dirty-build, or mismatched evidence returns a stable specific unknown_reason.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Replaced the page-local /upgrade inference with FileRuntimeStatusService. Validated published_release responses retain current_version, latest_version, available, and upgrade_available; source responses expose structured executable, checkout, upstream, freshness, relationship, running_from_head, and unknown_reason fields without fetching or adopting request CWD.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated the shared runtime banner above Node tabs: published releases still render Running latest or Upgrade available, while source runtimes render Running from HEAD with current/behind/ahead/diverged upstream text only for trusted evidence, otherwise an honest reason-specific unknown state. Added browser-unit coverage for every relationship and the unknown path.",
+                "id": "P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated docs/intent/03-capabilities/01-process.md, docs/intent/04-surfaces/03-browser/17-processes.md, and docs/intent/04-surfaces/04-api.md with the release validation boundary, immutable executable provenance, cached upstream proof, structured API, and fail-closed unknown behavior while preserving the established intent format.",
+                "id": "P5",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "cargo check --all-targets -> passed (exit 0)",
+              "cargo test --lib --bins -- --test-threads=1 -> passed: 1002 passed, 0 failed, 6 ignored; binary target 0 passed, 0 failed",
+              "cargo test --lib runtime_status -- --test-threads=1 -> passed: 3 passed, 0 failed, 1005 filtered out",
+              "cargo test --lib source_promotion -- --test-threads=1 -> passed: 56 passed, 0 failed, 2 ignored, 950 filtered out",
+              "cargo test --test production_binary_install -- --test-threads=1 -> passed: 9 passed, 0 failed",
+              "node --test tests/runtime_upgrade_banner.test.js -> passed: 2 passed, 0 failed, 0 skipped",
+              "cargo run --manifest-path xtask/Cargo.toml -- test-browser -> passed: 204 passed, 0 failed, 28 skipped because Playwright Chromium is unavailable",
+              "cargo build --release --locked -> passed (optimized release build)",
+              "source_commit=$(git rev-parse HEAD); strings target/release/refine | rg -F -m 1 \"$source_commit\" -> passed and found the exact HEAD commit embedded in the release executable",
+              "git diff --check -> passed with no whitespace errors",
+              "cargo fmt --all -- --check -> baseline-only failure in unchanged src/tools/observability/processes.rs:387",
+              "cargo clippy --all-targets -- -D warnings -> baseline-only failure: five warnings in unchanged project_projection/store.rs, http/background_loops.rs, cli/dispatch/config.rs, and work_items/service/round_helpers.rs",
+              "git diff --exit-code -- src/tools/observability/processes.rs src/tools/product/project_projection/store.rs src/surfaces/web_server/http/background_loops.rs src/surfaces/cli/dispatch/config.rs src/tools/product/work_items/service/round_helpers.rs -> passed (exit 0), confirming all fmt/Clippy findings are outside the candidate diff"
+            ]
+          },
+          "report": "Implemented release-versus-source runtime classification with immutable executable provenance, fail-closed HEAD/upstream relationships, a structured shared upgrade API, the Node Processes banner, and affected intent documentation. Candidate verification passed. Repository-wide fmt and strict Clippy remain blocked only by confirmed unchanged baseline findings, reported separately below.",
+          "started_at": "2026-08-17T13:50:22Z"
+        },
         "phase": "implement",
         "phase_started_at": "2026-08-17T13:50:22Z",
         "proposal": {
@@ -230,11 +301,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-08-17T13:43:57Z",
-        "state": "in_progress",
-        "updated_at": "2026-08-17T13:50:22Z"
+        "state": "completed",
+        "updated_at": "2026-08-17T14:16:43Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Implemented release-versus-source runtime classification with immutable executable provenance, fail-closed HEAD/upstream relationships, a structured shared upgrade API, the Node Processes banner, and affected intent documentation. Candidate verification passed. Repository-wide fmt and strict Clippy remain blocked only by confirmed unchanged baseline findings, reported separately below.",
+      "implementation_reported_at": "2026-08-17T14:16:43Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -245,7 +316,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-17T13:50:22Z",
+      "updated": "2026-08-17T14:16:44Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T13:43:57Z",
         "round_idx": 0,
@@ -255,8 +326,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-17T13:50:22Z",
-  "workflow_revision": 15
+  "updated": "2026-08-17T14:16:44Z",
+  "workflow_revision": 20
 }
