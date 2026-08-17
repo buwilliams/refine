@@ -127,6 +127,8 @@ fn test_cargo_integrations() -> Result<(), String> {
                 "cli_target_root",
                 "--test",
                 "production_binary_install",
+                "--test",
+                "sync_simulation",
                 "--",
                 "--test-threads=1",
             ])

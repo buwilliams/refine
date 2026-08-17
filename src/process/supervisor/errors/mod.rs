@@ -15,6 +15,21 @@ impl StateRecoveryConflictReason {
     }
 }
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MergeConflictStage {
+    CandidateIntegration,
+    TargetSynchronization,
+}
+
+impl MergeConflictStage {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::CandidateIntegration => "candidate integration",
+            Self::TargetSynchronization => "target synchronization",
+        }
+    }
+}
+
 #[derive(Debug, Error)]
 pub enum RefineError {
     #[error("{0}")]
@@ -40,6 +55,15 @@ pub enum RefineError {
         recorded_base: String,
         target_branch: String,
         target_commit: String,
+    },
+    /// A Git merge stopped on content conflicts. The conflicted paths stay
+    /// structured so recovery machinery can retain them as Round evidence
+    /// instead of flattening them into prose.
+    #[error("{message}")]
+    MergeConflict {
+        stage: MergeConflictStage,
+        conflicts: Vec<String>,
+        message: String,
     },
     /// A compare-and-swap ref advance observed the target moving underneath
     /// it; the integration pass must refresh against the new tip and retry.
@@ -86,6 +110,7 @@ impl RefineError {
             Self::Conflict(_)
             | Self::StateSyncMissingBaseline(_)
             | Self::StateRecoveryConflict { .. }
+            | Self::MergeConflict { .. }
             | Self::StaleCandidate { .. }
             | Self::TargetAdvanced { .. }
             | Self::QualityCandidateInfrastructure(_) => ErrorCategory::Conflict,

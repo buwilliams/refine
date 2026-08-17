@@ -1,6 +1,6 @@
 use super::*;
 
-use crate::tools::host::git_sync::with_repository_git_lock;
+use crate::tools::git::with_repository_git_lock;
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
 use crate::tools::product::work_items::WorkflowAttemptAuthority;
 use crate::workflow::context::WorkflowContext;
@@ -413,6 +413,77 @@ fn refresh_conflict_records_explicit_exhaustion_without_a_successor_round() {
     assert_eq!(
         detail["rounds"][1]["workflow_recovery"]["retained_evidence"]["original_candidate_commit"],
         fixture.candidate
+    );
+}
+
+#[test]
+fn integration_merge_conflict_queues_one_fenced_recovery_round_with_the_conflicted_paths() {
+    let fixture = RefreshFixture::new(true);
+    let mut context = fixture.context();
+    let outcome = crate::workflow::behaviors::queue_integration_merge_conflict_recovery(
+        &mut context,
+        vec!["app.txt".to_string()],
+        "candidate integration failed: CONFLICT (content): Merge conflict in app.txt".to_string(),
+        5,
+    )
+    .unwrap();
+    let crate::workflow::behavior::WorkflowAdvanceOutcome::Completed { final_status, .. } = outcome
+    else {
+        panic!("expected a completed outcome");
+    };
+    assert_eq!(final_status, GoalStatus::Todo);
+    let detail = fixture.work_items.show_goal_detail("GOAL1").unwrap();
+    assert_eq!(detail["status"], "todo");
+    assert_eq!(detail["rounds"].as_array().unwrap().len(), 2);
+    assert_eq!(
+        detail["rounds"][0]["workflow_recovery"]["reason"],
+        "candidate integration merge conflicted"
+    );
+    assert_eq!(
+        detail["rounds"][1]["automatic_retry"]["kind"],
+        "integration"
+    );
+    assert_eq!(detail["rounds"][1]["automatic_retry"]["attempt"], 1);
+    // The conflicted paths survive into the recovery Round evidence exactly
+    // as the rebase path retains `rebase.conflicts`.
+    assert!(
+        detail["rounds"][0]["workflow_recovery"]["retained_evidence"]["merge"]["conflicts"]
+            .as_array()
+            .is_some_and(|conflicts| conflicts.iter().any(|path| path == "app.txt"))
+    );
+}
+
+#[test]
+fn integration_merge_conflict_exhaustion_fails_with_integration_retry_exhausted() {
+    let fixture = RefreshFixture::new_with_retry(true, Some(5));
+    let mut context = fixture.context();
+    let outcome = crate::workflow::behaviors::queue_integration_merge_conflict_recovery(
+        &mut context,
+        vec!["app.txt".to_string()],
+        "candidate integration failed: CONFLICT (content): Merge conflict in app.txt".to_string(),
+        5,
+    )
+    .unwrap();
+    let crate::workflow::behavior::WorkflowAdvanceOutcome::Completed { final_status, .. } = outcome
+    else {
+        panic!("expected a completed outcome");
+    };
+    assert_eq!(final_status, GoalStatus::Failed);
+    let detail = fixture.work_items.show_goal_detail("GOAL1").unwrap();
+    assert_eq!(detail["status"], "failed");
+    assert_eq!(detail["rounds"].as_array().unwrap().len(), 2);
+    assert_eq!(
+        detail["rounds"][1]["workflow_recovery"]["state"],
+        "exhausted"
+    );
+    assert_eq!(
+        detail["rounds"][1]["failure_category"],
+        "integration_retry_exhausted"
+    );
+    assert!(
+        detail["rounds"][1]["workflow_recovery"]["retained_evidence"]["merge"]["conflicts"]
+            .as_array()
+            .is_some_and(|conflicts| conflicts.iter().any(|path| path == "app.txt"))
     );
 }
 

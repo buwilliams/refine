@@ -4,6 +4,11 @@ Use this runbook when `project sync` or `fleet sync` reports that Refine state
 changed on multiple nodes. Do not edit the live store, baseline, managed state
 worktree, recovery refs, or `refine/state` by hand.
 
+This runbook describes the shipped surface. The sync and recovery surface is
+slated to collapse into the persistence-sync capability
+(`docs/intent/03-capabilities/05-persistence-sync.md`); until that lands, the
+commands and behavior documented here are authoritative.
+
 ## How Divergence Is Decided
 
 Synchronization resolves almost everything before any of this applies, in

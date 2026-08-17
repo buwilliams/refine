@@ -12,6 +12,7 @@ pub(in crate::surfaces::web_server) fn error_response(error: RefineError) -> Api
         RefineError::Conflict(_)
         | RefineError::StateSyncMissingBaseline(_)
         | RefineError::StateRecoveryConflict { .. } => (409, "conflict"),
+        RefineError::MergeConflict { .. } => (409, "merge_conflict"),
         RefineError::StaleCandidate { .. } => (409, "stale_candidate"),
         RefineError::TargetAdvanced { .. } => (409, "target_advanced"),
         RefineError::QualityCandidateInfrastructure(_) => (409, "quality_candidate_infrastructure"),

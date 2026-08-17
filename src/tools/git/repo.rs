@@ -1,23 +1,36 @@
-use super::*;
+use serde_json::json;
+
+use crate::process::subprocess::{
+    FileProcessSupervisor, ManagedProcessSpec, ProcessOwner, ProcessResourceLimits,
+};
+use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::tools::host::git_sync::FileGitSyncService;
+
+#[derive(Debug)]
+pub(in crate::tools) struct GitCommandOutput {
+    pub(in crate::tools) success: bool,
+    pub(in crate::tools) stdout: Vec<u8>,
+    pub(in crate::tools) stderr: Vec<u8>,
+}
 
 impl FileGitSyncService {
-    pub(super) fn remote_exists(&self, remote: &str) -> RefineResult<bool> {
+    pub(in crate::tools) fn remote_exists(&self, remote: &str) -> RefineResult<bool> {
         Ok(self
             .git_stdout(&["remote"])?
             .lines()
             .any(|candidate| candidate.trim() == remote))
     }
 
-    pub(super) fn git_stdout(&self, args: &[&str]) -> RefineResult<String> {
+    pub(in crate::tools) fn git_stdout(&self, args: &[&str]) -> RefineResult<String> {
         let output = self.git_checked(args)?;
         Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
     }
 
-    pub(super) fn git_success(&self, args: &[&str]) -> RefineResult<bool> {
+    pub(in crate::tools) fn git_success(&self, args: &[&str]) -> RefineResult<bool> {
         self.git(args).map(|output| output.success)
     }
 
-    pub(super) fn git_checked(&self, args: &[&str]) -> RefineResult<GitCommandOutput> {
+    pub(in crate::tools) fn git_checked(&self, args: &[&str]) -> RefineResult<GitCommandOutput> {
         let output = self.git(args)?;
         if output.success {
             Ok(output)
@@ -26,11 +39,11 @@ impl FileGitSyncService {
         }
     }
 
-    pub(super) fn git(&self, args: &[&str]) -> RefineResult<GitCommandOutput> {
+    pub(in crate::tools) fn git(&self, args: &[&str]) -> RefineResult<GitCommandOutput> {
         self.git_at(&self.target_root, args)
     }
 
-    pub(super) fn git_at_stdout(
+    pub(in crate::tools) fn git_at_stdout(
         &self,
         root: &std::path::Path,
         args: &[&str],
@@ -39,7 +52,7 @@ impl FileGitSyncService {
         Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
     }
 
-    pub(super) fn git_at_checked(
+    pub(in crate::tools) fn git_at_checked(
         &self,
         root: &std::path::Path,
         args: &[&str],
@@ -52,7 +65,7 @@ impl FileGitSyncService {
         }
     }
 
-    pub(super) fn git_at(
+    pub(in crate::tools) fn git_at(
         &self,
         root: &std::path::Path,
         args: &[&str],
@@ -114,6 +127,20 @@ impl FileGitSyncService {
 }
 
 const GIT_SYNC_STALL_TIMEOUT_SECONDS: u64 = 300;
+
+pub(in crate::tools) fn command_failed(command: &str, output: &GitCommandOutput) -> RefineError {
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    let detail = if stderr.is_empty() { stdout } else { stderr };
+    RefineError::Conflict(format!(
+        "{command} failed{}",
+        if detail.is_empty() {
+            String::new()
+        } else {
+            format!(": {detail}")
+        }
+    ))
+}
 
 fn is_local_read_only_git_command(args: &[&str]) -> bool {
     match args {

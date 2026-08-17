@@ -410,7 +410,7 @@ fn web_server_state_recovery_preview_and_apply_use_the_shared_service() {
     let (release_tx, release_rx) = std::sync::mpsc::channel();
     let locked_target = b.clone();
     let holder = thread::spawn(move || {
-        crate::tools::host::git_sync::with_repository_git_lock(&locked_target, || {
+        crate::tools::git::with_repository_git_lock(&locked_target, || {
             held_tx.send(()).unwrap();
             release_rx.recv().unwrap();
             Ok(())
@@ -555,7 +555,7 @@ fn web_server_project_sync_returns_while_repository_worker_is_busy() {
     let (release_tx, release_rx) = std::sync::mpsc::channel();
     let lock_root = app_root.clone();
     let lock_thread = thread::spawn(move || {
-        crate::tools::host::git_sync::with_repository_git_lock(&lock_root, || {
+        crate::tools::git::with_repository_git_lock(&lock_root, || {
             locked_tx.send(()).unwrap();
             release_rx.recv().unwrap();
             Ok(())

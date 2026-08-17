@@ -124,6 +124,15 @@ pub(super) fn append_error_context(error: RefineError, context: &str) -> RefineE
                 message: append(message),
             }
         }
+        RefineError::MergeConflict {
+            stage,
+            conflicts,
+            message,
+        } => RefineError::MergeConflict {
+            stage,
+            conflicts,
+            message: append(message),
+        },
         stale @ RefineError::StaleCandidate { .. } => {
             RefineError::Conflict(append(stale.to_string()))
         }

@@ -220,11 +220,11 @@ fn same_existing_path(left: &Path, right: &Path) -> bool {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-struct HostCommandOutput {
-    success: bool,
-    exit_code: Option<i32>,
-    stdout: Vec<u8>,
-    stderr: Vec<u8>,
+pub(in crate::tools) struct HostCommandOutput {
+    pub(in crate::tools) success: bool,
+    pub(in crate::tools) exit_code: Option<i32>,
+    pub(in crate::tools) stdout: Vec<u8>,
+    pub(in crate::tools) stderr: Vec<u8>,
 }
 
 fn stdout(output: HostCommandOutput) -> RefineResult<String> {
@@ -232,7 +232,7 @@ fn stdout(output: HostCommandOutput) -> RefineResult<String> {
         .map_err(|error| RefineError::Serialization(format!("git output was not UTF-8: {error}")))
 }
 
-fn trimmed_command_text(output: &HostCommandOutput) -> String {
+pub(in crate::tools) fn trimmed_command_text(output: &HostCommandOutput) -> String {
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stderr = String::from_utf8_lossy(&output.stderr);
     format!("{}\n{}", stdout.trim(), stderr.trim())
@@ -328,7 +328,7 @@ fn reachable_commits(
     reachable
 }
 
-fn validate_commitish(commit: &str) -> RefineResult<()> {
+pub(in crate::tools) fn validate_commitish(commit: &str) -> RefineResult<()> {
     let commit = commit.trim();
     if commit.is_empty()
         || commit.starts_with('-')
@@ -344,7 +344,7 @@ fn validate_commitish(commit: &str) -> RefineResult<()> {
     Ok(())
 }
 
-fn validate_branch_name(branch: &str) -> RefineResult<()> {
+pub(in crate::tools) fn validate_branch_name(branch: &str) -> RefineResult<()> {
     let branch = branch.trim();
     if branch.is_empty()
         || branch.starts_with('-')
@@ -372,7 +372,7 @@ fn require_worktree_target(path: &Path) -> RefineResult<String> {
     Ok(target)
 }
 
-fn validate_head_branch_ref(reference: &str) -> RefineResult<()> {
+pub(in crate::tools) fn validate_head_branch_ref(reference: &str) -> RefineResult<()> {
     let Some(branch) = reference.trim().strip_prefix("refs/heads/") else {
         return Err(RefineError::InvalidInput(
             "reference must be a fully qualified refs/heads/ branch".to_string(),

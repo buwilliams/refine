@@ -35,6 +35,7 @@
     - [Cancelled](03-capabilities/03-workflow/10-cancelled.md)
     - [Shared Workflow Consistency Contract](03-capabilities/03-workflow/11-consistency-contract.md)
   - [Execution Ownership](03-capabilities/04-execution-ownership.md)
+  - [Persistence Sync](03-capabilities/05-persistence-sync.md)
 - Surfaces
   - [Surface Principles](04-surfaces/01-surface-principles.md)
   - [CLI](04-surfaces/02-cli.md)

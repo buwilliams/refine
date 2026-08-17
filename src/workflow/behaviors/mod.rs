@@ -5,7 +5,7 @@ use serde_json::{Value, json};
 use crate::model::workflow::GoalStatus;
 use crate::process::agent_sessions::{GoalAgentLaunch, run_goal_agent_with_settlement};
 use crate::process::supervisor::config::{FileGovernanceService, FileGuidanceService};
-use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::errors::{MergeConflictStage, RefineError, RefineResult};
 use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationRegistry, OperationState,
 };
@@ -13,8 +13,8 @@ use crate::prompts::{PromptEngine, PromptTemplate};
 use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
-use crate::tools::host::git_sync::with_repository_git_lock;
-use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
+use crate::tools::git::with_repository_git_lock;
+use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService, MergeResult};
 use crate::tools::host::quality::{
     QualityCheckResult, QualityOperationRunner, is_quality_harness_fault,
     is_quality_output_contract_fault, quality_error_summary,
@@ -1398,6 +1398,23 @@ impl WorkflowBehavior for WorkflowGovernance {
                 {
                     return Err(error);
                 }
+                // A conflicted `merge --no-ff` is the rebase conflict's twin:
+                // the candidate no longer applies to the advanced target.
+                // Route it into the same fenced integration recovery instead
+                // of failing the Goal, retaining the conflicted paths the way
+                // the rebase path retains `rebase.conflicts`.
+                Err(RefineError::MergeConflict {
+                    stage: MergeConflictStage::CandidateIntegration,
+                    conflicts,
+                    message,
+                }) => {
+                    return queue_integration_merge_conflict_recovery(
+                        ctx,
+                        conflicts,
+                        message,
+                        max_retries,
+                    );
+                }
                 Err(error) => return fail(ctx, "governance_integration", error),
             };
             match step {
@@ -1473,6 +1490,67 @@ impl WorkflowBehavior for WorkflowGovernance {
             reason: "Governance passed and integrated the implementation candidate".to_string(),
         })
     }
+}
+
+/// Settle a conflicted Governance integration merge through the same fenced
+/// integration recovery the conflicted candidate rebase uses: the conflicted
+/// paths are retained as Round evidence and the Goal returns to Todo while the
+/// shared automatic Round budget lasts. The recovery Round carries
+/// `automatic_retry.kind = "integration"`, so it replays from a fresh base
+/// instead of reusing the stale candidate worktree.
+pub(super) fn queue_integration_merge_conflict_recovery(
+    ctx: &mut WorkflowContext<'_>,
+    conflicts: Vec<String>,
+    message: String,
+    max_automatic_round_retries: u32,
+) -> RefineResult<WorkflowAdvanceOutcome> {
+    let reason = "candidate integration merge conflicted";
+    let retained = json!({
+        "merge": MergeResult {
+            ok: false,
+            conflicts,
+            message: Some(message),
+        }
+    });
+    let recovery = ctx.work_items.queue_integration_recovery_summary(
+        &ctx.goal_id,
+        ctx.attempt_authority,
+        &ctx.node_id,
+        reason,
+        retained.clone(),
+        max_automatic_round_retries,
+    )?;
+    let final_status = recovery.goal.status;
+    if final_status == GoalStatus::Todo {
+        ctx.log(
+            "governance_integration",
+            "Queued a fresh recovery Round for a conflicted candidate integration merge",
+            Some(json_object(json!({
+                "reason": reason,
+                "retained_evidence": retained
+            }))),
+        )?;
+    } else {
+        ctx.log(
+            "governance_integration",
+            "Integration merge conflict exhausted the shared automatic Round budget",
+            Some(json_object(json!({
+                "reason": reason,
+                "retained_evidence": retained,
+                "max_automatic_round_retries": max_automatic_round_retries
+            }))),
+        )?;
+    }
+    ctx.final_status = Some(final_status.clone());
+    Ok(WorkflowAdvanceOutcome::Completed {
+        final_status: final_status.clone(),
+        reason: if final_status == GoalStatus::Todo {
+            "Candidate integration merge conflict queued a fresh recovery Round".to_string()
+        } else {
+            "Candidate integration merge conflict exhausted the shared automatic Round budget"
+                .to_string()
+        },
+    })
 }
 
 impl WorkflowBehavior for WorkflowReview {

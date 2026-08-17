@@ -6,7 +6,7 @@ use serde_json::Value;
 use crate::model::workflow::GoalStatus;
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::tools::host::git_sync::with_repository_git_lock;
+use crate::tools::git::with_repository_git_lock;
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
 use crate::tools::host::project_layout::target_root_for_refine_dir;
 use crate::tools::product::project_projection::GoalSummaryProjection;

@@ -5,7 +5,7 @@ use serde_json::{Value, json};
 use crate::model::goal::RoundIntegration;
 use crate::model::workflow::GoalStatus;
 use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::tools::host::git_sync::with_repository_git_lock;
+use crate::tools::git::with_repository_git_lock;
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
 use crate::tools::product::work_items::FileWorkItemService;
 use crate::workflow::candidate_handoff::{find_candidate_handoff, register_candidate_handoff};

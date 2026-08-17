@@ -6,17 +6,18 @@ use std::io::{ErrorKind, Write};
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::{Arc, Mutex, OnceLock, TryLockError};
+#[cfg(test)]
+use std::sync::Arc;
+use std::sync::{Mutex, OnceLock, TryLockError};
 use std::thread;
-use std::time::{Duration, Instant, UNIX_EPOCH};
+#[cfg(test)]
+use std::time::Instant;
+use std::time::{Duration, UNIX_EPOCH};
 
-use fs2::FileExt;
 use serde::{Deserialize, Serialize};
+#[cfg(test)]
 use serde_json::json;
 
-use crate::process::subprocess::{
-    FileProcessSupervisor, ManagedProcessSpec, ProcessOwner, ProcessResourceLimits,
-};
 use crate::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::process::supervisor::coordination::{
     record_lock_key, replace_file_durably, with_record_lock,
@@ -33,28 +34,17 @@ use crate::tools::product::project_projection::ActiveGoalIndex;
 const PUSH_RETRY_LIMIT: usize = 3;
 const PUSH_RETRY_DELAY: Duration = Duration::from_millis(100);
 pub const REFINE_STATE_BRANCH: &str = "refine/state";
-/// How long to wait for the repository lock before reporting contention.
-///
-/// Longer than the Git stall budget on purpose: a legitimately slow operation
-/// that keeps reporting progress must be allowed to finish rather than have its
-/// waiters give up underneath it, while a wedged one is stopped by its own
-/// budget and releases the lock well inside this window.
-const REPOSITORY_LOCK_ACQUIRE_TIMEOUT: Duration = Duration::from_secs(600);
-const REPOSITORY_LOCK_POLL_INTERVAL: Duration = Duration::from_millis(50);
 const REFINE_STATE_REF: &str = "refs/heads/refine/state";
 const DEFAULT_REMOTE: &str = "origin";
 const STATE_BASELINE_FILE: &str = "refine-state-baseline.json";
 const STATE_BASELINE_REF_PREFIX: &str = "refs/refine/state-baseline";
-static REPOSITORY_GIT_LOCKS: OnceLock<Mutex<BTreeMap<PathBuf, Arc<Mutex<()>>>>> = OnceLock::new();
 static STATE_COPY_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 mod baseline;
 #[cfg(test)]
 use baseline::install_after_baseline_anchor_hook;
 mod conflict_report;
-mod git_commands;
 mod goal_merge;
-mod locks;
 mod node_registry_merge;
 mod recovery;
 mod semantic_merge;
@@ -67,7 +57,6 @@ pub use conflict_report::{
     StateSyncConflictPhase, StateSyncConflictReport, StateSyncConflictSummary,
     latest_state_sync_conflict_report,
 };
-pub use locks::with_repository_git_lock;
 use recovery::hydrate_recovery_target_from_map;
 pub use recovery::{
     StateRecoveryAuthority, StateRecoveryDecision, StateRecoveryManifest, StateRecoveryOutcome,
@@ -80,8 +69,9 @@ use recovery::{
     install_after_recovery_baseline_hook, install_during_recovery_preview_hook,
 };
 
+use crate::tools::git::locks::{RepositoryFileLock, repository_git_lock, with_repository_git_lock};
+use crate::tools::git::repo::{GitCommandOutput, command_failed};
 use goal_merge::*;
-use locks::*;
 use node_registry_merge::*;
 use semantic_merge::BaselineFileResolution;
 pub use semantic_merge::{
@@ -113,6 +103,23 @@ pub struct GitSyncResult {
     /// The repository is temporarily unsafe or busy. The reconciler should retry
     /// without requiring user action.
     pub deferred: bool,
+}
+
+fn skipped(detail: &str) -> GitSyncResult {
+    GitSyncResult {
+        ok: true,
+        detail: Some(detail.to_string()),
+        ..GitSyncResult::default()
+    }
+}
+
+fn deferred(detail: &str) -> GitSyncResult {
+    GitSyncResult {
+        ok: true,
+        detail: Some(detail.to_string()),
+        deferred: true,
+        ..GitSyncResult::default()
+    }
 }
 
 #[derive(Clone, Debug)]

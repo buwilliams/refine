@@ -6,6 +6,7 @@
 - **Review As Boundary**: review is a meaningful workflow state, not a decorative approval label.
 - **Worktree Isolation**: agent and standalone work should be isolated when that makes changes safer and easier to inspect.
 - **Evidence-Based Merge**: merge decisions should be grounded in diffs, quality results, logs, and Goal intent.
+- **Conflict As Invitation**: a conflicted merge or refresh is an invitation to resolve it, not a reason to abort; escalation is for genuine decisions, not first contact.
 - **Recoverable Handoff**: work should move from isolated implementation through Quality, Governance, integration, and acceptance without losing context.
 
 ## Purpose
@@ -24,11 +25,12 @@ This capability should connect workflow with the user's source repository:
   durably in Plan;
 - Governance should acquire the integrated-target lease before final target revalidation and retain it through any candidate refresh, replacement gates, publication, integration, and settlement;
 - Governance should merge and push the isolated candidate exactly once before Review;
-- ordinary target advancement may refresh only a clean candidate whose recorded base resolves, is its ancestor, whose target descends from that base, and whose delta is linear and unambiguous. Old and replacement identities and gate evidence remain inspectable, and replacement Quality and Governance run before integration. Conflict or ambiguity aborts without moving or deleting the original candidate and queues one fenced `integration` automatic-retry Round with target and conflict evidence, using the same monotonic attempt count and configured budget as Quality and Governance;
+- ordinary target advancement may refresh only a clean candidate whose recorded base resolves, is its ancestor, whose target descends from that base, and whose delta is linear and unambiguous. Old and replacement identities and gate evidence remain inspectable, and replacement Quality and Governance run before integration. A conflicted refresh aborts and cleans the attempted rebase, leaves the original candidate, branch, and evidence intact, retains the conflicted file list plus target and conflict snapshots, and queues one fenced `integration` automatic-retry Round that re-implements from a fresh base, using the same monotonic attempt count and configured budget as Quality and Governance;
+- merge-time conflicts at integration and refresh-time rebase conflicts are one physical event under one policy: no path hard-fails a Goal on its first conflict; only the shared `integration_retry_exhausted` budget or an explicit needs-decision escalation ends it;
 - an integrated current-Round candidate may be reconciled to Review when candidate-bound passed Governance and retained, fully normalized, or regenerated isolated Quality proof names that candidate and repository-coordinated observations prove it remains an ancestor of the local target and, when required, the published target. Unrelated descendant commits on a shared target are valid and both observed target snapshots remain inspectable;
 - review should preserve human or agent judgment over the integrated result;
 - approval should mark the reviewed integration accepted without merging or pushing again;
-- failed or conflicted merges should create recoverable evidence;
+- failed or conflicted merges should create recoverable evidence; conflicted file lists are always retained in evidence, and nothing is silently destroyed;
 - a failed candidate handoff should retain the latest implementation, Quality,
   or replacement candidate identity observed by that workflow attempt rather
   than an earlier runtime projection;
@@ -57,6 +59,6 @@ Review should be a real boundary in workflow. It lets later ordered Feature work
 
 ## Future Direction
 
-Future merge and review should support larger composition flows: many agents, many worktrees, dependency-aware ordering, conflict prediction, staged rollout, generated review summaries, and automatic recovery proposals.
+Future merge and review should support larger composition flows: many agents, many worktrees, dependency-aware ordering, conflict prediction, staged rollout, generated review summaries, and automatic recovery proposals. Agent resolution in place should become the first response to a conflicted refresh or merge: an agent attempts resolution on the conflicted, Refine-owned workspace — never the human checkout — with the conflicted file list and both Goals' intents as context, a resolved candidate re-enters exact-candidate Quality, resolution never moves, deletes, or rewrites the original candidate or its evidence, and today's abort plus fenced recovery Round becomes the fallback for when resolution fails or genuinely needs a decision. Stage-boundary candidate base refresh should classify the candidate against the target at the Implement→Quality boundary so collisions surface earlier and smaller, leaving Governance-time refresh as the last line rather than the only one. The deterministic merge ladder and the agent resolution contract this capability relies on live in `docs/intent/03-capabilities/05-persistence-sync.md`.
 
 The future direction should still preserve Git's value as a transparent audit and recovery layer without exposing Git chores as product workflow. Users and agents should be able to see what changed, why it changed, how it was checked, and how to undo it through Refine.
