@@ -1425,6 +1425,47 @@
           },
           "started_at": "2026-08-17T15:10:16Z"
         },
+        "final_plan": {
+          "completed_at": "2026-08-17T15:12:23Z",
+          "git_after": {
+            "branch": "refine/00000T040T05D388K5F1EW2002/round-3",
+            "head_commit": "9a4c1005fa5f9ee3de082faf6d8a9bc8c3694d97",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T040T05D388K5F1EW2002/round-3",
+            "head_commit": "9a4c1005fa5f9ee3de082faf6d8a9bc8c3694d97",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Reapply only candidate 88677acc657b36af7f0e270b49e5857e2819e5b4's three-file delta relative to its direct parent onto the current Round target while leaving the retained Round 2 branch and evidence unchanged.",
+                "id": "P1"
+              },
+              {
+                "description": "Add the conditional Transfer to my node modal action using authoritative active-node context and the existing single-item transfer endpoint, closing the menu, surfacing server-owned eligibility failures without refresh, and refreshing the Goal only after success.",
+                "id": "P2"
+              },
+              {
+                "description": "Carry forward the focused Goal-transfer regression coverage and update the Goal surface intent page to document the action and its shared server-side constraints.",
+                "id": "P3"
+              },
+              {
+                "description": "Establish the recovered exact candidate against the pinned Round target by confirming its ancestry, clean three-file scope, diff hygiene, focused and full browser suites, Rust suite, and clean worktree, while reporting any later main drift separately as an integration race.",
+                "id": "P4"
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "Added P4 to require pinned-target ancestry, exact three-file scope, diff hygiene, focused and full browser suites, the Rust suite, a clean worktree, and separate reporting of any later main drift."
+              }
+            ],
+            "summary": "Reapply the retained Goal-modal transfer behavior onto the current target so eligible Goals can move to the active node without replaying merge history or disturbing prior candidate evidence, and prove the recovered candidate is exact and safe before integration."
+          },
+          "started_at": "2026-08-17T15:11:44Z"
+        },
         "phase": "revise",
         "phase_started_at": "2026-08-17T15:11:43Z",
         "proposal": {
@@ -1461,7 +1502,7 @@
         "schema_version": 2,
         "started_at": "2026-08-17T15:09:22Z",
         "state": "in_progress",
-        "updated_at": "2026-08-17T15:11:43Z"
+        "updated_at": "2026-08-17T15:12:23Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -1475,7 +1516,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-08-17T15:11:43Z",
+      "updated": "2026-08-17T15:12:23Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T15:09:22Z",
         "round_idx": 2,
@@ -1518,6 +1559,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-17T15:11:43Z",
-  "workflow_revision": 52
+  "updated": "2026-08-17T15:12:23Z",
+  "workflow_revision": 53
 }
