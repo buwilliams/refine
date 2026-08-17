@@ -1,7 +1,7 @@
 {
   "base_commit": "5850e2fb336540fc41c8ab5ad2d7c934315353df",
   "branch_name": "refine/00000T03ZPY40KETBPRSEW2000/round-1",
-  "candidate_commit": "e245f5d05dcee246297fefda5d2003becb7c003d",
+  "candidate_commit": "c84c0cf699d88c90ef41d9c4661ea6ec9fa634b9",
   "created": "2026-08-17T13:43:56Z",
   "feature_id": null,
   "feature_order": null,
@@ -310,13 +310,15 @@
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
       "prompt": "Node > Processes shows \"Running latest 4.2.0\" even though I'm not running from a release checkout, but from HEAD, which may or may not be behind the actual origin head. This causes confusion. A better path is that it says whether it is running from HEAD and whether it is up to date with origin or not, unless it is running from a release checkout, in which case the current signal is good.",
+      "quality_agent_report": "Quality corrected the fail-closed source-runtime classifier so cached evidence is trusted only when it belongs to the owning checkout and its stored relationship agrees with its commit identities. Added user-facing unknown reasons and focused Rust and JavaScript regressions. Final Rust and JavaScript suites pass; repository-wide fmt and strict Clippy remain blocked only by verified unchanged baseline files.",
+      "quality_candidate_commit": "c84c0cf699d88c90ef41d9c4661ea6ec9fa634b9",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-17T14:16:44Z",
+      "updated": "2026-08-17T14:36:22Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T13:43:57Z",
         "round_idx": 0,
@@ -328,6 +330,6 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-17T14:16:44Z",
-  "workflow_revision": 20
+  "updated": "2026-08-17T14:36:22Z",
+  "workflow_revision": 22
 }
