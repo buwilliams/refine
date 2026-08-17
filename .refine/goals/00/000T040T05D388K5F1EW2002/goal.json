@@ -2427,15 +2427,33 @@
         "kind": "quality",
         "source_round": 3
       },
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-08-17T15:29:47Z",
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
-      "governance_candidate_commit": "",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_candidate_commit": "8580cb927992bac499a1598ac3294d4a4c2e89ae",
+      "governance_checked_at": "2026-08-17T15:46:48Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T040T05D388K5F1EW2002-round-3",
+        "failed_actions": [],
+        "governance_configured": true,
+        "guidance_checked": 2,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No actual governance rule violations found in committed Round 4.\",\"violations\":[]}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "No actual governance rule violations found in committed Round 4.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T040T05D388K5F1EW2002-round-3"
+      },
+      "governance_message": "No actual governance rule violations found in committed Round 4.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
       "governance_rule_actions": [],
       "guidance_decision": {
         "applied": [
@@ -2552,8 +2570,8 @@
       "implementation_report": "Recovered Round 3 without rewriting prior evidence by retaining exact candidate 8580cb927992bac499a1598ac3294d4a4c2e89ae on pinned base 9a4c1005fa5f9ee3de082faf6d8a9bc8c3694d97. The candidate changes only the intended Goal intent document, Goal modal JavaScript, and focused transfer regression test; its stable patch ID 4816e4dbb10b252066f3549ec31acde06236206e matches retained candidate 88677acc657b36af7f0e270b49e5857e2819e5b4. Focused browser checks passed 5/5, both corrected exact Rust predicates passed 1/1, the full browser suite passed 205 with 28 Playwright-unavailable skips and 0 failures, and the normal Rust suite passed 1015 with 6 platform/helper ignores and 0 failures. Current and retained worktrees are clean; main and origin/main remain at the pinned base, so no integration race was observed.",
       "implementation_reported_at": "2026-08-17T15:36:13Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Recover Round 3 from the Quality-command harness failure without discarding or rewriting prior evidence. Start from the fresh Round's pinned current target and selectively reapply only the intended three-file Goal-transfer delta represented by candidate 8580cb927992bac499a1598ac3294d4a4c2e89ae (equivalent retained patch ID 4816e4dbb10b252066f3549ec31acde06236206e): `docs/intent/04-surfaces/03-browser/08-goal.md`, `src/surfaces/web/static/js/features/goals-detail.js`, and `tests/web_goal_transfer.test.js`. Preserve the conditional `Transfer to my node` action, authoritative active-node targeting, existing `/api/nodes/transfer-goals` contract, surfaced server rejection without refresh, success refresh, documentation, and focused coverage. Do not alter the implementation, test expectations, Cargo configuration, or `tests/test_all.rs` merely because the prior Quality predicate used an invalid Cargo filter. Verify exact candidate ancestry against the Round's pinned base, clean worktree, exact three-file scope, `git diff --check`, and retained-patch equivalence where applicable. Run the browser checks, then run the focused Rust tests as `cargo test --lib surfaces::web_server::tests::goals::details::web_server_manages_nodes_and_transfers_goal_ownership -- --exact` and `cargo test --lib surfaces::web_server::tests::features::membership::web_server_transfers_feature_ownership_as_a_unit -- --exact`; also run the normal full browser and Rust suites and finish with a cleanliness assertion. Treat unavailable Playwright Chromium cases as skips. Submit the exact resulting candidate through fresh Quality and Governance; report any later target-branch movement as an integration race, not an implementation failure.",
       "quality_agent_report": "Quality review found no material candidate or test defect, so the retained three-file Goal-transfer delta was preserved unchanged. Candidate 8580cb927992bac499a1598ac3294d4a4c2e89ae directly parents pinned base 9a4c1005fa5f9ee3de082faf6d8a9bc8c3694d97, changes exactly the intended documentation, Goal-detail JavaScript, and focused browser test, and matches retained patch ID 4816e4dbb10b252066f3549ec31acde06236206e. Corrected focused browser and exact Rust predicates passed; the full browser suite passed with only unavailable-Playwright skips; the normal Rust suite passed; current and retained worktrees are clean; main and origin/main remain pinned, so no integration race was observed.",
       "quality_candidate_commit": "8580cb927992bac499a1598ac3294d4a4c2e89ae",
@@ -2611,19 +2629,29 @@
       "quality_message": "All Quality tests passed with observed supervised evidence.",
       "quality_state": "passed",
       "reporter": "Refine",
-      "rule_state": "unclassified",
-      "updated": "2026-08-17T15:45:36Z",
-      "workflow_attempt_authority": {
-        "claimed_at": "2026-08-17T15:29:47Z",
-        "round_idx": 3,
-        "workflow_revision": 66
+      "rule_state": "passed",
+      "updated": "2026-08-17T15:46:52Z",
+      "workflow_attempt_authority": null,
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "8580cb927992bac499a1598ac3294d4a4c2e89ae",
+        "integrated_at": "2026-08-17T15:46:52.161335237+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n docs/intent/04-surfaces/03-browser/08-goal.md      |  5 ++\n .../web/static/js/features/goals-detail.js         | 37 +++++++++\n tests/web_goal_transfer.test.js                    | 92 ++++++++++++++++++++++\n 3 files changed, 134 insertions(+)\n create mode 100644 tests/web_goal_transfer.test.js",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "7ac453f88389ede688b2bd8ba77b2327509b0154"
       },
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "governance",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-08-17T15:45:37Z",
-  "workflow_revision": 83
+  "updated": "2026-08-17T15:46:52Z",
+  "workflow_revision": 87
 }
