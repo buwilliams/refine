@@ -273,13 +273,15 @@
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
       "prompt": "On the goal modal, the button dropdown should support \"Transfer to my node\"",
+      "quality_agent_report": "Quality reviewed candidate 0c20c1cf29c7159cf47ce4256d7e57c734d98145 against the accepted P1-P3 plan. No corrections were required: the Goal modal conditionally exposes Transfer to my node from authoritative active-node and displayed ownership context, submits the existing single-item transfer contract, surfaces server-owned eligibility failures, refreshes after success, and documents the surface contract. Focused browser and Rust transfer tests, the full browser suite, the default Rust suite, ancestry, cleanliness, and candidate diff checks passed. cargo fmt --all -- --check found one pre-existing line-wrap delta in unchanged src/tools/observability/processes.rs; the candidate changes no Rust files.",
+      "quality_candidate_commit": "0c20c1cf29c7159cf47ce4256d7e57c734d98145",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-17T14:35:17Z",
+      "updated": "2026-08-17T14:41:27Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T14:22:15Z",
         "round_idx": 0,
@@ -291,6 +293,6 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-17T14:35:17Z",
-  "workflow_revision": 20
+  "updated": "2026-08-17T14:41:27Z",
+  "workflow_revision": 22
 }
