@@ -136,6 +136,51 @@
           },
           "started_at": "2026-08-17T13:46:33Z"
         },
+        "final_plan": {
+          "completed_at": "2026-08-17T13:50:16Z",
+          "git_after": {
+            "branch": "refine/00000T03ZPY40KETBPRSEW2000/round-1",
+            "head_commit": "5850e2fb336540fc41c8ab5ad2d7c934315353df",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T03ZPY40KETBPRSEW2000/round-1",
+            "head_commit": "5850e2fb336540fc41c8ab5ad2d7c934315353df",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Extend the existing host runtime-status capability to classify the bootstrap-owned running executable as a validated published release or source build and expose immutable source-commit provenance recorded with that executable separately from the product home's live checkout HEAD.",
+                "id": "P1"
+              },
+              {
+                "description": "Combine the running executable commit, live checkout HEAD, and cached local and upstream identities into a fail-closed source relationship that reports running from HEAD and current, behind, ahead, or diverged only when provenance matches and the cache is fresh, otherwise reporting the specific status as unknown.",
+                "id": "P2"
+              },
+              {
+                "description": "Revise the shared upgrade-status API contract so validated published releases retain version and upgrade fields while source runtimes return the structured executable, checkout, upstream, freshness, and relationship status consumed by surfaces.",
+                "id": "P3"
+              },
+              {
+                "description": "Update the shared Node tab-strip banner used above Processes to preserve Running latest and Upgrade available for validated published releases while rendering source runtimes as Running from HEAD with their trustworthy upstream relationship or an honest unknown state.",
+                "id": "P4"
+              },
+              {
+                "description": "Update the affected Process and browser intent pages to document the published-release validation boundary, running-executable provenance, cached upstream evidence, and unknown-state behavior.",
+                "id": "P5"
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "The revised plan records immutable source-commit provenance with the running executable, compares it with the live checkout HEAD and the cached local identity, and permits a HEAD or upstream-current claim only when all identities agree and the upstream cache is fresh, with every provenance, freshness, or identity mismatch reported as unknown."
+              }
+            ],
+            "summary": "Make Node > Processes distinguish a validated published release from a source-built runtime, and describe a source runtime as running from HEAD or current with upstream only when the running executable's immutable source commit agrees with the live checkout and fresh cached upstream evidence."
+          },
+          "started_at": "2026-08-17T13:49:08Z"
+        },
         "phase": "revise",
         "phase_started_at": "2026-08-17T13:49:08Z",
         "proposal": {
@@ -180,7 +225,7 @@
         "schema_version": 2,
         "started_at": "2026-08-17T13:43:57Z",
         "state": "in_progress",
-        "updated_at": "2026-08-17T13:49:08Z"
+        "updated_at": "2026-08-17T13:50:16Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -194,7 +239,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-17T13:49:08Z",
+      "updated": "2026-08-17T13:50:16Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T13:43:57Z",
         "round_idx": 0,
@@ -206,6 +251,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-17T13:49:08Z",
-  "workflow_revision": 11
+  "updated": "2026-08-17T13:50:16Z",
+  "workflow_revision": 12
 }
