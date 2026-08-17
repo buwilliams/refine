@@ -1,7 +1,7 @@
 {
   "base_commit": "333849baec66db01a61b6a9108cda0e697c9ac90",
   "branch_name": "refine/DRCDDE9E73984AB86F9DDB5782/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "67e52be97ea13636236bf5af4291cf82d59c804b",
   "created": "2026-08-17T12:14:30Z",
   "feature_id": null,
   "feature_order": null,
@@ -95,7 +95,28 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-17T12:38:00Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "333849baec66db01a61b6a9108cda0e697c9ac90",
@@ -106,6 +127,7 @@
           "round_idx": 0,
           "target_branch": "main"
         },
+        "completed_at": "2026-08-17T12:38:00Z",
         "criticism": {
           "completed_at": "2026-08-17T12:20:51Z",
           "git_after": {
@@ -168,6 +190,51 @@
           "message": "The finalized plan can be executed without violating the Constitution, governance rules, or enabled guidance.",
           "status": "passed"
         },
+        "implementation": {
+          "completed_at": "2026-08-17T12:38:00Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Added src/tools/host/git_sync/node_registry_merge.rs. It parses all three snapshots through NodeRegistry, validates unique nonempty lowercase canonical IDs and RFC3339 updated_at values, preserves raw unknown fields, retains the sorted union, keeps one-sided records, applies per-record later-timestamp selection, and rejects equal-time disagreement or invalid input.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Generalized prepare_semantic_state_changes and write_reconciled_state_changes so nodes.json and Goal merges are prepared before generic conflicts in initial sync and push retry. The same semantic preparation is used by reported-recovery preview/apply comparison, and resolved paths continue through existing commit, live hydration, concurrent-write preservation, and baseline publication.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Record absence preserves the observed/base record instead of deleting it. Prepared node merges are excluded only from their own path conflict and are not written until all unrelated paths pass conflict detection; malformed registries, duplicate/noncanonical IDs, invalid timestamps, and equal-time disagreements return None and remain complete ordinary conflicts.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added seven merge-policy unit tests plus multi-clone tests for disjoint heartbeat convergence, atomic withholding with an unrelated shared-state conflict, and rejected-push remote advancement. Coverage includes union, one-sided updates, non-deletion, later timestamps, equal-time ambiguity, malformed/duplicate/noncanonical/uncomparable registries, unknown-field retention, and retry convergence.",
+                "id": "P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated docs/intent/02-foundation/03-target-app.md and 04-fleet.md in their established format to define per-node semantic registry merging, heartbeat-only convergence without stale fencing/count downgrade, and fail-closed ambiguity/unrelated-conflict behavior.",
+                "id": "P5",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "cargo test --lib tools::host::git_sync => passed: 66 passed, 0 failed, 0 ignored, 938 filtered out",
+              "cargo test --lib --quiet => passed: 998 passed, 0 failed, 6 ignored, 0 measured, 0 filtered out",
+              "cargo test --lib push_retry_semantically_merges_node_registry_remote_advancement (five consecutive runs) => each passed: 1 passed, 0 failed",
+              "cargo clippy --lib -- -D warnings -A clippy::needless-pub-self -A clippy::unnecessary-sort-by => passed (exit 0)",
+              "cargo clippy --lib -- -D warnings => baseline failure (exit 101): two needless_pub_self findings in unchanged src/tools/product/project_projection/store.rs and one unnecessary_sort_by finding in unchanged src/surfaces/web_server/http/background_loops.rs",
+              "cargo fmt --all -- --check => baseline failure (exit 1): only unchanged src/tools/observability/processes.rs differs from current rustfmt",
+              "rustfmt --edition 2024 --check src/tools/host/git_sync/node_registry_merge.rs src/tools/host/git_sync/service.rs src/tools/host/git_sync/recovery/reported.rs src/tools/host/git_sync/tests/mod.rs src/tools/host/git_sync/tests/synchronization.rs src/tools/host/git_sync/tests/remote.rs src/tools/host/git_sync/mod.rs => passed (exit 0)",
+              "git diff --check => passed (exit 0)",
+              "git diff --quiet -- src/tools/product/project_projection/store.rs src/surfaces/web_server/http/background_loops.rs src/tools/observability/processes.rs => passed (exit 0), confirming every reported Clippy/rustfmt baseline file is unchanged"
+            ]
+          },
+          "report": "Implemented semantic per-node nodes.json reconciliation across ordinary first-pass sync, rejected-push retry, and reported-recovery comparison. The merge validates NodeRegistry snapshots, canonical unique IDs, and RFC3339 update timestamps; preserves unknown record fields and the union of records; never infers deletion from absence; selects only an unambiguous later concurrent record; and leaves malformed, duplicate, equal-time, or unrelated conflicts fenced atomically. Updated Target App and Fleet intent documentation and added focused unit plus two-clone Git synchronization regressions. Exact verification: cargo test --lib tools::host::git_sync passed 66/66; cargo test --lib --quiet passed 998 with 6 ignored; strict Clippy has only three confirmed pre-existing findings in unchanged files, while Clippy passes when those baseline lint categories are allowed; targeted rustfmt and git diff checks pass.",
+          "started_at": "2026-08-17T12:22:44Z"
+        },
         "phase": "implement",
         "phase_started_at": "2026-08-17T12:22:44Z",
         "proposal": {
@@ -211,11 +278,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-08-17T12:14:32Z",
-        "state": "in_progress",
-        "updated_at": "2026-08-17T12:22:44Z"
+        "state": "completed",
+        "updated_at": "2026-08-17T12:38:00Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Implemented semantic per-node nodes.json reconciliation across ordinary first-pass sync, rejected-push retry, and reported-recovery comparison. The merge validates NodeRegistry snapshots, canonical unique IDs, and RFC3339 update timestamps; preserves unknown record fields and the union of records; never infers deletion from absence; selects only an unambiguous later concurrent record; and leaves malformed, duplicate, equal-time, or unrelated conflicts fenced atomically. Updated Target App and Fleet intent documentation and added focused unit plus two-clone Git synchronization regressions. Exact verification: cargo test --lib tools::host::git_sync passed 66/66; cargo test --lib --quiet passed 998 with 6 ignored; strict Clippy has only three confirmed pre-existing findings in unchanged files, while Clippy passes when those baseline lint categories are allowed; targeted rustfmt and git diff checks pass.",
+      "implementation_reported_at": "2026-08-17T12:38:00Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -226,7 +293,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-17T12:22:44Z",
+      "updated": "2026-08-17T12:38:00Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T12:14:31Z",
         "round_idx": 0,
@@ -236,8 +303,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-17T12:22:44Z",
-  "workflow_revision": 15
+  "updated": "2026-08-17T12:38:00Z",
+  "workflow_revision": 20
 }
