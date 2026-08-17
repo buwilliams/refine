@@ -106,12 +106,51 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-08-17T12:14:32Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-08-17T12:18:02Z",
+        "proposal": {
+          "completed_at": "2026-08-17T12:18:02Z",
+          "git_after": {
+            "branch": "refine/DRCDDE9E73984AB86F9DDB5782/round-1",
+            "head_commit": "333849baec66db01a61b6a9108cda0e697c9ac90",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRCDDE9E73984AB86F9DDB5782/round-1",
+            "head_commit": "333849baec66db01a61b6a9108cda0e697c9ac90",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Introduce a focused Git-sync node-registry reconciler that parses each nodes.json through the existing NodeRegistry model, rejects malformed or duplicate canonical identities and unusable update timestamps, unions records by node id, and deterministically selects the owner-side latest record without inventing a parallel state model.",
+                "id": "P1"
+              },
+              {
+                "description": "Route nodes.json conflicts through semantic reconciliation before generic path conflict detection on both the initial pass and rejected-push retries, combining its prepared output with existing Goal merges and carrying it through the established commit, live hydration, concurrent-write preservation, and baseline boundaries.",
+                "id": "P2"
+              },
+              {
+                "description": "Keep automatic resolution narrow so matching-head heartbeat-only churn converges, union semantics never infer record deletion, and invalid or ambiguous registries plus unrelated unresolved paths still produce the existing complete conflict report without partially writing prepared merges.",
+                "id": "P3"
+              },
+              {
+                "description": "Add focused node-registry merge and multi-node synchronization regression cases for disjoint heartbeat updates, record union, same-record last-writer selection, remote advancement during push, malformed or duplicate registries, and mixed genuine conflicts.",
+                "id": "P4"
+              },
+              {
+                "description": "Update the affected Target App and Fleet intent pages to define nodes.json as semantically merged shared state and state that heartbeat-only registry churn no longer degrades sync health or fleet-count authority while genuine ambiguity remains fenced.",
+                "id": "P5"
+              }
+            ],
+            "summary": "Teach Git-backed state synchronization to merge concurrent nodes.json updates by node identity so heartbeat-only fleet churn converges automatically without weakening conflict fences for genuine or invalid state."
+          },
+          "started_at": "2026-08-17T12:14:32Z"
+        },
         "schema_version": 2,
         "started_at": "2026-08-17T12:14:32Z",
         "state": "in_progress",
-        "updated_at": "2026-08-17T12:14:32Z"
+        "updated_at": "2026-08-17T12:18:02Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -125,7 +164,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-17T12:14:32Z",
+      "updated": "2026-08-17T12:18:02Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-17T12:14:31Z",
         "round_idx": 0,
@@ -137,6 +176,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-17T12:14:32Z",
-  "workflow_revision": 7
+  "updated": "2026-08-17T12:18:02Z",
+  "workflow_revision": 9
 }
