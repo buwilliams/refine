@@ -1,0 +1,142 @@
+{
+  "base_commit": "bd392b96216d26fa00b5ef5d307af5abb2bd398f",
+  "branch_name": "refine/DR05060B5D11A47E115C6D1210/round-1",
+  "candidate_commit": null,
+  "created": "2026-08-17T14:18:03Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "DR05060B5D11A47E115C6D1210",
+  "name": "State-sync: disjoint per-node nodes.json fork becomes an unrecoverable hard conflict when the merge baseline is missing (needs manual state-recovery)",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": "buddy.williams@insurity.com",
+  "rounds": [
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-17T14:18:04Z",
+        "current_round": {
+          "assignee": "buddy.williams@insurity.com",
+          "prompt": "From: Buddy Williams <buddy.williams@insurity.com>\nSubject: State-sync: disjoint per-node nodes.json fork becomes an unrecoverable hard conflict when the merge baseline is missing (needs manual state-recovery)\n\nBody:\nSubject: State-sync: disjoint per-node nodes.json fork becomes an unrecoverable hard conflict when the merge baseline is missing (needs manual state-recovery)\r\n\r\nSeverity: High �X halts all-node state synchronization; dashboard shows \"counts are non-authoritative\"; requires manual\r\noperator recovery.\r\n\r\nEnvironment\r\n- Target app: /insurity/ProSuite, node bo2lnxnevo03-buddy, runtime root /insurity/refine/run/8082.\r\n- Build: bin/refine deployed 2026-08-17 09:27 (the release that added the state_sync_stale_threshold_seconds default\r\nand dropped worktree_cleanup_generated_paths).\r\n- Fleet: 5 registered nodes; at time of incident only this node was live.\r\n\r\nSymptom\r\nDashboard banner: \"State sync has failed since 2026-08-17T11:58:56Z. All-node counts are local and non-authoritative\r\nuntil synchronization recovers.\" Health record: status: failed, last_error: \"Refine state changed on multiple nodes\r\nduring first_pass: 1 unresolved path(s)\", unresolved_paths: [\"nodes.json\"].\r\n\r\nWhat triggered it\r\nThe 09:27 release performs a settings-schema migration. On first load+save after deploy, each node normalized its own\r\nnodes.json entry (added state_sync_stale_threshold_seconds, removed worktree_cleanup_generated_paths). This node's\r\nentry migrated at 11:29; the QA node (default) migrated at 11:28. Each side changed only its own record from a shared\r\npre-migration base �X i.e. a disjoint, per-node divergence.\r\n\r\nExpected\r\nmerge_node_registry (src/tools/host/git_sync/node_registry_merge.rs:18) is explicitly built for this: last-writer-wins\r\nper node id, retaining one-sided changes. The disjoint case is covered by the\r\ndisjoint_heartbeat_updates_merge_by_node_id unit test. It should have auto-resolved with no operator involvement.\r\n\r\nActual �X root cause\r\nIn prepare_semantic_state_changes (src/tools/host/git_sync/service.rs:426�V455), the merge only runs if the\r\ncommon-ancestor bytes can be loaded:\r\n\r\nlet Some(base_bytes) = self.load_baseline_file(state_root, &relative, *base_fingerprint)? else {\r\n  continue;   // baseline unrecoverable -> path left unresolved -> hard conflict\r\n};\r\n...\r\nlet Some(merged) = merged else { continue; };\r\n\r\nload_baseline_file (state_worktree.rs:296�V315) recovers the base content by scanning refine/state history for a\r\nrevision whose content matches the stored fingerprint. If that fingerprint's bytes are not reachable in history �X or\r\nthe baseline fingerprint file (.git/refine-state-baseline.json) is stale/absent �X it returns None, the merge is\r\nsilently skipped via continue, and nodes.json is reported as an unresolved first_pass conflict.\r\n\r\nNet effect: a fork the semantic merge is designed to resolve becomes a hard, sync-blocking conflict, solely because\r\nthe base couldn't be reconstructed. On this host the baseline file was dated 10:12 (stale relative to the 11:28/11:29\r\nmigration), consistent with this path. We suspect the baseline went stale/missing around the earlier runtime-root\r\nmigration (two runtime roots have bitten us before).\r\n\r\nContributing issue #1 �X silent skip, no diagnostic\r\nWhen load_baseline_file returns None, there's no log/telemetry distinguishing \"genuine multi-writer conflict\" from\r\n\"couldn't reconstruct base, so I gave up.\" Operators can't tell a real conflict from a recoverable-but-skipped one.\r\n\r\nContributing issue #2 �X recovery preview is unusable while automation runs\r\nEach failed sync attempt appends a state_sync activity entry into live .refine state (see append_state_sync_activity),\r\nwhich mutates the live snapshot. state-recovery preview fences on a stable live snapshot and aborts with \"the live\r\nstate snapshot changed\" (recovery/service.rs:141,200). Because the failing sync loop writes on every attempt, preview\r\nfails every time until automation is paused. We observed 3/3 preview failures back-to-back; it only succeeded after\r\nrefine workflow pause. The recovery tool the error message tells you to run doesn't work in the state it's advertised\r\nfor.\r\n\r\nContributing issue #3 �X no backoff on a persistent conflict (amplifies #2)\r\nOn a non-transient conflict the sync worker keeps retrying at the debounce cadence (state_sync_debounce_seconds,\r\ndefault 5s; schedule.rs) with no failure backoff. attempt_sequence advanced ~1000 (22512 �� 23542) in minutes, each\r\nattempt re-appending activity-log churn. This both spams the activity log and sustains the snapshot churn in #2.\r\n(Related to the still-pending backoff/GC work noted from the earlier claims-bloat incident.)\r\n\r\nImpact on multi-node recovery (why this matters now)\r\nThree nodes are currently shut down and will restart on the new binary. On startup each will re-migrate its own\r\nnodes.json entry (self-update) while its local refine/state is behind origin �X the same disjoint per-node divergence.\r\nThey should auto-merge on their first project sync only if their baseline is intact and the base bytes are reachable\r\nin refine/state history. Any node whose baseline went stale (same runtime-root history as this one) will reproduce\r\nthis hard conflict on startup and need manual state-recovery. A raw git pull is not a safe substitute �X it invokes\r\ngit's line-level merge on nodes.json instead of the semantic per-node merge and can leave the worktree conflicted.\r\n\r\nWorkaround that resolved it (for reference)\r\n1. refine workflow pause (stops the failing-sync churn so preview can get a stable snapshot).\r\n2. refine project state-recovery preview �� apply --authority remote (QA treated as authoritative for the registry).\r\n3. refine project sync (settles health, refreshes baseline, re-normalizes this node's entry, pushes to origin).\r\n4. refine workflow resume.\r\nPost-fix: last_attempt_outcome: succeeded, all failure/stale/error fields cleared; both migrated node entries\r\nidentical on live and remote.\r\n\r\nSuggested fixes for dev to consider\r\n1. When load_baseline_file returns None for a disjoint per-node change, fall back to a base-less 2-way per-node\r\nreconcile (LWW by updated_at) instead of continue, or at minimum emit a distinct, logged outcome (\"merge skipped: base\r\nunrecoverable\") rather than a generic hard conflict.\r\n2. Make state-recovery preview/apply resilient to the sync worker's own activity-log writes �X e.g. exclude state_sync\r\nactivity appends from the stale-fence snapshot, or auto-quiesce sync for the duration of a preview, so recovery works\r\nwithout a manual pause.\r\n3. Add failure backoff to the sync scheduler so a persistent conflict doesn't retry every ~5s indefinitely and\r\nself-amplify via activity-log churn.\r\n4. Investigate why the baseline (.git/refine-state-baseline.json) went stale/unrecoverable �X likely tied to the\r\nruntime-root migration; ensure save_state_baseline runs (and history retains the fingerprinted bytes) across\r\nruntime-root moves.\r\n\r\nArtifacts available on request: conflict report run/8082/state-sync-conflicts/latest.json, health record\r\nrun/8082/state-sync-health.json, recovery manifest under ProSuite/.git/refine-state-recoveries/.\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nBuddy Williams\r\nBuddy.Williams@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
+          "reporter": "buddy.williams@insurity.com",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "buddy.williams@insurity.com",
+          "id": "DR05060B5D11A47E115C6D1210",
+          "name": "State-sync: disjoint per-node nodes.json fork becomes an unrecoverable hard conflict when the merge baseline is missing (needs manual state-recovery)",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "buddy.williams@insurity.com"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "assignee": "buddy.williams@insurity.com",
+      "constitution_state": "unclassified",
+      "created": "2026-08-17T14:18:03Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_candidate_commit": "",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "guidance_decision": null,
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "bd392b96216d26fa00b5ef5d307af5abb2bd398f",
+          "context_digest": "36e8b63eb482ecb0db0573bbe11fd8ec0bc686a255ad90db066430902d634910",
+          "context_version": 1,
+          "goal_id": "DR05060B5D11A47E115C6D1210",
+          "implementation_branch": "refine/DR05060B5D11A47E115C6D1210/round-1",
+          "round_idx": 0,
+          "target_branch": "main"
+        },
+        "phase": "plan",
+        "phase_started_at": "2026-08-17T14:18:04Z",
+        "schema_version": 2,
+        "started_at": "2026-08-17T14:18:04Z",
+        "state": "in_progress",
+        "updated_at": "2026-08-17T14:18:04Z"
+      },
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "From: Buddy Williams <buddy.williams@insurity.com>\nSubject: State-sync: disjoint per-node nodes.json fork becomes an unrecoverable hard conflict when the merge baseline is missing (needs manual state-recovery)\n\nBody:\nSubject: State-sync: disjoint per-node nodes.json fork becomes an unrecoverable hard conflict when the merge baseline is missing (needs manual state-recovery)\r\n\r\nSeverity: High �X halts all-node state synchronization; dashboard shows \"counts are non-authoritative\"; requires manual\r\noperator recovery.\r\n\r\nEnvironment\r\n- Target app: /insurity/ProSuite, node bo2lnxnevo03-buddy, runtime root /insurity/refine/run/8082.\r\n- Build: bin/refine deployed 2026-08-17 09:27 (the release that added the state_sync_stale_threshold_seconds default\r\nand dropped worktree_cleanup_generated_paths).\r\n- Fleet: 5 registered nodes; at time of incident only this node was live.\r\n\r\nSymptom\r\nDashboard banner: \"State sync has failed since 2026-08-17T11:58:56Z. All-node counts are local and non-authoritative\r\nuntil synchronization recovers.\" Health record: status: failed, last_error: \"Refine state changed on multiple nodes\r\nduring first_pass: 1 unresolved path(s)\", unresolved_paths: [\"nodes.json\"].\r\n\r\nWhat triggered it\r\nThe 09:27 release performs a settings-schema migration. On first load+save after deploy, each node normalized its own\r\nnodes.json entry (added state_sync_stale_threshold_seconds, removed worktree_cleanup_generated_paths). This node's\r\nentry migrated at 11:29; the QA node (default) migrated at 11:28. Each side changed only its own record from a shared\r\npre-migration base �X i.e. a disjoint, per-node divergence.\r\n\r\nExpected\r\nmerge_node_registry (src/tools/host/git_sync/node_registry_merge.rs:18) is explicitly built for this: last-writer-wins\r\nper node id, retaining one-sided changes. The disjoint case is covered by the\r\ndisjoint_heartbeat_updates_merge_by_node_id unit test. It should have auto-resolved with no operator involvement.\r\n\r\nActual �X root cause\r\nIn prepare_semantic_state_changes (src/tools/host/git_sync/service.rs:426�V455), the merge only runs if the\r\ncommon-ancestor bytes can be loaded:\r\n\r\nlet Some(base_bytes) = self.load_baseline_file(state_root, &relative, *base_fingerprint)? else {\r\n  continue;   // baseline unrecoverable -> path left unresolved -> hard conflict\r\n};\r\n...\r\nlet Some(merged) = merged else { continue; };\r\n\r\nload_baseline_file (state_worktree.rs:296�V315) recovers the base content by scanning refine/state history for a\r\nrevision whose content matches the stored fingerprint. If that fingerprint's bytes are not reachable in history �X or\r\nthe baseline fingerprint file (.git/refine-state-baseline.json) is stale/absent �X it returns None, the merge is\r\nsilently skipped via continue, and nodes.json is reported as an unresolved first_pass conflict.\r\n\r\nNet effect: a fork the semantic merge is designed to resolve becomes a hard, sync-blocking conflict, solely because\r\nthe base couldn't be reconstructed. On this host the baseline file was dated 10:12 (stale relative to the 11:28/11:29\r\nmigration), consistent with this path. We suspect the baseline went stale/missing around the earlier runtime-root\r\nmigration (two runtime roots have bitten us before).\r\n\r\nContributing issue #1 �X silent skip, no diagnostic\r\nWhen load_baseline_file returns None, there's no log/telemetry distinguishing \"genuine multi-writer conflict\" from\r\n\"couldn't reconstruct base, so I gave up.\" Operators can't tell a real conflict from a recoverable-but-skipped one.\r\n\r\nContributing issue #2 �X recovery preview is unusable while automation runs\r\nEach failed sync attempt appends a state_sync activity entry into live .refine state (see append_state_sync_activity),\r\nwhich mutates the live snapshot. state-recovery preview fences on a stable live snapshot and aborts with \"the live\r\nstate snapshot changed\" (recovery/service.rs:141,200). Because the failing sync loop writes on every attempt, preview\r\nfails every time until automation is paused. We observed 3/3 preview failures back-to-back; it only succeeded after\r\nrefine workflow pause. The recovery tool the error message tells you to run doesn't work in the state it's advertised\r\nfor.\r\n\r\nContributing issue #3 �X no backoff on a persistent conflict (amplifies #2)\r\nOn a non-transient conflict the sync worker keeps retrying at the debounce cadence (state_sync_debounce_seconds,\r\ndefault 5s; schedule.rs) with no failure backoff. attempt_sequence advanced ~1000 (22512 �� 23542) in minutes, each\r\nattempt re-appending activity-log churn. This both spams the activity log and sustains the snapshot churn in #2.\r\n(Related to the still-pending backoff/GC work noted from the earlier claims-bloat incident.)\r\n\r\nImpact on multi-node recovery (why this matters now)\r\nThree nodes are currently shut down and will restart on the new binary. On startup each will re-migrate its own\r\nnodes.json entry (self-update) while its local refine/state is behind origin �X the same disjoint per-node divergence.\r\nThey should auto-merge on their first project sync only if their baseline is intact and the base bytes are reachable\r\nin refine/state history. Any node whose baseline went stale (same runtime-root history as this one) will reproduce\r\nthis hard conflict on startup and need manual state-recovery. A raw git pull is not a safe substitute �X it invokes\r\ngit's line-level merge on nodes.json instead of the semantic per-node merge and can leave the worktree conflicted.\r\n\r\nWorkaround that resolved it (for reference)\r\n1. refine workflow pause (stops the failing-sync churn so preview can get a stable snapshot).\r\n2. refine project state-recovery preview �� apply --authority remote (QA treated as authoritative for the registry).\r\n3. refine project sync (settles health, refreshes baseline, re-normalizes this node's entry, pushes to origin).\r\n4. refine workflow resume.\r\nPost-fix: last_attempt_outcome: succeeded, all failure/stale/error fields cleared; both migrated node entries\r\nidentical on live and remote.\r\n\r\nSuggested fixes for dev to consider\r\n1. When load_baseline_file returns None for a disjoint per-node change, fall back to a base-less 2-way per-node\r\nreconcile (LWW by updated_at) instead of continue, or at minimum emit a distinct, logged outcome (\"merge skipped: base\r\nunrecoverable\") rather than a generic hard conflict.\r\n2. Make state-recovery preview/apply resilient to the sync worker's own activity-log writes �X e.g. exclude state_sync\r\nactivity appends from the stale-fence snapshot, or auto-quiesce sync for the duration of a preview, so recovery works\r\nwithout a manual pause.\r\n3. Add failure backoff to the sync scheduler so a persistent conflict doesn't retry every ~5s indefinitely and\r\nself-amplify via activity-log churn.\r\n4. Investigate why the baseline (.git/refine-state-baseline.json) went stale/unrecoverable �X likely tied to the\r\nruntime-root migration; ensure save_state_baseline runs (and history retains the fingerprinted bytes) across\r\nruntime-root moves.\r\n\r\nArtifacts available on request: conflict report run/8082/state-sync-conflicts/latest.json, health record\r\nrun/8082/state-sync-health.json, recovery manifest under ProSuite/.git/refine-state-recoveries/.\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nBuddy Williams\r\nBuddy.Williams@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "buddy.williams@insurity.com",
+      "rule_state": "unclassified",
+      "updated": "2026-08-17T14:18:04Z",
+      "workflow_attempt_authority": {
+        "claimed_at": "2026-08-17T14:18:03Z",
+        "round_idx": 0,
+        "workflow_revision": 2
+      },
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    }
+  ],
+  "status": "plan",
+  "target_branch": "main",
+  "updated": "2026-08-17T14:18:04Z",
+  "workflow_revision": 7
+}
