@@ -92,6 +92,7 @@ impl SourcePromotionHost for FileSourcePromotionHost {
         }
         let candidate_result = Command::new(&self.candidate_builder)
             .args(["build", "--release", "--locked"])
+            .env("REFINE_BUILD_SOURCE_COMMIT", commit)
             .current_dir(&worktree)
             .output()
             .map_err(|error| RefineError::Io(format!("failed to launch candidate build: {error}")))

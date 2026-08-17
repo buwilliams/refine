@@ -168,6 +168,25 @@ impl FileSourcePromotionService {
                 &available_commit,
             ],
         )?;
+        let upstream_fast_forward = git_status(
+            &self.checkout_path,
+            &[
+                "merge-base",
+                "--is-ancestor",
+                &available_commit,
+                &current_commit,
+            ],
+        )?;
+        let relationship = if current_commit == available_commit {
+            "current"
+        } else if fast_forward {
+            "behind"
+        } else if upstream_fast_forward {
+            "ahead"
+        } else {
+            "diverged"
+        }
+        .to_string();
         let active_work = self.active_work()?;
         Ok(SourcePromotionSnapshot {
             checkout_path: self.checkout_path.display().to_string(),
@@ -177,6 +196,7 @@ impl FileSourcePromotionService {
             local_branch,
             branch: remote_branch,
             available_commit,
+            relationship,
             clean,
             fast_forward,
             active_work,

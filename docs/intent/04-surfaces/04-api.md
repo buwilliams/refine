@@ -65,6 +65,15 @@ by owner: ordinary work uses supervised cancellation, while
 rollback, executable identity, and prior workflow-admission intent before any
 terminal cancellation result is exposed.
 
+`GET /upgrade` classifies the bootstrap-owned executable before projecting a
+banner contract. A validated published release returns its version and upgrade
+fields. A source runtime instead returns structured executable provenance,
+owning checkout HEAD, cached local and upstream identities, cache freshness,
+and a relationship of current, behind, ahead, diverged, or unknown. HEAD and
+upstream relationships fail closed to a stable unknown reason unless the
+embedded executable commit, live checkout, cached identities, and fresh cached
+ancestry all agree; the handler never fetches or substitutes its CWD.
+
 Plan-to-Goal drafting uses the shared `/import/extract` route with purpose `plan_goal`; it returns exactly one unpersisted Goal draft so browser, CLI, and agent adapters can preserve their own explicit review boundary.
 
 The Goals screen sends its filter-scoped bulk selection to `POST /work/goals/export/jira`, which returns a durable operation immediately. The supervised runner records ownership, progress, logs, cancellation, failures, and the completed Jira CSV result; interrupted exports can be retried through `/work/goals/export/jira/{operation_id}/retry`. The result contains one row per selected Goal plus the filename, content type, selected Goal ids, and aggregate counts. Existing single-Goal CLI and agent adapters reuse the same row renderer and evidence rules rather than formatting separate reports. That renderer budgets every Description to Jira's Unicode-character limit, prioritizes audit identity and commit traceability before normalized round outcomes and narrative, and marks every shortened section or field explicitly. Raw provider payloads are not replayed, and verbose history in one Goal must not fail the rest of a valid bulk selection.

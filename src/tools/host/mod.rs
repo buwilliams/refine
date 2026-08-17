@@ -10,6 +10,7 @@ pub mod node_init;
 pub mod project_layout;
 pub mod quality;
 pub mod release;
+pub mod runtime_status;
 pub mod source_promotion;
 pub mod state_sync_health;
 pub mod target_apps;

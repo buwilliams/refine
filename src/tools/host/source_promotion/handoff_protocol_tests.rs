@@ -310,6 +310,7 @@ fn protocol_fixture(
         local_branch: "main".to_string(),
         branch: "main".to_string(),
         available_commit: "bbb".to_string(),
+        relationship: "behind".to_string(),
         clean: true,
         fast_forward: true,
         update_available: true,

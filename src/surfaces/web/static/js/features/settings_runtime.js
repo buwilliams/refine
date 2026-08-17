@@ -258,6 +258,41 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
 
 function renderRuntimeUpgradeBanner(upgrade) {
   if (!upgrade) return "";
+  if (upgrade.runtime_kind === "source") {
+    const source = upgrade.source || {};
+    const upstream = source.upstream || {};
+    const remoteRef = [upstream.remote, upstream.branch].filter(Boolean).join("/") || "upstream";
+    const relationshipLabels = {
+      current: `Up to date with ${remoteRef}`,
+      behind: `Behind ${remoteRef}`,
+      ahead: `Ahead of ${remoteRef}`,
+      diverged: `Diverged from ${remoteRef}`,
+    };
+    if (source.running_from_head === true && relationshipLabels[source.relationship]) {
+      return `
+        <div class="runtime-version-status" data-testid="runtime-upgrade-status">
+          <span data-testid="runtime-upgrade-message">Running from HEAD · ${htmlEscape(relationshipLabels[source.relationship])}</span>
+        </div>`;
+    }
+    const unknownLabels = {
+      executable_provenance_unverified: "executable provenance is unavailable",
+      checkout_head_unavailable: "checkout HEAD is unavailable",
+      executable_checkout_mismatch: "the running executable does not match checkout HEAD",
+      upstream_cache_unavailable: "cached upstream evidence is unavailable",
+      upstream_cache_unknown: "cached upstream evidence is unavailable",
+      upstream_cache_stale: "cached upstream evidence is stale",
+      cached_checkout_identity_unavailable: "cached checkout identity is unavailable",
+      cached_checkout_identity_mismatch: "cached checkout identity does not match HEAD",
+      cached_upstream_identity_unavailable: "cached upstream identity is unavailable",
+      cached_upstream_identity_mismatch: "cached upstream identities disagree",
+      cached_relationship_unavailable: "cached upstream relationship is unavailable",
+    };
+    const reason = unknownLabels[source.unknown_reason] || "runtime provenance is unavailable";
+    return `
+      <div class="runtime-version-status" data-testid="runtime-upgrade-status">
+        <span data-testid="runtime-upgrade-message">Source runtime status unknown · ${htmlEscape(reason)}</span>
+      </div>`;
+  }
   const current = upgrade.current_version || "unknown";
   const latest = upgrade.latest_version || "";
   if (upgrade.upgrade_available) {
@@ -278,12 +313,6 @@ function renderRuntimeUpgradeBanner(upgrade) {
           </svg>
         </button>
       </div>`;
-  }
-  if (upgrade.local_development) {
-    return latest ? `
-      <div class="runtime-version-status" data-testid="runtime-upgrade-status">
-        <span data-testid="runtime-upgrade-message">Running latest ${htmlEscape(latest)}</span>
-      </div>` : "";
   }
   if (current && latest && current === latest) {
     return `
