@@ -87,7 +87,7 @@ fn missing_baseline_recovery_kind_is_typed_and_cleared_by_success() {
         .record_recovery_success(
             &target,
             "node-a",
-            StateSyncRecoveryKind::MissingBaseline,
+            Some(StateSyncRecoveryKind::MissingBaseline),
             failed.revision,
         )
         .expect("recovered");
@@ -118,7 +118,7 @@ fn missing_baseline_recovery_kind_is_typed_and_cleared_by_success() {
         .record_recovery_success(
             &target,
             "node-a",
-            StateSyncRecoveryKind::MissingBaseline,
+            Some(StateSyncRecoveryKind::MissingBaseline),
             failed.revision,
         )
         .expect("stale conditional settlement");
@@ -145,7 +145,7 @@ fn missing_baseline_recovery_kind_is_typed_and_cleared_by_success() {
         .record_recovery_success(
             &target,
             "node-a",
-            StateSyncRecoveryKind::MissingBaseline,
+            Some(StateSyncRecoveryKind::MissingBaseline),
             unrelated_revision,
         )
         .expect("conditional settlement");
@@ -160,6 +160,42 @@ fn missing_baseline_recovery_kind_is_typed_and_cleared_by_success() {
         Some("unrelated fetch failure")
     );
     assert_eq!(unchanged.revision, unrelated_revision);
+
+    fs::remove_dir_all(temp).expect("cleanup");
+}
+
+#[test]
+fn terminal_recovery_settles_conflict_records_without_a_typed_recovery_kind() {
+    let temp = temp_root("state-sync-recovery-untyped");
+    let target = temp.join("target");
+    fs::create_dir_all(&target).expect("target");
+    let service = FileStateSyncHealthService::new(temp.join("run"));
+
+    // The merge-base pipeline records every conflict with recovery_kind None.
+    service
+        .record_failure(&target, "node-a", "state changed on multiple nodes")
+        .expect("conflict failure");
+    let failed = service
+        .inspect(&target, "node-a", Duration::from_secs(900))
+        .expect("failed health");
+    assert_eq!(failed.status, "failed");
+    assert_eq!(failed.recovery_kind, None);
+
+    let (settled, activity) = service
+        .record_recovery_success(&target, "node-a", None, failed.revision)
+        .expect("recovered");
+    assert!(settled);
+    assert!(matches!(
+        activity,
+        Some(StateSyncHealthActivity::Recovered { .. })
+    ));
+    assert_eq!(
+        service
+            .inspect(&target, "node-a", Duration::from_secs(900))
+            .expect("recovered health")
+            .status,
+        "healthy"
+    );
 
     fs::remove_dir_all(temp).expect("cleanup");
 }

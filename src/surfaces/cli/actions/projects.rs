@@ -98,20 +98,6 @@ pub enum ProjectAction {
         #[arg(long, default_value = "run")]
         runtime_root: PathBuf,
     },
-    /// Publish and pull Refine control state now.
-    Sync {
-        #[cfg_attr(test, arg(long, hide = true))]
-        #[cfg_attr(not(test), arg(skip = None))]
-        target_root: Option<PathBuf>,
-        /// Cache directory to persist the rebuilt projection snapshot into.
-        #[arg(long)]
-        cache_dir: Option<PathBuf>,
-    },
-    /// Inspect or apply stale-fenced recovery for missing-baseline or reported conflicts.
-    StateRecovery {
-        #[command(subcommand)]
-        action: ProjectStateRecoveryAction,
-    },
     /// Inspect or hibernate clean inactive Goal worktrees for the attached target app.
     ///
     /// Dry-run is the default. Recoverable branches remain; exact integrated refs may be retired.
@@ -141,58 +127,4 @@ pub enum ProjectAction {
         #[arg(long, default_value = ".")]
         repo_root: PathBuf,
     },
-}
-
-#[derive(Debug, Subcommand)]
-pub enum ProjectStateRecoveryAction {
-    /// Synchronize and, if synchronization is rejected, preview and apply
-    /// stale-fenced recovery as one operation with bounded race retries.
-    ///
-    /// Without --authority, the ownership policy decides per path: remote is
-    /// authoritative except Goal records this node owned at the last agreed
-    /// baseline, which keep their live copy.
-    Run {
-        /// Force one side for every conflicting path instead of the ownership policy.
-        #[arg(long, value_enum)]
-        authority: Option<CliStateRecoveryAuthority>,
-        /// Reported conflict path that should use live authority instead of the default.
-        #[arg(long = "live-path", requires = "authority")]
-        live_paths: Vec<PathBuf>,
-        /// Reported conflict path that should use remote authority instead of the default.
-        #[arg(long = "remote-path", requires = "authority")]
-        remote_paths: Vec<PathBuf>,
-        #[cfg_attr(test, arg(long, hide = true))]
-        #[cfg_attr(not(test), arg(skip = None))]
-        target_root: Option<PathBuf>,
-    },
-    /// Produce a read-only, bounded comparison suitable for operator review.
-    Preview {
-        #[cfg_attr(test, arg(long, hide = true))]
-        #[cfg_attr(not(test), arg(skip = None))]
-        target_root: Option<PathBuf>,
-    },
-    /// Apply a previously saved preview with an explicit authority choice.
-    Apply {
-        /// Which side is authoritative for the exceptional recovery.
-        #[arg(long, value_enum)]
-        authority: CliStateRecoveryAuthority,
-        /// JSON file containing the complete preview returned by `preview`.
-        #[arg(long)]
-        preview_file: PathBuf,
-        /// Reported conflict path that should use live authority instead of the default.
-        #[arg(long = "live-path")]
-        live_paths: Vec<PathBuf>,
-        /// Reported conflict path that should use remote authority instead of the default.
-        #[arg(long = "remote-path")]
-        remote_paths: Vec<PathBuf>,
-        #[cfg_attr(test, arg(long, hide = true))]
-        #[cfg_attr(not(test), arg(skip = None))]
-        target_root: Option<PathBuf>,
-    },
-}
-
-#[derive(Clone, Copy, Debug, ValueEnum)]
-pub enum CliStateRecoveryAuthority {
-    Live,
-    Remote,
 }

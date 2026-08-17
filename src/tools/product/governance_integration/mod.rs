@@ -717,7 +717,10 @@ impl FileGovernanceIntegrationService {
             let merge = worktree.git().merge_commit_no_ff(&candidate_commit)?;
             if !merge.ok {
                 let _ = worktree.git().recover();
-                return Err(merge_conflict(MergeConflictStage::CandidateIntegration, merge));
+                return Err(merge_conflict(
+                    MergeConflictStage::CandidateIntegration,
+                    merge,
+                ));
             }
             // `merge --no-ff` of a proven non-ancestor is inherently a
             // two-parent commit, which the already-merged revert machinery

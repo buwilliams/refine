@@ -5,13 +5,11 @@ use std::io::{ErrorKind, Write};
 #[cfg(test)]
 use std::path::Path;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU64, Ordering};
 #[cfg(test)]
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock, TryLockError};
 use std::thread;
-#[cfg(test)]
-use std::time::Instant;
 use std::time::{Duration, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
@@ -36,47 +34,27 @@ const PUSH_RETRY_DELAY: Duration = Duration::from_millis(100);
 pub const REFINE_STATE_BRANCH: &str = "refine/state";
 const REFINE_STATE_REF: &str = "refs/heads/refine/state";
 const DEFAULT_REMOTE: &str = "origin";
-const STATE_BASELINE_FILE: &str = "refine-state-baseline.json";
-const STATE_BASELINE_REF_PREFIX: &str = "refs/refine/state-baseline";
 static STATE_COPY_COUNTER: AtomicU64 = AtomicU64::new(0);
 
-mod baseline;
-#[cfg(test)]
-use baseline::install_after_baseline_anchor_hook;
 mod conflict_report;
-mod goal_merge;
-mod node_registry_merge;
 mod recovery;
-mod semantic_merge;
 mod service;
 mod state_codec;
 mod state_files;
 mod state_worktree;
 
+use conflict_report::conflict_path_summary;
 pub use conflict_report::{
-    StateSyncConflictPhase, StateSyncConflictReport, StateSyncConflictSummary,
-    latest_state_sync_conflict_report,
+    StateSyncConflictPath, StateSyncConflictPhase, StateSyncConflictReport,
+    StateSyncConflictSummary, latest_state_sync_conflict_report,
 };
-use recovery::hydrate_recovery_target_from_map;
 pub use recovery::{
-    StateRecoveryAuthority, StateRecoveryDecision, StateRecoveryManifest, StateRecoveryOutcome,
-    StateRecoveryOverride, StateRecoveryPathCounts, StateRecoveryPreview, StateRecoveryResult,
-    StateRecoveryRunPolicy, StateRecoveryRunResult, StateRecoveryStage,
-};
-#[cfg(test)]
-use recovery::{
-    hydrate_remote_with_recovery_cas, install_after_recovery_authority_hook,
-    install_after_recovery_baseline_hook, install_during_recovery_preview_hook,
+    StateRecoveryAuthority, StateRecoveryDecision, StateRecoveryOverride, StateRecoveryPreview,
+    StateRecoveryResult, StateRecoveryRunPolicy, StateRecoveryRunResult,
 };
 
 use crate::tools::git::locks::{RepositoryFileLock, repository_git_lock, with_repository_git_lock};
 use crate::tools::git::repo::{GitCommandOutput, command_failed};
-use goal_merge::*;
-use node_registry_merge::*;
-use semantic_merge::BaselineFileResolution;
-pub use semantic_merge::{
-    BaselineReconstructionSource, StateSyncReconciliationKind, StateSyncReconciliationOutcome,
-};
 use state_codec::*;
 use state_files::*;
 

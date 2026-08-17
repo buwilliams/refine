@@ -40,8 +40,6 @@ pub enum RefineError {
     Unauthorized(String),
     #[error("{0}")]
     Conflict(String),
-    #[error("{0}")]
-    StateSyncMissingBaseline(String),
     #[error("{message}")]
     StateRecoveryConflict {
         reason: StateRecoveryConflictReason,
@@ -108,7 +106,6 @@ impl RefineError {
             Self::NotFound(_) => ErrorCategory::NotFound,
             Self::Unauthorized(_) => ErrorCategory::Unauthorized,
             Self::Conflict(_)
-            | Self::StateSyncMissingBaseline(_)
             | Self::StateRecoveryConflict { .. }
             | Self::MergeConflict { .. }
             | Self::StaleCandidate { .. }

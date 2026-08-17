@@ -101,18 +101,6 @@ fn read_nodes(root: &Path) -> crate::model::node::NodeRegistry {
     .unwrap()
 }
 
-fn rewrite_baseline_fingerprint(root: &Path, relative: &str, fingerprint: u64) {
-    let path = git_common_dir(root).unwrap().join(STATE_BASELINE_FILE);
-    let mut stored: serde_json::Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
-    let fingerprints = if stored.get("fingerprints").is_some() {
-        stored["fingerprints"].as_object_mut().unwrap()
-    } else {
-        stored.as_object_mut().unwrap()
-    };
-    fingerprints.insert(relative.to_string(), serde_json::json!(fingerprint));
-    fs::write(path, serde_json::to_vec_pretty(&stored).unwrap()).unwrap();
-}
-
 fn configure(root: &Path) {
     git(root, &["config", "user.email", "sync@test"]);
     git(root, &["config", "user.name", "Sync Test"]);

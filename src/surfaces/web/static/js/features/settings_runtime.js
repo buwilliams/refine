@@ -429,7 +429,7 @@ function bindNodeRuntimeConfigControls() {
   bindOnce(syncNow, "click", async () => {
     await withButtonBusy(syncNow, "Syncing...", async () => {
       try {
-        const queued = await api("POST", "/api/project/sync", {});
+        const queued = await api("POST", "/api/sync", {});
         const result = await resolveBackgroundOperationResponse(
           queued,
           "Refine state synchronization queued",

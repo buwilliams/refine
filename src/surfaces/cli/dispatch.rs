@@ -11,6 +11,7 @@ mod goals;
 mod logs;
 mod nodes;
 mod projects;
+mod sync;
 mod system;
 mod todos;
 mod website;
@@ -133,6 +134,12 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             return Ok(());
         }
         Commands::Project { action } => return dispatch_project_daemon(action),
+        Commands::Sync {
+            preview,
+            authority,
+            paths,
+            ..
+        } => return sync::dispatch_daemon(preview, authority, paths),
         Commands::Goal { action } => return dispatch_goal_daemon(action),
         Commands::Feature { action } => return dispatch_feature_daemon(action),
         Commands::Todo { action } => return dispatch_todo(action),
@@ -181,6 +188,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         command @ Commands::Log { .. } => logs::dispatch_command(command),
         command @ Commands::Agent { .. } => agents::dispatch_command(command),
         command @ Commands::Project { .. } => projects::dispatch_command(command),
+        command @ Commands::Sync { .. } => sync::dispatch_command(command),
         command @ Commands::Goal { .. } => goals::dispatch_command(command),
         command @ Commands::Feature { .. } => features::dispatch_command(command),
         command @ Commands::Todo { .. } => todos::dispatch_command(command),
@@ -590,15 +598,10 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
             | ProjectAction::Clone { target_root, .. }
             | ProjectAction::Remove { target_root, .. }
             | ProjectAction::Migrate { target_root, .. }
-            | ProjectAction::Sync { target_root, .. }
             | ProjectAction::CleanupWorktrees { target_root, .. }
             | ProjectAction::Doctor { target_root, .. } => target_root.as_ref(),
-            ProjectAction::StateRecovery { action } => match action {
-                ProjectStateRecoveryAction::Preview { target_root }
-                | ProjectStateRecoveryAction::Apply { target_root, .. }
-                | ProjectStateRecoveryAction::Run { target_root, .. } => target_root.as_ref(),
-            },
         },
+        Commands::Sync { target_root, .. } => target_root.as_ref(),
         Commands::Goal { action } => match action {
             GoalAction::Create { target_root, .. }
             | GoalAction::Draft { target_root, .. }

@@ -27,7 +27,7 @@ capability's policy, not Fleet's
 principles that outlast any mechanism. Reconciliation never guesses a winner
 from circumstance: timestamps, recency, and which node happens to run the
 merge decide nothing. Ownership is declared doctrine, never circumstance:
-the node that owned a record at the last agreed baseline is authoritative
+the node that owned a record at the merge base is authoritative
 for contested members, and staleness alone never discards work only the
 owning node could produce — a stale local understanding is not a wrong one.
 Round evidence and the workflow authority that produced it (status,
@@ -43,7 +43,7 @@ canonical node id so absence never implies node deletion.
 Sync health is bound to the serving daemon's active target and node and remains outside `refine/state`. A daemon reports its active node from local evidence and reports other nodes as unknown unless it has direct evidence from those daemons. A stale or failed local reconciliation means that daemon's fleet-wide counts are a local projection, not an authoritative fleet total; surfaces must label that boundary instead of presenting divergent arithmetic as fact.
 
 Repeated unchanged background failures back off under a cap; any change in
-context or a successful sync resets suppression, and an explicit project sync
+context or a successful sync resets suppression, and an explicit `sync`
 always remains immediately available.
 
 Infrastructure and credentials remain outside Refine's core. The manage-fleet runbook guides agents through provisioning and authentication without placing secrets in shared state.

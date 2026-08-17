@@ -315,7 +315,7 @@ in the primary target-app worktree. Goal logs under
 Target App **Git remote** setting controls both state and Goal-branch
 publication and defaults to `origin`. If that remote is unavailable, Refine
 still initializes and commits local state; it simply cannot publish it. Use
-`project sync` or the Node screen's **Sync state now** action when a state
+`refine sync` or the Node screen's **Sync state now** action when a state
 handoff must happen immediately; `fleet sync` invokes the same shared
 capability for the current node. Manual sync is queued in a supervised runner
 process, and the UI reports its progress and any terminal error without

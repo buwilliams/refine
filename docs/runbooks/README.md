@@ -35,9 +35,9 @@ Runbooks:
 - [Accelerate Goal builds](accelerate-goal-builds.md) — share a compile cache
   across Round worktrees through the node's shell environment so fresh Rounds
   stop paying cold builds.
-- [Recover a state-sync conflict](state-sync-recovery.md) — inspect a complete
-  valid-baseline conflict report and apply stale-fenced default and per-path
-  authority without editing synchronized state by hand.
+- [Recover a state-sync conflict](state-sync-recovery.md) — read the
+  divergence preview and settle contested paths terminally with default and
+  per-path authority, without editing synchronized state by hand.
 - [Migrate Gap state to Goals](migrate-gap-state.md) — preserve intent through
   the agent-operated schema migration.
 - [Migrate a Refine v2 project to current v4](v2-to-v4-migration-runbook.md) —

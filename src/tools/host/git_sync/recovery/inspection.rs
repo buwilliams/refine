@@ -1,80 +1,295 @@
 use super::*;
 
+use crate::tools::git::ancestry::{Ancestry, classify};
+use crate::tools::git::state_driver::{merge_added_state_file, merge_state_file};
+
 impl FileGitSyncService {
-    /// Inspect missing-baseline or reported valid-baseline recovery without
-    /// changing any target repository ref, index, worktree, live state,
-    /// baseline, or remote.
+    /// Read-only preview: classify the current heads and summarize what a
+    /// sync (or a terminal recovery) would find — divergence shape, per-path
+    /// sides, and domain summaries for genuinely contested paths. Writes no
+    /// artifact files and is never an apply token.
     pub fn preview_state_recovery(&self) -> RefineResult<StateRecoveryPreview> {
         with_repository_git_lock(&self.target_root, || self.preview_state_recovery_locked())
     }
 
-    pub(in crate::tools::host::git_sync) fn preview_state_recovery_locked(
-        &self,
-    ) -> RefineResult<StateRecoveryPreview> {
+    fn preview_state_recovery_locked(&self) -> RefineResult<StateRecoveryPreview> {
         self.validate_recovery_target()?;
         let live_refine =
-            crate::tools::host::project_layout::refine_dir_for_target_root(&self.target_root)?;
-        if !live_refine.is_dir() {
-            return Err(RefineError::Conflict(
-                "State recovery requires an existing live Refine state store.".to_string(),
-            ));
-        }
-        if self.load_state_baseline()?.is_some() {
-            return self.preview_reported_state_recovery();
-        }
-        let live = durable_state_map(&live_refine)?;
-        #[cfg(test)]
-        run_during_recovery_preview_hook(&self.target_root);
-        if live.is_empty() || bootstrap_only_state(&live) {
-            return Err(RefineError::Conflict(
-                "State recovery requires non-bootstrap live Refine state.".to_string(),
-            ));
-        }
+            crate::tools::host::project_layout::prepare_refine_dir(&self.target_root)?;
         let remote = self.configured_remote(&live_refine)?;
         if !self.remote_exists(&remote)? {
             return Err(RefineError::Conflict(format!(
                 "Configured Git remote {remote} is unavailable; recovery never accepts a remote override."
             )));
         }
-        let remote_head = self.remote_state_head(&remote)?.ok_or_else(|| {
-            RefineError::Conflict(format!(
-                "Configured Git remote {remote} has no {REFINE_STATE_BRANCH} branch."
-            ))
-        })?;
-        let observation = self.observe_remote_state(&remote, &remote_head)?;
-        let remote_state = durable_state_map(&observation.path.join(".refine"))?;
-        let path_counts = recovery_path_counts(&live, &remote_state);
-        let all_conflicts = recovery_conflicting_paths(&live, &remote_state);
-        let conflicting_paths = all_conflicts
-            .iter()
-            .take(RECOVERY_PATH_LIMIT)
-            .cloned()
-            .collect::<Vec<_>>();
-        let conflicting_paths_truncated = all_conflicts.len() - conflicting_paths.len();
-        let target_identity = self.target_identity()?;
-        let repository_identity = self.repository_identity(&remote)?;
-        let local_state_head = self.local_state_head()?;
-        let mut preview = StateRecoveryPreview {
-            version: 1,
-            evidence_id: String::new(),
-            target_identity,
-            repository_identity,
-            configured_remote: remote,
-            local_state_head,
-            remote_state_head: remote_head,
-            baseline_status: "missing".to_string(),
-            baseline_snapshot: None,
-            conflict_report_id: None,
-            conflict_report_location: None,
-            live_snapshot: state_tree_digest(&live_refine, &live)?,
-            live_fingerprints: recovery_fingerprints(&live),
-            remote_snapshot: state_tree_digest(&observation.path.join(".refine"), &remote_state)?,
-            path_counts,
-            conflicting_paths,
-            conflicting_paths_truncated,
+        let live = durable_state_map(&live_refine)?;
+        let local_head = self.local_state_head()?;
+        if !self.remote_state_exists(&remote)? {
+            let detail = format!(
+                "Remote {remote} has no {REFINE_STATE_BRANCH} branch; the next sync publishes it."
+            );
+            return Ok(StateRecoveryPreview {
+                version: 2,
+                configured_remote: remote,
+                local_state_head: local_head,
+                remote_state_head: None,
+                merge_base: None,
+                ancestry: "remote_missing".to_string(),
+                live_pending_paths: Vec::new(),
+                local_paths: Vec::new(),
+                remote_paths: Vec::new(),
+                resolvable_paths: Vec::new(),
+                conflicts: Vec::new(),
+                detail,
+            });
+        }
+        self.fetch_state_branch(&remote)?;
+        let remote_head =
+            self.git_stdout(&["rev-parse", &format!("{remote}/{REFINE_STATE_BRANCH}")])?;
+
+        let Some(local_head) = local_head else {
+            return self.preview_join(remote, remote_head, &live, &live_refine);
         };
-        preview.evidence_id = preview_evidence_id(&preview)?;
+
+        let live_pending_paths = self.live_pending_paths(&local_head, &live)?;
+        let mut preview = StateRecoveryPreview {
+            version: 2,
+            configured_remote: remote,
+            local_state_head: Some(local_head.clone()),
+            remote_state_head: Some(remote_head.clone()),
+            merge_base: None,
+            ancestry: String::new(),
+            live_pending_paths,
+            local_paths: Vec::new(),
+            remote_paths: Vec::new(),
+            resolvable_paths: Vec::new(),
+            conflicts: Vec::new(),
+            detail: String::new(),
+        };
+        match classify(self, &local_head, &remote_head)? {
+            Ancestry::Equal => {
+                preview.ancestry = "converged".to_string();
+                preview.detail = "Local and remote state heads are equal.".to_string();
+            }
+            Ancestry::FastForwardToA => {
+                preview.ancestry = "local_ahead".to_string();
+                preview.local_paths = self.state_paths_changed(&remote_head, &local_head)?;
+                preview.detail =
+                    "The remote head is an ancestor of local work; sync publishes without merging."
+                        .to_string();
+            }
+            Ancestry::FastForwardToB => {
+                preview.ancestry = "remote_ahead".to_string();
+                preview.remote_paths = self.state_paths_changed(&local_head, &remote_head)?;
+                preview.detail =
+                    "Local work is an ancestor of the remote head; sync fast-forwards and hydrates."
+                        .to_string();
+            }
+            Ancestry::Diverged { merge_base } => {
+                self.preview_diverged(&mut preview, &merge_base, &local_head, &remote_head)?;
+            }
+            Ancestry::Unrelated => {
+                // Independent bootstraps: preview the empty-tree merge that
+                // sync uses to join the histories.
+                let empty_tree = crate::tools::git::merge::empty_tree_id(self, &self.target_root)?;
+                self.preview_diverged(&mut preview, &empty_tree, &local_head, &remote_head)?;
+                preview.ancestry = "unrelated".to_string();
+                preview.merge_base = None;
+                preview.detail = format!(
+                    "Heads share no common ancestor (independent bootstraps): {} path(s) contested, {} provable, {} one-sided; sync joins the histories with a merge commit.",
+                    preview.conflicts.len(),
+                    preview.resolvable_paths.len(),
+                    preview.local_paths.len() + preview.remote_paths.len()
+                );
+            }
+        }
         Ok(preview)
+    }
+
+    fn preview_diverged(
+        &self,
+        preview: &mut StateRecoveryPreview,
+        merge_base: &str,
+        local_head: &str,
+        remote_head: &str,
+    ) -> RefineResult<()> {
+        preview.ancestry = "diverged".to_string();
+        preview.merge_base = Some(merge_base.to_string());
+        let local_changed = self
+            .state_paths_changed(merge_base, local_head)?
+            .into_iter()
+            .collect::<BTreeSet<_>>();
+        let remote_changed = self
+            .state_paths_changed(merge_base, remote_head)?
+            .into_iter()
+            .collect::<BTreeSet<_>>();
+        for path in local_changed.union(&remote_changed) {
+            let relative = PathBuf::from(path);
+            match (local_changed.contains(path), remote_changed.contains(path)) {
+                (true, false) => preview.local_paths.push(path.clone()),
+                (false, true) => preview.remote_paths.push(path.clone()),
+                _ => {
+                    let tree_path = format!(".refine/{path}");
+                    let base = self.state_bytes_at(&self.target_root, merge_base, &tree_path)?;
+                    let local = self.state_bytes_at(&self.target_root, local_head, &tree_path)?;
+                    let remote = self.state_bytes_at(&self.target_root, remote_head, &tree_path)?;
+                    let provable = local == remote
+                        || matches!(
+                            (&base, &local, &remote),
+                            (Some(base), Some(local), Some(remote))
+                                if merge_state_file(&relative, base, local, remote).is_some()
+                        )
+                        || matches!(
+                            (&base, &local, &remote),
+                            (None, Some(local), Some(remote))
+                                if merge_added_state_file(&relative, local, remote).is_some()
+                        );
+                    if provable {
+                        preview.resolvable_paths.push(path.clone());
+                    } else {
+                        preview.conflicts.push(StateSyncConflictPath {
+                            path: path.clone(),
+                            summary: conflict_path_summary(
+                                &relative,
+                                base.as_deref(),
+                                local.as_deref(),
+                                remote.as_deref(),
+                            ),
+                        });
+                    }
+                }
+            }
+        }
+        preview.detail = format!(
+            "Heads diverged from merge base {}: {} path(s) contested, {} provable, {} one-sided.",
+            &merge_base[..merge_base.len().min(12)],
+            preview.conflicts.len(),
+            preview.resolvable_paths.len(),
+            preview.local_paths.len() + preview.remote_paths.len()
+        );
+        Ok(())
+    }
+
+    /// First contact: no local branch, so the comparison is live versus the
+    /// remote tree and there is no merge base to arbitrate with.
+    fn preview_join(
+        &self,
+        remote: String,
+        remote_head: String,
+        live: &DurableStateMap,
+        live_refine: &std::path::Path,
+    ) -> RefineResult<StateRecoveryPreview> {
+        let remote_paths = self.state_tree_paths(&remote_head)?;
+        let mut preview = StateRecoveryPreview {
+            version: 2,
+            configured_remote: remote,
+            local_state_head: None,
+            remote_state_head: Some(remote_head.clone()),
+            merge_base: None,
+            ancestry: "join".to_string(),
+            live_pending_paths: Vec::new(),
+            local_paths: Vec::new(),
+            remote_paths: Vec::new(),
+            resolvable_paths: Vec::new(),
+            conflicts: Vec::new(),
+            detail: String::new(),
+        };
+        let live_keys = live
+            .keys()
+            .filter(|path| !is_excluded_from_durable_state(path))
+            .cloned()
+            .collect::<BTreeSet<_>>();
+        for relative in live_keys.union(&remote_paths) {
+            let path = relative.to_string_lossy().replace('\\', "/");
+            match (live.get(relative), remote_paths.contains(relative)) {
+                (Some(_), false) => preview.local_paths.push(path),
+                (None, true) => preview.remote_paths.push(path),
+                (Some(fingerprint), true) => {
+                    let remote_bytes = self.state_bytes_at(
+                        &self.target_root,
+                        &remote_head,
+                        &format!(".refine/{path}"),
+                    )?;
+                    if remote_bytes.as_deref().map(state_content_fingerprint) == Some(*fingerprint)
+                    {
+                        continue;
+                    }
+                    let live_bytes = fs::read(live_refine.join(relative)).ok();
+                    preview.conflicts.push(StateSyncConflictPath {
+                        path,
+                        summary: conflict_path_summary(
+                            relative,
+                            None,
+                            live_bytes.as_deref(),
+                            remote_bytes.as_deref(),
+                        ),
+                    });
+                }
+                (None, false) => unreachable!(),
+            }
+        }
+        preview.detail = if bootstrap_only_state(live) {
+            "First contact with bootstrap-only live state; the next sync adopts the remote branch."
+                .to_string()
+        } else if preview.conflicts.is_empty() {
+            "First contact without contested content; the next sync joins additively.".to_string()
+        } else {
+            format!(
+                "First contact with {} contested path(s) and no merge base; an authority decision settles the join.",
+                preview.conflicts.len()
+            )
+        };
+        Ok(preview)
+    }
+
+    /// Live records whose bytes differ from the local branch head: the next
+    /// pass's local delta.
+    fn live_pending_paths(
+        &self,
+        local_head: &str,
+        live: &DurableStateMap,
+    ) -> RefineResult<Vec<String>> {
+        let tree = self.state_tree_paths(local_head)?;
+        let mut pending = Vec::new();
+        for relative in live
+            .keys()
+            .filter(|path| !is_excluded_from_durable_state(path))
+            .cloned()
+            .collect::<BTreeSet<_>>()
+            .union(&tree)
+        {
+            let path = relative.to_string_lossy().replace('\\', "/");
+            let committed = self
+                .state_bytes_at(&self.target_root, local_head, &format!(".refine/{path}"))?
+                .as_deref()
+                .map(state_content_fingerprint);
+            if live.get(relative).copied() != committed {
+                pending.push(path);
+            }
+        }
+        Ok(pending)
+    }
+
+    fn state_tree_paths(&self, commit: &str) -> RefineResult<BTreeSet<PathBuf>> {
+        Ok(self
+            .git_stdout(&["ls-tree", "-r", "--name-only", commit, "--", ".refine"])?
+            .lines()
+            .filter_map(|path| path.strip_prefix(".refine/"))
+            .map(PathBuf::from)
+            .filter(|path| !is_excluded_from_durable_state(path))
+            .collect())
+    }
+
+    /// State-relative paths whose content differs between two commits,
+    /// excluding paths that never belong in durable state.
+    fn state_paths_changed(&self, from: &str, to: &str) -> RefineResult<Vec<String>> {
+        Ok(self
+            .git_stdout(&["diff", "--name-only", from, to, "--", ".refine"])?
+            .lines()
+            .filter_map(|path| path.strip_prefix(".refine/"))
+            .filter(|path| !is_excluded_from_durable_state(std::path::Path::new(path)))
+            .map(str::to_string)
+            .collect())
     }
 
     pub(super) fn validate_recovery_target(&self) -> RefineResult<()> {
@@ -88,31 +303,6 @@ impl FileGitSyncService {
         Ok(())
     }
 
-    pub(super) fn target_identity(&self) -> RefineResult<String> {
-        self.target_root
-            .canonicalize()
-            .map(|path| path.display().to_string())
-            .map_err(|error| {
-                RefineError::Io(format!(
-                    "failed to resolve target identity {}: {error}",
-                    self.target_root.display()
-                ))
-            })
-    }
-
-    pub(super) fn repository_identity(&self, remote: &str) -> RefineResult<String> {
-        use sha2::{Digest, Sha256};
-
-        let common = git_common_dir(&self.target_root)?
-            .canonicalize()
-            .map_err(|error| RefineError::Io(format!("failed to resolve Git identity: {error}")))?;
-        let url = self.git_stdout(&["remote", "get-url", remote])?;
-        Ok(format!(
-            "sha256:{:x}",
-            Sha256::digest(format!("{}\0{url}", common.display()).as_bytes())
-        ))
-    }
-
     pub(in crate::tools::host::git_sync) fn local_state_head(
         &self,
     ) -> RefineResult<Option<String>> {
@@ -121,139 +311,4 @@ impl FileGitSyncService {
         }
         self.git_stdout(&["rev-parse", REFINE_STATE_REF]).map(Some)
     }
-
-    pub(super) fn remote_state_head(&self, remote: &str) -> RefineResult<Option<String>> {
-        let output = self.git(&["ls-remote", "--heads", remote, REFINE_STATE_REF])?;
-        if !output.success {
-            return Err(command_failed("git ls-remote", &output));
-        }
-        Ok(String::from_utf8_lossy(&output.stdout)
-            .split_whitespace()
-            .next()
-            .map(str::to_string))
-    }
-
-    pub(super) fn observe_remote_state(
-        &self,
-        remote: &str,
-        expected_head: &str,
-    ) -> RefineResult<DisposableCheckout> {
-        let url = self.git_stdout(&["remote", "get-url", remote])?;
-        let checkout = self.disposable_checkout("remote-observation")?;
-        let path = checkout.path.display().to_string();
-        self.git_checked(&[
-            "clone",
-            "-q",
-            "--single-branch",
-            "--branch",
-            REFINE_STATE_BRANCH,
-            "--",
-            &url,
-            &path,
-        ])?;
-        let observed = self.git_at_stdout(&checkout.path, &["rev-parse", "HEAD"])?;
-        if observed != expected_head {
-            return Err(stale_recovery(
-                "the remote state head changed during disposable observation",
-            ));
-        }
-        Ok(checkout)
-    }
-
-    pub(super) fn disposable_checkout(&self, label: &str) -> RefineResult<DisposableCheckout> {
-        let path = std::env::temp_dir().join(format!(
-            "refine-state-recovery-{label}-{}",
-            uuid::Uuid::new_v4()
-        ));
-        if path.exists() {
-            return Err(RefineError::Conflict(format!(
-                "disposable recovery path already exists: {}",
-                path.display()
-            )));
-        }
-        Ok(DisposableCheckout { path })
-    }
-}
-
-pub(super) fn recovery_fingerprints(state: &DurableStateMap) -> BTreeMap<String, u64> {
-    state
-        .iter()
-        .map(|(path, fingerprint)| (path.to_string_lossy().replace('\\', "/"), *fingerprint))
-        .collect()
-}
-
-pub(super) fn stale_live_snapshot_reason(
-    _live_refine: &std::path::Path,
-    expected: &BTreeMap<String, u64>,
-    current: &DurableStateMap,
-) -> String {
-    let current = recovery_fingerprints(current);
-    let changed = expected
-        .keys()
-        .chain(current.keys())
-        .cloned()
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .filter(|path| expected.get(path) != current.get(path))
-        .take(8)
-        .collect::<Vec<_>>();
-    if changed.is_empty() {
-        return "the live state snapshot changed while it was being read".to_string();
-    }
-    format!("the live state snapshot changed at {}", changed.join(", "))
-}
-
-pub(super) fn recovery_path_counts(
-    live: &DurableStateMap,
-    remote: &DurableStateMap,
-) -> StateRecoveryPathCounts {
-    let mut counts = StateRecoveryPathCounts::default();
-    for path in live.keys().chain(remote.keys()).collect::<BTreeSet<_>>() {
-        match (live.get(path), remote.get(path)) {
-            (Some(_), None) => counts.live_only += 1,
-            (None, Some(_)) => counts.remote_only += 1,
-            (Some(left), Some(right)) if left == right => counts.equal += 1,
-            (Some(_), Some(_)) => counts.differing += 1,
-            (None, None) => unreachable!(),
-        }
-    }
-    counts
-}
-
-pub(super) fn recovery_conflicting_paths(
-    live: &DurableStateMap,
-    remote: &DurableStateMap,
-) -> Vec<String> {
-    live.keys()
-        .chain(remote.keys())
-        .cloned()
-        .collect::<BTreeSet<_>>()
-        .into_iter()
-        .filter(|path| live.get(path) != remote.get(path))
-        .map(|path| path.to_string_lossy().replace('\\', "/"))
-        .collect()
-}
-
-pub(super) fn validate_recovery_comparison(
-    preview: &StateRecoveryPreview,
-    live: &DurableStateMap,
-    remote: &DurableStateMap,
-) -> RefineResult<()> {
-    let path_counts = recovery_path_counts(live, remote);
-    let all_conflicts = recovery_conflicting_paths(live, remote);
-    let conflicting_paths = all_conflicts
-        .iter()
-        .take(RECOVERY_PATH_LIMIT)
-        .cloned()
-        .collect::<Vec<_>>();
-    let conflicting_paths_truncated = all_conflicts.len() - conflicting_paths.len();
-    if preview.path_counts != path_counts
-        || preview.conflicting_paths != conflicting_paths
-        || preview.conflicting_paths_truncated != conflicting_paths_truncated
-    {
-        return Err(stale_recovery(
-            "the bounded path comparison does not match the observed snapshots",
-        ));
-    }
-    Ok(())
 }

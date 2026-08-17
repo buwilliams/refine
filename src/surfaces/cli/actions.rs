@@ -14,6 +14,7 @@ mod goals;
 mod logs;
 mod nodes;
 mod projects;
+mod sync;
 mod system;
 mod todos;
 mod workflow;
@@ -28,7 +29,8 @@ pub use fleet::FleetAction;
 pub use goals::GoalAction;
 pub use logs::LogAction;
 pub use nodes::NodeAction;
-pub use projects::{CliStateRecoveryAuthority, ProjectAction, ProjectStateRecoveryAction};
+pub use projects::ProjectAction;
+pub use sync::CliSyncAuthority;
 pub use system::{CliInstallTarget, SystemAction};
 pub use todos::TodoAction;
 pub use workflow::{CliGoalStatus, WorkflowAction};
@@ -55,6 +57,29 @@ pub enum Commands {
     Project {
         #[command(subcommand)]
         action: ProjectAction,
+    },
+    /// Converge this node's Refine state with the fleet through the
+    /// deterministic sync pipeline. A genuine conflict fails closed with a
+    /// stable report id and domain-terms summaries; settle it with
+    /// --authority, or inspect it first with --preview.
+    Sync {
+        /// Print a read-only divergence summary as JSON and change nothing.
+        #[arg(long, conflicts_with_all = ["authority", "paths"])]
+        preview: bool,
+        /// Terminal decision: settle every contested path on this side inside
+        /// one merge commit. Rerunning after success is a no-op.
+        #[arg(long, value_enum)]
+        authority: Option<CliSyncAuthority>,
+        /// Contested path to settle on the opposite side of --authority
+        /// instead. May repeat.
+        #[arg(long = "path", requires = "authority")]
+        paths: Vec<PathBuf>,
+        /// Cache directory to persist the rebuilt projection snapshot into.
+        #[arg(long)]
+        cache_dir: Option<PathBuf>,
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
+        target_root: Option<PathBuf>,
     },
     /// Create and drive Goals — prompt-driven units of work for the active app.
     /// Covers the full lifecycle: create, round, start, retry, approve, and undo.

@@ -13,7 +13,7 @@ fn static_runtime_settings_expose_state_sync_controls() {
     assert!(runtime.contains(r#"data-testid="runtime-worktree-cleanup-delay""#));
     assert!(!runtime.contains("worktree_cleanup_generated_paths"));
     assert!(runtime.contains(r#"data-testid="runtime-worktree-cleanup-now""#));
-    assert!(runtime.contains(r#"api("POST", "/api/project/sync", {})"#));
+    assert!(runtime.contains(r#"api("POST", "/api/sync", {})"#));
     assert!(runtime.contains(r#""/api/project/worktrees/cleanup""#));
     assert!(runtime.contains("resolveBackgroundOperationResponse"));
     assert!(

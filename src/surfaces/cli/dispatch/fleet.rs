@@ -408,7 +408,7 @@ pub(super) fn dispatch_fleet_daemon(action: FleetAction) -> RefineResult<()> {
             })
         }
         FleetAction::Sync { target_root: None } => {
-            follow_daemon_operation(daemon_json("POST", "/project/sync", None)?)?
+            follow_daemon_operation(daemon_json("POST", "/sync", None)?)?
         }
         other => {
             return Err(RefineError::NotImplemented(format!(

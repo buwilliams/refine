@@ -7,7 +7,8 @@ use crate::process::supervisor::lifecycle::DaemonStatus;
 use crate::tools::host::checkout::RefineCheckoutPaths;
 use crate::tools::product::project_projection::ProjectionSnapshot;
 
-pub const API_CONTRACT_VERSION: &str = "2";
+// 3: `/sync` family replaced `/project/sync` and `/project/state-recovery/*`.
+pub const API_CONTRACT_VERSION: &str = "3";
 pub const IDEMPOTENCY_DIR: &str = "idempotency";
 pub const API_EVENTS_FILE: &str = "api-events.jsonl";
 
@@ -28,7 +29,11 @@ pub const API_GROUPS: &[ApiRouteGroup] = &[
     },
     ApiRouteGroup {
         prefix: "/project",
-        capability: "active app status, app attach helpers, migration, sync, explicit state recovery, managed worktree cleanup",
+        capability: "active app status, app attach helpers, migration, managed worktree cleanup",
+    },
+    ApiRouteGroup {
+        prefix: "/sync",
+        capability: "state-branch synchronization, read-only divergence preview, terminal authority decisions",
     },
     ApiRouteGroup {
         prefix: "/target-app",

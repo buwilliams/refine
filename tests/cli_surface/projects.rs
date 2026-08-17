@@ -170,8 +170,8 @@ pub(crate) fn project_registry_lifecycle_commands(fixture: &IntegrationFixture) 
     assert_eq!(migrate_payload["ok"], true);
     assert_eq!(migrate_payload["migrated"], false);
 
-    let sync = fixture.run_refine(&["project", "sync"]);
-    fixture.assert_success("project sync", &sync);
+    let sync = fixture.run_refine(&["sync"]);
+    fixture.assert_success("sync", &sync);
     assert!(fixture.json_stdout(&sync).is_object());
 
     let clone = fixture.run_refine(&[

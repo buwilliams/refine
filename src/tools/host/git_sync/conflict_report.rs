@@ -1,6 +1,6 @@
 use super::*;
 
-const CONFLICT_REPORT_VERSION: u32 = 2;
+const CONFLICT_REPORT_VERSION: u32 = 3;
 const CONFLICT_REPORT_DIRECTORY: &str = "state-sync-conflicts";
 const CONFLICT_REPORT_FILE: &str = "latest.json";
 
@@ -29,12 +29,22 @@ pub struct StateSyncRecoveryMetadata {
     #[serde(default)]
     pub run_command: String,
     pub preview_command: String,
-    pub apply_command: String,
+}
+
+/// One conflicted path with a short domain-terms summary an operator can read
+/// (which goal, which members each side changed).
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct StateSyncConflictPath {
+    pub path: String,
+    pub summary: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct StateSyncConflictReport {
     pub version: u32,
+    /// Stable across attempts of the same divergence by construction: derived
+    /// from the merge base, both heads, and the sorted unresolved paths —
+    /// every operand a commit, none of them wall-clock or attempt state.
     pub report_id: String,
     pub phase: StateSyncConflictPhase,
     pub attempt_id: String,
@@ -43,16 +53,12 @@ pub struct StateSyncConflictReport {
     pub target_identity: String,
     pub repository_identity: String,
     pub configured_remote: String,
-    pub baseline_snapshot: String,
-    pub local_snapshot: String,
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub local_fingerprints: BTreeMap<String, u64>,
-    pub remote_snapshot: String,
-    pub local_state_head: Option<String>,
+    pub merge_base: String,
+    pub local_state_head: String,
     pub remote_state_head: String,
     pub unresolved_paths: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub reconciliation_outcomes: Vec<StateSyncReconciliationOutcome>,
+    pub conflicts: Vec<StateSyncConflictPath>,
     pub recovery: StateSyncRecoveryMetadata,
     pub report_location: String,
 }
@@ -71,7 +77,7 @@ impl std::fmt::Display for StateSyncConflictSummary {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             formatter,
-            "Refine state changed on multiple nodes during {}: {} unresolved path(s){}; complete conflict report {} is at {}. Run `{}` for one-shot stale-fenced recovery, or `refine project state-recovery preview` to review the comparison first.",
+            "Refine state changed on multiple nodes during {}: {} unresolved path(s){}; complete conflict report {} is at {}. Run `{}` for one-shot recovery, or `refine sync --preview` to review the comparison first.",
             self.phase.as_str(),
             self.unresolved_count,
             if self.diagnostics.is_empty() {
@@ -115,15 +121,10 @@ impl FileGitSyncService {
         phase: StateSyncConflictPhase,
         attempt: &StateSyncAttemptContext,
         remote: &str,
-        baseline: &DurableStateMap,
-        local_root: &std::path::Path,
-        local: &DurableStateMap,
-        remote_root: &std::path::Path,
-        remote_state: &DurableStateMap,
-        local_state_head: Option<String>,
-        remote_state_head: String,
-        unresolved: &[String],
-        reconciliation_outcomes: &[StateSyncReconciliationOutcome],
+        merge_base: &str,
+        local_state_head: &str,
+        remote_state_head: &str,
+        unresolved: &[StateSyncConflictPath],
     ) -> RefineResult<StateSyncConflictSummary> {
         use sha2::{Digest, Sha256};
 
@@ -136,14 +137,20 @@ impl FileGitSyncService {
             "sha256:{:x}",
             Sha256::digest(format!("{}\0{remote_url}", common.display()).as_bytes())
         );
-        let mut report = StateSyncConflictReport {
+        let mut unresolved = unresolved.to_vec();
+        unresolved.sort_by(|left, right| left.path.cmp(&right.path));
+        let report = StateSyncConflictReport {
             version: CONFLICT_REPORT_VERSION,
-            report_id: String::new(),
+            report_id: conflict_report_id(
+                merge_base,
+                local_state_head,
+                remote_state_head,
+                &unresolved,
+            ),
             phase,
             attempt_id: attempt.id.clone(),
             attempt_source: attempt.source.clone(),
-            created_at: chrono::Utc::now()
-                .to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
+            created_at: chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
             target_identity: self
                 .target_root
                 .canonicalize()
@@ -152,28 +159,22 @@ impl FileGitSyncService {
                 .to_string(),
             repository_identity,
             configured_remote: remote.to_string(),
-            baseline_snapshot: state_map_digest(baseline),
-            local_snapshot: state_tree_digest_for_report(local_root, local)?,
-            local_fingerprints: local
+            merge_base: merge_base.to_string(),
+            local_state_head: local_state_head.to_string(),
+            remote_state_head: remote_state_head.to_string(),
+            unresolved_paths: unresolved
                 .iter()
-                .map(|(path, fingerprint)| {
-                    (path.to_string_lossy().replace('\\', "/"), *fingerprint)
-                })
+                .map(|conflict| conflict.path.clone())
                 .collect(),
-            remote_snapshot: state_tree_digest_for_report(remote_root, remote_state)?,
-            local_state_head,
-            remote_state_head,
-            unresolved_paths: unresolved.to_vec(),
-            reconciliation_outcomes: reconciliation_outcomes.to_vec(),
+            conflicts: unresolved,
             recovery: StateSyncRecoveryMetadata {
                 available: true,
-                run_command: "refine project state-recovery run --authority <live|remote> [--live-path <path> | --remote-path <path>]".to_string(),
-                preview_command: "refine project state-recovery preview".to_string(),
-                apply_command: "refine project state-recovery apply --authority <live|remote> --preview-file <preview.json> [--live-path <path> | --remote-path <path>]".to_string(),
+                run_command: "refine sync --authority <live|remote> [--path <contested-path>]"
+                    .to_string(),
+                preview_command: "refine sync --preview".to_string(),
             },
             report_location: report_location.display().to_string(),
         };
-        report.report_id = conflict_report_id(&report)?;
         let bytes = serde_json::to_vec_pretty(&report).map_err(|error| {
             RefineError::Serialization(format!(
                 "failed to encode state-sync conflict report: {error}"
@@ -187,58 +188,102 @@ impl FileGitSyncService {
             report_location: report.report_location,
             recovery_command: report.recovery.run_command,
             diagnostics: report
-                .reconciliation_outcomes
+                .conflicts
                 .iter()
-                .filter(|outcome| report.unresolved_paths.contains(&outcome.path))
-                .map(|outcome| outcome.detail.clone())
+                .map(|conflict| conflict.summary.clone())
                 .collect(),
         })
     }
 }
 
-pub(super) fn conflict_report_id(report: &StateSyncConflictReport) -> RefineResult<String> {
-    use sha2::{Digest, Sha256};
-    let mut unsigned = report.clone();
-    unsigned.report_id.clear();
-    let bytes = serde_json::to_vec(&unsigned).map_err(|error| {
-        RefineError::Serialization(format!(
-            "failed to encode state-sync conflict report identity: {error}"
-        ))
-    })?;
-    Ok(format!("{:x}", Sha256::digest(bytes)))
-}
-
-pub(super) fn state_map_digest(state: &DurableStateMap) -> String {
+/// The report's identity is the divergence itself: same operands, same
+/// unresolved paths, same id — regardless of when or how often it is retried.
+pub(super) fn conflict_report_id(
+    merge_base: &str,
+    local_state_head: &str,
+    remote_state_head: &str,
+    unresolved: &[StateSyncConflictPath],
+) -> String {
     use sha2::{Digest, Sha256};
     let mut digest = Sha256::new();
-    for (path, fingerprint) in state {
-        digest.update(path.to_string_lossy().replace('\\', "/").as_bytes());
+    for operand in [merge_base, local_state_head, remote_state_head] {
+        digest.update(operand.as_bytes());
         digest.update([0]);
-        digest.update(fingerprint.to_be_bytes());
+    }
+    for conflict in unresolved {
+        digest.update(conflict.path.as_bytes());
         digest.update([0xff]);
     }
     format!("{:x}", digest.finalize())
 }
 
-fn state_tree_digest_for_report(
-    root: &std::path::Path,
-    state: &DurableStateMap,
-) -> RefineResult<String> {
-    use sha2::{Digest, Sha256};
-    let mut digest = Sha256::new();
-    for path in state.keys() {
-        digest.update(path.to_string_lossy().replace('\\', "/").as_bytes());
-        digest.update([0]);
-        let bytes = fs::read(root.join(path)).map_err(|error| {
-            RefineError::Io(format!(
-                "failed to hash state-sync conflict snapshot {}: {error}",
-                root.join(path).display()
-            ))
-        })?;
-        digest.update(Sha256::digest(bytes));
-        digest.update([0xff]);
+/// A one-line domain summary of one contested path: the record's identity and
+/// the top-level members each side changed since the shared base.
+pub(super) fn conflict_path_summary(
+    relative: &std::path::Path,
+    base: Option<&[u8]>,
+    local: Option<&[u8]>,
+    remote: Option<&[u8]>,
+) -> String {
+    let subject = if is_goal_record(relative) {
+        let goal_id = [local, remote, base]
+            .into_iter()
+            .flatten()
+            .find_map(|bytes| {
+                serde_json::from_slice::<serde_json::Value>(bytes)
+                    .ok()?
+                    .get("id")?
+                    .as_str()
+                    .map(str::to_string)
+            });
+        match goal_id {
+            Some(id) => format!("goal {id}"),
+            None => format!("goal record {}", relative.display()),
+        }
+    } else {
+        relative.display().to_string()
+    };
+    match (base, local, remote) {
+        (_, None, Some(_)) => format!("{subject}: deleted on this node, changed on another"),
+        (_, Some(_), None) => format!("{subject}: changed on this node, deleted on another"),
+        (Some(base), Some(local), Some(remote)) => {
+            let local_members = changed_members(base, local);
+            let remote_members = changed_members(base, remote);
+            match (local_members, remote_members) {
+                (Some(local_members), Some(remote_members)) => {
+                    let contested = local_members
+                        .intersection(&remote_members)
+                        .cloned()
+                        .collect::<Vec<_>>();
+                    if contested.is_empty() {
+                        format!(
+                            "{subject}: this node changed [{}], another changed [{}]",
+                            local_members.into_iter().collect::<Vec<_>>().join(", "),
+                            remote_members.into_iter().collect::<Vec<_>>().join(", ")
+                        )
+                    } else {
+                        format!("{subject}: both nodes changed {}", contested.join(", "))
+                    }
+                }
+                _ => format!("{subject}: changed on both nodes"),
+            }
+        }
+        _ => format!("{subject}: added independently on both nodes"),
     }
-    Ok(format!("{:x}", digest.finalize()))
+}
+
+fn changed_members(base: &[u8], side: &[u8]) -> Option<BTreeSet<String>> {
+    let base = serde_json::from_slice::<serde_json::Value>(base).ok()?;
+    let side = serde_json::from_slice::<serde_json::Value>(side).ok()?;
+    let base = base.as_object()?;
+    let side = side.as_object()?;
+    Some(
+        base.keys()
+            .chain(side.keys())
+            .filter(|key| base.get(*key) != side.get(*key))
+            .cloned()
+            .collect(),
+    )
 }
 
 fn conflict_report_path(runtime_root: &std::path::Path) -> PathBuf {

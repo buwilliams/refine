@@ -50,7 +50,7 @@ fn daemon_sync_operation_following_returns_terminal_results_and_structured_error
 }
 
 #[test]
-fn project_sync_rebuilds_projection_from_cli_surface() {
+fn sync_rebuilds_projection_from_cli_surface() {
     let temp_root = unique_temp_dir("cli-project-sync");
     let target_root = temp_root.clone();
     let refine_dir = target_root.join(".refine");
@@ -72,7 +72,6 @@ fn project_sync_rebuilds_projection_from_cli_surface() {
 
     let cli = Cli::try_parse_from([
         "refine",
-        "project",
         "sync",
         "--target-root",
         target_root.to_str().unwrap(),

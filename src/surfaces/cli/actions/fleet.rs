@@ -141,6 +141,7 @@ pub enum FleetAction {
         target_root: Option<PathBuf>,
     },
     /// Publish and pull this node's Refine control state now.
+    /// Pure orchestration of the same pipeline as `refine sync`.
     Sync {
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]

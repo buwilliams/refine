@@ -351,7 +351,7 @@ fn wait_for_project_sync_operation(
     assert_eq!(response.status, 202, "{:#}", response.body);
     let operation_id = response.body["operation"]["id"]
         .as_str()
-        .expect("project sync response should include an operation id");
+        .expect("queued sync response should include an operation id");
     wait_for_operation_status(
         &FileOperationRegistry::new(runtime_root),
         operation_id,

@@ -190,7 +190,7 @@ schema-number edit to bypass semantic review.
    Refine surface and correct unsupported or renamed values explicitly. Leave
    concurrency caps absent unless the recorded migration evidence proves they
    were intentional.
-5. Run `refine project doctor`, then `refine project sync`. Sync initializes or
+5. Run `refine project doctor`, then `refine sync`. Sync initializes or
    reconciles `STATE_WORKTREE` and `refine/state` without checking out or moving
    the application branch. If the configured remote is absent, verify the local
    state commit and configure the remote before expecting publication.
@@ -222,7 +222,7 @@ schema-number edit to bypass semantic review.
   operator cap was preserved.
 - A second v4 node synchronizes the same durable records. Node-local Goal logs
   are not expected to appear on that node through `refine/state`.
-- A no-op `refine project sync` creates no additional commit or push.
+- A no-op `refine sync` creates no additional commit or push.
 
 Write a migration report containing the installed Refine version, derived Git
 and runtime roots, backup location and checksum manifest, before/after counts,

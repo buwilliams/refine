@@ -37,7 +37,9 @@ function browserRuntime() {
       setRecoveryRoute: (route) => { state.currentRoute = route; },
       renderRecovery: (dashboard) => renderDashboardStateRecovery(dashboard),
       selectRecoveryAuthority: (authority) => dashboardRecoverySelectAuthority(authority),
-      confirmRecovery: (confirmed, evidenceId) => dashboardRecoverySetConfirmed(confirmed, evidenceId),
+      confirmRecovery: (confirmed, fingerprint) => dashboardRecoverySetConfirmed(confirmed, fingerprint),
+      recoveryFingerprint: () => dashboardRecoveryFingerprint(dashboardStateRecovery.preview),
+      previewFingerprint: (preview) => dashboardRecoveryFingerprint(preview),
       recoveryReady: () => dashboardRecoveryApplyReady(),
       recoveryPayload: () => dashboardRecoveryApplyPayload(),
       handleRecoveryConflict: (error) => dashboardRecoveryHandleConflict(error),
@@ -45,7 +47,7 @@ function browserRuntime() {
         phase: dashboardStateRecovery.phase,
         preview: dashboardStateRecovery.preview,
         authority: dashboardStateRecovery.authority,
-        confirmedEvidenceId: dashboardStateRecovery.confirmedEvidenceId,
+        confirmedFingerprint: dashboardStateRecovery.confirmedFingerprint,
         previewRefreshRequired: dashboardStateRecovery.previewRefreshRequired,
       }),
       setDashboardApi: (implementation) => { dashboardApi = implementation; },
@@ -141,7 +143,7 @@ function recoveryDashboard() {
     active_node_id: "default",
     state_sync_health: {
       status: "failed",
-      recovery_kind: "missing_baseline",
+      last_conflict_report_id: "report-123",
       target_root: "/target",
       node_id: "default",
       failure_since: "failure-1",
@@ -152,32 +154,41 @@ function recoveryDashboard() {
 
 function recoveryPreview() {
   return {
-    version: 1,
-    evidence_id: "evidence-123",
-    target_identity: "/target",
-    repository_identity: "sha256:repository",
+    version: 2,
     configured_remote: "origin",
     local_state_head: "local-head",
     remote_state_head: "remote-head",
-    baseline_status: "missing",
-    live_snapshot: "live-snapshot",
-    remote_snapshot: "remote-snapshot",
-    path_counts: { live_only: 2, remote_only: 3, differing: 4, equal: 5 },
-    conflicting_paths: ["goals/LIVE/goal.json", "goals/REMOTE/goal.json"],
-    conflicting_paths_truncated: 7,
+    merge_base: "base-head",
+    ancestry: "diverged",
+    live_pending_paths: ["goals/PENDING/goal.json"],
+    local_paths: ["goals/LOCAL/goal.json"],
+    remote_paths: ["goals/REMOTE/goal.json"],
+    resolvable_paths: ["nodes.json"],
+    conflicts: [
+      { path: "goals/SHARED/goal.json", summary: "goal SHARED: both nodes changed status" },
+    ],
+    detail: "Diverged from base-head.",
   };
 }
 
 function recoveryResult() {
   return {
-    authority: "remote",
-    baseline_created: true,
-    remote_state_head: "published-head",
-    local_state_head: "local-after",
-    recovery_location: "refs/refine/state-recovery/evidence-123/remote",
-    manifest_path: "/git/refine-state-recoveries/evidence-123-remote.json",
-    path_counts: recoveryPreview().path_counts,
+    ok: true,
+    attempts: 1,
+    recovered: true,
+    recovery: {
+      ok: true,
+      authority: "remote",
+      overrides: [],
+      local_state_head: "local-after",
+      remote_state_head: "published-head",
+      settled_paths: ["goals/SHARED/goal.json"],
+      retained_refs: ["refs/refine/retained/live-abcdef123456"],
+      detail: "Remote authority recovery completed.",
+    },
+    sync: { ok: true },
     detail: "Remote authority recovery completed.",
+    health_settled: true,
     state_sync_health: {
       status: "healthy",
       target_root: "/target",
@@ -187,7 +198,7 @@ function recoveryResult() {
   };
 }
 
-test("recovery preview renders complete evidence with neutral unselected authority", () => {
+test("recovery preview renders divergence evidence with neutral unselected authority", () => {
   const runtime = browserRuntime();
   runtime.resetRecovery();
   runtime.setRecoveryPreview(recoveryPreview());
@@ -195,11 +206,10 @@ test("recovery preview renders complete evidence with neutral unselected authori
   const html = runtime.renderRecovery(recoveryDashboard());
 
   for (const value of [
-    "/target", "sha256:repository", "origin", "local-head", "remote-head",
-    "live-snapshot", "remote-snapshot", "evidence-123", "goals/LIVE/goal.json",
+    "origin", "diverged", "local-head", "remote-head", "base-head",
+    "goals/SHARED/goal.json", "both nodes changed status",
   ]) assert.match(html, new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  assert.match(html, /Live only[\s\S]*Remote only[\s\S]*Differing[\s\S]*Equal/);
-  assert.match(html, /7 more/);
+  assert.match(html, /Live pending[\s\S]*Local only[\s\S]*Remote only[\s\S]*Resolvable[\s\S]*Contested/);
   assert.doesNotMatch(html, /value="(?:live|remote)" checked/);
   assert.match(html, /data-recovery-apply disabled/);
 });
@@ -211,23 +221,23 @@ test("authority and exact-preview confirmation are separate and invalidated safe
 
   runtime.selectRecoveryAuthority("live");
   assert.equal(runtime.recoveryReady(), false);
-  runtime.confirmRecovery(true, "different-evidence");
+  runtime.confirmRecovery(true, "different-divergence");
   assert.equal(runtime.recoveryReady(), false);
-  runtime.confirmRecovery(true, "evidence-123");
+  runtime.confirmRecovery(true, runtime.recoveryFingerprint());
   assert.equal(runtime.recoveryReady(), true);
   assert.deepEqual(
     JSON.parse(JSON.stringify(runtime.recoveryPayload())),
-    { authority: "live", preview: recoveryPreview() },
+    { authority: "live", paths: [] },
   );
 
   runtime.selectRecoveryAuthority("remote");
   assert.equal(runtime.recoveryReady(), false);
 
-  runtime.confirmRecovery(true, "evidence-123");
+  runtime.confirmRecovery(true, runtime.recoveryFingerprint());
   runtime.clearRecoveryForRoute();
   assert.equal(runtime.recoveryState().preview, null);
   assert.equal(runtime.recoveryState().authority, "");
-  assert.equal(runtime.recoveryState().confirmedEvidenceId, "");
+  assert.equal(runtime.recoveryState().confirmedFingerprint, "");
 });
 
 test("busy retains preview while stale rejection requires a fresh review", () => {
@@ -235,15 +245,15 @@ test("busy retains preview while stale rejection requires a fresh review", () =>
   runtime.resetRecovery();
   runtime.setRecoveryPreview(recoveryPreview());
   runtime.selectRecoveryAuthority("live");
-  runtime.confirmRecovery(true, "evidence-123");
+  runtime.confirmRecovery(true, runtime.recoveryFingerprint());
 
   runtime.handleRecoveryConflict({
     message: "Git busy",
     error: { reason: "git_busy" },
   });
   assert.equal(runtime.recoveryState().phase, "git_busy");
-  assert.equal(runtime.recoveryState().preview.evidence_id, "evidence-123");
-  assert.equal(runtime.recoveryState().confirmedEvidenceId, "");
+  assert.equal(runtime.recoveryState().preview.merge_base, "base-head");
+  assert.equal(runtime.recoveryState().confirmedFingerprint, "");
 
   runtime.handleRecoveryConflict({
     message: "Preview stale",
@@ -255,7 +265,7 @@ test("busy retains preview while stale rejection requires a fresh review", () =>
   assert.equal(runtime.recoveryState().previewRefreshRequired, true);
 });
 
-test("recovery preview is fetched only for typed eligible health", async () => {
+test("recovery preview is fetched only for conflict-shaped failed health", async () => {
   const runtime = browserRuntime();
   runtime.resetRecovery();
   let requests = 0;
@@ -272,7 +282,7 @@ test("recovery preview is fetched only for typed eligible health", async () => {
 
   await runtime.reconcileRecovery(recoveryDashboard());
   assert.equal(requests, 1);
-  assert.equal(runtime.recoveryState().preview.evidence_id, "evidence-123");
+  assert.equal(runtime.recoveryState().preview.merge_base, "base-head");
 });
 
 test("successful recovery retains evidence and renders authoritative health clearing", () => {
@@ -288,9 +298,8 @@ test("successful recovery retains evidence and renders authoritative health clea
 
   assert.match(html, /State-sync error cleared:<\/strong> Yes/);
   for (const value of [
-    "published-head", "local-after", "refs/refine/state-recovery/evidence-123/remote",
-    "/git/refine-state-recoveries/evidence-123-remote.json", "evidence-123",
-    "Remote authority recovery completed.",
+    "published-head", "local-after", "refs/refine/retained/live-abcdef123456",
+    "goals/SHARED/goal.json", "Remote authority recovery completed.",
   ]) assert.match(html, new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
 });
 
@@ -301,7 +310,7 @@ test("successful apply paints retained evidence before the health refetch settle
   runtime.setRecoveryContext(dashboard);
   runtime.setRecoveryPreview(recoveryPreview());
   runtime.selectRecoveryAuthority("remote");
-  runtime.confirmRecovery(true, "evidence-123");
+  runtime.confirmRecovery(true, runtime.recoveryFingerprint());
   runtime.setDashboardApi(async () => recoveryResult());
   const phases = [];
   runtime.setRecoveryUiHooks(
@@ -316,18 +325,18 @@ test("successful apply paints retained evidence before the health refetch settle
   assert.match(runtime.renderRecovery(dashboard), /State-sync error cleared:<\/strong> Yes/);
 });
 
-test("a newer missing-baseline episode replaces retained success with fresh neutral evidence", async () => {
+test("a newer conflict episode replaces retained success with fresh neutral evidence", async () => {
   const runtime = browserRuntime();
   const dashboard = recoveryDashboard();
   runtime.setRecoveryContext(dashboard);
   runtime.setRecoveryPreview(recoveryPreview());
   runtime.selectRecoveryAuthority("remote");
-  runtime.confirmRecovery(true, "evidence-123");
+  runtime.confirmRecovery(true, runtime.recoveryFingerprint());
   let previewRequests = 0;
   runtime.setDashboardApi(async (method) => {
     if (method === "POST") return recoveryResult();
     previewRequests++;
-    return { ...recoveryPreview(), evidence_id: "evidence-456" };
+    return { ...recoveryPreview(), merge_base: "base-head-2" };
   });
   runtime.setRecoveryUiHooks(() => {}, async () => {});
 
@@ -349,7 +358,7 @@ test("a newer missing-baseline episode replaces retained success with fresh neut
 
   assert.equal(previewRequests, 1);
   assert.equal(runtime.recoveryState().phase, "ready");
-  assert.equal(runtime.recoveryState().preview.evidence_id, "evidence-456");
+  assert.equal(runtime.recoveryState().preview.merge_base, "base-head-2");
   assert.equal(runtime.recoveryState().authority, "");
   assert.equal(runtime.recoveryReady(), false);
 });
@@ -359,7 +368,7 @@ test("late apply completion cannot restore recovery state after route context ch
   runtime.setRecoveryContext(recoveryDashboard());
   runtime.setRecoveryPreview(recoveryPreview());
   runtime.selectRecoveryAuthority("live");
-  runtime.confirmRecovery(true, "evidence-123");
+  runtime.confirmRecovery(true, runtime.recoveryFingerprint());
   let resolveApply;
   runtime.setDashboardApi(() => new Promise((resolve) => { resolveApply = resolve; }));
   runtime.setRecoveryUiHooks(() => {}, async () => {});

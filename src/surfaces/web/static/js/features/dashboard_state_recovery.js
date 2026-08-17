@@ -1,5 +1,3 @@
-const DASHBOARD_MISSING_BASELINE_RECOVERY = "missing_baseline";
-
 let dashboardStateRecovery = newDashboardStateRecovery("");
 
 function newDashboardStateRecovery(contextKey) {
@@ -8,8 +6,7 @@ function newDashboardStateRecovery(contextKey) {
     phase: "idle",
     preview: null,
     authority: "",
-    confirmedEvidenceId: "",
-    reviewedEvidenceId: "",
+    confirmedFingerprint: "",
     previewRefreshRequired: false,
     completedFailureSince: "",
     completedHealthRevision: -1,
@@ -31,9 +28,26 @@ function dashboardRecoveryContextKey(d) {
   ].join("\u0000");
 }
 
+// A conflict-shaped failure is a decision waiting for an operator: sync failed
+// closed with a stable report id. Other failures (network, lock) have nothing
+// an authority decision could settle.
 function dashboardRecoveryEligible(d) {
   return d?.state_sync_health?.status === "failed"
-    && d.state_sync_health.recovery_kind === DASHBOARD_MISSING_BASELINE_RECOVERY;
+    && !!d.state_sync_health.last_conflict_report_id;
+}
+
+// The preview is never an apply token; this local fingerprint only invalidates
+// the operator's confirmation checkbox when a refreshed preview shows a
+// different divergence.
+function dashboardRecoveryFingerprint(preview) {
+  if (!preview) return "";
+  return [
+    preview.local_state_head || "",
+    preview.remote_state_head || "",
+    preview.merge_base || "",
+    preview.ancestry || "",
+    ...(preview.conflicts || []).map((conflict) => conflict.path),
+  ].join("\u0000");
 }
 
 function dashboardRecoveryHealthRevision(health) {
@@ -52,13 +66,13 @@ function dashboardRecoverySuccessSuperseded(d) {
 }
 
 function dashboardRecoverySetPreview(preview) {
-  const previousEvidence = dashboardStateRecovery.preview?.evidence_id || "";
-  if (previousEvidence && previousEvidence !== preview.evidence_id) {
+  const previousFingerprint = dashboardRecoveryFingerprint(dashboardStateRecovery.preview);
+  const fingerprint = dashboardRecoveryFingerprint(preview);
+  if (previousFingerprint && previousFingerprint !== fingerprint) {
     dashboardStateRecovery.authority = "";
-    dashboardStateRecovery.confirmedEvidenceId = "";
+    dashboardStateRecovery.confirmedFingerprint = "";
   }
   dashboardStateRecovery.preview = preview;
-  dashboardStateRecovery.reviewedEvidenceId = preview.evidence_id;
   dashboardStateRecovery.previewRefreshRequired = false;
   dashboardStateRecovery.phase = "ready";
   dashboardStateRecovery.error = "";
@@ -83,7 +97,7 @@ async function reconcileDashboardStateRecovery(d) {
   try {
     const preview = await dashboardApi(
       "GET",
-      "/api/project/state-recovery/preview",
+      "/api/sync/preview",
       undefined,
       { recordError: false },
     );
@@ -100,36 +114,32 @@ function dashboardRecoveryApplyReady() {
   const preview = dashboardStateRecovery.preview;
   return !!preview
     && !!dashboardStateRecovery.authority
-    && dashboardStateRecovery.confirmedEvidenceId === preview.evidence_id
+    && dashboardStateRecovery.confirmedFingerprint === dashboardRecoveryFingerprint(preview)
     && ["ready", "git_busy", "apply_error"].includes(dashboardStateRecovery.phase);
 }
 
 function dashboardRecoveryApplyPayload() {
-  return {
-    authority: dashboardStateRecovery.authority,
-    preview: dashboardStateRecovery.preview,
-  };
+  return { authority: dashboardStateRecovery.authority, paths: [] };
 }
 
 function dashboardRecoverySelectAuthority(authority) {
   if (!dashboardStateRecovery.preview || !["live", "remote"].includes(authority)) return;
   dashboardStateRecovery.authority = authority;
-  dashboardStateRecovery.confirmedEvidenceId = "";
+  dashboardStateRecovery.confirmedFingerprint = "";
   if (["git_busy", "apply_error"].includes(dashboardStateRecovery.phase)) {
     dashboardStateRecovery.phase = "ready";
   }
 }
 
-function dashboardRecoverySetConfirmed(confirmed, evidenceId) {
-  const currentEvidence = dashboardStateRecovery.preview?.evidence_id || "";
-  dashboardStateRecovery.confirmedEvidenceId = confirmed && evidenceId === currentEvidence
-    ? currentEvidence
-    : "";
+function dashboardRecoverySetConfirmed(confirmed, fingerprint) {
+  const currentFingerprint = dashboardRecoveryFingerprint(dashboardStateRecovery.preview);
+  dashboardStateRecovery.confirmedFingerprint =
+    confirmed && fingerprint === currentFingerprint ? currentFingerprint : "";
 }
 
 function dashboardRecoveryHandleConflict(error) {
   const reason = error?.error?.reason || "";
-  dashboardStateRecovery.confirmedEvidenceId = "";
+  dashboardStateRecovery.confirmedFingerprint = "";
   dashboardStateRecovery.error = error?.message || "Recovery was rejected.";
   if (reason === "git_busy") {
     dashboardStateRecovery.phase = "git_busy";
@@ -150,18 +160,20 @@ function dashboardRecoveryField(label, value) {
   return `<div><dt>${htmlEscape(label)}</dt><dd>${htmlEscape(value)}</dd></div>`;
 }
 
-function renderDashboardRecoveryCounts(counts = {}) {
+function renderDashboardRecoveryCounts(preview = {}) {
   return `
     <div class="dashboard-recovery-counts" data-testid="state-recovery-counts">
-      ${[["Live only", counts.live_only], ["Remote only", counts.remote_only],
-         ["Differing", counts.differing], ["Equal", counts.equal]].map(([label, value]) => `
+      ${[["Live pending", (preview.live_pending_paths || []).length],
+         ["Local only", (preview.local_paths || []).length],
+         ["Remote only", (preview.remote_paths || []).length],
+         ["Resolvable", (preview.resolvable_paths || []).length],
+         ["Contested", (preview.conflicts || []).length]].map(([label, value]) => `
         <div><strong>${htmlEscape(value ?? 0)}</strong><span>${label}</span></div>`).join("")}
     </div>`;
 }
 
 function renderDashboardRecoverySuccess(d) {
   const result = dashboardStateRecovery.result;
-  const preview = dashboardStateRecovery.preview;
   if (!result) return "";
   const dashboardHealth = d?.state_sync_health || {};
   const resultHealth = result.state_sync_health || {};
@@ -170,22 +182,20 @@ function renderDashboardRecoverySuccess(d) {
   const currentHealth = resultHealth.status && resultRevision >= dashboardRevision
     ? resultHealth
     : dashboardHealth;
-  const healthCleared = !!currentHealth.status && currentHealth.status !== "failed"
-    && currentHealth.recovery_kind !== DASHBOARD_MISSING_BASELINE_RECOVERY;
+  const healthCleared = !!currentHealth.status && currentHealth.status !== "failed";
+  const recovery = result.recovery || {};
   return `
     <section class="dashboard-state-recovery success" data-testid="state-recovery-success">
       <h3>State recovery completed</h3>
       <p class="metric-good"><strong>State-sync error cleared:</strong> ${healthCleared ? "Yes" : "Awaiting authoritative health refresh"}</p>
       <dl class="dashboard-recovery-evidence">
-        ${dashboardRecoveryField("Authority", result.authority)}
-        ${dashboardRecoveryField("Baseline created", result.baseline_created ? "yes" : "no")}
-        ${dashboardRecoveryField("Published remote head", result.remote_state_head)}
-        ${dashboardRecoveryField("Local state head", result.local_state_head)}
-        ${dashboardRecoveryField("Recovery audit ref", result.recovery_location)}
-        ${dashboardRecoveryField("Recovery manifest", result.manifest_path)}
-        ${dashboardRecoveryField("Evidence identity", preview?.evidence_id || dashboardStateRecovery.reviewedEvidenceId)}
+        ${dashboardRecoveryField("Authority", recovery.authority)}
+        ${dashboardRecoveryField("Attempts", result.attempts)}
+        ${dashboardRecoveryField("Published remote head", recovery.remote_state_head)}
+        ${dashboardRecoveryField("Local state head", recovery.local_state_head)}
+        ${dashboardRecoveryField("Settled paths", (recovery.settled_paths || []).join(", "))}
+        ${dashboardRecoveryField("Retained refs", (recovery.retained_refs || []).join(", "))}
       </dl>
-      ${renderDashboardRecoveryCounts(result.path_counts)}
       <p class="small">${htmlEscape(result.detail || "Recovery completed.")}</p>
     </section>`;
 }
@@ -196,36 +206,37 @@ function renderDashboardStateRecovery(d) {
   }
   if (!dashboardRecoveryEligible(d)) return "";
   if (dashboardStateRecovery.phase === "loading" || dashboardStateRecovery.phase === "idle") {
-    return `<section class="dashboard-state-recovery" data-testid="state-recovery-loading"><p class="muted">Loading read-only recovery preview…</p></section>`;
+    return `<section class="dashboard-state-recovery" data-testid="state-recovery-loading"><p class="muted">Loading read-only divergence preview…</p></section>`;
   }
   if (dashboardStateRecovery.phase === "stale") {
     return `
       <section class="dashboard-state-recovery degraded" data-testid="state-recovery-stale">
-        <h3>Recovery preview is stale</h3>
+        <h3>Divergence preview is stale</h3>
         <p>${htmlEscape(dashboardStateRecovery.error)}</p>
-        <p class="muted small">Refresh the preview, review the changed evidence, choose authority again, and reconfirm before applying.</p>
+        <p class="muted small">Refresh the preview, review the changed divergence, choose authority again, and reconfirm before applying.</p>
         <button type="button" data-recovery-refresh>Refresh preview</button>
       </section>`;
   }
   if (!dashboardStateRecovery.preview) {
     return `
       <section class="dashboard-state-recovery degraded" data-testid="state-recovery-preview-error">
-        <h3>Recovery preview unavailable</h3>
+        <h3>Divergence preview unavailable</h3>
         <p>${htmlEscape(dashboardStateRecovery.error || "The preview could not be loaded.")}</p>
         <button type="button" data-recovery-refresh>Retry preview</button>
       </section>`;
   }
 
   const preview = dashboardStateRecovery.preview;
+  const fingerprint = dashboardRecoveryFingerprint(preview);
   const selected = dashboardStateRecovery.authority;
-  const confirmed = dashboardStateRecovery.confirmedEvidenceId === preview.evidence_id;
-  const conflicts = preview.conflicting_paths || [];
+  const confirmed = dashboardStateRecovery.confirmedFingerprint === fingerprint;
+  const conflicts = preview.conflicts || [];
   const retrying = dashboardStateRecovery.phase === "git_busy";
   return `
     <section class="dashboard-state-recovery ${retrying || dashboardStateRecovery.phase === "apply_error" ? "degraded" : ""}"
-             data-testid="state-recovery-preview" data-recovery-evidence="${htmlEscape(preview.evidence_id)}">
-      <h3>Missing state-sync baseline recovery</h3>
-      <p>No authority has been inferred. Review both sides and deliberately choose which state is authoritative.</p>
+             data-testid="state-recovery-preview">
+      <h3>Refine state needs a decision</h3>
+      <p>Refine state changed on multiple nodes. Review both sides and deliberately choose which state is authoritative; everything uncontested has already converged deterministically.</p>
       ${retrying ? `
         <div class="dashboard-recovery-warning" data-testid="state-recovery-git-busy">
           <strong>Git is busy.</strong> ${htmlEscape(dashboardStateRecovery.error)}
@@ -234,36 +245,33 @@ function renderDashboardStateRecovery(d) {
       ${dashboardStateRecovery.phase === "apply_error" ? `
         <div class="dashboard-recovery-warning">${htmlEscape(dashboardStateRecovery.error)}</div>` : ""}
       <dl class="dashboard-recovery-evidence">
-        ${dashboardRecoveryField("Target", preview.target_identity)}
-        ${dashboardRecoveryField("Repository identity", preview.repository_identity)}
         ${dashboardRecoveryField("Configured remote", preview.configured_remote)}
+        ${dashboardRecoveryField("Classification", preview.ancestry)}
         ${dashboardRecoveryField("Local state head", preview.local_state_head || "not present")}
         ${dashboardRecoveryField("Remote state head", preview.remote_state_head)}
-        ${dashboardRecoveryField("Baseline", preview.baseline_status)}
-        ${dashboardRecoveryField("Live snapshot", preview.live_snapshot)}
-        ${dashboardRecoveryField("Remote snapshot", preview.remote_snapshot)}
-        ${dashboardRecoveryField("Evidence identity", preview.evidence_id)}
+        ${dashboardRecoveryField("Merge base", preview.merge_base)}
+        ${dashboardRecoveryField("Detail", preview.detail)}
       </dl>
-      ${renderDashboardRecoveryCounts(preview.path_counts)}
+      ${renderDashboardRecoveryCounts(preview)}
       <div class="dashboard-recovery-conflicts">
-        <strong>Conflicting paths (${conflicts.length} shown${preview.conflicting_paths_truncated ? `, ${htmlEscape(preview.conflicting_paths_truncated)} more` : ""})</strong>
+        <strong>Contested paths (${conflicts.length})</strong>
         ${conflicts.length
-          ? `<ul>${conflicts.map((path) => `<li><code>${htmlEscape(path)}</code></li>`).join("")}</ul>`
-          : `<p class="muted small">No unequal paths.</p>`}
+          ? `<ul>${conflicts.map((conflict) => `<li><code>${htmlEscape(conflict.path)}</code> — ${htmlEscape(conflict.summary || "")}</li>`).join("")}</ul>`
+          : `<p class="muted small">No contested paths.</p>`}
       </div>
       <fieldset class="dashboard-recovery-authority" data-testid="state-recovery-authority">
         <legend>Choose authority</legend>
         <label>
           <input type="radio" name="state-recovery-authority" value="live" ${selected === "live" ? "checked" : ""}>
-          <span><strong>Live authority</strong> publishes the reviewed live durable state. Remote-only paths are deleted.</span>
+          <span><strong>Live authority</strong> settles every contested path on this node's version and republishes it to the fleet.</span>
         </label>
         <label>
           <input type="radio" name="state-recovery-authority" value="remote" ${selected === "remote" ? "checked" : ""}>
-          <span><strong>Remote authority</strong> replaces live durable state with the reviewed remote snapshot. The pre-recovery live state is preserved at a recovery audit ref.</span>
+          <span><strong>Remote authority</strong> settles every contested path on the fleet's version. Displaced local state stays reachable as a merge parent or retained ref.</span>
         </label>
       </fieldset>
       <label class="dashboard-recovery-confirmation">
-        <input type="checkbox" data-recovery-confirm data-recovery-evidence="${htmlEscape(preview.evidence_id)}" ${confirmed ? "checked" : ""} ${selected ? "" : "disabled"}>
+        <input type="checkbox" data-recovery-confirm data-recovery-fingerprint="${htmlEscape(fingerprint)}" ${confirmed ? "checked" : ""} ${selected ? "" : "disabled"}>
         I reviewed this exact preview and confirm the selected authority.
       </label>
       <div class="actions">
@@ -285,7 +293,7 @@ function dashboardRecoveryApplyContextCurrent(context) {
     && dashboardScopeFromHash() === context.scope
     && isNodeContextGenerationCurrent(context.nodeGeneration)
     && dashboardStateRecovery.contextKey === context.contextKey
-    && dashboardStateRecovery.preview?.evidence_id === context.evidenceId;
+    && dashboardRecoveryFingerprint(dashboardStateRecovery.preview) === context.fingerprint;
 }
 
 async function refreshDashboardRecoveryPreview() {
@@ -299,7 +307,7 @@ async function applyDashboardStateRecovery() {
   const payload = dashboardRecoveryApplyPayload();
   const context = {
     contextKey: dashboardStateRecovery.contextKey,
-    evidenceId: dashboardStateRecovery.preview.evidence_id,
+    fingerprint: dashboardRecoveryFingerprint(dashboardStateRecovery.preview),
     failureSince: state.dashboard?.state_sync_health?.failure_since || "",
     healthRevision: dashboardRecoveryHealthRevision(state.dashboard?.state_sync_health),
     scope: dashboardScopeFromHash(),
@@ -309,11 +317,7 @@ async function applyDashboardStateRecovery() {
   redrawDashboardRecovery();
   let result;
   try {
-    result = await dashboardApi(
-      "POST",
-      "/api/project/state-recovery/apply",
-      payload,
-    );
+    result = await dashboardApi("POST", "/api/sync", payload);
   } catch (error) {
     if (!dashboardRecoveryApplyContextCurrent(context)) return;
     dashboardRecoveryHandleConflict(error);
@@ -322,7 +326,7 @@ async function applyDashboardStateRecovery() {
   }
   if (!dashboardRecoveryApplyContextCurrent(context)) return;
   dashboardStateRecovery.phase = "success";
-  dashboardStateRecovery.confirmedEvidenceId = "";
+  dashboardStateRecovery.confirmedFingerprint = "";
   dashboardStateRecovery.completedFailureSince = context.failureSince;
   dashboardStateRecovery.completedHealthRevision = Math.max(
     context.healthRevision,
@@ -349,7 +353,7 @@ function wireDashboardStateRecovery() {
   bindOnce(confirmation, "change", () => {
     dashboardRecoverySetConfirmed(
       confirmation.checked,
-      confirmation.dataset.recoveryEvidence || "",
+      confirmation.dataset.recoveryFingerprint || "",
     );
     redrawDashboardRecovery();
   });

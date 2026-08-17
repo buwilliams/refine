@@ -6,8 +6,8 @@ use uuid::Uuid;
 
 use crate::process::supervisor::errors::RefineError;
 use crate::prompts::{PromptEngine, PromptTemplate, render};
-use crate::tools::host::checkout::active_refine_paths;
 use crate::tools::git::with_repository_git_lock;
+use crate::tools::host::checkout::active_refine_paths;
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
 use crate::tools::product::work_items::FileWorkItemService;
 

@@ -148,7 +148,7 @@ fn ensure_target_repo(
         match pulled {
             Ok(output) => record(steps, "refresh_target_repo", true, output.trim()),
             // A failed refresh is not fatal: the checkout still exists and the
-            // daemon can sync later through /project/sync.
+            // daemon can sync later through /sync.
             Err(error) => record(
                 steps,
                 "refresh_target_repo",

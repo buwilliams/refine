@@ -85,3 +85,8 @@ mail-parser = "0.11"
 
 [patch.crates-io]
 portable-pty = { path = "vendor/portable-pty" }
+
+[[test]]
+name = "sync_regressions"
+path = "tests/sync_regressions.rs"
+test = false

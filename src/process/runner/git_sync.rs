@@ -163,8 +163,7 @@ pub(super) fn run_git_sync_worker(
                                 &target_root,
                                 &node_id,
                                 &service,
-                                &error,
-                                conflict_report.is_some(),
+                                conflict_report.as_ref(),
                             )? {
                                 AutoRecoveryOutcome::Recovered => {
                                     failure_backoff.reset();

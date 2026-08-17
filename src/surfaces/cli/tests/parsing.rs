@@ -93,107 +93,81 @@ fn project_worktree_cleanup_is_dry_run_by_default_and_requires_explicit_apply() 
 }
 
 #[test]
-fn project_state_recovery_requires_a_preview_file_and_explicit_authority() {
-    let preview = Cli::try_parse_from(["refine", "project", "state-recovery", "preview"]).unwrap();
+fn sync_is_the_only_state_convergence_command() {
+    let plain = Cli::try_parse_from(["refine", "sync"]).unwrap();
+    assert!(matches!(
+        plain.command,
+        Commands::Sync {
+            preview: false,
+            authority: None,
+            target_root: None,
+            ..
+        }
+    ));
+
+    let preview = Cli::try_parse_from(["refine", "sync", "--preview"]).unwrap();
     assert!(matches!(
         preview.command,
-        Commands::Project {
-            action: ProjectAction::StateRecovery {
-                action: ProjectStateRecoveryAction::Preview { target_root: None }
-            }
-        }
+        Commands::Sync { preview: true, .. }
     ));
 
-    let apply = Cli::try_parse_from([
+    let terminal = Cli::try_parse_from([
         "refine",
-        "project",
-        "state-recovery",
-        "apply",
-        "--authority",
-        "remote",
-        "--preview-file",
-        "/tmp/preview.json",
-    ])
-    .unwrap();
-    assert!(matches!(
-        apply.command,
-        Commands::Project {
-            action: ProjectAction::StateRecovery {
-                action: ProjectStateRecoveryAction::Apply {
-                    authority: CliStateRecoveryAuthority::Remote,
-                    preview_file,
-                    target_root: None,
-                    ..
-                }
-            }
-        } if preview_file.as_path() == std::path::Path::new("/tmp/preview.json")
-    ));
-    assert!(
-        Cli::try_parse_from([
-            "refine",
-            "project",
-            "state-recovery",
-            "apply",
-            "--preview-file",
-            "/tmp/preview.json",
-        ])
-        .is_err()
-    );
-}
-
-#[test]
-fn project_state_recovery_run_defaults_to_the_ownership_policy() {
-    let run = Cli::try_parse_from(["refine", "project", "state-recovery", "run"]).unwrap();
-    assert!(matches!(
-        run.command,
-        Commands::Project {
-            action: ProjectAction::StateRecovery {
-                action: ProjectStateRecoveryAction::Run {
-                    authority: None,
-                    target_root: None,
-                    ..
-                }
-            }
-        }
-    ));
-
-    let overridden = Cli::try_parse_from([
-        "refine",
-        "project",
-        "state-recovery",
-        "run",
+        "sync",
         "--authority",
         "live",
-        "--remote-path",
+        "--path",
         "shared/state.json",
     ])
     .unwrap();
     assert!(matches!(
-        overridden.command,
-        Commands::Project {
-            action: ProjectAction::StateRecovery {
-                action: ProjectStateRecoveryAction::Run {
-                    authority: Some(CliStateRecoveryAuthority::Live),
-                    remote_paths,
-                    ..
-                }
-            }
-        } if remote_paths == vec![std::path::PathBuf::from("shared/state.json")]
+        terminal.command,
+        Commands::Sync {
+            preview: false,
+            authority: Some(CliSyncAuthority::Live),
+            ref paths,
+            ..
+        } if *paths == vec![std::path::PathBuf::from("shared/state.json")]
     ));
 
-    // Path overrides only refine an explicit uniform decision; the ownership
-    // policy computes its own per-path authority.
+    // Path exceptions only refine an explicit authority, and the preview is
+    // read-only: it never carries a decision.
     assert!(
-        Cli::try_parse_from([
+        Cli::try_parse_from(["refine", "sync", "--path", "goals/00/EXAMPLE/goal.json"]).is_err()
+    );
+    assert!(Cli::try_parse_from(["refine", "sync", "--preview", "--authority", "live"]).is_err());
+}
+
+#[test]
+fn retired_project_sync_and_state_recovery_commands_do_not_parse() {
+    for argv in [
+        vec!["refine", "project", "sync"],
+        vec!["refine", "project", "state-recovery", "preview"],
+        vec!["refine", "project", "state-recovery", "run"],
+        vec![
             "refine",
             "project",
             "state-recovery",
             "run",
-            "--live-path",
-            "goals/00/EXAMPLE/goal.json",
-        ])
-        .is_err()
-    );
+            "--authority",
+            "remote",
+        ],
+        vec![
+            "refine",
+            "project",
+            "state-recovery",
+            "apply",
+            "--authority",
+            "remote",
+            "--preview-file",
+            "/tmp/preview.json",
+        ],
+    ] {
+        assert!(
+            Cli::try_parse_from(&argv).is_err(),
+            "retired sync surface remained parseable: {argv:?}"
+        );
+    }
 }
 
 #[test]

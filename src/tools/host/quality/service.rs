@@ -22,8 +22,8 @@ use crate::process::supervisor::operations::{
 use crate::process::supervisor::security::{FileSecurityService, SecurityService};
 use crate::prompts::{PromptEngine, PromptTemplate, render};
 use crate::structured_output::Contract;
-use crate::tools::host::agent_providers::{HostAgentProviderService, ProviderInvocation};
 use crate::tools::git::with_repository_git_lock;
+use crate::tools::host::agent_providers::{HostAgentProviderService, ProviderInvocation};
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
 use crate::tools::observability::logs::FileLogService;
 use crate::tools::product::nodes::FileNodeRegistryService;

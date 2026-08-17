@@ -507,20 +507,12 @@ impl InProcessWebServer {
             return self.handle_project_detach();
         }
 
-        if request.method == "POST" && request.path == "/project/sync" {
-            return self.handle_project_sync();
+        if request.method == "POST" && request.path == "/sync" {
+            return self.handle_sync(request);
         }
 
-        if request.method == "GET" && request.path == "/project/state-recovery/preview" {
-            return self.handle_project_state_recovery_preview();
-        }
-
-        if request.method == "POST" && request.path == "/project/state-recovery/apply" {
-            return self.handle_project_state_recovery_apply(request);
-        }
-
-        if request.method == "POST" && request.path == "/project/state-recovery/run" {
-            return self.handle_project_state_recovery_run(request);
+        if request.method == "GET" && request.path == "/sync/preview" {
+            return self.handle_sync_preview();
         }
 
         if request.method == "POST" && request.path == "/project/worktrees/cleanup" {
@@ -1019,7 +1011,7 @@ fn should_refresh_projection_after_mutation(path: &str) -> bool {
     // tool actually mutates state, so the outer `/mcp` POST itself is exempt.
     !path.starts_with("/terminal/")
         && path != "/work/goals"
-        && path != "/project/sync"
+        && path != "/sync"
         && path != "/cache/rebuild"
         && !path.starts_with("/system/source/")
         && path != mcp::MCP_ROUTE

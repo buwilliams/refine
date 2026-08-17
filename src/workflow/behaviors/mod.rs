@@ -10,10 +10,10 @@ use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationRegistry, OperationState,
 };
 use crate::prompts::{PromptEngine, PromptTemplate};
+use crate::tools::git::with_repository_git_lock;
 use crate::tools::host::agent_providers::{
     AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
-use crate::tools::git::with_repository_git_lock;
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService, MergeResult};
 use crate::tools::host::quality::{
     QualityCheckResult, QualityOperationRunner, is_quality_harness_fault,

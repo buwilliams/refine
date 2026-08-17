@@ -387,9 +387,10 @@ fn refresh_repository_disk_usage_once() {
         Ok(state) => state
             .iter()
             .filter(|(_, entry)| {
-                entry.last_requested.is_some_and(|at| {
-                    now.duration_since(at) <= REPOSITORY_DISK_USAGE_DEMAND_WINDOW
-                }) && entry.next_measure_after.is_none_or(|after| now >= after)
+                entry
+                    .last_requested
+                    .is_some_and(|at| now.duration_since(at) <= REPOSITORY_DISK_USAGE_DEMAND_WINDOW)
+                    && entry.next_measure_after.is_none_or(|after| now >= after)
             })
             .map(|(path, _)| path.clone())
             .collect::<Vec<_>>(),

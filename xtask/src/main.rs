@@ -129,6 +129,8 @@ fn test_cargo_integrations() -> Result<(), String> {
                 "production_binary_install",
                 "--test",
                 "sync_simulation",
+                "--test",
+                "sync_regressions",
                 "--",
                 "--test-threads=1",
             ])

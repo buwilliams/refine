@@ -106,40 +106,6 @@ fn state_sync_health_emits_one_failure_episode_and_one_recovery_activity() {
 }
 
 #[test]
-fn state_sync_missing_baseline_failure_records_typed_recovery_eligibility() {
-    let temp_root = std::env::temp_dir().join(format!(
-        "refine-state-sync-recovery-kind-{}",
-        uuid::Uuid::new_v4()
-    ));
-    let target_root = temp_root.join("target");
-    let runtime_root = temp_root.join("run/8082");
-    std::fs::create_dir_all(target_root.join(".refine")).unwrap();
-    let error = RefineError::StateSyncMissingBaseline("baseline missing".to_string());
-    let source = "test";
-    let attempt_id =
-        record_state_sync_attempt(&runtime_root, &target_root, "default", source).unwrap();
-
-    record_state_sync_failure(
-        &runtime_root,
-        &target_root,
-        "default",
-        attempt_id,
-        source,
-        &error,
-    )
-    .unwrap();
-
-    let health = FileStateSyncHealthService::new(&runtime_root)
-        .inspect(&target_root, "default", Duration::from_secs(900))
-        .unwrap();
-    assert_eq!(
-        health.recovery_kind,
-        Some(crate::tools::host::state_sync_health::StateSyncRecoveryKind::MissingBaseline)
-    );
-    std::fs::remove_dir_all(temp_root).unwrap();
-}
-
-#[test]
 fn source_worker_inherits_debug_executable_without_installed_binary() {
     let checkout = SyntheticSourceProduct::new("source-worker-executable");
     let runtime_root = checkout.port_runtime_root(4557);
@@ -950,15 +916,30 @@ fn background_sync_conflict_auto_recovers_unless_the_node_opted_out() {
         std::fs::create_dir_all(destination.parent().unwrap()).unwrap();
         std::fs::write(destination, value).unwrap();
     };
-    // Establish a shared baseline, then diverge the same member on both nodes
-    // so semantic reconciliation must fail closed.
+    let write_goal = |root: &Path, name: &str| {
+        let destination = refine_dir_for_target_root(root)
+            .unwrap()
+            .join("goals/OWNED/goal.json");
+        std::fs::create_dir_all(destination.parent().unwrap()).unwrap();
+        std::fs::write(
+            destination,
+            format!(r#"{{"id":"OWNED","name":"{name}","node_id":"default"}}"#),
+        )
+        .unwrap();
+    };
+    // Establish a shared baseline, then diverge the same members on both
+    // nodes so structural reconciliation must fail closed. The goal record
+    // names this node as its owner at the merge base.
     write_shared(&a, "base\n");
+    write_goal(&a, "base");
     FileGitSyncService::new(&a, a.join("run")).sync().unwrap();
     let service = FileGitSyncService::new(&b, &runtime_root);
     service.sync().unwrap();
     write_shared(&a, "remote\n");
+    write_goal(&a, "remote-edit");
     FileGitSyncService::new(&a, a.join("run")).sync().unwrap();
     write_shared(&b, "live\n");
+    write_goal(&b, "live-edit");
 
     bind_state_sync_health(&runtime_root, &b, "default").unwrap();
     let refine_b = refine_dir_for_target_root(&b).unwrap();
@@ -978,21 +959,19 @@ fn background_sync_conflict_auto_recovers_unless_the_node_opted_out() {
     )
     .unwrap();
 
-    // A non-recoverable failure never triggers recovery regardless of the setting.
-    let outcome = attempt_automatic_state_recovery(
-        &runtime_root,
-        &b,
-        "default",
-        &service,
-        &RefineError::Io("network unreachable".to_string()),
-        false,
-    )
-    .unwrap();
+    let report = crate::tools::host::git_sync::latest_state_sync_conflict_report(&runtime_root)
+        .unwrap()
+        .expect("the contested sync records a conflict report");
+
+    // A failure without recorded conflict evidence never triggers recovery
+    // regardless of the setting.
+    let outcome =
+        attempt_automatic_state_recovery(&runtime_root, &b, "default", &service, None).unwrap();
     assert!(matches!(outcome, AutoRecoveryOutcome::NotAttempted));
 
     // The opted-out node keeps its fail-closed conflict.
     let outcome =
-        attempt_automatic_state_recovery(&runtime_root, &b, "default", &service, &error, true)
+        attempt_automatic_state_recovery(&runtime_root, &b, "default", &service, Some(&report))
             .unwrap();
     assert!(matches!(outcome, AutoRecoveryOutcome::NotAttempted));
     let health = FileStateSyncHealthService::new(&runtime_root)
@@ -1000,12 +979,14 @@ fn background_sync_conflict_auto_recovers_unless_the_node_opted_out() {
         .unwrap();
     assert!(health.failure_since.is_some(), "{health:#?}");
 
-    // With the default policy the same rejection converges on its own.
+    // With the default policy the same rejection converges on its own:
+    // remote authority for the shared record, a live override for the goal
+    // record whose merge-base bytes name this node.
     FileSettingsService::with_active_root(&refine_b, &runtime_root)
         .update(&json!({"state_sync_auto_recovery": "remote"}))
         .unwrap();
     let outcome =
-        attempt_automatic_state_recovery(&runtime_root, &b, "default", &service, &error, true)
+        attempt_automatic_state_recovery(&runtime_root, &b, "default", &service, Some(&report))
             .unwrap();
     assert!(matches!(outcome, AutoRecoveryOutcome::Recovered));
     let health = FileStateSyncHealthService::new(&runtime_root)
@@ -1019,6 +1000,13 @@ fn background_sync_conflict_auto_recovers_unless_the_node_opted_out() {
     assert_eq!(
         std::fs::read_to_string(refine_b.join("shared/state.json")).unwrap(),
         "remote\n"
+    );
+    let owned: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(refine_b.join("goals/OWNED/goal.json")).unwrap())
+            .unwrap();
+    assert_eq!(
+        owned["name"], "live-edit",
+        "merge-base ownership keeps this node's copy of its own goal"
     );
     let entries = FileActivityService::new(&refine_b).recent(10).unwrap();
     assert!(

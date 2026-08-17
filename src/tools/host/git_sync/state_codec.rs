@@ -4,7 +4,6 @@ use super::*;
 pub(super) struct StateWorktreeSetup {
     pub(super) path: PathBuf,
     pub(super) pulled: bool,
-    pub(super) local_ahead: bool,
     pub(super) created: bool,
 }
 
@@ -16,28 +15,19 @@ pub(super) fn state_content_fingerprint(bytes: &[u8]) -> u64 {
     hasher.finish()
 }
 
-pub(super) fn bootstrap_only_state(state: &DurableStateMap) -> bool {
-    state.keys().all(|path| {
-        matches!(
-            path.to_string_lossy().replace('\\', "/").as_str(),
-            "refine.json"
-                | "nodes.json"
-                | "logs/activity.jsonl"
-                | "quality/settings.json"
-                | "quality/legacy-command-transition.json"
-        )
-    })
+pub(super) fn is_bootstrap_state_path(path: &std::path::Path) -> bool {
+    matches!(
+        path.to_string_lossy().replace('\\', "/").as_str(),
+        "refine.json"
+            | "nodes.json"
+            | "logs/activity.jsonl"
+            | "quality/settings.json"
+            | "quality/legacy-command-transition.json"
+    )
 }
 
-pub(super) fn remote_first_bootstrap_baseline(
-    local: &DurableStateMap,
-    remote: &DurableStateMap,
-) -> DurableStateMap {
-    local
-        .iter()
-        .filter(|(path, _)| remote.contains_key(*path))
-        .map(|(path, fingerprint)| (path.clone(), *fingerprint))
-        .collect()
+pub(super) fn bootstrap_only_state(state: &DurableStateMap) -> bool {
+    state.keys().all(|path| is_bootstrap_state_path(path))
 }
 
 /// Identity of a file as it was when its contents were last hashed.
@@ -140,44 +130,6 @@ pub(super) fn durable_state_map(root: &std::path::Path) -> RefineResult<DurableS
     Ok(state)
 }
 
-pub(super) fn state_conflicts(
-    base: &DurableStateMap,
-    local: &DurableStateMap,
-    remote: &DurableStateMap,
-    resolved: &BTreeSet<PathBuf>,
-) -> Vec<String> {
-    state_conflict_paths(base, local, remote, resolved)
-        .into_iter()
-        .map(|path| path.to_string_lossy().replace('\\', "/"))
-        .collect()
-}
-
-pub(super) fn state_conflict_paths(
-    base: &DurableStateMap,
-    local: &DurableStateMap,
-    remote: &DurableStateMap,
-    resolved: &BTreeSet<PathBuf>,
-) -> Vec<PathBuf> {
-    let paths = base
-        .keys()
-        .chain(local.keys())
-        .chain(remote.keys())
-        .cloned()
-        .collect::<BTreeSet<_>>();
-    paths
-        .into_iter()
-        .filter(|path| {
-            if resolved.contains(path) {
-                return false;
-            }
-            let base_value = base.get(path);
-            let local_value = local.get(path);
-            let remote_value = remote.get(path);
-            local_value != base_value && remote_value != base_value && local_value != remote_value
-        })
-        .collect()
-}
-
 pub(super) fn state_change_status(
     before: &DurableStateMap,
     after: &DurableStateMap,
@@ -201,40 +153,6 @@ pub(super) fn state_change_status(
             ))
         })
         .collect()
-}
-
-pub(super) fn apply_local_state_delta(
-    live_root: &std::path::Path,
-    state_root: &std::path::Path,
-    base: &DurableStateMap,
-    local: &DurableStateMap,
-    resolved: &BTreeSet<PathBuf>,
-) -> RefineResult<()> {
-    let paths = base
-        .keys()
-        .chain(local.keys())
-        .cloned()
-        .collect::<BTreeSet<_>>();
-    for relative in paths {
-        if resolved.contains(&relative) {
-            continue;
-        }
-        if local.get(&relative) == base.get(&relative) {
-            continue;
-        }
-        let destination = state_root.join(&relative);
-        if local.contains_key(&relative) {
-            copy_state_file(&live_root.join(&relative), &destination)?;
-        } else if destination.exists() {
-            fs::remove_file(&destination).map_err(|error| {
-                RefineError::Io(format!(
-                    "failed to remove synchronized Refine state {}: {error}",
-                    destination.display()
-                ))
-            })?;
-        }
-    }
-    Ok(())
 }
 
 pub(super) fn replace_live_durable_state(
@@ -261,14 +179,6 @@ pub(super) fn replace_live_durable_state(
         )?;
     }
     Ok(())
-}
-
-pub(super) fn merge_state_into_live(
-    source_root: &std::path::Path,
-    live_root: &std::path::Path,
-    original_local: &DurableStateMap,
-) -> RefineResult<bool> {
-    hydrate_recovery_target_from_map(original_local, source_root, live_root)
 }
 
 /// Keep the scheduler's view current for Goals arriving from another Node.
@@ -360,42 +270,6 @@ pub(super) fn copy_state_file(
         let _ = fs::remove_file(&temp);
         RefineError::Io(format!(
             "failed to commit synchronized Refine state {}: {error}",
-            destination.display()
-        ))
-    })
-}
-
-pub(super) fn write_state_file_bytes(
-    destination: &std::path::Path,
-    bytes: &[u8],
-) -> RefineResult<()> {
-    if let Some(parent) = destination.parent() {
-        fs::create_dir_all(parent).map_err(|error| {
-            RefineError::Io(format!(
-                "failed to create Refine state directory {}: {error}",
-                parent.display()
-            ))
-        })?;
-    }
-    let parent = destination
-        .parent()
-        .unwrap_or_else(|| std::path::Path::new("."));
-    let temp = parent.join(format!(
-        ".refine-sync-{}-{}",
-        std::process::id(),
-        STATE_COPY_COUNTER.fetch_add(1, Ordering::Relaxed)
-    ));
-    if let Err(error) = fs::write(&temp, bytes) {
-        let _ = fs::remove_file(&temp);
-        return Err(RefineError::Io(format!(
-            "failed to write reconciled Refine state {}: {error}",
-            temp.display()
-        )));
-    }
-    fs::rename(&temp, destination).map_err(|error| {
-        let _ = fs::remove_file(&temp);
-        RefineError::Io(format!(
-            "failed to commit reconciled Refine state {}: {error}",
             destination.display()
         ))
     })

@@ -65,6 +65,19 @@ impl FileGitSyncService {
         Ok(true)
     }
 
+    /// Return the managed state worktree to a clean checkout after a failed
+    /// pass, so a later retry starts from durable Git evidence.
+    pub(in crate::tools::host::git_sync) fn restore_managed_state_worktree(
+        &self,
+    ) -> RefineResult<()> {
+        let path = state_worktree_for_target_root(&self.target_root)?;
+        if !path.exists() {
+            return Ok(());
+        }
+        let _ = self.git_at(&path, &["rebase", "--abort"]);
+        self.recover_interrupted_state_worktree(&path).map(|_| ())
+    }
+
     pub(super) fn fetch_remote(&self, remote: &str) -> RefineResult<()> {
         self.git_checked(&["fetch", "--prune", remote]).map(|_| ())
     }
@@ -113,7 +126,6 @@ impl FileGitSyncService {
                 return Ok(StateWorktreeSetup {
                     path,
                     pulled: false,
-                    local_ahead: self.local_state_ahead(remote, remote_exists)?,
                     created: false,
                 });
             }
@@ -156,7 +168,6 @@ impl FileGitSyncService {
             return Ok(StateWorktreeSetup {
                 path,
                 pulled: remote_exists && !local_exists,
-                local_ahead: local_exists && self.local_state_ahead(remote, remote_exists)?,
                 created: false,
             });
         }
@@ -185,26 +196,8 @@ impl FileGitSyncService {
         Ok(StateWorktreeSetup {
             path,
             pulled: false,
-            local_ahead: true,
             created: true,
         })
-    }
-
-    pub(super) fn local_state_ahead(
-        &self,
-        remote: &str,
-        remote_exists: bool,
-    ) -> RefineResult<bool> {
-        if !remote_exists {
-            return Ok(true);
-        }
-        let remote_ref = format!("{remote}/{REFINE_STATE_BRANCH}");
-        let range = format!("{remote_ref}..{REFINE_STATE_REF}");
-        Ok(self
-            .git_stdout(&["rev-list", "--count", &range])?
-            .parse::<usize>()
-            .unwrap_or(0)
-            > 0)
     }
 
     pub(super) fn ensure_local_state_excluded(&self) -> RefineResult<()> {

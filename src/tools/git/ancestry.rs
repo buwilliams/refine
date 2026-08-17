@@ -1,25 +1,29 @@
-use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::errors::RefineResult;
 use crate::tools::git::repo::command_failed;
 use crate::tools::host::git_sync::FileGitSyncService;
 
 /// How two commits relate in history. `FastForwardToA` means `b` is an
 /// ancestor of `a`, so a ref at `b` reaches `a` by fast-forward alone — and
-/// symmetrically for `FastForwardToB`. Only `Diverged` ever justifies a
-/// merge; ancestor-related heads never do.
+/// symmetrically for `FastForwardToB`. Only `Diverged` and `Unrelated` ever
+/// justify a merge; ancestor-related heads never do.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Ancestry {
     Equal,
     FastForwardToA,
     FastForwardToB,
-    Diverged { merge_base: String },
+    Diverged {
+        merge_base: String,
+    },
+    /// No common ancestor: independently bootstrapped orphan histories. The
+    /// caller decides whether joining them is meaningful (state branches merge
+    /// from the empty tree; code branches treat this as an error).
+    Unrelated,
 }
 
 /// Classify the relationship between two commits with one `merge-base` call.
 ///
 /// Both inputs are resolved to peeled commit ids first, so refs, short ids,
-/// and `HEAD` are all acceptable. Unrelated histories (no common ancestor)
-/// surface as a named error rather than a variant: every repository this
-/// runs against shares a root commit by construction.
+/// and `HEAD` are all acceptable.
 pub fn classify(repo: &FileGitSyncService, a: &str, b: &str) -> RefineResult<Ancestry> {
     let a = repo.git_stdout(&["rev-parse", "--verify", &format!("{a}^{{commit}}")])?;
     let b = repo.git_stdout(&["rev-parse", "--verify", &format!("{b}^{{commit}}")])?;
@@ -29,12 +33,10 @@ pub fn classify(repo: &FileGitSyncService, a: &str, b: &str) -> RefineResult<Anc
     let output = repo.git(&["merge-base", &a, &b])?;
     if !output.success {
         // `merge-base` fails printing nothing when the commits share no
-        // ancestor; name that condition instead of surfacing a detail-free
-        // command failure.
+        // ancestor: two nodes bootstrapping the orphan state branch
+        // independently, for example.
         if output.stdout.is_empty() && output.stderr.is_empty() {
-            return Err(RefineError::Conflict(format!(
-                "commits {a} and {b} share no common ancestor (unrelated histories)"
-            )));
+            return Ok(Ancestry::Unrelated);
         }
         return Err(command_failed(&format!("git merge-base {a} {b}"), &output));
     }
@@ -167,15 +169,12 @@ mod tests {
     }
 
     #[test]
-    fn unrelated_histories_surface_a_named_error() {
+    fn unrelated_histories_classify_as_unrelated() {
         let fixture = RepoFixture::new("unrelated");
         let rooted = fixture.commit_file("a.txt", "base\n", "initial");
         git(&fixture.root, &["checkout", "-q", "--orphan", "orphan"]);
         let orphaned = fixture.commit_file("b.txt", "other\n", "orphan root");
-        let error = classify(&fixture.service(), &rooted, &orphaned).unwrap_err();
-        assert!(
-            error.to_string().contains("share no common ancestor"),
-            "unexpected error: {error}"
-        );
+        let ancestry = classify(&fixture.service(), &rooted, &orphaned).unwrap();
+        assert_eq!(ancestry, Ancestry::Unrelated);
     }
 }

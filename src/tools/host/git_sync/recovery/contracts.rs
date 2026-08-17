@@ -36,111 +36,63 @@ impl StateRecoveryDecision {
             overrides: Vec::new(),
         }
     }
+
+    pub(in crate::tools::host::git_sync) fn authority_for(
+        &self,
+        path: &str,
+    ) -> StateRecoveryAuthority {
+        self.overrides
+            .iter()
+            .find(|chosen| chosen.path == path)
+            .map(|chosen| chosen.authority)
+            .unwrap_or(self.default_authority)
+    }
 }
 
-#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
-pub struct StateRecoveryPathCounts {
-    pub live_only: usize,
-    pub remote_only: usize,
-    pub equal: usize,
-    pub differing: usize,
-}
-
+/// Read-only divergence summary: what one classify plus a dry-run merge of the
+/// current heads would find. Produced fresh on every call; never written to
+/// disk and never used as an apply token — the terminal run re-derives
+/// everything itself.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct StateRecoveryPreview {
     pub version: u32,
-    pub evidence_id: String,
-    pub target_identity: String,
-    pub repository_identity: String,
     pub configured_remote: String,
     pub local_state_head: Option<String>,
-    pub remote_state_head: String,
-    pub baseline_status: String,
+    pub remote_state_head: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub baseline_snapshot: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub conflict_report_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub conflict_report_location: Option<String>,
-    pub live_snapshot: String,
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub live_fingerprints: BTreeMap<String, u64>,
-    pub remote_snapshot: String,
-    pub path_counts: StateRecoveryPathCounts,
-    pub conflicting_paths: Vec<String>,
-    pub conflicting_paths_truncated: usize,
+    pub merge_base: Option<String>,
+    /// `converged`, `local_ahead`, `remote_ahead`, `diverged`, `join`, or
+    /// `remote_missing`.
+    pub ancestry: String,
+    /// Live records not yet committed to the local state branch; they become
+    /// the next pass's local delta.
+    pub live_pending_paths: Vec<String>,
+    /// Paths only this side changed (or only this side holds, on a join).
+    pub local_paths: Vec<String>,
+    /// Paths only the remote side changed (or only the remote holds).
+    pub remote_paths: Vec<String>,
+    /// Both-changed paths the structural driver can settle without judgment.
+    pub resolvable_paths: Vec<String>,
+    /// Genuinely contested paths with domain-terms summaries; these are the
+    /// paths an authority decision would settle.
+    pub conflicts: Vec<StateSyncConflictPath>,
+    pub detail: String,
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum StateRecoveryOutcome {
-    Started,
-    Failed,
-    Succeeded,
-}
-
-#[derive(Clone, Copy, Debug, Default, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum StateRecoveryStage {
-    #[default]
-    Started,
-    TargetPersisted,
-    Published,
-    Hydrated,
-    BaselineCreated,
-    Completed,
-}
-
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct StateRecoveryManifest {
-    pub version: u32,
-    pub evidence_id: String,
-    pub authority: StateRecoveryAuthority,
-    #[serde(default)]
-    pub decision_id: String,
-    #[serde(default)]
-    pub overrides: Vec<StateRecoveryOverride>,
-    pub node: String,
-    pub target_identity: String,
-    pub repository_identity: String,
-    pub configured_remote: String,
-    pub local_state_head_before: Option<String>,
-    pub remote_state_head_before: String,
-    pub live_snapshot_before: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub baseline_snapshot_before: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub conflict_report_id: Option<String>,
-    pub local_state_head_after: Option<String>,
-    pub remote_state_head_after: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub target_snapshot: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub target_location: Option<String>,
-    pub path_counts: StateRecoveryPathCounts,
-    pub started_at: String,
-    pub completed_at: Option<String>,
-    pub outcome: StateRecoveryOutcome,
-    #[serde(default)]
-    pub stage: StateRecoveryStage,
-    pub recovery_location: String,
-    pub message: String,
-}
-
-/// Terminal outcome of a one-shot `state-recovery run`: synchronization,
-/// recovery evidence, authority application, and verification as a single
-/// operation. `recovered` is false when synchronization needed no recovery.
+/// Terminal outcome of a one-shot `sync` run: with an authority the
+/// pipeline settles every contested path on the chosen side inside one merge
+/// commit and verifies convergence with a read; without one it is the
+/// ordinary sync pipeline. `recovered` is false when nothing was contested.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct StateRecoveryRunResult {
     pub ok: bool,
     /// 1-based attempt that produced this result; earlier attempts lost a
-    /// bounded race against a moving remote or a concurrent live write.
+    /// bounded race against a moving remote.
     pub attempts: u32,
     pub recovered: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub recovery: Option<StateRecoveryResult>,
-    /// The verifying synchronization (or the ordinary one when no recovery
-    /// was needed).
+    /// What the synchronization pass itself did.
     pub sync: GitSyncResult,
     pub detail: String,
 }
@@ -151,11 +103,15 @@ pub struct StateRecoveryResult {
     pub authority: StateRecoveryAuthority,
     #[serde(default)]
     pub overrides: Vec<StateRecoveryOverride>,
-    pub baseline_created: bool,
     pub local_state_head: Option<String>,
-    pub remote_state_head: String,
-    pub recovery_location: String,
-    pub manifest_path: String,
-    pub path_counts: StateRecoveryPathCounts,
+    pub remote_state_head: Option<String>,
+    /// Contested paths the decision settled. Both pre-merge heads are parents
+    /// of the recovery merge commit, so every displaced version stays
+    /// reachable without a side ledger.
+    pub settled_paths: Vec<String>,
+    /// Refs retained for displaced state that is not otherwise reachable as a
+    /// merge parent (a joining node's live store).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub retained_refs: Vec<String>,
     pub detail: String,
 }

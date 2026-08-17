@@ -231,15 +231,19 @@ impl FileStateSyncHealthService {
         Ok(activity)
     }
 
+    /// Settle the exact failure a terminal recovery just cleared: the record
+    /// must still carry the observed revision and recovery kind (`None` for
+    /// every conflict the merge-base pipeline records; `missing_baseline`
+    /// only on legacy durable records).
     pub fn record_recovery_success(
         &self,
         target_root: &Path,
         node_id: &str,
-        expected_kind: StateSyncRecoveryKind,
+        expected_kind: Option<StateSyncRecoveryKind>,
         expected_revision: u64,
     ) -> RefineResult<(bool, Option<StateSyncHealthActivity>)> {
         let activity = self.update_if(target_root, node_id, |record| {
-            (record.revision == expected_revision && record.recovery_kind == Some(expected_kind))
+            (record.revision == expected_revision && record.recovery_kind == expected_kind)
                 .then(|| settle_success_record(record))
         })?;
         Ok(match activity {

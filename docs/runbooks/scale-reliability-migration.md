@@ -244,7 +244,7 @@ upgrade commits their deletion — on the order of dozens of files. This is
 expected, and it is the fix taking effect rather than data loss: the logs remain
 on the node under `runtime/`.
 
-Run `REFINE_DAEMON_PORT="$PORT" ./r project sync`, inspect the resulting
+Run `REFINE_DAEMON_PORT="$PORT" ./r sync`, inspect the resulting
 `refine/state` commit, and verify it removes old Goal log paths without adding
 `runtime/`.
 

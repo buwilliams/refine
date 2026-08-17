@@ -5,8 +5,8 @@
 //! the real in-process sync entry points (`FileGitSyncService`). A scenario is
 //! an explicit `Vec<Event>` executed by a scripted scheduler: no wall-clock
 //! randomness, no sleeps as synchronization. Each named scenario checks one of
-//! the invariants from the persistence-sync design's Testing section; ignored
-//! tests are the executable spec of the stage-2 redesign.
+//! the invariants from the persistence-sync design's Testing section; together
+//! they are the stage-2 acceptance gate.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -36,6 +36,15 @@ enum Event {
         node: usize,
         goal_id: &'static str,
         mutation: &'static str,
+    },
+    /// Write a goal record with explicit `name` and `status` members, so two
+    /// nodes can change *different* members of the same record from a shared
+    /// base — the provably disjoint case the structural driver must settle.
+    LiveWriteMembers {
+        node: usize,
+        goal_id: &'static str,
+        name: &'static str,
+        status: &'static str,
     },
     /// Run the real sync pipeline on the node.
     Sync { node: usize },
@@ -111,6 +120,7 @@ struct SimulatedFleet {
     root: PathBuf,
     remote: PathBuf,
     push_block_marker: PathBuf,
+    push_race_marker: PathBuf,
     nodes: Vec<SimulatedNode>,
     /// Live writes not yet durably committed by a sync on their node, keyed
     /// by state-relative path. A rewrite before any sync supersedes the
@@ -145,7 +155,8 @@ impl SimulatedFleet {
         );
         git(&seed, &["push", "-q", "-u", "origin", "main"]);
         let push_block_marker = root.join("block-state-pushes");
-        install_state_push_gate(&remote, &push_block_marker);
+        let push_race_marker = root.join("race-state-push");
+        install_state_push_gate(&remote, &push_block_marker, &push_race_marker);
 
         let nodes = node_ids
             .iter()
@@ -171,6 +182,7 @@ impl SimulatedFleet {
             root,
             remote,
             push_block_marker,
+            push_race_marker,
             pending: vec![BTreeMap::new(); nodes.len()],
             committed: Vec::new(),
             nodes,
@@ -195,15 +207,17 @@ impl SimulatedFleet {
                 node,
                 goal_id,
                 mutation,
-            } => {
-                let relative = goal_record_path(goal_id);
-                let bytes = goal_record_bytes(goal_id, mutation);
-                let destination = self.nodes[*node].live_refine().join(&relative);
-                fs::create_dir_all(destination.parent().unwrap()).unwrap();
-                fs::write(destination, &bytes).unwrap();
-                self.pending[*node].insert(relative, bytes);
-                Outcome::Write
-            }
+            } => self.write_goal(*node, goal_id, goal_record_bytes(goal_id, mutation)),
+            Event::LiveWriteMembers {
+                node,
+                goal_id,
+                name,
+                status,
+            } => self.write_goal(
+                *node,
+                goal_id,
+                goal_record_bytes_with(goal_id, name, status),
+            ),
             Event::Sync { node } => {
                 let result = self.nodes[*node].service().sync();
                 self.record_durably_committed(*node);
@@ -217,6 +231,36 @@ impl SimulatedFleet {
                 Outcome::Recovery(result)
             }
         }
+    }
+
+    fn write_goal(&mut self, node: usize, goal_id: &str, bytes: Vec<u8>) -> Outcome {
+        let relative = goal_record_path(goal_id);
+        let destination = self.nodes[node].live_refine().join(&relative);
+        fs::create_dir_all(destination.parent().unwrap()).unwrap();
+        fs::write(destination, &bytes).unwrap();
+        self.pending[node].insert(relative, bytes);
+        Outcome::Write
+    }
+
+    /// Clone one more target root from the origin without syncing it, the way
+    /// a node joins an already published fleet. Returns its index.
+    fn add_node(&mut self, id: &'static str) -> usize {
+        let target_root = self.root.join(id);
+        git(
+            &self.root,
+            &[
+                "clone",
+                "-q",
+                self.remote.to_str().unwrap(),
+                target_root.to_str().unwrap(),
+            ],
+        );
+        configure_repo(&target_root);
+        let node = SimulatedNode { id, target_root };
+        write_active_node_identity(&node);
+        self.nodes.push(node);
+        self.pending.push(BTreeMap::new());
+        self.nodes.len() - 1
     }
 
     /// Move a node's pending versions into the committed ledger by consulting
@@ -251,6 +295,29 @@ impl SimulatedFleet {
 
     fn allow_state_pushes(&self) {
         fs::remove_file(&self.push_block_marker).unwrap();
+    }
+
+    /// Publish a node's local `refine/state` head to the origin's staging ref
+    /// `refs/race/pending` without touching the state branch, so the race gate
+    /// can later advance the branch to it mid-push.
+    fn stage_race_commit(&self, node: usize) -> String {
+        git(
+            &self.nodes[node].target_root,
+            &["push", "-q", "origin", "refine/state:refs/race/pending"],
+        );
+        git_stdout(&self.remote, &["rev-parse", "refs/race/pending"])
+    }
+
+    /// Arm the origin so the NEXT `refine/state` push loses a race: the
+    /// pre-receive hook advances the branch to the staged commit and rejects
+    /// the push, exactly as if a third node had published between the pushing
+    /// pass's fetch and its push. One-shot: the hook consumes the marker.
+    fn arm_state_push_race(&self) {
+        fs::write(&self.push_race_marker, b"").unwrap();
+    }
+
+    fn state_push_race_armed(&self) -> bool {
+        self.push_race_marker.exists()
     }
 
     fn origin_state_head(&self) -> String {
@@ -312,6 +379,11 @@ impl SimulatedFleet {
 
     /// The record's `name` member as hydrated into the node's live dir.
     fn live_goal_name(&self, node: usize, goal_id: &str) -> String {
+        self.live_goal_member(node, goal_id, "name")
+    }
+
+    /// One string member of the record as hydrated into the node's live dir.
+    fn live_goal_member(&self, node: usize, goal_id: &str, member: &str) -> String {
         let path = self.nodes[node]
             .live_refine()
             .join(goal_record_path(goal_id));
@@ -320,7 +392,7 @@ impl SimulatedFleet {
                 .unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display())),
         )
         .unwrap();
-        record["name"].as_str().unwrap().to_string()
+        record[member].as_str().unwrap().to_string()
     }
 
     fn latest_report(&self, node: usize) -> Option<StateSyncConflictReport> {
@@ -350,6 +422,31 @@ impl Drop for SimulatedFleet {
     }
 }
 
+/// Evidence-preserving temp dir for scenarios that build repos outside a
+/// fleet, with the same panicking-keeps-evidence discipline.
+struct EvidenceDir(PathBuf);
+
+impl EvidenceDir {
+    fn new(name: &str) -> Self {
+        let root = unique_temp_dir(name);
+        fs::create_dir_all(&root).unwrap();
+        Self(root)
+    }
+
+    fn path(&self) -> &Path {
+        &self.0
+    }
+}
+
+impl Drop for EvidenceDir {
+    fn drop(&mut self) {
+        if std::thread::panicking() {
+            return;
+        }
+        let _ = fs::remove_dir_all(&self.0);
+    }
+}
+
 /// The daemon shards goal records as `goals/<id[..2]>/<id[2..]>/goal.json`.
 fn goal_record_path(goal_id: &str) -> String {
     format!("goals/{}/{}/goal.json", &goal_id[..2], &goal_id[2..])
@@ -361,7 +458,11 @@ fn goal_record_path(goal_id: &str) -> String {
 /// fail-closed conflict report — the genuine two-sided divergence the
 /// terminal-recovery and stable-identity scenarios need.
 fn goal_record_bytes(goal_id: &str, name: &str) -> Vec<u8> {
-    format!(r#"{{"id":"{goal_id}","name":"{name}","status":"todo","rounds":[]}}"#).into_bytes()
+    goal_record_bytes_with(goal_id, name, "todo")
+}
+
+fn goal_record_bytes_with(goal_id: &str, name: &str, status: &str) -> Vec<u8> {
+    format!(r#"{{"id":"{goal_id}","name":"{name}","status":"{status}","rounds":[]}}"#).into_bytes()
 }
 
 /// Record the machine-local active-node selection where identity resolution
@@ -383,16 +484,37 @@ fn write_active_node_identity(node: &SimulatedNode) {
     .unwrap();
 }
 
-/// Origin-side pre-receive hook that rejects `refine/state` pushes while the
-/// marker file exists, so a scenario can hold a node in the
-/// committed-but-unpublished state deterministically.
-fn install_state_push_gate(remote: &Path, marker: &Path) {
+/// Origin-side pre-receive hook with two deterministic gates for
+/// `refine/state` pushes: while the block marker exists every push is
+/// rejected (the committed-but-unpublished shape), and while the race marker
+/// exists exactly one push is rejected AFTER the hook itself advances the
+/// branch to the staged `refs/race/pending` commit — the remote moving
+/// between a pass's fetch and its push. `update-ref` runs outside the push's
+/// quarantine because the staged commit's objects were fully received by an
+/// earlier, completed push.
+fn install_state_push_gate(remote: &Path, block_marker: &Path, race_marker: &Path) {
     let hook = remote.join("hooks/pre-receive");
     fs::write(
         &hook,
         format!(
-            "#!/bin/sh\nwhile read old new ref; do\n  if test \"$ref\" = refs/heads/refine/state && test -e \"{}\"; then\n    exit 1\n  fi\ndone\nexit 0\n",
-            marker.display()
+            concat!(
+                "#!/bin/sh\n",
+                "while read old new ref; do\n",
+                "  if test \"$ref\" = refs/heads/refine/state; then\n",
+                "    if test -e \"{block}\"; then\n",
+                "      exit 1\n",
+                "    fi\n",
+                "    if test -e \"{race}\"; then\n",
+                "      env -u GIT_QUARANTINE_PATH git update-ref refs/heads/refine/state \"$(git rev-parse refs/race/pending)\"\n",
+                "      rm -f \"{race}\"\n",
+                "      exit 1\n",
+                "    fi\n",
+                "  fi\n",
+                "done\n",
+                "exit 0\n",
+            ),
+            block = block_marker.display(),
+            race = race_marker.display()
         ),
     )
     .unwrap();
