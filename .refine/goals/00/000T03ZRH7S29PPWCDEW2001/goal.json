@@ -85,15 +85,33 @@
         "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
       },
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-08-17T13:45:41Z",
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
-      "governance_candidate_commit": "",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_candidate_commit": "c182fda0ca5354ad58bdeb6676221631f2ec461f",
+      "governance_checked_at": "2026-08-17T14:17:25Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T03ZRH7S29PPWCDEW2001-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "guidance_checked": 2,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No actual governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "No actual governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T03ZRH7S29PPWCDEW2001-round-1"
+      },
+      "governance_message": "No actual governance rule violations found.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
       "governance_rule_actions": [],
       "guidance_decision": {
         "applied": [
@@ -299,8 +317,8 @@
       "implementation_report": "Renamed the public OS service commands to `system service-install` and `system service-uninstall`; preserved port-scoped systemd/launchd behavior; made the launcher bootstrap a missing release binary only for first service registration without rebuilding an existing binary or taking Git/source update authority from `system update`; updated installed-binary recovery diagnostics, intent pages, and install/update runbooks; and migrated parsing, catalog/help, launcher, diagnostic, runbook, and systemd integration expectations. Exact verification: focused CLI/catalog/diagnostic/runbook tests passed; `cargo test --test production_binary_install` passed 9/9; deterministic full library verification passed 1000 tests with 6 ignored; owned Rust formatting, launcher syntax, and diff whitespace checks passed. Parallel `cargo test --all-targets` exposed one unchanged concurrency-sensitive source-promotion test failure (`queued` observed before `running`) in both attempts after 999 passes and 6 ignores; that exact test passed in isolation and the complete library suite passed single-threaded. Repository-wide fmt and Clippy remain blocked only by pre-existing findings in untouched files, recorded in verification.",
       "implementation_reported_at": "2026-08-17T14:06:43Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "The CLI subcommands 'system install' and 'system uninstall' are confusing people because they only manage systemctl (on Linux; I don't remember the one for macOS). The authority for updates is the 'system update' subcommand. Therefore, we need to rename install/uninstall to something that reflects what they actually do.",
       "quality_agent_report": "Quality reviewed commit c182fda0ca5354ad58bdeb6676221631f2ec461f and found no material defect requiring correction; no additional code or test changes were made. Focused CLI, catalog/help, launcher, diagnostic, runbook, shell, and whitespace checks passed; production_binary_install passed 9/9; deterministic library verification passed 1000 tests with 6 ignored; and all-target compilation passed. Repository-wide fmt and Clippy remain blocked only by pre-existing findings in untouched files.",
       "quality_candidate_commit": "c182fda0ca5354ad58bdeb6676221631f2ec461f",
@@ -358,19 +376,29 @@
       "quality_message": "All Quality tests passed with observed supervised evidence.",
       "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-08-17T14:16:37Z",
-      "workflow_attempt_authority": {
-        "claimed_at": "2026-08-17T13:45:41Z",
-        "round_idx": 0,
-        "workflow_revision": 2
+      "rule_state": "passed",
+      "updated": "2026-08-17T14:17:29Z",
+      "workflow_attempt_authority": null,
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "c182fda0ca5354ad58bdeb6676221631f2ec461f",
+        "integrated_at": "2026-08-17T14:17:29.157088760+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n docs/intent/03-capabilities/01-process.md          |  9 ++--\n docs/intent/04-surfaces/02-cli.md                  |  4 +-\n docs/runbooks/install.md                           | 63 ++++++++++++++++------\n docs/runbooks/update-refine-source.md              |  4 +-\n r                                                  | 20 ++++---\n src/surfaces/cli/actions.rs                        |  2 +-\n src/surfaces/cli/actions/system.rs                 | 18 +++----\n src/surfaces/cli/catalog.rs                        | 28 ++++++++++\n src/surfaces/cli/dispatch.rs                       |  4 +-\n src/surfaces/cli/dispatch/system.rs                |  4 +-\n src/surfaces/cli/tests/system/installation.rs      | 20 +++++--\n src/tools/host/installation/state.rs               |  9 ++--\n src/tools/host/installation/tests.rs               | 40 ++++++++++++++\n src/tools/host/source_promotion/systemd_tests.rs   |  4 +-\n .../host/source_promotion/systemd_upgrade_tests.rs |  4 +-\n tests/production_binary_install.rs                 | 50 +++++++++--------\n 16 files changed, 206 insertions(+), 77 deletions(-)",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "bd392b96216d26fa00b5ef5d307af5abb2bd398f"
       },
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "governance",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-08-17T14:16:37Z",
-  "workflow_revision": 24
+  "updated": "2026-08-17T14:17:29Z",
+  "workflow_revision": 28
 }
