@@ -1,7 +1,7 @@
 {
   "base_commit": "34fcb147a5e372a66c2004c3688702e0dc6851fd",
   "branch_name": "refine/DR427BFD89E5391018EACA69CC/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "71fe6f126cc43371dfbb3ec68b6862b23fae684d",
   "created": "2026-08-18T15:39:04Z",
   "feature_id": null,
   "feature_order": null,
@@ -95,7 +95,28 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-18T16:16:35Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "34fcb147a5e372a66c2004c3688702e0dc6851fd",
@@ -106,6 +127,7 @@
           "round_idx": 0,
           "target_branch": "main"
         },
+        "completed_at": "2026-08-18T16:16:35Z",
         "criticism": {
           "completed_at": "2026-08-18T15:44:37Z",
           "git_after": {
@@ -185,6 +207,54 @@
           "message": "The finalized plan does not necessarily violate any governance rule or enabled guidance.",
           "status": "passed"
         },
+        "implementation": {
+          "completed_at": "2026-08-18T16:16:35Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Removed the worker post-conflict recovery branch, daemon recovery outcome/activity implementation, and merge-base ownership decision helper. Failed background sync now records the conflict and failure backoff and stops without invoking terminal recovery.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added a focused state ownership policy and acceptance gate: an unambiguous one-sided node_id transfer is pinned through structural or agent-assisted reconciliation, while different concurrent owner changes produce NeedsDecision before any agent call and direct operators to explicit live|remote authority or supported Goal-transfer surfaces.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Removed state_sync_auto_recovery from defaults, allowed settings, validation, browser rendering, autosave, and controls. Existing stored values are removed during settings migration and future updates are rejected as unknown; explicit sync authority and state_sync_agent_resolution remain.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Replaced worker and fleet scenarios with contracts proving stable transferred ownership, persistent failed health/conflict evidence, no automatic activity, zero agent calls for concurrent transfers, and convergence only after an explicit operator recovery event.",
+                "id": "P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated only the affected Fleet, Persistence Sync, CLI, API, activity-evidence intent pages and the state-sync recovery and fleet-management runbooks to document manual ownership movement, fail-closed ambiguity, and supported-surface operator authority.",
+                "id": "P5",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "cargo test --lib -- --test-threads=1 — 1112 passed, 0 failed, 6 ignored",
+              "cargo test --test sync_simulation -- --test-threads=1 — 26 passed, 0 failed",
+              "cargo test --test sync_regressions -- --test-threads=1 — 5 passed, 0 failed",
+              "cargo test --lib application::workers::tests -- --test-threads=1 — 18 passed, 0 failed",
+              "cargo test --lib application::persistence_sync::state::tests::resolution -- --test-threads=1 — 15 passed, 0 failed",
+              "cargo test --lib application::persistence_sync::resolution::tests -- --test-threads=1 — 16 passed, 0 failed",
+              "cargo test --lib infrastructure::process::supervisor::config::tests -- --test-threads=1 — 12 passed, 0 failed",
+              "node --test tests/web_javascript_syntax.test.js tests/web_settings_dom_morph.test.js — 5 passed, 0 failed",
+              "cargo clippy --all-targets -- -D warnings -A clippy::needless_pub_self -A clippy::module_inception -A clippy::unnecessary_sort_by -A clippy::cloned_ref_to_slice_refs -A clippy::items_after_test_module — passed",
+              "cargo clippy --all-targets -- -D warnings — candidate introduced no new warning; command remains blocked by six pre-existing warnings in untouched files across five lint classes",
+              "cargo fmt --all -- --check — passed",
+              "git diff --check — passed"
+            ]
+          },
+          "report": "Removed the automatic state-sync ownership arbitration pipeline. Background conflicts now remain failed with stable report, health, and backoff evidence until an operator uses an explicit sync-authority or Goal-transfer surface. One-sided Goal transfers are preserved, conflicting concurrent transfers fail closed before agent invocation, the retired setting and web control migrate away, and affected intent/runbook contracts and simulations now require manual authority. Verification passed: full Rust library suite (1112 passed, 0 failed, 6 ignored), full sync simulation suite (26 passed), sync regressions (5 passed), worker tests (18 passed), config tests (12 passed), browser settings tests (5 passed), formatting, diff validation, and Clippy with only the repository's six pre-existing untouched lint classes allowed.",
+          "started_at": "2026-08-18T15:45:47Z"
+        },
         "phase": "implement",
         "phase_started_at": "2026-08-18T15:45:47Z",
         "proposal": {
@@ -228,11 +298,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-08-18T15:39:06Z",
-        "state": "in_progress",
-        "updated_at": "2026-08-18T15:45:47Z"
+        "state": "completed",
+        "updated_at": "2026-08-18T16:16:35Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Removed the automatic state-sync ownership arbitration pipeline. Background conflicts now remain failed with stable report, health, and backoff evidence until an operator uses an explicit sync-authority or Goal-transfer surface. One-sided Goal transfers are preserved, conflicting concurrent transfers fail closed before agent invocation, the retired setting and web control migrate away, and affected intent/runbook contracts and simulations now require manual authority. Verification passed: full Rust library suite (1112 passed, 0 failed, 6 ignored), full sync simulation suite (26 passed), sync regressions (5 passed), worker tests (18 passed), config tests (12 passed), browser settings tests (5 passed), formatting, diff validation, and Clippy with only the repository's six pre-existing untouched lint classes allowed.",
+      "implementation_reported_at": "2026-08-18T16:16:35Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -243,7 +313,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T15:45:47Z",
+      "updated": "2026-08-18T16:16:35Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T15:39:05Z",
         "round_idx": 0,
@@ -253,8 +323,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-18T15:45:47Z",
-  "workflow_revision": 16
+  "updated": "2026-08-18T16:16:35Z",
+  "workflow_revision": 21
 }
