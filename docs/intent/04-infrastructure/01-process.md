@@ -54,6 +54,16 @@ captured from the login shell because a daemonized Refine does not inherit it â€
 and never reads Refine-owned files from the user home, XDG paths, or anywhere
 else to assemble it.
 
+Quality commands also need to discover host toolchains that an interactive
+shell places on `PATH`, but repository-selected commands must not receive the
+shell's arbitrary exports or credentials. The process launch policy therefore
+overlays only `PATH`, `PATHEXT`, and the vetted non-secret .NET discovery roots
+`DOTNET_ROOT`, `DOTNET_ROOT_X64`, and `DOTNET_ROOT_X86` for Quality, between the
+daemon's inherited environment and explicit process overrides. Capture failure
+leaves the inherited environment unchanged. Refine does not hardcode a dotnet
+installation path; changes to shell startup configuration take effect after the
+daemon restarts and recaptures the host-shell environment.
+
 ## Expected Role
 
 Managed processes record local facts such as owner, pid, state, label, output paths, limits, start time, exit code, Goal, Round, workflow state, provider, and target app. Node-local identifiers may connect local logs, sessions, operations, and child processes, and evidence may cite them as provenance. They do not grant permission to mutate a Goal or act as resumable workflow state. This is the Infrastructure boundary: mechanisms report what the host did while Application remains responsible for what that evidence means.
