@@ -240,11 +240,16 @@ fn web_server_open_agent_attaches_to_the_workflow_goal_agent() {
     let opened = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/terminal/session".to_string(),
-        body: Some(json!({"profile": "goal", "goal_id": "GOAL1"})),
+        body: Some(json!({
+            "profile": "goal",
+            "surface": "toolbar",
+            "goal_id": "GOAL1"
+        })),
     });
     assert_eq!(opened.status, 200, "{}", opened.body);
     assert_eq!(opened.body["profile"], "goal");
     assert_eq!(opened.body["goal_id"], "GOAL1");
+    assert_eq!(opened.body["toolbar_timeout_protected"], true);
     let session_id = opened.body["id"].as_str().unwrap();
     let input = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -694,10 +699,12 @@ fn browser_terminal_stop_fails_the_goal_after_stopping_its_local_agent() {
         path: "/api/terminal/session".to_string(),
         body: Some(json!({
             "profile": "goal",
+            "surface": "toolbar",
             "goal_id": "GOAL-TERMINAL-STOP"
         })),
     });
     assert_eq!(opened.status, 200, "{}", opened.body);
+    assert_eq!(opened.body["toolbar_timeout_protected"], true);
     let session_id = opened.body["id"].as_str().unwrap().to_string();
     let process_id = opened.body["process_id"].as_str().unwrap().to_string();
 

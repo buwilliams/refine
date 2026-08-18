@@ -246,6 +246,10 @@ where
     metadata.insert("session_id".to_string(), json!(&session_id));
     metadata.insert("cwd".to_string(), json!(cwd.display().to_string()));
     metadata.insert("attention_state".to_string(), json!("working"));
+    // Launch metadata cannot grant the Toolbar exemption. Only an attachment
+    // command accepted by this live runtime may make the state one-way true.
+    metadata.insert(TOOLBAR_TIMEOUT_PROTECTED_KEY.to_string(), json!(false));
+    metadata.remove(TOOLBAR_ATTACHMENT_ACKS_KEY);
     metadata.insert(
         "prompt_transport".to_string(),
         serde_json::to_value(&command.prompt_transport).map_err(|error| {
@@ -428,6 +432,7 @@ where
     let mut signal_reader =
         SignalReader::default().requiring_planning_result(requires_planning_result);
     let mut invalid_signal_recovery = InvalidSignalRecovery::default();
+    let mut toolbar_timeout_protected = false;
     let status_result = (|| -> RefineResult<_> {
         loop {
             for command in read_commands_since(&command_path, &mut command_offset)? {
@@ -465,6 +470,31 @@ where
                         pair.master.resize(pty_size(cols, rows)).map_err(|error| {
                             RefineError::Io(format!("failed to resize Goal Agent PTY: {error}"))
                         })?;
+                    }
+                    AgentSessionCommand::ToolbarAttach { acknowledgment_id } => {
+                        toolbar_timeout_protected = true;
+                        metadata.insert(TOOLBAR_TIMEOUT_PROTECTED_KEY.to_string(), json!(true));
+                        let acknowledgments = metadata
+                            .entry(TOOLBAR_ATTACHMENT_ACKS_KEY.to_string())
+                            .or_insert_with(|| json!([]))
+                            .as_array_mut()
+                            .ok_or_else(|| {
+                                RefineError::Serialization(
+                                    "Goal Agent Toolbar acknowledgment state is not an array"
+                                        .to_string(),
+                                )
+                            })?;
+                        if !acknowledgments
+                            .iter()
+                            .any(|value| value.as_str() == Some(&acknowledgment_id))
+                        {
+                            acknowledgments.push(json!(acknowledgment_id));
+                        }
+                        // Persist the protected state and matching identity in
+                        // one process-record update before either watchdog is
+                        // evaluated below.
+                        process.details = Some(encode_metadata(&metadata)?);
+                        supervisor.register(process.clone())?;
                     }
                 }
             }
@@ -577,8 +607,9 @@ where
                     .expect("reader thread handle observed finished");
                 return Err(transcript_capture_failure(handle.join()));
             }
-            if let Some(timeout) =
-                completion_timeout.filter(|timeout| completion_started_at.elapsed() >= *timeout)
+            if !toolbar_timeout_protected
+                && let Some(timeout) =
+                    completion_timeout.filter(|timeout| completion_started_at.elapsed() >= *timeout)
             {
                 return Err(RefineError::Degraded(format!(
                     "Goal Agent did not produce a valid completion signal within {} seconds",
@@ -588,7 +619,8 @@ where
             // The idle watchdog is suspended while the agent has signalled it
             // is waiting on a human: silence there is expected, and killing it
             // would punish exactly the session that behaved correctly.
-            if metadata.get("attention_state").and_then(Value::as_str) != Some("needs_input")
+            if !toolbar_timeout_protected
+                && metadata.get("attention_state").and_then(Value::as_str) != Some("needs_input")
                 && let Some(idle) = idle_timeout.filter(|idle| {
                     last_activity
                         .lock()

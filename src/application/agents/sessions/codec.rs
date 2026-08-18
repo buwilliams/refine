@@ -114,6 +114,10 @@ pub(super) fn snapshot_from_process(
             .get("attention_message")
             .and_then(Value::as_str)
             .map(str::to_string),
+        toolbar_timeout_protected: metadata
+            .get(TOOLBAR_TIMEOUT_PROTECTED_KEY)
+            .and_then(Value::as_bool)
+            .unwrap_or(false),
         transcript_bytes,
         alive,
         exited: !alive,

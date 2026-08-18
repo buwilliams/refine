@@ -29,6 +29,9 @@ const DEFAULT_COLS: u16 = 120;
 const DEFAULT_ROWS: u16 = 36;
 const MAX_INPUT_BYTES: usize = 16_000;
 const MAX_EVENT_BYTES: usize = 64 * 1024;
+const TOOLBAR_ATTACHMENT_ACK_TIMEOUT: Duration = Duration::from_secs(2);
+const TOOLBAR_TIMEOUT_PROTECTED_KEY: &str = "toolbar_timeout_protected";
+const TOOLBAR_ATTACHMENT_ACKS_KEY: &str = "toolbar_attachment_acknowledgments";
 
 #[derive(Clone, Debug)]
 pub struct GoalAgentLaunch {
@@ -88,6 +91,8 @@ pub struct AgentSessionSnapshot {
     pub attention_state: Option<String>,
     pub attention_message: Option<String>,
     #[serde(default)]
+    pub toolbar_timeout_protected: bool,
+    #[serde(default)]
     pub transcript_bytes: u64,
     pub alive: bool,
     pub exited: bool,
@@ -98,6 +103,7 @@ pub struct AgentSessionSnapshot {
 enum AgentSessionCommand {
     Input { data: String },
     Resize { cols: u16, rows: u16 },
+    ToolbarAttach { acknowledgment_id: String },
 }
 
 #[derive(Clone, Debug, Deserialize)]
@@ -174,6 +180,109 @@ pub fn find_agent_session(
 ) -> RefineResult<AgentSessionSnapshot> {
     let (process, metadata) = session_process(runtime_root, session_id)?;
     snapshot_from_process(&process, &metadata)
+}
+
+/// Protect an exact live workflow Goal Agent from automatic watchdog
+/// termination after a Toolbar open has been acknowledged by its runtime.
+///
+/// The session runtime owns the one-way state transition. The caller never
+/// treats appending the request as success: it waits for the matching identity
+/// in the same still-live process record, so an exit or a losing deadline race
+/// cannot be reported as an attached Toolbar session.
+pub fn attach_toolbar_goal_agent_session(
+    runtime_root: &Path,
+    session_id: &str,
+) -> RefineResult<AgentSessionSnapshot> {
+    attach_toolbar_goal_agent_session_with_timeout(
+        runtime_root,
+        session_id,
+        TOOLBAR_ATTACHMENT_ACK_TIMEOUT,
+    )
+}
+
+fn attach_toolbar_goal_agent_session_with_timeout(
+    runtime_root: &Path,
+    session_id: &str,
+    acknowledgment_timeout: Duration,
+) -> RefineResult<AgentSessionSnapshot> {
+    let attachment_ended = || {
+        RefineError::Conflict(format!(
+            "Goal Agent session {session_id} exited before acknowledging Toolbar attachment"
+        ))
+    };
+    let (expected_process, metadata) =
+        session_process(runtime_root, session_id).map_err(|error| match error {
+            RefineError::NotFound(_) => attachment_ended(),
+            other => other,
+        })?;
+    if metadata.get("profile").and_then(Value::as_str) != Some("goal") {
+        return Err(RefineError::Conflict(format!(
+            "terminal session {session_id} is not a workflow Goal Agent"
+        )));
+    }
+    if !FileProcessSupervisor::process_is_alive(&expected_process)? {
+        return Err(RefineError::Conflict(format!(
+            "Goal Agent session {session_id} exited before Toolbar attachment"
+        )));
+    }
+
+    let acknowledgment_id = Uuid::new_v4().to_string();
+    append_command(
+        runtime_root,
+        session_id,
+        AgentSessionCommand::ToolbarAttach {
+            acknowledgment_id: acknowledgment_id.clone(),
+        },
+    )
+    .map_err(|error| match error {
+        RefineError::NotFound(_) => attachment_ended(),
+        other => other,
+    })?;
+
+    let deadline = std::time::Instant::now() + acknowledgment_timeout;
+    loop {
+        let (process, metadata) =
+            session_process(runtime_root, session_id).map_err(|error| match error {
+                RefineError::NotFound(_) => attachment_ended(),
+                other => other,
+            })?;
+        if process.id != expected_process.id {
+            return Err(RefineError::Conflict(format!(
+                "Goal Agent session {session_id} changed while Toolbar attachment was pending"
+            )));
+        }
+        if !FileProcessSupervisor::process_is_alive(&process)? {
+            return Err(RefineError::Conflict(format!(
+                "Goal Agent session {session_id} exited before acknowledging Toolbar attachment"
+            )));
+        }
+        let acknowledged = metadata
+            .get(TOOLBAR_ATTACHMENT_ACKS_KEY)
+            .and_then(Value::as_array)
+            .is_some_and(|acknowledgments| {
+                acknowledgments
+                    .iter()
+                    .any(|value| value.as_str() == Some(&acknowledgment_id))
+            });
+        if acknowledged
+            && metadata
+                .get(TOOLBAR_TIMEOUT_PROTECTED_KEY)
+                .and_then(Value::as_bool)
+                == Some(true)
+        {
+            let snapshot = snapshot_from_process(&process, &metadata)?;
+            if !snapshot.alive {
+                return Err(attachment_ended());
+            }
+            return Ok(snapshot);
+        }
+        if std::time::Instant::now() >= deadline {
+            return Err(RefineError::Degraded(format!(
+                "Goal Agent session {session_id} did not acknowledge Toolbar attachment"
+            )));
+        }
+        thread::sleep(COMMAND_POLL_INTERVAL);
+    }
 }
 
 pub fn send_agent_session_input(
@@ -263,6 +372,8 @@ pub fn agent_session_events_range(
     })])
 }
 
+#[cfg(test)]
+mod attachment_tests;
 #[cfg(test)]
 mod recovery_tests;
 #[cfg(test)]

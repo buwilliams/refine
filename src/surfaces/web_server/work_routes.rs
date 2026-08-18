@@ -4,7 +4,9 @@ use std::thread;
 
 use serde_json::{Value, json};
 
-use crate::application::agents::sessions::find_goal_agent_session;
+use crate::application::agents::sessions::{
+    attach_toolbar_goal_agent_session, find_goal_agent_session,
+};
 use crate::application::exports::jira::FileGoalExportService;
 use crate::application::imports::{
     FileImportService, ImportPersistFailureKind, import_drafts_from_value,
