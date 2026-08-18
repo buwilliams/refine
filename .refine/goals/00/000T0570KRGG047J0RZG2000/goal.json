@@ -1,6 +1,6 @@
 {
   "base_commit": "7240706a10f1d45dc387a41825c08891ed52cf41",
-  "branch_name": "refine/00000T0570KRGG047J0RZG2000/round-1",
+  "branch_name": "refine/00000T0570KRGG047J0RZG2000/round-2",
   "candidate_commit": "0f1ca148a0887fc3a65ecbcc85f9b3bab0517d15",
   "created": "2026-08-18T12:37:40Z",
   "feature_id": null,
@@ -85,16 +85,55 @@
         "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
       },
       "assignee": "Buddy Williams",
-      "constitution_state": null,
+      "constitution_state": "passed",
       "created": "2026-08-18T12:37:40Z",
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
-      "governance_candidate_commit": null,
-      "governance_checked_at": null,
-      "governance_details": null,
-      "governance_message": null,
-      "governance_rule_actions": [],
+      "governance_candidate_commit": "0f1ca148a0887fc3a65ecbcc85f9b3bab0517d15",
+      "governance_checked_at": "2026-08-18T13:20:16Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T0570KRGG047J0RZG2000-round-1",
+        "failed_actions": [
+          {
+            "message": "POST /api/terminal/session synchronously polls internal process metadata every 40ms for up to 2 seconds while awaiting a Toolbar acknowledgment. The missing-ack path therefore blocks a local API call far beyond 50ms; repeated acknowledgments also accumulate indefinitely in process metadata.",
+            "rule": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+            "rule_id": "generated-rule-1786471155372-2"
+          }
+        ],
+        "governance_configured": true,
+        "guidance_checked": 2,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"failed\",\"message\":\"Toolbar attachment violates the API latency budget.\",\"violations\":[{\"rule_id\":\"generated-rule-1786471155372-2\",\"rule\":\"Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.\",\"message\":\"POST /api/terminal/session synchronously polls internal process metadata every 40ms for up to 2 seconds while awaiting a Toolbar acknowledgment. The missing-ack path therefore blocks a local API call far beyond 50ms; repeated acknowledgments also accumulate indefinitely in process metadata.\"}],\"recovery_analysis\":\"Preserve the exact-session, runtime-owned acknowledgment and ensure it is persisted before watchdog evaluation, but remove the blocking polling loop from the request path. Use an existing asynchronous operation or event mechanism so each API request returns within 50ms while the Toolbar waits separately before presenting the session as open. Bound or prune acknowledgment identities so repeated opens do not grow process metadata indefinitely.\",\"recovery_round_prompt\":\"Fresh Round for Goal 00000T0570KRGG047J0RZG2000: correct the Toolbar Goal Agent attachment implementation to satisfy the under-50ms non-external API budget without weakening lifecycle safety. Keep attachment one-way and scoped to the exact live workflow Goal Agent. The runtime must persist timeout protection and a matching acknowledgment before evaluating idle or completion watchdogs, and the Toolbar must not present the session as open until that acknowledgment is observed. Replace the synchronous 40ms polling loop and two-second request timeout with existing asynchronous operation/event infrastructure: queue attachment and return a pending result within 50ms, then let the Toolbar observe or poll settlement through requests that each remain under 50ms. Fail settlement on process exit, session or process identity change, or unavailable acknowledgment. Bound and prune pending or completed acknowledgment identities while supporting concurrent opens. Preserve valid completion, needs-input behavior, explicit Stop, Goal cancellation, natural exit, transcript capture, workflow settlement, CLI attachment, and non-Goal session behavior. Update only the affected Goal Agent and Toolbar intent pages while preserving their format. Add focused tests for deadline races, exact-session isolation, missing acknowledgments without blocking an API request, asynchronous Toolbar presentation, concurrent and repeated opens with bounded metadata, and unchanged explicit termination. Verify the exact candidate with formatting, focused Rust session and web lifecycle tests, Toolbar browser tests, scoped warning-denied Clippy, diff hygiene, and concrete request-latency evidence demonstrating every new local API request stays under 50ms.\"}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "Toolbar attachment violates the API latency budget.",
+          "recovery_analysis": "Preserve the exact-session, runtime-owned acknowledgment and ensure it is persisted before watchdog evaluation, but remove the blocking polling loop from the request path. Use an existing asynchronous operation or event mechanism so each API request returns within 50ms while the Toolbar waits separately before presenting the session as open. Bound or prune acknowledgment identities so repeated opens do not grow process metadata indefinitely.",
+          "recovery_round_prompt": "Fresh Round for Goal 00000T0570KRGG047J0RZG2000: correct the Toolbar Goal Agent attachment implementation to satisfy the under-50ms non-external API budget without weakening lifecycle safety. Keep attachment one-way and scoped to the exact live workflow Goal Agent. The runtime must persist timeout protection and a matching acknowledgment before evaluating idle or completion watchdogs, and the Toolbar must not present the session as open until that acknowledgment is observed. Replace the synchronous 40ms polling loop and two-second request timeout with existing asynchronous operation/event infrastructure: queue attachment and return a pending result within 50ms, then let the Toolbar observe or poll settlement through requests that each remain under 50ms. Fail settlement on process exit, session or process identity change, or unavailable acknowledgment. Bound and prune pending or completed acknowledgment identities while supporting concurrent opens. Preserve valid completion, needs-input behavior, explicit Stop, Goal cancellation, natural exit, transcript capture, workflow settlement, CLI attachment, and non-Goal session behavior. Update only the affected Goal Agent and Toolbar intent pages while preserving their format. Add focused tests for deadline races, exact-session isolation, missing acknowledgments without blocking an API request, asynchronous Toolbar presentation, concurrent and repeated opens with bounded metadata, and unchanged explicit termination. Verify the exact candidate with formatting, focused Rust session and web lifecycle tests, Toolbar browser tests, scoped warning-denied Clippy, diff hygiene, and concrete request-latency evidence demonstrating every new local API request stays under 50ms.",
+          "status": "failed",
+          "violations": [
+            {
+              "message": "POST /api/terminal/session synchronously polls internal process metadata every 40ms for up to 2 seconds while awaiting a Toolbar acknowledgment. The missing-ack path therefore blocks a local API call far beyond 50ms; repeated acknowledgments also accumulate indefinitely in process metadata.",
+              "rule": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "rule_id": "generated-rule-1786471155372-2"
+            }
+          ]
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T0570KRGG047J0RZG2000-round-1"
+      },
+      "governance_message": "Toolbar attachment violates the API latency budget.",
+      "governance_recovery_analysis": "Preserve the exact-session, runtime-owned acknowledgment and ensure it is persisted before watchdog evaluation, but remove the blocking polling loop from the request path. Use an existing asynchronous operation or event mechanism so each API request returns within 50ms while the Toolbar waits separately before presenting the session as open. Bound or prune acknowledgment identities so repeated opens do not grow process metadata indefinitely.",
+      "governance_recovery_attempt": 1,
+      "governance_recovery_round_prompt": "Fresh Round for Goal 00000T0570KRGG047J0RZG2000: correct the Toolbar Goal Agent attachment implementation to satisfy the under-50ms non-external API budget without weakening lifecycle safety. Keep attachment one-way and scoped to the exact live workflow Goal Agent. The runtime must persist timeout protection and a matching acknowledgment before evaluating idle or completion watchdogs, and the Toolbar must not present the session as open until that acknowledgment is observed. Replace the synchronous 40ms polling loop and two-second request timeout with existing asynchronous operation/event infrastructure: queue attachment and return a pending result within 50ms, then let the Toolbar observe or poll settlement through requests that each remain under 50ms. Fail settlement on process exit, session or process identity change, or unavailable acknowledgment. Bound and prune pending or completed acknowledgment identities while supporting concurrent opens. Preserve valid completion, needs-input behavior, explicit Stop, Goal cancellation, natural exit, transcript capture, workflow settlement, CLI attachment, and non-Goal session behavior. Update only the affected Goal Agent and Toolbar intent pages while preserving their format. Add focused tests for deadline races, exact-session isolation, missing acknowledgments without blocking an API request, asynchronous Toolbar presentation, concurrent and repeated opens with bounded metadata, and unchanged explicit termination. Verify the exact candidate with formatting, focused Rust session and web lifecycle tests, Toolbar browser tests, scoped warning-denied Clippy, diff hygiene, and concrete request-latency evidence demonstrating every new local API request stays under 50ms.",
+      "governance_rule_actions": [
+        {
+          "message": "POST /api/terminal/session synchronously polls internal process metadata every 40ms for up to 2 seconds while awaiting a Toolbar acknowledgment. The missing-ack path therefore blocks a local API call far beyond 50ms; repeated acknowledgments also accumulate indefinitely in process metadata.",
+          "rule": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+          "rule_id": "generated-rule-1786471155372-2"
+        }
+      ],
       "guidance_decision": {
         "applied": [
           {
@@ -312,8 +351,8 @@
       "implementation_report": "Implemented runtime-acknowledged Toolbar attachment for workflow Goal Agents. Toolbar opens now request a unique exact-session acknowledgment, wait for the same live process to persist one-way timeout protection, and fail closed on exit, mismatch, or missing acknowledgment. The runtime processes and persists attachment before watchdog evaluation, bypasses only idle and completion timeouts after protection, and preserves valid completion, needs-input, explicit Stop/cancellation, natural exit, transcript, worktree, and workflow settlement behavior. Updated Goal Agent and Toolbar intent documentation and added focused runtime and HTTP regressions. Verification: formatting, 34 Goal Agent session tests, 10 Goal lifecycle tests, 37 Toolbar browser tests, and changed-code Clippy passed. The 1,102-test library run had one unrelated source-promotion timing failure (1095 passed, 1 failed, 6 ignored); that exact untouched test passed on immediate isolated rerun.",
       "implementation_reported_at": "2026-08-18T12:58:22Z",
       "logs": [],
-      "meta_rule_state": null,
-      "product_state": null,
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Agent timeouts should not kill toolbar sessions the user has opened.",
       "quality_agent_report": "Quality reviewed the exact candidate and found the runtime/Toolbar contract correct. Added a focused watchdog-losing regression proving ordinary input and resize remain unprotected and a session terminated by its completion deadline cannot later report successful Toolbar attachment; also made the Unix-only test import platform-conditional. Formatting, diff hygiene, 35 Goal Agent session tests, 10 Goal lifecycle tests, 37 Toolbar tests, scoped warning-denied Clippy, and the full 1,103-test library suite passed. Strict unscoped Clippy remains blocked only by four pre-existing warnings in untouched files.",
       "quality_candidate_commit": "0f1ca148a0887fc3a65ecbcc85f9b3bab0517d15",
@@ -371,8 +410,8 @@
       "quality_message": "All Quality tests passed with observed supervised evidence.",
       "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": null,
-      "updated": "2026-08-18T13:17:30Z",
+      "rule_state": "failed",
+      "updated": "2026-08-18T13:20:16Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T12:37:40Z",
         "round_idx": 0,
@@ -473,10 +512,504 @@
       },
       "workflow_reconciliation": null,
       "workflow_recovery": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-18T13:20:17Z",
+        "current_round": {
+          "assignee": "Refine",
+          "prompt": "Fresh Round for Goal 00000T0570KRGG047J0RZG2000: correct the Toolbar Goal Agent attachment implementation to satisfy the under-50ms non-external API budget without weakening lifecycle safety. Keep attachment one-way and scoped to the exact live workflow Goal Agent. The runtime must persist timeout protection and a matching acknowledgment before evaluating idle or completion watchdogs, and the Toolbar must not present the session as open until that acknowledgment is observed. Replace the synchronous 40ms polling loop and two-second request timeout with existing asynchronous operation/event infrastructure: queue attachment and return a pending result within 50ms, then let the Toolbar observe or poll settlement through requests that each remain under 50ms. Fail settlement on process exit, session or process identity change, or unavailable acknowledgment. Bound and prune pending or completed acknowledgment identities while supporting concurrent opens. Preserve valid completion, needs-input behavior, explicit Stop, Goal cancellation, natural exit, transcript capture, workflow settlement, CLI attachment, and non-Goal session behavior. Update only the affected Goal Agent and Toolbar intent pages while preserving their format. Add focused tests for deadline races, exact-session isolation, missing acknowledgments without blocking an API request, asynchronous Toolbar presentation, concurrent and repeated opens with bounded metadata, and unchanged explicit termination. Verify the exact candidate with formatting, focused Rust session and web lifecycle tests, Toolbar browser tests, scoped warning-denied Clippy, diff hygiene, and concrete request-latency evidence demonstrating every new local API request stays under 50ms.",
+          "reporter": "Refine",
+          "round": 2
+        },
+        "goal": {
+          "assignee": "Refine",
+          "id": "00000T0570KRGG047J0RZG2000",
+          "name": "Agent timeouts should not kill toolbar sessions the user has opened.",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "Buddy Williams",
+            "constitution_state": "passed",
+            "governance_checked_at": "2026-08-18T13:20:16Z",
+            "governance_details": {
+              "configured": true,
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T0570KRGG047J0RZG2000-round-1",
+              "failed_actions": [
+                {
+                  "message": "POST /api/terminal/session synchronously polls internal process metadata every 40ms for up to 2 seconds while awaiting a Toolbar acknowledgment. The missing-ack path therefore blocks a local API call far beyond 50ms; repeated acknowledgments also accumulate indefinitely in process metadata.",
+                  "rule": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+                  "rule_id": "generated-rule-1786471155372-2"
+                }
+              ],
+              "governance_configured": true,
+              "guidance_checked": 2,
+              "phase": "post_implementation",
+              "provider": "codex",
+              "raw_output": "{\"status\":\"failed\",\"message\":\"Toolbar attachment violates the API latency budget.\",\"violations\":[{\"rule_id\":\"generated-rule-1786471155372-2\",\"rule\":\"Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.\",\"message\":\"POST /api/terminal/session synchronously polls internal process metadata every 40ms for up to 2 seconds while awaiting a Toolbar acknowledgment. The missing-ack path therefore blocks a local API call far beyond 50ms; repeated acknowledgments also accumulate indefinitely in process metadata.\"}],\"recovery_analysis\":\"Preserve the exact-session, runtime-owned acknowledgment and ensure it is persisted before watchdog evaluation, but remove the blocking polling loop from the request path. Use an existing asynchronous operation or event mechanism so each API request returns within 50ms while the Toolbar waits separately before presenting the session as open. Bound or prune acknowledgment identities so repeated opens do not grow process metadata indefinitely.\",\"recovery_round_prompt\":\"Fresh Round for Goal 00000T0570KRGG047J0RZG2000: correct the Toolbar Goal Agent attachment implementation to satisfy the under-50ms non-external API budget without weakening lifecycle safety. Keep attachment one-way and scoped to the exact live workflow Goal Agent. The runtime must persist timeout protection and a matching acknowledgment before evaluating idle or completion watchdogs, and the Toolbar must not present the session as open until that acknowledgment is observed. Replace the synchronous 40ms polling loop and two-second request timeout with existing asynchronous operation/event infrastructure: queue attachment and return a pending result within 50ms, then let the Toolbar observe or poll settlement through requests that each remain under 50ms. Fail settlement on process exit, session or process identity change, or unavailable acknowledgment. Bound and prune pending or completed acknowledgment identities while supporting concurrent opens. Preserve valid completion, needs-input behavior, explicit Stop, Goal cancellation, natural exit, transcript capture, workflow settlement, CLI attachment, and non-Goal session behavior. Update only the affected Goal Agent and Toolbar intent pages while preserving their format. Add focused tests for deadline races, exact-session isolation, missing acknowledgments without blocking an API request, asynchronous Toolbar presentation, concurrent and repeated opens with bounded metadata, and unchanged explicit termination. Verify the exact candidate with formatting, focused Rust session and web lifecycle tests, Toolbar browser tests, scoped warning-denied Clippy, diff hygiene, and concrete request-latency evidence demonstrating every new local API request stays under 50ms.\"}",
+              "rules_checked": 4,
+              "verdict": {
+                "message": "Toolbar attachment violates the API latency budget.",
+                "recovery_analysis": "Preserve the exact-session, runtime-owned acknowledgment and ensure it is persisted before watchdog evaluation, but remove the blocking polling loop from the request path. Use an existing asynchronous operation or event mechanism so each API request returns within 50ms while the Toolbar waits separately before presenting the session as open. Bound or prune acknowledgment identities so repeated opens do not grow process metadata indefinitely.",
+                "recovery_round_prompt": "Fresh Round for Goal 00000T0570KRGG047J0RZG2000: correct the Toolbar Goal Agent attachment implementation to satisfy the under-50ms non-external API budget without weakening lifecycle safety. Keep attachment one-way and scoped to the exact live workflow Goal Agent. The runtime must persist timeout protection and a matching acknowledgment before evaluating idle or completion watchdogs, and the Toolbar must not present the session as open until that acknowledgment is observed. Replace the synchronous 40ms polling loop and two-second request timeout with existing asynchronous operation/event infrastructure: queue attachment and return a pending result within 50ms, then let the Toolbar observe or poll settlement through requests that each remain under 50ms. Fail settlement on process exit, session or process identity change, or unavailable acknowledgment. Bound and prune pending or completed acknowledgment identities while supporting concurrent opens. Preserve valid completion, needs-input behavior, explicit Stop, Goal cancellation, natural exit, transcript capture, workflow settlement, CLI attachment, and non-Goal session behavior. Update only the affected Goal Agent and Toolbar intent pages while preserving their format. Add focused tests for deadline races, exact-session isolation, missing acknowledgments without blocking an API request, asynchronous Toolbar presentation, concurrent and repeated opens with bounded metadata, and unchanged explicit termination. Verify the exact candidate with formatting, focused Rust session and web lifecycle tests, Toolbar browser tests, scoped warning-denied Clippy, diff hygiene, and concrete request-latency evidence demonstrating every new local API request stays under 50ms.",
+                "status": "failed",
+                "violations": [
+                  {
+                    "message": "POST /api/terminal/session synchronously polls internal process metadata every 40ms for up to 2 seconds while awaiting a Toolbar acknowledgment. The missing-ack path therefore blocks a local API call far beyond 50ms; repeated acknowledgments also accumulate indefinitely in process metadata.",
+                    "rule": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+                    "rule_id": "generated-rule-1786471155372-2"
+                  }
+                ]
+              },
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T0570KRGG047J0RZG2000-round-1"
+            },
+            "governance_message": "Toolbar attachment violates the API latency budget.",
+            "governance_rule_actions": [
+              {
+                "message": "POST /api/terminal/session synchronously polls internal process metadata every 40ms for up to 2 seconds while awaiting a Toolbar acknowledgment. The missing-ack path therefore blocks a local API call far beyond 50ms; repeated acknowledgments also accumulate indefinitely in process metadata.",
+                "rule": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+                "rule_id": "generated-rule-1786471155372-2"
+              }
+            ],
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "id": "guidance-1",
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                },
+                {
+                  "enabled": true,
+                  "id": "guidance-2",
+                  "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+                  "name": "Cohesive code files",
+                  "rule": "Apply whenever an agent adds or changes code files in any language."
+                }
+              ],
+              "code_files_changed": true,
+              "context_version": 1,
+              "recorded_at": "2026-08-18T12:58:22Z",
+              "skipped": []
+            },
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "148e3ff37f026e3861adbefd86edc5ddbd9a3662",
+                "context_digest": "9a4c447a327f7eebccddbc0f711f87371418149ca6d397823a518c39398d9fda",
+                "context_version": 1,
+                "goal_id": "00000T0570KRGG047J0RZG2000",
+                "implementation_branch": "refine/00000T0570KRGG047J0RZG2000/round-1",
+                "round_idx": 0,
+                "target_branch": "main"
+              },
+              "completed_at": "2026-08-18T12:58:21Z",
+              "criticism": {
+                "completed_at": "2026-08-18T12:41:07Z",
+                "git_after": {
+                  "branch": "refine/00000T0570KRGG047J0RZG2000/round-1",
+                  "head_commit": "148e3ff37f026e3861adbefd86edc5ddbd9a3662",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/00000T0570KRGG047J0RZG2000/round-1",
+                  "head_commit": "148e3ff37f026e3861adbefd86edc5ddbd9a3662",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "findings": [
+                    {
+                      "checklist_item_ids": [
+                        "P1",
+                        "P2",
+                        "P4"
+                      ],
+                      "description": "The file-backed command queue is asynchronous, so writing the marker before returning a snapshot does not prove the runtime observed it before an already-due watchdog check kills the session.",
+                      "id": "C1",
+                      "material": true,
+                      "recommendation": "Require an acknowledgment or equivalent atomic coordination before returning success, and test attachment racing an idle or completion deadline."
+                    }
+                  ],
+                  "summary": "Require a successful Toolbar attachment to win atomically against timeout enforcement."
+                },
+                "started_at": "2026-08-18T12:39:22Z"
+              },
+              "final_plan": {
+                "completed_at": "2026-08-18T12:42:22Z",
+                "git_after": {
+                  "branch": "refine/00000T0570KRGG047J0RZG2000/round-1",
+                  "head_commit": "148e3ff37f026e3861adbefd86edc5ddbd9a3662",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/00000T0570KRGG047J0RZG2000/round-1",
+                  "head_commit": "148e3ff37f026e3861adbefd86edc5ddbd9a3662",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Extend the Goal Agent session control contract with an exact-session Toolbar attachment request carrying a unique acknowledgment identity and a persisted one-way protected state, while keeping ordinary input, resize, and non-Toolbar attachment semantics unchanged.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Coordinate attachment inside the Goal Agent runtime so it records the protected state and matching acknowledgment before evaluating either watchdog, making every acknowledged attachment win against an idle or completion deadline.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Make the Toolbar Goal Agent route wait for and validate the matching acknowledgment from the same still-live session before returning its snapshot, and return a conflict or unavailable result if the session exits or the acknowledgment cannot be established.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Once protected, bypass only idle and completion timeout termination while preserving valid completion-signal settlement, needs-input behavior, explicit Stop and Goal cancellation, natural process exit, transcript capture, and workflow ownership.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Add focused regressions for unattached timeout enforcement, acknowledged survival beyond both watchdogs, exact-session and non-Toolbar isolation, deadline races, failed attachment without false success, and later completion or explicit termination.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Update the Goal Agent and Toolbar intent pages to describe acknowledged Toolbar attachment, the automatic-timeout exemption, and the unchanged explicit and workflow-owned lifecycle boundaries.",
+                      "id": "P6"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "C1",
+                      "resolution": "The runtime processes an attachment request by persisting a protected state and its unique acknowledgment before either watchdog check, and the Toolbar route returns success only after it observes that acknowledgment for the exact live session; deadline-race coverage proves an acknowledged open cannot be followed by timeout termination while a losing race cannot be reported as a successful attachment."
+                    }
+                  ],
+                  "summary": "Make opening a live workflow Goal Agent from the Toolbar a one-way, runtime-acknowledged attachment that disables its idle and completion watchdogs before the open succeeds, so a session the user has actually opened cannot be killed by an automatic timeout while unattended sessions remain bounded."
+                },
+                "started_at": "2026-08-18T12:41:07Z"
+              },
+              "governance_precheck": {
+                "attempt": 1,
+                "checked_at": "2026-08-18T12:42:33Z",
+                "message": "The finalized plan does not require violating any governance rule or enabled guidance.",
+                "status": "passed"
+              },
+              "implementation": {
+                "completed_at": "2026-08-18T12:58:21Z",
+                "execution": {
+                  "checklist": [
+                    {
+                      "evidence": "Added the ToolbarAttach session command with a per-request UUID acknowledgment, persisted toolbar_timeout_protected state and acknowledgment identities in the exact managed process record, and exposed the protected state in session snapshots while leaving Input, Resize, and non-Toolbar routes unchanged.",
+                      "id": "P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "The Goal Agent runtime consumes ToolbarAttach commands at the top of its poll loop and registers the protected flag plus matching acknowledgment in one process-record update before inspecting exit/signals or evaluating either watchdog.",
+                      "id": "P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "The Toolbar Goal route now waits for the requested acknowledgment on the same process id and session id, rechecks liveness before returning the snapshot, returns conflict for an exited or changed session, and returns degraded/unavailable when acknowledgment is not established.",
+                      "id": "P3",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Only completion-timeout and idle-timeout verdicts are gated by the one-way protected state. Existing signal processing, needs-input attention, process exit, transcript capture, process-group cleanup, workflow settlement, cancellation, and Stop paths remain authoritative; regressions prove later valid completion and workflow-aware Stop still settle.",
+                      "id": "P4",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added focused attachment tests for near-deadline acknowledgment winning before both watchdogs, survival after both deadlines, unique repeated acknowledgments, exact-session and non-Goal isolation, missing acknowledgment without false success, and later valid completion. Existing unattached hard-cap/idle tests remain green, and web lifecycle coverage verifies acknowledged open plus explicit Stop.",
+                      "id": "P5",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Updated docs/intent Goal Agents and Toolbar pages with exact-session acknowledged attachment, the automatic-timeout exemption, fail-closed open races, and unchanged explicit/workflow lifecycle boundaries.",
+                      "id": "P6",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "cargo fmt -- --check -> exit 0",
+                    "cargo test --lib application::agents::sessions -- --nocapture -> 34 passed, 0 failed, 0 ignored",
+                    "cargo test --lib surfaces::web_server::tests::goals::lifecycle -- --nocapture -> 10 passed, 0 failed, 0 ignored",
+                    "node --test tests/web_supervisor_toolbar.test.js -> 37 passed, 0 failed, 0 skipped",
+                    "cargo clippy --lib -- -D warnings -A clippy::needless-pub-self -A clippy::module-inception -A clippy::unnecessary-sort-by -> exit 0; allowances are limited to untouched repository baseline lint classes",
+                    "cargo clippy --lib -- -D warnings -> failed on 4 pre-existing errors in untouched projection/store.rs, git/worktrees/mod.rs, and web/http/background_loops.rs",
+                    "cargo test --lib -> 1095 passed, 1 failed, 6 ignored; unrelated failure application::system::source_promotion::tests::agent_tests::upgrade_reservation_without_agent_settles_interrupted_and_retryable_after_restart observed queued instead of interrupted",
+                    "cargo test --lib application::system::source_promotion::tests::agent_tests::upgrade_reservation_without_agent_settles_interrupted_and_retryable_after_restart -- --exact --nocapture -> 1 passed, 0 failed",
+                    "git diff --check -> exit 0"
+                  ]
+                },
+                "report": "Implemented runtime-acknowledged Toolbar attachment for workflow Goal Agents. Toolbar opens now request a unique exact-session acknowledgment, wait for the same live process to persist one-way timeout protection, and fail closed on exit, mismatch, or missing acknowledgment. The runtime processes and persists attachment before watchdog evaluation, bypasses only idle and completion timeouts after protection, and preserves valid completion, needs-input, explicit Stop/cancellation, natural exit, transcript, worktree, and workflow settlement behavior. Updated Goal Agent and Toolbar intent documentation and added focused runtime and HTTP regressions. Verification: formatting, 34 Goal Agent session tests, 10 Goal lifecycle tests, 37 Toolbar browser tests, and changed-code Clippy passed. The 1,102-test library run had one unrelated source-promotion timing failure (1095 passed, 1 failed, 6 ignored); that exact untouched test passed on immediate isolated rerun.",
+                "started_at": "2026-08-18T12:42:33Z"
+              },
+              "phase": "implement",
+              "phase_started_at": "2026-08-18T12:42:33Z",
+              "proposal": {
+                "completed_at": "2026-08-18T12:39:22Z",
+                "git_after": {
+                  "branch": "refine/00000T0570KRGG047J0RZG2000/round-1",
+                  "head_commit": "148e3ff37f026e3861adbefd86edc5ddbd9a3662",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/00000T0570KRGG047J0RZG2000/round-1",
+                  "head_commit": "148e3ff37f026e3861adbefd86edc5ddbd9a3662",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Extend the Goal Agent session command and process metadata contract with a one-way Toolbar attachment marker that can be applied to the exact live session without creating a duplicate agent.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Have the Toolbar terminal-session route mark an existing Goal Agent as attached before returning its snapshot while preserving the default and CLI attachment behavior without the exemption.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Change the Goal Agent runtime to stop enforcing idle and completion timeout termination after the attachment marker is observed while retaining completion-signal handling, needs-input behavior, explicit Stop or cancellation, natural exit, transcript capture, and workflow settlement.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Add focused session and web-route regression coverage for unattached timeout enforcement, attached survival beyond both deadlines, exact-session marking, and later clean completion or explicit termination.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Update the affected Goal Agent and Toolbar intent pages to document that opening the workflow-owned session disables automatic timeout termination without changing its workflow ownership or explicit lifecycle controls.",
+                      "id": "P5"
+                    }
+                  ],
+                  "summary": "Mark a live workflow Goal Agent as user-attached when it is opened from the Toolbar and exempt that session from idle and completion timeouts so the user's terminal is not killed while unattended agents remain bounded."
+                },
+                "started_at": "2026-08-18T12:37:40Z"
+              },
+              "schema_version": 2,
+              "started_at": "2026-08-18T12:37:40Z",
+              "state": "completed",
+              "updated_at": "2026-08-18T12:58:21Z"
+            },
+            "implementation_report": "Implemented runtime-acknowledged Toolbar attachment for workflow Goal Agents. Toolbar opens now request a unique exact-session acknowledgment, wait for the same live process to persist one-way timeout protection, and fail closed on exit, mismatch, or missing acknowledgment. The runtime processes and persists attachment before watchdog evaluation, bypasses only idle and completion timeouts after protection, and preserves valid completion, needs-input, explicit Stop/cancellation, natural exit, transcript, worktree, and workflow settlement behavior. Updated Goal Agent and Toolbar intent documentation and added focused runtime and HTTP regressions. Verification: formatting, 34 Goal Agent session tests, 10 Goal lifecycle tests, 37 Toolbar browser tests, and changed-code Clippy passed. The 1,102-test library run had one unrelated source-promotion timing failure (1095 passed, 1 failed, 6 ignored); that exact untouched test passed on immediate isolated rerun.",
+            "implementation_reported_at": "2026-08-18T12:58:22Z",
+            "meta_rule_state": "passed",
+            "product_state": "passed",
+            "prompt": "Agent timeouts should not kill toolbar sessions the user has opened.",
+            "quality_checked_at": "2026-08-18T13:17:29Z",
+            "quality_details": {
+              "candidate_commit": "0f1ca148a0887fc3a65ecbcc85f9b3bab0517d15",
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T0570KRGG047J0RZG2000-round-1",
+              "diagnostics": [
+                "{\"ok\":true,\"summary\":\"Exact candidate passed all focused deterministic checks; no material uncertainty remains within the affected Goal Agent and Toolbar scope.\",\"results\":[{\"test\":\"The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\",\"status\":\"passed\",\"evidence\":\"Observed exit 0. Verified exact candidate 0f1ca148a0887fc3a65ecbcc85f9b3bab0517d15, expected branch, clean worktree, diff hygiene, formatting, 36/36 session tests, 10/10 Goal lifecycle tests, 37/37 Toolbar tests, and warning-denied scoped Clippy.\",\"command\":\"bash -lc 'set -euo pipefail\\ncandidate=0f1ca148a0887fc3a65ecbcc85f9b3bab0517d15\\nbase=7240706a10f1d45dc387a41825c08891ed52cf41\\n[[ \\\"$(git rev-parse HEAD)\\\" == \\\"$candidate\\\" ]]\\n[[ \\\"$(git branch --show-current)\\\" == \\\"refine/00000T0570KRGG047J0RZG2000/round-1\\\" ]]\\n[[ -z \\\"$(git status --porcelain)\\\" ]]\\ngit diff --check \\\"$base..$candidate\\\"\\ncargo fmt -- --check\\ncargo test --lib application::agents::sessions -- --test-threads=1\\ncargo test --lib surfaces::web_server::tests::goals::lifecycle -- --test-threads=1\\nnode --test tests/web_supervisor_toolbar.test.js\\ncargo clippy --lib -- -D warnings -A clippy::needless-pub-self -A clippy::module-inception -A clippy::unnecessary-sort-by\\n[[ -z \\\"$(git status --porcelain)\\\" ]]'\"}]}",
+                "Observed supervised process proc-1787059027173-868123-551 exited 0. stdout: rminal lifecycle routes (2.534665ms)\n✔ the morphed Start button dispatches Stop after an Agent connects (1.896414ms)\n✔ Goal Stop surfaces successful retained-worktree evidence (2.005349ms)\n✔ Goal Stop reports when explicit cancellation remains terminal (2.151947ms)\n✔ Goal Stop reports that a governed planned attempt needs a fresh Round (2.222994ms)\n✔ terminal exit releases Stop UI before workflow cancellation finishes settling (6.351096ms)\n✔ a stopping Agent tab closes locally without issuing a duplicate Stop (3.57346ms)\n✔ toolbar resizing survives a stopping Agent redraw (3.404395ms)\n✔ clicking a stopped terminal tab starts it once (2.472262ms)\n✔ terminal columns refit when its rendered width changes (104.003021ms)\n✔ terminal retains valid geometry while hidden and refits after layout transitions (509.921037ms)\n✔ terminal resize falls back when xterm renderer dimensions are unavailable (104.040807ms)\n✔ terminal output and exit events remain scoped to their tab (2.335439ms)\n✔ terminal output decodes transported ANSI escapes without changing ordinary text (1.632127ms)\n✔ a failed Goal opens an independent diagnostic Agent and can restart it (1.600087ms)\n✔ Goal Agent opens on the latest transcript tail while earlier context loads in the background (2.82489ms)\n✔ stored custom-chat ids are discarded while managed terminal ids reattach (3.638085ms)\n✔ refresh preserves and independently reattaches every explicitly opened Agent (4.372961ms)\n✔ a fresh app session ignores toolbar tabs from an earlier app session (1.398176ms)\n✔ refresh reattaches a live terminal and stream errors do not persist process exit (3.647994ms)\n✔ switching projects stops live terminal profiles before clearing the toolbar (3.620829ms)\n✔ closing a Goal Agent tab stops it through the workflow-aware backend path (1.803434ms)\n✔ process-manager Agent Stop removes any attached toolbar tab locally (2.690351ms)\nℹ tests 37\nℹ suites 0\nℹ pass 37\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 4189.95119 stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s"
+              ],
+              "evaluation_scope": "isolated_candidate",
+              "operation_id": "1a0150293ead3f1bd",
+              "provider_attempts": [
+                {
+                  "accepted": true,
+                  "attempt": 1,
+                  "process_id": "proc-1787058885985-868123-548",
+                  "raw_output": "{\"ok\":true,\"summary\":\"Exact candidate passed all focused deterministic checks; no material uncertainty remains within the affected Goal Agent and Toolbar scope.\",\"results\":[{\"test\":\"The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\",\"status\":\"passed\",\"evidence\":\"Observed exit 0. Verified exact candidate 0f1ca148a0887fc3a65ecbcc85f9b3bab0517d15, expected branch, clean worktree, diff hygiene, formatting, 36/36 session tests, 10/10 Goal lifecycle tests, 37/37 Toolbar tests, and warning-denied scoped Clippy.\",\"command\":\"bash -lc 'set -euo pipefail\\ncandidate=0f1ca148a0887fc3a65ecbcc85f9b3bab0517d15\\nbase=7240706a10f1d45dc387a41825c08891ed52cf41\\n[[ \\\"$(git rev-parse HEAD)\\\" == \\\"$candidate\\\" ]]\\n[[ \\\"$(git branch --show-current)\\\" == \\\"refine/00000T0570KRGG047J0RZG2000/round-1\\\" ]]\\n[[ -z \\\"$(git status --porcelain)\\\" ]]\\ngit diff --check \\\"$base..$candidate\\\"\\ncargo fmt -- --check\\ncargo test --lib application::agents::sessions -- --test-threads=1\\ncargo test --lib surfaces::web_server::tests::goals::lifecycle -- --test-threads=1\\nnode --test tests/web_supervisor_toolbar.test.js\\ncargo clippy --lib -- -D warnings -A clippy::needless-pub-self -A clippy::module-inception -A clippy::unnecessary-sort-by\\n[[ -z \\\"$(git status --porcelain)\\\" ]]'\"}]}"
+                }
+              ],
+              "quality_proof": {
+                "checked_at": "2026-08-18T13:17:29Z",
+                "checked_candidate_commit": "0f1ca148a0887fc3a65ecbcc85f9b3bab0517d15",
+                "evaluation_scope": "isolated_candidate",
+                "goal_id": "00000T0570KRGG047J0RZG2000",
+                "operation_id": "1a0150293ead3f1bd",
+                "results": [
+                  {
+                    "command": "bash -lc 'set -euo pipefail\ncandidate=0f1ca148a0887fc3a65ecbcc85f9b3bab0517d15\nbase=7240706a10f1d45dc387a41825c08891ed52cf41\n[[ \"$(git rev-parse HEAD)\" == \"$candidate\" ]]\n[[ \"$(git branch --show-current)\" == \"refine/00000T0570KRGG047J0RZG2000/round-1\" ]]\n[[ -z \"$(git status --porcelain)\" ]]\ngit diff --check \"$base..$candidate\"\ncargo fmt -- --check\ncargo test --lib application::agents::sessions -- --test-threads=1\ncargo test --lib surfaces::web_server::tests::goals::lifecycle -- --test-threads=1\nnode --test tests/web_supervisor_toolbar.test.js\ncargo clippy --lib -- -D warnings -A clippy::needless-pub-self -A clippy::module-inception -A clippy::unnecessary-sort-by\n[[ -z \"$(git status --porcelain)\" ]]'",
+                    "evidence": "Observed supervised process proc-1787059027173-868123-551 exited 0. stdout: rminal lifecycle routes (2.534665ms)\n✔ the morphed Start button dispatches Stop after an Agent connects (1.896414ms)\n✔ Goal Stop surfaces successful retained-worktree evidence (2.005349ms)\n✔ Goal Stop reports when explicit cancellation remains terminal (2.151947ms)\n✔ Goal Stop reports that a governed planned attempt needs a fresh Round (2.222994ms)\n✔ terminal exit releases Stop UI before workflow cancellation finishes settling (6.351096ms)\n✔ a stopping Agent tab closes locally without issuing a duplicate Stop (3.57346ms)\n✔ toolbar resizing survives a stopping Agent redraw (3.404395ms)\n✔ clicking a stopped terminal tab starts it once (2.472262ms)\n✔ terminal columns refit when its rendered width changes (104.003021ms)\n✔ terminal retains valid geometry while hidden and refits after layout transitions (509.921037ms)\n✔ terminal resize falls back when xterm renderer dimensions are unavailable (104.040807ms)\n✔ terminal output and exit events remain scoped to their tab (2.335439ms)\n✔ terminal output decodes transported ANSI escapes without changing ordinary text (1.632127ms)\n✔ a failed Goal opens an independent diagnostic Agent and can restart it (1.600087ms)\n✔ Goal Agent opens on the latest transcript tail while earlier context loads in the background (2.82489ms)\n✔ stored custom-chat ids are discarded while managed terminal ids reattach (3.638085ms)\n✔ refresh preserves and independently reattaches every explicitly opened Agent (4.372961ms)\n✔ a fresh app session ignores toolbar tabs from an earlier app session (1.398176ms)\n✔ refresh reattaches a live terminal and stream errors do not persist process exit (3.647994ms)\n✔ switching projects stops live terminal profiles before clearing the toolbar (3.620829ms)\n✔ closing a Goal Agent tab stops it through the workflow-aware backend path (1.803434ms)\n✔ process-manager Agent Stop removes any attached toolbar tab locally (2.690351ms)\nℹ tests 37\nℹ suites 0\nℹ pass 37\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 4189.95119 stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s Agent report: Observed exit 0. Verified exact candidate 0f1ca148a0887fc3a65ecbcc85f9b3bab0517d15, expected branch, clean worktree, diff hygiene, formatting, 36/36 session tests, 10/10 Goal lifecycle tests, 37/37 Toolbar tests, and warning-denied scoped Clippy.",
+                    "exit_code": 0,
+                    "process_id": "proc-1787059027173-868123-551",
+                    "status": "passed",
+                    "test": "The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks."
+                  }
+                ],
+                "round_idx": 0,
+                "schema_version": 1,
+                "source_candidate_commit": "0f1ca148a0887fc3a65ecbcc85f9b3bab0517d15",
+                "state": "passed"
+              },
+              "results": [
+                {
+                  "command": "bash -lc 'set -euo pipefail\ncandidate=0f1ca148a0887fc3a65ecbcc85f9b3bab0517d15\nbase=7240706a10f1d45dc387a41825c08891ed52cf41\n[[ \"$(git rev-parse HEAD)\" == \"$candidate\" ]]\n[[ \"$(git branch --show-current)\" == \"refine/00000T0570KRGG047J0RZG2000/round-1\" ]]\n[[ -z \"$(git status --porcelain)\" ]]\ngit diff --check \"$base..$candidate\"\ncargo fmt -- --check\ncargo test --lib application::agents::sessions -- --test-threads=1\ncargo test --lib surfaces::web_server::tests::goals::lifecycle -- --test-threads=1\nnode --test tests/web_supervisor_toolbar.test.js\ncargo clippy --lib -- -D warnings -A clippy::needless-pub-self -A clippy::module-inception -A clippy::unnecessary-sort-by\n[[ -z \"$(git status --porcelain)\" ]]'",
+                  "evidence": "Observed supervised process proc-1787059027173-868123-551 exited 0. stdout: rminal lifecycle routes (2.534665ms)\n✔ the morphed Start button dispatches Stop after an Agent connects (1.896414ms)\n✔ Goal Stop surfaces successful retained-worktree evidence (2.005349ms)\n✔ Goal Stop reports when explicit cancellation remains terminal (2.151947ms)\n✔ Goal Stop reports that a governed planned attempt needs a fresh Round (2.222994ms)\n✔ terminal exit releases Stop UI before workflow cancellation finishes settling (6.351096ms)\n✔ a stopping Agent tab closes locally without issuing a duplicate Stop (3.57346ms)\n✔ toolbar resizing survives a stopping Agent redraw (3.404395ms)\n✔ clicking a stopped terminal tab starts it once (2.472262ms)\n✔ terminal columns refit when its rendered width changes (104.003021ms)\n✔ terminal retains valid geometry while hidden and refits after layout transitions (509.921037ms)\n✔ terminal resize falls back when xterm renderer dimensions are unavailable (104.040807ms)\n✔ terminal output and exit events remain scoped to their tab (2.335439ms)\n✔ terminal output decodes transported ANSI escapes without changing ordinary text (1.632127ms)\n✔ a failed Goal opens an independent diagnostic Agent and can restart it (1.600087ms)\n✔ Goal Agent opens on the latest transcript tail while earlier context loads in the background (2.82489ms)\n✔ stored custom-chat ids are discarded while managed terminal ids reattach (3.638085ms)\n✔ refresh preserves and independently reattaches every explicitly opened Agent (4.372961ms)\n✔ a fresh app session ignores toolbar tabs from an earlier app session (1.398176ms)\n✔ refresh reattaches a live terminal and stream errors do not persist process exit (3.647994ms)\n✔ switching projects stops live terminal profiles before clearing the toolbar (3.620829ms)\n✔ closing a Goal Agent tab stops it through the workflow-aware backend path (1.803434ms)\n✔ process-manager Agent Stop removes any attached toolbar tab locally (2.690351ms)\nℹ tests 37\nℹ suites 0\nℹ pass 37\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 4189.95119 stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s Agent report: Observed exit 0. Verified exact candidate 0f1ca148a0887fc3a65ecbcc85f9b3bab0517d15, expected branch, clean worktree, diff hygiene, formatting, 36/36 session tests, 10/10 Goal lifecycle tests, 37/37 Toolbar tests, and warning-denied scoped Clippy.",
+                  "exit_code": 0,
+                  "process_id": "proc-1787059027173-868123-551",
+                  "status": "passed",
+                  "test": "The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks."
+                }
+              ],
+              "source_candidate_commit": "0f1ca148a0887fc3a65ecbcc85f9b3bab0517d15"
+            },
+            "quality_message": "All Quality tests passed with observed supervised evidence.",
+            "quality_state": "passed",
+            "reporter": "Buddy Williams",
+            "round": 1,
+            "rule_state": "failed"
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "assignee": "Refine",
+      "automatic_retry": {
+        "attempt": 1,
+        "generated_at": "2026-08-18T13:20:16Z",
+        "kind": "governance",
+        "source_round": 1
+      },
+      "constitution_state": "unclassified",
+      "created": "2026-08-18T13:20:16Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_candidate_commit": "",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "guidance_decision": null,
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "7240706a10f1d45dc387a41825c08891ed52cf41",
+          "context_digest": "e3f1650e12aa3702c7e19ac0fd8623bf4782c034cc3ea63b0d93553431828cf6",
+          "context_version": 1,
+          "goal_id": "00000T0570KRGG047J0RZG2000",
+          "implementation_branch": "refine/00000T0570KRGG047J0RZG2000/round-2",
+          "round_idx": 1,
+          "target_branch": "main"
+        },
+        "final_plan": {
+          "completed_at": "2026-08-18T13:20:17Z",
+          "git_after": {
+            "branch": "refine/00000T0570KRGG047J0RZG2000/round-2",
+            "head_commit": "0f1ca148a0887fc3a65ecbcc85f9b3bab0517d15",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T0570KRGG047J0RZG2000/round-2",
+            "head_commit": "0f1ca148a0887fc3a65ecbcc85f9b3bab0517d15",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Correct the Round 1 governance findings by implementing the current Round request on the retained candidate.",
+                "id": "R1"
+              }
+            ],
+            "summary": "Scoped governance recovery for Round 1: implement the current Round request directly on the retained candidate. Planning is skipped for this recovery; the full Quality and Governance gates still judge the result."
+          },
+          "started_at": "2026-08-18T13:20:17Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-18T13:20:17Z",
+        "proposal": {
+          "completed_at": "2026-08-18T13:20:17Z",
+          "git_after": {
+            "branch": "refine/00000T0570KRGG047J0RZG2000/round-2",
+            "head_commit": "0f1ca148a0887fc3a65ecbcc85f9b3bab0517d15",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T0570KRGG047J0RZG2000/round-2",
+            "head_commit": "0f1ca148a0887fc3a65ecbcc85f9b3bab0517d15",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Correct the Round 1 governance findings by implementing the current Round request on the retained candidate.",
+                "id": "R1"
+              }
+            ],
+            "summary": "Scoped governance recovery for Round 1: implement the current Round request directly on the retained candidate. Planning is skipped for this recovery; the full Quality and Governance gates still judge the result."
+          },
+          "started_at": "2026-08-18T13:20:17Z"
+        },
+        "schema_version": 2,
+        "started_at": "2026-08-18T13:20:17Z",
+        "state": "in_progress",
+        "updated_at": "2026-08-18T13:20:17Z"
+      },
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Fresh Round for Goal 00000T0570KRGG047J0RZG2000: correct the Toolbar Goal Agent attachment implementation to satisfy the under-50ms non-external API budget without weakening lifecycle safety. Keep attachment one-way and scoped to the exact live workflow Goal Agent. The runtime must persist timeout protection and a matching acknowledgment before evaluating idle or completion watchdogs, and the Toolbar must not present the session as open until that acknowledgment is observed. Replace the synchronous 40ms polling loop and two-second request timeout with existing asynchronous operation/event infrastructure: queue attachment and return a pending result within 50ms, then let the Toolbar observe or poll settlement through requests that each remain under 50ms. Fail settlement on process exit, session or process identity change, or unavailable acknowledgment. Bound and prune pending or completed acknowledgment identities while supporting concurrent opens. Preserve valid completion, needs-input behavior, explicit Stop, Goal cancellation, natural exit, transcript capture, workflow settlement, CLI attachment, and non-Goal session behavior. Update only the affected Goal Agent and Toolbar intent pages while preserving their format. Add focused tests for deadline races, exact-session isolation, missing acknowledgments without blocking an API request, asynchronous Toolbar presentation, concurrent and repeated opens with bounded metadata, and unchanged explicit termination. Verify the exact candidate with formatting, focused Rust session and web lifecycle tests, Toolbar browser tests, scoped warning-denied Clippy, diff hygiene, and concrete request-latency evidence demonstrating every new local API request stays under 50ms.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Refine",
+      "rule_state": "unclassified",
+      "updated": "2026-08-18T13:20:17Z",
+      "workflow_attempt_authority": {
+        "claimed_at": "2026-08-18T13:20:16Z",
+        "round_idx": 1,
+        "workflow_revision": 28
+      },
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
     }
   ],
-  "status": "governance",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-08-18T13:17:30Z",
-  "workflow_revision": 26
+  "updated": "2026-08-18T13:20:17Z",
+  "workflow_revision": 36
 }
