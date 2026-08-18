@@ -1,7 +1,7 @@
 {
   "base_commit": "ff07e292388a2b3cfe2fcb1c3fb52bec4bb0ab4a",
   "branch_name": "refine/DR49680EE1475D2F2FFE46AC54/round-2",
-  "candidate_commit": "d96184e661f45642f2de1a8160259e816ab2fdc6",
+  "candidate_commit": "fe95179e068d30533b0727546dc1eadbfd4c3cea",
   "created": "2026-08-18T13:36:00Z",
   "feature_id": null,
   "feature_order": null,
@@ -1092,13 +1092,15 @@
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
       "prompt": "Round 2 correction to the integrated Round 1 resource governor:\n\nChange automatic agent admission to use 70 percent of detected host capacity instead of the hard-coded 25 percent. The percentage applies consistently to both detected logical CPU cores and currently available memory, so the default leaves 30 percent for Docker, target applications, and other host work.\n\nMake this percentage an existing-architecture, node-scoped Refine Runtime Config setting named automatic_agent_resource_budget_percent. Its product default is 70. Supported settings load, patch, persistence, and copy-between-node behavior must carry it; legacy state where the key is absent must also behave as 70. Validate supported writes as an integer percentage in the inclusive range 1 through 100, and do not silently accept malformed or out-of-range values.\n\nThread the configured percentage into HostResources automatic-concurrency calculation. Use overflow-safe integer arithmetic and retain the minimum one-slot progress guarantee. Preserve Round 1 safeguards: unknown host memory still falls back to one automatic slot, the per-agent reservation remains at least 2 GiB, complete managed process-tree memory accounting remains required before observed usage can influence scaling, and disk-headroom behavior is unchanged.\n\nKeep a positive parallel_run_cap as the authoritative absolute operator override. The percentage only governs Automatic mode when parallel_run_cap is blank or unset; unset subordinate node, provider, and target-app caps must continue to inherit the resulting global limit.\n\nExpose Automatic resource budget percent in Node -> Runtime Config with a default/current value of 70, clear percent semantics, numeric bounds, and autosave through the existing settings API. Update the matching Guide and only the affected docs/intent pages so they describe the configurable 70 percent default rather than quarter-host behavior.\n\nAdd focused regression coverage proving: default and missing-key behavior are 70 percent; an explicit valid percentage changes both CPU- and memory-limited concurrency; invalid supported writes are rejected; the explicit parallel-run cap still wins; Runtime Config renders and saves the field; and the conservative telemetry/process-tree fallbacks from Round 1 remain intact. Verify the exact candidate with cargo fmt --all -- --check, git diff --check, JavaScript syntax checks for changed static files, and focused cargo test --lib filters for the settings codec, workflow policy, host resource governor, and static Runtime Config surface.",
+      "quality_agent_report": "Quality reviewed and corrected the round-2 candidate. The configured 70 percent Automatic CPU and available-memory budget, strict node settings codec, explicit-cap precedence, locked copy-between-node behavior, Runtime Config and Guide surfaces, and affected intent pages satisfy the finalized plan. Quality narrowed nodes.json lock scope so remote bootstrap runs outside the registry lock, reloads before health settlement, preserves concurrent Runtime Config writes, and rejects settlement when bootstrap authority changed. Exact verification passed: cargo fmt, diff hygiene, both changed JavaScript syntax checks, 14 settings tests, 3 workflow-policy tests, 11 host-resource tests, the copy API and static Runtime Config tests, the new bootstrap settlement regression, all 13 fleet-service tests, and adjusted strict Clippy.",
+      "quality_candidate_commit": "fe95179e068d30533b0727546dc1eadbfd4c3cea",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T15:25:34Z",
+      "updated": "2026-08-18T15:32:15Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T15:05:26Z",
         "round_idx": 1,
@@ -1110,6 +1112,6 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-18T15:25:34Z",
-  "workflow_revision": 55
+  "updated": "2026-08-18T15:32:15Z",
+  "workflow_revision": 57
 }
