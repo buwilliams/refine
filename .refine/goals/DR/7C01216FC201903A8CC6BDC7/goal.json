@@ -269,13 +269,15 @@
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
       "prompt": "From: Buddy Williams <buddy.williams@insurity.com>\nSubject: Improve Agent Prompt Guidance\n\nBody:\nThe guidance prompt given to web UI toolbar agents advise to initially operate on the existing node and that making changes should involve either creating new rounds on failed goals or creating new goals or answering questions. The agent is primarily there for investigations and managing the current refine node. Obviously, this guidance does not apply to the workflow automation (planning, implementation, quality, or governance) and is only related to the toolbar agents both normal agents and planning agents.\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nBuddy Williams\r\nBuddy.Williams@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
+      "quality_agent_report": "Quality review found no candidate defects and made no corrections. The committed candidate cleanly refactors the general-Agent policy into an exactly 180-word shared node-first toolbar prompt, composes it only into normal Agent and Planing Agent profiles, preserves the Goal diagnostic, Agent in Worktree, and workflow-automation boundaries, updates only the focused toolbar intent page, and adds focused composition coverage. Formatting, focused prompt tests, prompt-template invariants, diff checks, and baseline-adjusted Clippy pass. The full library suite reproduced one unrelated nondeterministic source-promotion baseline failure; 1091 tests passed, 6 were ignored, and the failed test passed immediately in isolation.",
+      "quality_candidate_commit": "07d27170c26d616c9d1db4badad069a17b8e1f02",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T11:15:09Z",
+      "updated": "2026-08-18T11:19:06Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T11:02:00Z",
         "round_idx": 0,
@@ -287,6 +289,6 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-18T11:15:09Z",
-  "workflow_revision": 21
+  "updated": "2026-08-18T11:19:06Z",
+  "workflow_revision": 23
 }
