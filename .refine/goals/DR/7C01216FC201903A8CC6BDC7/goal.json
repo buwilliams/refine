@@ -1,7 +1,7 @@
 {
   "base_commit": "827a23a8c5e609fad7bef0dcb98690a335da0228",
   "branch_name": "refine/DR7C01216FC201903A8CC6BDC7/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "07d27170c26d616c9d1db4badad069a17b8e1f02",
   "created": "2026-08-18T11:01:58Z",
   "feature_id": null,
   "feature_order": null,
@@ -95,7 +95,28 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-18T11:15:09Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "827a23a8c5e609fad7bef0dcb98690a335da0228",
@@ -106,6 +127,7 @@
           "round_idx": 0,
           "target_branch": "main"
         },
+        "completed_at": "2026-08-18T11:15:09Z",
         "criticism": {
           "completed_at": "2026-08-18T11:04:52Z",
           "git_after": {
@@ -160,6 +182,40 @@
           "message": "The finalized plan can be executed without violating the Constitution, governance rules, or enabled guidance.",
           "status": "passed"
         },
+        "implementation": {
+          "completed_at": "2026-08-18T11:15:09Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Replaced terminal_profiles/general-agent-workflow.md with the cohesive terminal_profiles/toolbar-agent-workflow.md contract. It begins with the existing Refine Node, prioritizes current-Node investigation/management and direct answers, sends requested repository changes to a new complete Goal, and uses an evidence-preserving recovery Round for a failed Goal.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "terminal_profile_prompt now composes TerminalProfileToolbarAgentWorkflow only for agent and plan. Regression coverage proves both receive the shared contract and retain their distinct general-purpose versus co-design role text, while goal and standalone profiles do not receive it; no planning, implementation, Quality, or Governance automation prompt was changed.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated docs/intent/05-surfaces/03-browser/15-toolbar.md only, documenting the existing-Node priority, new-Goal and failed-Goal recovery-Round handoffs, and the explicit normal-Agent/Planning-Agent toolbar-only boundary.",
+                "id": "P3",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "cargo fmt --all -- --check -> exit 0",
+              "git diff --check -> exit 0",
+              "cargo test --lib toolbar_agent_prompts_are_node_first_and_route_changes_through_refine_workflow -> 1 passed, 0 failed",
+              "cargo test --lib application::agent_io::prompts::tests -> 8 passed, 0 failed",
+              "cargo test --lib -> 1091 passed, 1 failed, 6 ignored; unrelated application::system::source_promotion::tests::agent_tests::active_launch_reservation_is_not_settled_before_its_process_receipt observed queued instead of interrupted",
+              "cargo test --lib application::system::source_promotion::tests::agent_tests::active_launch_reservation_is_not_settled_before_its_process_receipt -- --exact -> 1 passed, 0 failed",
+              "cargo clippy --lib -- -D warnings -> failed on four pre-existing unrelated warnings: two needless_pub_self in application/projects/projection/store.rs, module_inception in infrastructure/git/worktrees/mod.rs, and unnecessary_sort_by in surfaces/web_server/http/background_loops.rs",
+              "cargo clippy --lib -- -A clippy::needless-pub-self -A clippy::module-inception -A clippy::unnecessary-sort-by -D warnings -> exit 0"
+            ]
+          },
+          "report": "Refactored the former general-Agent-only policy into a shared 180-word node-first toolbar prompt, composed it into normal Agent and Planning Agent sessions only, preserved each profile's role text and the Goal/Agent-in-Worktree/workflow automation boundaries, updated the focused toolbar intent contract, and added profile-composition regression coverage. Formatting, focused tests, prompt-template invariants, and baseline-lint-adjusted Clippy pass. The full library run recorded 1091 passed, 1 unrelated source-promotion test failed, and 6 ignored; the exact failed test passed immediately in isolation. Strict Clippy found four pre-existing warnings in unrelated files, while the same command passed with only those named baseline lint categories allowed.",
+          "started_at": "2026-08-18T11:07:39Z"
+        },
         "invalid_output_attempts": [
           {
             "attempt": 1,
@@ -204,11 +260,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-08-18T11:02:00Z",
-        "state": "in_progress",
-        "updated_at": "2026-08-18T11:07:39Z"
+        "state": "completed",
+        "updated_at": "2026-08-18T11:15:09Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Refactored the former general-Agent-only policy into a shared 180-word node-first toolbar prompt, composed it into normal Agent and Planning Agent sessions only, preserved each profile's role text and the Goal/Agent-in-Worktree/workflow automation boundaries, updated the focused toolbar intent contract, and added profile-composition regression coverage. Formatting, focused tests, prompt-template invariants, and baseline-lint-adjusted Clippy pass. The full library run recorded 1091 passed, 1 unrelated source-promotion test failed, and 6 ignored; the exact failed test passed immediately in isolation. Strict Clippy found four pre-existing warnings in unrelated files, while the same command passed with only those named baseline lint categories allowed.",
+      "implementation_reported_at": "2026-08-18T11:15:09Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -219,7 +275,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T11:07:39Z",
+      "updated": "2026-08-18T11:15:09Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T11:02:00Z",
         "round_idx": 0,
@@ -229,8 +285,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-18T11:07:39Z",
-  "workflow_revision": 16
+  "updated": "2026-08-18T11:15:09Z",
+  "workflow_revision": 21
 }
