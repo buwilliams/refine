@@ -117,6 +117,13 @@ impl InProcessWebServer {
             };
             match find_goal_agent_session(&runtime_root, goal_id) {
                 Ok(snapshot) => {
+                    if surface == TerminalSessionLaunchSurface::Toolbar {
+                        return self.queue_toolbar_goal_agent_attachment(
+                            runtime_root,
+                            goal_id,
+                            snapshot,
+                        );
+                    }
                     return match serde_json::to_value(snapshot) {
                         Ok(value) => ApiResponse::json(200, value),
                         Err(error) => error_response(RefineError::Serialization(format!(

@@ -24,7 +24,7 @@ The add menu appears immediately after the Toolbar label and offers:
 - Terminal;
 - Planing Agent.
 
-Each selection creates or opens only the requested surface. Repeated Agent selections create independent sessions with unique labels such as Agent, Agent 2, and Agent 3. Agent in Worktree and Standalone use isolated Refine worktrees. Goal tabs attach to the workflow-owned Goal Agent already implementing that Goal and never launch a duplicate.
+Each selection creates or opens only the requested surface. Repeated Agent selections create independent sessions with unique labels such as Agent, Agent 2, and Agent 3. Agent in Worktree and Standalone use isolated Refine worktrees. Goal tabs attach to the workflow-owned Goal Agent already implementing that Goal and never launch a duplicate. Opening a live Goal tab queues a bounded background attachment operation immediately, then waits for the exact runtime session to acknowledge one-way protection from its idle and completion watchdogs before presenting the terminal; an exit, mismatched session, or unavailable acknowledgment fails the operation instead of returning a stale snapshot. This exemption is specific to a Toolbar-opened workflow Goal Agent and does not change other terminal attachment paths.
 
 ## Lifecycle
 
@@ -40,6 +40,10 @@ Each selection creates or opens only the requested surface. Repeated Agent selec
 - closing a Goal Agent tab uses the supported backend stop path, which preserves
   process settlement, worktree and branch retention, Goal requeue, and audit
   semantics after the browser surface detaches;
+- acknowledged Goal Agent timeout protection affects only automatic idle and
+  completion termination; valid completion, needs-input, explicit Stop and Goal
+  cancellation, natural exit, transcript capture, and workflow settlement keep
+  their existing authority;
 - when an explicit Stop is already in progress, closing its tab only detaches
   the browser surface and never sends a duplicate Stop; the original
   workflow-aware stop settlement continues and any late failure remains visible;

@@ -4,7 +4,10 @@ use std::thread;
 
 use serde_json::{Value, json};
 
-use crate::application::agents::sessions::find_goal_agent_session;
+use crate::application::agents::sessions::{
+    ToolbarGoalAgentAttachmentStatus, find_goal_agent_session, queue_toolbar_goal_agent_attachment,
+    toolbar_goal_agent_attachment_status,
+};
 use crate::application::exports::jira::FileGoalExportService;
 use crate::application::imports::{
     FileImportService, ImportPersistFailureKind, import_drafts_from_value,
@@ -78,6 +81,7 @@ mod import_routes;
 mod terminal_profiles;
 #[cfg(test)]
 mod tests;
+mod toolbar_attachment;
 
 use feature_contract::{feature_detail_response_from_goals, feature_reorder_order_from_body};
 use import_contract::{

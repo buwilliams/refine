@@ -321,6 +321,7 @@ function browserRuntime(storage = new Map(), persistentStorage = new Map()) {
       systemOperations() {
         return systemOperationState.messages.map((item) => ({ ...item }));
       },
+      settleOperation(operation) { dispatchBackgroundOperationUpdate(operation); },
       toasts() { return testToasts.map((item) => [...item]); },
       setApi(nextApi) { api = nextApi; },
       setReporter(name) { setLastReporter(name); },
@@ -858,6 +859,58 @@ test("Agent, Plan, Goal, and Standalone render the shared terminal surface", asy
     assert.doesNotMatch(browser.html(), /id="chat-input"/);
     assert.doesNotMatch(browser.html(), /data-testid="toolbar-agent-panel"/);
   }
+});
+
+test("Goal Agent is not presented until asynchronous Toolbar attachment is acknowledged", async () => {
+  const browser = browserRuntime();
+  const requests = [];
+  const operation = {
+    id: "goal-attachment-operation",
+    status: "running",
+    progress: {},
+    result: {},
+  };
+  browser.runtime.setApi(async (method, requestPath, body) => {
+    requests.push({ method, path: requestPath, body });
+    if (requestPath === "/api/terminal/session") return { operation };
+    if (requestPath === `/api/operations/${operation.id}`) return { operation };
+    throw new Error(`unexpected request: ${requestPath}`);
+  });
+
+  const opening = browser.runtime.openGoal("GOAL-ASYNC");
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(browser.runtime.terminal("GOAL-ASYNC").loading, true);
+  assert.equal(browser.runtime.terminal("GOAL-ASYNC").connected, false);
+  assert.equal(browser.runtime.terminal("GOAL-ASYNC").sessionId, "");
+  assert.equal(browser.events().length, 0);
+
+  browser.runtime.settleOperation({
+    ...operation,
+    status: "complete",
+    result: {
+      id: "goal-async-session",
+      process_id: "goal-async-process",
+      cwd: "/repo/worktree",
+      profile: "goal",
+      provider: "codex",
+      goal_id: "GOAL-ASYNC",
+      toolbar_timeout_protected: true,
+    },
+  });
+  await opening;
+
+  assert.equal(browser.runtime.terminal("GOAL-ASYNC").loading, false);
+  assert.equal(browser.runtime.terminal("GOAL-ASYNC").connected, true);
+  assert.equal(browser.runtime.terminal("GOAL-ASYNC").sessionId, "goal-async-session");
+  assert.equal(browser.events().length, 1);
+  assert.deepEqual(
+    requests.map(({ method, path }) => [method, path]),
+    [
+      ["POST", "/api/terminal/session"],
+      ["GET", "/api/operations/goal-attachment-operation"],
+    ],
+  );
 });
 
 test("switching back to each Agent terminal scrolls to bottom without disturbing scrollback earlier", async () => {
