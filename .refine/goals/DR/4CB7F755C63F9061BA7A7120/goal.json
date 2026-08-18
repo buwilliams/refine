@@ -106,8 +106,45 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-08-18T10:12:22Z",
+        "criticism": {
+          "completed_at": "2026-08-18T10:14:45Z",
+          "git_after": {
+            "branch": "refine/DR4CB7F755C63F9061BA7A7120/round-1",
+            "head_commit": "1037732c9b33d8574c66a026aa021ffc62dd96a7",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR4CB7F755C63F9061BA7A7120/round-1",
+            "head_commit": "1037732c9b33d8574c66a026aa021ffc62dd96a7",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P1"
+                ],
+                "description": "P1 does not explicitly require documenting priority as a hard lifecycle gate: a lower-priority Todo is ineligible while higher-priority authored, Feature-eligible Todo or automated-active work exists on the same node, and becomes eligible only after that higher-priority work exits the active lifecycle.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Add the exact blocking and release rule to P1 alongside the current per-node and intended global scope."
+              },
+              {
+                "checklist_item_ids": [
+                  "P1"
+                ],
+                "description": "P1 names only the workflow and Feature pages, but docs/intent/02-model/02-models.md still advertises future dependency graphs, contradicting the requested canonical linear Feature order plus priority model with no separate DAG.",
+                "id": "C2",
+                "material": true,
+                "recommendation": "Include the affected model intent page and remove or clearly disambiguate its dependency-graph promise."
+              }
+            ],
+            "summary": "The runtime plan is sound, but the documentation contract needs to state the exact priority gate and remove a conflicting DAG promise."
+          },
+          "started_at": "2026-08-18T10:12:22Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-08-18T10:14:45Z",
         "proposal": {
           "completed_at": "2026-08-18T10:12:22Z",
           "git_after": {
@@ -142,7 +179,7 @@
         "schema_version": 2,
         "started_at": "2026-08-18T10:09:45Z",
         "state": "in_progress",
-        "updated_at": "2026-08-18T10:12:22Z"
+        "updated_at": "2026-08-18T10:14:45Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -156,7 +193,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T10:12:22Z",
+      "updated": "2026-08-18T10:14:45Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T10:09:44Z",
         "round_idx": 0,
@@ -168,6 +205,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-18T10:12:22Z",
-  "workflow_revision": 9
+  "updated": "2026-08-18T10:14:45Z",
+  "workflow_revision": 11
 }
