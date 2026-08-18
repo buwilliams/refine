@@ -6,6 +6,7 @@
 - **Always-On Automation**: workflow is state movement, not a user-facing scheduler.
 - **Agents As Tools**: agents perform steps; they do not own workflow meaning.
 - **Transient Execution**: local workers are replaceable and may run work at least once.
+- **Hard Sequencing**: Feature order and priority enforce when Goals may start.
 - **Shared Semantics**: CLI, browser, API, MCP, and agent surfaces use the same rules.
 
 ## Purpose
@@ -29,7 +30,15 @@ The lifecycle is:
 - failed: the attempt stopped with inspectable evidence;
 - cancelled: the work is intentionally terminal.
 
-Workflow policy applies soft global, node, provider, and target-app limits based on observed live processes. Feature order and priority shape selection. An in-memory active set avoids duplicate launches in one runner, while synchronized Goal status, node assignment, and Round remain authoritative across nodes.
+Workflow policy applies soft global, node, provider, and target-app limits based on observed live processes. Feature order and priority enforce start ordering. For ordered Goals in a Feature, Goal N+1 cannot start until Goal N reaches review, done, or cancelled. A failed ordered Goal does not release the barrier and blocks the rest of that Feature sequence.
+
+Priority is also a hard gate across the active workflow lifecycle. A lower-priority authored Todo Goal is ineligible while a higher-priority authored and Feature-eligible Goal on the same node is Todo, plan, implement, quality, or governance. This includes Todo work already tracked by a runner. Already-active Goals continue; the lower-priority Todo becomes eligible only after the higher-priority work exits that lifecycle.
+
+These gates are currently evaluated per node, not across the fleet. Users who need an ordered sequence enforced today must assign its Goals to one node. Global enforcement across all nodes is the intended direction.
+
+Linear Feature order plus priority is Refine's canonical dependency model. User-authored “after X” placement and imported `depends_on` relationships compile to the Feature's integer order; Refine deliberately has no separate DAG or blocked-by graph.
+
+An in-memory active set avoids duplicate launches in one runner, while synchronized Goal status, node assignment, and Round remain authoritative across nodes.
 
 Workers persist semantic artifacts and reread Goal authority at transitions and consequential boundaries. A restart may schedule the same nonterminal Goal again. Preserved planning, Git, quality, governance, integration, logs, branches, and worktrees make that repetition idempotent and explainable. A valid Quality or Governance finding may draft a fresh recovery Round and atomically return the Goal to todo; both stages share one bounded retry counter. Provider, parsing, Git, harness, and infrastructure failures do not consume that automatic recovery budget.
 
@@ -41,4 +50,4 @@ The [Shared Workflow Consistency Contract](11-consistency-contract.md) and [Exec
 
 ## Future Direction
 
-Workflow should support richer dependency reasoning, agent selection, multi-agent composition, evidence-aware review, and merge orchestration while preserving explicit Goal state, cheap restart, shared semantics, and inspectable evidence.
+Workflow should support richer agent selection, multi-agent composition, evidence-aware review, and merge orchestration while preserving explicit Goal state, cheap restart, shared semantics, and inspectable evidence.

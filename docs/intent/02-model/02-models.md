@@ -25,7 +25,10 @@ Current implementation details that matter to intent:
 
 - `Goal` and `Feature` are explicit Rust model types.
 - Goal statuses are named workflow states: backlog, todo, plan, implement, quality, governance, review, done, failed, and cancelled. Legacy status names are accepted only while reading or migrating older records.
-- Goals can belong to Features with an order, letting Refine advance ordered work without forcing every Goal into a sequence.
+- Goals can belong to Features with a linear integer order. For Goals assigned to the same node, that order is a hard completion barrier: the next Goal waits until its predecessor reaches review, done, or cancelled, and failure keeps later ordered Goals blocked.
+- Priority is a hard same-node start gate, not a hint. A lower-priority authored Todo is ineligible while a higher-priority authored and Feature-eligible Todo or automated-active Goal remains in todo, plan, implement, quality, or governance; runner-active Todo work still holds the gate.
+- Linear Feature order plus priority is the canonical dependency model. “After X” and imported `depends_on` compile to Feature order by design; there is deliberately no separate dependency DAG or blocked-by graph.
+- Ordering and priority are currently enforced per node. Until intended global enforcement is available, users must pin work that needs one enforced sequence to the same node.
 - Active work is owned by a node so distributed or multi-instance operation can be reasoned about explicitly.
 - Projections exist so the system can stay fast without replacing flat files as the source of truth.
 - Scheduler indexes should scale with active work rather than total project
@@ -46,6 +49,6 @@ Future model changes should preserve these properties: human readability, agent 
 
 ## Future Direction
 
-As AI agents improve, models should become more expressive without becoming more obscure. Refine may need richer representations of design intent, dependency graphs, quality evidence, governance decisions, agent capabilities, review provenance, and composition plans.
+As AI agents improve, models should become more expressive without becoming more obscure. Refine may need richer representations of design intent, quality evidence, governance decisions, agent capabilities, review provenance, and composition plans while preserving linear Feature order plus priority as the dependency model.
 
 The direction should be toward a model that a superintelligent software system can use to compose large systems from many smaller changes while still leaving people an understandable audit trail. New model fields should answer real questions: what is the work, why does it matter, which node owns active progress, what evidence supports it, what can safely happen next, and what changed as a result.

@@ -201,7 +201,7 @@ impl WorkflowEngine {
         ActiveGoalIndex::ensure_built(&refine_dir)?;
         let index = ActiveGoalIndex::load_or_rebuild(&refine_dir)?;
         let policy = self.policy()?;
-        let eligibility = SchedulingEligibility::new(index.goals(), active);
+        let eligibility = SchedulingEligibility::new(index.goals());
         let mut goals = index
             .goals()
             .filter(|goal| {

@@ -1,10 +1,12 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use serde_json::{Value, json};
 
+mod scheduling_eligibility;
 mod settings;
+pub(crate) use scheduling_eligibility::SchedulingEligibility;
 pub(crate) use settings::{
     agent_idle_timeout, setting_cap_with_default_values, setting_string, setting_usize,
 };
@@ -21,13 +23,10 @@ use crate::infrastructure::process::subprocess::{
 use crate::infrastructure::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::infrastructure::runtime::host_resources::{HostResources, observed_agent_memory_bytes};
 use crate::infrastructure::storage::project_layout::prepare_refine_dir;
-use crate::model::goal::GoalIndexProjection;
 use crate::model::log::LogEntry;
 use crate::model::workflow::GoalStatus;
 
-use crate::application::workflow::{
-    WorkflowEngine, WorkflowPolicy, json_object, now_timestamp, priority_rank,
-};
+use crate::application::workflow::{WorkflowEngine, WorkflowPolicy, json_object, now_timestamp};
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct ExecutionLoad {
@@ -384,103 +383,5 @@ impl WorkflowEngine {
         Ok(self
             .observed_execution_load()?
             .available(policy, node, provider, target_app))
-    }
-}
-
-fn releases_feature_order(status: &GoalStatus) -> bool {
-    matches!(
-        status,
-        GoalStatus::Review | GoalStatus::Done | GoalStatus::Cancelled
-    )
-}
-
-fn occupies_feature_slot(status: &GoalStatus) -> bool {
-    matches!(
-        status,
-        GoalStatus::Plan | GoalStatus::Implement | GoalStatus::Quality | GoalStatus::Governance
-    )
-}
-
-pub(crate) struct SchedulingEligibility {
-    feature_eligible: BTreeSet<String>,
-    highest_todo_rank: BTreeMap<String, u8>,
-}
-
-impl SchedulingEligibility {
-    pub(crate) fn new<'a>(
-        goals: impl IntoIterator<Item = &'a GoalIndexProjection> + Clone,
-        excluded_goal_ids: &BTreeSet<String>,
-    ) -> Self {
-        let mut lowest_holding_order: BTreeMap<(&str, &str), i64> = BTreeMap::new();
-        let mut occupying_count: BTreeMap<(&str, &str), usize> = BTreeMap::new();
-        for goal in goals.clone() {
-            if goal.round_count == 0 {
-                continue;
-            }
-            let (Some(feature_id), Some(order)) = (goal.feature_id.as_deref(), goal.feature_order)
-            else {
-                continue;
-            };
-            let key = (goal.node_id.as_deref().unwrap_or("default"), feature_id);
-            if !releases_feature_order(&goal.status) {
-                lowest_holding_order
-                    .entry(key)
-                    .and_modify(|lowest| *lowest = (*lowest).min(order))
-                    .or_insert(order);
-            }
-            if occupies_feature_slot(&goal.status) {
-                *occupying_count.entry(key).or_default() += 1;
-            }
-        }
-        let feature_eligible = goals
-            .clone()
-            .into_iter()
-            .filter(|goal| {
-                if goal.round_count == 0 {
-                    return false;
-                }
-                let (Some(feature_id), Some(order)) =
-                    (goal.feature_id.as_deref(), goal.feature_order)
-                else {
-                    return true;
-                };
-                let key = (goal.node_id.as_deref().unwrap_or("default"), feature_id);
-                lowest_holding_order.get(&key).copied() == Some(order)
-                    && (goal.status != GoalStatus::Todo
-                        || occupying_count.get(&key).copied().unwrap_or(0) == 0)
-            })
-            .map(|goal| goal.id.clone())
-            .collect::<BTreeSet<_>>();
-        let mut highest_todo_rank = BTreeMap::new();
-        for goal in goals {
-            if goal.status != GoalStatus::Todo
-                || goal.round_count == 0
-                || excluded_goal_ids.contains(&goal.id)
-                || !feature_eligible.contains(&goal.id)
-            {
-                continue;
-            }
-            let rank = priority_rank(&goal.priority);
-            highest_todo_rank
-                .entry(goal.node_id.as_deref().unwrap_or("default").to_string())
-                .and_modify(|highest: &mut u8| *highest = (*highest).max(rank))
-                .or_insert(rank);
-        }
-        Self {
-            feature_eligible,
-            highest_todo_rank,
-        }
-    }
-
-    pub(crate) fn feature_eligible(&self, goal_id: &str) -> bool {
-        self.feature_eligible.contains(goal_id)
-    }
-
-    pub(crate) fn priority_eligible(&self, goal: &GoalIndexProjection) -> bool {
-        goal.status != GoalStatus::Todo
-            || self
-                .highest_todo_rank
-                .get(goal.node_id.as_deref().unwrap_or("default"))
-                .is_none_or(|highest| priority_rank(&goal.priority) >= *highest)
     }
 }
