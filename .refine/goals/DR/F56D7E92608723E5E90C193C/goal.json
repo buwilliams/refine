@@ -173,8 +173,14 @@
           },
           "started_at": "2026-08-18T13:42:45Z"
         },
-        "phase": "revise",
-        "phase_started_at": "2026-08-18T13:42:45Z",
+        "governance_precheck": {
+          "attempt": 1,
+          "checked_at": "2026-08-18T13:44:19Z",
+          "message": "The finalized plan can be executed without violating the constitution, governance rules, or enabled guidance.",
+          "status": "passed"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-18T13:44:19Z",
         "proposal": {
           "completed_at": "2026-08-18T13:39:08Z",
           "git_after": {
@@ -209,7 +215,7 @@
         "schema_version": 2,
         "started_at": "2026-08-18T13:36:09Z",
         "state": "in_progress",
-        "updated_at": "2026-08-18T13:44:12Z"
+        "updated_at": "2026-08-18T13:44:19Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -223,7 +229,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T13:44:12Z",
+      "updated": "2026-08-18T13:44:19Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T13:36:08Z",
         "round_idx": 0,
@@ -233,8 +239,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-08-18T13:44:12Z",
-  "workflow_revision": 12
+  "updated": "2026-08-18T13:44:19Z",
+  "workflow_revision": 15
 }
