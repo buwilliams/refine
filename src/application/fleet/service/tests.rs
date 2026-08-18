@@ -58,6 +58,52 @@ fn bootstrap_remote_node_rejects_user_at_host() {
 }
 
 #[test]
+fn bootstrap_health_settlement_preserves_settings_written_after_the_request_snapshot() {
+    let temp_root = unique_temp_dir("fleet-bootstrap-settlement-merge");
+    let refine_dir = temp_root.join(".refine");
+    let service = FileFleetService::new(&refine_dir);
+    service.add_node("node-1").unwrap();
+
+    let request = service
+        .nodes()
+        .with_registry_lock(|| service.bootstrap_node_request_locked("node-1", true))
+        .unwrap();
+    FileSettingsService::for_node(&refine_dir, "node-1")
+        .update(&serde_json::json!({
+            "automatic_agent_resource_budget_percent": 44
+        }))
+        .unwrap();
+
+    let result = RemoteRunResult {
+        node_id: request.node_id.clone(),
+        command: "ssh node-1".to_string(),
+        remote_command: "bootstrap".to_string(),
+        exit_code: None,
+        stdout: String::new(),
+        stderr: String::new(),
+        ok: true,
+    };
+    service
+        .nodes()
+        .with_registry_lock(|| service.settle_bootstrap_node_response_locked(&request, result))
+        .unwrap();
+
+    let settings = FileSettingsService::for_node(&refine_dir, "node-1")
+        .list_response()
+        .unwrap();
+    assert_eq!(
+        settings["settings"]["automatic_agent_resource_budget_percent"],
+        "44"
+    );
+    assert_eq!(
+        service.show("node-1").unwrap()["node"]["health"]["status"],
+        "ready"
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
 fn ssh_preflight_reports_missing_identity_file() {
     let temp_root = unique_temp_dir("fleet-ssh-preflight");
     let missing_identity = temp_root.join("missing_ed25519");

@@ -77,7 +77,8 @@ impl FileSettingsService {
                 "source_node_id is required".to_string(),
             ));
         }
-        let keys = match section.trim() {
+        let section = section.trim();
+        let keys = match section {
             "runtime" => RUNTIME_SETTINGS,
             "application" => APPLICATION_SETTINGS,
             other => {
