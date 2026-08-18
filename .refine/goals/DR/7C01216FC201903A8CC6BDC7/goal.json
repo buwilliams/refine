@@ -123,6 +123,37 @@
           },
           "started_at": "2026-08-18T11:03:36Z"
         },
+        "final_plan": {
+          "completed_at": "2026-08-18T11:06:45Z",
+          "git_after": {
+            "branch": "refine/DR7C01216FC201903A8CC6BDC7/round-1",
+            "head_commit": "827a23a8c5e609fad7bef0dcb98690a335da0228",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR7C01216FC201903A8CC6BDC7/round-1",
+            "head_commit": "827a23a8c5e609fad7bef0dcb98690a335da0228",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Refactor the general-Agent-only workflow guidance into a cohesive shared toolbar-agent prompt that directs agents to begin with the existing Node, prioritizes investigation, current-Node management, and question answering, and routes requested repository changes to a new Goal or an evidence-preserving recovery Round for a failed Goal.",
+                "id": "P1"
+              },
+              {
+                "description": "Compose the shared node-first guidance into both normal Agent and Planning Agent toolbar prompts while retaining each profile's distinct role context and leaving Goal diagnostics, Agent in Worktree, and planning, implementation, Quality, and Governance automation prompts unchanged.",
+                "id": "P2"
+              },
+              {
+                "description": "Align the focused browser toolbar intent contract with the shared node-first role, supported change-handoff choices, and explicit toolbar-only boundary without broadening unrelated intent documentation.",
+                "id": "P3"
+              }
+            ],
+            "summary": "Refine will give normal and Planning Agent toolbar sessions one shared node-first operating contract so they prioritize investigations, management of the current Refine Node, and direct answers while routing requested changes through new Goals or recovery Rounds without affecting workflow automation."
+          },
+          "started_at": "2026-08-18T11:06:01Z"
+        },
         "invalid_output_attempts": [
           {
             "attempt": 1,
@@ -168,7 +199,7 @@
         "schema_version": 2,
         "started_at": "2026-08-18T11:02:00Z",
         "state": "in_progress",
-        "updated_at": "2026-08-18T11:06:01Z"
+        "updated_at": "2026-08-18T11:06:45Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -182,7 +213,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T11:06:01Z",
+      "updated": "2026-08-18T11:06:45Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T11:02:00Z",
         "round_idx": 0,
@@ -194,6 +225,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-18T11:06:01Z",
-  "workflow_revision": 12
+  "updated": "2026-08-18T11:06:45Z",
+  "workflow_revision": 13
 }
