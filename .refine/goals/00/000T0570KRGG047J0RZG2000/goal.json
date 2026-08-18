@@ -1,7 +1,7 @@
 {
-  "base_commit": "148e3ff37f026e3861adbefd86edc5ddbd9a3662",
+  "base_commit": "7240706a10f1d45dc387a41825c08891ed52cf41",
   "branch_name": "refine/00000T0570KRGG047J0RZG2000/round-1",
-  "candidate_commit": "c833aba9a6e5d7151d4696151dfe71c5504cc130",
+  "candidate_commit": "0f1ca148a0887fc3a65ecbcc85f9b3bab0517d15",
   "created": "2026-08-18T12:37:40Z",
   "feature_id": null,
   "feature_order": null,
@@ -85,15 +85,15 @@
         "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
       },
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": null,
       "created": "2026-08-18T12:37:40Z",
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
-      "governance_candidate_commit": "",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_candidate_commit": null,
+      "governance_checked_at": null,
+      "governance_details": null,
+      "governance_message": null,
       "governance_rule_actions": [],
       "guidance_decision": {
         "applied": [
@@ -312,71 +312,115 @@
       "implementation_report": "Implemented runtime-acknowledged Toolbar attachment for workflow Goal Agents. Toolbar opens now request a unique exact-session acknowledgment, wait for the same live process to persist one-way timeout protection, and fail closed on exit, mismatch, or missing acknowledgment. The runtime processes and persists attachment before watchdog evaluation, bypasses only idle and completion timeouts after protection, and preserves valid completion, needs-input, explicit Stop/cancellation, natural exit, transcript, worktree, and workflow settlement behavior. Updated Goal Agent and Toolbar intent documentation and added focused runtime and HTTP regressions. Verification: formatting, 34 Goal Agent session tests, 10 Goal lifecycle tests, 37 Toolbar browser tests, and changed-code Clippy passed. The 1,102-test library run had one unrelated source-promotion timing failure (1095 passed, 1 failed, 6 ignored); that exact untouched test passed on immediate isolated rerun.",
       "implementation_reported_at": "2026-08-18T12:58:22Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": null,
+      "product_state": null,
       "prompt": "Agent timeouts should not kill toolbar sessions the user has opened.",
       "quality_agent_report": "Quality reviewed the exact candidate and found the runtime/Toolbar contract correct. Added a focused watchdog-losing regression proving ordinary input and resize remain unprotected and a session terminated by its completion deadline cannot later report successful Toolbar attachment; also made the Unix-only test import platform-conditional. Formatting, diff hygiene, 35 Goal Agent session tests, 10 Goal lifecycle tests, 37 Toolbar tests, scoped warning-denied Clippy, and the full 1,103-test library suite passed. Strict unscoped Clippy remains blocked only by four pre-existing warnings in untouched files.",
-      "quality_candidate_commit": "c833aba9a6e5d7151d4696151dfe71c5504cc130",
-      "quality_checked_at": "2026-08-18T13:11:22Z",
-      "quality_details": {
-        "candidate_commit": "c833aba9a6e5d7151d4696151dfe71c5504cc130",
-        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T0570KRGG047J0RZG2000-round-1",
-        "diagnostics": [
-          "{\"ok\":true,\"summary\":\"Exact candidate passed all focused deterministic checks; no material uncertainty remains within the affected Goal Agent and Toolbar scope.\",\"results\":[{\"test\":\"The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\",\"status\":\"passed\",\"evidence\":\"Exit 0. Verified exact candidate c833aba9a6e5d7151d4696151dfe71c5504cc130, expected branch, clean worktree, diff hygiene, formatting, 35/35 session tests, 10/10 Goal lifecycle tests, 37/37 Toolbar tests, and warning-denied scoped Clippy.\",\"command\":\"bash -lc 'set -euo pipefail\\ncandidate=c833aba9a6e5d7151d4696151dfe71c5504cc130\\nbase=148e3ff37f026e3861adbefd86edc5ddbd9a3662\\n[[ \\\"$(git rev-parse HEAD)\\\" == \\\"$candidate\\\" ]]\\n[[ \\\"$(git branch --show-current)\\\" == \\\"refine/00000T0570KRGG047J0RZG2000/round-1\\\" ]]\\n[[ -z \\\"$(git status --porcelain)\\\" ]]\\ngit diff --check \\\"$base..$candidate\\\"\\ncargo fmt -- --check\\ncargo test --lib application::agents::sessions -- --test-threads=1\\ncargo test --lib surfaces::web_server::tests::goals::lifecycle -- --test-threads=1\\nnode --test tests/web_supervisor_toolbar.test.js\\ncargo clippy --lib -- -D warnings -A clippy::needless-pub-self -A clippy::module-inception -A clippy::unnecessary-sort-by\\n[[ -z \\\"$(git status --porcelain)\\\" ]]'\"}]}",
-          "Observed supervised process proc-1787058660899-868123-437 exited 0. stdout: minal lifecycle routes (3.014852ms)\n✔ the morphed Start button dispatches Stop after an Agent connects (2.435198ms)\n✔ Goal Stop surfaces successful retained-worktree evidence (2.374031ms)\n✔ Goal Stop reports when explicit cancellation remains terminal (2.997182ms)\n✔ Goal Stop reports that a governed planned attempt needs a fresh Round (2.458953ms)\n✔ terminal exit releases Stop UI before workflow cancellation finishes settling (7.202744ms)\n✔ a stopping Agent tab closes locally without issuing a duplicate Stop (4.361397ms)\n✔ toolbar resizing survives a stopping Agent redraw (3.565942ms)\n✔ clicking a stopped terminal tab starts it once (3.255352ms)\n✔ terminal columns refit when its rendered width changes (103.532905ms)\n✔ terminal retains valid geometry while hidden and refits after layout transitions (510.767717ms)\n✔ terminal resize falls back when xterm renderer dimensions are unavailable (103.928458ms)\n✔ terminal output and exit events remain scoped to their tab (2.212108ms)\n✔ terminal output decodes transported ANSI escapes without changing ordinary text (1.606161ms)\n✔ a failed Goal opens an independent diagnostic Agent and can restart it (1.865228ms)\n✔ Goal Agent opens on the latest transcript tail while earlier context loads in the background (4.234241ms)\n✔ stored custom-chat ids are discarded while managed terminal ids reattach (3.663734ms)\n✔ refresh preserves and independently reattaches every explicitly opened Agent (4.68906ms)\n✔ a fresh app session ignores toolbar tabs from an earlier app session (1.624954ms)\n✔ refresh reattaches a live terminal and stream errors do not persist process exit (4.22271ms)\n✔ switching projects stops live terminal profiles before clearing the toolbar (3.728673ms)\n✔ closing a Goal Agent tab stops it through the workflow-aware backend path (2.062257ms)\n✔ process-manager Agent Stop removes any attached toolbar tab locally (2.375884ms)\nℹ tests 37\nℹ suites 0\nℹ pass 37\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 4220.054348 stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s"
-        ],
-        "evaluation_scope": "isolated_candidate",
-        "operation_id": "1a014fcc3b1d3f1bb",
-        "provider_attempts": [
-          {
-            "accepted": true,
-            "attempt": 1,
-            "process_id": "proc-1787058504996-868123-427",
-            "raw_output": "{\"ok\":true,\"summary\":\"Exact candidate passed all focused deterministic checks; no material uncertainty remains within the affected Goal Agent and Toolbar scope.\",\"results\":[{\"test\":\"The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\",\"status\":\"passed\",\"evidence\":\"Exit 0. Verified exact candidate c833aba9a6e5d7151d4696151dfe71c5504cc130, expected branch, clean worktree, diff hygiene, formatting, 35/35 session tests, 10/10 Goal lifecycle tests, 37/37 Toolbar tests, and warning-denied scoped Clippy.\",\"command\":\"bash -lc 'set -euo pipefail\\ncandidate=c833aba9a6e5d7151d4696151dfe71c5504cc130\\nbase=148e3ff37f026e3861adbefd86edc5ddbd9a3662\\n[[ \\\"$(git rev-parse HEAD)\\\" == \\\"$candidate\\\" ]]\\n[[ \\\"$(git branch --show-current)\\\" == \\\"refine/00000T0570KRGG047J0RZG2000/round-1\\\" ]]\\n[[ -z \\\"$(git status --porcelain)\\\" ]]\\ngit diff --check \\\"$base..$candidate\\\"\\ncargo fmt -- --check\\ncargo test --lib application::agents::sessions -- --test-threads=1\\ncargo test --lib surfaces::web_server::tests::goals::lifecycle -- --test-threads=1\\nnode --test tests/web_supervisor_toolbar.test.js\\ncargo clippy --lib -- -D warnings -A clippy::needless-pub-self -A clippy::module-inception -A clippy::unnecessary-sort-by\\n[[ -z \\\"$(git status --porcelain)\\\" ]]'\"}]}"
-          }
-        ],
-        "quality_proof": {
-          "checked_at": "2026-08-18T13:11:22Z",
-          "checked_candidate_commit": "c833aba9a6e5d7151d4696151dfe71c5504cc130",
-          "evaluation_scope": "isolated_candidate",
-          "goal_id": "00000T0570KRGG047J0RZG2000",
-          "operation_id": "1a014fcc3b1d3f1bb",
-          "results": [
-            {
-              "command": "bash -lc 'set -euo pipefail\ncandidate=c833aba9a6e5d7151d4696151dfe71c5504cc130\nbase=148e3ff37f026e3861adbefd86edc5ddbd9a3662\n[[ \"$(git rev-parse HEAD)\" == \"$candidate\" ]]\n[[ \"$(git branch --show-current)\" == \"refine/00000T0570KRGG047J0RZG2000/round-1\" ]]\n[[ -z \"$(git status --porcelain)\" ]]\ngit diff --check \"$base..$candidate\"\ncargo fmt -- --check\ncargo test --lib application::agents::sessions -- --test-threads=1\ncargo test --lib surfaces::web_server::tests::goals::lifecycle -- --test-threads=1\nnode --test tests/web_supervisor_toolbar.test.js\ncargo clippy --lib -- -D warnings -A clippy::needless-pub-self -A clippy::module-inception -A clippy::unnecessary-sort-by\n[[ -z \"$(git status --porcelain)\" ]]'",
-              "evidence": "Observed supervised process proc-1787058660899-868123-437 exited 0. stdout: minal lifecycle routes (3.014852ms)\n✔ the morphed Start button dispatches Stop after an Agent connects (2.435198ms)\n✔ Goal Stop surfaces successful retained-worktree evidence (2.374031ms)\n✔ Goal Stop reports when explicit cancellation remains terminal (2.997182ms)\n✔ Goal Stop reports that a governed planned attempt needs a fresh Round (2.458953ms)\n✔ terminal exit releases Stop UI before workflow cancellation finishes settling (7.202744ms)\n✔ a stopping Agent tab closes locally without issuing a duplicate Stop (4.361397ms)\n✔ toolbar resizing survives a stopping Agent redraw (3.565942ms)\n✔ clicking a stopped terminal tab starts it once (3.255352ms)\n✔ terminal columns refit when its rendered width changes (103.532905ms)\n✔ terminal retains valid geometry while hidden and refits after layout transitions (510.767717ms)\n✔ terminal resize falls back when xterm renderer dimensions are unavailable (103.928458ms)\n✔ terminal output and exit events remain scoped to their tab (2.212108ms)\n✔ terminal output decodes transported ANSI escapes without changing ordinary text (1.606161ms)\n✔ a failed Goal opens an independent diagnostic Agent and can restart it (1.865228ms)\n✔ Goal Agent opens on the latest transcript tail while earlier context loads in the background (4.234241ms)\n✔ stored custom-chat ids are discarded while managed terminal ids reattach (3.663734ms)\n✔ refresh preserves and independently reattaches every explicitly opened Agent (4.68906ms)\n✔ a fresh app session ignores toolbar tabs from an earlier app session (1.624954ms)\n✔ refresh reattaches a live terminal and stream errors do not persist process exit (4.22271ms)\n✔ switching projects stops live terminal profiles before clearing the toolbar (3.728673ms)\n✔ closing a Goal Agent tab stops it through the workflow-aware backend path (2.062257ms)\n✔ process-manager Agent Stop removes any attached toolbar tab locally (2.375884ms)\nℹ tests 37\nℹ suites 0\nℹ pass 37\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 4220.054348 stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s Agent report: Exit 0. Verified exact candidate c833aba9a6e5d7151d4696151dfe71c5504cc130, expected branch, clean worktree, diff hygiene, formatting, 35/35 session tests, 10/10 Goal lifecycle tests, 37/37 Toolbar tests, and warning-denied scoped Clippy.",
-              "exit_code": 0,
-              "process_id": "proc-1787058660899-868123-437",
-              "status": "passed",
-              "test": "The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks."
-            }
-          ],
-          "round_idx": 0,
-          "schema_version": 1,
-          "source_candidate_commit": "c833aba9a6e5d7151d4696151dfe71c5504cc130",
-          "state": "passed"
-        },
-        "results": [
-          {
-            "command": "bash -lc 'set -euo pipefail\ncandidate=c833aba9a6e5d7151d4696151dfe71c5504cc130\nbase=148e3ff37f026e3861adbefd86edc5ddbd9a3662\n[[ \"$(git rev-parse HEAD)\" == \"$candidate\" ]]\n[[ \"$(git branch --show-current)\" == \"refine/00000T0570KRGG047J0RZG2000/round-1\" ]]\n[[ -z \"$(git status --porcelain)\" ]]\ngit diff --check \"$base..$candidate\"\ncargo fmt -- --check\ncargo test --lib application::agents::sessions -- --test-threads=1\ncargo test --lib surfaces::web_server::tests::goals::lifecycle -- --test-threads=1\nnode --test tests/web_supervisor_toolbar.test.js\ncargo clippy --lib -- -D warnings -A clippy::needless-pub-self -A clippy::module-inception -A clippy::unnecessary-sort-by\n[[ -z \"$(git status --porcelain)\" ]]'",
-            "evidence": "Observed supervised process proc-1787058660899-868123-437 exited 0. stdout: minal lifecycle routes (3.014852ms)\n✔ the morphed Start button dispatches Stop after an Agent connects (2.435198ms)\n✔ Goal Stop surfaces successful retained-worktree evidence (2.374031ms)\n✔ Goal Stop reports when explicit cancellation remains terminal (2.997182ms)\n✔ Goal Stop reports that a governed planned attempt needs a fresh Round (2.458953ms)\n✔ terminal exit releases Stop UI before workflow cancellation finishes settling (7.202744ms)\n✔ a stopping Agent tab closes locally without issuing a duplicate Stop (4.361397ms)\n✔ toolbar resizing survives a stopping Agent redraw (3.565942ms)\n✔ clicking a stopped terminal tab starts it once (3.255352ms)\n✔ terminal columns refit when its rendered width changes (103.532905ms)\n✔ terminal retains valid geometry while hidden and refits after layout transitions (510.767717ms)\n✔ terminal resize falls back when xterm renderer dimensions are unavailable (103.928458ms)\n✔ terminal output and exit events remain scoped to their tab (2.212108ms)\n✔ terminal output decodes transported ANSI escapes without changing ordinary text (1.606161ms)\n✔ a failed Goal opens an independent diagnostic Agent and can restart it (1.865228ms)\n✔ Goal Agent opens on the latest transcript tail while earlier context loads in the background (4.234241ms)\n✔ stored custom-chat ids are discarded while managed terminal ids reattach (3.663734ms)\n✔ refresh preserves and independently reattaches every explicitly opened Agent (4.68906ms)\n✔ a fresh app session ignores toolbar tabs from an earlier app session (1.624954ms)\n✔ refresh reattaches a live terminal and stream errors do not persist process exit (4.22271ms)\n✔ switching projects stops live terminal profiles before clearing the toolbar (3.728673ms)\n✔ closing a Goal Agent tab stops it through the workflow-aware backend path (2.062257ms)\n✔ process-manager Agent Stop removes any attached toolbar tab locally (2.375884ms)\nℹ tests 37\nℹ suites 0\nℹ pass 37\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 4220.054348 stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s Agent report: Exit 0. Verified exact candidate c833aba9a6e5d7151d4696151dfe71c5504cc130, expected branch, clean worktree, diff hygiene, formatting, 35/35 session tests, 10/10 Goal lifecycle tests, 37/37 Toolbar tests, and warning-denied scoped Clippy.",
-            "exit_code": 0,
-            "process_id": "proc-1787058660899-868123-437",
-            "status": "passed",
-            "test": "The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks."
-          }
-        ],
-        "source_candidate_commit": "c833aba9a6e5d7151d4696151dfe71c5504cc130"
-      },
-      "quality_message": "All Quality tests passed with observed supervised evidence.",
-      "quality_state": "passed",
+      "quality_candidate_commit": null,
+      "quality_checked_at": null,
+      "quality_details": null,
+      "quality_message": null,
+      "quality_state": null,
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-08-18T13:11:22Z",
+      "rule_state": null,
+      "updated": "2026-08-18T13:14:44Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T12:37:40Z",
         "round_idx": 0,
         "workflow_revision": 2
+      },
+      "workflow_candidate_refresh": {
+        "authorizing_status": "governance",
+        "branch": "refine/00000T0570KRGG047J0RZG2000/round-1",
+        "conflict_resolution": {
+          "attempts": [
+            {
+              "attempt": 1,
+              "files": [
+                "docs/intent/03-application/01-agents/10-goal-agents.md"
+              ],
+              "outcome": "accepted"
+            }
+          ],
+          "files": [
+            "docs/intent/03-application/01-agents/10-goal-agents.md"
+          ],
+          "outcome": "resolved"
+        },
+        "node_id": "default",
+        "original_base_commit": "148e3ff37f026e3861adbefd86edc5ddbd9a3662",
+        "original_candidate_commit": "c833aba9a6e5d7151d4696151dfe71c5504cc130",
+        "previous_gate_evidence": {
+          "constitution_state": "unclassified",
+          "governance_candidate_commit": "",
+          "governance_checked_at": "",
+          "governance_details": "",
+          "governance_message": "",
+          "meta_rule_state": "unclassified",
+          "product_state": "unclassified",
+          "quality_candidate_commit": "c833aba9a6e5d7151d4696151dfe71c5504cc130",
+          "quality_checked_at": "2026-08-18T13:11:22Z",
+          "quality_details": {
+            "candidate_commit": "c833aba9a6e5d7151d4696151dfe71c5504cc130",
+            "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T0570KRGG047J0RZG2000-round-1",
+            "diagnostics": [
+              "{\"ok\":true,\"summary\":\"Exact candidate passed all focused deterministic checks; no material uncertainty remains within the affected Goal Agent and Toolbar scope.\",\"results\":[{\"test\":\"The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\",\"status\":\"passed\",\"evidence\":\"Exit 0. Verified exact candidate c833aba9a6e5d7151d4696151dfe71c5504cc130, expected branch, clean worktree, diff hygiene, formatting, 35/35 session tests, 10/10 Goal lifecycle tests, 37/37 Toolbar tests, and warning-denied scoped Clippy.\",\"command\":\"bash -lc 'set -euo pipefail\\ncandidate=c833aba9a6e5d7151d4696151dfe71c5504cc130\\nbase=148e3ff37f026e3861adbefd86edc5ddbd9a3662\\n[[ \\\"$(git rev-parse HEAD)\\\" == \\\"$candidate\\\" ]]\\n[[ \\\"$(git branch --show-current)\\\" == \\\"refine/00000T0570KRGG047J0RZG2000/round-1\\\" ]]\\n[[ -z \\\"$(git status --porcelain)\\\" ]]\\ngit diff --check \\\"$base..$candidate\\\"\\ncargo fmt -- --check\\ncargo test --lib application::agents::sessions -- --test-threads=1\\ncargo test --lib surfaces::web_server::tests::goals::lifecycle -- --test-threads=1\\nnode --test tests/web_supervisor_toolbar.test.js\\ncargo clippy --lib -- -D warnings -A clippy::needless-pub-self -A clippy::module-inception -A clippy::unnecessary-sort-by\\n[[ -z \\\"$(git status --porcelain)\\\" ]]'\"}]}",
+              "Observed supervised process proc-1787058660899-868123-437 exited 0. stdout: minal lifecycle routes (3.014852ms)\n✔ the morphed Start button dispatches Stop after an Agent connects (2.435198ms)\n✔ Goal Stop surfaces successful retained-worktree evidence (2.374031ms)\n✔ Goal Stop reports when explicit cancellation remains terminal (2.997182ms)\n✔ Goal Stop reports that a governed planned attempt needs a fresh Round (2.458953ms)\n✔ terminal exit releases Stop UI before workflow cancellation finishes settling (7.202744ms)\n✔ a stopping Agent tab closes locally without issuing a duplicate Stop (4.361397ms)\n✔ toolbar resizing survives a stopping Agent redraw (3.565942ms)\n✔ clicking a stopped terminal tab starts it once (3.255352ms)\n✔ terminal columns refit when its rendered width changes (103.532905ms)\n✔ terminal retains valid geometry while hidden and refits after layout transitions (510.767717ms)\n✔ terminal resize falls back when xterm renderer dimensions are unavailable (103.928458ms)\n✔ terminal output and exit events remain scoped to their tab (2.212108ms)\n✔ terminal output decodes transported ANSI escapes without changing ordinary text (1.606161ms)\n✔ a failed Goal opens an independent diagnostic Agent and can restart it (1.865228ms)\n✔ Goal Agent opens on the latest transcript tail while earlier context loads in the background (4.234241ms)\n✔ stored custom-chat ids are discarded while managed terminal ids reattach (3.663734ms)\n✔ refresh preserves and independently reattaches every explicitly opened Agent (4.68906ms)\n✔ a fresh app session ignores toolbar tabs from an earlier app session (1.624954ms)\n✔ refresh reattaches a live terminal and stream errors do not persist process exit (4.22271ms)\n✔ switching projects stops live terminal profiles before clearing the toolbar (3.728673ms)\n✔ closing a Goal Agent tab stops it through the workflow-aware backend path (2.062257ms)\n✔ process-manager Agent Stop removes any attached toolbar tab locally (2.375884ms)\nℹ tests 37\nℹ suites 0\nℹ pass 37\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 4220.054348 stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s"
+            ],
+            "evaluation_scope": "isolated_candidate",
+            "operation_id": "1a014fcc3b1d3f1bb",
+            "provider_attempts": [
+              {
+                "accepted": true,
+                "attempt": 1,
+                "process_id": "proc-1787058504996-868123-427",
+                "raw_output": "{\"ok\":true,\"summary\":\"Exact candidate passed all focused deterministic checks; no material uncertainty remains within the affected Goal Agent and Toolbar scope.\",\"results\":[{\"test\":\"The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\",\"status\":\"passed\",\"evidence\":\"Exit 0. Verified exact candidate c833aba9a6e5d7151d4696151dfe71c5504cc130, expected branch, clean worktree, diff hygiene, formatting, 35/35 session tests, 10/10 Goal lifecycle tests, 37/37 Toolbar tests, and warning-denied scoped Clippy.\",\"command\":\"bash -lc 'set -euo pipefail\\ncandidate=c833aba9a6e5d7151d4696151dfe71c5504cc130\\nbase=148e3ff37f026e3861adbefd86edc5ddbd9a3662\\n[[ \\\"$(git rev-parse HEAD)\\\" == \\\"$candidate\\\" ]]\\n[[ \\\"$(git branch --show-current)\\\" == \\\"refine/00000T0570KRGG047J0RZG2000/round-1\\\" ]]\\n[[ -z \\\"$(git status --porcelain)\\\" ]]\\ngit diff --check \\\"$base..$candidate\\\"\\ncargo fmt -- --check\\ncargo test --lib application::agents::sessions -- --test-threads=1\\ncargo test --lib surfaces::web_server::tests::goals::lifecycle -- --test-threads=1\\nnode --test tests/web_supervisor_toolbar.test.js\\ncargo clippy --lib -- -D warnings -A clippy::needless-pub-self -A clippy::module-inception -A clippy::unnecessary-sort-by\\n[[ -z \\\"$(git status --porcelain)\\\" ]]'\"}]}"
+              }
+            ],
+            "quality_proof": {
+              "checked_at": "2026-08-18T13:11:22Z",
+              "checked_candidate_commit": "c833aba9a6e5d7151d4696151dfe71c5504cc130",
+              "evaluation_scope": "isolated_candidate",
+              "goal_id": "00000T0570KRGG047J0RZG2000",
+              "operation_id": "1a014fcc3b1d3f1bb",
+              "results": [
+                {
+                  "command": "bash -lc 'set -euo pipefail\ncandidate=c833aba9a6e5d7151d4696151dfe71c5504cc130\nbase=148e3ff37f026e3861adbefd86edc5ddbd9a3662\n[[ \"$(git rev-parse HEAD)\" == \"$candidate\" ]]\n[[ \"$(git branch --show-current)\" == \"refine/00000T0570KRGG047J0RZG2000/round-1\" ]]\n[[ -z \"$(git status --porcelain)\" ]]\ngit diff --check \"$base..$candidate\"\ncargo fmt -- --check\ncargo test --lib application::agents::sessions -- --test-threads=1\ncargo test --lib surfaces::web_server::tests::goals::lifecycle -- --test-threads=1\nnode --test tests/web_supervisor_toolbar.test.js\ncargo clippy --lib -- -D warnings -A clippy::needless-pub-self -A clippy::module-inception -A clippy::unnecessary-sort-by\n[[ -z \"$(git status --porcelain)\" ]]'",
+                  "evidence": "Observed supervised process proc-1787058660899-868123-437 exited 0. stdout: minal lifecycle routes (3.014852ms)\n✔ the morphed Start button dispatches Stop after an Agent connects (2.435198ms)\n✔ Goal Stop surfaces successful retained-worktree evidence (2.374031ms)\n✔ Goal Stop reports when explicit cancellation remains terminal (2.997182ms)\n✔ Goal Stop reports that a governed planned attempt needs a fresh Round (2.458953ms)\n✔ terminal exit releases Stop UI before workflow cancellation finishes settling (7.202744ms)\n✔ a stopping Agent tab closes locally without issuing a duplicate Stop (4.361397ms)\n✔ toolbar resizing survives a stopping Agent redraw (3.565942ms)\n✔ clicking a stopped terminal tab starts it once (3.255352ms)\n✔ terminal columns refit when its rendered width changes (103.532905ms)\n✔ terminal retains valid geometry while hidden and refits after layout transitions (510.767717ms)\n✔ terminal resize falls back when xterm renderer dimensions are unavailable (103.928458ms)\n✔ terminal output and exit events remain scoped to their tab (2.212108ms)\n✔ terminal output decodes transported ANSI escapes without changing ordinary text (1.606161ms)\n✔ a failed Goal opens an independent diagnostic Agent and can restart it (1.865228ms)\n✔ Goal Agent opens on the latest transcript tail while earlier context loads in the background (4.234241ms)\n✔ stored custom-chat ids are discarded while managed terminal ids reattach (3.663734ms)\n✔ refresh preserves and independently reattaches every explicitly opened Agent (4.68906ms)\n✔ a fresh app session ignores toolbar tabs from an earlier app session (1.624954ms)\n✔ refresh reattaches a live terminal and stream errors do not persist process exit (4.22271ms)\n✔ switching projects stops live terminal profiles before clearing the toolbar (3.728673ms)\n✔ closing a Goal Agent tab stops it through the workflow-aware backend path (2.062257ms)\n✔ process-manager Agent Stop removes any attached toolbar tab locally (2.375884ms)\nℹ tests 37\nℹ suites 0\nℹ pass 37\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 4220.054348 stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s Agent report: Exit 0. Verified exact candidate c833aba9a6e5d7151d4696151dfe71c5504cc130, expected branch, clean worktree, diff hygiene, formatting, 35/35 session tests, 10/10 Goal lifecycle tests, 37/37 Toolbar tests, and warning-denied scoped Clippy.",
+                  "exit_code": 0,
+                  "process_id": "proc-1787058660899-868123-437",
+                  "status": "passed",
+                  "test": "The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks."
+                }
+              ],
+              "round_idx": 0,
+              "schema_version": 1,
+              "source_candidate_commit": "c833aba9a6e5d7151d4696151dfe71c5504cc130",
+              "state": "passed"
+            },
+            "results": [
+              {
+                "command": "bash -lc 'set -euo pipefail\ncandidate=c833aba9a6e5d7151d4696151dfe71c5504cc130\nbase=148e3ff37f026e3861adbefd86edc5ddbd9a3662\n[[ \"$(git rev-parse HEAD)\" == \"$candidate\" ]]\n[[ \"$(git branch --show-current)\" == \"refine/00000T0570KRGG047J0RZG2000/round-1\" ]]\n[[ -z \"$(git status --porcelain)\" ]]\ngit diff --check \"$base..$candidate\"\ncargo fmt -- --check\ncargo test --lib application::agents::sessions -- --test-threads=1\ncargo test --lib surfaces::web_server::tests::goals::lifecycle -- --test-threads=1\nnode --test tests/web_supervisor_toolbar.test.js\ncargo clippy --lib -- -D warnings -A clippy::needless-pub-self -A clippy::module-inception -A clippy::unnecessary-sort-by\n[[ -z \"$(git status --porcelain)\" ]]'",
+                "evidence": "Observed supervised process proc-1787058660899-868123-437 exited 0. stdout: minal lifecycle routes (3.014852ms)\n✔ the morphed Start button dispatches Stop after an Agent connects (2.435198ms)\n✔ Goal Stop surfaces successful retained-worktree evidence (2.374031ms)\n✔ Goal Stop reports when explicit cancellation remains terminal (2.997182ms)\n✔ Goal Stop reports that a governed planned attempt needs a fresh Round (2.458953ms)\n✔ terminal exit releases Stop UI before workflow cancellation finishes settling (7.202744ms)\n✔ a stopping Agent tab closes locally without issuing a duplicate Stop (4.361397ms)\n✔ toolbar resizing survives a stopping Agent redraw (3.565942ms)\n✔ clicking a stopped terminal tab starts it once (3.255352ms)\n✔ terminal columns refit when its rendered width changes (103.532905ms)\n✔ terminal retains valid geometry while hidden and refits after layout transitions (510.767717ms)\n✔ terminal resize falls back when xterm renderer dimensions are unavailable (103.928458ms)\n✔ terminal output and exit events remain scoped to their tab (2.212108ms)\n✔ terminal output decodes transported ANSI escapes without changing ordinary text (1.606161ms)\n✔ a failed Goal opens an independent diagnostic Agent and can restart it (1.865228ms)\n✔ Goal Agent opens on the latest transcript tail while earlier context loads in the background (4.234241ms)\n✔ stored custom-chat ids are discarded while managed terminal ids reattach (3.663734ms)\n✔ refresh preserves and independently reattaches every explicitly opened Agent (4.68906ms)\n✔ a fresh app session ignores toolbar tabs from an earlier app session (1.624954ms)\n✔ refresh reattaches a live terminal and stream errors do not persist process exit (4.22271ms)\n✔ switching projects stops live terminal profiles before clearing the toolbar (3.728673ms)\n✔ closing a Goal Agent tab stops it through the workflow-aware backend path (2.062257ms)\n✔ process-manager Agent Stop removes any attached toolbar tab locally (2.375884ms)\nℹ tests 37\nℹ suites 0\nℹ pass 37\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 4220.054348 stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.12s Agent report: Exit 0. Verified exact candidate c833aba9a6e5d7151d4696151dfe71c5504cc130, expected branch, clean worktree, diff hygiene, formatting, 35/35 session tests, 10/10 Goal lifecycle tests, 37/37 Toolbar tests, and warning-denied scoped Clippy.",
+                "exit_code": 0,
+                "process_id": "proc-1787058660899-868123-437",
+                "status": "passed",
+                "test": "The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks."
+              }
+            ],
+            "source_candidate_commit": "c833aba9a6e5d7151d4696151dfe71c5504cc130"
+          },
+          "quality_message": "All Quality tests passed with observed supervised evidence.",
+          "quality_state": "passed",
+          "rule_state": "unclassified"
+        },
+        "refreshed_at": "2026-08-18T13:14:44Z",
+        "replacement_base_commit": "7240706a10f1d45dc387a41825c08891ed52cf41",
+        "replacement_candidate_commit": "0f1ca148a0887fc3a65ecbcc85f9b3bab0517d15",
+        "round_idx": 0,
+        "state": "refreshed",
+        "workflow_revision": 2,
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T0570KRGG047J0RZG2000-round-1"
       },
       "workflow_reconciliation": null,
       "workflow_recovery": null
@@ -384,6 +428,6 @@
   ],
   "status": "governance",
   "target_branch": "main",
-  "updated": "2026-08-18T13:11:22Z",
-  "workflow_revision": 24
+  "updated": "2026-08-18T13:14:44Z",
+  "workflow_revision": 25
 }
