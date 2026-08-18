@@ -106,12 +106,43 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-08-18T11:02:00Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-08-18T11:03:36Z",
+        "proposal": {
+          "completed_at": "2026-08-18T11:03:36Z",
+          "git_after": {
+            "branch": "refine/DR7C01216FC201903A8CC6BDC7/round-1",
+            "head_commit": "827a23a8c5e609fad7bef0dcb98690a335da0228",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR7C01216FC201903A8CC6BDC7/round-1",
+            "head_commit": "827a23a8c5e609fad7bef0dcb98690a335da0228",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Replace the general-Agent-only workflow template with a clearly named shared toolbar-agent guidance template that starts on the existing Node, frames investigation, current-Node management, and question answering as the primary role, and routes requested repository changes through a new Goal or a new Round on a failed Goal while preserving audit boundaries.",
+                "id": "P1"
+              },
+              {
+                "description": "Compose the shared guidance into both normal Agent and Planning Agent toolbar prompts while leaving Goal diagnostics, standalone sessions, and planning, implementation, Quality, and Governance automation prompt paths unchanged.",
+                "id": "P2"
+              },
+              {
+                "description": "Update the focused browser-agent intent page so the durable surface contract describes the same node-first role, change-handoff choices, and toolbar-only scope without altering unrelated intent documentation.",
+                "id": "P3"
+              }
+            ],
+            "summary": "Refine will give normal and planning toolbar agents a shared node-first operating contract that prioritizes investigations, current-Node management, and questions, routes requested changes through new Goals or recovery Rounds for failed Goals, and remains isolated from workflow automation prompts."
+          },
+          "started_at": "2026-08-18T11:02:00Z"
+        },
         "schema_version": 2,
         "started_at": "2026-08-18T11:02:00Z",
         "state": "in_progress",
-        "updated_at": "2026-08-18T11:02:00Z"
+        "updated_at": "2026-08-18T11:03:36Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -125,7 +156,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T11:02:00Z",
+      "updated": "2026-08-18T11:03:36Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T11:02:00Z",
         "round_idx": 0,
@@ -137,6 +168,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-18T11:02:00Z",
-  "workflow_revision": 7
+  "updated": "2026-08-18T11:03:36Z",
+  "workflow_revision": 9
 }
