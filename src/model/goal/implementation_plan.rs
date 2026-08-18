@@ -117,6 +117,7 @@ pub struct ImplementationCriticismArtifact {
 #[serde(rename_all = "snake_case")]
 pub enum ImplementationChecklistOutcome {
     Completed,
+    NoChangeNeeded,
     Deviated,
     Rejected,
     Blocked,

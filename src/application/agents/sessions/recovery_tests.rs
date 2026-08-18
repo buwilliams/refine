@@ -38,7 +38,7 @@ fn changing_invalid_json_restarts_the_legacy_write_grace_period() {
         SignalRead::Pending
     ));
     thread::sleep(Duration::from_millis(30));
-    let SignalRead::Rejected(diagnostic) = reader.take(&signal_path).unwrap() else {
+    let SignalRead::MalformedTransport(diagnostic) = reader.take(&signal_path).unwrap() else {
         panic!("unchanged invalid JSON must become actionable");
     };
     assert!(diagnostic.contains("invalid JSON after 25 ms"));
@@ -53,7 +53,8 @@ fn unsupported_signal_state_is_an_immediate_typed_schema_rejection() {
     let signal_path = root.join("goal-agent-test.signal.json");
     fs::write(&signal_path, r#"{"state":"done"}"#).unwrap();
 
-    let SignalRead::Rejected(diagnostic) = SignalReader::default().take(&signal_path).unwrap()
+    let SignalRead::InvalidContract(diagnostic) =
+        SignalReader::default().take(&signal_path).unwrap()
     else {
         panic!("unsupported state must be rejected by the typed signal schema");
     };
@@ -109,30 +110,30 @@ sleep 10
 
 #[cfg(unix)]
 #[test]
-fn invalid_signal_recovery_fails_after_three_rejected_replacements() {
+fn typed_schema_rejection_is_terminal_without_a_replacement_instruction() {
     let _env_guard = crate::infrastructure::agents::invocation::smoke_ai_env_lock()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let script = r#"#!/bin/sh
-attempt=1
-while [ "$attempt" -le 4 ]; do
-  printf '%s\n' '{"state":7}' > "$REFINE_AGENT_SIGNAL_PATH"
-  if [ "$attempt" -lt 4 ]; then
-    IFS= read -r instruction
-  fi
-  attempt=$((attempt + 1))
-done
+printf '%s\n' '{"state":"completed","implementation_evidence":{"checklist":[{"id":"P1","outcome":"no_work_needed","evidence":"nothing changed"}],"verification":[]}}' > "$REFINE_AGENT_SIGNAL_PATH"
+if IFS= read -r instruction; then
+  printf '%s\n' "$instruction" > recovery-instruction.txt
+fi
 sleep 10
 "#;
     let (root, runtime_root, result) = run_test_provider(
-        "goal-agent-invalid-schema-limit",
+        "goal-agent-invalid-schema-terminal",
         script,
         Duration::from_secs(5),
     );
     let error = result.unwrap_err().to_string();
 
-    assert!(error.contains("exhausted the limit of 3 rejected replacement payloads"));
+    assert!(error.contains("typed-schema failures are terminal"));
     assert!(error.contains("does not match the required schema"));
+    assert!(error.contains("implementation_evidence.checklist[0].outcome"));
+    assert!(error.contains("unknown variant `no_work_needed`"));
+    assert!(error.contains("no_change_needed"));
+    assert!(!root.join("app/recovery-instruction.txt").exists());
     let process_dir = runtime_root.join("processes");
     let invalid_payloads = fs::read_dir(&process_dir)
         .unwrap()
@@ -150,8 +151,8 @@ sleep 10
         .filter_map(Result::ok)
         .filter(|entry| entry.file_name().to_string_lossy().ends_with(".error.txt"))
         .count();
-    assert_eq!(invalid_payloads, 4);
-    assert_eq!(diagnostics, 4);
+    assert_eq!(invalid_payloads, 1);
+    assert_eq!(diagnostics, 1);
 
     fs::remove_dir_all(root).unwrap();
 }
@@ -197,7 +198,7 @@ fn agent_exit_while_a_replacement_is_outstanding_returns_the_archived_diagnostic
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let script = r#"#!/bin/sh
-printf '%s\n' '{"state":7}' > "$REFINE_AGENT_SIGNAL_PATH"
+printf '%s' '{"state":"completed"' > "$REFINE_AGENT_SIGNAL_PATH"
 IFS= read -r instruction
 "#;
     let (root, _runtime_root, result) = run_test_provider(
@@ -208,7 +209,7 @@ IFS= read -r instruction
     let error = result.unwrap_err().to_string();
 
     assert!(error.contains("exited before it produced a valid replacement"));
-    assert!(error.contains("does not match the required schema"));
+    assert!(error.contains("invalid JSON"));
     assert!(error.contains(".signal.invalid.1.json"));
     assert!(error.contains(".signal.invalid.1.error.txt"));
 

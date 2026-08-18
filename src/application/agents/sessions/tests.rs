@@ -18,6 +18,7 @@ fn workflow_goal_agent_prompt_excludes_interactive_checkout_guidance() {
     assert!(!prompt.contains("Active Refine executable"));
     assert!(!prompt.contains("checkout-local `./r`"));
     assert!(prompt.contains("/runtime/processes/goal-agent.signal.json"));
+    assert!(prompt.contains("completed|no_change_needed|deviated|rejected|blocked"));
     assert!(!prompt.contains("{{"));
     assert_eq!(prompt.matches("# Goal Agent Specification").count(), 1);
     assert_eq!(prompt.matches("LATEST_SENTINEL").count(), 1);
@@ -64,7 +65,7 @@ fn completion_signal_rejects_guidance_names_as_a_schema_error() {
     .unwrap();
 
     let read = SignalReader::default().take(&signal_path).unwrap();
-    let SignalRead::Rejected(diagnostic) = read else {
+    let SignalRead::InvalidContract(diagnostic) = read else {
         panic!("schema-invalid signal must be rejected");
     };
 
@@ -86,7 +87,7 @@ fn completion_signal_allows_partial_json_only_for_the_write_grace_period() {
         reader.take(&signal_path).unwrap(),
         SignalRead::Pending
     ));
-    let SignalRead::Rejected(diagnostic) = reader.take(&signal_path).unwrap() else {
+    let SignalRead::MalformedTransport(diagnostic) = reader.take(&signal_path).unwrap() else {
         panic!("stable invalid JSON must be rejected after the grace period");
     };
 
@@ -107,7 +108,7 @@ fn planning_completion_signals_must_carry_the_planning_result_object() {
     .unwrap();
 
     let mut reader = SignalReader::new(Duration::ZERO).requiring_planning_result(true);
-    let SignalRead::Rejected(diagnostic) = reader.take(&signal_path).unwrap() else {
+    let SignalRead::InvalidContract(diagnostic) = reader.take(&signal_path).unwrap() else {
         panic!("a planning completion without planning_result must be rejected");
     };
     assert!(diagnostic.contains("omitted the required planning_result object"));
@@ -119,6 +120,30 @@ fn planning_completion_signals_must_carry_the_planning_result_object() {
         lenient.take(&signal_path).unwrap(),
         SignalRead::Valid(_)
     ));
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn implementation_completion_signal_accepts_no_change_needed_evidence() {
+    let root = unique_temp_dir("goal-agent-no-change-needed-signal");
+    fs::create_dir_all(&root).unwrap();
+    let signal_path = root.join("goal-agent.signal.json");
+    fs::write(
+        &signal_path,
+        r#"{"state":"completed","message":"nothing to change","guidance_applied":[],"implementation_evidence":{"checklist":[{"id":"P1","outcome":"no_change_needed","evidence":"The requested behavior is already present."}],"verification":["cargo test --lib: passed"]}}"#,
+    )
+    .unwrap();
+
+    let SignalRead::Valid(signal) = SignalReader::default().take(&signal_path).unwrap() else {
+        panic!("no_change_needed must be accepted by the Goal Agent completion schema");
+    };
+    let implementation_evidence = signal.implementation_evidence.unwrap();
+    let outcome = &implementation_evidence.checklist.first().unwrap().outcome;
+    assert_eq!(
+        outcome,
+        &crate::model::goal::ImplementationChecklistOutcome::NoChangeNeeded
+    );
+    assert!(!signal_path.exists());
     fs::remove_dir_all(root).unwrap();
 }
 

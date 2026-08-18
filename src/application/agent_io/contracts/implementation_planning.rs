@@ -280,6 +280,28 @@ mod tests {
         assert_contract_roundtrip::<ImplementationExecutionEvidence>();
     }
 
+    #[test]
+    fn implementation_evidence_persists_no_change_needed() {
+        let evidence: ImplementationExecutionEvidence = serde_json::from_value(serde_json::json!({
+            "checklist": [{
+                "id": "P1",
+                "outcome": "no_change_needed",
+                "evidence": "The requested behavior is already present."
+            }],
+            "verification": ["cargo test --lib: passed"]
+        }))
+        .unwrap();
+
+        assert_eq!(
+            evidence.checklist[0].outcome,
+            ImplementationChecklistOutcome::NoChangeNeeded
+        );
+        assert_eq!(
+            serde_json::to_value(&evidence).unwrap()["checklist"][0]["outcome"],
+            "no_change_needed"
+        );
+    }
+
     // Guard against `deny_unknown_fields` creep onto persisted artifact types:
     // goal.json evidence written by a future version must keep re-decoding.
     #[test]

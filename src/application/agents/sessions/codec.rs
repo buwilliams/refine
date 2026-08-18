@@ -198,7 +198,8 @@ pub(super) struct SignalReader {
 pub(super) enum SignalRead {
     Pending,
     Valid(AgentSessionSignal),
-    Rejected(String),
+    MalformedTransport(String),
+    InvalidContract(String),
 }
 
 impl Default for SignalReader {
@@ -274,7 +275,7 @@ impl SignalReader {
                         {
                             let elapsed = now.duration_since(incomplete.first_seen).as_millis();
                             self.incomplete = None;
-                            return Ok(SignalRead::Rejected(format!(
+                            return Ok(SignalRead::MalformedTransport(format!(
                                 "invalid JSON after {} ms: {error}",
                                 if writer_finished {
                                     elapsed
@@ -291,7 +292,7 @@ impl SignalReader {
                         });
                         if writer_finished {
                             self.incomplete = None;
-                            return Ok(SignalRead::Rejected(format!(
+                            return Ok(SignalRead::MalformedTransport(format!(
                                 "invalid JSON when the Goal Agent exited: {error}"
                             )));
                         }
@@ -304,7 +305,7 @@ impl SignalReader {
         let signal: AgentSessionSignal = match serde_path_to_error::deserialize(value) {
             Ok(signal) => signal,
             Err(error) => {
-                return Ok(SignalRead::Rejected(format!(
+                return Ok(SignalRead::InvalidContract(format!(
                     "does not match the required schema: {error}"
                 )));
             }
@@ -313,7 +314,7 @@ impl SignalReader {
             && matches!(signal.state, AgentSessionState::Completed)
             && signal.planning_result.is_none()
         {
-            return Ok(SignalRead::Rejected(
+            return Ok(SignalRead::InvalidContract(
                 "completion signal omitted the required planning_result object".to_string(),
             ));
         }
@@ -391,7 +392,7 @@ fn completion_contract(signal_path: &Path, implementation_phase: Option<&str>) -
             let implementation_evidence =
                 crate::application::agent_io::prompts::implementation_planning::implementation_evidence_contract_json();
             format!(
-                "Report changes and exact verification. Choose applicable Guidance. On completion, produce `{{\"state\":\"completed\",\"message\":\"changes and exact verification\",\"guidance_applied\":[0],\"implementation_evidence\":{implementation_evidence}}}`, replacing `[0]` with applicable indexes and each checklist `outcome` with one of `completed|deviated|rejected|blocked`. Guidance makes the field required, though it may be empty. A governed implementation checklist requires evidence for every stable ID without altering the accepted plan. {write_protocol}"
+                "Report changes and exact verification. Choose applicable Guidance. On completion, produce `{{\"state\":\"completed\",\"message\":\"changes and exact verification\",\"guidance_applied\":[0],\"implementation_evidence\":{implementation_evidence}}}`, replacing `[0]` with applicable indexes and each checklist `outcome` with one of `completed|no_change_needed|deviated|rejected|blocked`. Guidance makes the field required, though it may be empty. A governed implementation checklist requires evidence for every stable ID without altering the accepted plan. {write_protocol}"
             )
         }
     }
