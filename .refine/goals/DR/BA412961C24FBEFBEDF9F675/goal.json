@@ -123,6 +123,37 @@
           },
           "started_at": "2026-08-18T12:46:40Z"
         },
+        "final_plan": {
+          "completed_at": "2026-08-18T12:49:54Z",
+          "git_after": {
+            "branch": "refine/DRBA412961C24FBEFBEDF9F675/round-1",
+            "head_commit": "148e3ff37f026e3861adbefd86edc5ddbd9a3662",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRBA412961C24FBEFBEDF9F675/round-1",
+            "head_commit": "148e3ff37f026e3861adbefd86edc5ddbd9a3662",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Extend the durable implementation checklist outcome model and generated Goal Agent completion contract to accept no_change_needed, and make evidence validation, storage, and status presentation treat it as a successful evidenced non-change.",
+                "id": "P1"
+              },
+              {
+                "description": "Separate recoverable incomplete or malformed JSON transport writes from terminal typed-schema failures so a stable unknown enum or other schema violation is preserved with its path-aware diagnostic and ends the live session without a replacement instruction, while legacy direct-write grace and bounded recovery remain available only for transport repair.",
+                "id": "P2"
+              },
+              {
+                "description": "Update the Goal Agent intent documentation to define the aligned implementation outcome vocabulary and the fail-fast boundary between recoverable transport writes and terminal typed-schema rejection.",
+                "id": "P3"
+              }
+            ],
+            "summary": "Allow Goal Agent implementation evidence to report no_change_needed as a successful checklist result, and make stable typed-schema failures terminal before any rewrite or stop-hook retry while retaining bounded recovery for incomplete or malformed JSON, so valid non-change work completes promptly and invalid contracts remain inspectable without long silent stalls."
+          },
+          "started_at": "2026-08-18T12:48:32Z"
+        },
         "phase": "revise",
         "phase_started_at": "2026-08-18T12:48:32Z",
         "proposal": {
@@ -159,7 +190,7 @@
         "schema_version": 2,
         "started_at": "2026-08-18T12:44:09Z",
         "state": "in_progress",
-        "updated_at": "2026-08-18T12:48:32Z"
+        "updated_at": "2026-08-18T12:49:54Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -173,7 +204,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T12:48:32Z",
+      "updated": "2026-08-18T12:49:54Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T12:44:08Z",
         "round_idx": 0,
@@ -185,6 +216,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-18T12:48:32Z",
-  "workflow_revision": 11
+  "updated": "2026-08-18T12:49:54Z",
+  "workflow_revision": 12
 }
