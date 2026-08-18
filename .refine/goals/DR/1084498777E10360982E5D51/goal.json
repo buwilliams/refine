@@ -106,8 +106,25 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-08-18T14:50:26Z",
+        "criticism": {
+          "completed_at": "2026-08-18T14:51:58Z",
+          "git_after": {
+            "branch": "refine/DR1084498777E10360982E5D51/round-1",
+            "head_commit": "ff07e292388a2b3cfe2fcb1c3fb52bec4bb0ab4a",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR1084498777E10360982E5D51/round-1",
+            "head_commit": "ff07e292388a2b3cfe2fcb1c3fb52bec4bb0ab4a",
+            "status_porcelain": []
+          },
+          "result": {
+            "summary": "The plan correctly aligns rendered Guidance indexes, strict signal decoding, intent documentation, and regressions across all Goal Agent phases."
+          },
+          "started_at": "2026-08-18T14:50:26Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-08-18T14:51:58Z",
         "proposal": {
           "completed_at": "2026-08-18T14:50:26Z",
           "git_after": {
@@ -146,7 +163,7 @@
         "schema_version": 2,
         "started_at": "2026-08-18T14:47:27Z",
         "state": "in_progress",
-        "updated_at": "2026-08-18T14:50:26Z"
+        "updated_at": "2026-08-18T14:51:58Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -160,7 +177,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T14:50:26Z",
+      "updated": "2026-08-18T14:51:58Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T14:47:27Z",
         "round_idx": 0,
@@ -172,6 +189,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-18T14:50:26Z",
-  "workflow_revision": 10
+  "updated": "2026-08-18T14:51:58Z",
+  "workflow_revision": 12
 }
