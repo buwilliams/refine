@@ -489,8 +489,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "done",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-08-18T15:02:05Z",
-  "workflow_revision": 35
+  "updated": "2026-08-18T15:05:02Z",
+  "workflow_revision": 36
 }
