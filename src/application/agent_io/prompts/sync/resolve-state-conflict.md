@@ -6,6 +6,6 @@ Ownership doctrine, quoted from Refine's fleet intent, as guidance:
 
 {{doctrine}}
 
-Rewrite each conflicted file into one coherent record: remove every conflict marker, keep valid JSON, invent no data, and where evidence and workflow authority would otherwise split, prefer the side that owns workflow authority.
+Rewrite conflicted files coherently: remove markers, keep valid JSON, invent nothing, preserve every explicit Goal owner in the doctrine, and reconcile other members without changing or deleting that Goal.
 
 If no doctrine settles it, edit nothing and reply with a line beginning `NEEDS DECISION:` and your question naming the goal and contested members.

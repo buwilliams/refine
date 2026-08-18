@@ -7,6 +7,114 @@ fn write_shared_state(root: &Path, path: &str, value: &str) {
     fs::write(destination, value).unwrap();
 }
 
+fn write_owned_goal(root: &Path, owner: &str, name: &str, updated: &str) {
+    let destination = refine_dir_for_target_root(root)
+        .unwrap()
+        .join("goals/GO/ALA/goal.json");
+    fs::create_dir_all(destination.parent().unwrap()).unwrap();
+    fs::write(
+        destination,
+        serde_json::to_vec_pretty(&serde_json::json!({
+            "id": "GOALA",
+            "name": name,
+            "status": "todo",
+            "priority": "low",
+            "reporter": null,
+            "branch_name": null,
+            "feature_id": null,
+            "feature_order": null,
+            "node_id": owner,
+            "created": "2026-08-18T08:00:00Z",
+            "updated": updated,
+            "notes": [],
+            "rounds": []
+        }))
+        .unwrap(),
+    )
+    .unwrap();
+}
+
+fn read_owned_goal(root: &Path) -> serde_json::Value {
+    serde_json::from_slice(
+        &fs::read(
+            refine_dir_for_target_root(root)
+                .unwrap()
+                .join("goals/GO/ALA/goal.json"),
+        )
+        .unwrap(),
+    )
+    .unwrap()
+}
+
+fn assert_automatic_recovery_preserves_transfer(name: &str, transferred_locally: bool) {
+    let fixture = SyncFixture::new(name);
+    write_owned_goal(&fixture.a, "node-a", "base", "2026-08-18T08:00:00Z");
+    fixture.service(&fixture.a).sync().unwrap();
+    fixture.service(&fixture.b).sync().unwrap();
+    if transferred_locally {
+        write_owned_goal(&fixture.a, "node-a", "remote edit", "2026-08-18T09:00:00Z");
+        fixture.service(&fixture.a).sync().unwrap();
+        write_owned_goal(&fixture.b, "node-b", "live edit", "2026-08-18T10:00:00Z");
+    } else {
+        write_owned_goal(&fixture.a, "node-b", "remote edit", "2026-08-18T09:00:00Z");
+        fixture.service(&fixture.a).sync().unwrap();
+        write_owned_goal(&fixture.b, "node-a", "live edit", "2026-08-18T10:00:00Z");
+    }
+
+    let service = fixture.service(&fixture.b);
+    service.sync().unwrap_err();
+    let report = latest_state_sync_conflict_report(&fixture.b.join("run"))
+        .unwrap()
+        .expect("the non-owner member conflict remains available to recovery");
+    let run = service
+        .run_state_recovery_with_policy(StateRecoveryRunPolicy::Automatic(
+            service.automatic_recovery_decision(&report),
+        ))
+        .unwrap();
+    assert!(run.ok && run.recovered, "{run:#?}");
+    assert!(
+        run.detail.contains("preserved 1 explicit Goal transfer"),
+        "{run:#?}"
+    );
+    let goal = read_owned_goal(&fixture.b);
+    assert_eq!(goal["node_id"], "node-b");
+    assert_eq!(goal["name"], "remote edit");
+    fixture.service(&fixture.a).sync().unwrap();
+    assert_eq!(read_owned_goal(&fixture.a)["node_id"], "node-b");
+}
+
+#[test]
+fn automatic_recovery_preserves_remote_one_sided_transfer() {
+    assert_automatic_recovery_preserves_transfer("auto-remote-transfer", false);
+}
+
+#[test]
+fn automatic_recovery_overlays_local_one_sided_transfer_on_remote_record() {
+    assert_automatic_recovery_preserves_transfer("auto-local-transfer", true);
+}
+
+#[test]
+fn automatic_recovery_fails_closed_without_a_merge_base() {
+    let fixture = SyncFixture::new("auto-missing-base");
+    write_owned_goal(&fixture.a, "node-a", "remote", "2026-08-18T09:00:00Z");
+    fixture.service(&fixture.a).sync().unwrap();
+    write_owned_goal(&fixture.b, "node-b", "live", "2026-08-18T10:00:00Z");
+
+    let service = fixture.service(&fixture.b);
+    let run = service.run_state_recovery_with_policy(StateRecoveryRunPolicy::Automatic(
+        StateRecoveryDecision::uniform(StateRecoveryAuthority::Remote),
+    ));
+    let error = run.unwrap_err();
+    assert!(error.to_string().contains("explicit decision"), "{error}");
+    let report = latest_state_sync_conflict_report(&fixture.b.join("run"))
+        .unwrap()
+        .expect("first-contact ownership ambiguity remains inspectable");
+    assert!(report.merge_base.is_empty(), "{report:#?}");
+    let goal = read_owned_goal(&fixture.b);
+    assert_eq!(goal["node_id"], "node-b");
+    assert_eq!(goal["name"], "live");
+}
+
 /// Two nodes that share history and then contest one record.
 fn diverged_fixture(name: &str) -> SyncFixture {
     let fixture = SyncFixture::new(name);

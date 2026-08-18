@@ -997,9 +997,8 @@ fn background_sync_conflict_auto_recovers_unless_the_node_opted_out() {
         .unwrap();
     assert!(health.failure_since.is_some(), "{health:#?}");
 
-    // With the default policy the same rejection converges on its own:
-    // remote authority for the shared record, a live override for the goal
-    // record whose merge-base bytes name this node.
+    // With the default policy the same ordinary non-ownership rejection
+    // converges on its own with remote whole-record authority.
     FileSettingsService::with_active_root(&refine_b, &runtime_root)
         .update(&json!({"state_sync_auto_recovery": "remote"}))
         .unwrap();
@@ -1023,8 +1022,8 @@ fn background_sync_conflict_auto_recovers_unless_the_node_opted_out() {
         serde_json::from_slice(&std::fs::read(refine_b.join("goals/OWNED/goal.json")).unwrap())
             .unwrap();
     assert_eq!(
-        owned["name"], "live-edit",
-        "merge-base ownership keeps this node's copy of its own goal"
+        owned["name"], "remote-edit",
+        "ordinary non-ownership conflict takes the remote fallback"
     );
     let entries = FileActivityService::new(&refine_b).recent(10).unwrap();
     assert!(
@@ -1158,7 +1157,7 @@ fn agent_resolution_runs_before_auto_recovery_and_needs_decision_falls_through()
     assert!(report.decision_question.is_some(), "{report:#?}");
 
     // Only the NeedsDecision outcome falls through to auto-recovery, which
-    // still converges the node with the merge-base ownership policy.
+    // still converges this ordinary non-ownership conflict.
     let outcome =
         attempt_automatic_state_recovery(&runtime_root, &b, "default", &service, Some(&report))
             .unwrap();

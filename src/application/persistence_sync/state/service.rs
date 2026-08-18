@@ -1,5 +1,6 @@
 use super::*;
 
+use crate::application::persistence_sync::goal_ownership::{GoalOwnership, GoalOwnershipPolicy};
 use crate::application::persistence_sync::resolution::state::{
     LockAcquisition, StateResolutionHold, StateResolutionSlot,
 };
@@ -49,6 +50,7 @@ pub(crate) struct StateSyncPass {
     pub(crate) settled: Vec<String>,
     /// Refs retained for displaced state not reachable as a merge parent.
     pub(crate) retained: Vec<String>,
+    pub(crate) preserved_goal_owners: Vec<StateRecoveryGoalOwner>,
     /// The conflict-report id of an agent resolution this pass published as
     /// its merge commit; the entry retires its refs and clears the report.
     pub(crate) published_resolution: Option<String>,
@@ -60,6 +62,7 @@ impl StateSyncPass {
             result,
             settled: Vec::new(),
             retained: Vec::new(),
+            preserved_goal_owners: Vec::new(),
             published_resolution: None,
         }
     }
@@ -186,6 +189,7 @@ impl FileGitSyncService {
         fetch_scope: GitFetchScope,
         attempt: &StateSyncAttemptContext,
         decision: Option<&StateRecoveryDecision>,
+        automatic_recovery: bool,
         resolution_engaged: bool,
         resolution_slot: &mut Option<StateResolutionSlot>,
     ) -> RefineResult<StateSyncPass> {
@@ -193,6 +197,7 @@ impl FileGitSyncService {
             fetch_scope,
             attempt,
             decision,
+            automatic_recovery,
             resolution_engaged,
             resolution_slot,
         );
@@ -219,11 +224,13 @@ impl FileGitSyncService {
         fetch_scope: GitFetchScope,
         attempt: &StateSyncAttemptContext,
         decision: Option<&StateRecoveryDecision>,
+        automatic_recovery: bool,
         resolution_engaged: bool,
         resolution_slot: &mut Option<StateResolutionSlot>,
     ) -> RefineResult<StateSyncPass> {
         let mut settled = Vec::new();
         let mut retained = Vec::new();
+        let mut preserved_goal_owners = Vec::new();
         let mut published_resolution = None;
         if !self.target_root.join(".git").exists() {
             return Ok(StateSyncPass::clean(skipped(
@@ -293,6 +300,26 @@ impl FileGitSyncService {
             if !bootstrap_only_state(&live) {
                 let contested = self.join_contested_paths(&remote_head, &live, &live_refine)?;
                 if !contested.is_empty() {
+                    if automatic_recovery {
+                        let ownership = self.join_goal_ownership_policy(
+                            &remote_head,
+                            &live_refine,
+                            &contested,
+                        )?;
+                        if let Some(question) = ownership.decision_question() {
+                            let summary = self.record_conflict_report(
+                                StateSyncConflictPhase::FirstPass,
+                                attempt,
+                                &remote,
+                                "",
+                                "",
+                                &remote_head,
+                                &contested,
+                                Some(&question),
+                            )?;
+                            return Err(RefineError::Conflict(summary.to_string()));
+                        }
+                    }
                     let Some(decision) = decision else {
                         let summary = self.record_conflict_report(
                             StateSyncConflictPhase::FirstPass,
@@ -540,6 +567,7 @@ impl FileGitSyncService {
                     // settlements count once. The same holds for a published
                     // agent resolution.
                     let mut attempt_settled = Vec::new();
+                    let mut attempt_preserved_goal_owners = Vec::new();
                     let mut attempt_resolution = None;
                     let merge_commit = self.merge_diverged_state(
                         &state_root,
@@ -550,10 +578,12 @@ impl FileGitSyncService {
                         &remote_head,
                         push_attempt,
                         decision,
+                        automatic_recovery,
                         resolution_engaged,
                         resolution_slot,
                         &mut attempt_resolution,
                         &mut attempt_settled,
+                        &mut attempt_preserved_goal_owners,
                         &mut details,
                     )?;
                     // The merge commit descends from the fetched remote head,
@@ -571,6 +601,7 @@ impl FileGitSyncService {
                     append_output_detail(&mut details, &push);
                     if push.success {
                         settled.append(&mut attempt_settled);
+                        preserved_goal_owners.append(&mut attempt_preserved_goal_owners);
                         published_resolution = attempt_resolution.take();
                         live_advanced |= self.hydrate_live_from_commit(
                             &state_root,
@@ -626,6 +657,7 @@ impl FileGitSyncService {
             },
             settled,
             retained,
+            preserved_goal_owners,
             published_resolution,
         })
     }
@@ -700,10 +732,12 @@ impl FileGitSyncService {
         remote_head: &str,
         push_attempt: usize,
         decision: Option<&StateRecoveryDecision>,
+        automatic_recovery: bool,
         resolution_engaged: bool,
         resolution_slot: &mut Option<StateResolutionSlot>,
         published_resolution: &mut Option<String>,
         settled: &mut Vec<String>,
+        preserved_goal_owners: &mut Vec<StateRecoveryGoalOwner>,
         details: &mut Vec<String>,
     ) -> RefineResult<String> {
         let (mut tree, resolved, mut unresolved) =
@@ -711,14 +745,36 @@ impl FileGitSyncService {
         // The conflict-report id hashes the sorted unresolved paths; keep the
         // resolution id, the report, and the prompt in that one stable order.
         unresolved.sort_by(|left, right| left.path.cmp(&right.path));
+        let ownership = self.goal_ownership_policy(
+            state_root,
+            merge_base,
+            local_head,
+            remote_head,
+            &unresolved,
+        )?;
+        let phase = if push_attempt > 1 {
+            StateSyncConflictPhase::PushRetry
+        } else {
+            StateSyncConflictPhase::FirstPass
+        };
+        if (automatic_recovery || decision.is_none())
+            && let Some(question) = ownership.decision_question()
+        {
+            let summary = self.record_conflict_report(
+                phase,
+                attempt,
+                remote,
+                merge_base,
+                local_head,
+                remote_head,
+                &unresolved,
+                Some(&question),
+            )?;
+            return Err(RefineError::Conflict(summary.to_string()));
+        }
         let mut parents_message = None;
         if !unresolved.is_empty() {
             let Some(decision) = decision else {
-                let phase = if push_attempt > 1 {
-                    StateSyncConflictPhase::PushRetry
-                } else {
-                    StateSyncConflictPhase::FirstPass
-                };
                 if resolution_engaged {
                     match self.prepare_state_resolution(
                         state_root,
@@ -739,6 +795,19 @@ impl FileGitSyncService {
                         }
                         Some(StateResolutionHold::Prepared(prepared)) => {
                             *resolution_slot = Some(StateResolutionSlot::Prepared(prepared));
+                        }
+                        Some(StateResolutionHold::NeedsDecision { question }) => {
+                            let summary = self.record_conflict_report(
+                                phase,
+                                attempt,
+                                remote,
+                                merge_base,
+                                local_head,
+                                remote_head,
+                                &unresolved,
+                                Some(&question),
+                            )?;
+                            return Err(RefineError::Conflict(summary.to_string()));
                         }
                         Some(StateResolutionHold::Busy { report_id }) => {
                             // Reporting this divergence would race the
@@ -800,7 +869,13 @@ impl FileGitSyncService {
                     still_unresolved.len()
                 )));
             }
-            tree = forced_tree;
+            tree = self.overlay_goal_ownership(
+                state_root,
+                &forced_tree,
+                &ownership,
+                preserved_goal_owners,
+                details,
+            )?;
             settled.extend(unresolved.iter().map(|conflict| conflict.path.clone()));
             details.push(format!(
                 "Recovery settled contested state with {} authority: {}",
@@ -835,6 +910,130 @@ impl FileGitSyncService {
             &[local_head, remote_head],
             &message,
         )
+    }
+
+    fn goal_ownership_policy(
+        &self,
+        state_root: &std::path::Path,
+        merge_base: &str,
+        local_head: &str,
+        remote_head: &str,
+        unresolved: &[StateSyncConflictPath],
+    ) -> RefineResult<GoalOwnershipPolicy> {
+        let mut ownership = GoalOwnershipPolicy::default();
+        for conflict in unresolved {
+            let path = format!(".refine/{}", conflict.path);
+            let base = self.state_bytes_at(state_root, merge_base, &path)?;
+            let local = self.state_bytes_at(state_root, local_head, &path)?;
+            let remote = self.state_bytes_at(state_root, remote_head, &path)?;
+            ownership.include(&path, base.as_deref(), local.as_deref(), remote.as_deref());
+        }
+        Ok(ownership)
+    }
+
+    fn join_goal_ownership_policy(
+        &self,
+        remote_head: &str,
+        live_refine: &std::path::Path,
+        contested: &[StateSyncConflictPath],
+    ) -> RefineResult<GoalOwnershipPolicy> {
+        let mut ownership = GoalOwnershipPolicy::default();
+        for conflict in contested {
+            let path = format!(".refine/{}", conflict.path);
+            let local = match fs::read(live_refine.join(&conflict.path)) {
+                Ok(bytes) => Some(bytes),
+                Err(error) if error.kind() == ErrorKind::NotFound => None,
+                Err(error) => {
+                    return Err(RefineError::Io(format!(
+                        "failed to read live Goal ownership operand {}: {error}",
+                        live_refine.join(&conflict.path).display()
+                    )));
+                }
+            };
+            let remote = self.state_bytes_at(&self.target_root, remote_head, &path)?;
+            ownership.include(&path, None, local.as_deref(), remote.as_deref());
+        }
+        Ok(ownership)
+    }
+
+    /// Overlay the independently proven owner onto a whole-record recovery
+    /// choice. This preserves the existing live/remote authority decision for
+    /// every non-ownership member without letting that coarse choice reverse
+    /// an explicit transfer.
+    fn overlay_goal_ownership(
+        &self,
+        state_root: &std::path::Path,
+        tree: &str,
+        ownership: &GoalOwnershipPolicy,
+        preserved_goal_owners: &mut Vec<StateRecoveryGoalOwner>,
+        details: &mut Vec<String>,
+    ) -> RefineResult<String> {
+        let mut operations = Vec::new();
+        let mut transferred = Vec::new();
+        for (path, decision) in ownership.iter() {
+            let GoalOwnership::Preserve {
+                node_id,
+                transferred: was_transferred,
+            } = decision
+            else {
+                // Explicit operator recovery is allowed to settle ambiguity
+                // by selecting one complete side. Automatic recovery returned
+                // before this point.
+                continue;
+            };
+            let bytes = self.state_bytes_at(state_root, tree, path)?;
+            let Some(bytes) = bytes else {
+                return Err(RefineError::Conflict(format!(
+                    "State recovery cannot delete {path} while preserving explicit Goal owner {node_id}"
+                )));
+            };
+            let mut record =
+                serde_json::from_slice::<serde_json::Value>(&bytes).map_err(|error| {
+                    RefineError::Conflict(format!(
+                        "State recovery selected invalid Goal JSON at {path}: {error}"
+                    ))
+                })?;
+            let object = record.as_object_mut().ok_or_else(|| {
+                RefineError::Conflict(format!(
+                    "State recovery selected a non-object Goal record at {path}"
+                ))
+            })?;
+            if *was_transferred {
+                transferred.push(format!("{path} -> {node_id}"));
+                preserved_goal_owners.push(StateRecoveryGoalOwner {
+                    path: path.strip_prefix(".refine/").unwrap_or(path).to_string(),
+                    node_id: node_id.clone(),
+                });
+            }
+            if object.get("node_id").and_then(serde_json::Value::as_str) == Some(node_id.as_str()) {
+                continue;
+            }
+            object.insert(
+                "node_id".to_string(),
+                serde_json::Value::String(node_id.clone()),
+            );
+            let mut encoded = serde_json::to_vec_pretty(&record).map_err(|error| {
+                RefineError::Conflict(format!(
+                    "State recovery could not encode Goal ownership at {path}: {error}"
+                ))
+            })?;
+            encoded.push(b'\n');
+            operations.push(TreeOperation::set(
+                path.to_string(),
+                write_blob(self, state_root, &encoded)?,
+            ));
+        }
+        if !transferred.is_empty() {
+            details.push(format!(
+                "Preserved explicit Goal transfer(s): {}",
+                transferred.join(", ")
+            ));
+        }
+        if operations.is_empty() {
+            Ok(tree.to_string())
+        } else {
+            build_tree(self, state_root, tree, &operations)
+        }
     }
 
     /// Settle a contested first contact with an authority decision. There is

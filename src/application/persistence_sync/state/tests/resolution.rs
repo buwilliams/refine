@@ -13,6 +13,8 @@ use crate::application::persistence_sync::resolution::{
 const SHARED_STATE: &str = "shared/state.json";
 const SHARED_TREE_PATH: &str = ".refine/shared/state.json";
 const SECOND_STATE: &str = "second/state.json";
+const TRANSFER_GOAL: &str = "goals/GO/ALA/goal.json";
+const TRANSFER_TREE_PATH: &str = ".refine/goals/GO/ALA/goal.json";
 
 fn write_shared(root: &Path, bytes: &str) {
     write_record(root, SHARED_STATE, bytes);
@@ -26,6 +28,303 @@ fn write_record(root: &Path, relative: &str, bytes: &str) {
 
 fn read_shared(root: &Path) -> String {
     fs::read_to_string(refine_dir_for_target_root(root).unwrap().join(SHARED_STATE)).unwrap()
+}
+
+fn goal_bytes(owner: &str, name: &str, updated: &str) -> Vec<u8> {
+    let mut bytes = serde_json::to_vec_pretty(&serde_json::json!({
+        "id": "GOALA",
+        "name": name,
+        "status": "todo",
+        "priority": "low",
+        "reporter": null,
+        "branch_name": null,
+        "feature_id": null,
+        "feature_order": null,
+        "node_id": owner,
+        "created": "2026-08-18T08:00:00Z",
+        "updated": updated,
+        "notes": [],
+        "rounds": []
+    }))
+    .unwrap();
+    bytes.push(b'\n');
+    bytes
+}
+
+fn write_transfer_goal(root: &Path, owner: &str, name: &str, updated: &str) {
+    let destination = refine_dir_for_target_root(root)
+        .unwrap()
+        .join(TRANSFER_GOAL);
+    fs::create_dir_all(destination.parent().unwrap()).unwrap();
+    fs::write(destination, goal_bytes(owner, name, updated)).unwrap();
+}
+
+fn read_transfer_goal(root: &Path) -> serde_json::Value {
+    serde_json::from_slice(
+        &fs::read(
+            refine_dir_for_target_root(root)
+                .unwrap()
+                .join(TRANSFER_GOAL),
+        )
+        .unwrap(),
+    )
+    .unwrap()
+}
+
+fn assert_agent_preserves_one_sided_transfer(name: &str, transferred_locally: bool) {
+    let fixture = SyncFixture::new(name);
+    write_transfer_goal(&fixture.a, "node-a", "base", "2026-08-18T08:00:00Z");
+    fixture.service(&fixture.a).sync().unwrap();
+    fixture.service(&fixture.b).sync().unwrap();
+
+    if transferred_locally {
+        write_transfer_goal(&fixture.a, "node-a", "remote edit", "2026-08-18T09:00:00Z");
+        fixture.service(&fixture.a).sync().unwrap();
+        write_transfer_goal(&fixture.b, "node-b", "live edit", "2026-08-18T10:00:00Z");
+    } else {
+        write_transfer_goal(&fixture.a, "node-b", "remote edit", "2026-08-18T09:00:00Z");
+        fixture.service(&fixture.a).sync().unwrap();
+        write_transfer_goal(&fixture.b, "node-a", "live edit", "2026-08-18T10:00:00Z");
+    }
+
+    let calls = Arc::new(AtomicU32::new(0));
+    let counted = Arc::clone(&calls);
+    let _guard = install_resolver_override(
+        &fixture.b,
+        Arc::new(ScriptedResolver::new(vec![
+            completing({
+                let calls = Arc::clone(&calls);
+                move |request| {
+                    calls.fetch_add(1, Ordering::SeqCst);
+                    if transferred_locally {
+                        fs::remove_file(request.workspace_dir.join(TRANSFER_TREE_PATH)).unwrap();
+                    } else {
+                        fs::write(
+                            request.workspace_dir.join(TRANSFER_TREE_PATH),
+                            goal_bytes("node-a", "composed", "2026-08-18T10:00:00Z"),
+                        )
+                        .unwrap();
+                    }
+                }
+            }),
+            Box::new(move |request: &ResolutionRequest<'_>| {
+                counted.fetch_add(1, Ordering::SeqCst);
+                assert!(
+                    request
+                        .feedback
+                        .is_some_and(|feedback| feedback
+                            .contains("must preserve explicit Goal owner node-b")),
+                    "{:?}",
+                    request.feedback
+                );
+                fs::write(
+                    request.workspace_dir.join(TRANSFER_TREE_PATH),
+                    goal_bytes("node-b", "composed", "2026-08-18T10:00:00Z"),
+                )
+                .unwrap();
+                Ok(ResolverOutcome::Completed)
+            }) as ScriptedStep,
+        ])),
+    );
+
+    let result = fixture.service(&fixture.b).sync().unwrap();
+    assert!(result.ok && result.pushed, "{result:#?}");
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
+    let goal = read_transfer_goal(&fixture.b);
+    assert_eq!(goal["node_id"], "node-b");
+    assert_eq!(goal["name"], "composed");
+}
+
+#[test]
+fn agent_preserves_remote_one_sided_transfer_during_non_owner_conflict() {
+    assert_agent_preserves_one_sided_transfer("resolve-remote-transfer", false);
+}
+
+#[test]
+fn agent_preserves_local_one_sided_transfer_and_rejects_deletion() {
+    assert_agent_preserves_one_sided_transfer("resolve-local-transfer", true);
+}
+
+#[test]
+fn competing_transfers_bypass_agent_and_automatic_recovery() {
+    let fixture = SyncFixture::new("resolve-competing-transfers");
+    write_transfer_goal(&fixture.a, "node-a", "base", "2026-08-18T08:00:00Z");
+    fixture.service(&fixture.a).sync().unwrap();
+    fixture.service(&fixture.b).sync().unwrap();
+    write_transfer_goal(&fixture.a, "node-b", "remote", "2026-08-18T09:00:00Z");
+    fixture.service(&fixture.a).sync().unwrap();
+    write_transfer_goal(&fixture.b, "node-c", "live", "2026-08-18T10:00:00Z");
+
+    let calls = Arc::new(AtomicU32::new(0));
+    let counted = Arc::clone(&calls);
+    let _guard = install_resolver_override(
+        &fixture.b,
+        Arc::new(ScriptedResolver::new(vec![
+            Box::new(move |_request: &ResolutionRequest<'_>| {
+                counted.fetch_add(1, Ordering::SeqCst);
+                Ok(ResolverOutcome::Completed)
+            }) as ScriptedStep,
+        ])),
+    );
+    let service = fixture.service(&fixture.b);
+    let error = service.sync().unwrap_err();
+    assert!(error.to_string().contains("explicit decision"), "{error}");
+    assert_eq!(calls.load(Ordering::SeqCst), 0);
+    let report = latest_state_sync_conflict_report(&fixture.b.join("run"))
+        .unwrap()
+        .expect("ambiguous ownership remains inspectable");
+    assert!(
+        report
+            .decision_question
+            .as_deref()
+            .is_some_and(|question| question.contains("supported Goal-transfer surface")),
+        "{report:#?}"
+    );
+
+    let automatic = service.run_state_recovery_with_policy(StateRecoveryRunPolicy::Automatic(
+        service.automatic_recovery_decision(&report),
+    ));
+    assert!(matches!(automatic, Err(RefineError::Conflict(_))));
+    assert_eq!(read_transfer_goal(&fixture.b)["node_id"], "node-c");
+
+    let explicit = service
+        .run_state_recovery(StateRecoveryDecision::uniform(StateRecoveryAuthority::Live))
+        .unwrap();
+    assert!(explicit.ok && explicit.recovered, "{explicit:#?}");
+    assert_eq!(read_transfer_goal(&fixture.b)["node_id"], "node-c");
+}
+
+#[test]
+fn deleted_and_malformed_remote_operands_stay_inspectable() {
+    for (name, remote_bytes) in [
+        ("resolve-deleted-owner", None),
+        ("resolve-malformed-owner", Some(b"{}\n".as_slice())),
+    ] {
+        let fixture = SyncFixture::new(name);
+        write_transfer_goal(&fixture.a, "node-a", "base", "2026-08-18T08:00:00Z");
+        fixture.service(&fixture.a).sync().unwrap();
+        fixture.service(&fixture.b).sync().unwrap();
+        write_record(&fixture.b, "shared/anchor.json", "{\"anchor\":true}\n");
+        fixture.service(&fixture.b).sync().unwrap();
+        fixture.service(&fixture.a).sync().unwrap();
+        let remote_path = refine_dir_for_target_root(&fixture.a)
+            .unwrap()
+            .join(TRANSFER_GOAL);
+        match remote_bytes {
+            Some(bytes) => fs::write(&remote_path, bytes).unwrap(),
+            None => fs::remove_file(&remote_path).unwrap(),
+        }
+        fixture.service(&fixture.a).sync().unwrap();
+        write_transfer_goal(&fixture.b, "node-a", "live", "2026-08-18T10:00:00Z");
+
+        let service = fixture.service(&fixture.b);
+        let error = service.sync().unwrap_err();
+        assert!(error.to_string().contains("explicit decision"), "{error}");
+        let report = latest_state_sync_conflict_report(&fixture.b.join("run"))
+            .unwrap()
+            .expect("invalid ownership evidence remains inspectable");
+        let automatic = service.run_state_recovery_with_policy(StateRecoveryRunPolicy::Automatic(
+            service.automatic_recovery_decision(&report),
+        ));
+        assert!(matches!(automatic, Err(RefineError::Conflict(_))));
+        let goal = read_transfer_goal(&fixture.b);
+        assert_eq!(goal["node_id"], "node-a");
+        assert_eq!(goal["name"], "live");
+    }
+}
+
+#[test]
+#[cfg(unix)]
+fn hostile_crash_surviving_result_is_revalidated_before_publication() {
+    use std::os::unix::fs::PermissionsExt;
+
+    use crate::infrastructure::git::merge::{TreeOperation, build_tree, commit_tree, write_blob};
+
+    let fixture = SyncFixture::new("resolve-revalidate-survivor");
+    write_transfer_goal(&fixture.a, "node-a", "base", "2026-08-18T08:00:00Z");
+    fixture.service(&fixture.a).sync().unwrap();
+    fixture.service(&fixture.b).sync().unwrap();
+    write_transfer_goal(&fixture.a, "node-b", "remote", "2026-08-18T09:00:00Z");
+    fixture.service(&fixture.a).sync().unwrap();
+    write_transfer_goal(&fixture.b, "node-a", "live", "2026-08-18T10:00:00Z");
+
+    let hook = fixture.root.join("remote.git/hooks/pre-receive");
+    fs::write(
+        &hook,
+        "#!/bin/sh\nwhile read old new ref; do\n  if test \"$ref\" = refs/heads/refine/state; then exit 1; fi\ndone\nexit 0\n",
+    )
+    .unwrap();
+    fs::set_permissions(&hook, fs::Permissions::from_mode(0o755)).unwrap();
+
+    {
+        let _guard = install_resolver_override(
+            &fixture.b,
+            Arc::new(ScriptedResolver::new(vec![completing(|request| {
+                fs::write(
+                    request.workspace_dir.join(TRANSFER_TREE_PATH),
+                    goal_bytes("node-b", "composed", "2026-08-18T10:00:00Z"),
+                )
+                .unwrap();
+            })])),
+        );
+        assert!(fixture.service(&fixture.b).sync().is_err());
+    }
+
+    let result_ref = git_stdout(
+        &fixture.b,
+        &["for-each-ref", "--format=%(refname)", "refs/refine/resolve"],
+    )
+    .lines()
+    .find(|reference| reference.ends_with("/result"))
+    .expect("interrupted publication retains its result ref")
+    .to_string();
+    let service = fixture.service(&fixture.b);
+    let result = git_stdout(&fixture.b, &["rev-parse", &result_ref]);
+    let tree = git_stdout(&fixture.b, &["rev-parse", &format!("{result}^{{tree}}")]);
+    let hostile_blob = write_blob(
+        &service,
+        &fixture.b,
+        &goal_bytes("node-a", "hostile", "2026-08-18T10:00:00Z"),
+    )
+    .unwrap();
+    let hostile_tree = build_tree(
+        &service,
+        &fixture.b,
+        &tree,
+        &[TreeOperation::set(TRANSFER_TREE_PATH, hostile_blob)],
+    )
+    .unwrap();
+    let hostile_commit = commit_tree(
+        &service,
+        &fixture.b,
+        &hostile_tree,
+        &[&result],
+        "Inject hostile crash-surviving ownership result",
+    )
+    .unwrap();
+    git(&fixture.b, &["update-ref", &result_ref, &hostile_commit]);
+    fs::remove_file(&hook).unwrap();
+
+    let calls = Arc::new(AtomicU32::new(0));
+    let counted = Arc::clone(&calls);
+    let _guard = install_resolver_override(
+        &fixture.b,
+        Arc::new(ScriptedResolver::new(vec![completing(move |request| {
+            counted.fetch_add(1, Ordering::SeqCst);
+            fs::write(
+                request.workspace_dir.join(TRANSFER_TREE_PATH),
+                goal_bytes("node-b", "rederived", "2026-08-18T10:00:00Z"),
+            )
+            .unwrap();
+        })])),
+    );
+    let result = service.sync().unwrap();
+    assert!(result.ok && result.pushed, "{result:#?}");
+    assert_eq!(calls.load(Ordering::SeqCst), 1);
+    let goal = read_transfer_goal(&fixture.b);
+    assert_eq!(goal["node_id"], "node-b");
+    assert_eq!(goal["name"], "rederived");
+    assert!(resolve_refs(&fixture.b).is_empty());
 }
 
 /// Shared baseline on both nodes, then the same record changed differently on

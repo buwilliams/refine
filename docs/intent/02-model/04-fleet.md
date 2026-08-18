@@ -28,26 +28,25 @@ Application's persistence-sync policy, not Fleet's
 principles that outlast any mechanism — and they are more than prose:
 persistence sync hands this doctrine verbatim to the resolving agent as its
 guidance, and a test pins that quote to this document so code and intent
-cannot drift. Reconciliation never guesses a winner
-from circumstance: timestamps, recency, and which node happens to run the
-merge decide nothing. Ownership is declared doctrine, never circumstance:
-the node that owned a record at the merge base is authoritative
-for contested members, and staleness alone never discards work only the
-owning node could produce — a stale local understanding is not a wrong one.
-Round evidence and the workflow authority that produced it (status,
+cannot drift. Goal ownership changes only through supported transfer
+surfaces. A valid one-sided node_id change is an explicit transfer and remains
+authoritative while every other member is reconciled. Different concurrent
+transfers, or missing or malformed operands, remain ambiguous: automatic
+resolution must not delete the Goal or choose its owner. Timestamps, recency,
+current host, merge location, retry order, and merge-base ownership decide
+nothing. Round evidence and the workflow authority that produced it (status,
 assignment, branch) move as one coupled unit: Rounds and other identity-free
 ordered arrays are atomic and never split from that authority. Nothing is
 silently destroyed: every losing side is retained as a ref before
 publication. When resolution genuinely needs help, escalation carries a
-domain-terms question an operator can answer in one read, never a bare
-fence — and escalation is ordered: the agent resolves first, and only after
-it declares a decision is needed or spends its bounded attempts (or
-resolution is unavailable or disabled) does the daemon's automatic recovery
-apply merge-base ownership
-deterministically, itself carrying an opt-out for nodes doing deliberate
-divergence work. The deterministic structural driver merges what it can prove
-disjoint, including the `nodes.json` registry, whose records union by
-canonical node id so absence never implies node deletion.
+domain-terms question an operator can answer in one read, never a bare fence.
+The agent resolves ordinary contested members first; the daemon's automatic
+recovery remains available afterward under its own opt-out, but it overlays a
+proven transferred `node_id` on its whole-record choice and leaves ambiguous
+ownership unchanged for explicit sync authority or a supported Goal transfer.
+The deterministic structural driver merges what it can prove disjoint,
+including the `nodes.json` registry, whose records union by canonical node id
+so absence never implies node deletion.
 
 A fleet is upgraded node by node, in any order, and is never required to
 upgrade at once. A node's CLI and daemon are one binary, so no node is ever

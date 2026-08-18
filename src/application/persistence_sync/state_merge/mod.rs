@@ -6,12 +6,16 @@
 //! conflicted; Rounds and every other identity-free ordered array are atomic;
 //! a Goal's top-level `updated` timestamp takes the later value once every
 //! other member merges. `nodes.json` merges as a record union keyed by
-//! canonical node id. No ownership arbitration and no schema-validity veto
-//! live here — judgment belongs to resolution, not to the driver.
+//! canonical node id. A Goal's independently classified ownership invariant
+//! is overlaid here so a proven transfer survives other structural merges;
+//! every other judgment belongs to resolution, not to the driver.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
+use crate::application::persistence_sync::goal_ownership::{
+    GoalOwnership, classify_goal_ownership,
+};
 use crate::model::fleet::valid_node_id;
 use crate::model::node::NodeRegistry;
 
@@ -19,12 +23,12 @@ use crate::model::node::NodeRegistry;
 /// path stays conflicted and must be resolved above the driver.
 pub fn merge_state_file(
     relative: &Path,
-    base: &[u8],
-    local: &[u8],
-    remote: &[u8],
+    base_bytes: &[u8],
+    local_bytes: &[u8],
+    remote_bytes: &[u8],
 ) -> Option<Vec<u8>> {
     if relative == Path::new("nodes.json") {
-        return merge_node_registry(base, local, remote);
+        return merge_node_registry(base_bytes, local_bytes, remote_bytes);
     }
     if relative
         .extension()
@@ -33,10 +37,10 @@ pub fn merge_state_file(
     {
         return None;
     }
-    let base = serde_json::from_slice::<serde_json::Value>(base).ok()?;
-    let local = serde_json::from_slice::<serde_json::Value>(local).ok()?;
-    let remote = serde_json::from_slice::<serde_json::Value>(remote).ok()?;
-    let depth = if is_goal_record(relative) {
+    let base = serde_json::from_slice::<serde_json::Value>(base_bytes).ok()?;
+    let local = serde_json::from_slice::<serde_json::Value>(local_bytes).ok()?;
+    let remote = serde_json::from_slice::<serde_json::Value>(remote_bytes).ok()?;
+    let ownership = if is_goal_record(relative) {
         let base_id = base.get("id")?.as_str()?;
         if base_id.is_empty()
             || local.get("id").and_then(serde_json::Value::as_str) != Some(base_id)
@@ -44,11 +48,29 @@ pub fn merge_state_file(
         {
             return None;
         }
+        match classify_goal_ownership(
+            relative.to_str()?,
+            Some(base_bytes),
+            Some(local_bytes),
+            Some(remote_bytes),
+        ) {
+            Some(GoalOwnership::Preserve { node_id, .. }) => Some(node_id),
+            Some(GoalOwnership::Ambiguous { .. }) | None => return None,
+        }
+    } else {
+        None
+    };
+    let depth = if ownership.is_some() {
         GoalDepth::Root
     } else {
         GoalDepth::Deep
     };
-    let merged = merge_json_value(&base, &local, &remote, None, depth)?;
+    let mut merged = merge_json_value(&base, &local, &remote, None, depth)?;
+    if let Some(node_id) = ownership {
+        merged
+            .as_object_mut()?
+            .insert("node_id".to_string(), serde_json::Value::String(node_id));
+    }
     encode_json(&merged)
 }
 
@@ -359,6 +381,26 @@ mod tests {
         assert_eq!(merged["status"], "done");
         assert_eq!(merged["title"], "Clarified");
         assert_eq!(merged["updated"], "2026-08-03T18:22:00Z");
+    }
+
+    #[test]
+    fn one_sided_transfer_survives_simultaneous_structural_member_merge() {
+        let base = goal("todo", "Base", "2026-08-03T18:20:00Z");
+        let mut local = goal("done", "Base", "2026-08-03T18:22:00Z");
+        local["node_id"] = serde_json::json!("node-b");
+        let remote = goal("todo", "Clarified", "2026-08-03T18:21:00Z");
+
+        let merged = merge_goal(&base, &local, &remote).unwrap();
+        assert_eq!(merged["node_id"], "node-b");
+        assert_eq!(merged["status"], "done");
+        assert_eq!(merged["title"], "Clarified");
+
+        let mut local_untransferred = local.clone();
+        local_untransferred["node_id"] = serde_json::json!("node-a");
+        let mut remote_transferred = remote.clone();
+        remote_transferred["node_id"] = serde_json::json!("node-b");
+        let merged = merge_goal(&base, &local_untransferred, &remote_transferred).unwrap();
+        assert_eq!(merged["node_id"], "node-b");
     }
 
     #[test]

@@ -812,16 +812,14 @@ fn resolver_invalid_twice_needs_decision() {
 }
 
 /// NeedsDecision falls through to automatic recovery: with the daemon policy
-/// engaged, the same merge-base ownership decision the runner computes
-/// converges the fleet — remote authority by default, a live override for
-/// each contested goal record whose merge-base bytes name the recovering
-/// node — and the run's recovery evidence records the settlement (paths,
-/// authority, overrides). The runner-side wiring around this decision (the
+/// engaged, remote whole-record authority converges ordinary conflicts while
+/// the field-aware ownership policy preserves explicit transfers. The run's
+/// recovery evidence records the settlement. The runner-side wiring (the
 /// `state_sync_auto_recovery` gate, health episodes, and the activity entry
 /// built from this same evidence) is `pub(super)` daemon machinery covered
 /// by `src/application/workers/tests.rs`; this scenario drives the identical
-/// public pair the runner calls: `merge_base_ownership_decision` →
-/// `run_state_recovery`.
+/// public pair the runner calls: `automatic_recovery_decision` → an
+/// `Automatic` recovery run.
 #[test]
 fn needs_decision_falls_through_to_auto_recovery() {
     let mut fleet = SimulatedFleet::new("needs-decision-auto", NODE_IDS);
@@ -878,26 +876,15 @@ fn needs_decision_falls_through_to_auto_recovery() {
         .expect("the escalation persists a conflict report");
     assert!(report.decision_question.is_some(), "{report:#?}");
 
-    // The fall-through decision: ownership is read from the merge base, so
-    // no side votes for itself — this node keeps only the record whose base
-    // bytes name it as owner.
     let decision = fleet.nodes[B]
         .service()
-        .merge_base_ownership_decision(&report, "node-b");
+        .automatic_recovery_decision(&report);
     assert_eq!(decision.default_authority, StateRecoveryAuthority::Remote);
-    assert_eq!(
-        decision
-            .overrides
-            .iter()
-            .map(|entry| (entry.path.clone(), entry.authority))
-            .collect::<Vec<_>>(),
-        vec![(goal_record_path("BBOWNGOAL"), StateRecoveryAuthority::Live)],
-        "only the record owned by this node at the merge base earns a live override"
-    );
+    assert!(decision.overrides.is_empty());
 
     let run = fleet.nodes[B]
         .service()
-        .run_state_recovery(decision)
+        .run_state_recovery_with_policy(StateRecoveryRunPolicy::Automatic(decision))
         .unwrap();
     assert!(run.ok && run.recovered, "{run:#?}");
     let recovery = run.recovery.as_ref().unwrap();
@@ -908,8 +895,8 @@ fn needs_decision_falls_through_to_auto_recovery() {
     );
     assert_eq!(
         recovery.overrides.len(),
-        1,
-        "the recovery evidence records the ownership override: {recovery:#?}"
+        0,
+        "ownership is field-aware rather than encoded as whole-record authority: {recovery:#?}"
     );
 
     let outcomes = fleet.run(&[Event::Sync { node: A }, Event::Sync { node: C }]);
@@ -924,8 +911,8 @@ fn needs_decision_falls_through_to_auto_recovery() {
         );
         assert_eq!(
             fleet.live_goal_name(node, "BBOWNGOAL"),
-            "b-edit",
-            "merge-base ownership keeps the owning node's work"
+            "a-edit",
+            "ordinary non-ownership conflict takes the remote fallback"
         );
     }
     fleet.assert_committed_versions_reachable(
@@ -933,6 +920,69 @@ fn needs_decision_falls_through_to_auto_recovery() {
         &head,
         "needs_decision_falls_through_to_auto_recovery",
     );
+}
+
+#[test]
+fn automatic_recovery_preserves_a_one_sided_transfer_across_the_fleet() {
+    let mut fleet = SimulatedFleet::new("auto-preserves-transfer", NODE_IDS);
+    let outcomes = fleet.run(&[
+        Event::LiveWriteOwned {
+            node: A,
+            goal_id: "AATRANSFER",
+            name: "base",
+            owner: "node-a",
+        },
+        Event::Sync { node: A },
+        Event::Sync { node: B },
+        Event::LiveWriteOwned {
+            node: A,
+            goal_id: "AATRANSFER",
+            name: "remote-edit",
+            owner: "node-a",
+        },
+        Event::Sync { node: A },
+        Event::LiveWriteOwned {
+            node: B,
+            goal_id: "AATRANSFER",
+            name: "live-edit",
+            owner: "node-b",
+        },
+        Event::Sync { node: B },
+    ]);
+    outcomes[4].sync_ok("publish non-owner remote edit");
+    outcomes[6].sync_err("one-sided transfer with name conflict");
+    let report = fleet
+        .latest_report(B)
+        .expect("the ordinary member conflict remains recoverable");
+    let decision = fleet.nodes[B]
+        .service()
+        .automatic_recovery_decision(&report);
+    let run = fleet.nodes[B]
+        .service()
+        .run_state_recovery_with_policy(StateRecoveryRunPolicy::Automatic(decision))
+        .unwrap();
+    assert!(run.ok && run.recovered, "{run:#?}");
+    assert_eq!(
+        run.recovery.as_ref().unwrap().preserved_goal_owners,
+        vec![
+            refine::application::persistence_sync::recovery::StateRecoveryGoalOwner {
+                path: goal_record_path("AATRANSFER"),
+                node_id: "node-b".to_string(),
+            }
+        ]
+    );
+
+    let outcomes = fleet.run(&[Event::Sync { node: A }, Event::Sync { node: C }]);
+    outcomes[0].sync_ok("converge transferred goal to node a");
+    outcomes[1].sync_ok("converge transferred goal to node c");
+    fleet.assert_converged("automatic_recovery_preserves_a_one_sided_transfer_across_the_fleet");
+    for node in [A, B, C] {
+        assert_eq!(
+            fleet.live_goal_member(node, "AATRANSFER", "node_id"),
+            "node-b"
+        );
+        assert_eq!(fleet.live_goal_name(node, "AATRANSFER"), "remote-edit");
+    }
 }
 
 /// A resolver that reports Unavailable changes nothing: the contested-member
@@ -1536,14 +1586,13 @@ fn contention_budget_holds_without_fencing_auto_recovery() {
         fleet.resolve_workspace_names(B)
     );
 
-    // The daemon's fall-through policy is untouched by the hold: the same
-    // merge-base ownership decision the runner computes settles it.
+    // The daemon's ordinary remote fallback is untouched by the hold.
     let decision = fleet.nodes[B]
         .service()
-        .merge_base_ownership_decision(&report, "node-b");
+        .automatic_recovery_decision(&report);
     let run = fleet.nodes[B]
         .service()
-        .run_state_recovery(decision)
+        .run_state_recovery_with_policy(StateRecoveryRunPolicy::Automatic(decision))
         .unwrap();
     assert!(run.ok && run.recovered, "{run:#?}");
 
@@ -1554,8 +1603,8 @@ fn contention_budget_holds_without_fencing_auto_recovery() {
     for node in [A, B, C] {
         assert_eq!(
             fleet.live_goal_name(node, "BBBUDGET"),
-            "b-6",
-            "merge-base ownership keeps the owning node's work"
+            "a-edit",
+            "ordinary non-ownership conflict takes the remote fallback"
         );
     }
 }

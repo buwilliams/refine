@@ -20,7 +20,7 @@ use refine::application::persistence_sync::conflict_reports::{
     StateSyncConflictReport, latest_state_sync_conflict_report,
 };
 use refine::application::persistence_sync::recovery::{
-    StateRecoveryAuthority, StateRecoveryDecision, StateRecoveryRunResult,
+    StateRecoveryAuthority, StateRecoveryDecision, StateRecoveryRunPolicy, StateRecoveryRunResult,
 };
 use refine::application::persistence_sync::resolution::{
     CONTENTION_ATTEMPT_LIMIT, ResolutionRequest, ResolverOutcome, ResolverOverrideGuard,
@@ -82,9 +82,8 @@ enum Event {
     /// runs the current pipeline over exactly the state — branch, worktree,
     /// live store, and legacy leftovers — the pre-upgrade machinery left.
     Upgrade { node: usize },
-    /// Write a goal record carrying an explicit `node_id` owner member, so a
-    /// merge-base ownership decision can read who owned the record at the
-    /// shared base.
+    /// Write a goal record carrying an explicit `node_id` owner member, so
+    /// the field-aware policy can classify transfers from the shared base.
     LiveWriteOwned {
         node: usize,
         goal_id: &'static str,
@@ -895,11 +894,14 @@ fn goal_record_bytes(goal_id: &str, name: &str) -> Vec<u8> {
 }
 
 fn goal_record_bytes_with(goal_id: &str, name: &str, status: &str) -> Vec<u8> {
-    format!(r#"{{"id":"{goal_id}","name":"{name}","status":"{status}","rounds":[]}}"#).into_bytes()
+    format!(
+        r#"{{"id":"{goal_id}","name":"{name}","status":"{status}","node_id":"node-a","rounds":[]}}"#
+    )
+    .into_bytes()
 }
 
-/// A minimal record carrying an explicit `node_id` owner, so the merge base
-/// can testify who owned it when a merge-base ownership decision asks.
+/// A minimal record carrying an explicit `node_id` owner, so the simulation
+/// can prove whether either side transferred it from the merge base.
 fn goal_record_bytes_owned(goal_id: &str, name: &str, owner: &str) -> Vec<u8> {
     format!(
         r#"{{"id":"{goal_id}","name":"{name}","status":"todo","node_id":"{owner}","rounds":[]}}"#
