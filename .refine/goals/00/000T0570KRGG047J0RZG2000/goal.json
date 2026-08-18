@@ -136,6 +136,55 @@
           },
           "started_at": "2026-08-18T12:39:22Z"
         },
+        "final_plan": {
+          "completed_at": "2026-08-18T12:42:22Z",
+          "git_after": {
+            "branch": "refine/00000T0570KRGG047J0RZG2000/round-1",
+            "head_commit": "148e3ff37f026e3861adbefd86edc5ddbd9a3662",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T0570KRGG047J0RZG2000/round-1",
+            "head_commit": "148e3ff37f026e3861adbefd86edc5ddbd9a3662",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Extend the Goal Agent session control contract with an exact-session Toolbar attachment request carrying a unique acknowledgment identity and a persisted one-way protected state, while keeping ordinary input, resize, and non-Toolbar attachment semantics unchanged.",
+                "id": "P1"
+              },
+              {
+                "description": "Coordinate attachment inside the Goal Agent runtime so it records the protected state and matching acknowledgment before evaluating either watchdog, making every acknowledged attachment win against an idle or completion deadline.",
+                "id": "P2"
+              },
+              {
+                "description": "Make the Toolbar Goal Agent route wait for and validate the matching acknowledgment from the same still-live session before returning its snapshot, and return a conflict or unavailable result if the session exits or the acknowledgment cannot be established.",
+                "id": "P3"
+              },
+              {
+                "description": "Once protected, bypass only idle and completion timeout termination while preserving valid completion-signal settlement, needs-input behavior, explicit Stop and Goal cancellation, natural process exit, transcript capture, and workflow ownership.",
+                "id": "P4"
+              },
+              {
+                "description": "Add focused regressions for unattached timeout enforcement, acknowledged survival beyond both watchdogs, exact-session and non-Toolbar isolation, deadline races, failed attachment without false success, and later completion or explicit termination.",
+                "id": "P5"
+              },
+              {
+                "description": "Update the Goal Agent and Toolbar intent pages to describe acknowledged Toolbar attachment, the automatic-timeout exemption, and the unchanged explicit and workflow-owned lifecycle boundaries.",
+                "id": "P6"
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "The runtime processes an attachment request by persisting a protected state and its unique acknowledgment before either watchdog check, and the Toolbar route returns success only after it observes that acknowledgment for the exact live session; deadline-race coverage proves an acknowledged open cannot be followed by timeout termination while a losing race cannot be reported as a successful attachment."
+              }
+            ],
+            "summary": "Make opening a live workflow Goal Agent from the Toolbar a one-way, runtime-acknowledged attachment that disables its idle and completion watchdogs before the open succeeds, so a session the user has actually opened cannot be killed by an automatic timeout while unattended sessions remain bounded."
+          },
+          "started_at": "2026-08-18T12:41:07Z"
+        },
         "phase": "revise",
         "phase_started_at": "2026-08-18T12:41:07Z",
         "proposal": {
@@ -180,7 +229,7 @@
         "schema_version": 2,
         "started_at": "2026-08-18T12:37:40Z",
         "state": "in_progress",
-        "updated_at": "2026-08-18T12:41:07Z"
+        "updated_at": "2026-08-18T12:42:22Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -194,7 +243,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T12:41:07Z",
+      "updated": "2026-08-18T12:42:22Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T12:37:40Z",
         "round_idx": 0,
@@ -206,6 +255,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-18T12:41:07Z",
-  "workflow_revision": 11
+  "updated": "2026-08-18T12:42:22Z",
+  "workflow_revision": 12
 }
