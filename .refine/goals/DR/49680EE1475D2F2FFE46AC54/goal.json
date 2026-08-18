@@ -866,12 +866,59 @@
           "round_idx": 1,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-08-18T15:05:27Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-08-18T15:07:29Z",
+        "proposal": {
+          "completed_at": "2026-08-18T15:07:29Z",
+          "git_after": {
+            "branch": "refine/DR49680EE1475D2F2FFE46AC54/round-2",
+            "head_commit": "ff07e292388a2b3cfe2fcb1c3fb52bec4bb0ab4a",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR49680EE1475D2F2FFE46AC54/round-2",
+            "head_commit": "ff07e292388a2b3cfe2fcb1c3fb52bec4bb0ab4a",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Extend the existing node settings codec with automatic_agent_resource_budget_percent, a product default of 70, strict integer validation from 1 through 100, and load and persistence behavior where an absent legacy key resolves to 70 while a present malformed value fails visibly.",
+                "id": "P1"
+              },
+              {
+                "description": "Implement the existing copy-between-node Runtime Config action through the settings and node-registry architecture so it validates source and destination authority, copies the runtime settings allowlist including automatic_agent_resource_budget_percent, persists atomically, and reports invalid sections or nodes instead of returning the current no-op success.",
+                "id": "P2"
+              },
+              {
+                "description": "Thread the resolved node percentage from workflow policy into HostResources and calculate floor(capacity times percent divided by 100) for both logical cores and available memory with overflow-safe integer arithmetic, a minimum one-slot result, the 2 GiB per-agent floor, one-slot unknown-memory fallback, stable complete process-tree sampling, and unchanged disk headroom behavior.",
+                "id": "P3"
+              },
+              {
+                "description": "Keep a positive parallel_run_cap as the absolute global override and continue deriving unset node, provider, and target-app caps from the percentage-governed Automatic global limit so the new setting cannot weaken explicit operator controls.",
+                "id": "P4"
+              },
+              {
+                "description": "Add an Automatic resource budget percent field to Node Runtime Config that renders the loaded or legacy-default value as 70, explains that it applies to CPU and available memory and leaves the remainder for shared-host work, enforces numeric bounds of 1 through 100, and autosaves through the existing settings PATCH flow.",
+                "id": "P5"
+              },
+              {
+                "description": "Update the matching Guide entry and only the Process and browser Settings intent pages to replace quarter-host language with the configurable 70 percent default, explicit parallel-run override, and retained conservative telemetry boundaries.",
+                "id": "P6"
+              },
+              {
+                "description": "Add focused settings-codec, workflow-policy, host-resource, node-copy, and static Runtime Config regressions covering default and missing-key 70 behavior, valid CPU- and memory-limited changes, rejected malformed and out-of-range writes, explicit-cap precedence, field rendering and autosave, and the unchanged Round 1 fallback and descendant-accounting guarantees.",
+                "id": "P7"
+              }
+            ],
+            "summary": "Make Automatic agent admission use a node-configurable 70 percent CPU and available-memory budget so Refine leaves 30 percent for Docker, target applications, and other shared-host work while retaining explicit caps and the Round 1 safety fallbacks."
+          },
+          "started_at": "2026-08-18T15:05:27Z"
+        },
         "schema_version": 2,
         "started_at": "2026-08-18T15:05:27Z",
         "state": "in_progress",
-        "updated_at": "2026-08-18T15:05:27Z"
+        "updated_at": "2026-08-18T15:07:29Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -885,7 +932,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T15:05:27Z",
+      "updated": "2026-08-18T15:07:29Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T15:05:26Z",
         "round_idx": 1,
@@ -897,6 +944,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-18T15:05:27Z",
-  "workflow_revision": 42
+  "updated": "2026-08-18T15:07:29Z",
+  "workflow_revision": 44
 }
