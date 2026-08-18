@@ -10,7 +10,7 @@
   "node_id": "default",
   "notes": [],
   "priority": "low",
-  "reporter": "ethan.jacobson@insurity.com",
+  "reporter": "Ethan Jacobson",
   "rounds": [
     {
       "agent_context": {
@@ -84,7 +84,7 @@
         "version": 1,
         "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
       },
-      "assignee": "ethan.jacobson@insurity.com",
+      "assignee": "Ethan Jacobson",
       "constitution_state": "unclassified",
       "created": "2026-08-17T19:37:50Z",
       "failure_at": "",
@@ -324,7 +324,7 @@
       },
       "quality_recovery_round_prompt": "No corrective implementation Round should be generated solely from this Quality result. Re-evaluate exact candidate 04eab0ddade6011daef8da0d4b97c03aa3393754 with repository-valid commands: the focused static_main_uses_available_viewport_width test, cargo test --lib --bins -- --test-threads=1, cargo run --manifest-path xtask/Cargo.toml -- test-browser, targeted rustfmt for changed Rust files, and git diff --check. Do not add a package.json or modify unchanged source_promotion tests to satisfy the faulty predicate. If workflow mechanics require a fresh current-main Round, reapply only the reviewed four-file delta—remove main's max-width: 1120px while preserving gutters, width, flex, scrolling, and narrow-screen rules; retain the focused static regression and Main intent update—then run the valid checks above and report any unrelated baseline or harness failures separately.",
       "quality_state": "failed",
-      "reporter": "ethan.jacobson@insurity.com",
+      "reporter": "Ethan Jacobson",
       "rule_state": "unclassified",
       "updated": "2026-08-17T20:02:26Z",
       "workflow_attempt_authority": {
@@ -851,5 +851,5 @@
   "status": "done",
   "target_branch": "main",
   "updated": "2026-08-17T20:22:03Z",
-  "workflow_revision": 48
+  "workflow_revision": 49
 }
