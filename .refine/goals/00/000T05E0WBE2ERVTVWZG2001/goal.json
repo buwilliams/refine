@@ -159,6 +159,75 @@
           },
           "started_at": "2026-08-18T16:45:34Z"
         },
+        "final_plan": {
+          "completed_at": "2026-08-18T16:48:43Z",
+          "git_after": {
+            "branch": "refine/00000T05E0WBE2ERVTVWZG2001/round-1",
+            "head_commit": "c0c3fc6bc5f8f78208e77598bc3c5f2a4a9fd311",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T05E0WBE2ERVTVWZG2001/round-1",
+            "head_commit": "c0c3fc6bc5f8f78208e77598bc3c5f2a4a9fd311",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Add one cohesive Goal-ownership policy within application persistence sync that parses and validates the actual merge-base, local, and remote Goal operands and classifies ownership as unchanged, one valid one-sided transfer with its authoritative node_id, or ambiguity caused by competing transfers, missing or deleted peers, malformed records, or invalid node identifiers without using timestamps, host identity, merge location, retry order, or merge-base ownership as authority.",
+                "id": "P1"
+              },
+              {
+                "description": "Invoke that policy centrally for every deterministic, agent-assisted, automatic, CLI-authorized, and API-authorized decision-based recovery pass, recomputing the classification from the freshly pinned merge base, local head, and remote head on every bounded retry before any result is published.",
+                "id": "P2"
+              },
+              {
+                "description": "Apply the classification at the structural Goal merge boundary so a proven transferred node_id survives simultaneous non-owner field reconciliation in either local or remote orientation while an ambiguous ownership record remains contested and cannot be replaced or deleted.",
+                "id": "P3"
+              },
+              {
+                "description": "Carry the pinned ownership classification into agent prompting and deterministic result acceptance so a proven transfer rejects deletion, the prior owner, or any different node_id and ambiguous ownership rejects any agent-selected ownership outcome.",
+                "id": "P4"
+              },
+              {
+                "description": "Revalidate every crash-surviving agent resolution result against the current pass's freshly pinned ownership classification before publication, retiring and re-deriving a stale or violating result through the normal bounded path.",
+                "id": "P5"
+              },
+              {
+                "description": "Keep existing whole-record recovery authority for ordinary non-ownership conflicts but overlay a proven transferred node_id onto any selected Goal record before publication, and decline automatic publication only when ownership cannot be proven safe.",
+                "id": "P6"
+              },
+              {
+                "description": "Represent ambiguous ownership with a stable domain-terms conflict and health decision that preserves the current durable Goal unchanged and inspectable until an operator explicitly chooses existing sync authority or performs a supported Goal transfer.",
+                "id": "P7"
+              },
+              {
+                "description": "Preserve the automatic-recovery branch and setting, health and backoff settlement, activity evidence, retained refs, race and crash fences, explicit recovery surfaces, and normal non-ownership convergence, and update only the affected intent pages if their documented transfer or recovery contract changes.",
+                "id": "P8"
+              },
+              {
+                "description": "Add focused coverage for local- and remote-oriented one-sided transfers with concurrent non-owner conflicts, competing transfers, missing, deleted, and malformed operands, hostile agent deletion or prior-owner output, crash-surviving results, and ordinary automatic recovery, then record the exact repository-valid persistence-sync, worker and config, sync simulation and regression, web, formatting, diff, and scoped Clippy commands and results together with the base commit, candidate commit, and changed paths.",
+                "id": "P9"
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "P9 now covers every required transfer, ambiguity, malformed or deleted operand, hostile-agent, surviving-result, ordinary recovery, simulation, web, formatting, Clippy, commit, and changed-path evidence requirement."
+              },
+              {
+                "criticism_id": "C2",
+                "resolution": "P2 centralizes the ownership safeguard for automatic and explicit CLI or API recovery and requires reclassification from each retry's freshly pinned merge base, local head, and remote head before publication."
+              },
+              {
+                "criticism_id": "C3",
+                "resolution": "P5 requires crash-surviving resolution refs to pass the same fresh ownership validation before publication and retires and re-derives any result that would delete the Goal or violate proven or ambiguous ownership."
+              }
+            ],
+            "summary": "Preserve each provable one-sided explicit Goal transfer by enforcing a small field-aware ownership policy across every persistence-sync resolution and recovery path, while leaving ambiguous ownership unchanged and inspectable and retaining automatic reconciliation for all safe non-ownership conflicts."
+          },
+          "started_at": "2026-08-18T16:47:43Z"
+        },
         "phase": "revise",
         "phase_started_at": "2026-08-18T16:47:43Z",
         "proposal": {
@@ -211,7 +280,7 @@
         "schema_version": 2,
         "started_at": "2026-08-18T16:43:00Z",
         "state": "in_progress",
-        "updated_at": "2026-08-18T16:47:43Z"
+        "updated_at": "2026-08-18T16:48:43Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -225,7 +294,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T16:47:43Z",
+      "updated": "2026-08-18T16:48:43Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T16:42:59Z",
         "round_idx": 0,
@@ -237,6 +306,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-18T16:47:43Z",
-  "workflow_revision": 12
+  "updated": "2026-08-18T16:48:43Z",
+  "workflow_revision": 13
 }
