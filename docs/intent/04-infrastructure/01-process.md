@@ -70,6 +70,17 @@ Managed processes record local facts such as owner, pid, state, label, output pa
 
 Goal status and node assignment determine whether automated work is still authorized. A worker rereads those fields before a workflow transition or consequential side effect. Process records help avoid needless duplicate work on one node and provide controls; they are advisory when deciding capacity or recovery.
 
+Automatic agent admission is conservative for a shared host. It spends no more
+than one quarter of detected logical cores and one quarter of currently
+available memory, always permits at least one slot, and reserves at least 2 GiB
+for each agent workload. A workload is the managed agent root together with all
+of its descendants, so provider subprocesses, builds, and checks are included
+rather than hidden behind a small parent RSS. Only a complete stable live
+process-tree sample may raise the observed reservation above that floor; an
+incomplete tree retains the floor, and unavailable host-memory telemetry falls
+back to one automatic slot. This leaves most host capacity for Docker, target
+apps, and other expensive processes outside Refine's ownership.
+
 Stopping a Goal worker confirms its exit, retains its branch and worktree, and conditionally returns the same Goal attempt to `todo` only if the Goal status, Round, update, and node assignment still match the worker's starting observation. Explicit Goal cancellation is monotonic: the Goal becomes `cancelled` first and local process termination follows as best-effort cleanup. Neither path rolls synchronized Goal state back because local cleanup failed.
 
 After daemon restart, live-process recovery terminates stale owned workers and removes retired execution-coordination files. Any nonterminal Goal remains eligible for a new idempotent worker. Planning artifacts, Git observations, and semantic outputs remain durable; a prior process identity is only provenance, not ownership that must be recovered.

@@ -1,17 +1,18 @@
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 use crate::infrastructure::process::subprocess::{FileProcessSupervisor, ProcessOwner};
 
-/// A default per-agent memory reservation, used only until real usage has been
-/// observed. Deliberately modest: reserving pessimistically on a large host
-/// wastes capacity the operator paid for, and the observed figure replaces this
-/// as soon as one agent has run.
-const ASSUMED_AGENT_MEMORY_BYTES: u64 = 768 * 1024 * 1024;
-/// Memory left to the operating system, the daemon, and the target application's
-/// own build and test processes, which are not agents but do run concurrently.
-const RESERVED_HOST_MEMORY_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+/// The minimum reservation for one complete managed-agent workload. Observed
+/// usage may raise this reservation, but a small or incomplete sample must not
+/// make automatic admission more aggressive.
+const MIN_AGENT_MEMORY_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+/// Automatic admission spends at most one quarter of the host resources visible
+/// to Refine, leaving the majority available to Docker, target apps, and other
+/// expensive work that is not under Refine's process supervision.
+const SHARED_HOST_BUDGET_DIVISOR: usize = 4;
 /// How long a sample stays current. The scheduler asks for policy about once a
 /// second; resampling that often would be wasted work, and host capacity does
 /// not move meaningfully at that resolution.
@@ -29,9 +30,8 @@ static CACHED_SAMPLE: OnceLock<Mutex<Option<(Instant, HostResources)>>> = OnceLo
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct HostResources {
     pub cores: usize,
-    /// `None` where the platform is not one this can read. Callers must treat
-    /// an unknown value as "do not constrain on this axis" rather than as zero,
-    /// so an unsupported platform keeps working instead of refusing to run.
+    /// `None` where the platform is not one this can read. Automatic admission
+    /// treats an unknown value conservatively and permits one agent.
     pub available_memory_bytes: Option<u64>,
     pub free_disk_bytes: Option<u64>,
 }
@@ -65,21 +65,23 @@ impl HostResources {
 
     /// How many agents this host should run concurrently.
     ///
-    /// Scales up as readily as down. Leaving one core for the daemon and the
-    /// host keeps a busy fleet from starving the process supervising it, and
-    /// the memory bound uses observed per-agent usage where it exists so the
-    /// limit reflects measured cost rather than a guess. Never returns zero:
+    /// Automatic admission reserves three quarters of detected logical cores
+    /// and currently available memory for shared-host work. A complete observed
+    /// workload can raise the two-GiB per-agent reservation, but never lower it.
+    /// Unknown host memory permits one agent so unsupported or unreadable host
+    /// telemetry cannot restore aggressive admission. Never returns zero:
     /// making no progress is worse than making slow progress.
     pub fn recommended_agent_concurrency(&self, observed_agent_memory_bytes: Option<u64>) -> usize {
-        let by_cores = self.cores.saturating_sub(1).max(1);
+        let by_cores = (self.cores / SHARED_HOST_BUDGET_DIVISOR).max(1);
         let Some(available) = self.available_memory_bytes else {
-            return by_cores;
+            return 1;
         };
         let per_agent = observed_agent_memory_bytes
             .filter(|bytes| *bytes > 0)
-            .unwrap_or(ASSUMED_AGENT_MEMORY_BYTES);
-        let spendable = available.saturating_sub(RESERVED_HOST_MEMORY_BYTES);
-        let by_memory = (spendable / per_agent) as usize;
+            .unwrap_or(MIN_AGENT_MEMORY_BYTES)
+            .max(MIN_AGENT_MEMORY_BYTES);
+        let memory_budget = available / SHARED_HOST_BUDGET_DIVISOR as u64;
+        let by_memory = (memory_budget / per_agent) as usize;
         by_cores.min(by_memory).max(1)
     }
 
@@ -99,37 +101,178 @@ impl HostResources {
 /// to start new work rather than a half-written worktree or a truncated record.
 const RESERVED_DISK_BYTES: u64 = 2 * 1024 * 1024 * 1024;
 
-/// The largest resident footprint among agents currently running on this node.
+/// One process in a complete managed-agent process-tree sample.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct ProcessMemorySample {
+    pid: u32,
+    parent_pid: u32,
+    start_time: u64,
+    resident_bytes: u64,
+}
+
+/// The largest complete resident workload among agents currently running on
+/// this node.
 ///
-/// This is what lets the governor stop guessing. A reservation chosen up front
-/// is either pessimistic — wasting capacity the operator paid for — or
-/// optimistic, and overcommits. Measuring what agents actually cost on this
-/// host, with this provider, on this target application replaces both. Returns
-/// `None` until at least one agent has been observed, which is when the assumed
-/// reservation still applies.
+/// Each workload includes the managed agent root and all of its descendants,
+/// because provider CLIs commonly put their expensive work in child processes.
+/// Returns `None` until at least one complete stable tree can be observed. A
+/// missing PID, unsupported platform, or tree that changes while sampled is not
+/// evidence that can lower the conservative reservation.
 pub fn observed_agent_memory_bytes(runtime_root: &Path) -> Option<u64> {
     let processes = FileProcessSupervisor::new(runtime_root).list().ok()?;
-    processes
+    let agent_roots = processes
         .iter()
         .filter(|process| process.owner == ProcessOwner::Agent && process.state == "running")
-        .filter_map(|process| process.pid)
-        .filter_map(resident_bytes)
-        .max()
+        .map(|process| process.pid)
+        .collect::<Option<Vec<_>>>()?;
+    let sample = live_process_tree_sample(&agent_roots)?;
+    maximum_agent_workload_bytes(&agent_roots, &sample)
 }
 
 #[cfg(target_os = "linux")]
-fn resident_bytes(pid: u32) -> Option<u64> {
-    let status = std::fs::read_to_string(format!("/proc/{pid}/status")).ok()?;
-    status.lines().find_map(|line| {
-        let rest = line.strip_prefix("VmRSS:")?;
-        let kilobytes = rest.split_whitespace().next()?.parse::<u64>().ok()?;
-        Some(kilobytes * 1024)
-    })
+fn live_process_tree_sample(agent_roots: &[u32]) -> Option<Vec<ProcessMemorySample>> {
+    let mut sample = Vec::new();
+    let mut visited = HashSet::new();
+    for root in agent_roots {
+        sample_process_tree(*root, None, &mut visited, &mut sample)?;
+    }
+    Some(sample)
 }
 
 #[cfg(not(target_os = "linux"))]
-fn resident_bytes(_pid: u32) -> Option<u64> {
+fn live_process_tree_sample(_agent_roots: &[u32]) -> Option<Vec<ProcessMemorySample>> {
     None
+}
+
+#[cfg(target_os = "linux")]
+fn sample_process_tree(
+    pid: u32,
+    expected_parent: Option<u32>,
+    visited: &mut HashSet<u32>,
+    sample: &mut Vec<ProcessMemorySample>,
+) -> Option<()> {
+    if !visited.insert(pid) {
+        return Some(());
+    }
+    let before = process_memory_sample(pid)?;
+    if expected_parent.is_some_and(|parent| before.parent_pid != parent) {
+        return None;
+    }
+    let children_before = process_children(pid)?;
+    for child in &children_before {
+        sample_process_tree(*child, Some(pid), visited, sample)?;
+    }
+    let after = process_memory_sample(pid)?;
+    let children_after = process_children(pid)?;
+    if before.pid != after.pid
+        || before.parent_pid != after.parent_pid
+        || before.start_time != after.start_time
+        || children_before != children_after
+    {
+        return None;
+    }
+    sample.push(before);
+    Some(())
+}
+
+#[cfg(target_os = "linux")]
+fn process_children(pid: u32) -> Option<Vec<u32>> {
+    // Children are owned by the thread that created them. Reading only the
+    // main thread's `children` file misses subprocesses launched by provider
+    // runtime threads, so require a stable snapshot across every task.
+    let tasks_before = process_task_ids(pid)?;
+    let mut children = Vec::new();
+    for task in &tasks_before {
+        let raw = std::fs::read_to_string(format!("/proc/{pid}/task/{task}/children")).ok()?;
+        children.extend(
+            raw.split_whitespace()
+                .map(str::parse::<u32>)
+                .collect::<Result<Vec<_>, _>>()
+                .ok()?,
+        );
+    }
+    if tasks_before != process_task_ids(pid)? {
+        return None;
+    }
+    children.sort_unstable();
+    children.dedup();
+    Some(children)
+}
+
+#[cfg(target_os = "linux")]
+fn process_task_ids(pid: u32) -> Option<Vec<u32>> {
+    let mut tasks = std::fs::read_dir(format!("/proc/{pid}/task"))
+        .ok()?
+        .map(|entry| entry.ok()?.file_name().to_str()?.parse::<u32>().ok())
+        .collect::<Option<Vec<_>>>()?;
+    tasks.sort_unstable();
+    Some(tasks)
+}
+
+#[cfg(target_os = "linux")]
+fn process_memory_sample(pid: u32) -> Option<ProcessMemorySample> {
+    let raw = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
+    let (identity, remaining) = raw.rsplit_once(") ")?;
+    let sampled_pid = identity.split_once(" (")?.0.parse::<u32>().ok()?;
+    let fields = remaining.split_whitespace().collect::<Vec<_>>();
+    let page_size = unsafe { libc::sysconf(libc::_SC_PAGESIZE) };
+    if page_size <= 0 {
+        return None;
+    }
+    Some(ProcessMemorySample {
+        pid: sampled_pid,
+        parent_pid: fields.get(1)?.parse::<u32>().ok()?,
+        start_time: fields.get(19)?.parse::<u64>().ok()?,
+        resident_bytes: fields
+            .get(21)?
+            .parse::<u64>()
+            .ok()?
+            .saturating_mul(page_size as u64),
+    })
+}
+
+fn maximum_agent_workload_bytes(
+    agent_roots: &[u32],
+    sample: &[ProcessMemorySample],
+) -> Option<u64> {
+    if agent_roots.is_empty() {
+        return None;
+    }
+    let mut by_pid = HashMap::new();
+    let mut children_by_parent: HashMap<u32, Vec<u32>> = HashMap::new();
+    for process in sample {
+        if by_pid.insert(process.pid, process).is_some() {
+            return None;
+        }
+        children_by_parent
+            .entry(process.parent_pid)
+            .or_default()
+            .push(process.pid);
+    }
+    agent_roots
+        .iter()
+        .map(|root| workload_bytes(*root, &by_pid, &children_by_parent, &mut HashSet::new()))
+        .collect::<Option<Vec<_>>>()?
+        .into_iter()
+        .max()
+}
+
+fn workload_bytes(
+    pid: u32,
+    by_pid: &HashMap<u32, &ProcessMemorySample>,
+    children_by_parent: &HashMap<u32, Vec<u32>>,
+    visited: &mut HashSet<u32>,
+) -> Option<u64> {
+    if !visited.insert(pid) {
+        return None;
+    }
+    let process = by_pid.get(&pid)?;
+    children_by_parent.get(&pid).into_iter().flatten().try_fold(
+        process.resident_bytes,
+        |total, child| {
+            Some(total.saturating_add(workload_bytes(*child, by_pid, children_by_parent, visited)?))
+        },
+    )
 }
 
 #[cfg(target_os = "linux")]
@@ -183,40 +326,35 @@ mod tests {
     use super::*;
 
     #[test]
-    fn concurrency_scales_up_with_cores_when_memory_is_plentiful() {
+    fn automatic_concurrency_uses_one_quarter_of_host_capacity() {
         let host = HostResources {
             cores: 32,
             available_memory_bytes: Some(128 * 1024 * 1024 * 1024),
             free_disk_bytes: Some(500 * 1024 * 1024 * 1024),
         };
-        // A capable host must not be pinned to the old fixed constant of two.
-        assert_eq!(host.recommended_agent_concurrency(None), 31);
+        assert_eq!(host.recommended_agent_concurrency(None), 8);
     }
 
     #[test]
-    fn concurrency_is_bounded_by_memory_on_a_constrained_host() {
-        // The reference deployment: two cores, twenty gigabytes.
+    fn automatic_concurrency_uses_one_quarter_of_available_memory() {
         let host = HostResources {
-            cores: 2,
-            available_memory_bytes: Some(20 * 1024 * 1024 * 1024),
+            cores: 32,
+            available_memory_bytes: Some(24 * 1024 * 1024 * 1024),
             free_disk_bytes: Some(250 * 1024 * 1024 * 1024),
         };
-        assert_eq!(host.recommended_agent_concurrency(None), 1);
+        assert_eq!(host.recommended_agent_concurrency(None), 3);
     }
 
     #[test]
-    fn observed_usage_replaces_the_assumed_reservation() {
+    fn low_observed_usage_cannot_undercut_two_gibibyte_reservation() {
         let host = HostResources {
-            cores: 8,
-            available_memory_bytes: Some(10 * 1024 * 1024 * 1024),
+            cores: 64,
+            available_memory_bytes: Some(64 * 1024 * 1024 * 1024),
             free_disk_bytes: None,
         };
-        // Assuming a large footprint would leave one slot; measuring a small
-        // one earns the host the concurrency it can actually support.
-        assert_eq!(host.recommended_agent_concurrency(None), 7);
         assert_eq!(
-            host.recommended_agent_concurrency(Some(4 * 1024 * 1024 * 1024)),
-            2
+            host.recommended_agent_concurrency(Some(128 * 1024 * 1024)),
+            8
         );
     }
 
@@ -231,14 +369,112 @@ mod tests {
     }
 
     #[test]
-    fn unknown_capacity_does_not_constrain() {
+    fn unavailable_host_memory_falls_back_to_one_automatic_slot() {
         let host = HostResources {
-            cores: 4,
+            cores: 64,
             available_memory_bytes: None,
             free_disk_bytes: None,
         };
-        assert_eq!(host.recommended_agent_concurrency(None), 3);
+        assert_eq!(host.recommended_agent_concurrency(None), 1);
         assert!(host.has_disk_headroom(u64::MAX));
+    }
+
+    #[test]
+    fn descendant_memory_is_part_of_each_managed_agent_workload() {
+        let gib = 1024 * 1024 * 1024;
+        let sample = [
+            ProcessMemorySample {
+                pid: 10,
+                parent_pid: 1,
+                start_time: 1,
+                resident_bytes: gib / 8,
+            },
+            ProcessMemorySample {
+                pid: 11,
+                parent_pid: 10,
+                start_time: 2,
+                resident_bytes: gib,
+            },
+            ProcessMemorySample {
+                pid: 12,
+                parent_pid: 11,
+                start_time: 3,
+                resident_bytes: 2 * gib,
+            },
+            ProcessMemorySample {
+                pid: 20,
+                parent_pid: 1,
+                start_time: 4,
+                resident_bytes: gib,
+            },
+        ];
+        let observed = maximum_agent_workload_bytes(&[10, 20], &sample);
+        assert_eq!(observed, Some(3 * gib + gib / 8));
+
+        let host = HostResources {
+            cores: 64,
+            available_memory_bytes: Some(32 * gib),
+            free_disk_bytes: None,
+        };
+        assert_eq!(host.recommended_agent_concurrency(observed), 2);
+    }
+
+    #[test]
+    fn incomplete_process_tree_sample_is_not_scaling_evidence() {
+        let sample = [ProcessMemorySample {
+            pid: 10,
+            parent_pid: 1,
+            start_time: 1,
+            resident_bytes: 128 * 1024 * 1024,
+        }];
+        assert_eq!(maximum_agent_workload_bytes(&[10, 20], &sample), None);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn linux_sample_includes_descendant_resident_memory() {
+        use std::io::{BufRead, Write};
+        use std::process::Stdio;
+
+        let mut root = std::process::Command::new("sh")
+            .args([
+                "-c",
+                "sleep 30 & child=$!; echo ready; read done; kill \"$child\"; wait \"$child\" 2>/dev/null || true",
+            ])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap();
+        let mut ready = String::new();
+        std::io::BufReader::new(root.stdout.take().unwrap())
+            .read_line(&mut ready)
+            .unwrap();
+        assert_eq!(ready.trim(), "ready");
+        let root_pid = root.id();
+        let complete = (0..100).find_map(|_| {
+            let observation = live_process_tree_sample(&[root_pid]).and_then(|sample| {
+                let workload = maximum_agent_workload_bytes(&[root_pid], &sample)?;
+                let root_only = sample
+                    .iter()
+                    .find(|process| process.pid == root_pid)?
+                    .resident_bytes;
+                (sample.len() >= 2 && workload > root_only).then_some((
+                    sample.len(),
+                    workload,
+                    root_only,
+                ))
+            });
+            if observation.is_none() {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            observation
+        });
+        root.stdin.take().unwrap().write_all(b"done\n").unwrap();
+        let _ = root.wait();
+
+        let (process_count, workload, root_only) = complete.expect("stable root and child sample");
+        assert!(process_count >= 2);
+        assert!(workload > root_only);
     }
 
     #[test]

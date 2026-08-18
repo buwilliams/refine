@@ -93,6 +93,7 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
   const autoRecovery = String(s.state_sync_auto_recovery ?? "remote");
   const agentResolution = String(s.state_sync_agent_resolution ?? "on");
   const conflictResolution = String(s.workflow_conflict_resolution ?? "on");
+  const parallelRunCap = String(s.parallel_run_cap ?? "").trim();
   return `
     <section class="settings-section">
       <h3>Runtime configuration</h3>
@@ -106,8 +107,9 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
         id: "s-cap",
         label: "Parallel-run cap",
         guideItemId: "runtime-parallel-run-cap",
-        valueLabel: s.parallel_run_cap || 5,
-        control: `<input type="number" id="s-cap" data-testid="runtime-parallel-run-cap" value="${s.parallel_run_cap || 5}">`,
+        description: "Automatic reserves most CPU and memory for Docker and other shared-host work. Enter a number to override that conservative recommendation.",
+        valueLabel: parallelRunCap || "Automatic",
+        control: `<input type="number" id="s-cap" data-testid="runtime-parallel-run-cap" min="1" placeholder="Automatic" value="${htmlEscape(parallelRunCap)}">`,
       })}
       ${renderSettingsEditableField({
         id: "s-pattern",
