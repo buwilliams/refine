@@ -24,6 +24,7 @@ Current implementation details that matter to intent:
 - settings data loads are scoped by active surface and tab;
 - detached mode short-circuits app-scoped calls and keeps app management actionable;
 - target-app settings, quality settings, runtime settings, reporters, governance, guidance, processes, and performance are separate concerns;
+- Node Runtime Config presents a blank parallel-run cap as `Automatic`. Automatic admission follows the conservative shared-host CPU and memory recommendation; entering a positive number is an explicit node-level override. Unset node, provider, and target-app limits inherit the resulting global limit;
 - node runtime settings include a validated state-sync stale threshold. Its default is longer than the normal remote-fetch cadence so routine scheduling jitter does not degrade health;
 - the Nodes view keeps fleet bootstrap health separate from state-sync health: the active node uses this daemon's evidence and other nodes remain unknown without direct evidence;
 - Guidance editing uses stable item ids and an observed collection revision. Governance rule autosave and generated-rule adoption retain rule ids and the observed rules revision. Both surfaces consume authoritative write responses and refresh visible state after a `409` instead of retrying stale content;

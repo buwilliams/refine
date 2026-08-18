@@ -8,6 +8,11 @@ fn static_runtime_settings_expose_state_sync_controls() {
         fs::read_to_string(static_root.join("js/features/settings_releases.js")).unwrap();
 
     assert!(runtime.contains(r#"data-testid="runtime-state-sync-now""#));
+    assert!(runtime.contains(r#"placeholder="Automatic""#));
+    assert!(runtime.contains(r#"valueLabel: parallelRunCap || "Automatic""#));
+    assert!(runtime.contains(r#"emptyLabel: "Automatic""#));
+    assert!(runtime.contains("Enter a number to override that conservative recommendation"));
+    assert!(!runtime.contains("s.parallel_run_cap || 5"));
     assert!(runtime.contains(r#"data-testid="runtime-state-sync-debounce""#));
     assert!(runtime.contains(r#"data-testid="runtime-project-update-pulse""#));
     assert!(runtime.contains(r#"data-testid="runtime-worktree-cleanup-delay""#));

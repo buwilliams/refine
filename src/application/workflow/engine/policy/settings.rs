@@ -54,3 +54,51 @@ pub(crate) fn setting_string(settings: &JsonObject, key: &str, fallback: &str) -
         .map(ToString::to_string)
         .unwrap_or_else(|| fallback.to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn positive_parallel_run_cap_remains_authoritative() {
+        let settings = serde_json::json!({"parallel_run_cap": "2"})
+            .as_object()
+            .unwrap()
+            .clone();
+        assert_eq!(setting_usize(&settings, "parallel_run_cap", 1), 2);
+    }
+
+    #[test]
+    fn unset_subordinate_caps_inherit_the_governed_global_limit() {
+        let settings = JsonObject::new();
+        let global_limit = setting_usize(&settings, "parallel_run_cap", 3);
+        assert_eq!(global_limit, 3);
+        assert_eq!(
+            setting_cap_with_default_values(
+                &settings,
+                "parallel_per_node_cap",
+                global_limit,
+                &[1, 2]
+            ),
+            3
+        );
+        assert_eq!(
+            setting_cap_with_default_values(
+                &settings,
+                "parallel_per_provider_cap",
+                global_limit,
+                &[2]
+            ),
+            3
+        );
+        assert_eq!(
+            setting_cap_with_default_values(
+                &settings,
+                "parallel_per_target_app_cap",
+                global_limit,
+                &[2]
+            ),
+            3
+        );
+    }
+}
