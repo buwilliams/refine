@@ -1,7 +1,7 @@
 {
   "base_commit": "ff07e292388a2b3cfe2fcb1c3fb52bec4bb0ab4a",
   "branch_name": "refine/DR1084498777E10360982E5D51/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "be2a548b9cee658e409e09b17be0cd496fc781da",
   "created": "2026-08-18T14:47:26Z",
   "feature_id": null,
   "feature_order": null,
@@ -95,7 +95,28 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-18T15:09:10Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "ff07e292388a2b3cfe2fcb1c3fb52bec4bb0ab4a",
@@ -106,6 +127,7 @@
           "round_idx": 0,
           "target_branch": "main"
         },
+        "completed_at": "2026-08-18T15:09:10Z",
         "criticism": {
           "completed_at": "2026-08-18T14:51:58Z",
           "git_after": {
@@ -164,6 +186,46 @@
           "message": "The finalized plan can be executed without violating the constitution or governance rules.",
           "status": "passed"
         },
+        "implementation": {
+          "completed_at": "2026-08-18T15:09:10Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "The enabled Guidance renderer now labels each candidate with an explicit zero-based Completion Index and excludes the internal id field; a specification regression using the internal id guidance-1 proves the index remains visible while guidance-1 and the Id label are absent.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "A shared integer-only guidance_applied instruction is interpolated into Plan, Criticize, Revise, and Implement completion contracts, while the existing typed Vec<usize> decoder and immediate InvalidContract settlement remain strict; phase and live-session tests prove string IDs do not enter repair retries.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated the Guidance and Goal Agents intent pages to distinguish stable configuration ids, display names, and phase-local positional Completion Indexes, including terminal handling for string-valued identifiers.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added focused specification, all-phase prompt, valid integer decoding, string guidance-1 rejection, successful integer settlement, and terminal no-repair session regressions.",
+                "id": "P4",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "cargo test --lib application::workflow::agents::spec:: => passed: 1 passed, 0 failed",
+              "cargo test --lib application::agents::sessions:: => passed: 37 passed, 0 failed",
+              "cargo test --lib application::workflow::engine::behaviors::tests::guidance_ => passed: 1 passed, 0 failed",
+              "cargo test --lib -- --test-threads=1 => passed: 1110 passed, 0 failed, 6 ignored",
+              "cargo check --lib => passed",
+              "cargo clippy --lib -- -A clippy::needless_pub_self -A clippy::module_inception -A clippy::unnecessary_sort_by -D warnings => passed",
+              "cargo clippy --lib -- -D warnings => baseline-only failure: four unchanged warnings in src/application/projects/projection/store.rs, src/infrastructure/git/worktrees/mod.rs, and src/surfaces/web_server/http/background_loops.rs",
+              "cargo fmt --all -- --check => passed",
+              "git diff --check => passed"
+            ]
+          },
+          "report": "Removed the competing stable Guidance ID from the Goal Agent specification, made the displayed zero-based Completion Index explicit, aligned Plan, Criticize, Revise, and Implement on the same integer-only guidance_applied contract, documented identifier ownership, and added decoding and terminal-settlement regressions. The serial library suite passed 1110 tests with 6 ignored; focused suites, cargo check, candidate-scoped Clippy, rustfmt, and diff checks also passed.",
+          "started_at": "2026-08-18T14:54:01Z"
+        },
         "phase": "implement",
         "phase_started_at": "2026-08-18T14:54:01Z",
         "proposal": {
@@ -203,11 +265,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-08-18T14:47:27Z",
-        "state": "in_progress",
-        "updated_at": "2026-08-18T14:54:01Z"
+        "state": "completed",
+        "updated_at": "2026-08-18T15:09:10Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Removed the competing stable Guidance ID from the Goal Agent specification, made the displayed zero-based Completion Index explicit, aligned Plan, Criticize, Revise, and Implement on the same integer-only guidance_applied contract, documented identifier ownership, and added decoding and terminal-settlement regressions. The serial library suite passed 1110 tests with 6 ignored; focused suites, cargo check, candidate-scoped Clippy, rustfmt, and diff checks also passed.",
+      "implementation_reported_at": "2026-08-18T15:09:10Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -218,7 +280,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T14:54:01Z",
+      "updated": "2026-08-18T15:09:10Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T14:47:27Z",
         "round_idx": 0,
@@ -228,8 +290,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-18T14:54:01Z",
-  "workflow_revision": 16
+  "updated": "2026-08-18T15:09:11Z",
+  "workflow_revision": 21
 }
