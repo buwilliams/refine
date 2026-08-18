@@ -106,12 +106,59 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-08-18T16:43:00Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-08-18T16:45:34Z",
+        "proposal": {
+          "completed_at": "2026-08-18T16:45:34Z",
+          "git_after": {
+            "branch": "refine/00000T05E0WBE2ERVTVWZG2001/round-1",
+            "head_commit": "c0c3fc6bc5f8f78208e77598bc3c5f2a4a9fd311",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T05E0WBE2ERVTVWZG2001/round-1",
+            "head_commit": "c0c3fc6bc5f8f78208e77598bc3c5f2a4a9fd311",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Add a cohesive Goal-ownership reconciliation policy under application persistence sync that classifies base, local, and remote operands as unchanged ownership, one valid one-sided transfer with its authoritative node, or ambiguity from competing changes, deletion, absence, malformed data, or invalid node identifiers without consulting timestamps, host identity, merge location, retry order, or merge-base ownership.",
+                "id": "P1"
+              },
+              {
+                "description": "Apply the shared policy at the structural Goal merge boundary so a provable transferred node_id survives disjoint field merging while ownership ambiguity keeps the record contested instead of selecting or deleting it.",
+                "id": "P2"
+              },
+              {
+                "description": "Carry the ownership classification and updated transfer doctrine into agent-assisted state resolution, and make its deterministic acceptance gate reject deletion, the prior owner, or any other node_id when a one-sided transfer is provable while preventing an agent from choosing between ambiguous ownership operands.",
+                "id": "P3"
+              },
+              {
+                "description": "Extend automatic recovery with the smallest field-aware decision needed to retain its existing whole-record authority for non-ownership conflicts while overlaying a proven transferred node_id onto the selected Goal record before the merge commit is published.",
+                "id": "P4"
+              },
+              {
+                "description": "Make ambiguous ownership produce a stable domain-terms decision in the existing conflict report and leave durable state unchanged and inspectable until the current sync-authority or Goal-transfer surfaces provide an explicit decision.",
+                "id": "P5"
+              },
+              {
+                "description": "Keep the worker's attempt_automatic_state_recovery branch, opt-out setting, health and backoff settlement, retained refs, activity evidence, race fences, and ordinary automatic convergence intact, with the ownership policy declining only cases that cannot prove a safe transfer outcome.",
+                "id": "P6"
+              },
+              {
+                "description": "Update the affected Fleet, persistence-sync, CLI, API, and runtime-setting intent text to describe explicit-transfer precedence, field-aware fallback, and fail-closed ambiguity without changing the established surface contracts.",
+                "id": "P7"
+              }
+            ],
+            "summary": "Change state reconciliation to carry a provable one-sided Goal transfer as field-level authority through deterministic merging, agent resolution, and automatic fallback, while keeping ambiguous ownership fail-closed and preserving background recovery for unrelated conflicts."
+          },
+          "started_at": "2026-08-18T16:43:00Z"
+        },
         "schema_version": 2,
         "started_at": "2026-08-18T16:43:00Z",
         "state": "in_progress",
-        "updated_at": "2026-08-18T16:43:00Z"
+        "updated_at": "2026-08-18T16:45:34Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -125,7 +172,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T16:43:00Z",
+      "updated": "2026-08-18T16:45:34Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T16:42:59Z",
         "round_idx": 0,
@@ -137,6 +184,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-18T16:43:00Z",
-  "workflow_revision": 8
+  "updated": "2026-08-18T16:45:34Z",
+  "workflow_revision": 10
 }
