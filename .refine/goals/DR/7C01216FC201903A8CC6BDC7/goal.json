@@ -1,6 +1,6 @@
 {
   "base_commit": "827a23a8c5e609fad7bef0dcb98690a335da0228",
-  "branch_name": "refine/DR7C01216FC201903A8CC6BDC7/round-1",
+  "branch_name": "refine/DR7C01216FC201903A8CC6BDC7/round-2",
   "candidate_commit": "07d27170c26d616c9d1db4badad069a17b8e1f02",
   "created": "2026-08-18T11:01:58Z",
   "feature_id": null,
@@ -323,10 +323,26 @@
         "source_candidate_commit": "07d27170c26d616c9d1db4badad069a17b8e1f02"
       },
       "quality_message": "Quality failed: “The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across aff…” — supervised command exited with code 1.",
+      "quality_recovery_analysis": "Candidate 07d27170 has a surface-boundary defect, not a prompt-content defect. `terminal_profile_prompt` receives only `profile` and unconditionally appends `TerminalProfileToolbarAgentWorkflow` for `agent` and `plan`. Both toolbar.js and production CLI `attach_agent` post otherwise indistinguishable profile payloads to `/terminal/session`, so CLI Agent and Plan sessions also receive the toolbar-only contract. The Quality check’s count of two CLI occurrences reflects test and production dispatch paths rather than two distinct routes, but the production leak is confirmed. Focused tests covered profile boundaries only and therefore missed caller-surface behavior. Preserve the valid 180-word toolbar prompt and documentation, add explicit launch-surface context, apply it only to explicitly marked web-toolbar Agent/Plan sessions, and preserve baseline CLI behavior: CLI Agent retains the former general-agent workflow guidance while CLI Plan receives no toolbar guidance.",
+      "quality_recovery_attempt": 1,
+      "quality_recovery_checked_at": "2026-08-18T11:23:39Z",
+      "quality_recovery_details": {
+        "candidate_commit": "07d27170c26d616c9d1db4badad069a17b8e1f02",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR7C01216FC201903A8CC6BDC7-round-1",
+        "phase": "quality_recovery",
+        "provider": "codex",
+        "raw_output": "{\"recovery_analysis\":\"Candidate 07d27170 has a surface-boundary defect, not a prompt-content defect. `terminal_profile_prompt` receives only `profile` and unconditionally appends `TerminalProfileToolbarAgentWorkflow` for `agent` and `plan`. Both toolbar.js and production CLI `attach_agent` post otherwise indistinguishable profile payloads to `/terminal/session`, so CLI Agent and Plan sessions also receive the toolbar-only contract. The Quality check’s count of two CLI occurrences reflects test and production dispatch paths rather than two distinct routes, but the production leak is confirmed. Focused tests covered profile boundaries only and therefore missed caller-surface behavior. Preserve the valid 180-word toolbar prompt and documentation, add explicit launch-surface context, apply it only to explicitly marked web-toolbar Agent/Plan sessions, and preserve baseline CLI behavior: CLI Agent retains the former general-agent workflow guidance while CLI Plan receives no toolbar guidance.\",\"recovery_round_prompt\":\"Implement the corrected toolbar-only Agent guidance from a fresh current-main Round. Preserve the intended node-first prompt for normal Agent and Planing Agent sessions launched from the browser toolbar, including investigation/current-Node management, direct answers, new-Goal handoff for requested changes, and evidence-preserving recovery Rounds for failed Goals. Introduce an explicit typed launch-surface distinction through the terminal-session request and prompt-composition path; have `src/surfaces/web/static/js/features/toolbar.js` explicitly mark toolbar launches, while CLI `agent open` is explicitly CLI or defaults to a non-toolbar context. Fail closed: never infer toolbar eligibility merely from profile `agent` or `plan`. Compose `TerminalProfileToolbarAgentWorkflow` only when surface=toolbar and profile is agent or plan. Restore/preserve the pre-Round-1 general-Agent workflow template for non-toolbar CLI Agent sessions so existing CLI behavior is not silently removed; CLI Plan must retain its existing Plan role without the toolbar node-first contract. Keep Goal diagnostic, Agent in Worktree/standalone, and planning, implementation, Quality, and Governance automation prompts unchanged. Retain or refine the focused toolbar intent documentation without broadening the contract to CLI. Add behavioral regression coverage that proves toolbar Agent and Plan receive the shared guidance, CLI/default Agent and Plan do not receive it, CLI Agent retains its prior general workflow guidance, and Goal/standalone remain excluded; also assert that the browser terminal-session payload carries the toolbar marker. Replace brittle source-count assertions with behavior-level tests. Verify with `cargo fmt --all -- --check`, `git diff --check`, focused terminal-profile and static-toolbar tests, `cargo test --lib application::agent_io::prompts::tests`, and the repository-valid library/Clippy checks, reporting unrelated baseline failures separately.\"}",
+        "verdict": {
+          "recovery_analysis": "Candidate 07d27170 has a surface-boundary defect, not a prompt-content defect. `terminal_profile_prompt` receives only `profile` and unconditionally appends `TerminalProfileToolbarAgentWorkflow` for `agent` and `plan`. Both toolbar.js and production CLI `attach_agent` post otherwise indistinguishable profile payloads to `/terminal/session`, so CLI Agent and Plan sessions also receive the toolbar-only contract. The Quality check’s count of two CLI occurrences reflects test and production dispatch paths rather than two distinct routes, but the production leak is confirmed. Focused tests covered profile boundaries only and therefore missed caller-surface behavior. Preserve the valid 180-word toolbar prompt and documentation, add explicit launch-surface context, apply it only to explicitly marked web-toolbar Agent/Plan sessions, and preserve baseline CLI behavior: CLI Agent retains the former general-agent workflow guidance while CLI Plan receives no toolbar guidance.",
+          "recovery_round_prompt": "Implement the corrected toolbar-only Agent guidance from a fresh current-main Round. Preserve the intended node-first prompt for normal Agent and Planing Agent sessions launched from the browser toolbar, including investigation/current-Node management, direct answers, new-Goal handoff for requested changes, and evidence-preserving recovery Rounds for failed Goals. Introduce an explicit typed launch-surface distinction through the terminal-session request and prompt-composition path; have `src/surfaces/web/static/js/features/toolbar.js` explicitly mark toolbar launches, while CLI `agent open` is explicitly CLI or defaults to a non-toolbar context. Fail closed: never infer toolbar eligibility merely from profile `agent` or `plan`. Compose `TerminalProfileToolbarAgentWorkflow` only when surface=toolbar and profile is agent or plan. Restore/preserve the pre-Round-1 general-Agent workflow template for non-toolbar CLI Agent sessions so existing CLI behavior is not silently removed; CLI Plan must retain its existing Plan role without the toolbar node-first contract. Keep Goal diagnostic, Agent in Worktree/standalone, and planning, implementation, Quality, and Governance automation prompts unchanged. Retain or refine the focused toolbar intent documentation without broadening the contract to CLI. Add behavioral regression coverage that proves toolbar Agent and Plan receive the shared guidance, CLI/default Agent and Plan do not receive it, CLI Agent retains its prior general workflow guidance, and Goal/standalone remain excluded; also assert that the browser terminal-session payload carries the toolbar marker. Replace brittle source-count assertions with behavior-level tests. Verify with `cargo fmt --all -- --check`, `git diff --check`, focused terminal-profile and static-toolbar tests, `cargo test --lib application::agent_io::prompts::tests`, and the repository-valid library/Clippy checks, reporting unrelated baseline failures separately."
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR7C01216FC201903A8CC6BDC7-round-1"
+      },
+      "quality_recovery_round_prompt": "Implement the corrected toolbar-only Agent guidance from a fresh current-main Round. Preserve the intended node-first prompt for normal Agent and Planing Agent sessions launched from the browser toolbar, including investigation/current-Node management, direct answers, new-Goal handoff for requested changes, and evidence-preserving recovery Rounds for failed Goals. Introduce an explicit typed launch-surface distinction through the terminal-session request and prompt-composition path; have `src/surfaces/web/static/js/features/toolbar.js` explicitly mark toolbar launches, while CLI `agent open` is explicitly CLI or defaults to a non-toolbar context. Fail closed: never infer toolbar eligibility merely from profile `agent` or `plan`. Compose `TerminalProfileToolbarAgentWorkflow` only when surface=toolbar and profile is agent or plan. Restore/preserve the pre-Round-1 general-Agent workflow template for non-toolbar CLI Agent sessions so existing CLI behavior is not silently removed; CLI Plan must retain its existing Plan role without the toolbar node-first contract. Keep Goal diagnostic, Agent in Worktree/standalone, and planning, implementation, Quality, and Governance automation prompts unchanged. Retain or refine the focused toolbar intent documentation without broadening the contract to CLI. Add behavioral regression coverage that proves toolbar Agent and Plan receive the shared guidance, CLI/default Agent and Plan do not receive it, CLI Agent retains its prior general workflow guidance, and Goal/standalone remain excluded; also assert that the browser terminal-session payload carries the toolbar marker. Replace brittle source-count assertions with behavior-level tests. Verify with `cargo fmt --all -- --check`, `git diff --check`, focused terminal-profile and static-toolbar tests, `cargo test --lib application::agent_io::prompts::tests`, and the repository-valid library/Clippy checks, reporting unrelated baseline failures separately.",
       "quality_state": "failed",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T11:21:26Z",
+      "updated": "2026-08-18T11:23:39Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T11:02:00Z",
         "round_idx": 0,
@@ -334,10 +350,414 @@
       },
       "workflow_reconciliation": null,
       "workflow_recovery": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-08-18T11:23:39Z",
+        "current_round": {
+          "assignee": "Refine",
+          "prompt": "Implement the corrected toolbar-only Agent guidance from a fresh current-main Round. Preserve the intended node-first prompt for normal Agent and Planing Agent sessions launched from the browser toolbar, including investigation/current-Node management, direct answers, new-Goal handoff for requested changes, and evidence-preserving recovery Rounds for failed Goals. Introduce an explicit typed launch-surface distinction through the terminal-session request and prompt-composition path; have `src/surfaces/web/static/js/features/toolbar.js` explicitly mark toolbar launches, while CLI `agent open` is explicitly CLI or defaults to a non-toolbar context. Fail closed: never infer toolbar eligibility merely from profile `agent` or `plan`. Compose `TerminalProfileToolbarAgentWorkflow` only when surface=toolbar and profile is agent or plan. Restore/preserve the pre-Round-1 general-Agent workflow template for non-toolbar CLI Agent sessions so existing CLI behavior is not silently removed; CLI Plan must retain its existing Plan role without the toolbar node-first contract. Keep Goal diagnostic, Agent in Worktree/standalone, and planning, implementation, Quality, and Governance automation prompts unchanged. Retain or refine the focused toolbar intent documentation without broadening the contract to CLI. Add behavioral regression coverage that proves toolbar Agent and Plan receive the shared guidance, CLI/default Agent and Plan do not receive it, CLI Agent retains its prior general workflow guidance, and Goal/standalone remain excluded; also assert that the browser terminal-session payload carries the toolbar marker. Replace brittle source-count assertions with behavior-level tests. Verify with `cargo fmt --all -- --check`, `git diff --check`, focused terminal-profile and static-toolbar tests, `cargo test --lib application::agent_io::prompts::tests`, and the repository-valid library/Clippy checks, reporting unrelated baseline failures separately.",
+          "reporter": "Refine",
+          "round": 2
+        },
+        "goal": {
+          "assignee": "Refine",
+          "id": "DR7C01216FC201903A8CC6BDC7",
+          "name": "Improve Agent Prompt Guidance",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "buddy.williams@insurity.com"
+        },
+        "governance": {
+          "configured": true,
+          "constitution": "- Refine's components are model (entities), process (supervisor to manage running processes), prompts (LLM templates), surfaces (interfaces into refine), tools (reusable functions for workflow steps), and workflow (defined workflow which calls out to tools). These map directly to src/[model| process|prompts|surfaces|tools|workflow].\n- Refine uses a flat file persistence, file-based indexes, in-memory caching, and Rust to maintain high performance. Ensure <50ms performance on CLI and API calls (assuming we are not waiting on LLMs or outside tools).\n- Ensure that the architecture is maintained and is consistent. Do not invent new architectural concepts; instead, follow the existing architecture.\n- Ensure that documentation, especially src/intent/*, is maintained and the existing document format is preserved.\n- Ensure Refine remains \"agent-first\" by using installed coding-agent CLIs. Do not duplicate coding agent functionality.",
+          "product": "Refine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.",
+          "rules": [
+            {
+              "created": "2026-08-11T17:59:15.372635011+00:00",
+              "id": "generated-rule-1786471155372-1",
+              "source": "generated",
+              "text": "Keep component code within `src/{model,process,prompts,surfaces,tools,workflow}` and extend existing architecture instead of inventing new concepts.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372734717+00:00",
+              "id": "generated-rule-1786471155372-2",
+              "source": "generated",
+              "text": "Preserve Rust-based flat-file persistence, file indexes, and in-memory caching; keep non-external CLI/API work under 50ms.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372750673+00:00",
+              "id": "generated-rule-1786471155372-3",
+              "source": "generated",
+              "text": "Update affected documentation—especially `src/intent/*`—without changing its established format.",
+              "updated": "2026-08-11T17:59:15Z"
+            },
+            {
+              "created": "2026-08-11T17:59:15.372756994+00:00",
+              "id": "generated-rule-1786471155372-4",
+              "source": "generated",
+              "text": "Use installed coding-agent CLIs for coding-agent capabilities; do not reimplement them.",
+              "updated": "2026-08-11T17:59:15Z"
+            }
+          ]
+        },
+        "guidance_candidates": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "previous_rounds": [
+          {
+            "assignee": "buddy.williams@insurity.com",
+            "guidance_decision": {
+              "applied": [
+                {
+                  "enabled": true,
+                  "id": "guidance-1",
+                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                  "name": "Intent and architecture",
+                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                },
+                {
+                  "enabled": true,
+                  "id": "guidance-2",
+                  "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+                  "name": "Cohesive code files",
+                  "rule": "Apply whenever an agent adds or changes code files in any language."
+                }
+              ],
+              "code_files_changed": true,
+              "context_version": 1,
+              "recorded_at": "2026-08-18T11:15:09Z",
+              "skipped": []
+            },
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "827a23a8c5e609fad7bef0dcb98690a335da0228",
+                "context_digest": "d251b0f53df16fe0586467d205e6bd2c7572aaae23b985629a1eaad874b12c56",
+                "context_version": 1,
+                "goal_id": "DR7C01216FC201903A8CC6BDC7",
+                "implementation_branch": "refine/DR7C01216FC201903A8CC6BDC7/round-1",
+                "round_idx": 0,
+                "target_branch": "main"
+              },
+              "completed_at": "2026-08-18T11:15:09Z",
+              "criticism": {
+                "completed_at": "2026-08-18T11:04:52Z",
+                "git_after": {
+                  "branch": "refine/DR7C01216FC201903A8CC6BDC7/round-1",
+                  "head_commit": "827a23a8c5e609fad7bef0dcb98690a335da0228",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR7C01216FC201903A8CC6BDC7/round-1",
+                  "head_commit": "827a23a8c5e609fad7bef0dcb98690a335da0228",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "summary": "The proposed plan is complete and correctly scoped to the toolbar-agent guidance contract."
+                },
+                "started_at": "2026-08-18T11:03:36Z"
+              },
+              "final_plan": {
+                "completed_at": "2026-08-18T11:06:45Z",
+                "git_after": {
+                  "branch": "refine/DR7C01216FC201903A8CC6BDC7/round-1",
+                  "head_commit": "827a23a8c5e609fad7bef0dcb98690a335da0228",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR7C01216FC201903A8CC6BDC7/round-1",
+                  "head_commit": "827a23a8c5e609fad7bef0dcb98690a335da0228",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Refactor the general-Agent-only workflow guidance into a cohesive shared toolbar-agent prompt that directs agents to begin with the existing Node, prioritizes investigation, current-Node management, and question answering, and routes requested repository changes to a new Goal or an evidence-preserving recovery Round for a failed Goal.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Compose the shared node-first guidance into both normal Agent and Planning Agent toolbar prompts while retaining each profile's distinct role context and leaving Goal diagnostics, Agent in Worktree, and planning, implementation, Quality, and Governance automation prompts unchanged.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Align the focused browser toolbar intent contract with the shared node-first role, supported change-handoff choices, and explicit toolbar-only boundary without broadening unrelated intent documentation.",
+                      "id": "P3"
+                    }
+                  ],
+                  "summary": "Refine will give normal and Planning Agent toolbar sessions one shared node-first operating contract so they prioritize investigations, management of the current Refine Node, and direct answers while routing requested changes through new Goals or recovery Rounds without affecting workflow automation."
+                },
+                "started_at": "2026-08-18T11:06:01Z"
+              },
+              "governance_precheck": {
+                "attempt": 1,
+                "checked_at": "2026-08-18T11:07:39Z",
+                "message": "The finalized plan can be executed without violating the Constitution, governance rules, or enabled guidance.",
+                "status": "passed"
+              },
+              "implementation": {
+                "completed_at": "2026-08-18T11:15:09Z",
+                "execution": {
+                  "checklist": [
+                    {
+                      "evidence": "Replaced terminal_profiles/general-agent-workflow.md with the cohesive terminal_profiles/toolbar-agent-workflow.md contract. It begins with the existing Refine Node, prioritizes current-Node investigation/management and direct answers, sends requested repository changes to a new complete Goal, and uses an evidence-preserving recovery Round for a failed Goal.",
+                      "id": "P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "terminal_profile_prompt now composes TerminalProfileToolbarAgentWorkflow only for agent and plan. Regression coverage proves both receive the shared contract and retain their distinct general-purpose versus co-design role text, while goal and standalone profiles do not receive it; no planning, implementation, Quality, or Governance automation prompt was changed.",
+                      "id": "P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Updated docs/intent/05-surfaces/03-browser/15-toolbar.md only, documenting the existing-Node priority, new-Goal and failed-Goal recovery-Round handoffs, and the explicit normal-Agent/Planning-Agent toolbar-only boundary.",
+                      "id": "P3",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "cargo fmt --all -- --check -> exit 0",
+                    "git diff --check -> exit 0",
+                    "cargo test --lib toolbar_agent_prompts_are_node_first_and_route_changes_through_refine_workflow -> 1 passed, 0 failed",
+                    "cargo test --lib application::agent_io::prompts::tests -> 8 passed, 0 failed",
+                    "cargo test --lib -> 1091 passed, 1 failed, 6 ignored; unrelated application::system::source_promotion::tests::agent_tests::active_launch_reservation_is_not_settled_before_its_process_receipt observed queued instead of interrupted",
+                    "cargo test --lib application::system::source_promotion::tests::agent_tests::active_launch_reservation_is_not_settled_before_its_process_receipt -- --exact -> 1 passed, 0 failed",
+                    "cargo clippy --lib -- -D warnings -> failed on four pre-existing unrelated warnings: two needless_pub_self in application/projects/projection/store.rs, module_inception in infrastructure/git/worktrees/mod.rs, and unnecessary_sort_by in surfaces/web_server/http/background_loops.rs",
+                    "cargo clippy --lib -- -A clippy::needless-pub-self -A clippy::module-inception -A clippy::unnecessary-sort-by -D warnings -> exit 0"
+                  ]
+                },
+                "report": "Refactored the former general-Agent-only policy into a shared 180-word node-first toolbar prompt, composed it into normal Agent and Planning Agent sessions only, preserved each profile's role text and the Goal/Agent-in-Worktree/workflow automation boundaries, updated the focused toolbar intent contract, and added profile-composition regression coverage. Formatting, focused tests, prompt-template invariants, and baseline-lint-adjusted Clippy pass. The full library run recorded 1091 passed, 1 unrelated source-promotion test failed, and 6 ignored; the exact failed test passed immediately in isolation. Strict Clippy found four pre-existing warnings in unrelated files, while the same command passed with only those named baseline lint categories allowed.",
+                "started_at": "2026-08-18T11:07:39Z"
+              },
+              "invalid_output_attempts": [
+                {
+                  "attempt": 1,
+                  "diagnostics": "revised implementation plan resolved unknown or non-material criticism: C1",
+                  "phase": "revise",
+                  "raw_output": "{\"checklist\":[{\"description\":\"Refactor the general-Agent-only workflow guidance into a cohesive shared toolbar-agent prompt that directs agents to begin with the existing Node, prioritizes investigation, current-Node management, and question answering, and routes requested repository changes to a new Goal or an evidence-preserving recovery Round for a failed Goal.\",\"id\":\"P1\"},{\"description\":\"Compose the shared node-first guidance into both normal Agent and Planning Agent toolbar prompts while retaining each profile's distinct role context and leaving Goal diagnostics, Agent in Worktree, and planning, implementation, Quality, and Governance automation prompts unchanged.\",\"id\":\"P2\"},{\"description\":\"Align the focused browser toolbar intent contract with the shared node-first role, supported change-handoff choices, and explicit toolbar-only boundary without broadening unrelated intent documentation.\",\"id\":\"P3\"}],\"criticism_resolutions\":[{\"criticism_id\":\"C1\",\"resolution\":\"The criticism found the proposal complete and correctly scoped, so the revised plan preserves its three connected changes while making the shared normal-and-planning toolbar boundary and the excluded automation paths explicit.\"}],\"summary\":\"Refine will give normal and Planning Agent toolbar sessions one shared node-first operating contract so they prioritize investigations, management of the current Refine Node, and direct answers while routing requested changes through new Goals or recovery Rounds without affecting workflow automation.\"}",
+                  "recorded_at": "2026-08-18T11:06:01Z"
+                }
+              ],
+              "phase": "implement",
+              "phase_started_at": "2026-08-18T11:07:39Z",
+              "proposal": {
+                "completed_at": "2026-08-18T11:03:36Z",
+                "git_after": {
+                  "branch": "refine/DR7C01216FC201903A8CC6BDC7/round-1",
+                  "head_commit": "827a23a8c5e609fad7bef0dcb98690a335da0228",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR7C01216FC201903A8CC6BDC7/round-1",
+                  "head_commit": "827a23a8c5e609fad7bef0dcb98690a335da0228",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Replace the general-Agent-only workflow template with a clearly named shared toolbar-agent guidance template that starts on the existing Node, frames investigation, current-Node management, and question answering as the primary role, and routes requested repository changes through a new Goal or a new Round on a failed Goal while preserving audit boundaries.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Compose the shared guidance into both normal Agent and Planning Agent toolbar prompts while leaving Goal diagnostics, standalone sessions, and planning, implementation, Quality, and Governance automation prompt paths unchanged.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Update the focused browser-agent intent page so the durable surface contract describes the same node-first role, change-handoff choices, and toolbar-only scope without altering unrelated intent documentation.",
+                      "id": "P3"
+                    }
+                  ],
+                  "summary": "Refine will give normal and planning toolbar agents a shared node-first operating contract that prioritizes investigations, current-Node management, and questions, routes requested changes through new Goals or recovery Rounds for failed Goals, and remains isolated from workflow automation prompts."
+                },
+                "started_at": "2026-08-18T11:02:00Z"
+              },
+              "schema_version": 2,
+              "started_at": "2026-08-18T11:02:00Z",
+              "state": "completed",
+              "updated_at": "2026-08-18T11:15:09Z"
+            },
+            "implementation_report": "Refactored the former general-Agent-only policy into a shared 180-word node-first toolbar prompt, composed it into normal Agent and Planning Agent sessions only, preserved each profile's role text and the Goal/Agent-in-Worktree/workflow automation boundaries, updated the focused toolbar intent contract, and added profile-composition regression coverage. Formatting, focused tests, prompt-template invariants, and baseline-lint-adjusted Clippy pass. The full library run recorded 1091 passed, 1 unrelated source-promotion test failed, and 6 ignored; the exact failed test passed immediately in isolation. Strict Clippy found four pre-existing warnings in unrelated files, while the same command passed with only those named baseline lint categories allowed.",
+            "implementation_reported_at": "2026-08-18T11:15:09Z",
+            "prompt": "From: Buddy Williams <buddy.williams@insurity.com>\nSubject: Improve Agent Prompt Guidance\n\nBody:\nThe guidance prompt given to web UI toolbar agents advise to initially operate on the existing node and that making changes should involve either creating new rounds on failed goals or creating new goals or answering questions. The agent is primarily there for investigations and managing the current refine node. Obviously, this guidance does not apply to the workflow automation (planning, implementation, quality, or governance) and is only related to the toolbar agents both normal agents and planning agents.\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nBuddy Williams\r\nBuddy.Williams@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
+            "quality_checked_at": "2026-08-18T11:21:26Z",
+            "quality_details": {
+              "candidate_commit": "07d27170c26d616c9d1db4badad069a17b8e1f02",
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR7C01216FC201903A8CC6BDC7-round-1",
+              "diagnostics": [
+                "{\"ok\":false,\"summary\":\"Failed: focused regressions pass, but the toolbar-only guidance also reaches CLI Agent and Plan profiles.\",\"results\":[{\"test\":\"The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\",\"status\":\"failed\",\"evidence\":\"Exit 1. Formatting, diff checks, the focused toolbar regression (1 passed), and prompt-template tests (8 passed) succeeded. The boundary check found 2 CLI /terminal/session routes and 1 unconditional shared Agent/Plan prompt application, proving CLI sessions receive guidance documented and requested as toolbar-only.\",\"command\":\"bash -lc 'set -euo pipefail\\ncargo fmt --all -- --check\\ngit diff --check 827a23a8c5e609fad7bef0dcb98690a335da0228..HEAD\\ncargo test --lib toolbar_agent_prompts_are_node_first_and_route_changes_through_refine_workflow\\ncargo test --lib application::agent_io::prompts::tests\\ncli_route_count=$(awk '\\\\''index($0, \\\"\\\\\\\"/terminal/session\\\\\\\"\\\") { count++ } END { print count + 0 }'\\\\'' src/surfaces/cli/dispatch/agents.rs)\\nshared_profile_count=$(awk '\\\\''index($0, \\\"if matches!(profile, \\\\\\\"agent\\\\\\\" | \\\\\\\"plan\\\\\\\")\\\") { count++ } END { print count + 0 }'\\\\'' src/surfaces/web_server/work_routes/terminal_profiles.rs)\\nprintf \\\"cli_terminal_session_routes=%s shared_agent_plan_toolbar_prompt_applications=%s\\\\n\\\" \\\"$cli_route_count\\\" \\\"$shared_profile_count\\\"\\nif [ \\\"$cli_route_count\\\" -gt 0 ] && [ \\\"$shared_profile_count\\\" -gt 0 ]; then\\n  printf \\\"FAIL: CLI agent open routes through the same terminal/session handler that unconditionally adds the toolbar-only node-first contract to agent and plan profiles.\\\\n\\\" >&2\\n  exit 1\\nfi'\"}]}",
+                "Observed supervised process proc-1787052084317-868123-202 exited 1. stdout: running 1 test\ntest surfaces::web_server::tests::agents_chat::agents::toolbar_agent_prompts_are_node_first_and_route_changes_through_refine_workflow ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1097 filtered out; finished in 0.00s\n\n\nrunning 8 tests\ntest application::agent_io::prompts::tests::loads_templates_without_trailing_file_whitespace ... ok\ntest application::agent_io::prompts::tests::quality_commands_must_encode_pass_semantics_in_their_exit_status ... ok\ntest application::agent_io::prompts::tests::quality_defaults_are_template_owned ... ok\ntest application::agent_io::prompts::tests::standalone_chat_waits_for_user_in_an_unassigned_worktree ... ok\ntest application::agent_io::prompts::tests::rejects_missing_and_unused_variables ... ok\ntest application::agent_io::prompts::tests::every_feature_template_is_registered_exactly_once ... ok\ntest application::agent_io::prompts::tests::renders_embedded_markdown_template_variables ... ok\ntest application::agent_io::prompts::tests::agent_prompts_keep_only_task_specific_contracts ... ok\n\ntest result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 1090 filtered out; finished in 0.00s\n\ncli_terminal_session_routes=2 shared_agent_plan_toolbar_prompt_applications=1 stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\nFAIL: CLI agent open routes through the same terminal/session handler that unconditionally adds the toolbar-only node-first contract to agent and plan profiles."
+              ],
+              "evaluation_scope": "isolated_candidate",
+              "operation_id": "1a01498b38ad3f1b4",
+              "provider_attempts": [
+                {
+                  "accepted": true,
+                  "attempt": 1,
+                  "process_id": "proc-1787051947219-868123-199",
+                  "raw_output": "{\"ok\":false,\"summary\":\"Failed: focused regressions pass, but the toolbar-only guidance also reaches CLI Agent and Plan profiles.\",\"results\":[{\"test\":\"The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\",\"status\":\"failed\",\"evidence\":\"Exit 1. Formatting, diff checks, the focused toolbar regression (1 passed), and prompt-template tests (8 passed) succeeded. The boundary check found 2 CLI /terminal/session routes and 1 unconditional shared Agent/Plan prompt application, proving CLI sessions receive guidance documented and requested as toolbar-only.\",\"command\":\"bash -lc 'set -euo pipefail\\ncargo fmt --all -- --check\\ngit diff --check 827a23a8c5e609fad7bef0dcb98690a335da0228..HEAD\\ncargo test --lib toolbar_agent_prompts_are_node_first_and_route_changes_through_refine_workflow\\ncargo test --lib application::agent_io::prompts::tests\\ncli_route_count=$(awk '\\\\''index($0, \\\"\\\\\\\"/terminal/session\\\\\\\"\\\") { count++ } END { print count + 0 }'\\\\'' src/surfaces/cli/dispatch/agents.rs)\\nshared_profile_count=$(awk '\\\\''index($0, \\\"if matches!(profile, \\\\\\\"agent\\\\\\\" | \\\\\\\"plan\\\\\\\")\\\") { count++ } END { print count + 0 }'\\\\'' src/surfaces/web_server/work_routes/terminal_profiles.rs)\\nprintf \\\"cli_terminal_session_routes=%s shared_agent_plan_toolbar_prompt_applications=%s\\\\n\\\" \\\"$cli_route_count\\\" \\\"$shared_profile_count\\\"\\nif [ \\\"$cli_route_count\\\" -gt 0 ] && [ \\\"$shared_profile_count\\\" -gt 0 ]; then\\n  printf \\\"FAIL: CLI agent open routes through the same terminal/session handler that unconditionally adds the toolbar-only node-first contract to agent and plan profiles.\\\\n\\\" >&2\\n  exit 1\\nfi'\"}]}"
+                }
+              ],
+              "quality_proof": {
+                "checked_at": "2026-08-18T11:21:26Z",
+                "checked_candidate_commit": "07d27170c26d616c9d1db4badad069a17b8e1f02",
+                "evaluation_scope": "isolated_candidate",
+                "goal_id": "DR7C01216FC201903A8CC6BDC7",
+                "operation_id": "1a01498b38ad3f1b4",
+                "results": [
+                  {
+                    "command": "bash -lc 'set -euo pipefail\ncargo fmt --all -- --check\ngit diff --check 827a23a8c5e609fad7bef0dcb98690a335da0228..HEAD\ncargo test --lib toolbar_agent_prompts_are_node_first_and_route_changes_through_refine_workflow\ncargo test --lib application::agent_io::prompts::tests\ncli_route_count=$(awk '\\''index($0, \"\\\"/terminal/session\\\"\") { count++ } END { print count + 0 }'\\'' src/surfaces/cli/dispatch/agents.rs)\nshared_profile_count=$(awk '\\''index($0, \"if matches!(profile, \\\"agent\\\" | \\\"plan\\\")\") { count++ } END { print count + 0 }'\\'' src/surfaces/web_server/work_routes/terminal_profiles.rs)\nprintf \"cli_terminal_session_routes=%s shared_agent_plan_toolbar_prompt_applications=%s\\n\" \"$cli_route_count\" \"$shared_profile_count\"\nif [ \"$cli_route_count\" -gt 0 ] && [ \"$shared_profile_count\" -gt 0 ]; then\n  printf \"FAIL: CLI agent open routes through the same terminal/session handler that unconditionally adds the toolbar-only node-first contract to agent and plan profiles.\\n\" >&2\n  exit 1\nfi'",
+                    "evidence": "Observed supervised process proc-1787052084317-868123-202 exited 1. stdout: running 1 test\ntest surfaces::web_server::tests::agents_chat::agents::toolbar_agent_prompts_are_node_first_and_route_changes_through_refine_workflow ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1097 filtered out; finished in 0.00s\n\n\nrunning 8 tests\ntest application::agent_io::prompts::tests::loads_templates_without_trailing_file_whitespace ... ok\ntest application::agent_io::prompts::tests::quality_commands_must_encode_pass_semantics_in_their_exit_status ... ok\ntest application::agent_io::prompts::tests::quality_defaults_are_template_owned ... ok\ntest application::agent_io::prompts::tests::standalone_chat_waits_for_user_in_an_unassigned_worktree ... ok\ntest application::agent_io::prompts::tests::rejects_missing_and_unused_variables ... ok\ntest application::agent_io::prompts::tests::every_feature_template_is_registered_exactly_once ... ok\ntest application::agent_io::prompts::tests::renders_embedded_markdown_template_variables ... ok\ntest application::agent_io::prompts::tests::agent_prompts_keep_only_task_specific_contracts ... ok\n\ntest result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 1090 filtered out; finished in 0.00s\n\ncli_terminal_session_routes=2 shared_agent_plan_toolbar_prompt_applications=1 stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\nFAIL: CLI agent open routes through the same terminal/session handler that unconditionally adds the toolbar-only node-first contract to agent and plan profiles. Agent report: Exit 1. Formatting, diff checks, the focused toolbar regression (1 passed), and prompt-template tests (8 passed) succeeded. The boundary check found 2 CLI /terminal/session routes and 1 unconditional shared Agent/Plan prompt application, proving CLI sessions receive guidance documented and requested as toolbar-only.",
+                    "exit_code": 1,
+                    "process_id": "proc-1787052084317-868123-202",
+                    "status": "failed",
+                    "test": "The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks."
+                  }
+                ],
+                "round_idx": 0,
+                "schema_version": 1,
+                "source_candidate_commit": "07d27170c26d616c9d1db4badad069a17b8e1f02",
+                "state": "failed"
+              },
+              "results": [
+                {
+                  "command": "bash -lc 'set -euo pipefail\ncargo fmt --all -- --check\ngit diff --check 827a23a8c5e609fad7bef0dcb98690a335da0228..HEAD\ncargo test --lib toolbar_agent_prompts_are_node_first_and_route_changes_through_refine_workflow\ncargo test --lib application::agent_io::prompts::tests\ncli_route_count=$(awk '\\''index($0, \"\\\"/terminal/session\\\"\") { count++ } END { print count + 0 }'\\'' src/surfaces/cli/dispatch/agents.rs)\nshared_profile_count=$(awk '\\''index($0, \"if matches!(profile, \\\"agent\\\" | \\\"plan\\\")\") { count++ } END { print count + 0 }'\\'' src/surfaces/web_server/work_routes/terminal_profiles.rs)\nprintf \"cli_terminal_session_routes=%s shared_agent_plan_toolbar_prompt_applications=%s\\n\" \"$cli_route_count\" \"$shared_profile_count\"\nif [ \"$cli_route_count\" -gt 0 ] && [ \"$shared_profile_count\" -gt 0 ]; then\n  printf \"FAIL: CLI agent open routes through the same terminal/session handler that unconditionally adds the toolbar-only node-first contract to agent and plan profiles.\\n\" >&2\n  exit 1\nfi'",
+                  "evidence": "Observed supervised process proc-1787052084317-868123-202 exited 1. stdout: running 1 test\ntest surfaces::web_server::tests::agents_chat::agents::toolbar_agent_prompts_are_node_first_and_route_changes_through_refine_workflow ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1097 filtered out; finished in 0.00s\n\n\nrunning 8 tests\ntest application::agent_io::prompts::tests::loads_templates_without_trailing_file_whitespace ... ok\ntest application::agent_io::prompts::tests::quality_commands_must_encode_pass_semantics_in_their_exit_status ... ok\ntest application::agent_io::prompts::tests::quality_defaults_are_template_owned ... ok\ntest application::agent_io::prompts::tests::standalone_chat_waits_for_user_in_an_unassigned_worktree ... ok\ntest application::agent_io::prompts::tests::rejects_missing_and_unused_variables ... ok\ntest application::agent_io::prompts::tests::every_feature_template_is_registered_exactly_once ... ok\ntest application::agent_io::prompts::tests::renders_embedded_markdown_template_variables ... ok\ntest application::agent_io::prompts::tests::agent_prompts_keep_only_task_specific_contracts ... ok\n\ntest result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 1090 filtered out; finished in 0.00s\n\ncli_terminal_session_routes=2 shared_agent_plan_toolbar_prompt_applications=1 stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\nFAIL: CLI agent open routes through the same terminal/session handler that unconditionally adds the toolbar-only node-first contract to agent and plan profiles. Agent report: Exit 1. Formatting, diff checks, the focused toolbar regression (1 passed), and prompt-template tests (8 passed) succeeded. The boundary check found 2 CLI /terminal/session routes and 1 unconditional shared Agent/Plan prompt application, proving CLI sessions receive guidance documented and requested as toolbar-only.",
+                  "exit_code": 1,
+                  "process_id": "proc-1787052084317-868123-202",
+                  "status": "failed",
+                  "test": "The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks."
+                }
+              ],
+              "source_candidate_commit": "07d27170c26d616c9d1db4badad069a17b8e1f02"
+            },
+            "quality_message": "Quality failed: “The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across aff…” — supervised command exited with code 1.",
+            "quality_state": "failed",
+            "reporter": "buddy.williams@insurity.com",
+            "round": 1
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "assignee": "Refine",
+      "automatic_retry": {
+        "attempt": 1,
+        "generated_at": "2026-08-18T11:23:39Z",
+        "kind": "quality",
+        "source_round": 1
+      },
+      "constitution_state": "unclassified",
+      "created": "2026-08-18T11:23:39Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_candidate_commit": "",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "guidance_decision": null,
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "827a23a8c5e609fad7bef0dcb98690a335da0228",
+          "context_digest": "7c32c77f899a10d40817df249bdb24918d9542ac7424eba9da4796babea1339e",
+          "context_version": 1,
+          "goal_id": "DR7C01216FC201903A8CC6BDC7",
+          "implementation_branch": "refine/DR7C01216FC201903A8CC6BDC7/round-2",
+          "round_idx": 1,
+          "target_branch": "main"
+        },
+        "final_plan": {
+          "completed_at": "2026-08-18T11:23:39Z",
+          "git_after": {
+            "branch": "refine/DR7C01216FC201903A8CC6BDC7/round-2",
+            "head_commit": "07d27170c26d616c9d1db4badad069a17b8e1f02",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR7C01216FC201903A8CC6BDC7/round-2",
+            "head_commit": "07d27170c26d616c9d1db4badad069a17b8e1f02",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Correct the Round 1 quality findings by implementing the current Round request on the retained candidate.",
+                "id": "R1"
+              }
+            ],
+            "summary": "Scoped quality recovery for Round 1: implement the current Round request directly on the retained candidate. Planning is skipped for this recovery; the full Quality and Governance gates still judge the result."
+          },
+          "started_at": "2026-08-18T11:23:39Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-08-18T11:23:40Z",
+        "proposal": {
+          "completed_at": "2026-08-18T11:23:39Z",
+          "git_after": {
+            "branch": "refine/DR7C01216FC201903A8CC6BDC7/round-2",
+            "head_commit": "07d27170c26d616c9d1db4badad069a17b8e1f02",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR7C01216FC201903A8CC6BDC7/round-2",
+            "head_commit": "07d27170c26d616c9d1db4badad069a17b8e1f02",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Correct the Round 1 quality findings by implementing the current Round request on the retained candidate.",
+                "id": "R1"
+              }
+            ],
+            "summary": "Scoped quality recovery for Round 1: implement the current Round request directly on the retained candidate. Planning is skipped for this recovery; the full Quality and Governance gates still judge the result."
+          },
+          "started_at": "2026-08-18T11:23:39Z"
+        },
+        "schema_version": 2,
+        "started_at": "2026-08-18T11:23:39Z",
+        "state": "in_progress",
+        "updated_at": "2026-08-18T11:23:40Z"
+      },
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Implement the corrected toolbar-only Agent guidance from a fresh current-main Round. Preserve the intended node-first prompt for normal Agent and Planing Agent sessions launched from the browser toolbar, including investigation/current-Node management, direct answers, new-Goal handoff for requested changes, and evidence-preserving recovery Rounds for failed Goals. Introduce an explicit typed launch-surface distinction through the terminal-session request and prompt-composition path; have `src/surfaces/web/static/js/features/toolbar.js` explicitly mark toolbar launches, while CLI `agent open` is explicitly CLI or defaults to a non-toolbar context. Fail closed: never infer toolbar eligibility merely from profile `agent` or `plan`. Compose `TerminalProfileToolbarAgentWorkflow` only when surface=toolbar and profile is agent or plan. Restore/preserve the pre-Round-1 general-Agent workflow template for non-toolbar CLI Agent sessions so existing CLI behavior is not silently removed; CLI Plan must retain its existing Plan role without the toolbar node-first contract. Keep Goal diagnostic, Agent in Worktree/standalone, and planning, implementation, Quality, and Governance automation prompts unchanged. Retain or refine the focused toolbar intent documentation without broadening the contract to CLI. Add behavioral regression coverage that proves toolbar Agent and Plan receive the shared guidance, CLI/default Agent and Plan do not receive it, CLI Agent retains its prior general workflow guidance, and Goal/standalone remain excluded; also assert that the browser terminal-session payload carries the toolbar marker. Replace brittle source-count assertions with behavior-level tests. Verify with `cargo fmt --all -- --check`, `git diff --check`, focused terminal-profile and static-toolbar tests, `cargo test --lib application::agent_io::prompts::tests`, and the repository-valid library/Clippy checks, reporting unrelated baseline failures separately.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Refine",
+      "rule_state": "unclassified",
+      "updated": "2026-08-18T11:23:40Z",
+      "workflow_attempt_authority": {
+        "claimed_at": "2026-08-18T11:23:39Z",
+        "round_idx": 1,
+        "workflow_revision": 26
+      },
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
     }
   ],
-  "status": "quality",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-08-18T11:21:26Z",
-  "workflow_revision": 24
+  "updated": "2026-08-18T11:23:40Z",
+  "workflow_revision": 34
 }
