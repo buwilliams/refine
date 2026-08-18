@@ -106,12 +106,51 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-08-18T12:37:40Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-08-18T12:39:22Z",
+        "proposal": {
+          "completed_at": "2026-08-18T12:39:22Z",
+          "git_after": {
+            "branch": "refine/00000T0570KRGG047J0RZG2000/round-1",
+            "head_commit": "148e3ff37f026e3861adbefd86edc5ddbd9a3662",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T0570KRGG047J0RZG2000/round-1",
+            "head_commit": "148e3ff37f026e3861adbefd86edc5ddbd9a3662",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Extend the Goal Agent session command and process metadata contract with a one-way Toolbar attachment marker that can be applied to the exact live session without creating a duplicate agent.",
+                "id": "P1"
+              },
+              {
+                "description": "Have the Toolbar terminal-session route mark an existing Goal Agent as attached before returning its snapshot while preserving the default and CLI attachment behavior without the exemption.",
+                "id": "P2"
+              },
+              {
+                "description": "Change the Goal Agent runtime to stop enforcing idle and completion timeout termination after the attachment marker is observed while retaining completion-signal handling, needs-input behavior, explicit Stop or cancellation, natural exit, transcript capture, and workflow settlement.",
+                "id": "P3"
+              },
+              {
+                "description": "Add focused session and web-route regression coverage for unattached timeout enforcement, attached survival beyond both deadlines, exact-session marking, and later clean completion or explicit termination.",
+                "id": "P4"
+              },
+              {
+                "description": "Update the affected Goal Agent and Toolbar intent pages to document that opening the workflow-owned session disables automatic timeout termination without changing its workflow ownership or explicit lifecycle controls.",
+                "id": "P5"
+              }
+            ],
+            "summary": "Mark a live workflow Goal Agent as user-attached when it is opened from the Toolbar and exempt that session from idle and completion timeouts so the user's terminal is not killed while unattended agents remain bounded."
+          },
+          "started_at": "2026-08-18T12:37:40Z"
+        },
         "schema_version": 2,
         "started_at": "2026-08-18T12:37:40Z",
         "state": "in_progress",
-        "updated_at": "2026-08-18T12:37:40Z"
+        "updated_at": "2026-08-18T12:39:22Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -125,7 +164,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T12:37:40Z",
+      "updated": "2026-08-18T12:39:22Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T12:37:40Z",
         "round_idx": 0,
@@ -137,6 +176,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-18T12:37:40Z",
-  "workflow_revision": 7
+  "updated": "2026-08-18T12:39:22Z",
+  "workflow_revision": 9
 }
