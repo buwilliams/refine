@@ -1,7 +1,7 @@
 {
   "base_commit": "c0c3fc6bc5f8f78208e77598bc3c5f2a4a9fd311",
   "branch_name": "refine/DR427BFD89E5391018EACA69CC/round-1",
-  "candidate_commit": "c536c2250e94818ae4d0f72ad0d5c2839ce47644",
+  "candidate_commit": "cd5df03346066c2983589dcd33f4c4618eda640c",
   "created": "2026-08-18T15:39:04Z",
   "feature_id": null,
   "feature_order": null,
@@ -307,14 +307,15 @@
       "meta_rule_state": null,
       "product_state": null,
       "prompt": "From: Buddy Williams <buddy.williams@insurity.com>\nSubject: Remove automatic sync ownership arbitration pipeline\n\nBody:\nRequest: Remove automatic sync ownership arbitration pipeline. Goals stay where they are transferred unless manually moved via surface (CLI, web UI, etc.)\r\nDetails:\r\nFound it. The Refine 4.2.0 binary (deployed today at 09:13) introduced a new automatic sync ownership arbitration pipeline. Here's exactly what happened and why:\r\n\r\n  Why they moved: The commit message explains it directly — before 4.2.0, whenever two nodes had conflicting state on the same goal, the sync would wedge and require a manual operator. This was causing mass blockage at scale (67 unresolved\r\n  path(s) in production). So 4.2.0 added an auto-resolve rule: \"the node that owned the record at the last agreed baseline is authoritative.\"\r\n\r\n  Your 35 failed goals were originally assigned to the default node (the QA machine, bo2lnxnevo04). This node (bo2lnxipsapp01) had picked them up and advanced them through the workflow — but at the last sync baseline, default was the\r\n  declared owner. When 4.2.0's sync ran, it saw the conflict, applied the baseline-ownership policy, and moved those goals back to default.\r\n\r\n  Where they went: The default node — which now has 56 failed goals (up from 16 before). Your 35 plus others from around the fleet that were similarly repatriated.\r\n\r\n  They're not lost — they're on default in failed state. The catch is that they're also still carrying the signal schema failure (guidance_applied string vs integer) from the 4.2.0 agent prompt mismatch. So they'll keep failing on default\r\n  too until that's fixed.\r\n\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nBuddy Williams\r\nBuddy.Williams@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
-      "quality_candidate_commit": null,
+      "quality_agent_report": "Quality corrected two defects: agent resolution can no longer delete a conflicted Goal to bypass preserved explicit ownership, and the retired state_sync_auto_recovery key no longer participates in copy-between-node runtime settings. Added focused regressions and verified the complete candidate, simulations, browser contracts, formatting, diff hygiene, and changed-code lint cleanliness.",
+      "quality_candidate_commit": "cd5df03346066c2983589dcd33f4c4618eda640c",
       "quality_checked_at": null,
       "quality_details": null,
       "quality_message": null,
       "quality_state": null,
       "reporter": "Buddy Williams",
       "rule_state": null,
-      "updated": "2026-08-18T16:17:33Z",
+      "updated": "2026-08-18T16:28:00Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T15:39:05Z",
         "round_idx": 0,
@@ -370,6 +371,6 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-18T16:17:33Z",
-  "workflow_revision": 22
+  "updated": "2026-08-18T16:28:00Z",
+  "workflow_revision": 24
 }
