@@ -1,7 +1,7 @@
 {
   "base_commit": "7240706a10f1d45dc387a41825c08891ed52cf41",
   "branch_name": "refine/00000T0570KRGG047J0RZG2000/round-2",
-  "candidate_commit": "0f1ca148a0887fc3a65ecbcc85f9b3bab0517d15",
+  "candidate_commit": "e9baf5be7d2c55a4165503b5f0f1ec465cf96286",
   "created": "2026-08-18T12:37:40Z",
   "feature_id": null,
   "feature_order": null,
@@ -922,7 +922,28 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-18T13:38:00Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "7240706a10f1d45dc387a41825c08891ed52cf41",
@@ -933,6 +954,7 @@
           "round_idx": 1,
           "target_branch": "main"
         },
+        "completed_at": "2026-08-18T13:37:59Z",
         "final_plan": {
           "completed_at": "2026-08-18T13:20:17Z",
           "git_after": {
@@ -954,6 +976,32 @@
             ],
             "summary": "Scoped governance recovery for Round 1: implement the current Round request directly on the retained candidate. Planning is skipped for this recovery; the full Quality and Governance gates still judge the result."
           },
+          "started_at": "2026-08-18T13:20:17Z"
+        },
+        "implementation": {
+          "completed_at": "2026-08-18T13:37:59Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Corrected both Round 1 governance findings on the retained candidate: Toolbar attachment now queues an exact-session asynchronous operation and returns immediately, background settlement validates the same process/session and matching runtime acknowledgment, the browser does not create the terminal until settlement succeeds, missing acknowledgment or identity/liveness loss fails closed, and process metadata retains at most 32 acknowledgment identities with concurrent and repeated-open regression coverage.",
+                "id": "R1",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "cargo fmt -- --check -> exit 0",
+              "cargo test --lib application::agents::sessions -- --test-threads=1 -> 36 passed, 0 failed, 0 ignored",
+              "cargo test --lib surfaces::web_server::tests::goals::lifecycle -- --test-threads=1 -> 11 passed, 0 failed, 0 ignored",
+              "node --test tests/web_supervisor_toolbar.test.js -> 38 passed, 0 failed, 0 skipped",
+              "cargo test --lib surfaces::web_server::tests::static_surface::terminal -- --test-threads=1 -> 3 passed, 0 failed, 0 ignored",
+              "cargo clippy --lib -- -D warnings -A clippy::needless-pub-self -A clippy::module-inception -A clippy::unnecessary-sort-by -> exit 0",
+              "cargo test --lib surfaces::web_server::tests::goals::lifecycle::web_server_open_agent_attaches_to_the_workflow_goal_agent -- --exact --nocapture -> 1 passed; measured queue POST 7166us and operation-status GET 8638us",
+              "cargo test --lib surfaces::web_server::tests::goals::lifecycle::toolbar_attachment_missing_ack_is_asynchronous_and_fails_closed -- --exact --nocapture -> 1 passed; measured missing-ack queue POST 7061us and asynchronous failure settlement",
+              "git diff --check -> exit 0",
+              "git status --short --branch after commit e9baf5be7d2c55a4165503b5f0f1ec465cf96286 -> clean branch refine/00000T0570KRGG047J0RZG2000/round-2"
+            ]
+          },
+          "report": "Committed e9baf5be7d2c55a4165503b5f0f1ec465cf96286. Replaced the blocking Toolbar Goal Agent attachment request with an immediate 202 background operation; the Toolbar waits for exact-session runtime acknowledgment before presenting the terminal, failures settle closed, and runtime acknowledgment metadata is capped at 32 entries while concurrent opens remain supported. Preserved watchdog ordering and explicit lifecycle authority, split background settlement into a cohesive route module, and updated only the affected Goal Agent and Toolbar intent pages. Exact verification passed: formatting, 36 session tests, 11 Goal lifecycle tests, 38 Toolbar tests, 3 static terminal contracts, warning-denied scoped Clippy, diff hygiene, and isolated API latency measurements of 7.166ms queue POST, 8.638ms operation-status GET, and 7.061ms missing-ack queue POST.",
           "started_at": "2026-08-18T13:20:17Z"
         },
         "phase": "implement",
@@ -983,11 +1031,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-08-18T13:20:17Z",
-        "state": "in_progress",
-        "updated_at": "2026-08-18T13:20:17Z"
+        "state": "completed",
+        "updated_at": "2026-08-18T13:37:59Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Committed e9baf5be7d2c55a4165503b5f0f1ec465cf96286. Replaced the blocking Toolbar Goal Agent attachment request with an immediate 202 background operation; the Toolbar waits for exact-session runtime acknowledgment before presenting the terminal, failures settle closed, and runtime acknowledgment metadata is capped at 32 entries while concurrent opens remain supported. Preserved watchdog ordering and explicit lifecycle authority, split background settlement into a cohesive route module, and updated only the affected Goal Agent and Toolbar intent pages. Exact verification passed: formatting, 36 session tests, 11 Goal lifecycle tests, 38 Toolbar tests, 3 static terminal contracts, warning-denied scoped Clippy, diff hygiene, and isolated API latency measurements of 7.166ms queue POST, 8.638ms operation-status GET, and 7.061ms missing-ack queue POST.",
+      "implementation_reported_at": "2026-08-18T13:37:59Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -998,7 +1046,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T13:20:17Z",
+      "updated": "2026-08-18T13:38:00Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T13:20:16Z",
         "round_idx": 1,
@@ -1008,8 +1056,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-18T13:20:17Z",
-  "workflow_revision": 36
+  "updated": "2026-08-18T13:38:00Z",
+  "workflow_revision": 41
 }
