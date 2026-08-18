@@ -106,8 +106,36 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-08-18T13:38:54Z",
+        "criticism": {
+          "completed_at": "2026-08-18T13:41:17Z",
+          "git_after": {
+            "branch": "refine/DR49680EE1475D2F2FFE46AC54/round-1",
+            "head_commit": "7240706a10f1d45dc387a41825c08891ed52cf41",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR49680EE1475D2F2FFE46AC54/round-1",
+            "head_commit": "7240706a10f1d45dc387a41825c08891ed52cf41",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P1"
+                ],
+                "description": "P1 changes budget arithmetic without addressing that available memory and agent RSS are Linux-only and the current RSS sample counts only the managed parent PID, omitting memory-heavy agent descendants such as builds and tests.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Extend P1 to define conservative behavior when host memory is unavailable and to account for the full managed agent process tree or process group, with platform and descendant-workload regression tests."
+              }
+            ],
+            "summary": "Define complete host and agent memory measurement before implementing the conservative concurrency policy."
+          },
+          "started_at": "2026-08-18T13:38:54Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-08-18T13:41:17Z",
         "proposal": {
           "completed_at": "2026-08-18T13:38:54Z",
           "git_after": {
@@ -146,7 +174,7 @@
         "schema_version": 2,
         "started_at": "2026-08-18T13:36:01Z",
         "state": "in_progress",
-        "updated_at": "2026-08-18T13:38:54Z"
+        "updated_at": "2026-08-18T13:41:17Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -160,7 +188,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T13:38:54Z",
+      "updated": "2026-08-18T13:41:17Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T13:36:01Z",
         "round_idx": 0,
@@ -172,6 +200,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-18T13:38:54Z",
-  "workflow_revision": 9
+  "updated": "2026-08-18T13:41:17Z",
+  "workflow_revision": 11
 }
