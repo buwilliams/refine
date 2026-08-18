@@ -24,7 +24,7 @@ The add menu appears immediately after the Toolbar label and offers:
 - Terminal;
 - Planing Agent.
 
-Each selection creates or opens only the requested surface. Repeated Agent selections create independent sessions with unique labels such as Agent, Agent 2, and Agent 3. Agent in Worktree and Standalone use isolated Refine worktrees. Goal tabs attach to the workflow-owned Goal Agent already implementing that Goal and never launch a duplicate. Opening a live Goal tab waits for the exact runtime session to acknowledge one-way protection from its idle and completion watchdogs; an exit, mismatched session, or unavailable acknowledgment fails the open instead of returning a stale snapshot. This exemption is specific to a Toolbar-opened workflow Goal Agent and does not change other terminal attachment paths.
+Each selection creates or opens only the requested surface. Repeated Agent selections create independent sessions with unique labels such as Agent, Agent 2, and Agent 3. Agent in Worktree and Standalone use isolated Refine worktrees. Goal tabs attach to the workflow-owned Goal Agent already implementing that Goal and never launch a duplicate. Opening a live Goal tab queues a bounded background attachment operation immediately, then waits for the exact runtime session to acknowledge one-way protection from its idle and completion watchdogs before presenting the terminal; an exit, mismatched session, or unavailable acknowledgment fails the operation instead of returning a stale snapshot. This exemption is specific to a Toolbar-opened workflow Goal Agent and does not change other terminal attachment paths.
 
 ## Lifecycle
 

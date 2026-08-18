@@ -489,6 +489,12 @@ where
                             .any(|value| value.as_str() == Some(&acknowledgment_id))
                         {
                             acknowledgments.push(json!(acknowledgment_id));
+                            let overflow = acknowledgments
+                                .len()
+                                .saturating_sub(MAX_TOOLBAR_ATTACHMENT_ACKS);
+                            if overflow > 0 {
+                                acknowledgments.drain(..overflow);
+                            }
                         }
                         // Persist the protected state and matching identity in
                         // one process-record update before either watchdog is

@@ -1,5 +1,6 @@
 use super::*;
 use sha2::{Digest, Sha256};
+use uuid::Uuid;
 
 use crate::model::goal::{
     IMPLEMENTATION_PLAN_SCHEMA_VERSION, ImplementationPlan, ImplementationPlanBinding,
@@ -237,7 +238,8 @@ fn web_server_open_agent_attaches_to_the_workflow_goal_agent() {
     let mut server = server_with_projection();
     server.target_root = Some(app_root);
     server.runtime_root = Some(runtime_root.clone());
-    let opened = server.handle(ApiRequest {
+    let queue_started = Instant::now();
+    let queued = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/terminal/session".to_string(),
         body: Some(json!({
@@ -246,11 +248,42 @@ fn web_server_open_agent_attaches_to_the_workflow_goal_agent() {
             "goal_id": "GOAL1"
         })),
     });
-    assert_eq!(opened.status, 200, "{}", opened.body);
-    assert_eq!(opened.body["profile"], "goal");
-    assert_eq!(opened.body["goal_id"], "GOAL1");
-    assert_eq!(opened.body["toolbar_timeout_protected"], true);
-    let session_id = opened.body["id"].as_str().unwrap();
+    assert_eq!(queued.status, 202, "{}", queued.body);
+    let queue_elapsed = queue_started.elapsed();
+    assert!(
+        queue_elapsed < Duration::from_millis(50),
+        "Toolbar attachment queue request exceeded the 50ms local API budget: {:?}",
+        queue_elapsed
+    );
+    let operation_id = queued.body["operation"]["id"].as_str().unwrap();
+    let status_started = Instant::now();
+    let pending = server.handle(ApiRequest {
+        method: "GET".to_string(),
+        path: format!("/api/operations/{operation_id}"),
+        body: None,
+    });
+    assert_eq!(pending.status, 200, "{}", pending.body);
+    let status_elapsed = status_started.elapsed();
+    assert!(
+        status_elapsed < Duration::from_millis(50),
+        "Toolbar attachment status request exceeded the 50ms local API budget: {:?}",
+        status_elapsed
+    );
+    eprintln!(
+        "Toolbar attachment local API latency: queue={}us status={}us",
+        queue_elapsed.as_micros(),
+        status_elapsed.as_micros()
+    );
+    let opened = wait_for_operation_status(
+        &FileOperationRegistry::new(&runtime_root),
+        operation_id,
+        OperationState::Succeeded,
+    )
+    .result;
+    assert_eq!(opened["profile"], "goal");
+    assert_eq!(opened["goal_id"], "GOAL1");
+    assert_eq!(opened["toolbar_timeout_protected"], true);
+    let session_id = opened["id"].as_str().unwrap();
     let input = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: format!("/api/terminal/{session_id}/input"),
@@ -267,6 +300,85 @@ fn web_server_open_agent_attaches_to_the_workflow_goal_agent() {
             std::env::remove_var("REFINE_SMOKE_AI_PATH");
         }
     }
+    remove_temp_dir(&temp_root);
+}
+
+#[test]
+fn toolbar_attachment_missing_ack_is_asynchronous_and_fails_closed() {
+    let temp_root = unique_temp_dir("http-toolbar-attachment-missing-ack");
+    let app_root = temp_root.join("app");
+    let runtime_root = temp_root.join("run/8082");
+    let command_path = runtime_root.join("processes/goal.commands.jsonl");
+    fs::create_dir_all(&app_root).unwrap();
+    fs::create_dir_all(command_path.parent().unwrap()).unwrap();
+    fs::write(&command_path, "").unwrap();
+    let session_id = Uuid::new_v4().to_string();
+    let metadata = serde_json::Map::from_iter([
+        ("kind".to_string(), json!("interactive_session")),
+        ("profile".to_string(), json!("goal")),
+        ("goal_id".to_string(), json!("GOAL-MISSING-ACK")),
+        ("session_id".to_string(), json!(&session_id)),
+        (
+            "command_path".to_string(),
+            json!(command_path.display().to_string()),
+        ),
+    ]);
+    FileProcessSupervisor::new(&runtime_root)
+        .register(ManagedProcess {
+            id: "unresponsive-goal-agent".to_string(),
+            owner: ProcessOwner::Agent,
+            pid: Some(std::process::id()),
+            state: "running".to_string(),
+            label: Some("Goal Agent".to_string()),
+            details: Some(serde_json::to_string(&metadata).unwrap()),
+            stdout_path: None,
+            stderr_path: None,
+            stdin_path: Some(command_path.display().to_string()),
+            limits: None,
+            started_at: Utc::now().to_rfc3339(),
+            exit_code: None,
+        })
+        .unwrap();
+
+    let mut server = server_with_projection();
+    server.target_root = Some(app_root);
+    server.runtime_root = Some(runtime_root.clone());
+    let started_at = Instant::now();
+    let queued = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/terminal/session".to_string(),
+        body: Some(json!({
+            "profile": "goal",
+            "surface": "toolbar",
+            "goal_id": "GOAL-MISSING-ACK"
+        })),
+    });
+    assert_eq!(queued.status, 202, "{}", queued.body);
+    let queue_elapsed = started_at.elapsed();
+    assert!(
+        queue_elapsed < Duration::from_millis(50),
+        "missing-ack queue request blocked for {:?}",
+        queue_elapsed
+    );
+    eprintln!(
+        "Missing-ack Toolbar attachment queue latency: {}us",
+        queue_elapsed.as_micros()
+    );
+    let operation_id = queued.body["operation"]["id"].as_str().unwrap();
+    let failed = wait_for_operation_status(
+        &FileOperationRegistry::new(&runtime_root),
+        operation_id,
+        OperationState::Failed,
+    );
+    assert_eq!(
+        failed.error.unwrap()["code"],
+        "toolbar_attachment_unavailable"
+    );
+    assert!(
+        fs::read_to_string(command_path)
+            .unwrap()
+            .contains("toolbar_attach")
+    );
     remove_temp_dir(&temp_root);
 }
 
@@ -694,7 +806,7 @@ fn browser_terminal_stop_fails_the_goal_after_stopping_its_local_agent() {
     let mut server = server_with_projection();
     server.target_root = Some(app_root);
     server.runtime_root = Some(runtime_root.clone());
-    let opened = server.handle(ApiRequest {
+    let queued = server.handle(ApiRequest {
         method: "POST".to_string(),
         path: "/api/terminal/session".to_string(),
         body: Some(json!({
@@ -703,10 +815,17 @@ fn browser_terminal_stop_fails_the_goal_after_stopping_its_local_agent() {
             "goal_id": "GOAL-TERMINAL-STOP"
         })),
     });
-    assert_eq!(opened.status, 200, "{}", opened.body);
-    assert_eq!(opened.body["toolbar_timeout_protected"], true);
-    let session_id = opened.body["id"].as_str().unwrap().to_string();
-    let process_id = opened.body["process_id"].as_str().unwrap().to_string();
+    assert_eq!(queued.status, 202, "{}", queued.body);
+    let operation_id = queued.body["operation"]["id"].as_str().unwrap();
+    let opened = wait_for_operation_status(
+        &FileOperationRegistry::new(&runtime_root),
+        operation_id,
+        OperationState::Succeeded,
+    )
+    .result;
+    assert_eq!(opened["toolbar_timeout_protected"], true);
+    let session_id = opened["id"].as_str().unwrap().to_string();
+    let process_id = opened["process_id"].as_str().unwrap().to_string();
 
     let stopped = server.handle(ApiRequest {
         method: "POST".to_string(),

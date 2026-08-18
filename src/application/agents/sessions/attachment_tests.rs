@@ -1,10 +1,34 @@
 use super::*;
 
+use std::time::Instant;
+
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
 fn unique_temp_dir(name: &str) -> PathBuf {
     std::env::temp_dir().join(format!("refine-{name}-{}", Uuid::new_v4()))
+}
+
+fn await_toolbar_attachment(
+    runtime_root: &Path,
+    attachment: &ToolbarGoalAgentAttachment,
+    timeout: Duration,
+) -> RefineResult<AgentSessionSnapshot> {
+    let deadline = Instant::now() + timeout;
+    loop {
+        match toolbar_goal_agent_attachment_status(runtime_root, attachment)? {
+            ToolbarGoalAgentAttachmentStatus::Acknowledged(snapshot) => return Ok(*snapshot),
+            ToolbarGoalAgentAttachmentStatus::Pending if Instant::now() < deadline => {
+                thread::sleep(Duration::from_millis(5));
+            }
+            ToolbarGoalAgentAttachmentStatus::Pending => {
+                return Err(RefineError::Degraded(format!(
+                    "Goal Agent session {} did not acknowledge Toolbar attachment",
+                    attachment.session_id
+                )));
+            }
+        }
+    }
 }
 
 #[cfg(unix)]
@@ -61,20 +85,34 @@ fn toolbar_attachment_wins_a_deadline_race_then_completes() {
     // Put both watchdogs near their deadline. The runtime must consume and
     // persist the queued attachment before evaluating them in its next poll.
     thread::sleep(Duration::from_millis(650));
-    let attached = attach_toolbar_goal_agent_session(&runtime_root, &snapshot.id).unwrap();
+    let attachment = queue_toolbar_goal_agent_attachment(&runtime_root, &snapshot.id).unwrap();
+    let attached =
+        await_toolbar_attachment(&runtime_root, &attachment, Duration::from_secs(2)).unwrap();
     assert_eq!(attached.id, snapshot.id);
     assert_eq!(attached.process_id, snapshot.process_id);
     assert!(attached.toolbar_timeout_protected);
-    let reattached = attach_toolbar_goal_agent_session(&runtime_root, &snapshot.id).unwrap();
+    let reattachment = queue_toolbar_goal_agent_attachment(&runtime_root, &snapshot.id).unwrap();
+    let reattached =
+        await_toolbar_attachment(&runtime_root, &reattachment, Duration::from_secs(2)).unwrap();
     assert!(reattached.toolbar_timeout_protected);
+    let concurrent = (0..8)
+        .map(|_| queue_toolbar_goal_agent_attachment(&runtime_root, &snapshot.id).unwrap())
+        .collect::<Vec<_>>();
+    for attachment in &concurrent {
+        await_toolbar_attachment(&runtime_root, attachment, Duration::from_secs(2)).unwrap();
+    }
+    for _ in 0..MAX_TOOLBAR_ATTACHMENT_ACKS {
+        let attachment = queue_toolbar_goal_agent_attachment(&runtime_root, &snapshot.id).unwrap();
+        await_toolbar_attachment(&runtime_root, &attachment, Duration::from_secs(2)).unwrap();
+    }
     let (_, protected_metadata) = session_process(&runtime_root, &snapshot.id).unwrap();
     assert_eq!(
         protected_metadata[TOOLBAR_ATTACHMENT_ACKS_KEY]
             .as_array()
             .unwrap()
             .len(),
-        2,
-        "each Toolbar open must receive its own runtime acknowledgment"
+        MAX_TOOLBAR_ATTACHMENT_ACKS,
+        "concurrent opens must settle while repeated acknowledgments stay bounded"
     );
 
     thread::sleep(Duration::from_millis(300));
@@ -166,7 +204,7 @@ fn ordinary_commands_stay_unprotected_and_cannot_attach_after_the_deadline() {
     );
     assert!(
         matches!(
-            attach_toolbar_goal_agent_session(&runtime_root, &snapshot.id),
+            queue_toolbar_goal_agent_attachment(&runtime_root, &snapshot.id),
             Err(RefineError::Conflict(_))
         ),
         "an attachment request that loses the deadline race must not report success"
@@ -216,18 +254,18 @@ fn toolbar_attachment_rejects_non_goal_sessions_without_writing_a_command() {
         })
         .unwrap();
 
-    let error = attach_toolbar_goal_agent_session(&runtime_root, &session_id).unwrap_err();
+    let error = queue_toolbar_goal_agent_attachment(&runtime_root, &session_id).unwrap_err();
     assert!(matches!(error, RefineError::Conflict(_)));
     assert!(fs::read_to_string(&command_path).unwrap().is_empty());
     assert!(matches!(
-        attach_toolbar_goal_agent_session(&runtime_root, "different-session"),
+        queue_toolbar_goal_agent_attachment(&runtime_root, "different-session"),
         Err(RefineError::Conflict(_))
     ));
     fs::remove_dir_all(root).unwrap();
 }
 
 #[test]
-fn toolbar_attachment_without_a_runtime_ack_never_reports_success() {
+fn toolbar_attachment_without_a_runtime_ack_returns_pending_without_waiting() {
     let root = unique_temp_dir("toolbar-attachment-missing-ack");
     let runtime_root = root.join("run/8082");
     let command_path = runtime_root.join("processes/goal.commands.jsonl");
@@ -261,13 +299,16 @@ fn toolbar_attachment_without_a_runtime_ack_never_reports_success() {
         })
         .unwrap();
 
-    let error = attach_toolbar_goal_agent_session_with_timeout(
-        &runtime_root,
-        &session_id,
-        Duration::from_millis(80),
-    )
-    .unwrap_err();
-    assert!(matches!(error, RefineError::Degraded(_)));
+    let started_at = Instant::now();
+    let attachment = queue_toolbar_goal_agent_attachment(&runtime_root, &session_id).unwrap();
+    assert!(
+        started_at.elapsed() < Duration::from_millis(50),
+        "queuing a missing acknowledgment must not wait on the runtime"
+    );
+    assert_eq!(
+        toolbar_goal_agent_attachment_status(&runtime_root, &attachment).unwrap(),
+        ToolbarGoalAgentAttachmentStatus::Pending
+    );
     assert!(
         fs::read_to_string(&command_path)
             .unwrap()

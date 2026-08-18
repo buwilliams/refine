@@ -1246,7 +1246,7 @@ async function startTerminalSession(tab = currentToolbarTab()) {
   drawToolbar();
   try {
     const size = terminalSize(undefined, terminal) || retainedTerminalSize(terminal);
-    const result = await api("POST", "/api/terminal/session", {
+    const queued = await api("POST", "/api/terminal/session", {
       ...size,
       profile: tab.mode,
       surface: "toolbar",
@@ -1255,6 +1255,12 @@ async function startTerminalSession(tab = currentToolbarTab()) {
       initial_prompt: tab.initialPrompt || undefined,
       worktree: tab.mode === "standalone" ? tab.worktree || undefined : undefined,
     });
+    // Goal attachment is runtime-owned. Keep the tab in its loading state
+    // until the background operation observes the exact live session's
+    // acknowledgment; queuing alone must never present a protected terminal.
+    const result = queued?.operation
+      ? await waitForBackgroundOperation(queued.operation, { timeoutMs: 3000 })
+      : queued;
     terminal.eventSource?.close();
     terminal.term?.dispose();
     terminal.term = null;
