@@ -85,15 +85,35 @@
         "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
       },
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-08-18T14:47:26Z",
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
-      "governance_candidate_commit": "",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_candidate_commit": "be2a548b9cee658e409e09b17be0cd496fc781da",
+      "governance_checked_at": "2026-08-18T15:25:38Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR1084498777E10360982E5D51-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "guidance_checked": 2,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found in the exact committed candidate.\",\"violations\":[],\"recovery_analysis\":\"\",\"recovery_round_prompt\":\"\"}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "No governance rule violations found in the exact committed candidate.",
+          "recovery_analysis": "",
+          "recovery_round_prompt": "",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR1084498777E10360982E5D51-round-1"
+      },
+      "governance_message": "No governance rule violations found in the exact committed candidate.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
       "governance_rule_actions": [],
       "guidance_decision": {
         "applied": [
@@ -271,8 +291,8 @@
       "implementation_report": "Removed the competing stable Guidance ID from the Goal Agent specification, made the displayed zero-based Completion Index explicit, aligned Plan, Criticize, Revise, and Implement on the same integer-only guidance_applied contract, documented identifier ownership, and added decoding and terminal-settlement regressions. The serial library suite passed 1110 tests with 6 ignored; focused suites, cargo check, candidate-scoped Clippy, rustfmt, and diff checks also passed.",
       "implementation_reported_at": "2026-08-18T15:09:10Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "From: Buddy Williams <buddy.williams@insurity.com>\nSubject: After latest release of Refine, goals are failing.\n\nBody:\nAfter update goals are failing.  I check with Claude and this is what it found.\r\n\r\nRefine rejected your completion signal: does not match the required schema:\r\n  guidance_applied[0]: invalid type: string \"guidance-1\", expected usize.\r\n\r\n  Here's what's happening:\r\n\r\n  1. Agent completes its work (dotnet build ✅,  0 StyleCop warnings ✅,  dotnet test ✅  all passing)\r\n  2. Agent writes its completion signal with guidance_applied: [\"guidance-1\", \"guidance-2\", ...] (string IDs)\r\n  3. Refine rejects it — the schema expects integer indices ([0, 1, 2, ...]), not string IDs\r\n  4. Agent retries up to 3 times, still produces the wrong format\r\n  5. After 900 seconds of retrying, Refine kills it → goal fails\r\n\r\n  This is a systemic agent protocol issue, not a code problem. The code work is done and correct — the agents just can't write a valid signal to hand off. This is likely caused by a Refine version update that changed the expected schema for\r\n  5. After 900 seconds of retrying, Refine kills it → goal fails\r\n\r\n  This is a systemic agent protocol issue, not a code problem. The code work is done and correct — the agents just can't write a valid signal to hand off. This is likely caused by a Refine version update that changed the expected schema for\r\n  guidance_applied from string IDs to integer indices, and the agent's prompt hasn't caught up.\r\n\r\n  This would explain why so many goals are failing simultaneously — it's not goal-specific, it's the same schema rejection hitting every agent on this node.\r\n\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nBuddy Williams\r\nBuddy.Williams@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
       "quality_agent_report": "Quality retained implementation commit be2a548b without corrective edits. The Goal specification exposes zero-based Completion Index values while omitting stable Guidance IDs; all phase prompts use the integer-only contract; intent documentation distinguishes configuration IDs, names, and completion indexes; and focused decoding plus terminal-settlement regressions cover guidance-1 rejection without repair retries. Focused tests, the serial library suite, all-target checking, formatting, candidate-scoped Clippy, and diff hygiene pass. Parallel full-suite execution intermittently fails one unchanged source-promotion timing test; the same test passed three consecutive isolated runs.",
       "quality_candidate_commit": "be2a548b9cee658e409e09b17be0cd496fc781da",
@@ -330,19 +350,29 @@
       "quality_message": "All Quality tests passed with observed supervised evidence.",
       "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-08-18T15:23:53Z",
-      "workflow_attempt_authority": {
-        "claimed_at": "2026-08-18T14:47:27Z",
-        "round_idx": 0,
-        "workflow_revision": 2
+      "rule_state": "passed",
+      "updated": "2026-08-18T15:25:42Z",
+      "workflow_attempt_authority": null,
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "be2a548b9cee658e409e09b17be0cd496fc781da",
+        "integrated_at": "2026-08-18T15:25:42.843908108+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n .../intent/03-application/01-agents/02-guidance.md |  4 +-\n .../03-application/01-agents/10-goal-agents.md     |  2 +-\n src/application/agents/sessions/codec.rs           |  9 +++--\n src/application/agents/sessions/recovery_tests.rs  |  9 ++---\n src/application/agents/sessions/tests.rs           | 46 +++++++++++++++++-----\n src/application/workflow/agents/spec/mod.rs        |  6 ++-\n src/application/workflow/agents/spec/tests.rs      | 44 +++++++++++++++++++++\n 7 files changed, 97 insertions(+), 23 deletions(-)\n create mode 100644 src/application/workflow/agents/spec/tests.rs",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "34fcb147a5e372a66c2004c3688702e0dc6851fd"
       },
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "governance",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-08-18T15:23:53Z",
-  "workflow_revision": 25
+  "updated": "2026-08-18T15:25:43Z",
+  "workflow_revision": 29
 }

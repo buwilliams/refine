@@ -1,7 +1,7 @@
 {
   "base_commit": "ff07e292388a2b3cfe2fcb1c3fb52bec4bb0ab4a",
   "branch_name": "refine/DR49680EE1475D2F2FFE46AC54/round-2",
-  "candidate_commit": null,
+  "candidate_commit": "d96184e661f45642f2de1a8160259e816ab2fdc6",
   "created": "2026-08-18T13:36:00Z",
   "feature_id": null,
   "feature_order": null,
@@ -855,7 +855,28 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-18T15:25:34Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "ff07e292388a2b3cfe2fcb1c3fb52bec4bb0ab4a",
@@ -866,6 +887,7 @@
           "round_idx": 1,
           "target_branch": "main"
         },
+        "completed_at": "2026-08-18T15:25:34Z",
         "criticism": {
           "completed_at": "2026-08-18T15:09:33Z",
           "git_after": {
@@ -954,6 +976,62 @@
           "message": "The finalized plan can be executed within Refine's existing architecture, persistence, performance, documentation, and agent-first constraints; no rule violation is required.",
           "status": "passed"
         },
+        "implementation": {
+          "completed_at": "2026-08-18T15:25:34Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Added automatic_agent_resource_budget_percent to the supported node settings codec with product default 70, strict integer range validation from 1 through 100, durable load/patch/persistence behavior, legacy missing-key fallback to 70, and visible failure for malformed stored values.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Replaced the copy-settings no-op with a validated runtime/application allowlist copy into the active node. Source, destination, section, and source values are validated; the complete transaction uses the same per-record nodes.json lock as settings writes, node activation/metadata mutations, fleet registry mutations, Quality legacy cleanup, and state hydration, then persists with the existing atomic registry writer. Concurrent copy, settings update, and node metadata update coverage proves neither newer mutation is lost.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Workflow policy resolves the configured percentage and passes it to HostResources. CPU and available-memory budgets use floor(capacity times percent divided by 100) through overflow-safe u128 arithmetic, retain the minimum one-slot guarantee and 2 GiB workload floor, keep unknown-memory fallback at one slot, require stable complete process-tree observations, and leave disk headroom unchanged.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "A positive parallel_run_cap remains the authoritative absolute global limit, while blank or missing caps use the percentage-governed host recommendation and unset subordinate node, provider, and target-app caps continue inheriting that global limit.",
+                "id": "P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Node Runtime Config now renders Automatic resource budget percent with a loaded or legacy-default value of 70, min 1 and max 100, CPU and available-memory semantics, shared-host remainder guidance, and autosave through the existing PATCH settings flow.",
+                "id": "P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated the matching Guide entry and only docs/intent/04-infrastructure/01-process.md plus docs/intent/05-surfaces/03-browser/12-settings.md to describe the configurable 70 percent default, 30 percent shared-host remainder, explicit absolute cap override, and retained telemetry boundaries.",
+                "id": "P6",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added focused settings codec, policy, host governor, locked node-copy/API, and static Runtime Config regressions covering 70 default and missing-key behavior, valid CPU- and memory-limited percentages, malformed and out-of-range rejection, explicit-cap precedence, subordinate inheritance, rendering/autosave, process-tree and telemetry fallbacks, overflow safety, and concurrent nodes.json mutation preservation.",
+                "id": "P7",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "cargo test --lib infrastructure::process::supervisor::config::tests -- --test-threads=1 -> passed: 14 passed, 0 failed, 1105 filtered out",
+              "cargo test --lib application::workflow::engine::policy::settings::tests -- --test-threads=1 -> passed: 3 passed, 0 failed, 1116 filtered out",
+              "cargo test --lib infrastructure::runtime::host_resources::tests -- --test-threads=1 -> passed: 11 passed, 0 failed, 1108 filtered out",
+              "cargo test --lib surfaces::web_server::tests::static_surface::settings::static_runtime_settings_expose_state_sync_controls -- --exact --test-threads=1 -> passed: 1 passed, 0 failed, 1118 filtered out",
+              "cargo test --lib surfaces::web_server::tests::nodes_fleet::web_server_copies_validated_runtime_settings_between_nodes -- --exact --test-threads=1 -> passed: 1 passed, 0 failed, 1118 filtered out",
+              "cargo test --lib application::fleet::nodes::tests -- --test-threads=1 -> passed: 8 passed, 0 failed, 1111 filtered out",
+              "cargo test --lib application::workflow::phases::quality::tests::results::quality_project_migration_retries_after_staged_failure -- --exact --test-threads=1 -> passed: 1 passed, 0 failed, 1118 filtered out",
+              "cargo fmt --all -- --check && git diff --check && node --check src/surfaces/web/static/js/features/settings_runtime.js && node --check src/surfaces/web/static/js/features/guide.js -> passed with exit 0 and no output",
+              "cargo clippy --lib -- -D warnings -A clippy::needless_pub_self -A clippy::module_inception -A clippy::unnecessary_sort_by -> passed with exit 0",
+              "cargo clippy --lib -- -D warnings -> unchanged baseline only: needless_pub_self in src/application/projects/projection/store.rs, module_inception in src/infrastructure/git/worktrees/mod.rs, and unnecessary_sort_by in src/surfaces/web_server/http/background_loops.rs"
+            ]
+          },
+          "report": "Implemented node-configurable Automatic agent resource budgeting with a 70 percent default, real locked copy-between-node Runtime Config behavior, preserved explicit caps and conservative telemetry safeguards, updated Runtime Config and Guide surfaces, and updated only the affected intent pages. All required focused verification passed; strict Clippy reported only the unchanged baseline categories and passed when those categories were allowed.",
+          "started_at": "2026-08-18T15:10:54Z"
+        },
         "phase": "implement",
         "phase_started_at": "2026-08-18T15:10:54Z",
         "proposal": {
@@ -1005,11 +1083,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-08-18T15:05:27Z",
-        "state": "in_progress",
-        "updated_at": "2026-08-18T15:10:54Z"
+        "state": "completed",
+        "updated_at": "2026-08-18T15:25:34Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Implemented node-configurable Automatic agent resource budgeting with a 70 percent default, real locked copy-between-node Runtime Config behavior, preserved explicit caps and conservative telemetry safeguards, updated Runtime Config and Guide surfaces, and updated only the affected intent pages. All required focused verification passed; strict Clippy reported only the unchanged baseline categories and passed when those categories were allowed.",
+      "implementation_reported_at": "2026-08-18T15:25:34Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -1020,7 +1098,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T15:10:54Z",
+      "updated": "2026-08-18T15:25:34Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T15:05:26Z",
         "round_idx": 1,
@@ -1030,8 +1108,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-18T15:10:54Z",
-  "workflow_revision": 50
+  "updated": "2026-08-18T15:25:34Z",
+  "workflow_revision": 55
 }
