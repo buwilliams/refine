@@ -3,7 +3,7 @@
 ## Key Ideas
 
 - **Outcome Container**: a Feature groups Goals that together produce a larger result.
-- **Ordered When Needed**: Feature Goal order matters when work has dependencies.
+- **Ordered Completion Barrier**: each ordered Goal waits for its predecessor to reach review, done, or cancelled.
 - **Editable Membership**: users should be able to add, remove, reorder, and transfer Feature work safely.
 - **Rollup Visibility**: Features should summarize progress without hiding individual Goals.
 - **Shared List Pattern**: Features should reuse the same dense table, filter, sort, and pagination patterns as other work views.
@@ -25,6 +25,9 @@ Current implementation details that matter to intent:
 - the state rollup treats done, failed, and cancelled Goals as final, so a non-empty Feature is done when every Goal has reached any of those final states while preserving the separate outcome counts;
 - the same inline composer creates Goals and edits editable Goal metadata, prompts, priority, and sequence placement without nesting another modal;
 - ordered placement expresses Feature dependencies as a visible “after” relationship while independent Goals remain unordered;
+- that order is a hard execution barrier: Goal N+1 cannot start until Goal N reaches review, done, or cancelled, and a failed ordered Goal blocks the remaining sequence;
+- Feature “after” placement is the user-facing form of the canonical linear dependency model; it compiles to integer order rather than creating a separate DAG or blocked-by graph;
+- Feature ordering is currently enforced per node, so users must assign an ordered sequence to one node until intended fleet-wide enforcement is available;
 - completed or protected Goals should not be casually disrupted by Feature-level actions;
 - large Feature-managed Goal collections need pagination or incremental loading;
 - Feature work should reuse shared work item services rather than page-only rules.
