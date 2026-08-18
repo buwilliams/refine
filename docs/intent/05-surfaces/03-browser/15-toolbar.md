@@ -61,6 +61,8 @@ Each selection creates or opens only the requested surface. Repeated Agent selec
 - every Agent terminal receives the resolved active Refine executable and checkout so it can reliably use the correct CLI;
 - normal Agent and Planing Agent toolbar sessions begin with the existing Refine
   Node, prioritizing investigation, current-Node management, and direct answers;
+- the browser explicitly identifies toolbar-launched terminal sessions, and the
+  shared server never infers toolbar guidance eligibility from an Agent profile;
 - those toolbar agents route requested repository changes into a new complete,
   eligible Goal rather than implementing outside the workflow;
 - when continuing a failed Goal, those toolbar agents preserve its evidence and

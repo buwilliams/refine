@@ -296,13 +296,25 @@ fn web_server_reports_provider_diagnostics_for_agents_and_recheck() {
 
 #[test]
 fn toolbar_agent_prompts_are_node_first_and_route_changes_through_refine_workflow() {
+    use crate::surfaces::web_server::work_routes::TerminalSessionLaunchSurface;
+
     let server = server_with_projection();
     let agent_prompt = crate::surfaces::web_server::work_routes::terminal_profile_prompt(
-        &server, "agent", None, None, None,
+        &server,
+        "agent",
+        TerminalSessionLaunchSurface::Toolbar,
+        None,
+        None,
+        None,
     )
     .unwrap();
     let plan_prompt = crate::surfaces::web_server::work_routes::terminal_profile_prompt(
-        &server, "plan", None, None, None,
+        &server,
+        "plan",
+        TerminalSessionLaunchSurface::Toolbar,
+        None,
+        None,
+        None,
     )
     .unwrap();
 
@@ -346,9 +358,40 @@ fn toolbar_agent_prompts_are_node_first_and_route_changes_through_refine_workflo
     assert!(plan_prompt.contains("Use Refine's CLI when the user asks you to persist"));
     assert!(!plan_prompt.contains("general-purpose native Agent"));
 
+    for surface in [
+        TerminalSessionLaunchSurface::Cli,
+        TerminalSessionLaunchSurface::default(),
+    ] {
+        let cli_agent_prompt = crate::surfaces::web_server::work_routes::terminal_profile_prompt(
+            &server, "agent", surface, None, None, None,
+        )
+        .unwrap();
+        assert!(
+            cli_agent_prompt.contains("Treat Refine as the execution path for repository changes")
+        );
+        assert!(
+            cli_agent_prompt.contains("continuing work after an unsuccessful recorded attempt")
+        );
+        assert!(!cli_agent_prompt.contains("Begin with the existing Refine Node"));
+
+        let cli_plan_prompt = crate::surfaces::web_server::work_routes::terminal_profile_prompt(
+            &server, "plan", surface, None, None, None,
+        )
+        .unwrap();
+        assert!(cli_plan_prompt.contains("Co-design software from the user's intent"));
+        assert!(cli_plan_prompt.contains("Use Refine's CLI when the user asks you to persist"));
+        assert!(!cli_plan_prompt.contains("Begin with the existing Refine Node"));
+        assert!(!cli_plan_prompt.contains("Treat Refine as the execution path"));
+    }
+
     for profile in ["goal", "standalone"] {
         let other_prompt = crate::surfaces::web_server::work_routes::terminal_profile_prompt(
-            &server, profile, None, None, None,
+            &server,
+            profile,
+            TerminalSessionLaunchSurface::Toolbar,
+            None,
+            None,
+            None,
         )
         .unwrap();
         assert!(
@@ -356,6 +399,40 @@ fn toolbar_agent_prompts_are_node_first_and_route_changes_through_refine_workflo
             "{profile} must not receive the toolbar Agent contract"
         );
     }
+}
+
+#[test]
+fn terminal_session_surface_is_typed_and_defaults_to_non_toolbar() {
+    use crate::surfaces::web_server::work_routes::TerminalSessionLaunchSurface;
+
+    assert_eq!(
+        TerminalSessionLaunchSurface::from_request(None).unwrap(),
+        TerminalSessionLaunchSurface::Cli
+    );
+    assert_eq!(
+        TerminalSessionLaunchSurface::from_request(Some(&json!(null))).unwrap(),
+        TerminalSessionLaunchSurface::Cli
+    );
+    assert_eq!(
+        TerminalSessionLaunchSurface::from_request(Some(&json!("toolbar"))).unwrap(),
+        TerminalSessionLaunchSurface::Toolbar
+    );
+    assert_eq!(
+        TerminalSessionLaunchSurface::from_request(Some(&json!("cli"))).unwrap(),
+        TerminalSessionLaunchSurface::Cli
+    );
+    assert!(
+        TerminalSessionLaunchSurface::from_request(Some(&json!("browser")))
+            .unwrap_err()
+            .to_string()
+            .contains("unknown terminal session surface")
+    );
+    assert!(
+        TerminalSessionLaunchSurface::from_request(Some(&json!(true)))
+            .unwrap_err()
+            .to_string()
+            .contains("must be toolbar or cli")
+    );
 }
 
 #[test]

@@ -13,9 +13,43 @@ use crate::infrastructure::runtime::checkout::active_refine_paths;
 
 use super::InProcessWebServer;
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub(crate) enum TerminalSessionLaunchSurface {
+    Toolbar,
+    #[default]
+    Cli,
+}
+
+impl TerminalSessionLaunchSurface {
+    pub(crate) fn from_request(value: Option<&Value>) -> Result<Self, RefineError> {
+        match value {
+            None | Some(Value::Null) => Ok(Self::default()),
+            Some(Value::String(value)) if value.trim().eq_ignore_ascii_case("toolbar") => {
+                Ok(Self::Toolbar)
+            }
+            Some(Value::String(value)) if value.trim().eq_ignore_ascii_case("cli") => Ok(Self::Cli),
+            Some(Value::String(value)) => Err(RefineError::InvalidInput(format!(
+                "unknown terminal session surface {}",
+                value.trim()
+            ))),
+            Some(_) => Err(RefineError::InvalidInput(
+                "terminal session surface must be toolbar or cli".to_string(),
+            )),
+        }
+    }
+
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Toolbar => "toolbar",
+            Self::Cli => "cli",
+        }
+    }
+}
+
 pub(crate) fn terminal_profile_prompt(
     server: &InProcessWebServer,
     profile: &str,
+    surface: TerminalSessionLaunchSurface,
     goal_id: Option<&str>,
     feature_id: Option<&str>,
     supplemental_prompt: Option<&str>,
@@ -32,9 +66,13 @@ pub(crate) fn terminal_profile_prompt(
         }
     };
     let mut sections = vec![PromptEngine::load(template).trim().to_string()];
-    if matches!(profile, "agent" | "plan") {
+    if surface == TerminalSessionLaunchSurface::Toolbar && matches!(profile, "agent" | "plan") {
         sections.push(
             PromptEngine::load(PromptTemplate::TerminalProfileToolbarAgentWorkflow).to_string(),
+        );
+    } else if surface == TerminalSessionLaunchSurface::Cli && profile == "agent" {
+        sections.push(
+            PromptEngine::load(PromptTemplate::TerminalProfileGeneralAgentWorkflow).to_string(),
         );
     }
     if profile == "agent" {

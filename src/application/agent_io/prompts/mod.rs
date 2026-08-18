@@ -68,6 +68,7 @@ prompt_templates! {
     TargetAppCommandStart => "target_apps/command-start.md",
     TargetAppCommandStop => "target_apps/command-stop.md",
     TargetAppCommandBuild => "target_apps/command-build.md",
+    TerminalProfileGeneralAgentWorkflow => "terminal_profiles/general-agent-workflow.md",
     TerminalProfileToolbarAgentWorkflow => "terminal_profiles/toolbar-agent-workflow.md",
     TerminalProfileActiveRefine => "terminal_profiles/active-refine.md",
     TerminalProfileAttachedGoal => "terminal_profiles/attached-goal.md",
@@ -273,7 +274,8 @@ mod tests {
             let word_count = PromptEngine::load(template).split_whitespace().count();
             let word_limit = match template {
                 PromptTemplate::AgentProviderFileBootstrap => 140,
-                PromptTemplate::TerminalProfileToolbarAgentWorkflow => 180,
+                PromptTemplate::TerminalProfileGeneralAgentWorkflow
+                | PromptTemplate::TerminalProfileToolbarAgentWorkflow => 180,
                 _ => 90,
             };
             assert!(
