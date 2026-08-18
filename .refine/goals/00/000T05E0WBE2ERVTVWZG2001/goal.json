@@ -1,0 +1,19 @@
+{
+  "base_commit": null,
+  "branch_name": null,
+  "candidate_commit": null,
+  "created": "2026-08-18T16:42:37Z",
+  "feature_id": null,
+  "feature_order": null,
+  "id": "00000T05E0WBE2ERVTVWZG2001",
+  "name": "Preserve explicit Goal transfers during background sync",
+  "node_id": "default",
+  "notes": [],
+  "priority": "low",
+  "reporter": null,
+  "rounds": [],
+  "status": "backlog",
+  "target_branch": null,
+  "updated": "2026-08-18T16:42:37Z",
+  "workflow_revision": 1
+}
