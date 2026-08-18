@@ -25,12 +25,14 @@ pub(super) fn default_settings() -> JsonObject {
         ("state_sync_debounce_seconds", "5"),
         ("state_sync_stale_threshold_seconds", "900"),
         ("state_sync_auto_recovery", "remote"),
+        ("state_sync_agent_resolution", "on"),
         ("project_update_pulse_interval_seconds", "300"),
         ("file_browser_ignore_patterns", ""),
         ("agent_subpath", ""),
         ("git_remote", "origin"),
         ("merge_target_branch", "main"),
         ("quality_enabled", "0"),
+        ("workflow_conflict_resolution", "on"),
         ("allowed_commands", ""),
         ("agent_cli", "claude"),
         ("target_app_start_instructions", ""),
@@ -82,12 +84,14 @@ pub(super) fn allowed_settings() -> BTreeSet<&'static str> {
         "state_sync_debounce_seconds",
         "state_sync_stale_threshold_seconds",
         "state_sync_auto_recovery",
+        "state_sync_agent_resolution",
         "project_update_pulse_interval_seconds",
         "file_browser_ignore_patterns",
         "agent_subpath",
         "git_remote",
         "merge_target_branch",
         "quality_enabled",
+        "workflow_conflict_resolution",
         "allowed_commands",
         "agent_cli",
         "target_app_start_instructions",
@@ -192,6 +196,18 @@ pub(super) fn normalize_setting(key: &str, value: &Value) -> RefineResult<String
             }
         }
         "quality_enabled" => Ok(if value_is_truthy(value) { "1" } else { "0" }.to_string()),
+        // Resolve-in-place for conflicted candidate refreshes. Off falls back
+        // to queueing a fenced recovery Round on every rebase conflict.
+        "workflow_conflict_resolution" => {
+            let choice = as_string(value).trim().to_ascii_lowercase();
+            if matches!(choice.as_str(), "on" | "off") {
+                Ok(choice)
+            } else {
+                Err(RefineError::InvalidInput(
+                    "workflow_conflict_resolution must be on or off".to_string(),
+                ))
+            }
+        }
         "target_app_env_json" => {
             let raw = as_string(value);
             let parsed = serde_json::from_str::<Value>(raw.trim()).map_err(|_| {
@@ -236,6 +252,18 @@ pub(super) fn normalize_setting(key: &str, value: &Value) -> RefineResult<String
             } else {
                 Err(RefineError::InvalidInput(
                     "state_sync_auto_recovery must be remote or off".to_string(),
+                ))
+            }
+        }
+        // Inline agent resolution of contested state merges: on by default,
+        // off keeps every conflict fail-closed for the operator.
+        "state_sync_agent_resolution" => {
+            let choice = as_string(value).trim().to_ascii_lowercase();
+            if matches!(choice.as_str(), "on" | "off") {
+                Ok(choice)
+            } else {
+                Err(RefineError::InvalidInput(
+                    "state_sync_agent_resolution must be on or off".to_string(),
                 ))
             }
         }

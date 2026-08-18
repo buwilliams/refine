@@ -7,11 +7,11 @@ use crate::model::JsonObject;
 use crate::model::goal::RoundIntegration;
 use crate::model::workflow::GoalStatus;
 use crate::process::subprocess::workflow_subprocess_metadata;
-use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::process::supervisor::errors::{MergeConflictStage, RefineError, RefineResult};
 use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationRegistry, OperationState,
 };
-use crate::tools::host::git_sync::with_repository_git_lock;
+use crate::tools::git::with_repository_git_lock;
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService, MergeResult};
 use crate::tools::host::project_layout::target_root_for_refine_dir;
 use crate::tools::product::project_projection::GoalSummaryProjection;
@@ -274,6 +274,7 @@ impl FileGovernanceIntegrationService {
                     let code = match &error {
                         RefineError::StaleCandidate { .. } => "governance_candidate_stale",
                         RefineError::TargetAdvanced { .. } => "governance_target_advanced",
+                        RefineError::MergeConflict { .. } => "governance_merge_conflict",
                         _ => "governance_integration_failed",
                     };
                     if let Some(operation_id) = operation_id.as_deref() {
@@ -678,7 +679,10 @@ impl FileGovernanceIntegrationService {
                 let synchronized = worktree.git().merge_commit_no_ff(&remote_target)?;
                 if !synchronized.ok {
                     let _ = worktree.git().recover();
-                    return Err(merge_failure("target synchronization", synchronized));
+                    return Err(merge_conflict(
+                        MergeConflictStage::TargetSynchronization,
+                        synchronized,
+                    ));
                 }
                 let synchronized_commit = worktree.git().resolve_commit("HEAD")?;
                 self.advance_target(
@@ -713,7 +717,10 @@ impl FileGovernanceIntegrationService {
             let merge = worktree.git().merge_commit_no_ff(&candidate_commit)?;
             if !merge.ok {
                 let _ = worktree.git().recover();
-                return Err(merge_failure("candidate integration", merge));
+                return Err(merge_conflict(
+                    MergeConflictStage::CandidateIntegration,
+                    merge,
+                ));
             }
             // `merge --no-ff` of a proven non-ancestor is inherently a
             // two-parent commit, which the already-merged revert machinery
@@ -985,6 +992,21 @@ fn merge_failure(stage: &str, merge: MergeResult) -> RefineError {
             .message
             .unwrap_or_else(|| "Git merge failed".to_string())
     ))
+}
+
+/// A merge that stopped on content conflicts becomes the typed error whose
+/// conflicted paths survive into workflow recovery evidence; `merge_failure`
+/// remains for failures with no conflict list worth retaining.
+fn merge_conflict(stage: MergeConflictStage, merge: MergeResult) -> RefineError {
+    RefineError::MergeConflict {
+        message: format!(
+            "{} failed: {}",
+            stage.as_str(),
+            merge.message.as_deref().unwrap_or("Git merge failed")
+        ),
+        conflicts: merge.conflicts,
+        stage,
+    }
 }
 
 pub fn branch_name_for_goal(settings: &JsonObject, goal_id: &str) -> String {

@@ -177,17 +177,3 @@ pub(super) fn push_rejected_by_race(output: &GitCommandOutput) -> bool {
     .to_ascii_lowercase();
     text.contains("rejected") || text.contains("non-fast-forward") || text.contains("fetch first")
 }
-
-pub(super) fn command_failed(command: &str, output: &GitCommandOutput) -> RefineError {
-    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
-    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-    let detail = if stderr.is_empty() { stdout } else { stderr };
-    RefineError::Conflict(format!(
-        "{command} failed{}",
-        if detail.is_empty() {
-            String::new()
-        } else {
-            format!(": {detail}")
-        }
-    ))
-}

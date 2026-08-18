@@ -20,7 +20,7 @@ The CLI should be the most stable surface for automation and system control. Bro
 
 Current implementation details that matter to intent:
 
-- command groups include config, project, goal, feature, Todo, workflow, node, fleet, log, agent, and system.
+- command groups include config, project, sync, goal, feature, Todo, workflow, node, fleet, log, agent, and system.
 - `refine config` reads Settings, Quality, Governance, and Guidance together or by domain. Its domain subcommands accept concise scalar and multiline flags or one JSON object supplied inline, by file, or through stdin; successful writes print the daemon's authoritative pretty-JSON readback. Configuration does not absorb project attach/switch, workflow pause/resume, node or fleet management, Reporter/Todo lifecycle, or agent authentication, which remain in their named groups.
 - normal config calls use the active checkout-owned daemon, API contract version, and mutation idempotency key. Detached apps, unreachable daemons, invalid payloads, missing entries, and stale collection revisions remain structured errors suitable for automation. Explicit target roots exist only as hidden test adapters.
 - `fleet manage "<request>"` opens an agent session seeded with the manage-fleet runbook so fleet changes are conversational; `fleet "<request>"` and `fleet distribute "<instructions>"` reach the same session. The other fleet commands remain the deterministic primitives the agent acts through.
@@ -38,27 +38,60 @@ Current implementation details that matter to intent:
   `--profile plan` and `--profile standalone` open those role sessions. Ctrl-]
   detaches without stopping the agent.
 - normal target-state mutations are routed to the daemon instead of directly writing files in normal operation.
-- daemon-routed `project sync` and `fleet sync` follow their durable operation
-  through success, failure, cancellation, interruption, or timeout. Success
-  prints the terminal structured result; every other terminal outcome is
-  nonzero and retains the structured reconciler error, complete-report pointer,
-  and recovery guidance instead of returning an initial `running` receipt.
-- `project state-recovery preview` accepts missing-baseline and reported
-  valid-baseline conflicts. Apply requires a default `--authority`; repeated
-  `--live-path` and `--remote-path` overrides are valid only for paths in the
-  complete reviewed report, and the daemon rejects stale or changed decisions.
-- `project state-recovery run` is the consolidated one-shot recovery: it
-  synchronizes, derives and applies recovery evidence under a single repository
-  lock hold when synchronization is rejected with recoverable evidence, and
-  verifies with a fresh synchronization. Without `--authority` it applies the
-  ownership policy — remote is authoritative except Goal records this node
-  owned at the agreed baseline, which keep their live copy; an explicit
-  `--authority` forces one side and is required for path overrides. Bounded
-  races against a moving remote head or a concurrent live write are retried
-  inside the command; callers never wrap it in retry loops, and every non-race
-  failure surfaces immediately as itself. The daemon runs the same policy
-  automatically after a recoverable background-sync rejection unless the node
-  sets `state_sync_auto_recovery: off`, so ordinary syncing needs no CLI.
+- `sync` is the single top-level state-convergence command; it replaced
+  `project sync` and the `project state-recovery` subtree with no aliases.
+  That replacement is per node, not per fleet: a node's CLI and daemon are one
+  binary, so the retired spellings and the routes behind them disappear
+  together on the node being upgraded while every other node keeps its own.
+  Daemon-routed `sync`, and the local leg of `fleet sync`, follow their
+  durable operation through success, failure, cancellation, interruption, or
+  timeout. Success prints the terminal structured result; every other terminal
+  outcome is nonzero and retains the structured reconciler error, the stable
+  conflict report id, the node-local report path, and per-path domain-terms
+  summaries instead of returning an initial `running` receipt.
+- `fleet sync` is this node's own `sync` plus one status per other node,
+  asked over each node's daemon API. A node still on the previous build
+  rejects this build's API contract version and is reported as that node's
+  `pending upgrade`, carrying both contract versions; the rest of the fleet
+  still syncs and the command still succeeds. Nodes are upgraded one at a
+  time and in any order, so the condition is normal during a rollout rather
+  than a fleet failure — and it never withholds work from the node, which
+  keeps running its own build. A node whose Git is older than the one the
+  state merge requires is reported the same way, as that node's
+  `unsupported_git`: it cannot merge state at all until its Git is upgraded,
+  and that is one node's condition rather than the fleet's.
+  Unreachable and error answers stay per-node
+  conditions in the same way: no answer from another node's daemon changes
+  that node's recorded health, which is its provisioning verdict and the one
+  thing that withholds work from it. The statuses are this pass's own
+  observation and stay in this pass's output rather than being published to
+  the fleet, because whether one node can reach another is a fact about that
+  link and not shared truth. The other nodes' statuses are reported even when
+  this node's own `sync` fails: a standing conflict here is this node's
+  condition, and a rollout check must still be able to read the fleet.
+  What a reached node answers is a receipt — it `queued` its own pass — not a
+  verdict on its reconciliation, which that node runs under its own lock and
+  reports on its own sync surface and state-sync health. Following each node's
+  pass from here would hold the whole fan-out behind one node's agent
+  resolution, which takes minutes by design.
+- `sync --preview` is a read-only divergence summary — classification, both
+  heads and the merge base, per-path sides, a domain-terms summary per
+  contested path, and the recorded `decision_question` when a conflict report
+  matches the previewed heads. It writes nothing, exits nonzero on error
+  having written nothing, and is never a token handed to another command.
+- `sync --authority live|remote` is terminal recovery — sync with a decision
+  attached: every contested path takes the chosen side inside one merge
+  commit, and repeated `--path` exceptions settle named contested paths on
+  the opposite side. Rerunning after success finds converged heads and is a
+  no-op. Bounded races against a moving remote head are retried inside the
+  command; callers never wrap it in retry loops, and every non-race failure
+  surfaces immediately as itself. Escalation is ordered before any of this:
+  the sync attempt resolves contested records with an agent first (`sync` and
+  `fleet sync` opt in, subject to `state_sync_agent_resolution`), and only a
+  conflict that resolution escalated, could not reach, or is not allowed to
+  touch reaches the daemon's automatic merge-base ownership policy — which a
+  node sets `state_sync_auto_recovery: off` to decline. Ordinary syncing needs
+  no CLI either way.
 - every stateful command derives its product home from the invoked checkout-owned binary and uses only that checkout's `run/<port>` tree. Running the command from another checkout cannot redirect ownership. Explicit absolute runtime paths fail closed unless they are the exact canonical checkout runtime; isolated tests use explicit test-only adapters rather than production fallbacks.
 - system commands handle daemon lifecycle, port-scoped OS service registration and removal, repair, rollback, doctor, and API group discovery. They are thin callers of the same port-scoped host lifecycle and installation capabilities used by HTTP/API, update, and maintenance paths. `system service-install` and `system service-uninstall` name the service-manager effect directly; the retired `system install` and `system uninstall` spellings are neither parsed nor advertised. Checkout-only production-binary maintenance remains owned by `./r system build` and `./r system clean`, while source updates remain owned by `./r system update`; these are launcher operations rather than production-binary subcommands. The shared lifecycle authority selects activated systemd or launchd control versus direct-process fallback, reconciles durable state with fresh post-control reachability, keeps command failures visible without replacing a still-reachable daemon's healthy state, fails closed on unreachable or ambiguous observations with partial recovery evidence, and preserves restart-specific evidence. It reports stopped only after shutdown is confirmed. Explicit foreground and one-request starts remain direct bootstrap paths. launchd labels are installation-port scoped, while a recorded legacy registration is migrated or controlled only when exact parsed arguments prove that it belongs to the selected installation; adjacent textual ports never count as ownership.
 - current installation targets are daemon-oriented (`macos_daemon`, `windows_daemon`, and `linux_cli_web`). Historical target spellings are deserialize-only migration aliases. When the production binary is missing, `./r system service-install` bootstraps the locked release from the invoked product home, atomically publishes the stable `bin/refine` executable and deployed marker, and only then performs ordinary service conflict detection and registration. An existing binary is never rebuilt as a side effect of service registration, and the command never fetches or updates source. A bootstrap or publication failure leaves service state untouched. `./r system service-uninstall` stops and removes only the selected port's service registration. Explicit repair backs up exact legacy registration bytes and parsed identity in a retained port-scoped journal before atomically publishing a checkout-local registration, and restores the original registration if activation or verification fails. External runtime and binary trees are never merged, overwritten, or deleted.

@@ -2,15 +2,28 @@ use thiserror::Error;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum StateRecoveryConflictReason {
-    GitBusy,
-    StalePreview,
+    StateMoved,
 }
 
 impl StateRecoveryConflictReason {
     pub fn as_str(self) -> &'static str {
         match self {
-            Self::GitBusy => "git_busy",
-            Self::StalePreview => "stale_preview",
+            Self::StateMoved => "state_moved",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum MergeConflictStage {
+    CandidateIntegration,
+    TargetSynchronization,
+}
+
+impl MergeConflictStage {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::CandidateIntegration => "candidate integration",
+            Self::TargetSynchronization => "target synchronization",
         }
     }
 }
@@ -25,8 +38,6 @@ pub enum RefineError {
     Unauthorized(String),
     #[error("{0}")]
     Conflict(String),
-    #[error("{0}")]
-    StateSyncMissingBaseline(String),
     #[error("{message}")]
     StateRecoveryConflict {
         reason: StateRecoveryConflictReason,
@@ -41,6 +52,15 @@ pub enum RefineError {
         target_branch: String,
         target_commit: String,
     },
+    /// A Git merge stopped on content conflicts. The conflicted paths stay
+    /// structured so recovery machinery can retain them as Round evidence
+    /// instead of flattening them into prose.
+    #[error("{message}")]
+    MergeConflict {
+        stage: MergeConflictStage,
+        conflicts: Vec<String>,
+        message: String,
+    },
     /// A compare-and-swap ref advance observed the target moving underneath
     /// it; the integration pass must refresh against the new tip and retry.
     #[error("target advanced: {reference} moved from {expected} to {current} before the update")]
@@ -51,6 +71,15 @@ pub enum RefineError {
     },
     #[error("{0}")]
     QualityCandidateInfrastructure(Box<QualityCandidateInfrastructureError>),
+    /// The host Git is older than the one state synchronization requires.
+    /// Refine's three-way merge IS `git merge-tree`; there is no second
+    /// implementation to fall back to, so this is a precondition of running at
+    /// all on this node, and it is that NODE's condition — the rest of the
+    /// fleet keeps converging over the state branch regardless.
+    #[error(
+        "Refine needs Git {required} or newer to synchronize state, but this node has {observed}. Upgrade Git on this node; every other node keeps syncing meanwhile."
+    )]
+    UnsupportedGitVersion { required: String, observed: String },
     #[error("{0}")]
     Degraded(String),
     #[error("{0}")]
@@ -84,12 +113,12 @@ impl RefineError {
             Self::NotFound(_) => ErrorCategory::NotFound,
             Self::Unauthorized(_) => ErrorCategory::Unauthorized,
             Self::Conflict(_)
-            | Self::StateSyncMissingBaseline(_)
             | Self::StateRecoveryConflict { .. }
+            | Self::MergeConflict { .. }
             | Self::StaleCandidate { .. }
             | Self::TargetAdvanced { .. }
             | Self::QualityCandidateInfrastructure(_) => ErrorCategory::Conflict,
-            Self::Degraded(_) => ErrorCategory::Degraded,
+            Self::Degraded(_) | Self::UnsupportedGitVersion { .. } => ErrorCategory::Degraded,
             Self::Io(_) => ErrorCategory::Io,
             Self::Serialization(_) | Self::StructuredOutput(_) => ErrorCategory::Serialization,
             Self::NotImplemented(_) => ErrorCategory::NotImplemented,

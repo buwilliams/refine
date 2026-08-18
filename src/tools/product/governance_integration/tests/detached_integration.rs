@@ -246,6 +246,19 @@ fn conflicted_candidate_leaves_target_checkout_and_worktree_recovered() {
     let target_before = git_stdout(&fixture.repo, &["rev-parse", "main"]);
 
     let error = fixture.integrate().unwrap_err();
+    // The conflict is a typed workflow signal, not a terminal failure: the
+    // conflicted paths must survive for the recovery Round's evidence.
+    let RefineError::MergeConflict {
+        stage, conflicts, ..
+    } = &error
+    else {
+        panic!("expected a typed merge conflict, got {error}");
+    };
+    assert_eq!(*stage, MergeConflictStage::CandidateIntegration);
+    assert!(
+        conflicts.iter().any(|path| path == "app.txt"),
+        "{conflicts:?}"
+    );
     assert!(
         error.to_string().contains("candidate integration failed"),
         "{error}"

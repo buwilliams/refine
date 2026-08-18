@@ -1,4 +1,23 @@
-use super::*;
+use std::collections::BTreeMap;
+use std::fs::{File, OpenOptions};
+use std::io::ErrorKind;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex, OnceLock};
+use std::time::{Duration, Instant};
+
+use fs2::FileExt;
+
+use crate::process::supervisor::errors::{RefineError, RefineResult};
+
+/// How long to wait for the repository lock before reporting contention.
+///
+/// Longer than the Git stall budget on purpose: a legitimately slow operation
+/// that keeps reporting progress must be allowed to finish rather than have its
+/// waiters give up underneath it, while a wedged one is stopped by its own
+/// budget and releases the lock well inside this window.
+const REPOSITORY_LOCK_ACQUIRE_TIMEOUT: Duration = Duration::from_secs(600);
+const REPOSITORY_LOCK_POLL_INTERVAL: Duration = Duration::from_millis(50);
+static REPOSITORY_GIT_LOCKS: OnceLock<Mutex<BTreeMap<PathBuf, Arc<Mutex<()>>>>> = OnceLock::new();
 
 pub fn with_repository_git_lock<T>(
     target_root: &std::path::Path,
@@ -12,7 +31,9 @@ pub fn with_repository_git_lock<T>(
     action()
 }
 
-pub(super) fn repository_git_lock(target_root: &std::path::Path) -> RefineResult<Arc<Mutex<()>>> {
+pub(in crate::tools) fn repository_git_lock(
+    target_root: &std::path::Path,
+) -> RefineResult<Arc<Mutex<()>>> {
     let key = target_root
         .canonicalize()
         .unwrap_or_else(|_| target_root.to_path_buf());
@@ -27,31 +48,7 @@ pub(super) fn repository_git_lock(target_root: &std::path::Path) -> RefineResult
     }
 }
 
-pub(super) fn skipped(detail: &str) -> GitSyncResult {
-    GitSyncResult {
-        ok: true,
-        detail: Some(detail.to_string()),
-        ..GitSyncResult::default()
-    }
-}
-
-pub(super) fn deferred(detail: &str) -> GitSyncResult {
-    GitSyncResult {
-        ok: true,
-        detail: Some(detail.to_string()),
-        deferred: true,
-        ..GitSyncResult::default()
-    }
-}
-
-#[derive(Debug)]
-pub(super) struct GitCommandOutput {
-    pub(super) success: bool,
-    pub(super) stdout: Vec<u8>,
-    pub(super) stderr: Vec<u8>,
-}
-
-pub(super) struct RepositoryFileLock {
+pub(in crate::tools) struct RepositoryFileLock {
     file: Option<File>,
 }
 
@@ -89,7 +86,9 @@ impl RepositoryFileLock {
         }
     }
 
-    pub(super) fn try_acquire(target_root: &std::path::Path) -> RefineResult<Option<Self>> {
+    pub(in crate::tools) fn try_acquire(
+        target_root: &std::path::Path,
+    ) -> RefineResult<Option<Self>> {
         let Some(file) = repository_lock_file(target_root)? else {
             return Ok(Some(Self { file: None }));
         };
@@ -112,7 +111,7 @@ impl Drop for RepositoryFileLock {
     }
 }
 
-pub(super) fn repository_lock_file(target_root: &std::path::Path) -> RefineResult<Option<File>> {
+fn repository_lock_file(target_root: &std::path::Path) -> RefineResult<Option<File>> {
     let common_dir = match crate::tools::host::project_layout::git_common_dir(target_root) {
         Ok(dir) => dir,
         Err(RefineError::Io(error)) => return Err(RefineError::Io(error)),

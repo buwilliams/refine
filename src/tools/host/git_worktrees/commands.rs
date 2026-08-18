@@ -29,7 +29,7 @@ impl FileGitWorktreeService {
         self
     }
 
-    pub(super) fn git_output(&self, args: &[&str]) -> RefineResult<HostCommandOutput> {
+    pub(in crate::tools) fn git_output(&self, args: &[&str]) -> RefineResult<HostCommandOutput> {
         let output = self.git_raw_with_env(args, &[])?;
         if output.success {
             Ok(output)
@@ -38,7 +38,7 @@ impl FileGitWorktreeService {
         }
     }
 
-    pub(super) fn git_raw(&self, args: &[&str]) -> RefineResult<HostCommandOutput> {
+    pub(in crate::tools) fn git_raw(&self, args: &[&str]) -> RefineResult<HostCommandOutput> {
         self.git_raw_with_env(args, &[])
     }
 
@@ -219,7 +219,7 @@ impl FileGitWorktreeService {
         Ok(commit)
     }
 
-    pub(super) fn audit(
+    pub(in crate::tools) fn audit(
         &self,
         action: &str,
         status: &str,

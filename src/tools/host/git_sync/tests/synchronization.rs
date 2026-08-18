@@ -23,7 +23,7 @@ fn valid_goal_record(id: &str, node_id: &str, status: &str, title: &str, updated
 }
 
 #[test]
-fn sync_rebases_disjoint_state_when_nodes_race() {
+fn sync_merges_disjoint_state_when_nodes_race() {
     let fixture = SyncFixture::new("race");
     write_goal(&fixture.a, "SEED");
     fixture.service(&fixture.a).sync().unwrap();
@@ -79,10 +79,9 @@ fn sync_converges_disjoint_node_heartbeats_without_a_conflict_report() {
         "{result:?}"
     );
     assert!(
-        result
-            .detail
-            .as_deref()
-            .is_some_and(|detail| detail.contains("Merged per-node registry changes")),
+        result.detail.as_deref().is_some_and(
+            |detail| detail.contains("Merged divergent state records structurally: nodes.json")
+        ),
         "{result:?}"
     );
     let nodes = read_nodes(&fixture.b);
@@ -92,231 +91,6 @@ fn sync_converges_disjoint_node_heartbeats_without_a_conflict_report() {
         latest_state_sync_conflict_report(&fixture.b.join("run"))
             .unwrap()
             .is_none()
-    );
-}
-
-#[test]
-fn sync_converges_nodes_with_unavailable_recorded_baseline_bytes_on_first_pass() {
-    let fixture = SyncFixture::new("node-baseline-unavailable-first-pass");
-    write_nodes(
-        &fixture.a,
-        &[
-            ("node-a", "2026-08-17T08:00:00Z", "unknown"),
-            ("node-b", "2026-08-17T08:00:00Z", "unknown"),
-        ],
-    );
-    fixture.service(&fixture.a).sync().unwrap();
-    fixture.service(&fixture.b).sync().unwrap();
-    rewrite_baseline_fingerprint(&fixture.b, "nodes.json", u64::MAX);
-
-    write_nodes(
-        &fixture.a,
-        &[
-            ("node-a", "2026-08-17T08:01:00Z", "healthy"),
-            ("node-b", "2026-08-17T08:00:00Z", "unknown"),
-        ],
-    );
-    fixture.service(&fixture.a).sync().unwrap();
-    write_nodes(
-        &fixture.b,
-        &[
-            ("node-a", "2026-08-17T08:00:00Z", "unknown"),
-            ("node-b", "2026-08-17T08:02:00Z", "healthy"),
-        ],
-    );
-
-    let result = fixture.service(&fixture.b).sync().unwrap();
-
-    assert!(
-        result.detail.as_deref().is_some_and(|detail| detail
-            .contains("Merged per-node registry changes with safe baseline-unavailable fallback")),
-        "{result:#?}"
-    );
-    let nodes = read_nodes(&fixture.b);
-    assert_eq!(nodes.nodes[0].updated_at, "2026-08-17T08:01:00Z");
-    assert_eq!(nodes.nodes[1].updated_at, "2026-08-17T08:02:00Z");
-}
-
-#[test]
-fn versioned_baseline_anchor_survives_interruption_and_legacy_metadata_still_loads() {
-    let fixture = SyncFixture::new("versioned-baseline-anchor-interruption");
-    write_goal(&fixture.a, "GOALA");
-    let service = fixture.service(&fixture.a);
-    service.sync().unwrap();
-    let baseline_path = git_common_dir(&fixture.a)
-        .unwrap()
-        .join(STATE_BASELINE_FILE);
-    let original_bytes = fs::read(&baseline_path).unwrap();
-    let original: serde_json::Value = serde_json::from_slice(&original_bytes).unwrap();
-    assert_eq!(original["version"], 2);
-    let original_ref = original["snapshot_ref"].as_str().unwrap().to_string();
-    let original_oid = original["snapshot_oid"].as_str().unwrap().to_string();
-    assert_eq!(
-        git_stdout(&fixture.a, &["rev-parse", &original_ref]),
-        original_oid
-    );
-    let state_root = state_worktree_for_target_root(&fixture.a).unwrap();
-    let goal_a = Path::new("goals/GOALA/goal.json");
-    let original_fingerprints = service.load_state_baseline().unwrap().unwrap();
-    assert!(matches!(
-        service
-            .reconstruct_baseline_file(
-                &state_root,
-                goal_a,
-                *original_fingerprints.get(goal_a).unwrap(),
-            )
-            .unwrap(),
-        BaselineFileResolution::Loaded {
-            source: BaselineReconstructionSource::RetainedSnapshot,
-            ..
-        }
-    ));
-
-    git(&fixture.a, &["pack-refs", "--all"]);
-    assert!(
-        !git_common_dir(&fixture.a)
-            .unwrap()
-            .join(&original_ref)
-            .exists()
-    );
-    service.sync().unwrap();
-    assert_eq!(fs::read(&baseline_path).unwrap(), original_bytes);
-
-    write_goal(&fixture.a, "GOALB");
-    install_after_baseline_anchor_hook(&fixture.a);
-    let interrupted = service.sync().unwrap_err();
-    assert!(
-        interrupted
-            .to_string()
-            .contains("retained state-baseline anchor")
-    );
-    assert_eq!(fs::read(&baseline_path).unwrap(), original_bytes);
-    let anchors_after_interruption = git_stdout(
-        &fixture.a,
-        &[
-            "for-each-ref",
-            "--format=%(refname)",
-            STATE_BASELINE_REF_PREFIX,
-        ],
-    );
-    assert!(anchors_after_interruption.lines().count() >= 2);
-
-    service.sync().unwrap();
-    let current: serde_json::Value =
-        serde_json::from_slice(&fs::read(&baseline_path).unwrap()).unwrap();
-    let current_ref = current["snapshot_ref"].as_str().unwrap();
-    assert_ne!(current_ref, original_ref);
-    assert!(
-        git_stdout(
-            &fixture.a,
-            &["for-each-ref", "--format=%(refname)", &original_ref]
-        )
-        .is_empty()
-    );
-
-    let fingerprints = current["fingerprints"].clone();
-    fs::write(
-        &baseline_path,
-        serde_json::to_vec_pretty(&fingerprints).unwrap(),
-    )
-    .unwrap();
-    git(&fixture.a, &["update-ref", "-d", current_ref]);
-    let loaded = service.load_state_baseline().unwrap().unwrap();
-    assert_eq!(
-        loaded,
-        durable_state_map(&state_root.join(".refine")).unwrap()
-    );
-    let goal_b = Path::new("goals/GOALB/goal.json");
-    assert!(matches!(
-        service
-            .reconstruct_baseline_file(&state_root, goal_b, *loaded.get(goal_b).unwrap())
-            .unwrap(),
-        BaselineFileResolution::Loaded {
-            source: BaselineReconstructionSource::LegacyHistory,
-            ..
-        }
-    ));
-}
-
-#[test]
-fn unavailable_baseline_rejects_equal_time_node_disagreement_with_diagnostics() {
-    let fixture = SyncFixture::new("node-baseline-unavailable-rejected");
-    write_nodes(&fixture.a, &[("node-a", "2026-08-17T08:00:00Z", "unknown")]);
-    fixture.service(&fixture.a).sync().unwrap();
-    fixture.service(&fixture.b).sync().unwrap();
-    rewrite_baseline_fingerprint(&fixture.b, "nodes.json", u64::MAX);
-    write_nodes(&fixture.a, &[("node-a", "2026-08-17T08:01:00Z", "remote")]);
-    fixture.service(&fixture.a).sync().unwrap();
-    write_nodes(&fixture.b, &[("node-a", "2026-08-17T08:01:00Z", "local")]);
-
-    let error = fixture.service(&fixture.b).sync().unwrap_err();
-    let report = latest_state_sync_conflict_report(&fixture.b.join("run"))
-        .unwrap()
-        .unwrap();
-
-    assert!(
-        error
-            .to_string()
-            .contains("recorded baseline bytes were unavailable"),
-        "{error}"
-    );
-    assert_eq!(report.unresolved_paths, vec!["nodes.json"]);
-    assert!(report.reconciliation_outcomes.iter().any(|outcome| {
-        outcome.path == "nodes.json"
-            && outcome.outcome == StateSyncReconciliationKind::BaselineBytesUnavailable
-    }));
-}
-
-#[test]
-fn unrelated_conflict_withholds_a_prepared_node_registry_merge() {
-    let fixture = SyncFixture::new("node-merge-atomicity");
-    write_nodes(
-        &fixture.a,
-        &[
-            ("node-a", "2026-08-17T08:00:00Z", "unknown"),
-            ("node-b", "2026-08-17T08:00:00Z", "unknown"),
-        ],
-    );
-    let refine_a = refine_dir_for_target_root(&fixture.a).unwrap();
-    fs::write(refine_a.join("shared.json"), "base\n").unwrap();
-    fixture.service(&fixture.a).sync().unwrap();
-    fixture.service(&fixture.b).sync().unwrap();
-
-    write_nodes(
-        &fixture.a,
-        &[
-            ("node-a", "2026-08-17T08:01:00Z", "healthy"),
-            ("node-b", "2026-08-17T08:00:00Z", "unknown"),
-        ],
-    );
-    fs::write(refine_a.join("shared.json"), "remote\n").unwrap();
-    fixture.service(&fixture.a).sync().unwrap();
-
-    write_nodes(
-        &fixture.b,
-        &[
-            ("node-a", "2026-08-17T08:00:00Z", "unknown"),
-            ("node-b", "2026-08-17T08:02:00Z", "healthy"),
-        ],
-    );
-    let refine_b = refine_dir_for_target_root(&fixture.b).unwrap();
-    fs::write(refine_b.join("shared.json"), "local\n").unwrap();
-    let before = fs::read(refine_b.join("nodes.json")).unwrap();
-
-    let error = fixture.service(&fixture.b).sync().unwrap_err();
-
-    assert!(error.to_string().contains("1 unresolved path"), "{error}");
-    let report = latest_state_sync_conflict_report(&fixture.b.join("run"))
-        .unwrap()
-        .unwrap();
-    assert_eq!(report.unresolved_paths, vec!["shared.json"]);
-    assert_eq!(fs::read(refine_b.join("nodes.json")).unwrap(), before);
-    assert_eq!(
-        git_stdout(
-            &state_worktree_for_target_root(&fixture.b).unwrap(),
-            &["status", "--short"]
-        ),
-        ""
     );
 }
 
@@ -434,11 +208,59 @@ fn sync_reports_same_record_multi_node_conflicts() {
     fixture.service(&fixture.a).sync().unwrap();
 
     let error = fixture.service(&fixture.b).sync().unwrap_err();
-    assert!(error.to_string().contains("1 unresolved path"), "{error}");
+    assert!(error.to_string().contains("needs a decision"), "{error}");
+    assert!(error.to_string().contains("1 contested"), "{error}");
     let report = latest_state_sync_conflict_report(&fixture.b.join("run"))
         .unwrap()
         .unwrap();
     assert_eq!(report.unresolved_paths, vec!["goals/GOALA/goal.json"]);
+}
+
+#[test]
+fn contested_member_conflict_keeps_a_stable_report_identity_across_attempts() {
+    let fixture = SyncFixture::new("stable-report-id");
+    write_goal(&fixture.a, "GOALA");
+    fixture.service(&fixture.a).sync().unwrap();
+    fixture.service(&fixture.b).sync().unwrap();
+
+    let goal_a = refine_dir_for_target_root(&fixture.a)
+        .unwrap()
+        .join("goals/GOALA/goal.json");
+    let goal_b = refine_dir_for_target_root(&fixture.b)
+        .unwrap()
+        .join("goals/GOALA/goal.json");
+    fs::write(
+        &goal_a,
+        valid_goal_record("GOALA", "node-a", "review", "Base", "2026-08-03T18:21:00Z"),
+    )
+    .unwrap();
+    fs::write(
+        &goal_b,
+        valid_goal_record("GOALA", "node-a", "qa", "Base", "2026-08-03T18:22:00Z"),
+    )
+    .unwrap();
+    fixture.service(&fixture.a).sync().unwrap();
+
+    fixture.service(&fixture.b).sync().unwrap_err();
+    let first = latest_state_sync_conflict_report(&fixture.b.join("run"))
+        .unwrap()
+        .unwrap();
+    // Nothing changed between attempts: the same divergence keeps the same
+    // report identity, and the summary names the contested member.
+    fixture.service(&fixture.b).sync().unwrap_err();
+    let second = latest_state_sync_conflict_report(&fixture.b.join("run"))
+        .unwrap()
+        .unwrap();
+    assert_eq!(first.report_id, second.report_id);
+    assert!(
+        first
+            .conflicts
+            .iter()
+            .any(|conflict| conflict.summary.contains("goal GOALA")
+                && conflict.summary.contains("status")),
+        "{:?}",
+        first.conflicts
+    );
 }
 
 #[test]
@@ -483,7 +305,7 @@ fn sync_merges_disjoint_goal_changes_without_blocking_remote_records() {
         result
             .detail
             .as_deref()
-            .is_some_and(|detail| detail.contains("Merged non-overlapping Goal changes")),
+            .is_some_and(|detail| detail.contains("Merged divergent state records structurally")),
         "{result:?}"
     );
     let merged: serde_json::Value = serde_json::from_slice(&fs::read(&goal_b).unwrap()).unwrap();
@@ -498,210 +320,8 @@ fn sync_merges_disjoint_goal_changes_without_blocking_remote_records() {
     );
 }
 
-fn merged_goal_value(merge: GoalRecordMerge) -> (serde_json::Value, bool) {
-    match merge {
-        GoalRecordMerge::Merged(bytes) => (serde_json::from_slice(&bytes).unwrap(), false),
-        GoalRecordMerge::OwnershipResolved { bytes, .. } => {
-            (serde_json::from_slice(&bytes).unwrap(), true)
-        }
-    }
-}
-
 #[test]
-fn goal_merge_settles_competing_lifecycle_changes_by_baseline_owner_not_timestamps() {
-    let base = valid_goal_record("GOALA", "node-a", "todo", "Base", "2026-08-03T18:20:00Z");
-    let local = valid_goal_record("GOALA", "node-a", "done", "Base", "2026-08-03T18:21:00Z");
-    // The remote side has the later timestamp; timestamps still decide
-    // nothing — ownership does.
-    let remote = valid_goal_record(
-        "GOALA",
-        "node-a",
-        "cancelled",
-        "Base",
-        "2026-08-03T18:22:00Z",
-    );
-
-    let (owner_local, ownership) =
-        merged_goal_value(merge_goal_record(&base, &local, &remote, "node-a").unwrap());
-    assert!(ownership);
-    assert_eq!(owner_local["status"], "done");
-
-    let (owner_elsewhere, ownership) =
-        merged_goal_value(merge_goal_record(&base, &local, &remote, "node-b").unwrap());
-    assert!(ownership);
-    assert_eq!(owner_elsewhere["status"], "cancelled");
-}
-
-#[test]
-fn goal_merge_keeps_the_authoritative_start_over_a_concurrent_reassignment_request() {
-    let base = valid_goal_record("GOALA", "node-a", "todo", "Base", "2026-08-03T18:20:00Z");
-    let local = valid_goal_record(
-        "GOALA",
-        "node-a",
-        "in-progress",
-        "Base",
-        "2026-08-03T18:21:00Z",
-    );
-    let remote = valid_goal_record(
-        "GOALA",
-        "node-b",
-        "todo",
-        "Clarified",
-        "2026-08-03T18:22:00Z",
-    );
-
-    let (merged, ownership) =
-        merged_goal_value(merge_goal_record(&base, &local, &remote, "node-a").unwrap());
-    assert!(
-        !ownership,
-        "the start-versus-reassignment rule needs no owner"
-    );
-    assert_eq!(merged["status"], "in-progress");
-    assert_eq!(merged["node_id"], "node-a");
-    assert_eq!(merged["title"], "Clarified");
-    assert_eq!(merged["updated"], "2026-08-03T18:22:00Z");
-}
-
-#[test]
-fn goal_merge_settles_competing_non_start_lifecycle_changes_by_owner() {
-    let base = valid_goal_record("GOALA", "node-a", "todo", "Base", "2026-08-03T18:20:00Z");
-    let local = valid_goal_record(
-        "GOALA",
-        "node-a",
-        "cancelled",
-        "Base",
-        "2026-08-03T18:21:00Z",
-    );
-    let remote = valid_goal_record("GOALA", "node-b", "done", "Base", "2026-08-03T18:22:00Z");
-
-    // Called on the owning node: its contested lifecycle change wins, while
-    // the one-sided reassignment still merges as an ordinary member change.
-    let (merged, ownership) =
-        merged_goal_value(merge_goal_record(&base, &local, &remote, "node-a").unwrap());
-    assert!(ownership);
-    assert_eq!(merged["status"], "cancelled");
-    assert_eq!(merged["node_id"], "node-b");
-
-    // Called anywhere else: the remote side carries fleet history and wins.
-    let (merged, ownership) =
-        merged_goal_value(merge_goal_record(&base, &local, &remote, "node-c").unwrap());
-    assert!(ownership);
-    assert_eq!(merged["status"], "done");
-    assert_eq!(merged["node_id"], "node-b");
-}
-
-#[test]
-fn goal_merge_combines_notes_by_stable_id_and_validates_the_goal_schema() {
-    let base = valid_goal_record("GOALA", "node-a", "todo", "Base", "2026-08-03T18:20:00Z");
-    let mut local: serde_json::Value = serde_json::from_slice(&base).unwrap();
-    let mut remote = local.clone();
-    local["notes"] = serde_json::json!([{
-        "id": "NOTE-A",
-        "author": "A",
-        "body": "local",
-        "created": "2026-08-03T18:21:00Z",
-        "updated": "2026-08-03T18:21:00Z"
-    }]);
-    local["updated"] = serde_json::json!("2026-08-03T18:21:00Z");
-    remote["notes"] = serde_json::json!([{
-        "id": "NOTE-B",
-        "author": "B",
-        "body": "remote",
-        "created": "2026-08-03T18:22:00Z",
-        "updated": "2026-08-03T18:22:00Z"
-    }]);
-    remote["updated"] = serde_json::json!("2026-08-03T18:22:00Z");
-    let local = serde_json::to_vec(&local).unwrap();
-    let remote = serde_json::to_vec(&remote).unwrap();
-
-    let (merged, ownership) =
-        merged_goal_value(merge_goal_record(&base, &local, &remote, "node-a").unwrap());
-    assert!(!ownership, "keyed note additions merge without an owner");
-    let goal: crate::model::goal::Goal = serde_json::from_value(merged).unwrap();
-    assert_eq!(
-        goal.notes
-            .iter()
-            .map(|note| note.id.as_str())
-            .collect::<Vec<_>>(),
-        vec!["NOTE-A", "NOTE-B"]
-    );
-}
-
-#[test]
-fn goal_merge_couples_rounds_and_authority_to_the_owner_and_keeps_compatible_edits() {
-    let base = valid_goal_record("GOALA", "node-a", "todo", "Base", "2026-08-03T18:20:00Z");
-    let mut local: serde_json::Value = serde_json::from_slice(&base).unwrap();
-    let mut remote = local.clone();
-    local["rounds"] = serde_json::json!([{
-        "reporter": "A",
-        "prompt": "Implement",
-        "created": "2026-08-03T18:21:00Z",
-        "updated": "2026-08-03T18:21:00Z",
-        "guidance_decision": null,
-        "governance": null,
-        "quality": null,
-        "logs": []
-    }]);
-    remote["status"] = serde_json::json!("plan");
-    remote["title"] = serde_json::json!("Clarified");
-    let local = serde_json::to_vec(&local).unwrap();
-    let remote = serde_json::to_vec(&remote).unwrap();
-
-    // On the owning node, Round evidence and workflow authority win as one
-    // unit; the other side's non-authority edit still merges.
-    let (merged, ownership) =
-        merged_goal_value(merge_goal_record(&base, &local, &remote, "node-a").unwrap());
-    assert!(ownership);
-    assert_eq!(merged["rounds"].as_array().unwrap().len(), 1);
-    assert_eq!(merged["status"], "todo");
-    assert_eq!(merged["title"], "Clarified");
-
-    // The same inputs seen from any other node (sides swapped: the owner's
-    // Round evidence arrives on the remote side) converge identically.
-    let (converged, ownership) =
-        merged_goal_value(merge_goal_record(&base, &remote, &local, "node-b").unwrap());
-    assert!(ownership);
-    assert_eq!(converged, merged);
-}
-
-#[test]
-fn goal_merge_rejects_cross_field_invalid_round_evidence() {
-    let base = valid_goal_record("GOALA", "node-a", "todo", "Base", "2026-08-03T18:20:00Z");
-    let mut local: serde_json::Value = serde_json::from_slice(&base).unwrap();
-    let mut remote = local.clone();
-    local["rounds"] = serde_json::json!([{
-        "reporter": "A",
-        "prompt": "Implement",
-        "created": "2026-08-03T18:21:00Z",
-        "updated": "2026-08-03T18:21:00Z",
-        "guidance_decision": null,
-        "implementation_report": "completed without its timestamp",
-        "governance": null,
-        "quality": null,
-        "logs": []
-    }]);
-    remote["notes"] = serde_json::json!([{
-        "id": "NOTE-A",
-        "author": "A",
-        "body": "remote",
-        "created": "2026-08-03T18:22:00Z",
-        "updated": "2026-08-03T18:22:00Z"
-    }]);
-
-    // Invalid Round evidence never merges, even from the owning side.
-    assert!(
-        merge_goal_record(
-            &base,
-            &serde_json::to_vec(&local).unwrap(),
-            &serde_json::to_vec(&remote).unwrap(),
-            "node-a",
-        )
-        .is_none()
-    );
-}
-
-#[test]
-fn unresolved_conflict_does_not_write_other_prepared_merges() {
+fn unresolved_conflict_withholds_driver_resolved_merges() {
     let fixture = SyncFixture::new("mixed-goal-conflicts");
     write_goal(&fixture.a, "GOALA");
     let refine_a = refine_dir_for_target_root(&fixture.a).unwrap();
@@ -722,17 +342,24 @@ fn unresolved_conflict_does_not_write_other_prepared_merges() {
     .unwrap();
     fs::write(refine_a.join("shared/state.json"), "remote\n").unwrap();
     fixture.service(&fixture.a).sync().unwrap();
+    let remote_head_before = git_stdout(&fixture.a, &["rev-parse", "origin/refine/state"]);
 
     let refine_b = refine_dir_for_target_root(&fixture.b).unwrap();
     fs::write(
         refine_b.join("goals/GOALA/goal.json"),
-        valid_goal_record("GOALA", "node-b", "done", "Base", "2026-08-03T18:22:00Z"),
+        valid_goal_record(
+            "GOALA",
+            "node-b",
+            "backlog",
+            "Retitled",
+            "2026-08-03T18:22:00Z",
+        ),
     )
     .unwrap();
     fs::write(refine_b.join("shared/state.json"), "live\n").unwrap();
 
-    // The Goal contention is ownership-resolvable, but the shared record is
-    // not; one unresolved path withholds the entire prepared reconciliation.
+    // The Goal contention is driver-resolvable (disjoint members), but the
+    // shared record is not; one unresolved path withholds the entire merge.
     let _error = fixture.service(&fixture.b).sync().unwrap_err();
 
     let report = latest_state_sync_conflict_report(&fixture.b.join("run"))
@@ -742,10 +369,160 @@ fn unresolved_conflict_does_not_write_other_prepared_merges() {
         report.unresolved_paths,
         vec!["shared/state.json".to_string()]
     );
+    git(&fixture.b, &["fetch", "-q", "origin", REFINE_STATE_BRANCH]);
+    assert_eq!(
+        git_stdout(&fixture.b, &["rev-parse", "origin/refine/state"]),
+        remote_head_before,
+        "a conflicted pass must publish nothing"
+    );
+    assert_eq!(
+        fs::read_to_string(refine_b.join("shared/state.json")).unwrap(),
+        "live\n"
+    );
     assert_eq!(
         git_stdout(
             &state_worktree_for_target_root(&fixture.b).unwrap(),
             &["status", "--short"]
+        ),
+        ""
+    );
+}
+
+#[test]
+fn rejected_publish_then_fast_forward_push_without_a_conflict_report() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let fixture = SyncFixture::new("ancestor-fast-forward");
+    write_goal(&fixture.a, "GOALA");
+    fixture.service(&fixture.a).sync().unwrap();
+
+    // The origin rejects state pushes; the advance still commits locally.
+    let remote = fixture.root.join("remote.git");
+    let hook = remote.join("hooks/pre-receive");
+    fs::write(
+        &hook,
+        "#!/bin/sh\nwhile read old new ref; do\n  if test \"$ref\" = refs/heads/refine/state; then exit 1; fi\ndone\nexit 0\n",
+    )
+    .unwrap();
+    let mut permissions = fs::metadata(&hook).unwrap().permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(&hook, permissions).unwrap();
+
+    let live_goal = refine_dir_for_target_root(&fixture.a)
+        .unwrap()
+        .join("goals/GOALA/goal.json");
+    fs::write(&live_goal, "{\"id\":\"GOALA\",\"status\":\"v2\"}\n").unwrap();
+    fixture.service(&fixture.a).sync().unwrap_err();
+    assert!(
+        latest_state_sync_conflict_report(&fixture.a.join("run"))
+            .unwrap()
+            .is_none(),
+        "a one-sided local advance must not produce a conflict report"
+    );
+    let origin_head = git_stdout(&fixture.a, &["rev-parse", "origin/refine/state"]);
+    let local_head = git_stdout(&fixture.a, &["rev-parse", "refine/state"]);
+    assert_ne!(origin_head, local_head);
+    git(
+        &fixture.a,
+        &["merge-base", "--is-ancestor", &origin_head, &local_head],
+    );
+
+    // Remote is a strict ancestor of local: the next pass fast-forwards and
+    // publishes without merging.
+    fs::remove_file(&hook).unwrap();
+    fs::write(&live_goal, "{\"id\":\"GOALA\",\"status\":\"v3\"}\n").unwrap();
+    let result = fixture.service(&fixture.a).sync().unwrap();
+    assert!(result.pushed, "{result:?}");
+    assert!(
+        latest_state_sync_conflict_report(&fixture.a.join("run"))
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(
+        git_stdout(&fixture.a, &["rev-parse", "origin/refine/state"]),
+        git_stdout(&fixture.a, &["rev-parse", "refine/state"])
+    );
+}
+
+#[test]
+fn hydration_preimage_cas_skips_records_the_daemon_advanced_mid_pass() {
+    let fixture = SyncFixture::new("hydration-cas");
+    write_goal(&fixture.a, "GOALA");
+    let service = fixture.service(&fixture.a);
+    service.sync().unwrap();
+    let live_refine = refine_dir_for_target_root(&fixture.a).unwrap();
+    let original = durable_state_map(&live_refine).unwrap();
+    let state_worktree = state_worktree_for_target_root(&fixture.a).unwrap();
+    let base_commit = git_stdout(&state_worktree, &["rev-parse", "HEAD"]);
+
+    // Build the adopted commit: GOALA advanced remotely, GOALB added.
+    fs::write(
+        state_worktree.join(".refine/goals/GOALA/goal.json"),
+        "{\"id\":\"GOALA\",\"status\":\"remote\"}\n",
+    )
+    .unwrap();
+    fs::create_dir_all(state_worktree.join(".refine/goals/GOALB")).unwrap();
+    fs::write(
+        state_worktree.join(".refine/goals/GOALB/goal.json"),
+        "{\"id\":\"GOALB\"}\n",
+    )
+    .unwrap();
+    git(&state_worktree, &["add", "-f", "-A", "--", ".refine"]);
+    git(&state_worktree, &["commit", "-q", "-m", "advance"]);
+    let target_commit = git_stdout(&state_worktree, &["rev-parse", "HEAD"]);
+
+    // A daemon write lands after the pass snapshotted live.
+    let live_goal = live_refine.join("goals/GOALA/goal.json");
+    fs::write(&live_goal, "{\"id\":\"GOALA\",\"status\":\"concurrent\"}\n").unwrap();
+
+    let concurrent = service
+        .hydrate_live_from_commit(
+            &state_worktree,
+            crate::tools::host::git_sync::service::HydrationScope::ChangedSince(base_commit),
+            &target_commit,
+            &original,
+            &live_refine,
+        )
+        .unwrap();
+
+    assert!(concurrent, "the skipped record must be reported");
+    assert_eq!(
+        fs::read_to_string(&live_goal).unwrap(),
+        "{\"id\":\"GOALA\",\"status\":\"concurrent\"}\n",
+        "a record the daemon advanced mid-pass is left alone"
+    );
+    assert_eq!(
+        fs::read_to_string(live_refine.join("goals/GOALB/goal.json")).unwrap(),
+        "{\"id\":\"GOALB\"}\n",
+        "unchanged-preimage records hydrate normally"
+    );
+}
+
+#[test]
+fn first_sync_retires_the_legacy_baseline_file_and_anchor_refs() {
+    let fixture = SyncFixture::new("legacy-baseline-retire");
+    write_goal(&fixture.a, "GOALA");
+    let baseline = git_common_dir(&fixture.a)
+        .unwrap()
+        .join("refine-state-baseline.json");
+    fs::write(&baseline, "{\"legacy\":true}\n").unwrap();
+    let head = git_stdout(&fixture.a, &["rev-parse", "HEAD"]);
+    git(
+        &fixture.a,
+        &["update-ref", "refs/refine/state-baseline/legacy", &head],
+    );
+
+    fixture.service(&fixture.a).sync().unwrap();
+
+    assert!(!baseline.exists());
+    assert_eq!(
+        git_stdout(
+            &fixture.a,
+            &[
+                "for-each-ref",
+                "--format=%(refname)",
+                "refs/refine/state-baseline",
+            ],
         ),
         ""
     );
@@ -827,31 +604,6 @@ fn failed_state_copy_removes_its_partial_temp_file() {
     assert_eq!(
         fs::read_dir(destination.parent().unwrap()).unwrap().count(),
         0
-    );
-    fs::remove_dir_all(root).unwrap();
-}
-
-#[test]
-fn copy_back_preserves_mutations_that_arrive_during_sync() {
-    let root = unique_temp_dir("copy-back-race");
-    let live = root.join("live");
-    let state = root.join("state");
-    fs::create_dir_all(&live).unwrap();
-    fs::create_dir_all(&state).unwrap();
-    fs::write(live.join("goal.json"), "before\n").unwrap();
-    let original = durable_state_map(&live).unwrap();
-    fs::write(live.join("goal.json"), "concurrent\n").unwrap();
-    fs::write(state.join("goal.json"), "remote\n").unwrap();
-    fs::write(state.join("remote.json"), "remote-only\n").unwrap();
-
-    assert!(merge_state_into_live(&state, &live, &original).unwrap());
-    assert_eq!(
-        fs::read_to_string(live.join("goal.json")).unwrap(),
-        "concurrent\n"
-    );
-    assert_eq!(
-        fs::read_to_string(live.join("remote.json")).unwrap(),
-        "remote-only\n"
     );
     fs::remove_dir_all(root).unwrap();
 }
@@ -944,61 +696,4 @@ fn sync_requires_legacy_state_to_be_removed_from_application_branch() {
         )
         .contains("review")
     );
-}
-
-#[test]
-fn sync_settles_contested_goal_records_by_ownership_without_a_conflict() {
-    let fixture = SyncFixture::new("ownership-merge-sync");
-    let refine_a = refine_dir_for_target_root(&fixture.a).unwrap();
-    for (id, node) in [("GOALMINE", "default"), ("GOALOTHER", "node-a")] {
-        write_goal(&fixture.a, id);
-        fs::write(
-            refine_a.join(format!("goals/{id}/goal.json")),
-            valid_goal_record(id, node, "backlog", "Base", "2026-08-03T18:20:00Z"),
-        )
-        .unwrap();
-    }
-    fixture.service(&fixture.a).sync().unwrap();
-    fixture.service(&fixture.b).sync().unwrap();
-
-    for (id, node) in [("GOALMINE", "default"), ("GOALOTHER", "node-a")] {
-        fs::write(
-            refine_a.join(format!("goals/{id}/goal.json")),
-            valid_goal_record(id, node, "backlog", "remote-edit", "2026-08-03T18:21:00Z"),
-        )
-        .unwrap();
-    }
-    fixture.service(&fixture.a).sync().unwrap();
-    let refine_b = refine_dir_for_target_root(&fixture.b).unwrap();
-    for (id, node) in [("GOALMINE", "default"), ("GOALOTHER", "node-a")] {
-        fs::write(
-            refine_b.join(format!("goals/{id}/goal.json")),
-            valid_goal_record(id, node, "backlog", "live-edit", "2026-08-03T18:22:00Z"),
-        )
-        .unwrap();
-    }
-
-    // Same-member contention on both records: node b owns GOALMINE at the
-    // baseline and keeps its understanding; GOALOTHER converges to remote.
-    // No conflict report, no recovery, no operator.
-    let result = fixture.service(&fixture.b).sync().unwrap();
-    assert!(result.ok && result.pushed, "{result:#?}");
-
-    let read_title = |root: &Path, id: &str| {
-        let bytes = fs::read(
-            refine_dir_for_target_root(root)
-                .unwrap()
-                .join(format!("goals/{id}/goal.json")),
-        )
-        .unwrap();
-        serde_json::from_slice::<serde_json::Value>(&bytes).unwrap()["title"]
-            .as_str()
-            .unwrap()
-            .to_string()
-    };
-    assert_eq!(read_title(&fixture.b, "GOALMINE"), "live-edit");
-    assert_eq!(read_title(&fixture.b, "GOALOTHER"), "remote-edit");
-    fixture.service(&fixture.a).sync().unwrap();
-    assert_eq!(read_title(&fixture.a, "GOALMINE"), "live-edit");
-    assert_eq!(read_title(&fixture.a, "GOALOTHER"), "remote-edit");
 }

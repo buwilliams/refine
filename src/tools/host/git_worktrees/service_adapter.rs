@@ -211,7 +211,7 @@ impl GitWorktreeService for FileGitWorktreeService {
 
     fn rebase(&self, branch: &str) -> RefineResult<MergeResult> {
         validate_branch_name(branch)?;
-        let output = self.git_raw(&["rebase", branch])?;
+        let output = self.git_raw_with_env(&["rebase", branch], &BASE_IN_CONFLICT_MARKERS)?;
         let result = MergeResult {
             ok: output.success,
             conflicts: self.conflicts().unwrap_or_default(),

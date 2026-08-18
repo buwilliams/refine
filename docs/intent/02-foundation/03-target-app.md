@@ -50,40 +50,26 @@ The current implementation details that matter to intent are:
 - Git provides history, isolation, rollback, and merge discipline;
 - shared services and daemon routes should coordinate state mutation so surfaces do not compete for authority.
 - the active checkout-owned daemon is the normal configuration mutation authority for browser and CLI. Guidance and Governance collection revisions make stale writers explicit while stable item ids preserve unrelated entries; no surface writes `.git/refine-live-state` directly or creates a parallel configuration model.
-- the synchronization baseline is durable authority for ordinary three-way
-  reconciliation. If it is absent while both non-bootstrap live state and a
-  remote `refine/state` branch exist, automatic and manual sync fail closed.
-  Recovery is a separate daemon-owned capability. Missing-baseline recovery
-  retains its explicit whole-side choice. A valid-baseline conflict first
-  writes a complete node-local report, then a read-only preview binds the exact
-  baseline, live snapshot, remote head, and report. Apply accepts one default
-  live or remote authority plus path overrides only inside that report. It
-  persists an owned target and manifest, publishes with remote-head
-  compare-and-swap, hydrates records under their normal leases and preimage
-  fences, preserves later writes as the next local delta, and creates the new
-  baseline only after those boundaries are durable. Ordinary valid-baseline
+- state synchronization has no separate baseline artifact: the Git merge base
+  of the local and remote `refine/state` heads is the reconciliation baseline,
+  shared and durable by construction. Every sync pass snapshots live state
+  once as a commit, classifies the commit pair, fast-forwards ancestor-related
+  heads without merging, and merges genuinely diverged heads from their real
+  merge base — the mechanism and its policies live in the persistence-sync
+  capability (`docs/intent/03-capabilities/05-persistence-sync.md`). A
+  contested path fails closed with a node-local conflict report whose id is
+  stable across attempts, and `sync --authority live|remote [--path]` settles
+  it terminally as one merge commit with both heads as parents, the losing
+  side reachable as a merge parent or retained ref. `sync --preview` is a
+  read-only divergence summary, never an apply token; there are no preview
+  files, manifests, or baseline anchors to persist. Hydration into the live
+  store keeps per-record leases and preimage fences, so a record the daemon
+  advanced mid-pass is preserved as the next local delta. Ordinary
   synchronization treats `nodes.json` as a per-node registry instead of an
   atomic blob: it retains the record union and uses each record's comparable
-  update timestamp to reconcile concurrent versions. Heartbeat-only churn can
-  therefore converge without a stale fence, while malformed registries,
-  duplicate or noncanonical identities, equal-time disagreement, and unrelated
-  shared-state conflicts still fail closed without applying a partial merge.
-  A recorded baseline now binds its fingerprint map to an immutable retained
-  Git snapshot. Refine publishes and validates that anchor before atomically
-  replacing the metadata, and retires the prior anchor only after the new pair
-  is durable. Legacy fingerprint-only metadata remains readable. When a
-  recorded `nodes.json` fingerprint cannot be reconstructed from either the
-  retained snapshot or legacy history, only that registry may use a two-way
-  fallback: both sides must validate, the canonical node-id union is retained,
-  and unequal shared records require strictly ordered comparable timestamps.
-  Goals, a wholly absent baseline, malformed data, and equal-time disagreement
-  retain fail-closed recovery authority.
-
-State-recovery preview captures its live snapshot under the same repository
-coordination boundary as synchronization, while apply retains every existing
-snapshot, head, identity, decision, and hydration fence. Stale-preview errors
-name the changed durable paths. Runtime-only activity logs are not part of the
-durable snapshot and need no recovery-fence exception.
+  update timestamp to reconcile concurrent versions, while malformed
+  registries, duplicate or noncanonical identities, and equal-time
+  disagreement still fail closed without applying a partial merge.
 
 The important boundary is source of truth. Caches, indexes, projections, and UI state are allowed and necessary for performance, but they should not replace durable target-app state. If a cache is wrong, the repair path should be refresh or rebuild, not manual database surgery.
 

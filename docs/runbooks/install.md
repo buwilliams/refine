@@ -11,6 +11,7 @@ Use this document when an agent is responsible for installing or updating Refine
 - Determine which dependency sources are available on this host before installing anything: system package managers, existing corporate mirrors, preinstalled toolchains, or manual user setup.
 - Make sure the user can approve dependency installation from the available source or choose to install missing dependencies manually.
 - Install or repair required dependencies before cloning or updating Refine: `curl`, `git`, a C compiler/linker, and Rust Cargo.
+- **Git 2.42 or newer is required**, on every node. Refine's state merge is `git merge-tree`, so a node with an older Git cannot synchronize state at all: the daemon refuses to start and says so, `refine fleet sync` reports that node as `unsupported_git`, and the rest of the fleet keeps converging meanwhile. Check with `git --version` and upgrade before installing.
 - If using a real provider, make sure the user can complete that provider's CLI authentication on this host.
 
 ## Ask If You Cannot Infer
@@ -30,7 +31,7 @@ Ask only when the answer is not clear from the user's environment, prior convers
 
 ```bash
 curl --version
-git --version
+git --version   # must report 2.42 or newer
 cc --version
 cargo --version
 ```
@@ -315,11 +316,17 @@ in the primary target-app worktree. Goal logs under
 Target App **Git remote** setting controls both state and Goal-branch
 publication and defaults to `origin`. If that remote is unavailable, Refine
 still initializes and commits local state; it simply cannot publish it. Use
-`project sync` or the Node screen's **Sync state now** action when a state
+`refine sync` or the Node screen's **Sync state now** action when a state
 handoff must happen immediately; `fleet sync` invokes the same shared
-capability for the current node. Manual sync is queued in a supervised runner
-process, and the UI reports its progress and any terminal error without
-blocking the daemon.
+capability for the current node and adds one status per other node. Manual sync
+is queued in a supervised runner process, and the UI reports its progress and
+any terminal error without blocking the daemon.
+
+Upgrading is per node. Install a new build on one node at a time, in any order:
+a node's CLI and daemon are one binary, so nothing on that node is ever half
+upgraded, nodes on different builds keep converging on `refine/state`, and
+until a node is upgraded `fleet sync` reports it as `pending_upgrade` instead
+of failing. [Manage the fleet](manage-fleet.md) carries the rollout procedure.
 
 ### Refine-owned durable state
 

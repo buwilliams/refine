@@ -16,7 +16,7 @@ The API should be treated as local capability plumbing. It is important, but it 
 
 ## Expected Role
 
-The API should expose system capability groups that match Refine's product design. Current route groups include system, apps, project, target app, work, workflow, activity, import, dashboard, agents, operations, runner workers, processes, events, quality, chat, settings, governance, guidance, reporters, Reporter-scoped todos, nodes, fleet, changes, cache, performance, files, terminal, diagnostics, and upgrade.
+The API should expose system capability groups that match Refine's product design. Current route groups include system, apps, project, sync, target app, work, workflow, activity, import, dashboard, agents, operations, runner workers, processes, events, quality, chat, settings, governance, guidance, reporters, Reporter-scoped todos, nodes, fleet, changes, cache, performance, files, terminal, diagnostics, and upgrade.
 
 The daemon stores the checkout identity resolved at bootstrap and passes that
 request-scoped authority through system, install, update, source, process, and
@@ -26,17 +26,35 @@ canonical checkout-local runtime root so clients can diagnose ownership.
 
 Those groups are useful because they map surfaces onto shared behavior. They should not drift into page-specific endpoints when a shared service would express the capability better.
 
-Dashboard responses include typed node-local state-sync health, freshness timestamps, the configured stale threshold, an optional exceptional `recovery_kind`, and whether all-node counts are authoritative. `missing_baseline` is emitted only for the daemon's missing three-way baseline failure; other failed, stale, detached, bootstrap, and ineligible states do not acquire that eligibility by parsing error text. Nodes responses attach that evidence only to the serving daemon's active node and explicitly mark other nodes unknown, without changing fleet bootstrap health. The event stream publishes typed `state_sync_health` state whose semantic fingerprint changes on failure, recovery eligibility, the wall-clock stale boundary, and recovery; clients reconcile Dashboard, Nodes, and Logs from their authoritative read endpoints on those events and after reconnect.
+Dashboard responses include typed node-local state-sync health, freshness timestamps, the configured stale threshold, and whether all-node counts are authoritative. Health carries no recovery-kind classification: the merge-base pipeline records every failure the same way, and a `recovery_kind` written by an older binary is simply an unknown member that reads back ignored. Nodes responses attach that evidence only to the serving daemon's active node and explicitly mark other nodes unknown, without changing fleet bootstrap health. The event stream publishes typed `state_sync_health` state whose semantic fingerprint changes on failure, recovery eligibility, the wall-clock stale boundary, and recovery; clients reconcile Dashboard, Nodes, and Logs from their authoritative read endpoints on those events and after reconnect.
 
-State recovery remains a shared daemon capability: `GET /api/project/state-recovery/preview` returns the complete bounded, evidence-identified comparison and `POST /api/project/state-recovery/apply` accepts only an explicit authority plus that unchanged preview. Apply-time `409` errors carry stable `error.reason` values `git_busy` or `stale_preview` when those recovery actions apply; unrelated conflicts remain generic. A successful apply settles authoritative state-sync health and returns the resulting heads, recovery audit ref, manifest, counts, authority, detail, evidence-correlated result, and refreshed health. Browser code never performs the Git or durable-state mutation. `POST /api/project/state-recovery/run` is the consolidated one-shot form: it synchronizes, and only when synchronization is rejected with recoverable evidence derives and applies recovery under one repository lock hold before verifying with a fresh synchronization; a body without a decision applies the ownership policy (remote authoritative except Goal records this node owned at the agreed baseline, which keep their live copy), bounded races are retried inside the daemon rather than by callers, and a recovered run settles state-sync health exactly like apply. The background sync worker invokes the same policy automatically after a recoverable rejection, records a `sync_auto_recovered` activity entry naming the retained recovery ref, and honors the node's `state_sync_auto_recovery: off` opt-out.
+State convergence is one shared daemon capability under `/api/sync`, mirroring the CLI's single `sync` command; the `/project/sync` and `/project/state-recovery/*` routes are deleted, not aliased — a deletion that lands on each node as that node is upgraded, since a node's daemon and CLI ship as one binary and no node ever serves a mixture. `GET /api/sync/preview` returns the read-only divergence summary — classification, both heads and the merge base, per-path sides, a domain-terms summary per contested path, and, when a recorded conflict report matches the previewed heads, the `decision_question` resolution escalated with — the resolving agent's own words when it declared it could not choose, and otherwise the contested-records question a spent resolution budget produced — and is never an apply token. `POST /api/sync` without a body stays a sub-50ms queueing adapter that returns a durable operation for the ordinary pipeline; its terminal error preserves the stable conflict report id, node-local report location, and recovery guidance, leading with that decision question when resolution escalated. `POST /api/sync` with `{"authority": "live"|"remote", "paths": [...]}` is terminal recovery — sync with a decision attached: contested paths take the chosen side inside one merge commit, named `paths` are exceptions settled on the opposite side, bounded races are retried inside the daemon rather than by callers, and a recovered run settles authoritative state-sync health and returns the resulting heads, settled paths, retained refs, authority, detail, and refreshed health. Conflict-time `409` errors carry the stable `error.reason` value `state_moved` when a terminal recovery lost its bounded race because the remote moved again while the pass was being verified — the answer is to rerun, and a reviewing client drops the divergence it reviewed for a fresh one; unrelated conflicts remain generic. Browser code never performs the Git or durable-state mutation. The sync attempt itself runs agent resolution first, subject to the node's `state_sync_agent_resolution` opt-out; the background sync worker invokes the merge-base ownership policy automatically only after resolution has escalated, is unavailable, or is disabled, records a `sync_auto_recovered` activity entry naming any retained ref, and honors the node's `state_sync_auto_recovery: off` opt-out.
+
+The API contract version is the one version fact nodes exchange with each
+other, because a fleet upgrades node by node in any order and never at once.
+Every mutation that can cross builds carries the caller's contract version — the
+CLI to its own daemon, and one node's fleet request to another node's — and a
+daemon that does not speak it answers `426` naming the version it does speak
+instead of acting on a request it does not understand. The browser is not such a
+caller: it is served by the daemon it talks to and upgrades with it. `POST /api/fleet/sync` is the fleet
+fan-out around this node's own `/api/sync`: it asks every other enabled node's
+daemon to synchronize and returns one status per node — `local` for the serving
+daemon's own node, which the calling pass already synchronized in-process,
+`queued` for a node
+that accepted the request and queued its own pass, `pending_upgrade` for a node
+whose daemon rejected the contract version, `unsupported_git` for a node
+whose Git is too old to run the state merge at all, `unreachable`, `failed`, or
+`disabled`. The statuses are that fan-out's own observation and are returned,
+never written into the synchronized node registry: a node's recorded health is
+its provisioning verdict and no sync answer may create or erase it, so
+`GET /api/fleet` keeps reporting what bootstrap found. A node that has not been
+upgraded yet is therefore a reported per-node status with both contract
+versions attached, never a failed fan-out: the rest of the fleet still syncs
+and the route still answers `200`.
 
 State-sync health also carries the latest monotonic attempt id and source, the
 latest failed reconciliation identity, and the stable id and location of its
-complete conflict report. `POST /project/sync` stays a sub-50ms queueing
-adapter and returns a durable operation; its terminal error preserves those
-fields and recovery guidance. State-recovery preview and apply use the shared
-service: valid-baseline previews bind the exact local report and snapshots,
-and apply accepts a default authority plus validated path overrides.
+complete conflict report.
 
 Settings, Quality, Governance, and Guidance routes are the shared configuration contract for browser and CLI. Ordinary Settings and Quality writes remain validated partial patches. Governance scalar patches preserve rules, while every rule replacement carries the observed `rules_revision`; Guidance entries have stable ids, item routes mutate one entry under the repository coordination lock, and both item and compatibility whole-list writes carry the observed `revision`. Stale revisions return `409` without overwriting unrelated state, missing ids return `404`, and successful writes return the normalized authoritative collection.
 

@@ -67,6 +67,14 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
     ["remote", "Automatic (remote wins; this node's Goals stay live)"],
     ["off",    "Off — hold conflicts for operator review"],
   ];
+  const agentResolutionOptions = [
+    ["on",  "On — an agent merges both intents before any authority fallback"],
+    ["off", "Off — contested merges fail closed immediately"],
+  ];
+  const conflictResolutionOptions = [
+    ["on",  "On — an agent resolves the conflicted refresh in place"],
+    ["off", "Off — a conflicted refresh aborts and queues a recovery Round"],
+  ];
   const providerOptions = [
     ["claude", "Claude Code (default)"],
     ["codex", "OpenAI Codex"],
@@ -83,6 +91,8 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
   const remoteFetchInterval = String(s.project_update_pulse_interval_seconds ?? "300");
   const staleThreshold = String(s.state_sync_stale_threshold_seconds ?? "900");
   const autoRecovery = String(s.state_sync_auto_recovery ?? "remote");
+  const agentResolution = String(s.state_sync_agent_resolution ?? "on");
+  const conflictResolution = String(s.workflow_conflict_resolution ?? "on");
   return `
     <section class="settings-section">
       <h3>Runtime configuration</h3>
@@ -234,6 +244,26 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
         valueLabel: optionLabel(autoRecoveryOptions, autoRecovery),
         control: `<select id="s-state-sync-auto-recovery" data-testid="runtime-state-sync-auto-recovery">
           ${autoRecoveryOptions.map(([v, lbl]) => `<option value="${v}" ${autoRecovery === v ? "selected" : ""}>${lbl}</option>`).join("")}
+        </select>`,
+      })}
+      ${renderSettingsEditableField({
+        id: "s-state-sync-agent-resolution",
+        label: "State sync agent resolution",
+        guideItemId: "runtime-project-update-pulse",
+        description: "when the same record changes on two nodes, let the installed agent resolve the conflict in an isolated workspace first; only a merge it cannot justify escalates as a decision.",
+        valueLabel: optionLabel(agentResolutionOptions, agentResolution),
+        control: `<select id="s-state-sync-agent-resolution" data-testid="runtime-state-sync-agent-resolution">
+          ${agentResolutionOptions.map(([v, lbl]) => `<option value="${v}" ${agentResolution === v ? "selected" : ""}>${lbl}</option>`).join("")}
+        </select>`,
+      })}
+      ${renderSettingsEditableField({
+        id: "s-workflow-conflict-resolution",
+        label: "Candidate refresh agent resolution",
+        guideItemId: "runtime-project-update-pulse",
+        description: "when a Goal's candidate no longer rebases onto the target it will merge into, let the installed agent resolve the conflicted refresh in place; turning it off aborts the refresh and queues the fenced integration recovery Round instead.",
+        valueLabel: optionLabel(conflictResolutionOptions, conflictResolution),
+        control: `<select id="s-workflow-conflict-resolution" data-testid="runtime-workflow-conflict-resolution">
+          ${conflictResolutionOptions.map(([v, lbl]) => `<option value="${v}" ${conflictResolution === v ? "selected" : ""}>${lbl}</option>`).join("")}
         </select>`,
       })}
       ${renderSettingsEditableField({
@@ -401,6 +431,8 @@ async function autosaveSettingsRuntime(options = {}) {
     project_update_pulse_interval_seconds: $("#s-project-update-pulse").value,
     state_sync_stale_threshold_seconds: $("#s-state-sync-stale-threshold").value,
     state_sync_auto_recovery: $("#s-state-sync-auto-recovery").value,
+    state_sync_agent_resolution: $("#s-state-sync-agent-resolution").value,
+    workflow_conflict_resolution: $("#s-workflow-conflict-resolution").value,
     file_browser_ignore_patterns: $("#s-file-browser-ignore").value,
     agent_cli: chosen,
   });
@@ -414,7 +446,7 @@ function bindNodeRuntimeConfigControls() {
   const root = document.querySelector('[data-tab-pane="runtime"]');
   const autosaveRuntime = bindSettingsAutosave(
     root,
-    "#s-cap, #s-pattern, #s-idle, #s-hard, #s-worker-memory, #s-ui-memory, #s-worker-cpu-priority, #s-resource-isolation, #s-agent-limit-pause, #s-chat-idle, #s-backlog-promote, #s-worktree-cleanup-delay, #s-state-sync-debounce, #s-project-update-pulse, #s-state-sync-stale-threshold, #s-state-sync-auto-recovery, #s-file-browser-ignore",
+    "#s-cap, #s-pattern, #s-idle, #s-hard, #s-worker-memory, #s-ui-memory, #s-worker-cpu-priority, #s-resource-isolation, #s-agent-limit-pause, #s-chat-idle, #s-backlog-promote, #s-worktree-cleanup-delay, #s-state-sync-debounce, #s-project-update-pulse, #s-state-sync-stale-threshold, #s-state-sync-auto-recovery, #s-state-sync-agent-resolution, #s-workflow-conflict-resolution, #s-file-browser-ignore",
     autosaveSettingsRuntime,
     { event: "settings-editable-commit" },
   );
@@ -429,7 +461,7 @@ function bindNodeRuntimeConfigControls() {
   bindOnce(syncNow, "click", async () => {
     await withButtonBusy(syncNow, "Syncing...", async () => {
       try {
-        const queued = await api("POST", "/api/project/sync", {});
+        const queued = await api("POST", "/api/sync", {});
         const result = await resolveBackgroundOperationResponse(
           queued,
           "Refine state synchronization queued",

@@ -33,6 +33,9 @@ use crate::process::supervisor::runtime::RuntimeRoot;
 use crate::tools::host::daemon_lifecycle::{
     run_service_managed_daemon_with, stop_service_managed_daemon_with,
 };
+use crate::tools::host::fleet::{
+    FleetNodeDaemonClient, NodeDaemonReply, install_node_daemon_client,
+};
 use crate::tools::host::installation::InstalledServiceAction;
 use crate::tools::host::project_layout::refine_dir_for_target_root;
 use crate::tools::observability::activity::ActivityService;

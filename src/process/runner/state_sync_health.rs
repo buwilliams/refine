@@ -68,8 +68,6 @@ pub(super) fn record_state_sync_failure(
         .filter(|report| {
             report.attempt_id == attempt_id.to_string() && report.attempt_source == source
         });
-    let recovery_kind = matches!(error, RefineError::StateSyncMissingBaseline(_))
-        .then_some(crate::tools::host::state_sync_health::StateSyncRecoveryKind::MissingBaseline);
     let activity = FileStateSyncHealthService::new(runtime_root).settle_failure(
         target_root,
         node_id,
@@ -80,7 +78,6 @@ pub(super) fn record_state_sync_failure(
         report
             .as_ref()
             .map(|report| report.report_location.as_str()),
-        recovery_kind,
     )?;
     append_state_sync_activity(target_root, node_id, activity, report.as_ref())
 }
@@ -103,12 +100,14 @@ pub(super) enum AutoRecoveryOutcome {
 /// Converge a rejected background synchronization without operator action.
 ///
 /// Basic syncing must not require CLI ceremony: when ordinary sync fails
-/// closed with evidence recovery consumes (a missing baseline, or the
-/// semantic conflict that attempt just recorded), the daemon runs the same
-/// consolidated `state-recovery run` sequence an operator would, always with
-/// remote authority — the pre-recovery live state stays retained on the
-/// recovery ref. A node set to `state_sync_auto_recovery: off` keeps the
-/// fail-closed behavior for deliberate divergence work.
+/// closed with the conflict that attempt just recorded, the daemon runs the
+/// same terminal `sync --authority` decision an operator would, with the ownership
+/// policy read from the merge base so no side votes for itself: remote
+/// authority by default, and a live override for each contested goal record
+/// whose merge-base bytes name this node as `node_id`. The displaced side
+/// stays reachable as a merge parent (or retained ref on a join). A node set
+/// to `state_sync_auto_recovery: off` keeps the fail-closed behavior for
+/// deliberate divergence work.
 ///
 /// The recovery is its own health attempt under `auto_recovery`, so success
 /// and failure flow through the same episode, reminder, and recovered
@@ -118,18 +117,19 @@ pub(super) fn attempt_automatic_state_recovery(
     target_root: &Path,
     node_id: &str,
     service: &FileGitSyncService,
-    sync_error: &RefineError,
-    conflict_recorded: bool,
+    conflict_report: Option<&StateSyncConflictReport>,
 ) -> RefineResult<AutoRecoveryOutcome> {
-    let recoverable =
-        matches!(sync_error, RefineError::StateSyncMissingBaseline(_)) || conflict_recorded;
-    if !recoverable || !state_sync_auto_recovery_enabled(runtime_root, target_root) {
+    let Some(report) = conflict_report else {
+        return Ok(AutoRecoveryOutcome::NotAttempted);
+    };
+    if !state_sync_auto_recovery_enabled(runtime_root, target_root) {
         return Ok(AutoRecoveryOutcome::NotAttempted);
     }
+    let decision = service.merge_base_ownership_decision(report, node_id);
     let attempt_id =
         record_state_sync_attempt(runtime_root, target_root, node_id, AUTO_RECOVERY_SOURCE)?;
     let run = match run_background_repository_operation(runtime_root, GIT_SYNC_RUNNER, || {
-        service.run_state_recovery_with_policy(StateRecoveryRunPolicy::OwnershipPrefersRemote)
+        service.run_state_recovery(decision.clone())
     })? {
         BackgroundOperationOutcome::Completed(Ok(run)) => run,
         BackgroundOperationOutcome::Completed(Err(error)) => {
@@ -174,9 +174,10 @@ fn state_sync_auto_recovery_enabled(runtime_root: &Path, target_root: &Path) -> 
         != Some("off")
 }
 
-/// Record the audit trail for a recovery the daemon chose on its own. The
-/// entry names the displaced side's retained ref because remote authority
-/// resolved genuinely divergent paths by discarding their live copies.
+/// Record the audit trail for a recovery the daemon chose on its own. Every
+/// displaced version stays reachable as a merge parent (or the named
+/// retained ref on a join), so the entry carries the settled paths and any
+/// ownership overrides the merge base granted this node.
 fn append_auto_recovery_activity(
     target_root: &Path,
     node_id: &str,
@@ -191,8 +192,13 @@ fn append_auto_recovery_activity(
     let service = FileActivityService::new(refine_dir);
     let mut entry = service.new_entry(
         format!(
-            "State sync auto-recovered on node {node_id} with remote authority; pre-recovery live state is retained at {}.",
-            recovery.recovery_location
+            "State sync auto-recovered on node {node_id} with {} authority; displaced state stays reachable as a merge parent{}.",
+            recovery.authority.as_str(),
+            if recovery.retained_refs.is_empty() {
+                String::new()
+            } else {
+                format!(" and at {}", recovery.retained_refs.join(", "))
+            }
         ),
         "warn",
         "state_sync",
@@ -204,9 +210,9 @@ fn append_auto_recovery_activity(
         "node_id": node_id,
         "authority": recovery.authority.as_str(),
         "attempts": run.attempts,
-        "recovery_location": recovery.recovery_location,
-        "manifest_path": recovery.manifest_path,
-        "path_counts": recovery.path_counts,
+        "settled_paths": recovery.settled_paths,
+        "ownership_overrides": recovery.overrides,
+        "retained_refs": recovery.retained_refs,
         "local_only": true
     })
     .as_object()
@@ -223,7 +229,6 @@ pub(crate) fn settle_state_recovery_success(
     let (settled, activity) = health_service.record_recovery_success(
         target_root,
         &expected_health.node_id,
-        crate::tools::host::state_sync_health::StateSyncRecoveryKind::MissingBaseline,
         expected_health.revision,
     )?;
     append_state_sync_activity(target_root, &expected_health.node_id, activity, None)?;

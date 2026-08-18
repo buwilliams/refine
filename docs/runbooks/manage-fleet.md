@@ -20,10 +20,16 @@ claim an operation succeeded until the fleet readback shows it.
 
 - A target project is attached and has the configured **Git remote** (default
   `origin`) where Refine publishes its dedicated `refine/state` branch. Run
-  `refine project status` and `refine project sync` before fleet changes; do
+  `refine project status` and `refine sync` before fleet changes; do
   not infer publication from local state alone.
 - The target repository is reachable from every worker, including credentials
   for a private repository. Interactive Git prompting is disabled on workers.
+- **Git 2.42 or newer on every node.** Refine's state merge is `git
+  merge-tree`, so a node with an older Git cannot synchronize at all: its
+  daemon refuses to start with a message naming the required and observed
+  versions, and `refine fleet sync` reports it as `unsupported_git`. Upgrading
+  Git on that node is the whole fix, and the rest of the fleet keeps
+  converging in the meantime.
 - For any machine you create or destroy, the user has approved the
   infrastructure, account, size, and expected cost.
 
@@ -47,7 +53,8 @@ refine node list
 refine next
 ```
 
-`refine fleet list` reports each node's enablement, connection, and health.
+`refine fleet list` reports each node's enablement, connection, and health —
+including `pending_upgrade` for a node that has not been upgraded yet.
 `refine next` recommends the next fleet operations with exact commands.
 
 ## Add a worker
@@ -128,8 +135,54 @@ Goal by Goal:
    limits and Feature ordering.
 3. Apply each assignment: `refine fleet transfer <node-id> <goal-id>`.
 4. Publish the new ownership so every node observes it: `refine fleet sync`.
+   Its per-node statuses say which nodes were asked and what each answered —
+   `queued` is that node's receipt for the request, not proof it has already
+   reconciled. A node reported `pending_upgrade` still received the ownership
+   change through `refine/state`.
 5. Read back `refine fleet list` and `refine goal list`, and report the
    resulting placement to the user.
+
+## Upgrade the fleet
+
+Upgrade nodes **one at a time, in any order**. There is no fleet-wide upgrade
+step, no window in which every node must be on the same build, and no need to
+stop the fleet. Each node is upgraded by following
+[the install runbook](install.md) on that node; a node's CLI and daemon are one
+binary, so upgrading a node upgrades both at once and no node is ever running a
+mixture.
+
+While a rollout is in progress the fleet is mixed, and that is a supported
+state:
+
+- Synchronization keeps converging. Upgraded and not-yet-upgraded nodes publish
+  to the same `refine/state` branch and each reads the other's commits; neither
+  deletes nor loses the other's records.
+- `refine fleet sync` reports one status per node and succeeds. A node whose
+  daemon is still on the previous API contract is reported as
+  `pending_upgrade`, with the contract version it speaks and the one this node
+  speaks. The rest of the fleet still syncs. The statuses are that command's
+  output, not a rewrite of the fleet's registry: `refine fleet list` keeps
+  showing each node's provisioning health, which no sync answer changes.
+- A `pending_upgrade` node keeps its work and keeps receiving distributed work.
+  It is a working node whose turn has not come, not a broken one.
+
+To roll out:
+
+1. Pick a node and check the fleet first: `refine fleet list`.
+2. Upgrade that node and restart its daemon on the same port.
+3. Confirm from the control machine: `refine fleet sync`. The upgraded node's
+   status in that output must no longer be `pending_upgrade`. That answer is
+   what proves the build changed; the node's own reconciliation is reported by
+   that node, through its own `refine sync` and its state-sync health.
+4. Repeat for the next node. Stop and report if a node's status becomes
+   `failed` or stays `unreachable` after its daemon is back. A node reported
+   `unsupported_git` needs its Git upgraded to 2.42 or newer before it can
+   sync; like `pending_upgrade` it is that node's own condition and does not
+   hold up the rest of the rollout.
+
+Do not treat `pending_upgrade` on the nodes you have not reached yet as a
+failure, and do not "fix" it by editing synchronized state, forcing a sync, or
+upgrading everything at once.
 
 ## Retire a worker
 
@@ -182,78 +235,36 @@ state appears on it before distributing work.
   state. See "Refine-owned durable state" in `docs/runbooks/install.md` for
   the other Refine-owned artifacts an operator may encounter.
 
-## Recover a missing synchronization baseline
+## Recover a contested first contact
 
-Use this procedure only when sync explicitly reports that its persisted
-three-way baseline is missing while non-bootstrap live state and the configured
-remote's existing `refine/state` branch are both present. Ordinary sync remains
-fail-closed in this topology and does not choose either side.
+Use this procedure only when a node joining an existing fleet fails closed:
+its live store already carries non-bootstrap records that contest content on
+the configured remote's `refine/state` branch, and there is no shared history
+to merge from. Ordinary divergence between nodes that share history is decided
+automatically (see `docs/runbooks/state-sync-recovery.md`).
 
-The daemon normally converges this automatically (see
-`docs/runbooks/state-sync-recovery.md` for the decision ladder). On an
-opted-out node, prefer the consolidated one-shot command and skip the rest of
-this procedure:
-
-```bash
-refine project state-recovery run
-```
-
-It performs sync, preview, apply, and the verifying sync as one operation with
-bounded internal race retries, deciding per path by Goal ownership at the
-agreed baseline (explicit `--authority remote|live` forces one side). Do not
-wrap it in your own retry loop. Use the manual preview flow below when an
-operator needs to review the comparison before choosing authority.
-
-1. Run the preview through the daemon-backed CLI and save the complete JSON:
+The daemon normally converges this automatically with remote authority. On an
+opted-out node, review the divergence and settle it in one command:
 
 ```bash
-refine project state-recovery preview > /tmp/refine-state-recovery-preview.json
+refine sync --preview
+refine sync --authority remote
+# or: --authority live, with --path exceptions taken from the other side
 ```
 
-   The preview is read-only. Confirm its target identity, configured remote,
-   exact local and remote state heads, missing baseline status, live-only,
-   remote-only, equal, and differing counts, and its bounded conflicting path
-   list. Do not edit the preview: the complete object is stale-fenced evidence.
-2. Choose authority explicitly:
+The preview is read-only JSON — the classification (`join` for a first
+contact), per-path sides, and a domain summary for each contested path. It is
+not a token; the terminal run re-derives everything itself.
 
-   - `live` anchors at the observed remote head, then uses normal state delta
-     semantics to publish live additions, modifications, and deletions as one
-     linear non-force commit. A path present only on the remote is deleted.
-   - `remote` first commits the complete pre-recovery live durable state to a
-     dedicated recovery ref, then compare-and-swap hydrates the observed remote
-     state into the live store.
-
-3. Apply the reviewed evidence:
-
-```bash
-refine project state-recovery apply --authority live \
-  --preview-file /tmp/refine-state-recovery-preview.json
-# or: --authority remote
-```
-
-   The equivalent daemon API is
-   `GET /api/project/state-recovery/preview` followed by
-   `POST /api/project/state-recovery/apply` with `authority` and the complete
-   `preview` object. When authoritative Dashboard health reports recovery kind
-   `missing_baseline`, the Dashboard exposes the same neutral preview and
-   requires a separate authority choice and exact-preview confirmation. It
-   never recommends or preselects authority.
-4. Read the result and inspect the reported recovery ref and manifest under the
-   repository's Git common directory in `refine-state-recoveries/`. The bounded
-   manifest records authority, node, target and remote identity, before/after
-   heads, counts, timestamps, outcome, and recovery location. Only a successful
-   result creates the baseline.
-5. If apply fails or is interrupted, do not delete its recovery ref or
-   manifest and do not fabricate a baseline. A `409` reason of `git_busy`
-   retains the same preview for retry, but requires deliberate confirmation
-   again. A `409` reason of `stale_preview` requires a new preview, authority
-   choice, and confirmation. Any changed target, repository, remote, remote
-   head, or unrelated live write likewise requires new operator review. After
-   success, confirm that Dashboard state-sync health cleared and retain the
-   displayed audit ref, manifest, published and local heads, evidence identity,
-   counts, authority, and detail.
+`refine sync --authority remote` retains the node's complete pre-recovery live
+store under `refs/refine/retained/live-<head>` before hydrating the remote
+branch into live, then joins the branch. `refine sync --authority live` keeps
+the live store, hydrates remote-only records additively, and publishes.
+Rerunning after success finds converged heads and is a no-op. The daemon API
+equivalent is `GET /api/sync/preview` and `POST /api/sync` with an
+`{"authority": ...}` body, which also settles state-sync health.
 
 Never run this live recovery from a Goal candidate or other isolated worktree.
 Run it through the daemon attached to the production target app. Recovery never
-accepts a remote override, force-pushes, rewrites history, or changes the
+accepts a remote override, rewrites application history, or changes the
 application branch, index, or worktree.

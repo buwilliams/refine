@@ -17,6 +17,13 @@ current v4 release can both report project schema version `2` while using
 incompatible durable layouts. Inspect the files; do not infer compatibility
 from the schema number alone.
 
+This is a one-time rewrite of the project's durable state from a v2 layout,
+which is why it stops every node once. It is not how ordinary upgrades work:
+v4 nodes are upgraded one at a time, in any order, while the rest of the fleet
+keeps running and converging on `refine/state` (see
+[`manage-fleet.md`](manage-fleet.md)). Do not generalize the stop-everything
+step below into a fleet-wide upgrade procedure.
+
 ## Outcome
 
 - The application branch no longer tracks or contains `<target-app>/.refine`.
@@ -190,7 +197,7 @@ schema-number edit to bypass semantic review.
    Refine surface and correct unsupported or renamed values explicitly. Leave
    concurrency caps absent unless the recorded migration evidence proves they
    were intentional.
-5. Run `refine project doctor`, then `refine project sync`. Sync initializes or
+5. Run `refine project doctor`, then `refine sync`. Sync initializes or
    reconciles `STATE_WORKTREE` and `refine/state` without checking out or moving
    the application branch. If the configured remote is absent, verify the local
    state commit and configure the remote before expecting publication.
@@ -222,7 +229,7 @@ schema-number edit to bypass semantic review.
   operator cap was preserved.
 - A second v4 node synchronizes the same durable records. Node-local Goal logs
   are not expected to appear on that node through `refine/state`.
-- A no-op `refine project sync` creates no additional commit or push.
+- A no-op `refine sync` creates no additional commit or push.
 
 Write a migration report containing the installed Refine version, derived Git
 and runtime roots, backup location and checksum manifest, before/after counts,

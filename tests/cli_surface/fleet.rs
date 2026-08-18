@@ -67,6 +67,22 @@ pub(crate) fn fleet_local_registry_commands(fixture: &IntegrationFixture) {
     let sync_payload = fixture.json_stdout(&sync);
     assert_eq!(sync_payload["ok"], true, "{sync_payload:#}");
     assert_eq!(sync_payload["git_sync"]["ok"], true, "{sync_payload:#}");
+    // Fleet sync reports one status per node beside this node's own result.
+    // Nothing here is mid-upgrade, so no node is pending upgrade.
+    let node_statuses = sync_payload["nodes"]
+        .as_array()
+        .unwrap_or_else(|| panic!("fleet sync must report per-node status: {sync_payload:#}"));
+    assert!(
+        node_statuses
+            .iter()
+            .any(|node| node["node_id"] == "fleet-smoke"),
+        "{sync_payload:#}"
+    );
+    assert_eq!(
+        sync_payload["pending_upgrade"],
+        json!([]),
+        "{sync_payload:#}"
+    );
     let maintenance = fixture.run_refine(&["fleet", "maintenance"]);
     fixture.assert_success("fleet maintenance", &maintenance);
     let maintenance_payload = fixture.json_stdout(&maintenance);

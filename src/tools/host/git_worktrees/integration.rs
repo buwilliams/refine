@@ -1,6 +1,39 @@
 use super::*;
 
+/// Write conflict markers that carry the merge base as well as both sides.
+///
+/// A conflict a resolver is asked to understand is not readable from two
+/// versions alone: without the base section it cannot tell which side changed
+/// what. Refine's state workspaces render the base explicitly; a conflicted
+/// rebase gets it from Git, whatever the user's own `merge.conflictStyle`
+/// happens to be, through this per-invocation configuration.
+pub(super) const BASE_IN_CONFLICT_MARKERS: [(&str, &str); 3] = [
+    ("GIT_CONFIG_COUNT", "1"),
+    ("GIT_CONFIG_KEY_0", "merge.conflictStyle"),
+    ("GIT_CONFIG_VALUE_0", "diff3"),
+];
+
 impl FileGitWorktreeService {
+    /// Whether a merge, rebase, revert, or cherry-pick is stopped
+    /// mid-operation in this worktree. A crash between Refine's two holds
+    /// leaves exactly that, and the checkout stays wedged until something
+    /// aborts it.
+    pub fn operation_in_progress(&self) -> RefineResult<bool> {
+        let rebase_merge = self.git_path("rebase-merge")?;
+        let Some(git_dir) = rebase_merge.parent() else {
+            return Ok(false);
+        };
+        Ok([
+            "rebase-merge",
+            "rebase-apply",
+            "MERGE_HEAD",
+            "REVERT_HEAD",
+            "CHERRY_PICK_HEAD",
+        ]
+        .iter()
+        .any(|marker| git_dir.join(marker).exists()))
+    }
+
     pub fn remote_exists(&self, remote: &str) -> RefineResult<bool> {
         if remote.trim().is_empty() {
             return Ok(false);
@@ -113,126 +146,6 @@ impl FileGitWorktreeService {
         )
     }
 
-    /// Delete only the exact Refine-owned remote ref previously inspected.
-    ///
-    /// The force-with-lease is a compare-and-delete fence, not a history
-    /// rewrite: if another process advances the branch, Git rejects deletion.
-    pub fn delete_remote_branch_if_matches(
-        &self,
-        remote: &str,
-        branch: &str,
-        expected_commit: &str,
-    ) -> RefineResult<()> {
-        validate_branch_name(branch)?;
-        validate_commitish(expected_commit)?;
-        let reference = format!("refs/heads/{branch}");
-        let lease = format!("--force-with-lease={reference}:{expected_commit}");
-        let deletion = format!(":{reference}");
-        self.git_output(&["push", &lease, remote, &deletion])?;
-        self.audit(
-            "remote_branch_delete",
-            "ok",
-            json!({
-                "remote": remote,
-                "branch": branch,
-                "expected_commit": expected_commit,
-                "exact_sha_fence": true
-            }),
-        )
-    }
-
-    /// Atomically compare both advertised refs and delete only the branch.
-    ///
-    /// The target refspec is intentionally a no-op when the snapshot still
-    /// matches. If the target moved, it becomes a rejected stale lease instead
-    /// of silently validating ancestry against an obsolete target.
-    pub fn delete_remote_branch_if_snapshot_matches(
-        &self,
-        remote: &str,
-        branch: &str,
-        expected_branch_commit: &str,
-        target_branch: &str,
-        expected_target_commit: &str,
-    ) -> RefineResult<GitRemoteRefDeleteOutcome> {
-        validate_branch_name(branch)?;
-        validate_branch_name(target_branch)?;
-        validate_commitish(expected_branch_commit)?;
-        validate_commitish(expected_target_commit)?;
-        if branch == target_branch {
-            return Err(RefineError::InvalidInput(
-                "cleanup branch and merge target must be distinct".to_string(),
-            ));
-        }
-        let snapshot = self.remote_refine_ref_snapshot(remote, target_branch)?;
-        if snapshot.target_commit.as_deref() != Some(expected_target_commit) {
-            return Ok(GitRemoteRefDeleteOutcome::TargetChanged);
-        }
-        if snapshot
-            .refine_branches
-            .iter()
-            .find(|candidate| candidate.branch == branch)
-            .map(|candidate| candidate.commit.as_str())
-            != Some(expected_branch_commit)
-        {
-            return Ok(GitRemoteRefDeleteOutcome::BranchChanged);
-        }
-
-        let branch_ref = format!("refs/heads/{branch}");
-        let target_ref = format!("refs/heads/{target_branch}");
-        let branch_lease = format!("--force-with-lease={branch_ref}:{expected_branch_commit}");
-        let target_lease = format!("--force-with-lease={target_ref}:{expected_target_commit}");
-        let deletion = format!(":{branch_ref}");
-        let target_noop = format!("{expected_target_commit}:{target_ref}");
-        let output = self.git_raw(&[
-            "push",
-            "--atomic",
-            &branch_lease,
-            &target_lease,
-            remote,
-            &deletion,
-            &target_noop,
-        ])?;
-        if output.success {
-            self.audit(
-                "remote_branch_delete",
-                "ok",
-                json!({
-                    "remote": remote,
-                    "branch": branch,
-                    "expected_commit": expected_branch_commit,
-                    "target_branch": target_branch,
-                    "expected_target_commit": expected_target_commit,
-                    "exact_sha_fence": true,
-                    "atomic_target_fence": true
-                }),
-            )?;
-            return Ok(GitRemoteRefDeleteOutcome::Deleted);
-        }
-
-        let message = trimmed_command_text(&output);
-        let current = self.remote_refine_ref_snapshot(remote, target_branch)?;
-        if current.target_commit.as_deref() != Some(expected_target_commit) {
-            return Ok(GitRemoteRefDeleteOutcome::TargetChanged);
-        }
-        if current
-            .refine_branches
-            .iter()
-            .find(|candidate| candidate.branch == branch)
-            .map(|candidate| candidate.commit.as_str())
-            != Some(expected_branch_commit)
-        {
-            return Ok(GitRemoteRefDeleteOutcome::BranchChanged);
-        }
-        let lower = message.to_ascii_lowercase();
-        if lower.contains("does not support --atomic")
-            || lower.contains("does not support atomic")
-            || lower.contains("atomic push is not supported")
-        {
-            return Ok(GitRemoteRefDeleteOutcome::AtomicUnsupported);
-        }
-        Err(RefineError::Conflict(message))
-    }
-
     pub fn fast_forward_from_remote(&self, remote: &str, branch: &str) -> RefineResult<()> {
         self.fetch_branch(remote, branch)?;
         let remote_branch = format!("{remote}/{branch}");
@@ -320,6 +233,54 @@ impl FileGitWorktreeService {
             .filter(|path| !path.is_empty())
             .map(|path| String::from_utf8_lossy(path).to_string())
             .collect())
+    }
+
+    /// Stage the resolved paths of a stopped rebase and continue it. Refine
+    /// never skips a pick: a further conflicted stop or any other failure
+    /// comes back as a non-ok `MergeResult` for the caller to route.
+    pub fn rebase_continue(&self, resolved_paths: &[String]) -> RefineResult<MergeResult> {
+        if resolved_paths.is_empty() {
+            return Err(RefineError::InvalidInput(
+                "rebase continue requires the resolved paths of the current stop".to_string(),
+            ));
+        }
+        let mut add_args = vec!["add", "--"];
+        add_args.extend(resolved_paths.iter().map(String::as_str));
+        self.git_output(&add_args)?;
+        let mut env = vec![("GIT_EDITOR", "true")];
+        env.extend(BASE_IN_CONFLICT_MARKERS);
+        let output = self.git_raw_with_env(&["rebase", "--continue"], &env)?;
+        let result = MergeResult {
+            ok: output.success,
+            conflicts: self.conflicts().unwrap_or_default(),
+            message: Some(trimmed_command_text(&output)),
+        };
+        if result.ok {
+            self.audit("rebase_continue", "ok", json!({"result": &result}))?;
+        } else {
+            let _ = self.audit("rebase_continue", "conflict", json!({"result": &result}));
+        }
+        Ok(result)
+    }
+
+    /// Commits in `base..tip` that touched any of `paths`, newest first,
+    /// capped so provenance lookups over the conflicting range stay bounded.
+    pub fn commits_in_range_touching(
+        &self,
+        base: &str,
+        tip: &str,
+        paths: &[String],
+    ) -> RefineResult<Vec<String>> {
+        validate_commitish(base)?;
+        validate_commitish(tip)?;
+        if paths.is_empty() {
+            return Ok(Vec::new());
+        }
+        let range = format!("{base}..{tip}");
+        let mut args = vec!["rev-list", "-n", "50", &range, "--"];
+        args.extend(paths.iter().map(String::as_str));
+        let output = stdout(self.git_output(&args)?)?;
+        Ok(output.split_whitespace().map(str::to_string).collect())
     }
 
     pub fn merge_commit_no_ff(&self, commit: &str) -> RefineResult<MergeResult> {
@@ -571,54 +532,6 @@ impl FileGitWorktreeService {
         validate_commitish(commit)?;
         self.git_output(&["checkout", "--detach", commit])?;
         self.audit("checkout_detached", "ok", json!({"commit": commit}))
-    }
-
-    /// Compare-and-swap advance of a fully qualified branch ref.
-    ///
-    /// Unlike `branch -f`, `update-ref` moves a branch even while it is
-    /// checked out in another worktree, which is what lets a detached
-    /// integration worktree advance the target branch of the shared human
-    /// checkout. Losing the race maps to `TargetAdvanced` naming the current
-    /// commit so callers can rejoin their refresh loop.
-    pub fn update_ref_cas(
-        &self,
-        reference: &str,
-        to_commit: &str,
-        expected_old: &str,
-    ) -> RefineResult<()> {
-        validate_head_branch_ref(reference)?;
-        validate_commitish(to_commit)?;
-        validate_commitish(expected_old)?;
-        let output = self.git_raw(&["update-ref", reference, to_commit, expected_old])?;
-        if output.success {
-            return self.audit(
-                "update_ref_cas",
-                "ok",
-                json!({
-                    "reference": reference,
-                    "to_commit": to_commit,
-                    "expected_old": expected_old,
-                    "exact_sha_fence": true
-                }),
-            );
-        }
-        let message = trimmed_command_text(&output);
-        let expected = self.resolve_commit(expected_old)?;
-        if let Ok(current) = self.resolve_commit(reference)
-            && current != expected
-        {
-            let _ = self.audit(
-                "update_ref_cas",
-                "conflict",
-                json!({"reference": reference, "expected_old": expected, "current": current}),
-            );
-            return Err(RefineError::TargetAdvanced {
-                reference: reference.to_string(),
-                expected,
-                current,
-            });
-        }
-        Err(RefineError::Conflict(message))
     }
 
     /// Two-tree merge of the `from`→`to` delta into the index and working

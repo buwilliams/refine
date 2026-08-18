@@ -7,6 +7,7 @@
 - **Ephemeral Workers, Durable Evidence**: a worker can be rebuilt from Git and synchronized state.
 - **Symmetric Sync**: every node publishes and pulls the same control branch.
 - **Node-Local Sync Health**: each daemon reports its own reconciliation freshness; it cannot infer another daemon's health from shared state.
+- **Rolling Upgrades**: nodes upgrade one at a time, in any order; mixed versions converge on the shared control branch, and a node whose turn has not come reports pending upgrade rather than failing the fleet.
 - **Judgment Converges**: implementation may run anywhere while review converges where judgment occurs.
 
 ## Purpose
@@ -21,58 +22,60 @@ Convergence is distribution pointed toward the review node. Strategies remain in
 
 State synchronizes symmetrically on `refine/state`; application branches remain separate. Goal records carry target branch, base commit, candidate branch, and exact candidate commit. Implementation, quality, and governance evidence are produced where work runs, and review and integration consume that durable evidence.
 
-Reconciliation never guesses a winner from circumstance: timestamps, recency,
-and which node happens to run the merge decide nothing. Which side wins comes
-only from declared policy or an explicit operator decision. The declared
-policy is ownership, and the merge itself applies it: when both sides changed
-the same member of a Goal record and compatibility cannot be proven, the node
-that owned the record at the last agreed baseline is authoritative for the
-contested members — a stale local understanding is not a wrong one, so
-staleness alone never discards work only the owning node could produce —
-while the other side's compatible edits still merge and synchronization
-completes with an `ownership_resolved` reconciliation outcome instead of a
-conflict. Round evidence and workflow authority (status, assignment, branch)
-are one coupled unit under that arbitration, so Rounds are never split from
-the authority that produced them. Ownership is read from baseline bytes, so
-neither contested side can vote for itself and every node resolves the same
-contention identically. What the merge cannot arbitrate at all — unparseable
-or schema-invalid records, non-Goal shared state, delete contention — still
-fails closed, and the daemon then applies the same ownership policy through
-automatic recovery (missing baseline stays uniformly remote), records the
-auto-recovery with its retained ref in activity, and honors a node's
-`state_sync_auto_recovery: off` opt-out, so ordinary syncing requires no
-operator ceremony. A missing baseline remains a whole-side recovery. Unequal
-unarbitratable edits from a valid baseline produce an atomic, complete
-node-local conflict report while health and activity expose only its stable
-id, count, location, and guidance. The corresponding stale-fenced preview
-supports a default side and explicit per-path overrides. Recovery preserves
-one-sided and schema-proven changes, retains pre-recovery and target refs,
-compare-and-swaps the remote head, and resumes only its exact manifest.
-Rounds and other identity-free ordered arrays remain atomic; compatible Goal
-merges are limited to object members and stable keyed collections, with
-baseline ownership arbitrating what compatibility cannot prove. The shared
-`nodes.json` registry is reconciled by canonical node id: records are retained
-as a union, one-sided changes survive, and concurrent versions use the later
-comparable record timestamp. Absence never implies node deletion. Invalid or
-duplicate identities, malformed timestamps, and equal-timestamp disagreement
-remain conflicts, and an unrelated unresolved path withholds the entire
-prepared reconciliation.
+How divergent `refine/state` heads converge is the persistence-sync
+capability's policy, not Fleet's
+(`docs/intent/03-capabilities/05-persistence-sync.md`). Fleet keeps only the
+principles that outlast any mechanism — and they are more than prose:
+persistence sync hands this doctrine verbatim to the resolving agent as its
+guidance, and a test pins that quote to this document so code and intent
+cannot drift. Reconciliation never guesses a winner
+from circumstance: timestamps, recency, and which node happens to run the
+merge decide nothing. Ownership is declared doctrine, never circumstance:
+the node that owned a record at the merge base is authoritative
+for contested members, and staleness alone never discards work only the
+owning node could produce — a stale local understanding is not a wrong one.
+Round evidence and the workflow authority that produced it (status,
+assignment, branch) move as one coupled unit: Rounds and other identity-free
+ordered arrays are atomic and never split from that authority. Nothing is
+silently destroyed: every losing side is retained as a ref before
+publication. When resolution genuinely needs help, escalation carries a
+domain-terms question an operator can answer in one read, never a bare
+fence — and escalation is ordered: the agent resolves first, and only after
+it declares a decision is needed or spends its bounded attempts (or
+resolution is unavailable or disabled) does the daemon's automatic recovery
+apply merge-base ownership
+deterministically, itself carrying an opt-out for nodes doing deliberate
+divergence work. The deterministic structural driver merges what it can prove
+disjoint, including the `nodes.json` registry, whose records union by
+canonical node id so absence never implies node deletion.
 
-If a valid recorded baseline exists but its exact bytes are no longer
-reconstructable, synchronization reports that condition distinctly. Only
-`nodes.json` may attempt a base-less reconcile, under the same canonical-id,
-record-union, strict timestamp, and atomic-application rules. The baseline's
-fingerprint map is paired with a retained immutable state snapshot so ordinary
-history rewriting or runtime-root changes do not silently discard merge
-evidence; missing whole-baseline authority remains a manual recovery.
+A fleet is upgraded node by node, in any order, and is never required to
+upgrade at once. A node's CLI and daemon are one binary, so no node is ever
+internally mixed; between nodes there are exactly two shared surfaces. The
+first is `refine/state`, where an upgraded node's merges and a
+not-yet-upgraded node's linear rebase-and-push are each just commits to the
+other side, so the branch keeps converging throughout a rollout and neither
+kind of node loses or deletes the other's records. The second is the daemon
+API: a node still on the previous contract version rejects a newer node's
+request, and fleet surfaces report that as that node's pending-upgrade status
+— a per-node condition that leaves the rest of the fleet syncing, keeps the
+node eligible for work because it is still a working node, and clears when
+that node's turn comes. Upgrading a node also retires whatever the previous
+build left on it, without losing a record.
 
-Sync health is bound to the serving daemon's active target and node and remains outside `refine/state`. Monotonic attempt ids and sources fence overlapping settlements: a late result cannot relabel a newer attempt, and a neutral lock deferral cannot clear an active failure episode or its report pointer. A daemon reports its active node from local evidence and reports other nodes as unknown unless it has direct evidence from those daemons. A stale or failed local reconciliation means that daemon's fleet-wide counts are a local projection, not an authoritative fleet total; surfaces must label that boundary instead of presenting divergent arithmetic as fact. Ordinary per-node heartbeat churn is semantically reconciled and does not by itself stale-fence synchronization or downgrade otherwise authoritative fleet counts.
+What one node observes of another's daemon — reachable, upgraded, erroring —
+belongs to the pass that observed it and is reported there. It is never
+written into the synchronized node registry, because it is a fact about the
+link between those two nodes rather than shared truth, and because a node's
+recorded health is its provisioning verdict: the one signal that withholds
+work from a node, owned by the bootstrap that produced it. No answer to a
+synchronization request may create that verdict or erase it.
 
-Repeated unchanged background failures use capped in-memory exponential
-backoff. A changed target, node, durable-state fingerprint, failure context, or
-successful sync resets suppression. Suppressed intervals create no attempt or
-activity evidence, while an explicit project sync always remains immediately
-available.
+Sync health is bound to the serving daemon's active target and node and remains outside `refine/state`. A daemon reports its active node from local evidence and reports other nodes as unknown unless it has direct evidence from those daemons. A stale or failed local reconciliation means that daemon's fleet-wide counts are a local projection, not an authoritative fleet total; surfaces must label that boundary instead of presenting divergent arithmetic as fact.
+
+Repeated unchanged background failures back off under a cap; any change in
+context or a successful sync resets suppression, and an explicit `sync`
+always remains immediately available.
 
 Infrastructure and credentials remain outside Refine's core. The manage-fleet runbook guides agents through provisioning and authentication without placing secrets in shared state.
 

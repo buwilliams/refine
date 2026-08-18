@@ -59,6 +59,11 @@ name = "multi_instance_sync"
 path = "tests/multi_instance_sync.rs"
 test = false
 
+[[test]]
+name = "sync_simulation"
+path = "tests/sync_simulation.rs"
+test = false
+
 [dependencies]
 clap = { version = "4.5", features = ["derive"] }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
@@ -80,3 +85,8 @@ mail-parser = "0.11"
 
 [patch.crates-io]
 portable-pty = { path = "vendor/portable-pty" }
+
+[[test]]
+name = "sync_regressions"
+path = "tests/sync_regressions.rs"
+test = false

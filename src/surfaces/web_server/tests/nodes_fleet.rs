@@ -89,6 +89,86 @@ fn web_server_manages_fleet_operations_over_nodes() {
     remove_temp_dir(&temp_root);
 }
 
+/// The daemon's fleet fan-out during a rolling upgrade: the node still on the
+/// previous build answers the API-contract gate, and the route reports that
+/// node as pending upgrade with a 200 — the fleet did not fail, one node has
+/// simply not been upgraded yet.
+#[test]
+fn web_server_fleet_sync_reports_a_pending_upgrade_node_without_failing() {
+    use crate::tools::host::fleet::{
+        FleetNodeDaemonClient, NodeDaemonReply, install_node_daemon_client,
+    };
+
+    struct ContractGateDaemon;
+
+    impl FleetNodeDaemonClient for ContractGateDaemon {
+        fn sync_node(&self, node: &crate::model::node::Node) -> NodeDaemonReply {
+            if node.id == "node-old" {
+                return NodeDaemonReply::Answered {
+                    status: 426,
+                    body: json!({
+                        "error": {
+                            "code": "api_version_mismatch",
+                            "message": "unsupported Refine API contract version"
+                        },
+                        "api_contract_version": "2",
+                        "supported_api_contract_versions": ["2"]
+                    }),
+                };
+            }
+            NodeDaemonReply::Answered {
+                status: 200,
+                body: json!({"operation": {"id": "op-1", "status": "running"}}),
+            }
+        }
+    }
+
+    let temp_root = unique_temp_dir("http-fleet-sync-pending-upgrade");
+    let refine_dir = temp_root.join(".refine");
+    fs::create_dir_all(&refine_dir).unwrap();
+    let mut server = server_with_projection();
+    server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
+    for id in ["node-old", "node-new"] {
+        let registered = server.handle(ApiRequest {
+            method: "POST".to_string(),
+            path: "/api/fleet/nodes".to_string(),
+            body: Some(json!({"id": id, "ssh_host": "example.com", "refine_port": 8082})),
+        });
+        assert_eq!(registered.status, 200);
+    }
+    let _daemons = install_node_daemon_client(&refine_dir, std::sync::Arc::new(ContractGateDaemon));
+
+    let synced = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/fleet/sync".to_string(),
+        body: None,
+    });
+
+    assert_eq!(synced.status, 200);
+    assert_eq!(synced.body["ok"], true);
+    assert_eq!(synced.body["pending_upgrade"], json!(["node-old"]));
+    let status = |id: &str| {
+        synced.body["nodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|node| node["node_id"] == id)
+            .unwrap_or_else(|| panic!("{id} is missing from the fleet sync report"))
+            .clone()
+    };
+    assert_eq!(status("node-old")["status"], "pending_upgrade");
+    assert_eq!(status("node-old")["api_contract_version"], "2");
+    assert_eq!(
+        status("node-old")["expected_api_contract_version"],
+        crate::model::API_CONTRACT_VERSION
+    );
+    // The answer is the node's receipt for the request, not a verdict on its
+    // reconciliation: that node runs and reports its own pass.
+    assert_eq!(status("node-new")["status"], "queued");
+
+    remove_temp_dir(&temp_root);
+}
+
 #[test]
 fn web_server_reports_dashboard_diagnostics_target_app_nodes_and_fleet() {
     let temp_root = unique_temp_dir("http-status-surfaces");

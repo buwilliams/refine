@@ -17,6 +17,7 @@ pub(super) fn run_project_sync_operation(
         let attempt_id = record_state_sync_attempt(runtime_root, target_root, &node_id, source)?;
         attempted = Some((attempt_id, source));
         let git_sync = match FileGitSyncService::new(target_root, runtime_root)
+            .with_agent_resolution()
             .sync_with_attempt(StateSyncAttemptContext::new(attempt_id.to_string(), source))
         {
             Ok(result) => {

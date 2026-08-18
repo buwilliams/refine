@@ -43,7 +43,7 @@ fn sync_commits_pushes_and_pulls_refine_state() {
 }
 
 #[test]
-fn push_retry_rechecks_original_base_against_fresh_local_and_remote_state() {
+fn push_race_retry_remerges_and_reports_contested_records_with_push_retry_phase() {
     use std::os::unix::fs::PermissionsExt;
 
     let fixture = SyncFixture::new("push-retry-conflict");
@@ -99,9 +99,9 @@ fn push_retry_rechecks_original_base_against_fresh_local_and_remote_state() {
         .collect::<Vec<_>>();
     assert_eq!(errors.len(), 1, "left={left:?}, right={right:?}");
     assert!(
-        errors[0]
-            .to_string()
-            .contains("during push_retry: 1 unresolved path"),
+        errors[0].to_string().contains(
+            "needs a decision: this node and another changed the same record(s) (1 contested"
+        ),
         "{}",
         errors[0]
     );
@@ -127,10 +127,10 @@ fn push_retry_rechecks_original_base_against_fresh_local_and_remote_state() {
 }
 
 #[test]
-fn push_retry_uses_safe_node_registry_fallback_when_recorded_baseline_bytes_are_unavailable() {
+fn push_race_retry_merges_disjoint_records_from_the_fresh_remote_head() {
     use std::os::unix::fs::PermissionsExt;
 
-    let fixture = SyncFixture::new("push-retry-node-merge");
+    let fixture = SyncFixture::new("push-retry-merge");
     write_nodes(
         &fixture.a,
         &[
@@ -140,8 +140,6 @@ fn push_retry_uses_safe_node_registry_fallback_when_recorded_baseline_bytes_are_
     );
     fixture.service(&fixture.a).sync().unwrap();
     fixture.service(&fixture.b).sync().unwrap();
-    rewrite_baseline_fingerprint(&fixture.a, "nodes.json", u64::MAX);
-    rewrite_baseline_fingerprint(&fixture.b, "nodes.json", u64::MAX);
     write_nodes(
         &fixture.a,
         &[
@@ -197,15 +195,6 @@ fn push_retry_uses_safe_node_registry_fallback_when_recorded_baseline_bytes_are_
         left.pushed && right.pushed,
         "left={left:?}, right={right:?}"
     );
-    assert!(
-        [left.detail.as_deref(), right.detail.as_deref()]
-            .into_iter()
-            .flatten()
-            .any(|detail| detail.contains(
-                "Merged per-node registry changes during push retry with safe baseline-unavailable fallback"
-            )),
-        "left={left:?}, right={right:?}"
-    );
     git(&fixture.a, &["fetch", "-q", "origin", REFINE_STATE_BRANCH]);
     let remote_nodes: crate::model::node::NodeRegistry = serde_json::from_str(&git_stdout(
         &fixture.a,
@@ -214,45 +203,6 @@ fn push_retry_uses_safe_node_registry_fallback_when_recorded_baseline_bytes_are_
     .unwrap();
     assert_eq!(remote_nodes.nodes[0].updated_at, "2026-08-17T08:01:00Z");
     assert_eq!(remote_nodes.nodes[1].updated_at, "2026-08-17T08:02:00Z");
-}
-
-#[test]
-fn missing_first_reconciliation_requires_explicit_authority_without_deleting_remote_records() {
-    let fixture = SyncFixture::new("failed-first-reconciliation");
-    write_goal(&fixture.a, "GOALA");
-    let refine_a = refine_dir_for_target_root(&fixture.a).unwrap();
-    let refine_b = refine_dir_for_target_root(&fixture.b).unwrap();
-    fs::create_dir_all(&refine_b).unwrap();
-    fs::write(refine_a.join("shared.json"), "{\"node\":\"a\"}\n").unwrap();
-    fs::write(refine_b.join("shared.json"), "{\"node\":\"b\"}\n").unwrap();
-    fixture.service(&fixture.a).sync().unwrap();
-
-    let error = fixture.service(&fixture.b).sync().unwrap_err();
-    assert!(error.to_string().contains("baseline is missing"), "{error}");
-    assert!(refine_b.join("shared.json").exists());
-    assert!(
-        !git_stdout(
-            &fixture.b,
-            &["show", "origin/refine/state:.refine/goals/GOALA/goal.json"],
-        )
-        .is_empty()
-    );
-
-    let service = fixture.service(&fixture.b);
-    let preview = service.preview_state_recovery().unwrap();
-    let recovered = service
-        .apply_state_recovery(StateRecoveryAuthority::Remote, preview)
-        .unwrap();
-
-    assert!(recovered.baseline_created, "{recovered:?}");
-    assert!(refine_b.join("goals/GOALA/goal.json").exists());
-    assert!(
-        !git_stdout(
-            &fixture.b,
-            &["show", "origin/refine/state:.refine/goals/GOALA/goal.json"],
-        )
-        .is_empty()
-    );
 }
 
 #[test]
@@ -304,6 +254,73 @@ fn first_sync_hydrates_remote_state_over_local_bootstrap_metadata() {
             .as_deref()
             .is_some_and(|detail| detail.contains("bootstrap metadata")),
         "{hydrated:?}"
+    );
+}
+
+#[test]
+fn joining_with_unpublished_records_publishes_them_and_keeps_remote_records() {
+    let fixture = SyncFixture::new("join-disjoint");
+    write_goal(&fixture.a, "GOALA");
+    fixture.service(&fixture.a).sync().unwrap();
+
+    // Node B has real (non-bootstrap) live records that were never published
+    // anywhere, but nothing overlaps with the remote branch.
+    write_goal(&fixture.b, "GOALB");
+
+    let joined = fixture.service(&fixture.b).sync().unwrap();
+
+    assert!(joined.committed && joined.pushed, "{joined:?}");
+    let refine_b = refine_dir_for_target_root(&fixture.b).unwrap();
+    assert!(refine_b.join("goals/GOALA/goal.json").exists());
+    assert!(refine_b.join("goals/GOALB/goal.json").exists());
+    assert!(
+        !git_stdout(
+            &fixture.b,
+            &["show", "origin/refine/state:.refine/goals/GOALA/goal.json"],
+        )
+        .is_empty()
+    );
+    assert!(
+        !git_stdout(
+            &fixture.b,
+            &["show", "origin/refine/state:.refine/goals/GOALB/goal.json"],
+        )
+        .is_empty()
+    );
+}
+
+#[test]
+fn joining_with_contested_records_fails_closed_without_touching_either_side() {
+    let fixture = SyncFixture::new("join-contested");
+    write_goal(&fixture.a, "GOALA");
+    let refine_a = refine_dir_for_target_root(&fixture.a).unwrap();
+    let refine_b = refine_dir_for_target_root(&fixture.b).unwrap();
+    fs::create_dir_all(&refine_b).unwrap();
+    fs::write(refine_a.join("shared.json"), "{\"node\":\"a\"}\n").unwrap();
+    fs::write(refine_b.join("shared.json"), "{\"node\":\"b\"}\n").unwrap();
+    fixture.service(&fixture.b).sync().unwrap();
+    fixture.service(&fixture.a).sync().unwrap_err();
+
+    // A first contact has no merge base to arbitrate a contested record.
+    assert!(refine_a.join("shared.json").exists());
+    assert_eq!(
+        fs::read_to_string(refine_a.join("shared.json")).unwrap(),
+        "{\"node\":\"a\"}\n"
+    );
+    let report = latest_state_sync_conflict_report(&fixture.a.join("run"))
+        .unwrap()
+        .unwrap();
+    assert_eq!(report.unresolved_paths, vec!["shared.json"]);
+    // The local branch stays absent so the join re-derives on every rerun.
+    assert!(
+        !git_stdout(&fixture.a, &["branch", "--list", "refine/state"]).contains("refine/state")
+    );
+    assert!(
+        !git_stdout(
+            &fixture.a,
+            &["show", "origin/refine/state:.refine/shared.json"],
+        )
+        .is_empty()
     );
 }
 

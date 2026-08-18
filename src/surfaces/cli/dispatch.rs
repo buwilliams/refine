@@ -11,6 +11,7 @@ mod goals;
 mod logs;
 mod nodes;
 mod projects;
+mod sync;
 mod system;
 mod todos;
 mod website;
@@ -83,6 +84,7 @@ use crate::tools::host::daemon_lifecycle::{
 };
 use crate::tools::host::fleet::{
     FLEET_RUNBOOK_PATH, FileFleetService, FleetService, NodeRemoteUpdate, fleet_manage_prompt,
+    fleet_sync_response,
 };
 use crate::tools::host::git_sync::FileGitSyncService;
 use crate::tools::host::installation::{FileInstallationService, InstallationService};
@@ -133,6 +135,12 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
             return Ok(());
         }
         Commands::Project { action } => return dispatch_project_daemon(action),
+        Commands::Sync {
+            preview,
+            authority,
+            paths,
+            ..
+        } => return sync::dispatch_daemon(preview, authority, paths),
         Commands::Goal { action } => return dispatch_goal_daemon(action),
         Commands::Feature { action } => return dispatch_feature_daemon(action),
         Commands::Todo { action } => return dispatch_todo(action),
@@ -181,6 +189,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         command @ Commands::Log { .. } => logs::dispatch_command(command),
         command @ Commands::Agent { .. } => agents::dispatch_command(command),
         command @ Commands::Project { .. } => projects::dispatch_command(command),
+        command @ Commands::Sync { .. } => sync::dispatch_command(command),
         command @ Commands::Goal { .. } => goals::dispatch_command(command),
         command @ Commands::Feature { .. } => features::dispatch_command(command),
         command @ Commands::Todo { .. } => todos::dispatch_command(command),
@@ -246,6 +255,14 @@ pub(super) fn run_system_start(
     // without this a slow start is indistinguishable from a hung one.
     lifecycle.record_startup_progress(actual_port, "preparing");
     eprintln!("refine: preparing daemon at http://{addr}");
+    // State synchronization is `git merge-tree`; a node whose Git cannot run it
+    // would serve happily and then fail every sync. Say so once, here, in the
+    // sentence that names the fix — and record it as a start failure so a
+    // service-managed daemon's readiness waiter sees the reason too.
+    if let Err(error) = crate::tools::git::merge::ensure_supported_git() {
+        let _ = lifecycle.mark_start_failed(actual_port, &error);
+        return Err(error);
+    }
     let project_preparation = (|| -> RefineResult<_> {
         lifecycle.record_startup_progress(actual_port, "loading-project-registry");
         eprintln!("refine: loading active project registry");
@@ -590,15 +607,10 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
             | ProjectAction::Clone { target_root, .. }
             | ProjectAction::Remove { target_root, .. }
             | ProjectAction::Migrate { target_root, .. }
-            | ProjectAction::Sync { target_root, .. }
             | ProjectAction::CleanupWorktrees { target_root, .. }
             | ProjectAction::Doctor { target_root, .. } => target_root.as_ref(),
-            ProjectAction::StateRecovery { action } => match action {
-                ProjectStateRecoveryAction::Preview { target_root }
-                | ProjectStateRecoveryAction::Apply { target_root, .. }
-                | ProjectStateRecoveryAction::Run { target_root, .. } => target_root.as_ref(),
-            },
         },
+        Commands::Sync { target_root, .. } => target_root.as_ref(),
         Commands::Goal { action } => match action {
             GoalAction::Create { target_root, .. }
             | GoalAction::Draft { target_root, .. }

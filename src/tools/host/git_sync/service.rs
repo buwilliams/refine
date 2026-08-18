@@ -1,11 +1,84 @@
 use super::*;
 
+use super::resolution::{LockAcquisition, StateResolutionHold, StateResolutionSlot};
+use crate::tools::git::ancestry::{Ancestry, classify};
+use crate::tools::git::merge::{
+    TreeOperation, build_tree, commit_tree, empty_tree_id, ensure_supported_git, merge_commits,
+    write_blob,
+};
+use crate::tools::git::state_driver::{merge_added_state_file, merge_state_file};
+
+/// Durable marker that a branch-state adoption (live store lost or never
+/// populated while the branch carries records) is underway. Hydration copies
+/// records one at a time, so a crash mid-adoption leaves live carrying only
+/// some of them; without the marker the rerun would mirror that partial live
+/// back onto the branch as deletions of everything not yet copied.
+const STATE_ADOPTION_REF: &str = "refs/refine/state-adoption";
+
+/// How much of an adopted commit hydration copies into the live store.
+#[derive(Clone, Debug)]
+pub(super) enum HydrationScope {
+    /// Only paths the adoption changed relative to the previously observed
+    /// local head; deletions propagate because the deleted path was observed.
+    ChangedSince(String),
+    /// Every durable path in the commit; nothing is deleted from live. Used
+    /// when the local tree never matched live (bootstrap adoption, join).
+    FullTree,
+    /// Only commit paths the pass's live snapshot did not carry at all:
+    /// strictly additive. Used when live is authoritative for everything it
+    /// already holds (live-authority join).
+    MissingOnly,
+    /// Every durable path in the commit except `keep`; nothing is deleted
+    /// from live. Contested paths decided live stay untouched via `keep`,
+    /// and live-only paths — never contested on a join — remain in place to
+    /// be published additively by the same pass. Reserved for authority
+    /// decisions (remote-authority join with per-path live exceptions).
+    FullSync { keep: BTreeSet<PathBuf> },
+    /// Exactly the given commit paths, nothing else and no deletions.
+    /// Reserved for authority decisions (remote-side path overrides).
+    Only(BTreeSet<PathBuf>),
+}
+
+/// One synchronization pass's outcome, including what an attached recovery
+/// decision did. Ordinary syncs always report empty `settled`/`retained`.
+pub(super) struct StateSyncPass {
+    pub(super) result: GitSyncResult,
+    /// Contested paths the decision settled.
+    pub(super) settled: Vec<String>,
+    /// Refs retained for displaced state not reachable as a merge parent.
+    pub(super) retained: Vec<String>,
+    /// The conflict-report id of an agent resolution this pass published as
+    /// its merge commit; the entry retires its refs and clears the report.
+    pub(super) published_resolution: Option<String>,
+}
+
+impl StateSyncPass {
+    fn clean(result: GitSyncResult) -> Self {
+        Self {
+            result,
+            settled: Vec::new(),
+            retained: Vec::new(),
+            published_resolution: None,
+        }
+    }
+}
+
 impl FileGitSyncService {
     pub fn new(target_root: impl Into<PathBuf>, runtime_root: impl Into<PathBuf>) -> Self {
         Self {
             target_root: target_root.into(),
             runtime_root: runtime_root.into(),
+            agent_resolution: false,
         }
+    }
+
+    /// Allow this entry point to resolve merge conflicts with the installed
+    /// agent (subject to the node's `state_sync_agent_resolution` setting).
+    /// The daemon's sync worker and the explicit `refine sync` surfaces opt
+    /// in; everything else keeps the fail-closed deterministic ladder.
+    pub fn with_agent_resolution(mut self) -> Self {
+        self.agent_resolution = true;
+        self
     }
 
     /// Synchronize durable `.refine` state through the dedicated
@@ -19,9 +92,7 @@ impl FileGitSyncService {
         &self,
         attempt: StateSyncAttemptContext,
     ) -> RefineResult<GitSyncResult> {
-        with_repository_git_lock(&self.target_root, || {
-            self.sync_locked(GitFetchScope::All, &attempt)
-        })
+        self.sync_resolving(GitFetchScope::All, &attempt, LockAcquisition::Blocking)
     }
 
     /// Attempt a best-effort background sync without delaying foreground work.
@@ -81,29 +152,7 @@ impl FileGitSyncService {
         fetch_scope: GitFetchScope,
         attempt: &StateSyncAttemptContext,
     ) -> RefineResult<GitSyncResult> {
-        let lock = repository_git_lock(&self.target_root)?;
-        let _guard = match lock.try_lock() {
-            Ok(guard) => guard,
-            Err(TryLockError::WouldBlock) => {
-                return Ok(deferred(
-                    "Repository Git operations are busy; sync will retry on the next cadence.",
-                ));
-            }
-            Err(TryLockError::Poisoned(_)) => {
-                return Err(RefineError::Conflict(
-                    "Repository Git lock was poisoned".to_string(),
-                ));
-            }
-        };
-        let _file_guard = match RepositoryFileLock::try_acquire(&self.target_root)? {
-            Some(guard) => guard,
-            None => {
-                return Ok(deferred(
-                    "Repository Git operations are busy; sync will retry on the next cadence.",
-                ));
-            }
-        };
-        self.sync_locked(fetch_scope, attempt)
+        self.sync_resolving(fetch_scope, attempt, LockAcquisition::Try)
     }
 
     /// Fingerprint durable Refine state without touching the user's checkout.
@@ -124,37 +173,71 @@ impl FileGitSyncService {
         Ok(hasher.finish())
     }
 
-    pub(super) fn sync_locked(
+    pub(super) fn sync_locked_pass(
         &self,
         fetch_scope: GitFetchScope,
         attempt: &StateSyncAttemptContext,
-    ) -> RefineResult<GitSyncResult> {
-        let result = self.sync_locked_inner(fetch_scope, attempt);
+        decision: Option<&StateRecoveryDecision>,
+        resolution_engaged: bool,
+        resolution_slot: &mut Option<StateResolutionSlot>,
+    ) -> RefineResult<StateSyncPass> {
+        let result = self.sync_locked_inner(
+            fetch_scope,
+            attempt,
+            decision,
+            resolution_engaged,
+            resolution_slot,
+        );
         if result.is_err() {
             // Sync owns only the managed state worktree. Any failure must leave
             // that checkout clean so a later retry starts from durable Git
-            // evidence instead of half-applied retirement or reconciliation.
+            // evidence instead of half-applied snapshot or index scratch work.
             let _ = self.restore_managed_state_worktree();
         }
         result
     }
 
+    /// The deterministic ladder: snapshot live once as a commit, classify the
+    /// commit pair, and only merge genuinely diverged heads from their real
+    /// merge base. Live is hydrated before the local branch ever advances to
+    /// content this node has not observed, so a crash at any point re-derives
+    /// on the next pass without inventing deletions.
+    ///
+    /// With a `decision` attached the same pass is terminal recovery: every
+    /// path the ladder cannot settle takes the decided side instead of
+    /// failing closed, inside one merge commit with both heads as parents.
     fn sync_locked_inner(
         &self,
         fetch_scope: GitFetchScope,
         attempt: &StateSyncAttemptContext,
-    ) -> RefineResult<GitSyncResult> {
+        decision: Option<&StateRecoveryDecision>,
+        resolution_engaged: bool,
+        resolution_slot: &mut Option<StateResolutionSlot>,
+    ) -> RefineResult<StateSyncPass> {
+        let mut settled = Vec::new();
+        let mut retained = Vec::new();
+        let mut published_resolution = None;
         if !self.target_root.join(".git").exists() {
-            return Ok(skipped("Target app is not a Git repository."));
+            return Ok(StateSyncPass::clean(skipped(
+                "Target app is not a Git repository.",
+            )));
         }
         if !self.git_success(&["rev-parse", "--is-inside-work-tree"])? {
-            return Ok(skipped("Target app is not a Git worktree."));
+            return Ok(StateSyncPass::clean(skipped(
+                "Target app is not a Git worktree.",
+            )));
         }
+        // The merge IS `git merge-tree`, so an unsupported Git cannot produce a
+        // pass at all. Failing here, typed, gives the operator the version
+        // sentence instead of an unrecognized-option failure from somewhere
+        // deep in the ladder. Cached, so this costs nothing per pass.
+        ensure_supported_git()?;
         let live_refine = prepare_refine_dir(&self.target_root)?;
         self.ensure_local_state_excluded()?;
+        self.retire_legacy_baseline()?;
         let remote = self.configured_remote(&live_refine)?;
         let remote_configured = self.remote_exists(&remote)?;
-        let remote_exists = if remote_configured {
+        let mut remote_branch_exists = if remote_configured {
             match fetch_scope {
                 GitFetchScope::All => {
                     self.fetch_remote(&remote)?;
@@ -171,29 +254,7 @@ impl FileGitSyncService {
         } else {
             false
         };
-        // Missing three-way authority is an exceptional operator recovery,
-        // not an empty baseline. Fail before creating, rebasing, or retiring
-        // anything in the managed worktree. Bootstrap-only metadata retains
-        // its established remote-first initialization behavior.
-        let stored_base = self.load_state_baseline()?;
-        let local = durable_state_map(&live_refine)?;
-        if stored_base.is_none() && remote_exists && !bootstrap_only_state(&local) {
-            return Err(RefineError::StateSyncMissingBaseline(format!(
-                "Refine state synchronization baseline is missing while non-bootstrap live state and {remote}/{REFINE_STATE_BRANCH} both exist. Ordinary sync remains fail-closed. Run `refine project state-recovery run --authority <live|remote>` for one-shot recovery, or `refine project state-recovery preview` to review the bounded comparison before applying it. Do not recover live state from an isolated candidate worktree."
-            )));
-        }
-        let setup = self.ensure_state_worktree(&remote, remote_exists, &live_refine)?;
-        let state_root = setup.path;
-        let state_refine = state_root.join(".refine");
-        let recovered_interrupted_sync = self.recover_interrupted_state_worktree(&state_root)?;
-        // The checked-out state branch is not a synchronization baseline: it can
-        // advance before a failed first reconciliation has copied remote records
-        // into the live store. Persist the last successfully copied state so an
-        // absent local record is only interpreted as a deletion after this node
-        // has actually observed it.
-        let before = self.git_at_stdout(&state_root, &["rev-parse", "HEAD"])?;
 
-        let mut pulled = setup.pulled;
         let mut details = if remote_configured {
             Vec::new()
         } else {
@@ -201,103 +262,186 @@ impl FileGitSyncService {
                 "Git remote {remote} is not configured; Refine state was committed locally."
             )]
         };
+
+        // This pass's ONLY read of live durable state. Every later operand is
+        // a commit; a record the daemon advances after this point is simply
+        // the next pass's delta. (A decision-settled join re-reads once after
+        // its own authorized hydration, below.)
+        let mut live = durable_state_map(&live_refine)?;
+
+        // Joining an existing fleet: the remote branch exists but this node
+        // has no local branch yet, so nothing on the branch has been observed
+        // by this live store. Hydrate BEFORE the branch is created — a crash
+        // leaves the branch absent and the join re-derives — and fail closed
+        // when live already contests remote content, because no merge base
+        // exists to arbitrate a first contact.
+        let local_branch_exists =
+            self.git_success(&["show-ref", "--verify", "--quiet", REFINE_STATE_REF])?;
+        let joining = remote_branch_exists && !local_branch_exists;
+        if joining {
+            let remote_ref = format!("{remote}/{REFINE_STATE_BRANCH}");
+            let remote_head = self.git_stdout(&["rev-parse", &remote_ref])?;
+            let mut join_hydrated = false;
+            if !bootstrap_only_state(&live) {
+                let contested = self.join_contested_paths(&remote_head, &live, &live_refine)?;
+                if !contested.is_empty() {
+                    let Some(decision) = decision else {
+                        let summary = self.record_conflict_report(
+                            StateSyncConflictPhase::FirstPass,
+                            attempt,
+                            &remote,
+                            "",
+                            "",
+                            &remote_head,
+                            &contested,
+                            None,
+                        )?;
+                        return Err(RefineError::Conflict(summary.to_string()));
+                    };
+                    join_hydrated = true;
+                    let live_advanced = self.settle_contested_join(
+                        decision,
+                        &remote_head,
+                        &contested,
+                        &live,
+                        &live_refine,
+                        &mut settled,
+                        &mut retained,
+                        &mut details,
+                    )?;
+                    if live_advanced {
+                        details.push(LIVE_ADVANCED_DETAIL.to_string());
+                    }
+                    // The settle just rewrote live under this pass's own
+                    // authority (including deletions); refresh the operand
+                    // once so the snapshot mirrors what the decision left.
+                    live = durable_state_map(&live_refine)?;
+                }
+            } else {
+                details.push(
+                    "Adopted synchronized Refine state over locally generated bootstrap metadata."
+                        .to_string(),
+                );
+            }
+            if !join_hydrated {
+                let live_advanced = self.hydrate_live_from_commit(
+                    &self.target_root,
+                    HydrationScope::FullTree,
+                    &remote_head,
+                    &live,
+                    &live_refine,
+                )?;
+                if live_advanced {
+                    details.push(LIVE_ADVANCED_DETAIL.to_string());
+                }
+            }
+        }
+
+        let setup = self.ensure_state_worktree(&remote, remote_branch_exists, &live_refine)?;
+        let state_root = setup.path;
+        let state_refine = state_root.join(".refine");
+        let recovered_interrupted_sync = self.recover_interrupted_state_worktree(&state_root)?;
         if recovered_interrupted_sync {
             details.push(
                 "Recovered an interrupted Refine state copy before reconciling current live state."
                     .to_string(),
             );
         }
-        let mut observed_remote_head = before.clone();
-        if remote_exists {
-            let remote_ref = format!("{remote}/{REFINE_STATE_BRANCH}");
-            let remote_head = self.git_stdout(&["rev-parse", &remote_ref])?;
-            observed_remote_head = remote_head.clone();
-            pulled |= before != remote_head;
-            let rebase = self.git_at(&state_root, &["rebase", &remote_ref])?;
-            append_output_detail(&mut details, &rebase);
-            if !rebase.success {
-                let _ = self.git_at(&state_root, &["rebase", "--abort"]);
-                return Err(command_failed(&format!("git rebase {remote_ref}"), &rebase));
-            }
-        }
 
-        let remote_state = durable_state_map(&state_refine)?;
-        let bootstrap_remote_state =
-            stored_base.is_none() && remote_exists && bootstrap_only_state(&local);
-        let base = if bootstrap_remote_state {
+        let branch_state = durable_state_map(&state_refine)?;
+        // Bootstrap-only live state against a branch that carries real
+        // records is adoption, never mass deletion: the branch side wins and
+        // hydrates the live store once the pass converges. A pending adoption
+        // marker keeps that stance across a crash: hydrating even one record
+        // makes live look non-bootstrap on rerun, and without the marker the
+        // snapshot would commit the still-missing records as deletions.
+        let adoption_pending =
+            self.git_success(&["show-ref", "--verify", "--quiet", STATE_ADOPTION_REF])?;
+        let adopt_branch_state = !joining
+            && !bootstrap_only_state(&branch_state)
+            && (bootstrap_only_state(&live) || adoption_pending);
+        if adopt_branch_state {
             details.push(
-                "Adopted remote Refine state over locally generated bootstrap metadata."
+                "Adopted synchronized Refine state over locally generated bootstrap metadata."
                     .to_string(),
             );
-            remote_first_bootstrap_baseline(&local, &remote_state)
-        } else {
-            stored_base.unwrap_or_default()
-        };
-        let reconciled = self.prepare_semantic_state_changes(
-            &state_root,
-            &live_refine,
-            &state_refine,
-            &base,
-            &local,
-            &remote_state,
-        )?;
-        let resolved_paths = reconciled.changes.keys().cloned().collect::<BTreeSet<_>>();
-        append_reconciliation_details(&mut details, &reconciled.outcomes, false);
-        let conflicts = state_conflicts(&base, &local, &remote_state, &resolved_paths);
-        if !conflicts.is_empty() {
-            let summary = self.record_conflict_report(
-                StateSyncConflictPhase::FirstPass,
-                attempt,
-                &remote,
-                &base,
-                &live_refine,
-                &local,
-                &state_refine,
-                &remote_state,
-                self.local_state_head()?,
-                observed_remote_head.clone(),
-                &conflicts,
-                &reconciled.outcomes,
-            )?;
-            return Err(RefineError::Conflict(summary.to_string()));
+            let head = self.git_at_stdout(&state_root, &["rev-parse", "HEAD"])?;
+            self.git_checked(&["update-ref", STATE_ADOPTION_REF, &head])?;
+        } else if adoption_pending {
+            // A join or an emptied branch superseded the marked adoption.
+            self.clear_state_adoption_marker()?;
         }
-        // Retirement mutates the managed checkout, so it follows every
-        // fail-closed validation. Successful sync still records the intended
-        // deletions in the next state commit.
-        let removed_excluded = self.retire_excluded_tracked_state(&state_root, &state_refine)?;
-        write_reconciled_state_changes(&state_refine, &reconciled.changes)?;
-        apply_local_state_delta(&live_refine, &state_refine, &base, &local, &resolved_paths)?;
 
-        let updated = durable_state_map(&state_refine)?;
-        let mut changed = state_change_status(&remote_state, &updated);
-        changed.extend(
-            removed_excluded
-                .into_iter()
-                .map(|path| format!("D  .refine/{}", path.to_string_lossy().replace('\\', "/"))),
-        );
-        let delta_committed = !changed.is_empty();
-        let mut committed = setup.created || delta_committed;
-        let mut commit = if delta_committed {
-            self.git_at_checked(&state_root, &["add", "-f", "-A", "--", ".refine"])?;
-            let node_id =
-                FileNodeRegistryService::with_active_root(&live_refine, &self.runtime_root)
-                    .active_node_id()
-                    .unwrap_or_else(|_| "default".to_string());
-            let summary = state_commit_summary(&changed.join("\n"));
-            self.git_at_checked(
-                &state_root,
-                &["commit", "-m", &summary, "-m", &format!("Node: {node_id}")],
-            )?;
+        let mut committed = setup.created;
+        let mut commit = if setup.created {
             Some(self.git_at_stdout(&state_root, &["rev-parse", "HEAD"])?)
-        } else if setup.created {
-            Some(before.clone())
         } else {
             None
         };
+        if !adopt_branch_state {
+            // Snapshot live onto the branch. While joining, branch-only paths
+            // were hydrated into live above, so the mirror cannot invent
+            // deletions; skipping deletions besides keeps a mid-join crash
+            // recoverable.
+            let mut changed =
+                snapshot_live_state(&live_refine, &state_refine, &live, &branch_state, !joining)?;
+            let removed_excluded =
+                self.retire_excluded_tracked_state(&state_root, &state_refine)?;
+            changed.extend(
+                removed_excluded.into_iter().map(|path| {
+                    format!("D  .refine/{}", path.to_string_lossy().replace('\\', "/"))
+                }),
+            );
+            if !changed.is_empty()
+                && self.commit_staged_snapshot(
+                    &state_root,
+                    &format!("Node: {}", self.active_node_id(&live_refine)),
+                )?
+            {
+                committed = true;
+                commit = Some(self.git_at_stdout(&state_root, &["rev-parse", "HEAD"])?);
+            }
+        }
 
+        let mut pulled = setup.pulled || joining;
         let mut pushed = false;
-        if remote_configured && (!remote_exists || committed || setup.local_ahead) {
-            for push_attempt in 1..=PUSH_RETRY_LIMIT {
+        let mut live_advanced = false;
+
+        if !remote_configured {
+            if adopt_branch_state {
+                let head = self.git_at_stdout(&state_root, &["rev-parse", "HEAD"])?;
+                live_advanced |= self.hydrate_live_from_commit(
+                    &state_root,
+                    HydrationScope::FullTree,
+                    &head,
+                    &live,
+                    &live_refine,
+                )?;
+                self.clear_state_adoption_marker()?;
+            }
+            if live_advanced {
+                details.push(LIVE_ADVANCED_DETAIL.to_string());
+            }
+            return Ok(StateSyncPass::clean(GitSyncResult {
+                ok: true,
+                attempted: true,
+                committed,
+                pulled,
+                pushed,
+                branch: Some(REFINE_STATE_BRANCH.to_string()),
+                commit,
+                detail: nonempty_detail(details),
+                remote_configured: Some(false),
+                deferred: live_advanced,
+            }));
+        }
+
+        let mut push_attempt = 0usize;
+        loop {
+            push_attempt += 1;
+            let local_head = self.git_at_stdout(&state_root, &["rev-parse", "HEAD"])?;
+            if !remote_branch_exists {
+                // Bootstrap publish: no remote branch to classify against.
                 let push =
                     self.git_at(&state_root, &["push", "-u", &remote, REFINE_STATE_BRANCH])?;
                 append_output_detail(&mut details, &push);
@@ -305,190 +449,803 @@ impl FileGitSyncService {
                     pushed = true;
                     break;
                 }
-                if push_attempt == PUSH_RETRY_LIMIT || !push_rejected_by_race(&push) {
+                if push_attempt >= PUSH_RETRY_LIMIT || !push_rejected_by_race(&push) {
                     return Err(command_failed("git push", &push));
                 }
+                // Another node published the branch first; classify against
+                // the fresh remote head on the next attempt.
                 self.fetch_state_branch(&remote)?;
-                let remote_ref = format!("{remote}/{REFINE_STATE_BRANCH}");
-                let retry_remote_head = self.git_stdout(&["rev-parse", &remote_ref])?;
-                self.git_at_checked(&state_root, &["reset", "--hard", &remote_ref])?;
-                let retry_removed_excluded =
-                    self.retire_excluded_tracked_state(&state_root, &state_refine)?;
-                let retry_remote_state = durable_state_map(&state_refine)?;
-                // A rejected push means both the remote and the live store may have advanced
-                // since the original reconciliation. Re-evaluate the original observed base
-                // against both fresh sides before replaying any local delta.
-                let retry_local = durable_state_map(&live_refine)?;
-                let retry_reconciled = self.prepare_semantic_state_changes(
-                    &state_root,
-                    &live_refine,
-                    &state_refine,
-                    &base,
-                    &retry_local,
-                    &retry_remote_state,
-                )?;
-                let retry_resolved_paths = retry_reconciled
-                    .changes
-                    .keys()
-                    .cloned()
-                    .collect::<BTreeSet<_>>();
-                append_reconciliation_details(&mut details, &retry_reconciled.outcomes, true);
-                let retry_conflicts = state_conflicts(
-                    &base,
-                    &retry_local,
-                    &retry_remote_state,
-                    &retry_resolved_paths,
-                );
-                if !retry_conflicts.is_empty() {
-                    let summary = self.record_conflict_report(
-                        StateSyncConflictPhase::PushRetry,
+                remote_branch_exists = self.remote_state_tracking_exists(&remote)?;
+                thread::sleep(PUSH_RETRY_DELAY);
+                continue;
+            }
+
+            let remote_ref = format!("{remote}/{REFINE_STATE_BRANCH}");
+            let remote_head = self.git_stdout(&["rev-parse", &remote_ref])?;
+            match classify(self, &local_head, &remote_head)? {
+                Ancestry::Equal => {
+                    if adopt_branch_state {
+                        live_advanced |= self.hydrate_live_from_commit(
+                            &state_root,
+                            HydrationScope::FullTree,
+                            &local_head,
+                            &live,
+                            &live_refine,
+                        )?;
+                    }
+                    break;
+                }
+                Ancestry::FastForwardToA => {
+                    // The remote head is a strict ancestor of local work:
+                    // publish, never merge.
+                    let push =
+                        self.git_at(&state_root, &["push", "-u", &remote, REFINE_STATE_BRANCH])?;
+                    append_output_detail(&mut details, &push);
+                    if push.success {
+                        pushed = true;
+                        if adopt_branch_state {
+                            live_advanced |= self.hydrate_live_from_commit(
+                                &state_root,
+                                HydrationScope::FullTree,
+                                &local_head,
+                                &live,
+                                &live_refine,
+                            )?;
+                        }
+                        break;
+                    }
+                    if push_attempt >= PUSH_RETRY_LIMIT || !push_rejected_by_race(&push) {
+                        return Err(command_failed("git push", &push));
+                    }
+                    self.fetch_state_branch(&remote)?;
+                    thread::sleep(PUSH_RETRY_DELAY);
+                }
+                Ancestry::FastForwardToB => {
+                    // Hydrate live before the branch advances, so the branch
+                    // head never claims records this node has not observed; a
+                    // crash between the two steps reruns idempotently.
+                    live_advanced |= self.hydrate_live_from_commit(
+                        &state_root,
+                        if adopt_branch_state {
+                            HydrationScope::FullTree
+                        } else {
+                            HydrationScope::ChangedSince(local_head.clone())
+                        },
+                        &remote_head,
+                        &live,
+                        &live_refine,
+                    )?;
+                    self.git_at_checked(&state_root, &["reset", "--hard", &remote_head])?;
+                    pulled = true;
+                    break;
+                }
+                ancestry @ (Ancestry::Diverged { .. } | Ancestry::Unrelated) => {
+                    let merge_base = match ancestry {
+                        Ancestry::Diverged { merge_base } => merge_base,
+                        // Independently bootstrapped orphan histories share no
+                        // root: merge from the empty tree and join them with a
+                        // two-parent commit instead of wedging forever.
+                        _ => empty_tree_id(self, &state_root)?,
+                    };
+                    // Settled paths from an attempt that loses its push are
+                    // re-derived by the retry; only the published attempt's
+                    // settlements count once. The same holds for a published
+                    // agent resolution.
+                    let mut attempt_settled = Vec::new();
+                    let mut attempt_resolution = None;
+                    let merge_commit = self.merge_diverged_state(
+                        &state_root,
                         attempt,
                         &remote,
-                        &base,
-                        &live_refine,
-                        &retry_local,
-                        &state_refine,
-                        &retry_remote_state,
-                        self.local_state_head()?,
-                        retry_remote_head,
-                        &retry_conflicts,
-                        &retry_reconciled.outcomes,
+                        &merge_base,
+                        &local_head,
+                        &remote_head,
+                        push_attempt,
+                        decision,
+                        resolution_engaged,
+                        resolution_slot,
+                        &mut attempt_resolution,
+                        &mut attempt_settled,
+                        &mut details,
                     )?;
-                    return Err(RefineError::Conflict(summary.to_string()));
+                    // The merge commit descends from the fetched remote head,
+                    // so a plain refspec push is a fast-forward there and a
+                    // rejection can only mean the remote moved (a race). A
+                    // decision publishes with force-with-lease against the
+                    // head it merged, which is the same guarantee spelled out.
+                    let lease = format!("--force-with-lease={REFINE_STATE_REF}:{remote_head}");
+                    let refspec = format!("{merge_commit}:{REFINE_STATE_REF}");
+                    let push = if decision.is_some() {
+                        self.git_at(&state_root, &["push", &lease, &remote, &refspec])?
+                    } else {
+                        self.git_at(&state_root, &["push", &remote, &refspec])?
+                    };
+                    append_output_detail(&mut details, &push);
+                    if push.success {
+                        settled.append(&mut attempt_settled);
+                        published_resolution = attempt_resolution.take();
+                        live_advanced |= self.hydrate_live_from_commit(
+                            &state_root,
+                            if adopt_branch_state {
+                                HydrationScope::FullTree
+                            } else {
+                                HydrationScope::ChangedSince(local_head.clone())
+                            },
+                            &merge_commit,
+                            &live,
+                            &live_refine,
+                        )?;
+                        self.git_at_checked(&state_root, &["reset", "--hard", &merge_commit])?;
+                        pushed = true;
+                        pulled = true;
+                        committed = true;
+                        commit = Some(merge_commit);
+                        break;
+                    }
+                    // The abandoned merge commit was never a ref; its parents
+                    // stay reachable, so nothing needs retention here. The
+                    // retry re-merges from the fresh remote head with the same
+                    // committed local operand — live is never re-read.
+                    if push_attempt >= PUSH_RETRY_LIMIT || !push_rejected_by_race(&push) {
+                        return Err(command_failed("git push", &push));
+                    }
+                    self.fetch_state_branch(&remote)?;
+                    thread::sleep(PUSH_RETRY_DELAY);
                 }
-                write_reconciled_state_changes(&state_refine, &retry_reconciled.changes)?;
-                apply_local_state_delta(
-                    &live_refine,
-                    &state_refine,
-                    &base,
-                    &retry_local,
-                    &retry_resolved_paths,
-                )?;
-                let retry_updated = durable_state_map(&state_refine)?;
-                let mut retry_changed = state_change_status(&retry_remote_state, &retry_updated);
-                // Both sides of that comparison are enumerated through the
-                // exclusion, so a retired path is invisible to it. Record the
-                // removals explicitly or the reset would silently restore them.
-                retry_changed.extend(retry_removed_excluded.into_iter().map(|path| {
-                    format!("D  .refine/{}", path.to_string_lossy().replace('\\', "/"))
-                }));
-                committed = !retry_changed.is_empty();
-                if committed {
-                    self.git_at_checked(&state_root, &["add", "-f", "-A", "--", ".refine"])?;
-                    let node_id =
-                        FileNodeRegistryService::with_active_root(&live_refine, &self.runtime_root)
-                            .active_node_id()
-                            .unwrap_or_else(|_| "default".to_string());
-                    let summary = state_commit_summary(&retry_changed.join("\n"));
-                    self.git_at_checked(
-                        &state_root,
-                        &["commit", "-m", &summary, "-m", &format!("Node: {node_id}")],
-                    )?;
-                }
-                pulled = true;
-                if committed {
-                    commit = Some(self.git_at_stdout(&state_root, &["rev-parse", "HEAD"])?);
-                } else {
-                    commit = None;
-                }
-                thread::sleep(PUSH_RETRY_DELAY);
             }
         }
 
-        let concurrent_local_change = merge_state_into_live(&state_refine, &live_refine, &local)?;
-        self.save_state_baseline(&durable_state_map(&state_refine)?)?;
-        if concurrent_local_change {
-            details.push(
-                "A newer local state mutation arrived during synchronization; it was preserved and will be published in the next batch."
-                    .to_string(),
-            );
+        if adopt_branch_state {
+            // The pass converged with every adopted record hydrated (records
+            // the daemon advanced mid-pass are its newer state, not losses).
+            self.clear_state_adoption_marker()?;
         }
-        Ok(GitSyncResult {
-            ok: true,
-            attempted: true,
-            committed,
-            pulled,
-            pushed,
-            branch: Some(REFINE_STATE_BRANCH.to_string()),
-            commit,
-            detail: nonempty_detail(details),
-            remote_configured: Some(remote_configured),
-            deferred: concurrent_local_change,
+        if live_advanced {
+            details.push(LIVE_ADVANCED_DETAIL.to_string());
+        }
+        Ok(StateSyncPass {
+            result: GitSyncResult {
+                ok: true,
+                attempted: true,
+                committed,
+                pulled,
+                pushed,
+                branch: Some(REFINE_STATE_BRANCH.to_string()),
+                commit,
+                detail: nonempty_detail(details),
+                remote_configured: Some(true),
+                deferred: live_advanced,
+            },
+            settled,
+            retained,
+            published_resolution,
         })
+    }
+
+    fn clear_state_adoption_marker(&self) -> RefineResult<()> {
+        if self.git_success(&["show-ref", "--verify", "--quiet", STATE_ADOPTION_REF])? {
+            self.git_checked(&["update-ref", "-d", STATE_ADOPTION_REF])?;
+        }
+        Ok(())
+    }
+
+    /// Paths where the joining node's live store and the remote branch both
+    /// carry different content: a first contact has no merge base, so these
+    /// fail closed for an operator decision.
+    fn join_contested_paths(
+        &self,
+        remote_head: &str,
+        live: &DurableStateMap,
+        live_refine: &std::path::Path,
+    ) -> RefineResult<Vec<StateSyncConflictPath>> {
+        let listing =
+            self.git_stdout(&["ls-tree", "-r", "--name-only", remote_head, "--", ".refine"])?;
+        let mut contested = Vec::new();
+        for path in listing.lines() {
+            let Some(relative) = path.strip_prefix(".refine/") else {
+                continue;
+            };
+            let relative_path = PathBuf::from(relative);
+            if is_excluded_from_durable_state(&relative_path) {
+                continue;
+            }
+            let Some(live_fingerprint) = live.get(&relative_path) else {
+                continue;
+            };
+            let remote_bytes = self.state_bytes_at(&self.target_root, remote_head, path)?;
+            let remote_fingerprint = remote_bytes.as_deref().map(state_content_fingerprint);
+            if remote_fingerprint == Some(*live_fingerprint) {
+                continue;
+            }
+            let live_bytes = fs::read(live_refine.join(&relative_path)).ok();
+            contested.push(StateSyncConflictPath {
+                path: relative.to_string(),
+                summary: conflict_path_summary(
+                    &relative_path,
+                    None,
+                    live_bytes.as_deref(),
+                    remote_bytes.as_deref(),
+                ),
+            });
+        }
+        Ok(contested)
+    }
+
+    /// Merge two genuinely diverged state heads from their real merge base.
+    /// Cleanly merging paths are accepted from Git's own tree merge;
+    /// textually conflicted state files go to the structural driver; anything
+    /// still contested fails closed with a conflict report — unless a
+    /// recovery decision is attached, in which case each remaining path takes
+    /// its decided side and no conflict can survive. With agent resolution
+    /// engaged, the fail-closed path first performs lock Hold A (pin the
+    /// operands, materialize the conflicted workspace) so the entry can
+    /// resolve UNLOCKED, and a gated result surviving from an earlier run of
+    /// this exact divergence is published directly as the merge commit.
+    #[allow(clippy::too_many_arguments)]
+    fn merge_diverged_state(
+        &self,
+        state_root: &std::path::Path,
+        attempt: &StateSyncAttemptContext,
+        remote: &str,
+        merge_base: &str,
+        local_head: &str,
+        remote_head: &str,
+        push_attempt: usize,
+        decision: Option<&StateRecoveryDecision>,
+        resolution_engaged: bool,
+        resolution_slot: &mut Option<StateResolutionSlot>,
+        published_resolution: &mut Option<String>,
+        settled: &mut Vec<String>,
+        details: &mut Vec<String>,
+    ) -> RefineResult<String> {
+        let (mut tree, resolved, mut unresolved) =
+            self.merge_diverged_trees(state_root, merge_base, local_head, remote_head, &[])?;
+        // The conflict-report id hashes the sorted unresolved paths; keep the
+        // resolution id, the report, and the prompt in that one stable order.
+        unresolved.sort_by(|left, right| left.path.cmp(&right.path));
+        let mut parents_message = None;
+        if !unresolved.is_empty() {
+            let Some(decision) = decision else {
+                let phase = if push_attempt > 1 {
+                    StateSyncConflictPhase::PushRetry
+                } else {
+                    StateSyncConflictPhase::FirstPass
+                };
+                if resolution_engaged {
+                    match self.prepare_state_resolution(
+                        state_root,
+                        phase,
+                        remote,
+                        merge_base,
+                        local_head,
+                        remote_head,
+                        &tree,
+                        &unresolved,
+                    )? {
+                        Some(StateResolutionHold::Result { report_id, commit }) => {
+                            details.push(format!(
+                                "Published the agent-resolved merge for state conflict {report_id}."
+                            ));
+                            *published_resolution = Some(report_id);
+                            return Ok(commit);
+                        }
+                        Some(StateResolutionHold::Prepared(prepared)) => {
+                            *resolution_slot = Some(StateResolutionSlot::Prepared(prepared));
+                        }
+                        Some(StateResolutionHold::Busy { report_id }) => {
+                            // Reporting this divergence would race the
+                            // operation already resolving it: defer instead,
+                            // leaving its report — and its question — alone.
+                            *resolution_slot = Some(StateResolutionSlot::Busy);
+                            return Err(RefineError::Conflict(format!(
+                                "Another operation is resolving state conflict {report_id}."
+                            )));
+                        }
+                        None => {}
+                    }
+                }
+                // An escalation already on file for this contention keeps its
+                // question: a later pass that re-reports the same contested
+                // records against the same remote head must not replace the
+                // agent's words with the generic headline — not even when
+                // this node's own live writes have moved the local head since.
+                let escalated = self.escalated_decision_question(remote_head, &unresolved);
+                let summary = self.record_conflict_report(
+                    phase,
+                    attempt,
+                    remote,
+                    merge_base,
+                    local_head,
+                    remote_head,
+                    &unresolved,
+                    escalated.as_deref(),
+                )?;
+                return Err(RefineError::Conflict(summary.to_string()));
+            };
+            let authority_commit = |authority: StateRecoveryAuthority| match authority {
+                StateRecoveryAuthority::Live => local_head.to_string(),
+                StateRecoveryAuthority::Remote => remote_head.to_string(),
+            };
+            // Conflict paths inside `.refine/` are recorded stripped; anything
+            // else keeps its full tree path. Offer both spellings so the
+            // forced re-merge settles either kind.
+            let forced = unresolved
+                .iter()
+                .flat_map(|conflict| {
+                    let source = authority_commit(decision.authority_for(&conflict.path));
+                    [
+                        (format!(".refine/{}", conflict.path), source.clone()),
+                        (conflict.path.clone(), source),
+                    ]
+                })
+                .collect::<Vec<_>>();
+            let (forced_tree, _, still_unresolved) = self.merge_diverged_trees(
+                state_root,
+                merge_base,
+                local_head,
+                remote_head,
+                &forced,
+            )?;
+            if !still_unresolved.is_empty() {
+                return Err(RefineError::Conflict(format!(
+                    "State recovery could not settle {} path(s) even with authority; this is a bug.",
+                    still_unresolved.len()
+                )));
+            }
+            tree = forced_tree;
+            settled.extend(unresolved.iter().map(|conflict| conflict.path.clone()));
+            details.push(format!(
+                "Recovery settled contested state with {} authority: {}",
+                decision.default_authority.as_str(),
+                unresolved
+                    .iter()
+                    .map(|conflict| conflict.path.as_str())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ));
+            parents_message = Some(format!(
+                "Recover Refine state with {} authority",
+                decision.default_authority.as_str()
+            ));
+        }
+        if !resolved.is_empty() {
+            details.push(format!(
+                "Merged divergent state records structurally: {}",
+                resolved.join(", ")
+            ));
+        }
+        let live_refine = prepare_refine_dir(&self.target_root)?;
+        let message = format!(
+            "{}\n\nNode: {}",
+            parents_message.unwrap_or_else(|| "Merge Refine state".to_string()),
+            self.active_node_id(&live_refine)
+        );
+        commit_tree(
+            self,
+            state_root,
+            &tree,
+            &[local_head, remote_head],
+            &message,
+        )
+    }
+
+    /// Settle a contested first contact with an authority decision. There is
+    /// no merge base and the live store was never a commit, so the losing
+    /// live content is retained by ref before anything overwrites it; the
+    /// remaining join (branch creation, additive snapshot, publish) proceeds
+    /// as the ordinary pipeline.
+    #[allow(clippy::too_many_arguments)]
+    fn settle_contested_join(
+        &self,
+        decision: &StateRecoveryDecision,
+        remote_head: &str,
+        contested: &[StateSyncConflictPath],
+        live: &DurableStateMap,
+        live_refine: &std::path::Path,
+        settled: &mut Vec<String>,
+        retained: &mut Vec<String>,
+        details: &mut Vec<String>,
+    ) -> RefineResult<bool> {
+        let mut live_kept = BTreeSet::new();
+        let mut remote_taken = BTreeSet::new();
+        for conflict in contested {
+            match decision.authority_for(&conflict.path) {
+                StateRecoveryAuthority::Live => {
+                    live_kept.insert(PathBuf::from(&conflict.path));
+                }
+                StateRecoveryAuthority::Remote => {
+                    remote_taken.insert(PathBuf::from(&conflict.path));
+                }
+            }
+            settled.push(conflict.path.clone());
+        }
+        let live_advanced = match decision.default_authority {
+            StateRecoveryAuthority::Remote => {
+                // Contested paths take the remote branch except explicitly
+                // kept ones; uncontested live-only records stay in place and
+                // publish additively with the rest of the join. The whole
+                // displaced live store stays findable by ref.
+                let retained_ref = self.retain_live_snapshot(live_refine, remote_head)?;
+                retained.push(retained_ref);
+                self.hydrate_live_from_commit(
+                    &self.target_root,
+                    HydrationScope::FullSync { keep: live_kept },
+                    remote_head,
+                    live,
+                    live_refine,
+                )?
+            }
+            StateRecoveryAuthority::Live => {
+                // Live keeps everything it holds; remote-only records and
+                // explicitly remote-decided paths hydrate in. The remote head
+                // becomes a parent of the join snapshot, so nothing needs a
+                // retained ref.
+                let mut advanced = self.hydrate_live_from_commit(
+                    &self.target_root,
+                    HydrationScope::MissingOnly,
+                    remote_head,
+                    live,
+                    live_refine,
+                )?;
+                if !remote_taken.is_empty() {
+                    advanced |= self.hydrate_live_from_commit(
+                        &self.target_root,
+                        HydrationScope::Only(remote_taken),
+                        remote_head,
+                        live,
+                        live_refine,
+                    )?;
+                }
+                advanced
+            }
+        };
+        details.push(format!(
+            "Recovery settled a contested first contact with {} authority: {}",
+            decision.default_authority.as_str(),
+            settled.join(", ")
+        ));
+        Ok(live_advanced)
+    }
+
+    /// Run the tree merge plus the structural driver and return the merged
+    /// tree, the driver-resolved state paths, and the still-conflicted paths
+    /// with domain summaries. `forced` paths take the given side's blob
+    /// instead of conflicting (operator authority).
+    pub(in crate::tools::host::git_sync) fn merge_diverged_trees(
+        &self,
+        state_root: &std::path::Path,
+        merge_base: &str,
+        local_head: &str,
+        remote_head: &str,
+        forced: &[(String, String)],
+    ) -> RefineResult<(String, Vec<String>, Vec<StateSyncConflictPath>)> {
+        // Git finds the merge base itself; `merge_base` stays the driver's
+        // reading base below, where the structural merge needs the bytes.
+        let merged = merge_commits(self, state_root, local_head, remote_head)?;
+        let forced = forced.iter().cloned().collect::<BTreeMap<_, _>>();
+        let mut operations = Vec::new();
+        let mut resolved = Vec::new();
+        let mut unresolved = Vec::new();
+        for path in &merged.conflicted_paths {
+            if let Some(source) = forced.get(path) {
+                match self.state_bytes_at(state_root, source, path)? {
+                    Some(bytes) => {
+                        let blob = write_blob(self, state_root, &bytes)?;
+                        operations.push(TreeOperation::set(path.clone(), blob));
+                    }
+                    None => operations.push(TreeOperation::Remove { path: path.clone() }),
+                }
+                continue;
+            }
+            let Some(relative) = path.strip_prefix(".refine/") else {
+                unresolved.push(StateSyncConflictPath {
+                    path: path.clone(),
+                    summary: OUTSIDE_STATE_CONFLICT_SUMMARY.to_string(),
+                });
+                continue;
+            };
+            let relative_path = PathBuf::from(relative);
+            if is_excluded_from_durable_state(&relative_path) {
+                // Excluded paths never belong on the branch; retire them
+                // rather than contest them.
+                operations.push(TreeOperation::Remove { path: path.clone() });
+                continue;
+            }
+            let base_bytes = self.state_bytes_at(state_root, merge_base, path)?;
+            let local_bytes = self.state_bytes_at(state_root, local_head, path)?;
+            let remote_bytes = self.state_bytes_at(state_root, remote_head, path)?;
+            let driver_merged = match (&base_bytes, &local_bytes, &remote_bytes) {
+                (Some(base), Some(local), Some(remote)) => {
+                    merge_state_file(&relative_path, base, local, remote)
+                }
+                // Added independently on both sides (an empty-tree merge base
+                // joining unrelated bootstraps): only files with an
+                // identity-keyed empty form merge.
+                (None, Some(local), Some(remote)) => {
+                    merge_added_state_file(&relative_path, local, remote)
+                }
+                _ => None,
+            };
+            match driver_merged {
+                Some(bytes) => {
+                    let blob = write_blob(self, state_root, &bytes)?;
+                    operations.push(TreeOperation::set(path.clone(), blob));
+                    resolved.push(relative.to_string());
+                }
+                None => unresolved.push(StateSyncConflictPath {
+                    path: relative.to_string(),
+                    summary: conflict_path_summary(
+                        &relative_path,
+                        base_bytes.as_deref(),
+                        local_bytes.as_deref(),
+                        remote_bytes.as_deref(),
+                    ),
+                }),
+            }
+        }
+        let tree = if operations.is_empty() {
+            merged.tree
+        } else {
+            build_tree(self, state_root, &merged.tree, &operations)?
+        };
+        Ok((tree, resolved, unresolved))
+    }
+
+    pub(in crate::tools::host::git_sync) fn state_bytes_at(
+        &self,
+        root: &std::path::Path,
+        commitish: &str,
+        path: &str,
+    ) -> RefineResult<Option<Vec<u8>>> {
+        let output = self.git_at(root, &["show", &format!("{commitish}:{path}")])?;
+        Ok(output.success.then_some(output.stdout))
+    }
+
+    /// The baseline system is gone: `git merge-base` is the baseline, shared
+    /// and durable by construction. The first sync of an upgraded node
+    /// retires the legacy fingerprint file and its retained anchor refs.
+    fn retire_legacy_baseline(&self) -> RefineResult<()> {
+        let path = git_common_dir(&self.target_root)?.join("refine-state-baseline.json");
+        if path.exists() {
+            fs::remove_file(&path).map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to retire legacy Refine state baseline {}: {error}",
+                    path.display()
+                ))
+            })?;
+        }
+        let anchors = self.git_stdout(&[
+            "for-each-ref",
+            "--format=%(refname)",
+            "refs/refine/state-baseline",
+        ])?;
+        for anchor in anchors.lines() {
+            let _ = self.git(&["update-ref", "-d", anchor]);
+        }
+        Ok(())
+    }
+
+    /// Stage the snapshotted `.refine` tree and commit it when anything is
+    /// actually staged. Snapshot copies can settle to bytes identical to the
+    /// branch (for example after this pass's own hydration), so the commit
+    /// decision reads Git's staged status, and the summary is derived from it.
+    pub(in crate::tools::host::git_sync) fn commit_staged_snapshot(
+        &self,
+        state_root: &std::path::Path,
+        trailer: &str,
+    ) -> RefineResult<bool> {
+        self.git_at_checked(state_root, &["add", "-f", "-A", "--", ".refine"])?;
+        let status = self.git_at_stdout(
+            state_root,
+            &[
+                "status",
+                "--porcelain=v1",
+                "--untracked-files=no",
+                "--",
+                ".refine",
+            ],
+        )?;
+        if status.is_empty() {
+            return Ok(false);
+        }
+        let summary = state_commit_summary(&status);
+        self.git_at_checked(state_root, &["commit", "-m", &summary, "-m", trailer])?;
+        Ok(true)
+    }
+
+    pub(in crate::tools::host::git_sync) fn active_node_id(
+        &self,
+        live_refine: &std::path::Path,
+    ) -> String {
+        FileNodeRegistryService::with_active_root(live_refine, &self.runtime_root)
+            .active_node_id()
+            .unwrap_or_else(|_| "default".to_string())
+    }
+
+    /// Copy records an adopted commit carries into the live store under
+    /// per-record leases with preimage compare-and-swap: a record the daemon
+    /// advanced after the pass's snapshot is left alone and becomes the next
+    /// pass's delta. Bootstrap-class metadata hydrates first so an
+    /// interrupted adoption still looks like an adoption on rerun.
+    pub(in crate::tools::host::git_sync) fn hydrate_live_from_commit(
+        &self,
+        git_root: &std::path::Path,
+        scope: HydrationScope,
+        commit: &str,
+        original: &DurableStateMap,
+        live_root: &std::path::Path,
+    ) -> RefineResult<bool> {
+        let candidates: BTreeSet<PathBuf> = match &scope {
+            HydrationScope::ChangedSince(base) => self
+                .git_at_stdout(
+                    git_root,
+                    &["diff", "--name-only", base, commit, "--", ".refine"],
+                )?
+                .lines()
+                .filter_map(|path| path.strip_prefix(".refine/"))
+                .map(PathBuf::from)
+                .collect(),
+            HydrationScope::Only(paths) => paths.clone(),
+            HydrationScope::FullTree
+            | HydrationScope::FullSync { .. }
+            | HydrationScope::MissingOnly => {
+                let mut paths = self
+                    .git_at_stdout(
+                        git_root,
+                        &["ls-tree", "-r", "--name-only", commit, "--", ".refine"],
+                    )?
+                    .lines()
+                    .filter_map(|path| path.strip_prefix(".refine/"))
+                    .map(PathBuf::from)
+                    .collect::<BTreeSet<_>>();
+                match &scope {
+                    HydrationScope::FullSync { keep } => {
+                        paths.retain(|path| !keep.contains(path));
+                    }
+                    HydrationScope::MissingOnly => {
+                        paths.retain(|path| !original.contains_key(path));
+                    }
+                    _ => {}
+                }
+                paths
+            }
+        };
+        let mut ordered = candidates
+            .into_iter()
+            .filter(|relative| !is_excluded_from_durable_state(relative))
+            .collect::<Vec<_>>();
+        ordered.sort_by_key(|relative| (!is_bootstrap_state_path(relative), relative.clone()));
+        let mut concurrent_change = false;
+        for relative in ordered {
+            let target_bytes = self.state_bytes_at(
+                git_root,
+                commit,
+                &format!(".refine/{}", relative.to_string_lossy().replace('\\', "/")),
+            )?;
+            let desired = target_bytes.as_deref().map(state_content_fingerprint);
+            if desired.is_none()
+                && matches!(
+                    scope,
+                    HydrationScope::FullTree
+                        | HydrationScope::FullSync { .. }
+                        | HydrationScope::MissingOnly
+                        | HydrationScope::Only(_)
+                )
+            {
+                continue;
+            }
+            let destination = live_root.join(&relative);
+            let key = record_lock_key(&destination);
+            with_record_lock(live_root, &key, || {
+                let current = live_path_fingerprint(&destination)?;
+                let before = original.get(&relative).copied();
+                if current == desired {
+                    reconcile_hydrated_index(live_root, &relative, &destination, desired);
+                    return Ok(());
+                }
+                if current != before {
+                    concurrent_change = true;
+                    return Ok(());
+                }
+                if let Some(bytes) = &target_bytes {
+                    replace_file_durably(&destination, bytes)?;
+                } else if destination.exists() {
+                    fs::remove_file(&destination).map_err(|error| {
+                        RefineError::Io(format!(
+                            "failed to hydrate synchronized deletion {}: {error}",
+                            destination.display()
+                        ))
+                    })?;
+                    if let Some(parent) = destination.parent() {
+                        File::open(parent)
+                            .and_then(|directory| directory.sync_all())
+                            .map_err(|error| {
+                                RefineError::Io(format!(
+                                    "failed to durably commit synchronized deletion {}: {error}",
+                                    destination.display()
+                                ))
+                            })?;
+                    }
+                }
+                reconcile_hydrated_index(live_root, &relative, &destination, desired);
+                Ok(())
+            })?;
+        }
+        Ok(concurrent_change)
     }
 }
 
-fn display_state_paths(paths: &BTreeSet<PathBuf>) -> String {
-    paths
-        .iter()
-        .map(|path| path.to_string_lossy().replace('\\', "/"))
-        .collect::<Vec<_>>()
-        .join(", ")
-}
+pub(super) const LIVE_ADVANCED_DETAIL: &str = "A newer local state mutation arrived during synchronization; it was preserved and will be published in the next batch.";
 
-fn append_reconciliation_details(
-    details: &mut Vec<String>,
-    outcomes: &[StateSyncReconciliationOutcome],
-    push_retry: bool,
-) {
-    let resolved = outcomes
-        .iter()
-        .filter(|outcome| {
-            matches!(
-                outcome.outcome,
-                StateSyncReconciliationKind::ThreeWayMerged
-                    | StateSyncReconciliationKind::BaselineUnavailableFallbackMerged
-            )
-        })
-        .map(|outcome| PathBuf::from(&outcome.path))
-        .collect::<BTreeSet<_>>();
-    let goals = resolved
-        .iter()
-        .filter(|path| is_goal_record(path))
+/// The summary recorded for a conflicted path that is not synchronized Refine
+/// state. Agent resolution never judges these; they always fail closed.
+pub(super) const OUTSIDE_STATE_CONFLICT_SUMMARY: &str =
+    "path outside synchronized Refine state changed on both nodes";
+
+/// Make the state worktree's durable set mirror the live snapshot and report
+/// the change lines. Only differing records are rewritten, so an idle pass
+/// touches nothing. With `include_deletions` false, branch-only paths are
+/// left in place (join passes, where absence means unobserved, not deleted).
+pub(super) fn snapshot_live_state(
+    live_refine: &std::path::Path,
+    state_refine: &std::path::Path,
+    live: &DurableStateMap,
+    branch_state: &DurableStateMap,
+    include_deletions: bool,
+) -> RefineResult<Vec<String>> {
+    let mut changed = Vec::new();
+    let paths = live
+        .keys()
+        .chain(branch_state.keys())
         .cloned()
         .collect::<BTreeSet<_>>();
-    if !goals.is_empty() {
-        details.push(format!(
-            "Merged non-overlapping Goal changes{}: {}",
-            if push_retry { " during push retry" } else { "" },
-            display_state_paths(&goals)
+    for relative in paths {
+        let status = match (branch_state.get(&relative), live.get(&relative)) {
+            (None, Some(_)) => "A",
+            (Some(_), None) if include_deletions => "D",
+            (Some(_), None) => continue,
+            (Some(before), Some(after)) if before != after => "M",
+            _ => continue,
+        };
+        let destination = state_refine.join(&relative);
+        if live.contains_key(&relative) {
+            copy_state_file(&live_refine.join(&relative), &destination)?;
+        } else if destination.exists() {
+            fs::remove_file(&destination).map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to remove synchronized Refine state {}: {error}",
+                    destination.display()
+                ))
+            })?;
+        }
+        changed.push(format!(
+            "{status}  .refine/{}",
+            relative.to_string_lossy().replace('\\', "/")
         ));
     }
-    let ownership_resolved = outcomes
-        .iter()
-        .filter(|outcome| outcome.outcome == StateSyncReconciliationKind::OwnershipResolved)
-        .map(|outcome| PathBuf::from(&outcome.path))
-        .collect::<BTreeSet<_>>();
-    if !ownership_resolved.is_empty() {
-        details.push(format!(
-            "Resolved contested Goal records by baseline ownership{}: {}",
-            if push_retry { " during push retry" } else { "" },
-            display_state_paths(&ownership_resolved)
-        ));
-    }
-    if resolved.contains(std::path::Path::new("nodes.json")) {
-        let fallback = outcomes.iter().any(|outcome| {
-            outcome.path == "nodes.json"
-                && outcome.outcome == StateSyncReconciliationKind::BaselineUnavailableFallbackMerged
-        });
-        details.push(format!(
-            "Merged per-node registry changes{}{}: nodes.json",
-            if push_retry { " during push retry" } else { "" },
-            if fallback {
-                " with safe baseline-unavailable fallback"
-            } else {
-                ""
-            }
-        ));
+    Ok(changed)
+}
+
+fn reconcile_hydrated_index(
+    live_root: &std::path::Path,
+    relative: &std::path::Path,
+    destination: &std::path::Path,
+    desired: Option<u64>,
+) {
+    if desired.is_some() {
+        record_synchronized_goal(live_root, relative, destination);
+    } else {
+        forget_synchronized_goal(live_root, relative);
     }
 }
 
-fn write_reconciled_state_changes(
-    state_refine: &std::path::Path,
-    reconciled: &BTreeMap<PathBuf, Vec<u8>>,
-) -> RefineResult<()> {
-    for (relative, bytes) in reconciled {
-        write_state_file_bytes(&state_refine.join(relative), bytes)?;
+fn live_path_fingerprint(path: &std::path::Path) -> RefineResult<Option<u64>> {
+    match fs::read(path) {
+        Ok(bytes) => Ok(Some(state_content_fingerprint(&bytes))),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(RefineError::Io(format!(
+            "failed to inspect live Refine state {}: {error}",
+            path.display()
+        ))),
     }
-    Ok(())
 }

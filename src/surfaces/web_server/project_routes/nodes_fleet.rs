@@ -320,6 +320,31 @@ impl InProcessWebServer {
         }
     }
 
+    /// Ask every other fleet node's daemon to synchronize and report what
+    /// each one answered. This node's own state sync stays `POST /sync`; this
+    /// route is the fan-out around it, and a node still on the previous build
+    /// is reported as that node's pending upgrade rather than failing the
+    /// fleet — nodes upgrade one at a time and the rest keep converging.
+    pub(crate) fn handle_fleet_sync(&self) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "sync the fleet");
+        let service = if let Some(runtime_root) = &self.runtime_root {
+            FileFleetService::with_runtime_root(refine_dir, runtime_root)
+        } else {
+            FileFleetService::new(refine_dir)
+        };
+        match service.sync_nodes() {
+            Ok(report) => ApiResponse::json(
+                200,
+                json!({
+                    "ok": true,
+                    "nodes": report.nodes,
+                    "pending_upgrade": report.pending_upgrade
+                }),
+            ),
+            Err(error) => error_response(error),
+        }
+    }
+
     pub(crate) fn handle_fleet_distribute(&self, request: ApiRequest) -> ApiResponse {
         let refine_dir = require_refine_dir!(self, "distribute work");
         let body = request.body.unwrap_or_else(|| json!({}));

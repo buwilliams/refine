@@ -238,7 +238,7 @@ fn restart_recovery_preserves_active_zero_round_goal_and_recovers_valid_sibling(
 #[test]
 fn cleanup_observes_candidate_handoff_through_governance_integration() {
     use crate::process::supervisor::operations::{FileOperationRegistry, OperationState};
-    use crate::tools::host::git_sync::with_repository_git_lock;
+    use crate::tools::git::with_repository_git_lock;
     use crate::tools::product::worktree_cleanup::{
         FileWorktreeCleanupService, WorktreeCleanupOptions,
     };

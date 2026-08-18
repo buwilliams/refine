@@ -525,8 +525,16 @@ impl FileFleetService {
     }
 }
 
+mod node_sync;
 mod remote;
 
+#[cfg(test)]
+pub use node_sync::{FleetNodeDaemonClient, NodeDaemonReply, install_node_daemon_client};
+pub use node_sync::{
+    FleetNodeSyncReport, FleetNodeSyncStatus, NODE_SYNC_DISABLED, NODE_SYNC_FAILED,
+    NODE_SYNC_LOCAL, NODE_SYNC_PENDING_UPGRADE, NODE_SYNC_QUEUED, NODE_SYNC_UNREACHABLE,
+    NODE_SYNC_UNSUPPORTED_GIT, fleet_sync_response,
+};
 pub use remote::{bootstrap_remote_node, validate_remote_node_enabled};
 
 use remote::*;

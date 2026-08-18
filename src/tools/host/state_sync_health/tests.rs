@@ -56,110 +56,101 @@ fn failure_episode_is_redacted_and_recovery_is_transition_based() {
 }
 
 #[test]
-fn missing_baseline_recovery_kind_is_typed_and_cleared_by_success() {
-    let temp = temp_root("state-sync-recovery-kind");
+fn legacy_records_with_a_retired_recovery_kind_still_read_and_settle() {
+    let temp = temp_root("state-sync-legacy-recovery-kind");
     let target = temp.join("target");
     fs::create_dir_all(&target).expect("target");
-    let service = FileStateSyncHealthService::new(temp.join("run"));
+    let runtime = temp.join("run");
+    let service = FileStateSyncHealthService::new(&runtime);
 
+    // A durable record written before `missing_baseline` was retired: the
+    // unknown member is ignored on read, so old health never wedges.
     service
-        .record_failure_with_recovery_kind(
-            &target,
-            "node-a",
-            "baseline is missing",
-            Some(StateSyncRecoveryKind::MissingBaseline),
-        )
-        .expect("typed failure");
+        .record_failure(&target, "node-a", "baseline is missing")
+        .expect("failure");
+    let written = fs::read_to_string(service.path()).expect("record");
+    let mut legacy: serde_json::Value = serde_json::from_str(&written).expect("json");
+    legacy["recovery_kind"] = serde_json::Value::String("missing_baseline".to_string());
+    fs::write(service.path(), serde_json::to_vec_pretty(&legacy).unwrap()).expect("legacy write");
+
     let failed = service
         .inspect(&target, "node-a", Duration::from_secs(900))
         .expect("failed health");
     assert_eq!(failed.status, "failed");
-    assert_eq!(
-        failed.recovery_kind,
-        Some(StateSyncRecoveryKind::MissingBaseline)
-    );
-    assert_eq!(
-        serde_json::to_value(&failed).unwrap()["recovery_kind"],
-        "missing_baseline"
+    assert!(
+        !serde_json::to_value(&failed)
+            .unwrap()
+            .as_object()
+            .unwrap()
+            .contains_key("recovery_kind")
     );
 
     let (settled, activity) = service
-        .record_recovery_success(
-            &target,
-            "node-a",
-            StateSyncRecoveryKind::MissingBaseline,
-            failed.revision,
-        )
+        .record_recovery_success(&target, "node-a", failed.revision)
         .expect("recovered");
     assert!(settled);
     assert!(matches!(
         activity,
         Some(StateSyncHealthActivity::Recovered { .. })
     ));
-    let recovered = service
-        .inspect(&target, "node-a", Duration::from_secs(900))
-        .expect("recovered health");
-    assert_eq!(recovered.status, "healthy");
-    assert_eq!(recovered.recovery_kind, None);
+    assert_eq!(
+        service
+            .inspect(&target, "node-a", Duration::from_secs(900))
+            .expect("recovered health")
+            .status,
+        "healthy"
+    );
 
+    // A newer failure invalidates a stale settlement observation.
     service
-        .record_failure_with_recovery_kind(
-            &target,
-            "node-a",
-            "newer baseline failure",
-            Some(StateSyncRecoveryKind::MissingBaseline),
-        )
-        .expect("newer typed failure");
-    let newer_revision = service
-        .inspect(&target, "node-a", Duration::from_secs(900))
-        .expect("newer failed health")
-        .revision;
+        .record_failure(&target, "node-a", "newer failure")
+        .expect("newer failure");
     let (settled, activity) = service
-        .record_recovery_success(
-            &target,
-            "node-a",
-            StateSyncRecoveryKind::MissingBaseline,
-            failed.revision,
-        )
+        .record_recovery_success(&target, "node-a", failed.revision)
         .expect("stale conditional settlement");
     assert!(!settled);
     assert_eq!(activity, None);
-    let newer_unchanged = service
-        .inspect(&target, "node-a", Duration::from_secs(900))
-        .expect("preserved newer failed health");
-    assert_eq!(newer_unchanged.status, "failed");
-    assert_eq!(newer_unchanged.revision, newer_revision);
     assert_eq!(
-        newer_unchanged.recovery_kind,
-        Some(StateSyncRecoveryKind::MissingBaseline)
+        service
+            .inspect(&target, "node-a", Duration::from_secs(900))
+            .expect("preserved newer failed health")
+            .status,
+        "failed"
     );
 
+    fs::remove_dir_all(temp).expect("cleanup");
+}
+
+#[test]
+fn terminal_recovery_settles_conflict_records_by_revision() {
+    let temp = temp_root("state-sync-recovery-untyped");
+    let target = temp.join("target");
+    fs::create_dir_all(&target).expect("target");
+    let service = FileStateSyncHealthService::new(temp.join("run"));
+
     service
-        .record_failure(&target, "node-a", "unrelated fetch failure")
-        .expect("unrelated failure");
-    let unrelated_revision = service
+        .record_failure(&target, "node-a", "state changed on multiple nodes")
+        .expect("conflict failure");
+    let failed = service
         .inspect(&target, "node-a", Duration::from_secs(900))
-        .expect("unrelated health")
-        .revision;
+        .expect("failed health");
+    assert_eq!(failed.status, "failed");
+
     let (settled, activity) = service
-        .record_recovery_success(
-            &target,
-            "node-a",
-            StateSyncRecoveryKind::MissingBaseline,
-            unrelated_revision,
-        )
-        .expect("conditional settlement");
-    assert!(!settled);
-    assert_eq!(activity, None);
-    let unchanged = service
-        .inspect(&target, "node-a", Duration::from_secs(900))
-        .expect("unchanged health");
-    assert_eq!(unchanged.status, "failed");
+        .record_recovery_success(&target, "node-a", failed.revision)
+        .expect("recovered");
+    assert!(settled);
+    assert!(matches!(
+        activity,
+        Some(StateSyncHealthActivity::Recovered { .. })
+    ));
     assert_eq!(
-        unchanged.last_error.as_deref(),
-        Some("unrelated fetch failure")
+        service
+            .inspect(&target, "node-a", Duration::from_secs(900))
+            .expect("recovered health")
+            .status,
+        "healthy"
     );
-    assert_eq!(unchanged.revision, unrelated_revision);
 
     fs::remove_dir_all(temp).expect("cleanup");
 }
@@ -231,12 +222,7 @@ fn deferrals_and_an_unconfigured_remote_are_neutral() {
     assert!(unconfigured.aggregate_counts_authoritative);
 
     service
-        .record_failure_with_recovery_kind(
-            &target,
-            "node-a",
-            "baseline missing",
-            Some(StateSyncRecoveryKind::MissingBaseline),
-        )
+        .record_failure(&target, "node-a", "baseline missing")
         .expect("recovery failure");
     service
         .record_neutral(&target, "node-a", "unconfigured", Some(false))
@@ -245,7 +231,6 @@ fn deferrals_and_an_unconfigured_remote_are_neutral() {
         .inspect(&target, "node-a", Duration::from_secs(900))
         .expect("ineligible health");
     assert_eq!(no_longer_eligible.status, "unconfigured");
-    assert_eq!(no_longer_eligible.recovery_kind, None);
 
     fs::remove_dir_all(temp).expect("cleanup");
 }
@@ -271,7 +256,6 @@ fn freshness_derivation_crosses_the_wall_clock_threshold() {
         last_failure_source: None,
         last_conflict_report_id: None,
         last_conflict_report_location: None,
-        recovery_kind: None,
         last_reminder_at: None,
         remote_configured: Some(true),
         revision: 7,
@@ -313,7 +297,6 @@ fn correlated_attempt_settlement_keeps_newer_metadata_and_active_failure_evidenc
             "conflict",
             Some("report-1"),
             Some("/run/conflicts/latest.json"),
-            None,
         )
         .unwrap();
     let third = service
@@ -389,7 +372,6 @@ fn correlated_attempt_settlement_keeps_newer_metadata_and_active_failure_evidenc
             "late conflict",
             Some("stale-report"),
             Some("/run/conflicts/stale.json"),
-            None,
         )
         .unwrap();
     let still_healthy = service

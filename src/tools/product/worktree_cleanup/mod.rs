@@ -14,7 +14,7 @@ use crate::process::supervisor::errors::{RefineError, RefineResult};
 use crate::process::supervisor::operations::{
     FileOperationRegistry, OperationRegistry, OperationState,
 };
-use crate::tools::host::git_sync::with_repository_git_lock;
+use crate::tools::git::with_repository_git_lock;
 use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitLinkedWorktree};
 use crate::tools::host::project_layout::refine_dir_for_target_root;
 use crate::tools::product::work_items::FileWorkItemService;

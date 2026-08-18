@@ -106,40 +106,6 @@ fn state_sync_health_emits_one_failure_episode_and_one_recovery_activity() {
 }
 
 #[test]
-fn state_sync_missing_baseline_failure_records_typed_recovery_eligibility() {
-    let temp_root = std::env::temp_dir().join(format!(
-        "refine-state-sync-recovery-kind-{}",
-        uuid::Uuid::new_v4()
-    ));
-    let target_root = temp_root.join("target");
-    let runtime_root = temp_root.join("run/8082");
-    std::fs::create_dir_all(target_root.join(".refine")).unwrap();
-    let error = RefineError::StateSyncMissingBaseline("baseline missing".to_string());
-    let source = "test";
-    let attempt_id =
-        record_state_sync_attempt(&runtime_root, &target_root, "default", source).unwrap();
-
-    record_state_sync_failure(
-        &runtime_root,
-        &target_root,
-        "default",
-        attempt_id,
-        source,
-        &error,
-    )
-    .unwrap();
-
-    let health = FileStateSyncHealthService::new(&runtime_root)
-        .inspect(&target_root, "default", Duration::from_secs(900))
-        .unwrap();
-    assert_eq!(
-        health.recovery_kind,
-        Some(crate::tools::host::state_sync_health::StateSyncRecoveryKind::MissingBaseline)
-    );
-    std::fs::remove_dir_all(temp_root).unwrap();
-}
-
-#[test]
 fn source_worker_inherits_debug_executable_without_installed_binary() {
     let checkout = SyntheticSourceProduct::new("source-worker-executable");
     let runtime_root = checkout.port_runtime_root(4557);
@@ -354,7 +320,11 @@ fn pause_at_ensure_is_quiet_and_invalid_pause_state_is_an_error() {
         uuid::Uuid::new_v4()
     ));
     let pause_root = runtime_root.clone();
-    let _hook = install_background_worker_hook(move |worker_kind, boundary| {
+    let observed_root = runtime_root.clone();
+    let _hook = install_background_worker_hook(move |root, worker_kind, boundary| {
+        if root != observed_root {
+            return;
+        }
         if worker_kind == GIT_SYNC_RUNNER && boundary == BackgroundWorkerBoundary::EnsureLaunch {
             FileProcessSupervisor::new(&pause_root)
                 .set_workflow_paused(true)
@@ -494,11 +464,18 @@ fn repository_workers_skip_blocked_operations_then_do_work_after_resume() {
     let release = Arc::new((Mutex::new(false), Condvar::new()));
     let (event_tx, event_rx) = mpsc::channel();
     let hook_release = Arc::clone(&release);
-    let _blocked_hook = install_background_worker_hook(move |worker_kind, boundary| {
-        if !matches!(
-            boundary,
-            BackgroundWorkerBoundary::BeforeOperation | BackgroundWorkerBoundary::AfterOperation
-        ) {
+    let blocked_root = runtime_root.clone();
+    let _blocked_hook = install_background_worker_hook(move |root, worker_kind, boundary| {
+        // Every test shares this process, so only this test's own workers
+        // count: another test's background operation must not be read as
+        // work this pause was supposed to stop.
+        if root != blocked_root
+            || !matches!(
+                boundary,
+                BackgroundWorkerBoundary::BeforeOperation
+                    | BackgroundWorkerBoundary::AfterOperation
+            )
+        {
             return;
         }
         event_tx.send((worker_kind.to_string(), boundary)).unwrap();
@@ -542,11 +519,15 @@ fn repository_workers_skip_blocked_operations_then_do_work_after_resume() {
 
     supervisor.set_workflow_paused(false).unwrap();
     let (event_tx, event_rx) = mpsc::channel();
-    let _resumed_hook = install_background_worker_hook(move |worker_kind, boundary| {
-        if matches!(
-            boundary,
-            BackgroundWorkerBoundary::BeforeOperation | BackgroundWorkerBoundary::AfterOperation
-        ) {
+    let resumed_root = runtime_root.clone();
+    let _resumed_hook = install_background_worker_hook(move |root, worker_kind, boundary| {
+        if root == resumed_root
+            && matches!(
+                boundary,
+                BackgroundWorkerBoundary::BeforeOperation
+                    | BackgroundWorkerBoundary::AfterOperation
+            )
+        {
             event_tx.send((worker_kind.to_string(), boundary)).unwrap();
         }
     });
@@ -950,15 +931,30 @@ fn background_sync_conflict_auto_recovers_unless_the_node_opted_out() {
         std::fs::create_dir_all(destination.parent().unwrap()).unwrap();
         std::fs::write(destination, value).unwrap();
     };
-    // Establish a shared baseline, then diverge the same member on both nodes
-    // so semantic reconciliation must fail closed.
+    let write_goal = |root: &Path, name: &str| {
+        let destination = refine_dir_for_target_root(root)
+            .unwrap()
+            .join("goals/OWNED/goal.json");
+        std::fs::create_dir_all(destination.parent().unwrap()).unwrap();
+        std::fs::write(
+            destination,
+            format!(r#"{{"id":"OWNED","name":"{name}","node_id":"default"}}"#),
+        )
+        .unwrap();
+    };
+    // Establish a shared baseline, then diverge the same members on both
+    // nodes so structural reconciliation must fail closed. The goal record
+    // names this node as its owner at the merge base.
     write_shared(&a, "base\n");
+    write_goal(&a, "base");
     FileGitSyncService::new(&a, a.join("run")).sync().unwrap();
     let service = FileGitSyncService::new(&b, &runtime_root);
     service.sync().unwrap();
     write_shared(&a, "remote\n");
+    write_goal(&a, "remote-edit");
     FileGitSyncService::new(&a, a.join("run")).sync().unwrap();
     write_shared(&b, "live\n");
+    write_goal(&b, "live-edit");
 
     bind_state_sync_health(&runtime_root, &b, "default").unwrap();
     let refine_b = refine_dir_for_target_root(&b).unwrap();
@@ -978,21 +974,19 @@ fn background_sync_conflict_auto_recovers_unless_the_node_opted_out() {
     )
     .unwrap();
 
-    // A non-recoverable failure never triggers recovery regardless of the setting.
-    let outcome = attempt_automatic_state_recovery(
-        &runtime_root,
-        &b,
-        "default",
-        &service,
-        &RefineError::Io("network unreachable".to_string()),
-        false,
-    )
-    .unwrap();
+    let report = crate::tools::host::git_sync::latest_state_sync_conflict_report(&runtime_root)
+        .unwrap()
+        .expect("the contested sync records a conflict report");
+
+    // A failure without recorded conflict evidence never triggers recovery
+    // regardless of the setting.
+    let outcome =
+        attempt_automatic_state_recovery(&runtime_root, &b, "default", &service, None).unwrap();
     assert!(matches!(outcome, AutoRecoveryOutcome::NotAttempted));
 
     // The opted-out node keeps its fail-closed conflict.
     let outcome =
-        attempt_automatic_state_recovery(&runtime_root, &b, "default", &service, &error, true)
+        attempt_automatic_state_recovery(&runtime_root, &b, "default", &service, Some(&report))
             .unwrap();
     assert!(matches!(outcome, AutoRecoveryOutcome::NotAttempted));
     let health = FileStateSyncHealthService::new(&runtime_root)
@@ -1000,12 +994,14 @@ fn background_sync_conflict_auto_recovers_unless_the_node_opted_out() {
         .unwrap();
     assert!(health.failure_since.is_some(), "{health:#?}");
 
-    // With the default policy the same rejection converges on its own.
+    // With the default policy the same rejection converges on its own:
+    // remote authority for the shared record, a live override for the goal
+    // record whose merge-base bytes name this node.
     FileSettingsService::with_active_root(&refine_b, &runtime_root)
         .update(&json!({"state_sync_auto_recovery": "remote"}))
         .unwrap();
     let outcome =
-        attempt_automatic_state_recovery(&runtime_root, &b, "default", &service, &error, true)
+        attempt_automatic_state_recovery(&runtime_root, &b, "default", &service, Some(&report))
             .unwrap();
     assert!(matches!(outcome, AutoRecoveryOutcome::Recovered));
     let health = FileStateSyncHealthService::new(&runtime_root)
@@ -1020,6 +1016,13 @@ fn background_sync_conflict_auto_recovers_unless_the_node_opted_out() {
         std::fs::read_to_string(refine_b.join("shared/state.json")).unwrap(),
         "remote\n"
     );
+    let owned: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(refine_b.join("goals/OWNED/goal.json")).unwrap())
+            .unwrap();
+    assert_eq!(
+        owned["name"], "live-edit",
+        "merge-base ownership keeps this node's copy of its own goal"
+    );
     let entries = FileActivityService::new(&refine_b).recent(10).unwrap();
     assert!(
         entries
@@ -1029,5 +1032,140 @@ fn background_sync_conflict_auto_recovers_unless_the_node_opted_out() {
         "{entries:#?}"
     );
     service.sync().unwrap();
+    std::fs::remove_dir_all(temp_root).unwrap();
+}
+
+/// Agent resolution runs FIRST, inside the sync attempt itself; only its
+/// `NeedsDecision` escalation falls through to the merge-base-ownership
+/// auto-recovery, so overnight convergence still terminates.
+#[test]
+fn agent_resolution_runs_before_auto_recovery_and_needs_decision_falls_through() {
+    use crate::tools::git::resolve::{
+        ResolutionRequest, ResolverOutcome, ScriptedResolver, ScriptedStep,
+        install_resolver_override,
+    };
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    let temp_root = std::env::temp_dir().join(format!(
+        "refine-state-sync-resolution-order-{}",
+        uuid::Uuid::new_v4()
+    ));
+    let remote = temp_root.join("remote.git");
+    let seed = temp_root.join("seed");
+    let a = temp_root.join("a");
+    let b = temp_root.join("b");
+    let runtime_root = temp_root.join("run/8082");
+    std::fs::create_dir_all(&seed).unwrap();
+    let git = |root: &Path, args: &[&str]| {
+        let output = std::process::Command::new("git")
+            .args(args)
+            .current_dir(root)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "git {} failed: {}",
+            args.join(" "),
+            String::from_utf8_lossy(&output.stderr)
+        );
+    };
+    git(&temp_root, &["init", "--bare", remote.to_str().unwrap()]);
+    git(&seed, &["init", "-q", "-b", "main"]);
+    git(&seed, &["config", "user.email", "sync@test"]);
+    git(&seed, &["config", "user.name", "Sync Test"]);
+    std::fs::write(seed.join("app.txt"), "base\n").unwrap();
+    git(&seed, &["add", "app.txt"]);
+    git(&seed, &["commit", "-q", "-m", "initial"]);
+    git(
+        &seed,
+        &["remote", "add", "origin", remote.to_str().unwrap()],
+    );
+    git(&seed, &["push", "-q", "-u", "origin", "main"]);
+    for root in [&a, &b] {
+        git(
+            &temp_root,
+            &[
+                "clone",
+                "-q",
+                remote.to_str().unwrap(),
+                root.to_str().unwrap(),
+            ],
+        );
+        git(root, &["config", "user.email", "sync@test"]);
+        git(root, &["config", "user.name", "Sync Test"]);
+    }
+    let write_shared = |root: &Path, value: &str| {
+        let destination = refine_dir_for_target_root(root)
+            .unwrap()
+            .join("shared/state.json");
+        std::fs::create_dir_all(destination.parent().unwrap()).unwrap();
+        std::fs::write(destination, value).unwrap();
+    };
+    write_shared(&a, "{\"node\":\"base\"}\n");
+    FileGitSyncService::new(&a, a.join("run")).sync().unwrap();
+    let service = FileGitSyncService::new(&b, &runtime_root);
+    service.sync().unwrap();
+    write_shared(&a, "{\"node\":\"remote\"}\n");
+    FileGitSyncService::new(&a, a.join("run")).sync().unwrap();
+    write_shared(&b, "{\"node\":\"live\"}\n");
+    bind_state_sync_health(&runtime_root, &b, "default").unwrap();
+
+    let resolver_calls = Arc::new(AtomicU32::new(0));
+    let step = |calls: &Arc<AtomicU32>| -> ScriptedStep {
+        let counted = Arc::clone(calls);
+        Box::new(move |_request: &ResolutionRequest<'_>| {
+            counted.fetch_add(1, Ordering::SeqCst);
+            Ok(ResolverOutcome::Failed(
+                "both versions look intentional".to_string(),
+            ))
+        })
+    };
+    let _guard = install_resolver_override(
+        &b,
+        Arc::new(ScriptedResolver::new(vec![
+            step(&resolver_calls),
+            step(&resolver_calls),
+        ])),
+    );
+
+    let attempt =
+        record_state_sync_attempt(&runtime_root, &b, "default", "background_publish").unwrap();
+    let error = service.sync().unwrap_err();
+    record_state_sync_failure(
+        &runtime_root,
+        &b,
+        "default",
+        attempt,
+        "background_publish",
+        &error,
+    )
+    .unwrap();
+
+    // Resolution ran first (both bounded attempts) and escalated in domain
+    // terms; the report leads with the question.
+    assert_eq!(resolver_calls.load(Ordering::SeqCst), 2);
+    assert!(error.to_string().contains("needs a decision"), "{error}");
+    let report = crate::tools::host::git_sync::latest_state_sync_conflict_report(&runtime_root)
+        .unwrap()
+        .expect("the escalated conflict keeps its report");
+    assert!(report.decision_question.is_some(), "{report:#?}");
+
+    // Only the NeedsDecision outcome falls through to auto-recovery, which
+    // still converges the node with the merge-base ownership policy.
+    let outcome =
+        attempt_automatic_state_recovery(&runtime_root, &b, "default", &service, Some(&report))
+            .unwrap();
+    assert!(matches!(outcome, AutoRecoveryOutcome::Recovered));
+    assert_eq!(resolver_calls.load(Ordering::SeqCst), 2);
+    let refine_b = refine_dir_for_target_root(&b).unwrap();
+    assert_eq!(
+        std::fs::read_to_string(refine_b.join("shared/state.json")).unwrap(),
+        "{\"node\":\"remote\"}\n"
+    );
+    let health = FileStateSyncHealthService::new(&runtime_root)
+        .inspect(&b, "default", Duration::from_secs(900))
+        .unwrap();
+    assert!(health.failure_since.is_none(), "{health:#?}");
     std::fs::remove_dir_all(temp_root).unwrap();
 }

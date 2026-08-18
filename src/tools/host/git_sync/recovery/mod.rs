@@ -1,43 +1,16 @@
 use super::*;
 
 mod contracts;
-mod hydration;
 mod inspection;
-mod reported;
-mod reported_support;
 mod run;
-mod service;
-mod storage;
-#[cfg(test)]
-mod test_hooks;
 
 pub use contracts::*;
-#[cfg(test)]
-pub(super) use hydration::hydrate_remote_with_recovery_cas;
-#[cfg(not(test))]
-use hydration::*;
-pub(super) use hydration::{hydrate_recovery_target_from_map, hydrate_recovery_target_with_cas};
 pub use run::StateRecoveryRunPolicy;
-use storage::*;
-#[cfg(test)]
-use test_hooks::*;
-#[cfg(test)]
-pub(super) use test_hooks::{
-    install_after_recovery_authority_hook, install_after_recovery_baseline_hook,
-    install_during_recovery_preview_hook,
-};
 
-const RECOVERY_PATH_LIMIT: usize = 100;
-const RECOVERY_MANIFEST_DIR: &str = "refine-state-recoveries";
-const RECOVERY_REF_PREFIX: &str = "refs/refine/state-recovery";
-const REPORTED_RECOVERY_VERSION: u32 = 2;
-
-#[cfg(test)]
-pub(in crate::tools::host::git_sync) fn preview_evidence_id_for_test(
-    preview: &StateRecoveryPreview,
-) -> RefineResult<String> {
-    storage::preview_evidence_id(preview)
-}
+/// Losing sides of a terminal recovery stay reachable as merge parents; this
+/// names anything displaced without a parent (a joining node's live store) so
+/// operators can find it by ref.
+pub(in crate::tools::host::git_sync) const RETAINED_REF_PREFIX: &str = "refs/refine/retained";
 
 struct DisposableCheckout {
     path: PathBuf,
@@ -49,42 +22,98 @@ impl Drop for DisposableCheckout {
     }
 }
 
-fn stale_recovery(reason: &str) -> RefineError {
+fn raced_recovery(reason: &str) -> RefineError {
     RefineError::StateRecoveryConflict {
-        reason: crate::process::supervisor::errors::StateRecoveryConflictReason::StalePreview,
-        message: format!(
-            "State recovery preview is stale because {reason}; run a new read-only preview."
-        ),
-    }
-}
-
-fn git_busy_recovery() -> RefineError {
-    RefineError::StateRecoveryConflict {
-        reason: crate::process::supervisor::errors::StateRecoveryConflictReason::GitBusy,
-        message: "Repository Git operations are busy; recovery was not started.".to_string(),
+        reason: crate::process::supervisor::errors::StateRecoveryConflictReason::StateMoved,
+        message: format!("State recovery lost a race because {reason}; rerun the command."),
     }
 }
 
 impl FileGitSyncService {
-    /// Take both repository locks without blocking, reporting typed Git-busy
-    /// contention. Every recovery mutation runs under this exclusive hold.
-    pub(in crate::tools::host::git_sync) fn with_exclusive_recovery_locks<T>(
+    fn disposable_checkout(&self, label: &str) -> RefineResult<DisposableCheckout> {
+        let path = std::env::temp_dir().join(format!(
+            "refine-state-recovery-{label}-{}",
+            uuid::Uuid::new_v4()
+        ));
+        if path.exists() {
+            return Err(RefineError::Conflict(format!(
+                "disposable recovery path already exists: {}",
+                path.display()
+            )));
+        }
+        Ok(DisposableCheckout { path })
+    }
+
+    /// Commit the live durable state in a disposable repository, parentless,
+    /// and retain it in the target repository by ref. Used when a losing live
+    /// side is not otherwise reachable from any commit (a contested join).
+    pub(in crate::tools::host::git_sync) fn retain_live_snapshot(
         &self,
-        action: impl FnOnce() -> RefineResult<T>,
-    ) -> RefineResult<T> {
-        let lock = repository_git_lock(&self.target_root)?;
-        let _guard = match lock.try_lock() {
-            Ok(guard) => guard,
-            Err(TryLockError::WouldBlock) => return Err(git_busy_recovery()),
-            Err(TryLockError::Poisoned(_)) => {
-                return Err(RefineError::Conflict(
-                    "Repository Git lock was poisoned".to_string(),
-                ));
+        live_refine: &std::path::Path,
+        label: &str,
+    ) -> RefineResult<String> {
+        let checkout = self.disposable_checkout("retain-live")?;
+        fs::create_dir_all(&checkout.path).map_err(|error| {
+            RefineError::Io(format!(
+                "failed to create retention snapshot {}: {error}",
+                checkout.path.display()
+            ))
+        })?;
+        let path = checkout.path.display().to_string();
+        self.git_checked(&["init", "-q", "--", &path])?;
+        replace_live_durable_state(live_refine, &checkout.path.join(".refine"))?;
+        self.git_at_checked(&checkout.path, &["add", "-f", "-A", "--", ".refine"])?;
+        self.git_at_checked(
+            &checkout.path,
+            &[
+                "commit",
+                "--allow-empty",
+                "-m",
+                "Retain pre-recovery Refine live state",
+            ],
+        )?;
+        let short = &label[..label.len().min(12)];
+        let tree = self.git_at_stdout(&checkout.path, &["rev-parse", "HEAD^{tree}"])?;
+        // An interrupted recovery reruns this retention against the same
+        // remote head. Reuse the existing ref when it already holds this
+        // exact live tree; otherwise pick a fresh suffixed name — never
+        // overwrite a prior retention, which may hold live content the
+        // interrupted attempt has since displaced.
+        let base_name = format!("{RETAINED_REF_PREFIX}/live-{short}");
+        let mut retained_ref = base_name.clone();
+        let mut suffix = 2usize;
+        loop {
+            let existing =
+                self.git(&["rev-parse", "--verify", &format!("{retained_ref}^{{tree}}")])?;
+            if !existing.success {
+                break;
             }
-        };
-        let Some(_file_guard) = RepositoryFileLock::try_acquire(&self.target_root)? else {
-            return Err(git_busy_recovery());
-        };
-        action()
+            if String::from_utf8_lossy(&existing.stdout).trim() == tree {
+                return Ok(retained_ref);
+            }
+            retained_ref = format!("{base_name}-{suffix}");
+            suffix += 1;
+        }
+        self.git_checked(&["fetch", "--no-tags", &path, &format!("HEAD:{retained_ref}")])?;
+        Ok(retained_ref)
+    }
+
+    pub(super) fn reject_foreign_git_operation(&self) -> RefineResult<()> {
+        let common = git_common_dir(&self.target_root)?;
+        let markers = [
+            "MERGE_HEAD",
+            "CHERRY_PICK_HEAD",
+            "REVERT_HEAD",
+            "BISECT_LOG",
+            "rebase-apply",
+            "rebase-merge",
+            "sequencer",
+        ];
+        if let Some(marker) = markers.iter().find(|marker| common.join(marker).exists()) {
+            return Err(RefineError::Conflict(format!(
+                "Git operation marker {marker} is active; recovery was not started."
+            )));
+        }
+        Ok(())
     }
 }
