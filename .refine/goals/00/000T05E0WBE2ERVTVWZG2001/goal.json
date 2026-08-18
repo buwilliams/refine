@@ -391,13 +391,15 @@
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
       "prompt": "Outcome: keep a Goal on the node selected by its latest unambiguous explicit transfer while preserving Refine background state-sync error reconciliation.\n\nUser intent: Goals move between nodes only through supported transfer surfaces such as the CLI or web UI. When one side changed node_id from the merge base and the other side did not, that one-sided transfer is authoritative and every node must converge to the transferred node. Background sync must never repatriate the Goal to its merge-base owner merely because a conflict occurred.\n\nScope and constraints:\n1. Keep the background post-conflict recovery/reconciliation pipeline. Do not remove or disable attempt_automatic_state_recovery, state_sync_auto_recovery, its stored setting and web control, health/backoff settlement, recovery activity evidence, explicit sync authority, or useful automatic reconciliation for non-ownership conflicts.\n2. Narrow or replace only the ownership decision that lets merge-base ownership reverse an explicit transfer. Do not use timestamps, current host, merge location, retry order, or merge-base ownership as a substitute for an explicit transfer.\n3. Preserve a provable one-sided transferred node_id through deterministic resolution, agent-assisted resolution, and any later automatic recovery fallback, including when other fields in the same Goal record conflict. If whole-record authority cannot preserve that field safely, introduce the smallest field-aware policy or path handling needed; do not solve it by making every background conflict manual.\n4. If both sides independently changed node_id to different nodes, or operands are missing or malformed such that a one-sided transfer cannot be proven, fail closed with stable conflict and health evidence and a domain-terms decision resolvable through existing supported sync-authority or Goal-transfer surfaces. Never delete a Goal or change node_id from ambiguous evidence.\n5. Preserve all non-ownership background reconciliation, retained refs, crash/race safety, explicit operator recovery, and audit evidence.\n\nHistorical evidence: cancelled Goal DR427BFD89E5391018EACA69CC over-expanded this request. Its Round 1 candidate removed the automatic recovery branch, setting, activity contract, tests, and documentation; its generated Round 2 explicitly prohibited restoring them. Those removals are rejected requirements and must not be carried onto main. The useful ownership-gate idea may be reconsidered only if adapted to coexist with background recovery. Preserve that cancelled Goal, its two Rounds, branches, candidates, worktrees, logs, and Quality evidence unchanged.\n\nVerification and evidence:\n- Add focused tests for one-sided transfers in both local and remote orientations, with simultaneous non-owner field conflicts, and prove the final node_id is the transferred node.\n- Cover competing transfers, missing/deleted/malformed peer operands, agent output that attempts the prior owner or deletion, and prove ambiguous cases remain unchanged and inspectable until explicit recovery.\n- Prove ordinary non-ownership background conflicts still enter automatic recovery and retain health, backoff, activity, setting, and retained-state contracts.\n- Run focused persistence-sync resolution/state, worker/config, sync simulation/regression, and relevant web tests; cargo fmt --all -- --check; git diff --check; scoped Clippy or repository-valid baseline handling. Report exact commands, results, candidate commit, base commit, and changed paths.",
+      "quality_agent_report": "Quality reviewed base c0c3fc6bc5f8f78208e77598bc3c5f2a4a9fd311 and candidate 726e8db34077c02ac3dced80545359e2b095ffc8. No corrections or test changes were needed: the 22-path candidate preserves provable explicit Goal transfers across structural merge, agent resolution, crash-surviving results, and automatic recovery; ambiguous ownership fails closed; ordinary non-ownership automatic recovery and its settings, health, backoff, activity, retained-state, CLI, API, and browser contracts remain intact. The worktree is clean. Focused persistence-sync, worker/config, simulation/regression, browser, formatting, and diff checks passed. Strict Clippy reported four pre-existing warnings only in three paths unchanged from the base; allowing exactly those baseline lints produced a clean Clippy run.",
+      "quality_candidate_commit": "726e8db34077c02ac3dced80545359e2b095ffc8",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T17:23:11Z",
+      "updated": "2026-08-18T17:31:44Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T16:42:59Z",
         "round_idx": 0,
@@ -409,6 +411,6 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-18T17:23:11Z",
-  "workflow_revision": 21
+  "updated": "2026-08-18T17:31:44Z",
+  "workflow_revision": 23
 }
