@@ -85,15 +85,33 @@
         "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
       },
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-08-18T16:42:58Z",
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
-      "governance_candidate_commit": "",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_candidate_commit": "726e8db34077c02ac3dced80545359e2b095ffc8",
+      "governance_checked_at": "2026-08-18T17:38:48Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T05E0WBE2ERVTVWZG2001-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "guidance_checked": 2,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No actual governance rule violations found.\",\"violations\":[]}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "No actual governance rule violations found.",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T05E0WBE2ERVTVWZG2001-round-1"
+      },
+      "governance_message": "No actual governance rule violations found.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
       "governance_rule_actions": [],
       "guidance_decision": {
         "applied": [
@@ -388,8 +406,8 @@
       "implementation_report": "Implemented and committed field-aware Goal ownership protection without removing background automatic recovery. A freshly pinned merge-base/local/remote policy now preserves provable one-sided transfers through structural merge, agent resolution, crash-surviving results, and whole-record automatic recovery; ambiguous ownership fails closed with inspectable domain evidence and existing explicit recovery surfaces. Automatic recovery settings, worker health/backoff/activity settlement, retained refs, and ordinary non-ownership reconciliation remain active. Base commit: c0c3fc6bc5f8f78208e77598bc3c5f2a4a9fd311. Candidate commit: 726e8db34077c02ac3dced80545359e2b095ffc8. Changed paths: 22 files under affected docs/intent pages, the sync resolution prompt, application persistence_sync and worker modules/tests, and sync simulation tests. Exact verification is recorded below; the candidate worktree is clean.",
       "implementation_reported_at": "2026-08-18T17:23:11Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Outcome: keep a Goal on the node selected by its latest unambiguous explicit transfer while preserving Refine background state-sync error reconciliation.\n\nUser intent: Goals move between nodes only through supported transfer surfaces such as the CLI or web UI. When one side changed node_id from the merge base and the other side did not, that one-sided transfer is authoritative and every node must converge to the transferred node. Background sync must never repatriate the Goal to its merge-base owner merely because a conflict occurred.\n\nScope and constraints:\n1. Keep the background post-conflict recovery/reconciliation pipeline. Do not remove or disable attempt_automatic_state_recovery, state_sync_auto_recovery, its stored setting and web control, health/backoff settlement, recovery activity evidence, explicit sync authority, or useful automatic reconciliation for non-ownership conflicts.\n2. Narrow or replace only the ownership decision that lets merge-base ownership reverse an explicit transfer. Do not use timestamps, current host, merge location, retry order, or merge-base ownership as a substitute for an explicit transfer.\n3. Preserve a provable one-sided transferred node_id through deterministic resolution, agent-assisted resolution, and any later automatic recovery fallback, including when other fields in the same Goal record conflict. If whole-record authority cannot preserve that field safely, introduce the smallest field-aware policy or path handling needed; do not solve it by making every background conflict manual.\n4. If both sides independently changed node_id to different nodes, or operands are missing or malformed such that a one-sided transfer cannot be proven, fail closed with stable conflict and health evidence and a domain-terms decision resolvable through existing supported sync-authority or Goal-transfer surfaces. Never delete a Goal or change node_id from ambiguous evidence.\n5. Preserve all non-ownership background reconciliation, retained refs, crash/race safety, explicit operator recovery, and audit evidence.\n\nHistorical evidence: cancelled Goal DR427BFD89E5391018EACA69CC over-expanded this request. Its Round 1 candidate removed the automatic recovery branch, setting, activity contract, tests, and documentation; its generated Round 2 explicitly prohibited restoring them. Those removals are rejected requirements and must not be carried onto main. The useful ownership-gate idea may be reconsidered only if adapted to coexist with background recovery. Preserve that cancelled Goal, its two Rounds, branches, candidates, worktrees, logs, and Quality evidence unchanged.\n\nVerification and evidence:\n- Add focused tests for one-sided transfers in both local and remote orientations, with simultaneous non-owner field conflicts, and prove the final node_id is the transferred node.\n- Cover competing transfers, missing/deleted/malformed peer operands, agent output that attempts the prior owner or deletion, and prove ambiguous cases remain unchanged and inspectable until explicit recovery.\n- Prove ordinary non-ownership background conflicts still enter automatic recovery and retain health, backoff, activity, setting, and retained-state contracts.\n- Run focused persistence-sync resolution/state, worker/config, sync simulation/regression, and relevant web tests; cargo fmt --all -- --check; git diff --check; scoped Clippy or repository-valid baseline handling. Report exact commands, results, candidate commit, base commit, and changed paths.",
       "quality_agent_report": "Quality reviewed base c0c3fc6bc5f8f78208e77598bc3c5f2a4a9fd311 and candidate 726e8db34077c02ac3dced80545359e2b095ffc8. No corrections or test changes were needed: the 22-path candidate preserves provable explicit Goal transfers across structural merge, agent resolution, crash-surviving results, and automatic recovery; ambiguous ownership fails closed; ordinary non-ownership automatic recovery and its settings, health, backoff, activity, retained-state, CLI, API, and browser contracts remain intact. The worktree is clean. Focused persistence-sync, worker/config, simulation/regression, browser, formatting, and diff checks passed. Strict Clippy reported four pre-existing warnings only in three paths unchanged from the base; allowing exactly those baseline lints produced a clean Clippy run.",
       "quality_candidate_commit": "726e8db34077c02ac3dced80545359e2b095ffc8",
@@ -447,19 +465,29 @@
       "quality_message": "All Quality tests passed with observed supervised evidence.",
       "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-08-18T17:36:31Z",
-      "workflow_attempt_authority": {
-        "claimed_at": "2026-08-18T16:42:59Z",
-        "round_idx": 0,
-        "workflow_revision": 3
+      "rule_state": "passed",
+      "updated": "2026-08-18T17:38:52Z",
+      "workflow_attempt_authority": null,
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "726e8db34077c02ac3dced80545359e2b095ffc8",
+        "integrated_at": "2026-08-18T17:38:52.791698034+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n docs/intent/02-model/04-fleet.md                   |  31 ++-\n docs/intent/03-application/04-persistence-sync.md  |   8 +-\n docs/intent/05-surfaces/02-cli.md                  |   7 +-\n docs/intent/05-surfaces/04-api.md                  |   2 +-\n .../prompts/sync/resolve-state-conflict.md         |   2 +-\n src/application/persistence_sync/goal_ownership.rs | 291 ++++++++++++++++++++\n src/application/persistence_sync/mod.rs            |   1 +\n .../persistence_sync/recovery/contracts.rs         |  10 +\n src/application/persistence_sync/recovery/run.rs   |  73 ++---\n src/application/persistence_sync/resolution/mod.rs | 127 ++++++---\n .../persistence_sync/resolution/state.rs           |  77 ++++--\n src/application/persistence_sync/state/mod.rs      |   2 +-\n src/application/persistence_sync/state/service.rs  | 211 ++++++++++++++-\n .../persistence_sync/state/tests/recovery.rs       | 108 ++++++++\n .../persistence_sync/state/tests/remote.rs         |   6 +-\n .../persistence_sync/state/tests/resolution.rs     | 299 +++++++++++++++++++++\n .../state/tests/synchronization.rs                 |   7 +-\n .../persistence_sync/state_merge/mod.rs            |  64 ++++-\n src/application/workers/state_sync_health.rs       |  21 +-\n src/application/workers/tests.rs                   |  11 +-\n tests/sync_simulation.rs                           |  16 +-\n tests/sync_simulation/scenarios.rs                 | 111 +++++---\n 22 files changed, 1283 insertions(+), 202 deletions(-)\n create mode 100644 src/application/persistence_sync/goal_ownership.rs",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "18ac0db9f247b1c82c0ff8719a8a750ddcb332da"
       },
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "governance",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-08-18T17:36:32Z",
-  "workflow_revision": 25
+  "updated": "2026-08-18T17:38:53Z",
+  "workflow_revision": 29
 }
