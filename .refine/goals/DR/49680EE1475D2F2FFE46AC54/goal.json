@@ -866,8 +866,37 @@
           "round_idx": 1,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-08-18T15:07:29Z",
+        "criticism": {
+          "completed_at": "2026-08-18T15:09:33Z",
+          "git_after": {
+            "branch": "refine/DR49680EE1475D2F2FFE46AC54/round-2",
+            "head_commit": "ff07e292388a2b3cfe2fcb1c3fb52bec4bb0ab4a",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR49680EE1475D2F2FFE46AC54/round-2",
+            "head_commit": "ff07e292388a2b3cfe2fcb1c3fb52bec4bb0ab4a",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P2",
+                  "P7"
+                ],
+                "description": "P2 promises atomic persistence but does not serialize the full nodes.json read-modify-write with concurrent Runtime Config autosaves or state-sync settlement, so copy can silently overwrite newer node settings or registry metadata.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Run copy under the existing nodes.json mutation lock shared by participating writers and add a regression proving a concurrent change is preserved or rejected rather than lost."
+              }
+            ],
+            "summary": "Serialize the new node-settings copy mutation so it cannot discard concurrent node-registry changes."
+          },
+          "started_at": "2026-08-18T15:07:29Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-08-18T15:09:33Z",
         "proposal": {
           "completed_at": "2026-08-18T15:07:29Z",
           "git_after": {
@@ -918,7 +947,7 @@
         "schema_version": 2,
         "started_at": "2026-08-18T15:05:27Z",
         "state": "in_progress",
-        "updated_at": "2026-08-18T15:07:29Z"
+        "updated_at": "2026-08-18T15:09:33Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -932,7 +961,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T15:07:29Z",
+      "updated": "2026-08-18T15:09:33Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T15:05:26Z",
         "round_idx": 1,
@@ -944,6 +973,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-18T15:07:29Z",
-  "workflow_revision": 44
+  "updated": "2026-08-18T15:09:33Z",
+  "workflow_revision": 46
 }
