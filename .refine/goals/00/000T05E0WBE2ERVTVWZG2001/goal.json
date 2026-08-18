@@ -106,8 +106,61 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-08-18T16:45:34Z",
+        "criticism": {
+          "completed_at": "2026-08-18T16:47:43Z",
+          "git_after": {
+            "branch": "refine/00000T05E0WBE2ERVTVWZG2001/round-1",
+            "head_commit": "c0c3fc6bc5f8f78208e77598bc3c5f2a4a9fd311",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T05E0WBE2ERVTVWZG2001/round-1",
+            "head_commit": "c0c3fc6bc5f8f78208e77598bc3c5f2a4a9fd311",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P2",
+                  "P3",
+                  "P4",
+                  "P5",
+                  "P6"
+                ],
+                "description": "The checklist contains no implementation item for the authoritative request's focused transfer, ambiguity, malformed/deleted operand, hostile agent output, ordinary auto-recovery, simulation, web, formatting, Clippy, or exact commit and path evidence.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Add a verification and evidence checklist item covering every required matrix case and exact repository-valid commands, results, base, candidate commit, and changed paths."
+              },
+              {
+                "checklist_item_ids": [
+                  "P4",
+                  "P5",
+                  "P6"
+                ],
+                "description": "P4 scopes the field-aware safeguard to automatic fallback even though CLI and API authority use the same recovery path, and it does not require reclassification from the freshly pinned operands on each bounded retry rather than reusing a stale report-derived decision.",
+                "id": "C2",
+                "material": true,
+                "recommendation": "Enforce ownership centrally for every decision-based recovery pass and recompute it from that pass's actual merge base, local head, and remote head before publication."
+              },
+              {
+                "checklist_item_ids": [
+                  "P3",
+                  "P6"
+                ],
+                "description": "P3 strengthens the agent acceptance gate but omits the existing crash-only surviving-result shortcut, which publishes a previously gated result ref without invoking the gate and could therefore publish deletion or prior ownership after the policy changes.",
+                "id": "C3",
+                "material": true,
+                "recommendation": "Revalidate surviving resolution results against the pinned ownership classification before publication, retiring and re-deriving any result that violates the transfer or ambiguity policy."
+              }
+            ],
+            "summary": "The plan captures the core ownership rule but needs three safety-critical additions before implementation."
+          },
+          "started_at": "2026-08-18T16:45:34Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-08-18T16:47:43Z",
         "proposal": {
           "completed_at": "2026-08-18T16:45:34Z",
           "git_after": {
@@ -158,7 +211,7 @@
         "schema_version": 2,
         "started_at": "2026-08-18T16:43:00Z",
         "state": "in_progress",
-        "updated_at": "2026-08-18T16:45:34Z"
+        "updated_at": "2026-08-18T16:47:43Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -172,7 +225,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T16:45:34Z",
+      "updated": "2026-08-18T16:47:43Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T16:42:59Z",
         "round_idx": 0,
@@ -184,6 +237,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-18T16:45:34Z",
-  "workflow_revision": 10
+  "updated": "2026-08-18T16:47:43Z",
+  "workflow_revision": 12
 }
