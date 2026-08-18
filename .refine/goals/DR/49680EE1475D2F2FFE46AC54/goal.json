@@ -1,7 +1,7 @@
 {
-  "base_commit": "ff07e292388a2b3cfe2fcb1c3fb52bec4bb0ab4a",
+  "base_commit": "34fcb147a5e372a66c2004c3688702e0dc6851fd",
   "branch_name": "refine/DR49680EE1475D2F2FFE46AC54/round-2",
-  "candidate_commit": "fe95179e068d30533b0727546dc1eadbfd4c3cea",
+  "candidate_commit": "807c16aee9814a52205ca1ee16189e5733c8ac4c",
   "created": "2026-08-18T13:36:00Z",
   "feature_id": null,
   "feature_order": null,
@@ -845,15 +845,15 @@
         "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
       },
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": null,
       "created": "2026-08-18T15:05:26Z",
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
-      "governance_candidate_commit": "",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_candidate_commit": null,
+      "governance_checked_at": null,
+      "governance_details": null,
+      "governance_message": null,
       "governance_rule_actions": [],
       "guidance_decision": {
         "applied": [
@@ -1089,29 +1089,107 @@
       "implementation_report": "Implemented node-configurable Automatic agent resource budgeting with a 70 percent default, real locked copy-between-node Runtime Config behavior, preserved explicit caps and conservative telemetry safeguards, updated Runtime Config and Guide surfaces, and updated only the affected intent pages. All required focused verification passed; strict Clippy reported only the unchanged baseline categories and passed when those categories were allowed.",
       "implementation_reported_at": "2026-08-18T15:25:34Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": null,
+      "product_state": null,
       "prompt": "Round 2 correction to the integrated Round 1 resource governor:\n\nChange automatic agent admission to use 70 percent of detected host capacity instead of the hard-coded 25 percent. The percentage applies consistently to both detected logical CPU cores and currently available memory, so the default leaves 30 percent for Docker, target applications, and other host work.\n\nMake this percentage an existing-architecture, node-scoped Refine Runtime Config setting named automatic_agent_resource_budget_percent. Its product default is 70. Supported settings load, patch, persistence, and copy-between-node behavior must carry it; legacy state where the key is absent must also behave as 70. Validate supported writes as an integer percentage in the inclusive range 1 through 100, and do not silently accept malformed or out-of-range values.\n\nThread the configured percentage into HostResources automatic-concurrency calculation. Use overflow-safe integer arithmetic and retain the minimum one-slot progress guarantee. Preserve Round 1 safeguards: unknown host memory still falls back to one automatic slot, the per-agent reservation remains at least 2 GiB, complete managed process-tree memory accounting remains required before observed usage can influence scaling, and disk-headroom behavior is unchanged.\n\nKeep a positive parallel_run_cap as the authoritative absolute operator override. The percentage only governs Automatic mode when parallel_run_cap is blank or unset; unset subordinate node, provider, and target-app caps must continue to inherit the resulting global limit.\n\nExpose Automatic resource budget percent in Node -> Runtime Config with a default/current value of 70, clear percent semantics, numeric bounds, and autosave through the existing settings API. Update the matching Guide and only the affected docs/intent pages so they describe the configurable 70 percent default rather than quarter-host behavior.\n\nAdd focused regression coverage proving: default and missing-key behavior are 70 percent; an explicit valid percentage changes both CPU- and memory-limited concurrency; invalid supported writes are rejected; the explicit parallel-run cap still wins; Runtime Config renders and saves the field; and the conservative telemetry/process-tree fallbacks from Round 1 remain intact. Verify the exact candidate with cargo fmt --all -- --check, git diff --check, JavaScript syntax checks for changed static files, and focused cargo test --lib filters for the settings codec, workflow policy, host resource governor, and static Runtime Config surface.",
       "quality_agent_report": "Quality reviewed and corrected the round-2 candidate. The configured 70 percent Automatic CPU and available-memory budget, strict node settings codec, explicit-cap precedence, locked copy-between-node behavior, Runtime Config and Guide surfaces, and affected intent pages satisfy the finalized plan. Quality narrowed nodes.json lock scope so remote bootstrap runs outside the registry lock, reloads before health settlement, preserves concurrent Runtime Config writes, and rejects settlement when bootstrap authority changed. Exact verification passed: cargo fmt, diff hygiene, both changed JavaScript syntax checks, 14 settings tests, 3 workflow-policy tests, 11 host-resource tests, the copy API and static Runtime Config tests, the new bootstrap settlement regression, all 13 fleet-service tests, and adjusted strict Clippy.",
-      "quality_candidate_commit": "fe95179e068d30533b0727546dc1eadbfd4c3cea",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_candidate_commit": null,
+      "quality_checked_at": null,
+      "quality_details": null,
+      "quality_message": null,
+      "quality_state": null,
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-08-18T15:32:15Z",
+      "rule_state": null,
+      "updated": "2026-08-18T15:35:11Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T15:05:26Z",
         "round_idx": 1,
         "workflow_revision": 37
       },
+      "workflow_candidate_refresh": {
+        "authorizing_status": "governance",
+        "branch": "refine/DR49680EE1475D2F2FFE46AC54/round-2",
+        "node_id": "default",
+        "original_base_commit": "ff07e292388a2b3cfe2fcb1c3fb52bec4bb0ab4a",
+        "original_candidate_commit": "fe95179e068d30533b0727546dc1eadbfd4c3cea",
+        "previous_gate_evidence": {
+          "constitution_state": "unclassified",
+          "governance_candidate_commit": "",
+          "governance_checked_at": "",
+          "governance_details": "",
+          "governance_message": "",
+          "meta_rule_state": "unclassified",
+          "product_state": "unclassified",
+          "quality_candidate_commit": "fe95179e068d30533b0727546dc1eadbfd4c3cea",
+          "quality_checked_at": "2026-08-18T15:35:10Z",
+          "quality_details": {
+            "candidate_commit": "fe95179e068d30533b0727546dc1eadbfd4c3cea",
+            "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR49680EE1475D2F2FFE46AC54-round-2",
+            "diagnostics": [
+              "{\"ok\":true,\"summary\":\"Exact candidate fe95179e passed. Remaining uncertainty: no end-to-end browser interaction or real remote SSH bootstrap was exercised.\",\"results\":[{\"test\":\"The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\",\"status\":\"passed\",\"evidence\":\"Observed exit 0. Exact SHA and clean worktree confirmed; diff hygiene, Rust formatting, and JavaScript syntax passed. All 53 focused Rust regressions passed across settings/persistence, resource budgeting, policy precedence, node/fleet locking, API and static surfaces, Quality migration, and state hydration. Final output: predicate=passed.\",\"command\":\"set -euo pipefail\\ncandidate_sha=fe95179e068d30533b0727546dc1eadbfd4c3cea\\nbase_sha=ff07e292388a2b3cfe2fcb1c3fb52bec4bb0ab4a\\nactual_sha=$(git rev-parse HEAD)\\nprintf 'candidate=%s\\\\n' \\\"$actual_sha\\\"\\ntest \\\"$actual_sha\\\" = \\\"$candidate_sha\\\"\\nworktree_status=$(git status --porcelain=v1)\\ntest -z \\\"$worktree_status\\\"\\ngit diff --check \\\"$base_sha\\\"...\\\"$candidate_sha\\\"\\ncargo fmt --all -- --check\\nnode --check src/surfaces/web/static/js/features/settings_runtime.js\\nnode --check src/surfaces/web/static/js/features/guide.js\\ncargo test --lib infrastructure::process::supervisor::config::tests -- --test-threads=1\\ncargo test --lib application::workflow::engine::policy::settings::tests -- --test-threads=1\\ncargo test --lib infrastructure::runtime::host_resources::tests -- --test-threads=1\\ncargo test --lib application::fleet::nodes::tests -- --test-threads=1\\ncargo test --lib application::fleet::service::tests -- --test-threads=1\\ncargo test --lib surfaces::web_server::tests::nodes_fleet::web_server_copies_validated_runtime_settings_between_nodes -- --exact --test-threads=1\\ncargo test --lib surfaces::web_server::tests::static_surface::settings::static_runtime_settings_expose_state_sync_controls -- --exact --test-threads=1\\ncargo test --lib application::workflow::phases::quality::tests::results::quality_project_migration_retries_after_staged_failure -- --exact --test-threads=1\\ncargo test --lib application::persistence_sync::state::tests::remote::first_sync_hydrates_remote_state_over_local_bootstrap_metadata -- --exact --test-threads=1\\nprintf 'predicate=passed\\\\n'\"}]}",
+              "Observed supervised process proc-1787067306799-868123-1180 exited 0. stdout: ::service::tests::bootstrap_remote_node_builds_dry_run_ssh_command ... ok\ntest application::fleet::service::tests::bootstrap_remote_node_rejects_user_at_host ... ok\ntest application::fleet::service::tests::distribute_targets_only_enabled_healthy_nodes ... ok\ntest application::fleet::service::tests::file_fleet_service_authorizes_remote_run_commands ... ok\ntest application::fleet::service::tests::file_fleet_service_manages_node_lifecycle ... ok\ntest application::fleet::service::tests::file_fleet_service_migrates_legacy_fleet_json_to_nodes ... ok\ntest application::fleet::service::tests::fleet_node_api_uses_the_shared_identity_contract ... ok\ntest application::fleet::service::tests::fleet_sync_never_rewrites_the_provisioning_verdict_that_gates_work ... ok\ntest application::fleet::service::tests::ssh_command_uses_existing_identity_file ... ok\ntest application::fleet::service::tests::ssh_preflight_reports_missing_identity_file ... ok\n\ntest result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 1107 filtered out; finished in 0.04s\n\n\nrunning 1 test\ntest surfaces::web_server::tests::nodes_fleet::web_server_copies_validated_runtime_settings_between_nodes ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1119 filtered out; finished in 0.01s\n\n\nrunning 1 test\ntest surfaces::web_server::tests::static_surface::settings::static_runtime_settings_expose_state_sync_controls ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1119 filtered out; finished in 0.00s\n\n\nrunning 1 test\ntest application::workflow::phases::quality::tests::results::quality_project_migration_retries_after_staged_failure ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1119 filtered out; finished in 0.01s\n\n\nrunning 1 test\ntest application::persistence_sync::state::tests::remote::first_sync_hydrates_remote_state_over_local_bootstrap_metadata ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1119 filtered out; finished in 0.23s\n\npredicate=passed stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)"
+            ],
+            "evaluation_scope": "isolated_candidate",
+            "operation_id": "1a015807a6cd3f1b1c",
+            "provider_attempts": [
+              {
+                "accepted": true,
+                "attempt": 1,
+                "process_id": "proc-1787067136966-868123-1177",
+                "raw_output": "{\"ok\":true,\"summary\":\"Exact candidate fe95179e passed. Remaining uncertainty: no end-to-end browser interaction or real remote SSH bootstrap was exercised.\",\"results\":[{\"test\":\"The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\",\"status\":\"passed\",\"evidence\":\"Observed exit 0. Exact SHA and clean worktree confirmed; diff hygiene, Rust formatting, and JavaScript syntax passed. All 53 focused Rust regressions passed across settings/persistence, resource budgeting, policy precedence, node/fleet locking, API and static surfaces, Quality migration, and state hydration. Final output: predicate=passed.\",\"command\":\"set -euo pipefail\\ncandidate_sha=fe95179e068d30533b0727546dc1eadbfd4c3cea\\nbase_sha=ff07e292388a2b3cfe2fcb1c3fb52bec4bb0ab4a\\nactual_sha=$(git rev-parse HEAD)\\nprintf 'candidate=%s\\\\n' \\\"$actual_sha\\\"\\ntest \\\"$actual_sha\\\" = \\\"$candidate_sha\\\"\\nworktree_status=$(git status --porcelain=v1)\\ntest -z \\\"$worktree_status\\\"\\ngit diff --check \\\"$base_sha\\\"...\\\"$candidate_sha\\\"\\ncargo fmt --all -- --check\\nnode --check src/surfaces/web/static/js/features/settings_runtime.js\\nnode --check src/surfaces/web/static/js/features/guide.js\\ncargo test --lib infrastructure::process::supervisor::config::tests -- --test-threads=1\\ncargo test --lib application::workflow::engine::policy::settings::tests -- --test-threads=1\\ncargo test --lib infrastructure::runtime::host_resources::tests -- --test-threads=1\\ncargo test --lib application::fleet::nodes::tests -- --test-threads=1\\ncargo test --lib application::fleet::service::tests -- --test-threads=1\\ncargo test --lib surfaces::web_server::tests::nodes_fleet::web_server_copies_validated_runtime_settings_between_nodes -- --exact --test-threads=1\\ncargo test --lib surfaces::web_server::tests::static_surface::settings::static_runtime_settings_expose_state_sync_controls -- --exact --test-threads=1\\ncargo test --lib application::workflow::phases::quality::tests::results::quality_project_migration_retries_after_staged_failure -- --exact --test-threads=1\\ncargo test --lib application::persistence_sync::state::tests::remote::first_sync_hydrates_remote_state_over_local_bootstrap_metadata -- --exact --test-threads=1\\nprintf 'predicate=passed\\\\n'\"}]}\n"
+              }
+            ],
+            "quality_proof": {
+              "checked_at": "2026-08-18T15:35:10Z",
+              "checked_candidate_commit": "fe95179e068d30533b0727546dc1eadbfd4c3cea",
+              "evaluation_scope": "isolated_candidate",
+              "goal_id": "DR49680EE1475D2F2FFE46AC54",
+              "operation_id": "1a015807a6cd3f1b1c",
+              "results": [
+                {
+                  "command": "set -euo pipefail\ncandidate_sha=fe95179e068d30533b0727546dc1eadbfd4c3cea\nbase_sha=ff07e292388a2b3cfe2fcb1c3fb52bec4bb0ab4a\nactual_sha=$(git rev-parse HEAD)\nprintf 'candidate=%s\\n' \"$actual_sha\"\ntest \"$actual_sha\" = \"$candidate_sha\"\nworktree_status=$(git status --porcelain=v1)\ntest -z \"$worktree_status\"\ngit diff --check \"$base_sha\"...\"$candidate_sha\"\ncargo fmt --all -- --check\nnode --check src/surfaces/web/static/js/features/settings_runtime.js\nnode --check src/surfaces/web/static/js/features/guide.js\ncargo test --lib infrastructure::process::supervisor::config::tests -- --test-threads=1\ncargo test --lib application::workflow::engine::policy::settings::tests -- --test-threads=1\ncargo test --lib infrastructure::runtime::host_resources::tests -- --test-threads=1\ncargo test --lib application::fleet::nodes::tests -- --test-threads=1\ncargo test --lib application::fleet::service::tests -- --test-threads=1\ncargo test --lib surfaces::web_server::tests::nodes_fleet::web_server_copies_validated_runtime_settings_between_nodes -- --exact --test-threads=1\ncargo test --lib surfaces::web_server::tests::static_surface::settings::static_runtime_settings_expose_state_sync_controls -- --exact --test-threads=1\ncargo test --lib application::workflow::phases::quality::tests::results::quality_project_migration_retries_after_staged_failure -- --exact --test-threads=1\ncargo test --lib application::persistence_sync::state::tests::remote::first_sync_hydrates_remote_state_over_local_bootstrap_metadata -- --exact --test-threads=1\nprintf 'predicate=passed\\n'",
+                  "evidence": "Observed supervised process proc-1787067306799-868123-1180 exited 0. stdout: ::service::tests::bootstrap_remote_node_builds_dry_run_ssh_command ... ok\ntest application::fleet::service::tests::bootstrap_remote_node_rejects_user_at_host ... ok\ntest application::fleet::service::tests::distribute_targets_only_enabled_healthy_nodes ... ok\ntest application::fleet::service::tests::file_fleet_service_authorizes_remote_run_commands ... ok\ntest application::fleet::service::tests::file_fleet_service_manages_node_lifecycle ... ok\ntest application::fleet::service::tests::file_fleet_service_migrates_legacy_fleet_json_to_nodes ... ok\ntest application::fleet::service::tests::fleet_node_api_uses_the_shared_identity_contract ... ok\ntest application::fleet::service::tests::fleet_sync_never_rewrites_the_provisioning_verdict_that_gates_work ... ok\ntest application::fleet::service::tests::ssh_command_uses_existing_identity_file ... ok\ntest application::fleet::service::tests::ssh_preflight_reports_missing_identity_file ... ok\n\ntest result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 1107 filtered out; finished in 0.04s\n\n\nrunning 1 test\ntest surfaces::web_server::tests::nodes_fleet::web_server_copies_validated_runtime_settings_between_nodes ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1119 filtered out; finished in 0.01s\n\n\nrunning 1 test\ntest surfaces::web_server::tests::static_surface::settings::static_runtime_settings_expose_state_sync_controls ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1119 filtered out; finished in 0.00s\n\n\nrunning 1 test\ntest application::workflow::phases::quality::tests::results::quality_project_migration_retries_after_staged_failure ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1119 filtered out; finished in 0.01s\n\n\nrunning 1 test\ntest application::persistence_sync::state::tests::remote::first_sync_hydrates_remote_state_over_local_bootstrap_metadata ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1119 filtered out; finished in 0.23s\n\npredicate=passed stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d) Agent report: Observed exit 0. Exact SHA and clean worktree confirmed; diff hygiene, Rust formatting, and JavaScript syntax passed. All 53 focused Rust regressions passed across settings/persistence, resource budgeting, policy precedence, node/fleet locking, API and static surfaces, Quality migration, and state hydration. Final output: predicate=passed.",
+                  "exit_code": 0,
+                  "process_id": "proc-1787067306799-868123-1180",
+                  "status": "passed",
+                  "test": "The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks."
+                }
+              ],
+              "round_idx": 1,
+              "schema_version": 1,
+              "source_candidate_commit": "fe95179e068d30533b0727546dc1eadbfd4c3cea",
+              "state": "passed"
+            },
+            "results": [
+              {
+                "command": "set -euo pipefail\ncandidate_sha=fe95179e068d30533b0727546dc1eadbfd4c3cea\nbase_sha=ff07e292388a2b3cfe2fcb1c3fb52bec4bb0ab4a\nactual_sha=$(git rev-parse HEAD)\nprintf 'candidate=%s\\n' \"$actual_sha\"\ntest \"$actual_sha\" = \"$candidate_sha\"\nworktree_status=$(git status --porcelain=v1)\ntest -z \"$worktree_status\"\ngit diff --check \"$base_sha\"...\"$candidate_sha\"\ncargo fmt --all -- --check\nnode --check src/surfaces/web/static/js/features/settings_runtime.js\nnode --check src/surfaces/web/static/js/features/guide.js\ncargo test --lib infrastructure::process::supervisor::config::tests -- --test-threads=1\ncargo test --lib application::workflow::engine::policy::settings::tests -- --test-threads=1\ncargo test --lib infrastructure::runtime::host_resources::tests -- --test-threads=1\ncargo test --lib application::fleet::nodes::tests -- --test-threads=1\ncargo test --lib application::fleet::service::tests -- --test-threads=1\ncargo test --lib surfaces::web_server::tests::nodes_fleet::web_server_copies_validated_runtime_settings_between_nodes -- --exact --test-threads=1\ncargo test --lib surfaces::web_server::tests::static_surface::settings::static_runtime_settings_expose_state_sync_controls -- --exact --test-threads=1\ncargo test --lib application::workflow::phases::quality::tests::results::quality_project_migration_retries_after_staged_failure -- --exact --test-threads=1\ncargo test --lib application::persistence_sync::state::tests::remote::first_sync_hydrates_remote_state_over_local_bootstrap_metadata -- --exact --test-threads=1\nprintf 'predicate=passed\\n'",
+                "evidence": "Observed supervised process proc-1787067306799-868123-1180 exited 0. stdout: ::service::tests::bootstrap_remote_node_builds_dry_run_ssh_command ... ok\ntest application::fleet::service::tests::bootstrap_remote_node_rejects_user_at_host ... ok\ntest application::fleet::service::tests::distribute_targets_only_enabled_healthy_nodes ... ok\ntest application::fleet::service::tests::file_fleet_service_authorizes_remote_run_commands ... ok\ntest application::fleet::service::tests::file_fleet_service_manages_node_lifecycle ... ok\ntest application::fleet::service::tests::file_fleet_service_migrates_legacy_fleet_json_to_nodes ... ok\ntest application::fleet::service::tests::fleet_node_api_uses_the_shared_identity_contract ... ok\ntest application::fleet::service::tests::fleet_sync_never_rewrites_the_provisioning_verdict_that_gates_work ... ok\ntest application::fleet::service::tests::ssh_command_uses_existing_identity_file ... ok\ntest application::fleet::service::tests::ssh_preflight_reports_missing_identity_file ... ok\n\ntest result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 1107 filtered out; finished in 0.04s\n\n\nrunning 1 test\ntest surfaces::web_server::tests::nodes_fleet::web_server_copies_validated_runtime_settings_between_nodes ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1119 filtered out; finished in 0.01s\n\n\nrunning 1 test\ntest surfaces::web_server::tests::static_surface::settings::static_runtime_settings_expose_state_sync_controls ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1119 filtered out; finished in 0.00s\n\n\nrunning 1 test\ntest application::workflow::phases::quality::tests::results::quality_project_migration_retries_after_staged_failure ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1119 filtered out; finished in 0.01s\n\n\nrunning 1 test\ntest application::persistence_sync::state::tests::remote::first_sync_hydrates_remote_state_over_local_bootstrap_metadata ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1119 filtered out; finished in 0.23s\n\npredicate=passed stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d) Agent report: Observed exit 0. Exact SHA and clean worktree confirmed; diff hygiene, Rust formatting, and JavaScript syntax passed. All 53 focused Rust regressions passed across settings/persistence, resource budgeting, policy precedence, node/fleet locking, API and static surfaces, Quality migration, and state hydration. Final output: predicate=passed.",
+                "exit_code": 0,
+                "process_id": "proc-1787067306799-868123-1180",
+                "status": "passed",
+                "test": "The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks."
+              }
+            ],
+            "source_candidate_commit": "fe95179e068d30533b0727546dc1eadbfd4c3cea"
+          },
+          "quality_message": "All Quality tests passed with observed supervised evidence.",
+          "quality_state": "passed",
+          "rule_state": "unclassified"
+        },
+        "refreshed_at": "2026-08-18T15:35:11Z",
+        "replacement_base_commit": "34fcb147a5e372a66c2004c3688702e0dc6851fd",
+        "replacement_candidate_commit": "807c16aee9814a52205ca1ee16189e5733c8ac4c",
+        "round_idx": 1,
+        "state": "refreshed",
+        "workflow_revision": 37,
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR49680EE1475D2F2FFE46AC54-round-2"
+      },
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "quality",
+  "status": "governance",
   "target_branch": "main",
-  "updated": "2026-08-18T15:32:15Z",
-  "workflow_revision": 57
+  "updated": "2026-08-18T15:35:11Z",
+  "workflow_revision": 60
 }
