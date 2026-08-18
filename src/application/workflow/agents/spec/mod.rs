@@ -7,6 +7,9 @@ use crate::error::{RefineError, RefineResult};
 
 mod markdown;
 
+#[cfg(test)]
+mod tests;
+
 use markdown::*;
 
 const GOAL_IDENTITY_FIELDS: &[(&str, &str)] = &[
@@ -317,6 +320,7 @@ fn render_guidance_candidate(index: usize, candidate: &Value) -> String {
     let name = meaningful_string(object.get("name")).unwrap_or("Guidance Candidate");
     let mut output = String::new();
     push_heading(&mut output, 4, &format!("{index}. {name}"));
+    push_scalar_field(&mut output, "Completion Index", &Value::from(index));
     if let Some(rule) = object.get("rule").filter(|value| meaningful(value)) {
         push_named_value(&mut output, "Applies When", rule, 5);
     }
@@ -325,7 +329,7 @@ fn render_guidance_candidate(index: usize, candidate: &Value) -> String {
     }
     output.push_str(&render_object_fields(
         object,
-        &["name", "enabled", "rule", "instructions"],
+        &["id", "name", "enabled", "rule", "instructions"],
         5,
     ));
     output
