@@ -198,3 +198,63 @@ fn managed_child_observes_the_exact_preflighted_effective_environment() {
     assert!(!observed.contains_key("OPENAI_API_KEY"));
     fs::remove_dir_all(temp_root).unwrap();
 }
+
+#[cfg(unix)]
+#[test]
+fn supervised_quality_command_discovers_only_allowlisted_shell_tools() {
+    use std::collections::BTreeMap;
+    use std::os::unix::fs::PermissionsExt;
+
+    let temp_root = unique_temp_dir("quality-shell-tool-discovery");
+    let runtime_root = temp_root.join("run/8080");
+    let tool_root = temp_root.join("shell-tools");
+    fs::create_dir_all(&tool_root).unwrap();
+    let tool = tool_root.join("refine-quality-tool");
+    fs::write(&tool, "#!/bin/sh\nprintf 'tool-found:%s:%s:%s' \"${DOTNET_ROOT-unset}\" \"${OPENAI_API_KEY-unset}\" \"${DATABASE_URL-unset}\"\n").unwrap();
+    let mut permissions = fs::metadata(&tool).unwrap().permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(&tool, permissions).unwrap();
+
+    let shell = BTreeMap::from([
+        ("PATH".to_string(), tool_root.to_string_lossy().to_string()),
+        ("DOTNET_ROOT".to_string(), "/shell/dotnet".to_string()),
+        (
+            "OPENAI_API_KEY".to_string(),
+            "shell-provider-key".to_string(),
+        ),
+        (
+            "DATABASE_URL".to_string(),
+            "shell-database-secret".to_string(),
+        ),
+    ]);
+    let environment = crate::infrastructure::process::launch_environment::EffectiveLaunchEnvironment::assemble_for_test(
+        &ProcessOwner::Quality,
+        &[],
+        &shell,
+        &[],
+    )
+    .unwrap();
+    let supervisor = FileProcessSupervisor::new(&runtime_root);
+    let output = supervisor
+        .run_to_completion_with_prepared_environment(
+            ManagedProcessSpec {
+                owner: ProcessOwner::Quality,
+                command: "/bin/sh".to_string(),
+                args: shell_args("refine-quality-tool"),
+                cwd: None,
+                env: Vec::new(),
+                stdin: None,
+                limits: None,
+                authorization_command: Some("refine-quality-tool".to_string()),
+                sensitive: false,
+                metadata: Default::default(),
+            },
+            &environment,
+            |_, _| {},
+        )
+        .unwrap();
+
+    assert_eq!(output.process.exit_code, Some(0));
+    assert_eq!(output.stdout, "tool-found:/shell/dotnet:unset:unset");
+    fs::remove_dir_all(temp_root).unwrap();
+}

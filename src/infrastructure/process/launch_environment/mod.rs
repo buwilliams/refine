@@ -1,10 +1,10 @@
 //! Authoritative environment assembly and launch-size preflight.
 //!
 //! A process must be preflighted against the same effective environment that is
-//! handed to `exec`, after inherited values, agent configuration, process
-//! overrides, and removals have all been applied. Keeping that projection as an
-//! owned value also lets the ordinary process and PTY launchers share exactly
-//! the same precedence and byte accounting.
+//! handed to `exec`, after inherited values, owner-specific host-shell
+//! projections, process overrides, and removals have all been applied. Keeping
+//! that projection as an owned value also lets the ordinary process and PTY
+//! launchers share exactly the same precedence and byte accounting.
 
 use std::collections::BTreeMap;
 use std::env;
@@ -32,6 +32,20 @@ pub const AGENT_DIRECT_API_KEY_ENV: &[&str] = &[
     "OPENAI_API_KEY",
 ];
 
+/// Host-shell values that Quality may use to discover installed toolchains.
+///
+/// Quality commands are selected by repository configuration, so importing the
+/// shell's complete environment would expose unrelated credentials to them.
+/// Keep this list limited to executable lookup and vendor-documented tool roots;
+/// it deliberately contains no credential or package-source configuration.
+pub const QUALITY_SHELL_TOOL_DISCOVERY_ENV: &[&str] = &[
+    "PATH",
+    "PATHEXT",
+    "DOTNET_ROOT",
+    "DOTNET_ROOT_X64",
+    "DOTNET_ROOT_X86",
+];
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct EffectiveLaunchEnvironment {
     entries: Vec<(OsString, OsString)>,
@@ -39,12 +53,32 @@ pub struct EffectiveLaunchEnvironment {
 
 impl EffectiveLaunchEnvironment {
     pub fn assemble(owner: &ProcessOwner, overrides: &[(String, String)]) -> RefineResult<Self> {
+        if matches!(owner, ProcessOwner::Agent | ProcessOwner::Quality) {
+            Self::assemble_from_sources(
+                owner,
+                env::vars_os(),
+                crate::infrastructure::process::agent_env::login_shell_env(),
+                overrides,
+            )
+        } else {
+            Self::assemble_from_sources(owner, env::vars_os(), &BTreeMap::new(), overrides)
+        }
+    }
+
+    fn assemble_from_sources(
+        owner: &ProcessOwner,
+        inherited: impl IntoIterator<Item = (OsString, OsString)>,
+        shell: &BTreeMap<String, String>,
+        overrides: &[(String, String)],
+    ) -> RefineResult<Self> {
         let mut entries = BTreeMap::new();
-        for (key, value) in env::vars_os() {
+        for (key, value) in inherited {
             insert_checked(&mut entries, key, value)?;
         }
-        if *owner == ProcessOwner::Agent {
-            for (key, value) in crate::infrastructure::process::agent_env::login_shell_env() {
+        for (key, value) in shell {
+            if *owner == ProcessOwner::Agent
+                || (*owner == ProcessOwner::Quality && quality_shell_variable_is_allowed(key))
+            {
                 insert_checked(&mut entries, key.clone().into(), value.clone().into())?;
             }
         }
@@ -59,6 +93,23 @@ impl EffectiveLaunchEnvironment {
         let entries = entries.into_values().collect::<Vec<_>>();
         validate_environment(&entries)?;
         Ok(Self { entries })
+    }
+
+    #[cfg(test)]
+    pub(crate) fn assemble_for_test(
+        owner: &ProcessOwner,
+        inherited: &[(String, String)],
+        shell: &BTreeMap<String, String>,
+        overrides: &[(String, String)],
+    ) -> RefineResult<Self> {
+        Self::assemble_from_sources(
+            owner,
+            inherited
+                .iter()
+                .map(|(key, value)| (key.clone().into(), value.clone().into())),
+            shell,
+            overrides,
+        )
     }
 
     pub fn apply_to_command(&self, command: &mut Command) {
@@ -129,6 +180,18 @@ impl EffectiveLaunchEnvironment {
             .iter()
             .find_map(|(candidate, value)| (candidate == key).then_some(value.as_os_str()))
     }
+}
+
+#[cfg(windows)]
+fn quality_shell_variable_is_allowed(key: &str) -> bool {
+    QUALITY_SHELL_TOOL_DISCOVERY_ENV
+        .iter()
+        .any(|allowed| key.eq_ignore_ascii_case(allowed))
+}
+
+#[cfg(not(windows))]
+fn quality_shell_variable_is_allowed(key: &str) -> bool {
+    QUALITY_SHELL_TOOL_DISCOVERY_ENV.contains(&key)
 }
 
 fn insert_checked(
@@ -228,6 +291,58 @@ fn os_len(value: &OsStr) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn quality_shell_projection_is_allowlisted_and_overrides_remain_final() {
+        let shell = BTreeMap::from([
+            ("PATH".to_string(), "/shell/tools".to_string()),
+            ("DOTNET_ROOT".to_string(), "/shell/dotnet".to_string()),
+            (
+                "OPENAI_API_KEY".to_string(),
+                "shell-provider-key".to_string(),
+            ),
+            (
+                "DATABASE_URL".to_string(),
+                "shell-database-secret".to_string(),
+            ),
+        ]);
+        let environment = EffectiveLaunchEnvironment::assemble_for_test(
+            &ProcessOwner::Quality,
+            &[("INHERITED_ONLY".to_string(), "daemon-value".to_string())],
+            &shell,
+            &[
+                ("PATH".to_string(), "/explicit/tools".to_string()),
+                ("DOTNET_ROOT".to_string(), "/explicit/dotnet".to_string()),
+            ],
+        )
+        .unwrap();
+
+        assert_eq!(environment.get("PATH"), Some(OsStr::new("/explicit/tools")));
+        assert_eq!(
+            environment.get("DOTNET_ROOT"),
+            Some(OsStr::new("/explicit/dotnet"))
+        );
+        assert_eq!(
+            environment.get("INHERITED_ONLY"),
+            Some(OsStr::new("daemon-value"))
+        );
+        assert_eq!(environment.get("OPENAI_API_KEY"), None);
+        assert_eq!(environment.get("DATABASE_URL"), None);
+    }
+
+    #[test]
+    fn failed_quality_shell_capture_preserves_inherited_and_explicit_environment() {
+        let environment = EffectiveLaunchEnvironment::assemble_for_test(
+            &ProcessOwner::Quality,
+            &[("PATH".to_string(), "/daemon/tools".to_string())],
+            &BTreeMap::new(),
+            &[("QUALITY_MODE".to_string(), "strict".to_string())],
+        )
+        .unwrap();
+
+        assert_eq!(environment.get("PATH"), Some(OsStr::new("/daemon/tools")));
+        assert_eq!(environment.get("QUALITY_MODE"), Some(OsStr::new("strict")));
+    }
 
     #[test]
     fn overrides_are_counted_once_and_agent_removals_are_final() {
