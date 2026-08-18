@@ -58,6 +58,21 @@ const RESOLVE_REF_NAMESPACE: &str = "refs/refine/resolve";
 /// output re-prompts with feedback; it never fences.
 pub const RESOLUTION_ATTEMPT_LIMIT: u32 = 2;
 
+/// Refs namespace holding each contended record's resolution budget: one ref
+/// per attempt bought, targeting the remote head it was bought against.
+/// Bounded by construction — at most [`CONTENTION_ATTEMPT_LIMIT`] refs per
+/// contended record, and every ref bought against a superseded remote head is
+/// swept the next time that record is contended.
+const CONTENTION_REF_NAMESPACE: &str = "refs/refine/contention";
+
+/// How many consecutive resolution engagements one contended record may buy
+/// while the side that actually needs deciding — the remote head — has not
+/// moved. Agent calls cost real money and a resolution that answered nothing
+/// will answer nothing again, so a node under sustained contention holds here
+/// instead of paying per pass. The hold is never a fence: see
+/// [`buy_contention_attempt`].
+pub const CONTENTION_ATTEMPT_LIMIT: u32 = 2;
+
 /// The ownership doctrine handed to the state resolver as guidance, quoted
 /// from `docs/intent/02-foundation/04-fleet.md` (a test pins the quote to the
 /// intent doc so the two cannot drift apart).
@@ -485,6 +500,163 @@ pub fn sweep_abandoned_resolutions(
     Ok(retired)
 }
 
+/// The gated result an interrupted earlier run of this divergence left
+/// behind, if any. Publishing it costs no agent — it is the crash-only rerun
+/// path — so it is never charged against a contention budget.
+pub fn surviving_resolution_result(
+    repo: &FileGitSyncService,
+    root: &Path,
+    id: &str,
+) -> RefineResult<Option<String>> {
+    validate_resolution_id(id)?;
+    ref_target(repo, root, &result_ref(id))
+}
+
+/// The durable identity of one contended record's contention: the record and
+/// the remote head that must be reconciled with it.
+///
+/// The local side is deliberately absent. A node that keeps working snapshots
+/// live state onto its branch every pass, so its local head — and with it the
+/// divergence's id — moves constantly while nothing that actually needs
+/// deciding has changed. Charging an agent for that churn is exactly how a
+/// busy node under one standing contention bought unbounded resolution
+/// attempts.
+fn contention_key(remote_head: &str, path: &str) -> String {
+    use sha2::{Digest, Sha256};
+    let mut digest = Sha256::new();
+    digest.update(remote_head.as_bytes());
+    digest.update([0]);
+    digest.update(path.as_bytes());
+    format!("{:x}", digest.finalize())
+}
+
+/// What each contended record has already spent against this remote head,
+/// after dropping every attempt bought against a head that has since been
+/// superseded.
+fn spent_contention(
+    repo: &FileGitSyncService,
+    root: &Path,
+    remote_head: &str,
+    paths: &[String],
+) -> RefineResult<Vec<(String, u32)>> {
+    sweep_superseded_contention(repo, root, remote_head)?;
+    let mut spent = Vec::new();
+    for path in paths {
+        let key = contention_key(remote_head, path);
+        let attempts = contention_attempts(repo, root, &key)?;
+        spent.push((key, attempts));
+    }
+    Ok(spent)
+}
+
+/// Whether any contended record still has budget to engage a resolver against
+/// this remote head. Reading the budget is separate from spending it so a
+/// caller can decide to hold BEFORE doing the preparation an engagement needs:
+/// preparation that fails the same way every pass would otherwise spend the
+/// budget without an agent ever seeing the contention.
+///
+/// The budget is per contended RECORD, so a record newly dragged into the
+/// contention brings its own attempts with it and is decided at once; only
+/// records that already had their turn are held.
+pub fn contention_budget_available(
+    repo: &FileGitSyncService,
+    root: &Path,
+    remote_head: &str,
+    paths: &[String],
+) -> RefineResult<bool> {
+    Ok(spent_contention(repo, root, remote_head, paths)?
+        .iter()
+        .any(|(_, attempts)| *attempts < CONTENTION_ATTEMPT_LIMIT))
+}
+
+/// Buy one resolution attempt for each contended record against this remote
+/// head, returning the highest attempt number bought — or `None` when every
+/// contended record has spent its budget and resolution must hold.
+///
+/// A moved remote head mints new keys, which is why the attempt refs also
+/// carry it: every ref bought against a superseded head is swept here, so the
+/// namespace holds at most [`CONTENTION_ATTEMPT_LIMIT`] refs per currently
+/// contended record.
+///
+/// Crash-only: the attempt is bought under lock Hold A, BEFORE the unlocked
+/// agent call, so a process that dies mid-resolution has already paid for the
+/// attempt it started and the rerun spends what is left rather than starting
+/// over. Nothing here fences: a held contention still reports, still answers
+/// to `--authority`, and re-engages the moment the remote side moves.
+pub fn buy_contention_attempt(
+    repo: &FileGitSyncService,
+    root: &Path,
+    remote_head: &str,
+    paths: &[String],
+) -> RefineResult<Option<u32>> {
+    let spent = spent_contention(repo, root, remote_head, paths)?;
+    if spent
+        .iter()
+        .all(|(_, attempts)| *attempts >= CONTENTION_ATTEMPT_LIMIT)
+    {
+        return Ok(None);
+    }
+    let mut bought = None;
+    for (key, attempts) in spent {
+        if attempts >= CONTENTION_ATTEMPT_LIMIT {
+            continue;
+        }
+        let attempt = attempts + 1;
+        repo.git_at_checked(
+            root,
+            &[
+                "update-ref",
+                &format!("{CONTENTION_REF_NAMESPACE}/{key}/{attempt}"),
+                remote_head,
+            ],
+        )?;
+        bought = Some(bought.unwrap_or(0).max(attempt));
+    }
+    Ok(bought)
+}
+
+/// How many attempts this contended record has already bought.
+fn contention_attempts(repo: &FileGitSyncService, root: &Path, key: &str) -> RefineResult<u32> {
+    let refs = repo.git_at_stdout(
+        root,
+        &[
+            "for-each-ref",
+            "--format=%(refname)",
+            &format!("{CONTENTION_REF_NAMESPACE}/{key}"),
+        ],
+    )?;
+    let attempts = refs.lines().filter(|line| !line.trim().is_empty()).count();
+    Ok(u32::try_from(attempts).unwrap_or(u32::MAX))
+}
+
+/// Drop every attempt bought against a remote head that is no longer the one
+/// needing a decision. The ref's target IS the head it was bought against, so
+/// the sweep needs no bookkeeping beyond the refs themselves.
+fn sweep_superseded_contention(
+    repo: &FileGitSyncService,
+    root: &Path,
+    remote_head: &str,
+) -> RefineResult<()> {
+    let listing = repo.git_at_stdout(
+        root,
+        &[
+            "for-each-ref",
+            "--format=%(objectname) %(refname)",
+            CONTENTION_REF_NAMESPACE,
+        ],
+    )?;
+    for line in listing.lines() {
+        let Some((target, reference)) = line.trim().split_once(' ') else {
+            continue;
+        };
+        if target == remote_head {
+            continue;
+        }
+        repo.git_at_checked(root, &["update-ref", "-d", reference])?;
+    }
+    Ok(())
+}
+
 /// Read the three sides of each conflicted path from the pinned refs.
 pub fn conflict_sides(
     repo: &FileGitSyncService,
@@ -632,10 +804,10 @@ fn commit_resolution(
     let mut operations = Vec::new();
     for conflict in &prepared.conflicts {
         match fs::read(workspace.join(&conflict.path)) {
-            Ok(bytes) => operations.push(TreeOperation::Set {
-                path: conflict.path.clone(),
-                blob: write_blob(repo, workspace, &bytes)?,
-            }),
+            Ok(bytes) => operations.push(TreeOperation::set(
+                conflict.path.clone(),
+                write_blob(repo, workspace, &bytes)?,
+            )),
             Err(error) if error.kind() == ErrorKind::NotFound => {
                 operations.push(TreeOperation::Remove {
                     path: conflict.path.clone(),
@@ -1166,8 +1338,7 @@ mod tests {
                     merge_base: self.base.clone()
                 }
             );
-            let merged =
-                merge_commits(&repo, &self.root, &self.base, &self.ours, &self.theirs).unwrap();
+            let merged = merge_commits(&repo, &self.root, &self.ours, &self.theirs).unwrap();
             assert_eq!(merged.conflicted_paths, vec![GOAL_PATH.to_string()]);
             let lock = try_claim_resolution(&self.worktrees(), id)
                 .unwrap()
@@ -1683,6 +1854,67 @@ mod tests {
         assert!(matches!(outcome, ResolutionOutcome::Resolved { .. }));
         let feedback = seen_feedback.lock().unwrap().clone().unwrap();
         assert!(feedback.contains("conflict markers"), "{feedback}");
+    }
+
+    /// Reading the budget must not spend it. The preparation an engagement
+    /// needs runs between the two, and it can fail the same way on every pass;
+    /// if the check charged, a repeatable preparation failure would hold a
+    /// contention no agent has ever been handed.
+    #[test]
+    fn checking_the_contention_budget_never_spends_it() {
+        let fixture = ResolveFixture::new("contention-check");
+        let repo = fixture.repo();
+        let records = vec!["goals/GOALA/goal.json".to_string()];
+
+        for _ in 0..5 {
+            assert!(
+                contention_budget_available(&repo, &fixture.root, &fixture.theirs, &records)
+                    .unwrap()
+            );
+        }
+        assert!(contention_refs(&fixture.root).is_empty());
+
+        for attempt in 1..=CONTENTION_ATTEMPT_LIMIT {
+            assert_eq!(
+                buy_contention_attempt(&repo, &fixture.root, &fixture.theirs, &records).unwrap(),
+                Some(attempt)
+            );
+        }
+        assert_eq!(
+            contention_refs(&fixture.root).len(),
+            CONTENTION_ATTEMPT_LIMIT as usize
+        );
+        assert!(
+            !contention_budget_available(&repo, &fixture.root, &fixture.theirs, &records).unwrap()
+        );
+        assert!(
+            buy_contention_attempt(&repo, &fixture.root, &fixture.theirs, &records)
+                .unwrap()
+                .is_none()
+        );
+
+        // Not a fence: a record contended for the first time brings its own
+        // budget even while the one beside it is held.
+        let both = vec![
+            "goals/GOALA/goal.json".to_string(),
+            "goals/GOALB/goal.json".to_string(),
+        ];
+        assert!(contention_budget_available(&repo, &fixture.root, &fixture.theirs, &both).unwrap());
+        fs::remove_dir_all(&fixture.root).unwrap();
+    }
+
+    fn contention_refs(root: &Path) -> Vec<String> {
+        git_stdout(
+            root,
+            &[
+                "for-each-ref",
+                "--format=%(refname)",
+                CONTENTION_REF_NAMESPACE,
+            ],
+        )
+        .lines()
+        .map(str::to_string)
+        .collect()
     }
 
     #[test]

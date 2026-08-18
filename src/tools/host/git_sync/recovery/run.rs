@@ -66,9 +66,7 @@ impl FileGitSyncService {
                 Ok(result) => return Ok(result),
                 Err(
                     error @ RefineError::StateRecoveryConflict {
-                        reason:
-                            StateRecoveryConflictReason::StalePreview
-                            | StateRecoveryConflictReason::GitBusy,
+                        reason: StateRecoveryConflictReason::StateMoved,
                         ..
                     },
                 ) => {
@@ -157,13 +155,13 @@ impl FileGitSyncService {
         let remote_head =
             self.git_stdout(&["rev-parse", &format!("{remote}/{REFINE_STATE_BRANCH}")])?;
         let Some(local_head) = self.local_state_head()? else {
-            return Err(stale_recovery(
+            return Err(raced_recovery(
                 "the local refine/state branch disappeared during verification",
             ));
         };
         match classify(self, &local_head, &remote_head)? {
             Ancestry::Equal => Ok((Some(local_head), Some(remote_head))),
-            _ => Err(stale_recovery(
+            _ => Err(raced_recovery(
                 "state diverged again while recovery was being verified",
             )),
         }

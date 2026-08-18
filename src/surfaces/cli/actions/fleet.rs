@@ -140,8 +140,13 @@ pub enum FleetAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
-    /// Publish and pull this node's Refine control state now.
-    /// Pure orchestration of the same pipeline as `refine sync`.
+    /// Publish and pull this node's Refine control state now, then ask every
+    /// other enabled node's daemon to do the same.
+    /// This node's leg is the same pipeline as `refine sync`; each other node
+    /// is reported under `nodes` as `queued`, `pending_upgrade` (still on the
+    /// previous build), `unreachable`, `failed`, or `disabled`, and a node's
+    /// answer is a receipt for the request rather than its reconciliation
+    /// result. One node's condition never fails the rest of the fan-out.
     Sync {
         #[cfg_attr(test, arg(long, hide = true))]
         #[cfg_attr(not(test), arg(skip = None))]

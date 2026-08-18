@@ -18,10 +18,11 @@ Synchronization resolves almost everything without an operator, in order:
    fast-forward. A node that is merely ahead publishes; a node that is merely
    behind hydrates.
 2. **Merge from the real merge base** — genuinely diverged heads merge as one
-   commit with both heads as parents. Cleanly merging paths are taken from
-   Git's own tree merge; contested state files go to the structural driver,
-   which merges only what it can prove disjoint (one-sided member changes,
-   keyed Notes, the node registry). It is a merge driver, not a judge.
+   commit with both heads as parents. A record changed on only one side is
+   taken from that side; a record changed on both goes to the structural
+   driver, which merges only what it can prove disjoint (one-sided member
+   changes, keyed Notes, the node registry). It is a merge driver, not a
+   judge, and no textual line merge ever decides a contested record.
 3. **Agent resolution** — anything still contested goes to an agent call-out
    (default on; set `state_sync_agent_resolution: off` to keep the fail-closed
    report instead). The agent never runs under the repository lock: a short
@@ -44,8 +45,25 @@ Synchronization resolves almost everything without an operator, in order:
    node-local report path, and a domain-terms summary per contested path;
    when resolution escalated, the report records the `decision_question` and
    the summary leads with it, which `--authority` answers. A later pass over
-   the same unchanged divergence keeps that question rather than re-asking
-   the agent, so a standing escalation costs nothing until someone answers.
+   the same contention — the same contested records against the same remote
+   head — keeps that question rather than re-asking the agent, so a standing
+   escalation costs nothing until someone answers. It is the contention, not
+   the divergence, because this node snapshots live state every pass and so
+   mints a new divergence constantly; the carried question therefore states
+   what an agent could not decide when it was authored, while the per-path
+   summaries printed beside it are always the current sides.
+
+   Under sustained contention a pass can report the conflict having invoked
+   no agent at all, and that is deliberate rather than a failure to engage:
+   each contested record may buy a bounded number of resolution engagements
+   against one remote head before this node holds, because an agent asked
+   again on the same evidence answers the same way and each call costs real
+   money. Holding is not fencing — the report stands, `--authority` settles
+   it in one command, automatic recovery still runs, a record contested for
+   the first time is engaged at once even while another is held, and any
+   publication on the remote side re-engages the resolver on the next pass.
+   `git for-each-ref refs/refine/contention` shows what a node has spent, one
+   ref per attempt, each targeting the remote head it was bought against.
 5. **Automatic recovery** — once resolution has escalated, is unavailable, or
    is disabled, the daemon runs the terminal recovery itself with the
    ownership policy read from the merge base: remote authority by default,
@@ -62,6 +80,14 @@ Synchronization resolves almost everything without an operator, in order:
 
 Users never run CLI commands for ordinary syncing.
 
+A mixed-version fleet needs nothing from this runbook. While nodes are being
+upgraded one at a time, a node still on the previous build rebases and pushes
+linear commits and an upgraded node publishes merges; each is an ordinary
+remote head to the other, so the ladder above decides them exactly as it
+decides any other divergence. A node reported `pending_upgrade` by
+`refine fleet sync` is an API-contract fact about that node, never a state-sync
+conflict, and it is not answered with `--authority`.
+
 ## Preview (read-only)
 
 ```text
@@ -69,11 +95,13 @@ refine sync --preview
 ```
 
 Prints one JSON document and writes nothing: the classification (`converged`,
-`local_ahead`, `remote_ahead`, `diverged`, `join`, or `remote_missing`), both
+`local_ahead`, `remote_ahead`, `diverged`, `unrelated` for two independent
+bootstraps of the same branch, `join`, or `remote_missing`), both
 heads and the merge base, per-path sides (changed locally, changed remotely,
 provable by the driver), domain-terms summaries for each contested path, any
 live records not yet committed to the local branch, and — when a recorded
-conflict report matches the previewed heads — the escalated
+conflict report names the same contention, meaning the same remote head and
+the same contested records — the escalated
 `decision_question`. The preview is not a
 token and is never handed to another command. The daemon API equivalent is
 `GET /api/sync/preview`. On error it exits nonzero having written nothing.

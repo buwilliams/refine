@@ -17,6 +17,13 @@ current v4 release can both report project schema version `2` while using
 incompatible durable layouts. Inspect the files; do not infer compatibility
 from the schema number alone.
 
+This is a one-time rewrite of the project's durable state from a v2 layout,
+which is why it stops every node once. It is not how ordinary upgrades work:
+v4 nodes are upgraded one at a time, in any order, while the rest of the fleet
+keeps running and converging on `refine/state` (see
+[`manage-fleet.md`](manage-fleet.md)). Do not generalize the stop-everything
+step below into a fleet-wide upgrade procedure.
+
 ## Outcome
 
 - The application branch no longer tracks or contains `<target-app>/.refine`.

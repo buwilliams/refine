@@ -6,6 +6,9 @@ function newDashboardStateRecovery(contextKey) {
     phase: "idle",
     preview: null,
     authority: "",
+    // Contested paths the operator settles on the OPPOSITE side of the chosen
+    // authority — the same exceptions `refine sync --path` names.
+    exceptions: [],
     confirmedFingerprint: "",
     previewRefreshRequired: false,
     completedFailureSince: "",
@@ -70,6 +73,7 @@ function dashboardRecoverySetPreview(preview) {
   const fingerprint = dashboardRecoveryFingerprint(preview);
   if (previousFingerprint && previousFingerprint !== fingerprint) {
     dashboardStateRecovery.authority = "";
+    dashboardStateRecovery.exceptions = [];
     dashboardStateRecovery.confirmedFingerprint = "";
   }
   dashboardStateRecovery.preview = preview;
@@ -115,20 +119,43 @@ function dashboardRecoveryApplyReady() {
   return !!preview
     && !!dashboardStateRecovery.authority
     && dashboardStateRecovery.confirmedFingerprint === dashboardRecoveryFingerprint(preview)
-    && ["ready", "git_busy", "apply_error"].includes(dashboardStateRecovery.phase);
+    && ["ready", "apply_error"].includes(dashboardStateRecovery.phase);
+}
+
+// Exceptions only ever name paths the current preview still lists as
+// contested, so a preview that no longer contests a path cannot smuggle it
+// into the decision.
+function dashboardRecoveryExceptions() {
+  const contested = (dashboardStateRecovery.preview?.conflicts || [])
+    .map((conflict) => conflict.path);
+  return contested.filter((path) => dashboardStateRecovery.exceptions.includes(path));
 }
 
 function dashboardRecoveryApplyPayload() {
-  return { authority: dashboardStateRecovery.authority, paths: [] };
+  return {
+    authority: dashboardStateRecovery.authority,
+    paths: dashboardRecoveryExceptions(),
+  };
 }
 
 function dashboardRecoverySelectAuthority(authority) {
   if (!dashboardStateRecovery.preview || !["live", "remote"].includes(authority)) return;
   dashboardStateRecovery.authority = authority;
   dashboardStateRecovery.confirmedFingerprint = "";
-  if (["git_busy", "apply_error"].includes(dashboardStateRecovery.phase)) {
+  if (dashboardStateRecovery.phase === "apply_error") {
     dashboardStateRecovery.phase = "ready";
   }
+}
+
+// An exception changes which side a path lands on, so it invalidates the
+// confirmation exactly the way choosing an authority does.
+function dashboardRecoveryToggleException(path, excepted) {
+  const contested = (dashboardStateRecovery.preview?.conflicts || [])
+    .map((conflict) => conflict.path);
+  if (!contested.includes(path)) return;
+  const kept = dashboardStateRecovery.exceptions.filter((entry) => entry !== path);
+  dashboardStateRecovery.exceptions = excepted ? [...kept, path] : kept;
+  dashboardStateRecovery.confirmedFingerprint = "";
 }
 
 function dashboardRecoverySetConfirmed(confirmed, fingerprint) {
@@ -141,11 +168,7 @@ function dashboardRecoveryHandleConflict(error) {
   const reason = error?.error?.reason || "";
   dashboardStateRecovery.confirmedFingerprint = "";
   dashboardStateRecovery.error = error?.message || "Recovery was rejected.";
-  if (reason === "git_busy") {
-    dashboardStateRecovery.phase = "git_busy";
-    return;
-  }
-  if (reason === "stale_preview") {
+  if (reason === "state_moved") {
     dashboardStateRecovery.phase = "stale";
     dashboardStateRecovery.preview = null;
     dashboardStateRecovery.authority = "";
@@ -231,19 +254,18 @@ function renderDashboardStateRecovery(d) {
   const selected = dashboardStateRecovery.authority;
   const confirmed = dashboardStateRecovery.confirmedFingerprint === fingerprint;
   const conflicts = preview.conflicts || [];
-  const retrying = dashboardStateRecovery.phase === "git_busy";
+  const exceptions = dashboardRecoveryExceptions();
+  const opposite = selected === "live" ? "the fleet's" : "this node's";
+  const exceptionHint = selected
+    ? `Ticked paths are exceptions: they settle on ${opposite} version instead, the same as <code>refine sync --path</code>.`
+    : "Choose an authority first; individual paths can then be excepted onto the other side.";
   return `
-    <section class="dashboard-state-recovery ${retrying || dashboardStateRecovery.phase === "apply_error" ? "degraded" : ""}"
+    <section class="dashboard-state-recovery ${dashboardStateRecovery.phase === "apply_error" ? "degraded" : ""}"
              data-testid="state-recovery-preview">
       <h3>State sync needs a decision</h3>
       ${preview.decision_question
         ? `<p data-testid="state-recovery-question">${htmlEscape(preview.decision_question)}</p>`
         : `<p>This node and another node changed the same records, and no side can be chosen automatically. Review both sides and deliberately choose which state is authoritative; everything uncontested has already converged deterministically.</p>`}
-      ${retrying ? `
-        <div class="dashboard-recovery-warning" data-testid="state-recovery-git-busy">
-          <strong>Git is busy.</strong> ${htmlEscape(dashboardStateRecovery.error)}
-          The same preview is retained, but confirmation is required again before retry.
-        </div>` : ""}
       ${dashboardStateRecovery.phase === "apply_error" ? `
         <div class="dashboard-recovery-warning">${htmlEscape(dashboardStateRecovery.error)}</div>` : ""}
       <dl class="dashboard-recovery-evidence">
@@ -258,7 +280,17 @@ function renderDashboardStateRecovery(d) {
       <div class="dashboard-recovery-conflicts">
         <strong>Contested paths (${conflicts.length})</strong>
         ${conflicts.length
-          ? `<ul>${conflicts.map((conflict) => `<li><code>${htmlEscape(conflict.path)}</code> — ${htmlEscape(conflict.summary || "")}</li>`).join("")}</ul>`
+          ? `<ul>${conflicts.map((conflict) => `
+              <li>
+                <label>
+                  <input type="checkbox" data-recovery-exception
+                         value="${htmlEscape(conflict.path)}"
+                         ${exceptions.includes(conflict.path) ? "checked" : ""}
+                         ${selected ? "" : "disabled"}>
+                  <code>${htmlEscape(conflict.path)}</code> — ${htmlEscape(conflict.summary || "")}
+                </label>
+              </li>`).join("")}</ul>
+             <p class="muted small" data-testid="state-recovery-exceptions">${exceptionHint}</p>`
           : `<p class="muted small">No contested paths.</p>`}
       </div>
       <fieldset class="dashboard-recovery-authority" data-testid="state-recovery-authority">
@@ -278,7 +310,7 @@ function renderDashboardStateRecovery(d) {
       </label>
       <div class="actions">
         <button type="button" data-recovery-apply ${dashboardRecoveryApplyReady() ? "" : "disabled"}>
-          ${retrying ? "Retry recovery" : dashboardStateRecovery.phase === "applying" ? "Applying…" : "Apply recovery"}
+          ${dashboardStateRecovery.phase === "apply_error" ? "Retry recovery" : dashboardStateRecovery.phase === "applying" ? "Applying…" : "Apply recovery"}
         </button>
         <button type="button" class="secondary" data-recovery-refresh>Refresh preview</button>
       </div>
@@ -348,6 +380,12 @@ function wireDashboardStateRecovery() {
   $$('[name="state-recovery-authority"]').forEach((control) => {
     bindOnce(control, "change", () => {
       dashboardRecoverySelectAuthority(control.value);
+      redrawDashboardRecovery();
+    });
+  });
+  $$('[data-recovery-exception]').forEach((control) => {
+    bindOnce(control, "change", () => {
+      dashboardRecoveryToggleException(control.value, control.checked);
       redrawDashboardRecovery();
     });
   });

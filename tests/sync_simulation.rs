@@ -13,12 +13,13 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use refine::process::supervisor::errors::{RefineError, RefineResult};
 use refine::tools::git::resolve::{
-    ResolutionRequest, ResolverOutcome, ResolverOverrideGuard, ScriptedResolver, ScriptedStep,
-    install_resolver_override,
+    CONTENTION_ATTEMPT_LIMIT, ResolutionRequest, ResolverOutcome, ResolverOverrideGuard,
+    ScriptedResolver, ScriptedStep, install_resolver_override,
 };
 use refine::tools::host::git_sync::{
     FileGitSyncService, GitSyncResult, StateRecoveryAuthority, StateRecoveryDecision,
@@ -26,8 +27,27 @@ use refine::tools::host::git_sync::{
 };
 use refine::tools::host::project_layout::refine_dir_for_target_root;
 
+#[path = "sync_simulation/rolling_upgrade.rs"]
+mod rolling_upgrade;
 #[path = "sync_simulation/scenarios.rs"]
 mod scenarios;
+
+/// Which machinery a simulated node runs. A fleet upgrades node by node, so
+/// both kinds publish to one remote at the same time and every convergence
+/// invariant has to hold across the mixture.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum NodeKind {
+    /// The shipped pipeline: `FileGitSyncService`, ancestry classification,
+    /// merge commits, agent resolution.
+    Current,
+    /// A node that has not been upgraded yet. Its behavior is emulated
+    /// mechanically with git — fetch, rebase the local state branch onto the
+    /// remote, commit the live delta as one linear commit, push — rather than
+    /// by keeping the retired code alive. What matters for compatibility is
+    /// the shape a pre-upgrade node leaves on the shared branch, not which
+    /// code produced it.
+    Legacy,
+}
 
 /// One scripted step of a simulation scenario. Node indices address the
 /// fleet's clones in creation order (0 = node-a, 1 = node-b, 2 = node-c).
@@ -53,6 +73,12 @@ enum Event {
     },
     /// Run the real sync pipeline on the node.
     Sync { node: usize },
+    /// Run one pre-upgrade synchronization pass on a not-yet-upgraded node.
+    LegacySync { node: usize },
+    /// Upgrade a node in place: nothing durable changes, and its next `Sync`
+    /// runs the current pipeline over exactly the state — branch, worktree,
+    /// live store, and legacy leftovers — the pre-upgrade machinery left.
+    Upgrade { node: usize },
     /// Write a goal record carrying an explicit `node_id` owner member, so a
     /// merge-base ownership decision can read who owned the record at the
     /// shared base.
@@ -85,8 +111,25 @@ enum Event {
 enum Outcome {
     Write,
     Crash,
+    Upgrade,
     Sync(RefineResult<GitSyncResult>),
+    LegacySync(LegacyPass),
     Recovery(RefineResult<StateRecoveryRunResult>),
+}
+
+/// What one pre-upgrade pass did. A legacy pass has no typed result to
+/// return, so the harness reports the three mechanical facts a scenario can
+/// assert on.
+#[derive(Clone, Debug, Default)]
+struct LegacyPass {
+    /// The pass replayed this node's local commits onto the remote head.
+    rebased: bool,
+    /// The live delta became one new linear commit.
+    committed: bool,
+    /// The linear commit reached the origin.
+    pushed: bool,
+    /// Why git refused, when the rebase or the push lost.
+    rejected: Option<String>,
 }
 
 impl Outcome {
@@ -115,6 +158,24 @@ impl Outcome {
             _ => panic!("{label}: outcome is not a recovery run"),
         }
     }
+
+    fn legacy(&self, label: &str) -> &LegacyPass {
+        match self {
+            Outcome::LegacySync(pass) => pass,
+            _ => panic!("{label}: outcome is not a legacy sync"),
+        }
+    }
+
+    /// A legacy pass that published: nothing was rejected, and the branch
+    /// this node pushed is the branch the origin now carries.
+    fn legacy_published(&self, label: &str) -> &LegacyPass {
+        let pass = self.legacy(label);
+        assert!(
+            pass.pushed && pass.rejected.is_none(),
+            "{label}: legacy pass did not publish: {pass:#?}"
+        );
+        pass
+    }
 }
 
 struct SimulatedNode {
@@ -122,6 +183,8 @@ struct SimulatedNode {
     /// active-node selection exactly where product code reads it.
     id: &'static str,
     target_root: PathBuf,
+    /// Whether this node has been upgraded yet.
+    kind: NodeKind,
 }
 
 impl SimulatedNode {
@@ -139,6 +202,53 @@ impl SimulatedNode {
 
     fn state_head(&self) -> String {
         git_stdout(&self.target_root, &["rev-parse", "refine/state"])
+    }
+
+    /// The isolated checkout of `refine/state` both machineries own, at the
+    /// one path the product has always used — an upgraded node inherits the
+    /// pre-upgrade node's worktree instead of creating a second one.
+    fn state_worktree(&self) -> PathBuf {
+        self.target_root.join(".git/refine-state-worktree")
+    }
+
+    /// The retired baseline fingerprint file, where the pre-upgrade
+    /// machinery kept it.
+    fn legacy_baseline_file(&self) -> PathBuf {
+        self.target_root.join(".git/refine-state-baseline.json")
+    }
+
+    /// The retired baseline anchor refs still present in this repository.
+    fn legacy_baseline_refs(&self) -> Vec<String> {
+        git_stdout(
+            &self.target_root,
+            &[
+                "for-each-ref",
+                "--format=%(refname)",
+                "refs/refine/state-baseline",
+            ],
+        )
+        .lines()
+        .map(str::to_string)
+        .collect()
+    }
+
+    /// Every durable path the node's state branch carries, so a scenario can
+    /// assert an exact file set instead of only the records it looked up.
+    fn state_tree_paths(&self) -> Vec<String> {
+        git_stdout(
+            &self.target_root,
+            &[
+                "ls-tree",
+                "-r",
+                "--name-only",
+                "refine/state",
+                "--",
+                ".refine",
+            ],
+        )
+        .lines()
+        .filter_map(|path| path.strip_prefix(".refine/").map(str::to_string))
+        .collect()
     }
 }
 
@@ -202,7 +312,11 @@ impl SimulatedFleet {
                     ],
                 );
                 configure_repo(&target_root);
-                let node = SimulatedNode { id, target_root };
+                let node = SimulatedNode {
+                    id,
+                    target_root,
+                    kind: NodeKind::Current,
+                };
                 write_active_node_identity(&node);
                 node
             })
@@ -266,16 +380,45 @@ impl SimulatedFleet {
                 // touched.
                 self.resolvers[*node] = None;
                 let id = self.nodes[*node].id;
+                let kind = self.nodes[*node].kind;
                 self.nodes[*node] = SimulatedNode {
                     id,
                     target_root: self.root.join(id),
+                    kind,
                 };
                 Outcome::Crash
             }
             Event::Sync { node } => {
+                assert_eq!(
+                    self.nodes[*node].kind,
+                    NodeKind::Current,
+                    "{}: the current pipeline runs only on an upgraded node",
+                    self.nodes[*node].id
+                );
                 let result = self.nodes[*node].service().sync();
                 self.record_durably_committed(*node);
                 Outcome::Sync(result)
+            }
+            Event::LegacySync { node } => {
+                assert_eq!(
+                    self.nodes[*node].kind,
+                    NodeKind::Legacy,
+                    "{}: the pre-upgrade pass runs only on a node that has not been upgraded",
+                    self.nodes[*node].id
+                );
+                let pass = self.legacy_sync(*node);
+                self.record_durably_committed(*node);
+                Outcome::LegacySync(pass)
+            }
+            Event::Upgrade { node } => {
+                assert_eq!(
+                    self.nodes[*node].kind,
+                    NodeKind::Legacy,
+                    "{}: the node is already upgraded",
+                    self.nodes[*node].id
+                );
+                self.nodes[*node].kind = NodeKind::Current;
+                Outcome::Upgrade
             }
             Event::RecoveryRun { node, authority } => {
                 let result = self.nodes[*node]
@@ -299,6 +442,16 @@ impl SimulatedFleet {
     /// Clone one more target root from the origin without syncing it, the way
     /// a node joins an already published fleet. Returns its index.
     fn add_node(&mut self, id: &'static str) -> usize {
+        self.add_node_of_kind(id, NodeKind::Current)
+    }
+
+    /// Join a node that has not been upgraded yet: same clone, same live
+    /// store, same identity — only its synchronization machinery differs.
+    fn add_legacy_node(&mut self, id: &'static str) -> usize {
+        self.add_node_of_kind(id, NodeKind::Legacy)
+    }
+
+    fn add_node_of_kind(&mut self, id: &'static str, kind: NodeKind) -> usize {
         let target_root = self.root.join(id);
         git(
             &self.root,
@@ -310,12 +463,197 @@ impl SimulatedFleet {
             ],
         );
         configure_repo(&target_root);
-        let node = SimulatedNode { id, target_root };
+        let node = SimulatedNode {
+            id,
+            target_root,
+            kind,
+        };
         write_active_node_identity(&node);
         self.nodes.push(node);
         self.resolvers.push(None);
         self.pending.push(BTreeMap::new());
         self.nodes.len() - 1
+    }
+
+    /// One pre-upgrade synchronization pass, emulated mechanically with git:
+    /// fetch, rebase this node's `refine/state` onto the remote head, commit
+    /// the live delta as one linear commit, push, then hydrate the branch
+    /// back into the live store. It never creates a merge commit, never
+    /// classifies ancestry, and never deletes a path it did not observe —
+    /// the pre-upgrade machinery published a delta, not a mirror.
+    ///
+    /// The pass writes the retired baseline leftovers where that machinery
+    /// wrote them (`.git/refine-state-baseline.json` plus a
+    /// `refs/refine/state-baseline/<oid>` anchor) and shares the one state
+    /// worktree path, so upgrading the node exercises inheriting both.
+    fn legacy_sync(&mut self, node: usize) -> LegacyPass {
+        let root = self.nodes[node].target_root.clone();
+        let id = self.nodes[node].id;
+        let live = self.nodes[node].live_refine();
+        let worktree = self.nodes[node].state_worktree();
+        let worktree_state = worktree.join(".refine");
+        let remote_ref = "origin/refine/state";
+
+        git(&root, &["fetch", "-q", "--prune", "origin"]);
+        let remote_exists = git_try(
+            &root,
+            &[
+                "show-ref",
+                "--verify",
+                "--quiet",
+                &format!("refs/remotes/{remote_ref}"),
+            ],
+        )
+        .0;
+        let local_exists = git_try(
+            &root,
+            &["show-ref", "--verify", "--quiet", "refs/heads/refine/state"],
+        )
+        .0;
+        if !local_exists && remote_exists {
+            git(&root, &["branch", "--track", "refine/state", remote_ref]);
+        }
+        if !worktree.exists() {
+            let path = worktree.to_str().unwrap().to_string();
+            if local_exists || remote_exists {
+                git(&root, &["worktree", "add", "-q", &path, "refine/state"]);
+            } else {
+                git(&root, &["worktree", "add", "-q", "--detach", &path, "HEAD"]);
+                git(&worktree, &["switch", "--orphan", "refine/state"]);
+                git(&worktree, &["rm", "-rf", "--ignore-unmatch", "."]);
+            }
+        }
+
+        let mut pass = LegacyPass::default();
+        if remote_exists {
+            let (ok, output) = git_try(&worktree, &["rebase", remote_ref]);
+            if !ok {
+                let _ = git_try(&worktree, &["rebase", "--abort"]);
+                pass.rejected = Some(output);
+                return pass;
+            }
+            pass.rebased = true;
+        }
+
+        // Publish only what this node changed since the state it last agreed
+        // with. The retired machinery kept its fingerprint file for exactly
+        // this: a live copy that still matches the baseline is not a local
+        // edit, and republishing it would resurrect a version the fleet has
+        // already moved past.
+        let baseline = self.read_legacy_baseline(node);
+        let mut published = Vec::new();
+        for relative in durable_state_paths(&live) {
+            let bytes = fs::read(live.join(&relative)).unwrap();
+            if baseline.get(&relative).map(String::as_str)
+                == Some(state_fingerprint(&bytes).as_str())
+            {
+                continue;
+            }
+            let destination = worktree_state.join(&relative);
+            fs::create_dir_all(destination.parent().unwrap()).unwrap();
+            fs::write(&destination, &bytes).unwrap();
+            published.push(relative);
+        }
+        git(&worktree, &["add", "-f", "-A", "--", ".refine"]);
+        let staged = git_stdout(
+            &worktree,
+            &[
+                "status",
+                "--porcelain=v1",
+                "--untracked-files=no",
+                "--",
+                ".refine",
+            ],
+        );
+        if !staged.is_empty() {
+            git(
+                &worktree,
+                &[
+                    "commit",
+                    "-q",
+                    "-m",
+                    "Update Refine state",
+                    "-m",
+                    &format!("Node: {id}"),
+                ],
+            );
+            pass.committed = true;
+        }
+        let (pushed, output) = git_try(&worktree, &["push", "-q", "origin", "refine/state"]);
+        pass.pushed = pushed;
+        if !pushed {
+            pass.rejected = Some(output);
+        }
+
+        // Hydrate everything the branch carries that this pass did not
+        // publish itself. Records are copied in, never removed: a
+        // pre-upgrade pass moved a delta in both directions and had no way to
+        // express a deletion it had not observed.
+        for relative in durable_state_paths(&worktree_state) {
+            if published.contains(&relative) {
+                continue;
+            }
+            let bytes = fs::read(worktree_state.join(&relative)).unwrap();
+            let destination = live.join(&relative);
+            if fs::read(&destination).ok().as_deref() == Some(bytes.as_slice()) {
+                continue;
+            }
+            fs::create_dir_all(destination.parent().unwrap()).unwrap();
+            fs::write(&destination, &bytes).unwrap();
+        }
+        self.write_legacy_baseline(node, &worktree_state);
+        pass
+    }
+
+    /// The fingerprints of the state this node last agreed with, as the
+    /// retired machinery recorded them.
+    fn read_legacy_baseline(&self, node: usize) -> BTreeMap<String, String> {
+        let Ok(bytes) = fs::read(self.nodes[node].legacy_baseline_file()) else {
+            return BTreeMap::new();
+        };
+        let stored: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        stored
+            .get("fingerprints")
+            .and_then(serde_json::Value::as_object)
+            .map(|fingerprints| {
+                fingerprints
+                    .iter()
+                    .filter_map(|(path, value)| {
+                        value
+                            .as_str()
+                            .map(|value| (path.clone(), value.to_string()))
+                    })
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Record the pre-upgrade baseline fingerprint file and its retained
+    /// anchor ref, the leftovers an upgraded node must retire.
+    fn write_legacy_baseline(&self, node: usize, worktree_state: &Path) {
+        let root = &self.nodes[node].target_root;
+        let head = git_stdout(root, &["rev-parse", "refine/state"]);
+        let fingerprints = durable_state_paths(worktree_state)
+            .into_iter()
+            .map(|relative| {
+                let bytes = fs::read(worktree_state.join(&relative)).unwrap_or_default();
+                let fingerprint = state_fingerprint(&bytes);
+                (relative, serde_json::json!(fingerprint))
+            })
+            .collect::<serde_json::Map<_, _>>();
+        let snapshot_ref = format!("refs/refine/state-baseline/{head}");
+        fs::write(
+            self.nodes[node].legacy_baseline_file(),
+            serde_json::to_vec_pretty(&serde_json::json!({
+                "version": 2,
+                "snapshot_oid": head,
+                "snapshot_ref": snapshot_ref,
+                "fingerprints": fingerprints
+            }))
+            .unwrap(),
+        )
+        .unwrap();
+        git(root, &["update-ref", &snapshot_ref, &head]);
     }
 
     /// Install a scripted conflict resolver on the node, the way the daemon
@@ -598,6 +936,26 @@ fn completing(edit: impl FnMut(&ResolutionRequest<'_>) + Send + 'static) -> Scri
     })
 }
 
+/// A script of `count` identical steps that answer the same way every time
+/// and count the call — the spend meter contention scenarios read. The script
+/// is deliberately longer than any bounded run may spend, so an unbounded one
+/// is measured rather than cut short by an exhausted script.
+fn counting_script(
+    calls: &Arc<AtomicU32>,
+    count: usize,
+    answer: fn() -> ResolverOutcome,
+) -> Vec<ScriptedStep> {
+    (0..count)
+        .map(|_| {
+            let counted = Arc::clone(calls);
+            Box::new(move |_request: &ResolutionRequest<'_>| {
+                counted.fetch_add(1, Ordering::SeqCst);
+                Ok(answer())
+            }) as ScriptedStep
+        })
+        .collect()
+}
+
 /// A scripted resolver step that resolves one contested goal record by
 /// writing a complete Goal whose `name` composes both sides' intents.
 fn resolving_goal(goal_id: &'static str, merged_name: &'static str) -> ScriptedStep {
@@ -705,6 +1063,80 @@ fn git_stdout(root: &Path, args: &[&str]) -> String {
         String::from_utf8_lossy(&output.stderr)
     );
     String::from_utf8_lossy(&output.stdout).trim().to_string()
+}
+
+/// Run git without asserting success: the pre-upgrade pass has to observe a
+/// rejected push or a failed rebase the way the old binary did.
+fn git_try(root: &Path, args: &[&str]) -> (bool, String) {
+    let output = Command::new("git")
+        .args(args)
+        .current_dir(root)
+        .output()
+        .unwrap_or_else(|error| panic!("failed to run git {}: {error}", args.join(" ")));
+    let text = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    (output.status.success(), text.trim().to_string())
+}
+
+/// Every durable state path under `root`, relative and slash-separated.
+fn durable_state_paths(root: &Path) -> Vec<String> {
+    let mut paths = Vec::new();
+    collect_durable_state_paths(root, root, &mut paths);
+    paths.sort();
+    paths
+}
+
+fn collect_durable_state_paths(root: &Path, current: &Path, paths: &mut Vec<String>) {
+    let Ok(entries) = fs::read_dir(current) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let relative = path.strip_prefix(root).unwrap_or(&path).to_path_buf();
+        if excluded_from_durable_state(&relative) {
+            continue;
+        }
+        if path.is_dir() {
+            collect_durable_state_paths(root, &path, paths);
+        } else {
+            paths.push(relative.to_string_lossy().replace('\\', "/"));
+        }
+    }
+}
+
+/// A content fingerprint in the shape the retired baseline file stored one:
+/// stable per bytes, and never compared across anything but itself.
+fn state_fingerprint(bytes: &[u8]) -> String {
+    let mut hash = 0xcbf2_9ce4_8422_2325u64;
+    for byte in bytes {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x100_0000_01b3);
+    }
+    format!("{hash:016x}")
+}
+
+/// The product's durable-state exclusions, as they apply to the files this
+/// harness creates: node-local evidence directories and in-flight scratch
+/// files never reach the branch (`src/tools/host/git_sync/state_files.rs`).
+fn excluded_from_durable_state(relative: &Path) -> bool {
+    let leading = relative
+        .components()
+        .next()
+        .and_then(|component| component.as_os_str().to_str());
+    if matches!(
+        leading,
+        Some("run" | "runtime" | "logs" | "support-bundles" | "provider-bin")
+    ) {
+        return true;
+    }
+    let name = relative
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or_default();
+    name.ends_with(".lock") || name.ends_with(".tmp") || name.starts_with(".refine-sync-")
 }
 
 fn git_bytes_optional(root: &Path, args: &[&str]) -> Option<Vec<u8>> {

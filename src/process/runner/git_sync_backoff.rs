@@ -62,10 +62,14 @@ impl GitSyncFailureBackoff {
     }
 }
 
-/// Keep retry identity stable across conflict-report rewrites. The report id
-/// is derived from the divergence's commits and unresolved paths, so retrying
-/// the same divergence keeps one backoff context while any real movement
-/// (either head, the merge base, or the conflict set) resets it.
+/// Keep retry identity stable across conflict-report rewrites. What makes two
+/// failures the same failure is the CONTENTION — the contested records and
+/// the remote head that must be reconciled with them — not the report id: a
+/// node still writing records snapshots a new local head every pass, minting
+/// a new report id for a divergence whose contested question has not moved.
+/// Keyed on the report id, that churn reset the escalating retry delay to its
+/// base on every pass, so a busy node never backed off a standing conflict at
+/// all. Real movement on either side still mints a new context.
 pub(super) fn git_sync_failure_context(
     error: &RefineError,
     conflict_report: Option<&StateSyncConflictReport>,
@@ -73,17 +77,30 @@ pub(super) fn git_sync_failure_context(
     let Some(report) = conflict_report else {
         return error.to_string();
     };
-    format!("state_sync_conflict:{}", report.report_id)
+    let mut contested = report.unresolved_paths.clone();
+    contested.sort();
+    format!(
+        "state_sync_contention:{}:{}",
+        report.remote_state_head,
+        contested.join(",")
+    )
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn conflict_report(report_id: &str, attempt_id: &str) -> StateSyncConflictReport {
+    fn conflict_report(
+        local_state_head: &str,
+        remote_state_head: &str,
+        contested: &str,
+        attempt_id: &str,
+    ) -> StateSyncConflictReport {
         serde_json::from_value(serde_json::json!({
             "version": 3,
-            "report_id": report_id,
+            // The report's identity is the divergence: every operand of it,
+            // this node's own snapshot commit included.
+            "report_id": format!("{local_state_head}-{remote_state_head}-{contested}"),
             "phase": "first_pass",
             "attempt_id": attempt_id,
             "attempt_source": "background_publish",
@@ -92,15 +109,14 @@ mod tests {
             "repository_identity": "repository",
             "configured_remote": "origin",
             "merge_base": "base-head",
-            "local_state_head": "local-head",
-            "remote_state_head": "remote-head",
-            "unresolved_paths": ["nodes.json"],
+            "local_state_head": local_state_head,
+            "remote_state_head": remote_state_head,
+            "unresolved_paths": [contested],
             "conflicts": [{
-                "path": "nodes.json",
+                "path": contested,
                 "summary": "both nodes changed node-a"
             }],
             "recovery": {
-                "available": true,
                 "run_command": "run",
                 "preview_command": "preview"
             },
@@ -156,13 +172,16 @@ mod tests {
     }
 
     #[test]
-    fn repeated_attempts_of_one_divergence_keep_the_same_backoff_context() {
-        let error_a = RefineError::Conflict("conflict report stable-id attempt 1".to_string());
-        let error_b = RefineError::Conflict("conflict report stable-id attempt 2".to_string());
-        // Same divergence, two attempts: report ids are stable by
-        // construction, so only the attempt metadata differs.
-        let report_a = conflict_report("stable-id", "01");
-        let report_b = conflict_report("stable-id", "02");
+    fn a_standing_contention_keeps_one_backoff_context_while_the_node_keeps_working() {
+        let error_a = RefineError::Conflict("conflict report attempt 1".to_string());
+        let error_b = RefineError::Conflict("conflict report attempt 2".to_string());
+        // One standing contention, two passes. This node kept writing
+        // records, so its snapshot moved the local head — and the report id
+        // with it — while the contested record and the remote head that must
+        // be reconciled with it did not move at all.
+        let report_a = conflict_report("local-1", "remote-head", "nodes.json", "01");
+        let report_b = conflict_report("local-2", "remote-head", "nodes.json", "02");
+        assert_ne!(report_a.report_id, report_b.report_id);
         let context_a = git_sync_failure_context(&error_a, Some(&report_a));
         let context_b = git_sync_failure_context(&error_b, Some(&report_b));
         assert_eq!(context_a, context_b);
@@ -179,11 +198,23 @@ mod tests {
             FAILURE_BACKOFF_BASE * 2
         );
 
-        // A new divergence mints a new report identity and resets the delay.
-        let changed_report = conflict_report("moved-id", "03");
-        let changed_context = git_sync_failure_context(&error_b, Some(&changed_report));
+        // The remote side moving is what genuinely needs deciding again, and
+        // so is a different record being contested; either resets the delay.
+        let moved_remote = conflict_report("local-2", "remote-moved", "nodes.json", "03");
         assert_eq!(
-            backoff.record_failure(now, &changed_context),
+            backoff.record_failure(
+                now,
+                &git_sync_failure_context(&error_b, Some(&moved_remote))
+            ),
+            FAILURE_BACKOFF_BASE
+        );
+        let other_record =
+            conflict_report("local-2", "remote-moved", "goals/AA/BB/goal.json", "04");
+        assert_eq!(
+            backoff.record_failure(
+                now,
+                &git_sync_failure_context(&error_b, Some(&other_record))
+            ),
             FAILURE_BACKOFF_BASE
         );
     }

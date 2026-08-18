@@ -435,6 +435,7 @@ fn integration_recovery_records_truthful_successor_and_clears_authority() {
         .queue_integration_recovery_summary(
             "GOAL1",
             authority,
+            &GoalStatus::Governance,
             "default",
             "merge failed",
             json!({"kept": true}),
@@ -500,6 +501,7 @@ fn integration_recovery_reuses_its_own_claimed_unworked_recovery_round() {
         .queue_integration_recovery_summary(
             "GOAL1",
             authority,
+            &GoalStatus::Governance,
             "default",
             "target branch advanced ahead of every integration attempt",
             json!({"kept": true}),

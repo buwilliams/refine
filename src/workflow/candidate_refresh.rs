@@ -1,6 +1,15 @@
 //! Candidate refresh onto an advanced target, with resolve-in-place for
 //! conflicted rebases.
 //!
+//! One implementation serves both stage boundaries that refresh. The
+//! Implement→Quality boundary refreshes so Quality judges the candidate
+//! against the target it will actually merge into, while the implementing
+//! agent's context is still fresh; Governance refreshes again immediately
+//! before integrating, and after an earlier refresh that second pass is
+//! normally `Unchanged`. `authority_status` is the only difference between the
+//! two callers — the workflow status the Goal is authorized under while the
+//! refresh runs and persists.
+//!
 //! The repository lock never contains agent work. The refresh runs as two
 //! short holds around an unlocked middle, the same discipline Governance uses
 //! for its quality/governance verdicts:
@@ -75,22 +84,29 @@ pub(super) fn workflow_conflict_resolution_enabled(settings: &JsonObject) -> boo
     setting_string(settings, "workflow_conflict_resolution", "on") != "off"
 }
 
+/// The resolver a conflicted refresh calls out to: the workflow's own provider
+/// identity and idle budget, matching every other agent invocation this Goal
+/// makes. Not installed maps to `Unavailable`, and `workflow_conflict_resolution
+/// = off` maps to `None`; both fall back exactly to pre-resolver behavior.
+pub(super) fn workflow_conflict_resolver(
+    ctx: &WorkflowContext<'_>,
+) -> Option<InstalledAgentResolver> {
+    workflow_conflict_resolution_enabled(&ctx.settings).then(|| InstalledAgentResolver {
+        provider: ctx.provider.clone(),
+        agents_runtime_root: ctx.runtime_root.join("agents"),
+        stall_timeout_seconds: agent_idle_timeout(&ctx.settings).map(|timeout| timeout.as_secs()),
+    })
+}
+
 pub(super) fn refresh_candidate_for_target_advancement(
     ctx: &mut WorkflowContext<'_>,
+    authority_status: GoalStatus,
     max_automatic_round_retries: u32,
 ) -> RefineResult<CandidateRefreshOutcome> {
-    // The workflow's own provider identity and idle budget, matching every
-    // other agent invocation this Goal makes. Not installed maps to
-    // `Unavailable`, which falls back exactly to pre-resolver behavior.
-    let resolver =
-        workflow_conflict_resolution_enabled(&ctx.settings).then(|| InstalledAgentResolver {
-            provider: ctx.provider.clone(),
-            agents_runtime_root: ctx.runtime_root.join("agents"),
-            stall_timeout_seconds: agent_idle_timeout(&ctx.settings)
-                .map(|timeout| timeout.as_secs()),
-        });
+    let resolver = workflow_conflict_resolver(ctx);
     refresh_candidate_with_resolver(
         ctx,
+        authority_status,
         max_automatic_round_retries,
         resolver
             .as_ref()
@@ -102,19 +118,31 @@ pub(super) fn refresh_candidate_for_target_advancement(
 /// lock holds — callers must not wrap this in `with_repository_git_lock`.
 pub(super) fn refresh_candidate_with_resolver(
     ctx: &mut WorkflowContext<'_>,
+    authority_status: GoalStatus,
     max_automatic_round_retries: u32,
     resolver: Option<&dyn ConflictResolver>,
 ) -> RefineResult<CandidateRefreshOutcome> {
     let target_root = ctx.target_root.to_path_buf();
     let step = with_repository_git_lock(&target_root, || {
-        locked_refresh_attempt(ctx, max_automatic_round_retries, resolver.is_some())
+        locked_refresh_attempt(
+            ctx,
+            &authority_status,
+            max_automatic_round_retries,
+            resolver.is_some(),
+        )
     })?;
     match step {
         LockedRefreshStep::Done(outcome) => Ok(outcome),
         LockedRefreshStep::Conflicted(pending) => {
             let resolver = resolver
                 .expect("a conflicted refresh is only preserved when a resolver is available");
-            resolve_conflicted_refresh(ctx, max_automatic_round_retries, resolver, *pending)
+            resolve_conflicted_refresh(
+                ctx,
+                &authority_status,
+                max_automatic_round_retries,
+                resolver,
+                *pending,
+            )
         }
     }
 }
@@ -140,10 +168,11 @@ struct ConflictedRefresh {
 
 fn locked_refresh_attempt(
     ctx: &mut WorkflowContext<'_>,
+    authority_status: &GoalStatus,
     max_automatic_round_retries: u32,
     resolver_available: bool,
 ) -> RefineResult<LockedRefreshStep> {
-    ctx.revalidate_authority(GoalStatus::Governance)?;
+    ctx.revalidate_authority(authority_status.clone())?;
     let detail = ctx.work_items.show_goal_detail(&ctx.goal_id)?;
     let branch = required(&detail, "branch_name", &ctx.goal_id)?;
     let original_base = required(&detail, "base_commit", &ctx.goal_id)?;
@@ -152,8 +181,9 @@ fn locked_refresh_attempt(
     let worktree = ctx.require_worktree_path()?.to_string();
     if ctx.require_branch()? != branch || ctx.require_commit()? != original_candidate {
         return Err(RefineError::Conflict(format!(
-            "Goal {} hydrated candidate identity changed before integration lease",
-            ctx.goal_id
+            "Goal {} hydrated candidate identity changed before the {} candidate refresh",
+            ctx.goal_id,
+            authority_status.as_str()
         )));
     }
 
@@ -221,6 +251,7 @@ fn locked_refresh_attempt(
         let restored = interrupted.then(|| worktree_git.head_ref()).transpose()?;
         return queue_recovery(
             ctx,
+            authority_status,
             max_automatic_round_retries,
             reason,
             json!({
@@ -239,7 +270,7 @@ fn locked_refresh_attempt(
         .map(LockedRefreshStep::Done);
     }
 
-    ctx.revalidate_authority(GoalStatus::Governance)?;
+    ctx.revalidate_authority(authority_status.clone())?;
     let rebase = worktree_git.rebase(&target_branch)?;
     if !rebase.ok {
         if resolver_available && !rebase.conflicts.is_empty() {
@@ -259,6 +290,7 @@ fn locked_refresh_attempt(
         let restored = worktree_git.head_ref()?;
         return queue_recovery(
             ctx,
+            authority_status,
             max_automatic_round_retries,
             "candidate refresh conflicted",
             json!({
@@ -277,6 +309,7 @@ fn locked_refresh_attempt(
     }
     finalize_refreshed_candidate(
         ctx,
+        authority_status,
         &worktree_git,
         &branch,
         &worktree,
@@ -293,6 +326,7 @@ fn locked_refresh_attempt(
 #[allow(clippy::too_many_arguments)]
 fn finalize_refreshed_candidate(
     ctx: &mut WorkflowContext<'_>,
+    authority_status: &GoalStatus,
     worktree_git: &FileGitWorktreeService,
     branch: &str,
     worktree: &str,
@@ -316,6 +350,7 @@ fn finalize_refreshed_candidate(
     }
     let evidence = persist_candidate_refresh_or_restore(
         ctx,
+        authority_status,
         worktree_git,
         branch,
         worktree,
@@ -355,6 +390,7 @@ enum ContinueStep {
 /// one attempt.
 fn resolve_conflicted_refresh(
     ctx: &mut WorkflowContext<'_>,
+    authority_status: &GoalStatus,
     max_automatic_round_retries: u32,
     resolver: &dyn ConflictResolver,
     pending: ConflictedRefresh,
@@ -394,6 +430,7 @@ fn resolve_conflicted_refresh(
             let question = resolution_question(ctx, &pending, &stop_conflicts);
             return abort_conflicted_refresh_and_queue(
                 ctx,
+                authority_status,
                 max_automatic_round_retries,
                 &pending,
                 json!({
@@ -441,6 +478,7 @@ fn resolve_conflicted_refresh(
                 attempts.push(json!({"attempt": invocation, "outcome": "unavailable"}));
                 return abort_conflicted_refresh_and_queue(
                     ctx,
+                    authority_status,
                     max_automatic_round_retries,
                     &pending,
                     json!({"outcome": "unavailable", "attempts": attempts}),
@@ -457,6 +495,7 @@ fn resolve_conflicted_refresh(
                 }));
                 return abort_conflicted_refresh_and_queue(
                     ctx,
+                    authority_status,
                     max_automatic_round_retries,
                     &pending,
                     json!({
@@ -566,6 +605,7 @@ fn resolve_conflicted_refresh(
             });
             finalize_refreshed_candidate(
                 ctx,
+                authority_status,
                 &worktree_git,
                 &pending.branch,
                 &pending.worktree,
@@ -599,6 +639,7 @@ fn resolve_conflicted_refresh(
                 }));
                 return abort_conflicted_refresh_and_queue(
                     ctx,
+                    authority_status,
                     max_automatic_round_retries,
                     &pending,
                     json!({"outcome": "failed", "attempts": attempts}),
@@ -623,6 +664,7 @@ fn changed_paths(worktree_git: &FileGitWorktreeService) -> RefineResult<BTreeSet
 /// the retained evidence.
 fn abort_conflicted_refresh_and_queue(
     ctx: &mut WorkflowContext<'_>,
+    authority_status: &GoalStatus,
     max_automatic_round_retries: u32,
     pending: &ConflictedRefresh,
     conflict_resolution: Value,
@@ -637,6 +679,7 @@ fn abort_conflicted_refresh_and_queue(
     })?;
     queue_recovery(
         ctx,
+        authority_status,
         max_automatic_round_retries,
         "candidate refresh conflicted",
         json!({
@@ -771,6 +814,7 @@ fn conflicting_goal_reports(
 #[allow(clippy::too_many_arguments)]
 pub(super) fn persist_candidate_refresh_or_restore(
     ctx: &mut WorkflowContext<'_>,
+    authority_status: &GoalStatus,
     worktree_git: &FileGitWorktreeService,
     branch: &str,
     worktree: &str,
@@ -781,10 +825,11 @@ pub(super) fn persist_candidate_refresh_or_restore(
     conflict_resolution: Option<Value>,
 ) -> RefineResult<Value> {
     let persist = (|| {
-        ctx.revalidate_authority(GoalStatus::Governance)?;
+        ctx.revalidate_authority(authority_status.clone())?;
         ctx.work_items.record_candidate_refresh(
             &ctx.goal_id,
             ctx.attempt_authority,
+            authority_status,
             &ctx.node_id,
             branch,
             worktree,
@@ -831,6 +876,7 @@ fn restore_unpersisted_refresh(
 
 fn queue_recovery(
     ctx: &mut WorkflowContext<'_>,
+    authority_status: &GoalStatus,
     max_automatic_round_retries: u32,
     reason: &str,
     evidence: Value,
@@ -838,6 +884,7 @@ fn queue_recovery(
     let recovery = ctx.work_items.queue_integration_recovery_summary(
         &ctx.goal_id,
         ctx.attempt_authority,
+        authority_status,
         &ctx.node_id,
         reason,
         evidence.clone(),

@@ -5,6 +5,7 @@ mod execution_ownership;
 mod failure_settlement;
 mod governance;
 mod planning_repair;
+mod quality_base_refresh;
 mod quality_recovery;
 mod worktree_resume;
 

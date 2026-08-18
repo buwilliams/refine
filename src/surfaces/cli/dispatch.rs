@@ -84,6 +84,7 @@ use crate::tools::host::daemon_lifecycle::{
 };
 use crate::tools::host::fleet::{
     FLEET_RUNBOOK_PATH, FileFleetService, FleetService, NodeRemoteUpdate, fleet_manage_prompt,
+    fleet_sync_response,
 };
 use crate::tools::host::git_sync::FileGitSyncService;
 use crate::tools::host::installation::{FileInstallationService, InstallationService};
@@ -254,6 +255,14 @@ pub(super) fn run_system_start(
     // without this a slow start is indistinguishable from a hung one.
     lifecycle.record_startup_progress(actual_port, "preparing");
     eprintln!("refine: preparing daemon at http://{addr}");
+    // State synchronization is `git merge-tree`; a node whose Git cannot run it
+    // would serve happily and then fail every sync. Say so once, here, in the
+    // sentence that names the fix — and record it as a start failure so a
+    // service-managed daemon's readiness waiter sees the reason too.
+    if let Err(error) = crate::tools::git::merge::ensure_supported_git() {
+        let _ = lifecycle.mark_start_failed(actual_port, &error);
+        return Err(error);
+    }
     let project_preparation = (|| -> RefineResult<_> {
         lifecycle.record_startup_progress(actual_port, "loading-project-registry");
         eprintln!("refine: loading active project registry");

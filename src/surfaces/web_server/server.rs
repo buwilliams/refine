@@ -307,6 +307,10 @@ impl InProcessWebServer {
             return self.handle_fleet_distribute(request);
         }
 
+        if request.method == "POST" && request.path == "/fleet/sync" {
+            return self.handle_fleet_sync();
+        }
+
         if request.method == "POST" && request.path == "/fleet/nodes" {
             return self.handle_remote_node_upsert(request, None);
         }

@@ -130,9 +130,12 @@ mod settings;
 #[cfg(test)]
 mod tests;
 
-use candidate_refresh::{CandidateRefreshOutcome, refresh_candidate_for_target_advancement};
 #[cfg(test)]
-use candidate_refresh::{refresh_candidate_with_resolver, workflow_conflict_resolution_enabled};
+use candidate_refresh::workflow_conflict_resolution_enabled;
+use candidate_refresh::{
+    CandidateRefreshOutcome, refresh_candidate_for_target_advancement,
+    refresh_candidate_with_resolver, workflow_conflict_resolver,
+};
 use execution_context::{
     agent_worktree_cwd, authored_workflow_commitment, hydrate_plan_or_implement_context,
     hydrate_retry_context, implementation_branch_name,

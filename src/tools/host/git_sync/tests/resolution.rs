@@ -6,14 +6,20 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 use crate::tools::git::resolve::{
-    ResolutionRequest, ResolverOutcome, ScriptedResolver, ScriptedStep, install_resolver_override,
+    CONTENTION_ATTEMPT_LIMIT, ResolutionRequest, ResolverOutcome, ScriptedResolver, ScriptedStep,
+    install_resolver_override,
 };
 
 const SHARED_STATE: &str = "shared/state.json";
 const SHARED_TREE_PATH: &str = ".refine/shared/state.json";
+const SECOND_STATE: &str = "second/state.json";
 
 fn write_shared(root: &Path, bytes: &str) {
-    let destination = refine_dir_for_target_root(root).unwrap().join(SHARED_STATE);
+    write_record(root, SHARED_STATE, bytes);
+}
+
+fn write_record(root: &Path, relative: &str, bytes: &str) {
+    let destination = refine_dir_for_target_root(root).unwrap().join(relative);
     fs::create_dir_all(destination.parent().unwrap()).unwrap();
     fs::write(destination, bytes).unwrap();
 }
@@ -45,6 +51,40 @@ fn completing(edit: impl FnMut(&ResolutionRequest<'_>) + Send + 'static) -> Scri
 
 fn resolve_refs(root: &Path) -> String {
     git_stdout(root, &["for-each-ref", "refs/refine/resolve"])
+}
+
+fn contention_refs(root: &Path) -> Vec<String> {
+    git_stdout(
+        root,
+        &[
+            "for-each-ref",
+            "--format=%(refname)",
+            "refs/refine/contention",
+        ],
+    )
+    .lines()
+    .map(str::to_string)
+    .collect()
+}
+
+/// A resolver step that counts the call and answers the same way every time —
+/// the spend meter every contention scenario reads.
+fn counting(calls: &Arc<AtomicU32>, answer: fn() -> ResolverOutcome) -> ScriptedStep {
+    let counted = Arc::clone(calls);
+    Box::new(move |_request: &ResolutionRequest<'_>| {
+        counted.fetch_add(1, Ordering::SeqCst);
+        Ok(answer())
+    })
+}
+
+/// A script of `count` identical counted steps: more than any bounded run may
+/// spend, so an unbounded one is measured rather than cut short.
+fn counting_script(
+    calls: &Arc<AtomicU32>,
+    count: usize,
+    answer: fn() -> ResolverOutcome,
+) -> Vec<ScriptedStep> {
+    (0..count).map(|_| counting(calls, answer)).collect()
 }
 
 #[test]
@@ -362,4 +402,213 @@ fn a_raced_resolution_re_derives_once_and_publishes_the_second() {
     assert!(resolve_refs(&fixture.b).is_empty());
     fixture.service(&fixture.a).sync().unwrap();
     assert_eq!(read_shared(&fixture.a), "{\"node\":\"final-merge\"}\n");
+}
+
+/// A standing escalation survives the node that keeps working. Every pass
+/// snapshots live state, so a node still writing records mints a NEW local
+/// head — a genuinely new divergence id — while nothing the question asked
+/// about has moved: the remote side is unchanged and the same record is still
+/// contested. Keyed on the divergence, that churn handed the same unanswered
+/// question back to the agent on every pass, forever, and overwrote the
+/// agent's words with the generic headline on the way. Keyed on the
+/// contention, the question is neither re-asked nor replaced.
+#[test]
+fn live_writes_do_not_re_ask_a_standing_escalation() {
+    const QUESTION: &str = "shared/state.json: this node calls it live and another calls it remote; which reading holds?";
+    fn escalate() -> ResolverOutcome {
+        ResolverOutcome::NeedsDecision {
+            question: QUESTION.to_string(),
+        }
+    }
+    let fixture = contested_fixture("resolve-standing-live-writes");
+    let service = fixture.service(&fixture.b);
+    let calls = Arc::new(AtomicU32::new(0));
+    let _guard = install_resolver_override(
+        &fixture.b,
+        Arc::new(ScriptedResolver::new(counting_script(&calls, 8, escalate))),
+    );
+
+    for pass in 0..5 {
+        // The daemon keeps advancing live state while the question stands.
+        write_shared(&fixture.b, &format!("{{\"node\":\"live-{pass}\"}}\n"));
+        let error = service.sync().unwrap_err().to_string();
+        assert!(error.contains(QUESTION), "pass {pass}: {error}");
+    }
+
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        1,
+        "a live write is not new evidence: the standing question must not be re-asked"
+    );
+    let report = latest_state_sync_conflict_report(&fixture.b.join("run"))
+        .unwrap()
+        .expect("the escalation keeps its report");
+    assert_eq!(report.decision_question.as_deref(), Some(QUESTION));
+    assert!(resolve_refs(&fixture.b).is_empty());
+}
+
+/// The contention budget bounds what a divergence with NO standing question
+/// can spend. An engagement that answers nothing — an uninstalled agent, a
+/// resolution superseded before it published — leaves the escalation guard
+/// with nothing to hold, so the per-contended-record budget is what stops a
+/// live-writing node from buying an agent attempt every pass. The hold is not
+/// a fence: the conflict report stands, and one authority run converges.
+#[test]
+fn sustained_contention_bounds_resolution_attempts() {
+    fn unavailable() -> ResolverOutcome {
+        ResolverOutcome::Unavailable
+    }
+    let fixture = contested_fixture("resolve-contention-budget");
+    let service = fixture.service(&fixture.b);
+    let calls = Arc::new(AtomicU32::new(0));
+    let _guard = install_resolver_override(
+        &fixture.b,
+        Arc::new(ScriptedResolver::new(counting_script(
+            &calls,
+            8,
+            unavailable,
+        ))),
+    );
+
+    for pass in 0..6 {
+        write_shared(&fixture.b, &format!("{{\"node\":\"live-{pass}\"}}\n"));
+        service.sync().unwrap_err();
+    }
+
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        CONTENTION_ATTEMPT_LIMIT,
+        "one contended record buys a bounded number of attempts against one remote head"
+    );
+    // Bounded durable accounting: one ref per attempt bought, and nothing
+    // else left behind.
+    assert_eq!(
+        contention_refs(&fixture.b).len(),
+        CONTENTION_ATTEMPT_LIMIT as usize
+    );
+    assert!(resolve_refs(&fixture.b).is_empty());
+    // The hold leaves the question — here the fail-closed headline — on file
+    // and the operator's answer immediate.
+    assert!(
+        latest_state_sync_conflict_report(&fixture.b.join("run"))
+            .unwrap()
+            .is_some()
+    );
+    let run = service
+        .run_state_recovery(StateRecoveryDecision::uniform(StateRecoveryAuthority::Live))
+        .unwrap();
+    assert!(run.ok && run.recovered, "{run:#?}");
+    assert_eq!(read_shared(&fixture.b), "{\"node\":\"live-5\"}\n");
+    fixture.service(&fixture.a).sync().unwrap();
+    assert_eq!(read_shared(&fixture.a), "{\"node\":\"live-5\"}\n");
+}
+
+/// The one property that separates a budget from a fence: the budget is per
+/// contended RECORD, so a record newly dragged into the contention is decided
+/// at once even while another record next to it is held. Without this, a busy
+/// node's first conflict on a new record would be fenced by a budget spent on
+/// an unrelated one.
+#[test]
+fn a_newly_contended_record_engages_while_another_is_held() {
+    fn unavailable() -> ResolverOutcome {
+        ResolverOutcome::Unavailable
+    }
+    let fixture = SyncFixture::new("resolve-contention-second-record");
+    // Both nodes share a baseline for both records.
+    write_shared(&fixture.a, "{\"node\":\"base\"}\n");
+    write_record(&fixture.a, SECOND_STATE, "{\"node\":\"base\"}\n");
+    fixture.service(&fixture.a).sync().unwrap();
+    fixture.service(&fixture.b).sync().unwrap();
+    // Node A changes both and publishes once; the remote head then stays put,
+    // so nothing about the side that needs deciding moves for the rest of the
+    // test.
+    write_shared(&fixture.a, "{\"node\":\"remote\"}\n");
+    write_record(&fixture.a, SECOND_STATE, "{\"node\":\"remote\"}\n");
+    fixture.service(&fixture.a).sync().unwrap();
+
+    let service = fixture.service(&fixture.b);
+    let calls = Arc::new(AtomicU32::new(0));
+    let _guard = install_resolver_override(
+        &fixture.b,
+        Arc::new(ScriptedResolver::new(counting_script(
+            &calls,
+            8,
+            unavailable,
+        ))),
+    );
+
+    // One contended record spends its whole budget and holds.
+    for pass in 0..4 {
+        write_shared(&fixture.b, &format!("{{\"node\":\"live-{pass}\"}}\n"));
+        service.sync().unwrap_err();
+    }
+    assert_eq!(calls.load(Ordering::SeqCst), CONTENTION_ATTEMPT_LIMIT);
+    assert_eq!(
+        contention_refs(&fixture.b).len(),
+        CONTENTION_ATTEMPT_LIMIT as usize
+    );
+
+    // A second record is now contested against that same unmoved remote head.
+    write_record(&fixture.b, SECOND_STATE, "{\"node\":\"live\"}\n");
+    service.sync().unwrap_err();
+
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        CONTENTION_ATTEMPT_LIMIT + 1,
+        "a record contended for the first time brings its own budget with it"
+    );
+    assert_eq!(
+        contention_refs(&fixture.b).len(),
+        CONTENTION_ATTEMPT_LIMIT as usize + 1,
+        "the new record bought one attempt; the held record bought nothing more"
+    );
+    // Still not a fence: the report stands and one authority run converges.
+    let run = service
+        .run_state_recovery(StateRecoveryDecision::uniform(StateRecoveryAuthority::Live))
+        .unwrap();
+    assert!(run.ok && run.recovered, "{run:#?}");
+    assert_eq!(read_shared(&fixture.b), "{\"node\":\"live-3\"}\n");
+}
+
+/// A moved remote side is the change that genuinely needs deciding again: the
+/// budget is keyed on it, so the next pass engages the resolver immediately
+/// even though this node's contention was held a moment earlier.
+#[test]
+fn a_moved_remote_side_re_engages_a_held_contention() {
+    fn unavailable() -> ResolverOutcome {
+        ResolverOutcome::Unavailable
+    }
+    let fixture = contested_fixture("resolve-contention-remote-moved");
+    let service = fixture.service(&fixture.b);
+    let calls = Arc::new(AtomicU32::new(0));
+    let mut steps = counting_script(&calls, CONTENTION_ATTEMPT_LIMIT as usize, unavailable);
+    let counted = Arc::clone(&calls);
+    steps.push(completing(move |request| {
+        counted.fetch_add(1, Ordering::SeqCst);
+        fs::write(
+            request.workspace_dir.join(SHARED_TREE_PATH),
+            "{\"node\":\"merged\"}\n",
+        )
+        .unwrap();
+    }));
+    let _guard = install_resolver_override(&fixture.b, Arc::new(ScriptedResolver::new(steps)));
+
+    for pass in 0..4 {
+        write_shared(&fixture.b, &format!("{{\"node\":\"live-{pass}\"}}\n"));
+        service.sync().unwrap_err();
+    }
+    assert_eq!(calls.load(Ordering::SeqCst), CONTENTION_ATTEMPT_LIMIT);
+
+    // The other node publishes: the side that needs deciding moved.
+    write_shared(&fixture.a, "{\"node\":\"remote-2\"}\n");
+    fixture.service(&fixture.a).sync().unwrap();
+
+    let result = service.sync().unwrap();
+
+    assert!(result.ok && result.pushed, "{result:#?}");
+    assert_eq!(calls.load(Ordering::SeqCst), CONTENTION_ATTEMPT_LIMIT + 1);
+    assert_eq!(read_shared(&fixture.b), "{\"node\":\"merged\"}\n");
+    // The budget bought against the superseded remote head is swept with it.
+    assert_eq!(contention_refs(&fixture.b).len(), 1);
+    assert!(resolve_refs(&fixture.b).is_empty());
 }

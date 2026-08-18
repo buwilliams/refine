@@ -48,7 +48,7 @@ pub use conflict_report::{
     StateSyncConflictPath, StateSyncConflictPhase, StateSyncConflictReport,
     StateSyncConflictSummary, latest_state_sync_conflict_report,
 };
-use conflict_report::{conflict_path_summary, conflict_report_id};
+use conflict_report::{conflict_path_summary, conflict_report_id, contended_records};
 pub use recovery::{
     StateRecoveryAuthority, StateRecoveryDecision, StateRecoveryOverride, StateRecoveryPreview,
     StateRecoveryResult, StateRecoveryRunPolicy, StateRecoveryRunResult,

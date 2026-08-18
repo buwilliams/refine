@@ -6,9 +6,10 @@ use std::sync::Arc;
 use super::service::{OUTSIDE_STATE_CONFLICT_SUMMARY, StateSyncPass};
 use crate::tools::git::resolve::{
     ConflictResolver, ConflictedPath, InstalledAgentResolver, PreparedResolution, ResolutionLock,
-    ResolutionOutcome, StateFileGates, conflict_sides, materialize_conflicted_workspace,
-    pin_resolution_inputs, resolve_conflict, resolver_override, retire_resolution,
-    state_conflict_block, state_conflict_context, sweep_abandoned_resolutions,
+    ResolutionOutcome, StateFileGates, buy_contention_attempt, conflict_sides,
+    contention_budget_available, materialize_conflicted_workspace, pin_resolution_inputs,
+    resolve_conflict, resolver_override, retire_resolution, state_conflict_block,
+    state_conflict_context, surviving_resolution_result, sweep_abandoned_resolutions,
     try_claim_resolution,
 };
 use crate::tools::host::git_worktrees::FileGitWorktreeService;
@@ -261,9 +262,11 @@ impl FileGitSyncService {
     ///
     /// Returns `None` when resolution does not apply: a contested path lies
     /// outside synchronized Refine state, which agent resolution never
-    /// judges, or this exact divergence already escalated with a question
-    /// nobody has answered yet — re-asking an unchanged divergence spends an
-    /// agent to re-derive the question already on file.
+    /// judges; this contention already escalated with a question nobody has
+    /// answered yet — re-asking it spends an agent to re-derive the question
+    /// already on file; or every contended record has spent its contention
+    /// budget against this remote head, so resolution holds until something
+    /// that needs deciding actually changes.
     #[allow(clippy::too_many_arguments)]
     pub(super) fn prepare_state_resolution(
         &self,
@@ -283,7 +286,7 @@ impl FileGitSyncService {
             return Ok(None);
         }
         if self
-            .escalated_decision_question(merge_base, local_head, remote_head, unresolved)
+            .escalated_decision_question(remote_head, unresolved)
             .is_some()
         {
             return Ok(None);
@@ -293,6 +296,29 @@ impl FileGitSyncService {
             .map(|conflict| format!(".refine/{}", conflict.path))
             .collect::<Vec<_>>();
         let report_id = conflict_report_id(merge_base, local_head, remote_head, unresolved);
+        let worktrees =
+            FileGitWorktreeService::with_runtime_root(&self.target_root, &self.runtime_root);
+        let Some(lock) = try_claim_resolution(&worktrees, &report_id)? else {
+            return Ok(Some(StateResolutionHold::Busy { report_id }));
+        };
+        // Everything the claim proves is unowned is finished work: retire it
+        // now, while a lock is held anyway, so no workspace outlives the
+        // divergence it belongs to.
+        let _ = sweep_abandoned_resolutions(&worktrees, self, &self.target_root, &report_id);
+        // A gated result an interrupted run left behind publishes without any
+        // agent, so it is never charged.
+        let publishable = surviving_resolution_result(self, state_root, &report_id)?.is_some();
+        let contended = contended_records(unresolved);
+        if !publishable && !contention_budget_available(self, state_root, remote_head, &contended)?
+        {
+            // Every contended record has spent its budget against this remote
+            // head. Holding is not fencing: the pass still reports the
+            // contention in domain terms, `--authority` and the daemon's
+            // ownership policy still settle it in one command, and movement
+            // on the side that needs deciding re-engages the resolver at once.
+            self.retire_state_resolution(&report_id, Some(&lock));
+            return Ok(None);
+        }
         let pinned = pin_resolution_inputs(
             self,
             state_root,
@@ -307,15 +333,6 @@ impl FileGitSyncService {
                 commit: commit.clone(),
             }));
         }
-        let worktrees =
-            FileGitWorktreeService::with_runtime_root(&self.target_root, &self.runtime_root);
-        let Some(lock) = try_claim_resolution(&worktrees, &report_id)? else {
-            return Ok(Some(StateResolutionHold::Busy { report_id }));
-        };
-        // Everything the claim proves is unowned is finished work: retire it
-        // now, while a lock is held anyway, so no workspace outlives the
-        // divergence it belongs to.
-        let _ = sweep_abandoned_resolutions(&worktrees, self, &self.target_root, &report_id);
         let sides = conflict_sides(self, state_root, &pinned, &tree_paths)?;
         let conflicts = unresolved
             .iter()
@@ -326,6 +343,12 @@ impl FileGitSyncService {
             .collect::<Vec<_>>();
         let workspace = materialize_conflicted_workspace(&worktrees, self, &pinned, &sides)?;
         let context = state_conflict_context(&state_conflict_block(&conflicts, &sides));
+        // The attempt is charged here: everything above can fail the same way
+        // on every pass, and a repeatable preparation failure that spent the
+        // budget would hold a contention no agent has yet been handed. This is
+        // still under lock Hold A and still before the unlocked agent call, so
+        // a crash mid-resolution has already paid for the attempt it started.
+        let _ = buy_contention_attempt(self, state_root, remote_head, &contended)?;
         Ok(Some(StateResolutionHold::Prepared(Box::new(
             PreparedStateResolution {
                 resolution: PreparedResolution {

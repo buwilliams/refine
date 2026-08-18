@@ -478,6 +478,7 @@ fn bootstrap_no_remote() {
     let node = SimulatedNode {
         id: "solo-node",
         target_root,
+        kind: NodeKind::Current,
     };
     write_active_node_identity(&node);
     let relative = goal_record_path("AASOLOGOAL");
@@ -1362,4 +1363,199 @@ fn push_race_retry() {
         assert_eq!(fleet.live_goal_name(node, "CCRACEGOAL"), "v1");
     }
     fleet.assert_committed_versions_reachable(B, &head, "push_race_retry");
+}
+
+/// Sustained contention on a working node: the escalation stands unanswered
+/// while the daemon keeps advancing records, so every pass snapshots a new
+/// local head and the divergence's id genuinely moves — but nothing the
+/// question asked about does. The agent is handed the contention ONCE; each
+/// later pass keeps re-reporting it in the agent's own words instead of
+/// buying a fresh opinion nobody asked for, and one authority run still
+/// converges the fleet.
+#[test]
+fn standing_escalation_survives_a_working_node() {
+    const QUESTION: &str = "goal AASTANDING: this node renamed it and another renamed it differently; which name holds?";
+    fn escalate() -> ResolverOutcome {
+        ResolverOutcome::NeedsDecision {
+            question: QUESTION.to_string(),
+        }
+    }
+    let mut fleet = SimulatedFleet::new("standing-escalation-working", NODE_IDS);
+    let outcomes = fleet.run(&[
+        Event::LiveWrite {
+            node: A,
+            goal_id: "AASTANDING",
+            mutation: "base",
+        },
+        Event::Sync { node: A },
+        Event::Sync { node: B },
+        Event::LiveWrite {
+            node: A,
+            goal_id: "AASTANDING",
+            mutation: "a-edit",
+        },
+        Event::Sync { node: A },
+    ]);
+    outcomes[4].sync_ok("publishing a-edit");
+
+    let calls = Arc::new(AtomicU32::new(0));
+    fleet.install_resolver(B, counting_script(&calls, 12, escalate));
+    // Five passes, each preceded by the record advancing again on this node:
+    // the local head — and the divergence id with it — moves every time.
+    let mut report_ids = Vec::new();
+    for mutation in ["b-1", "b-2", "b-3", "b-4", "b-5"] {
+        let outcomes = fleet.run(&[
+            Event::LiveWrite {
+                node: B,
+                goal_id: "AASTANDING",
+                mutation,
+            },
+            Event::Sync { node: B },
+        ]);
+        let error = outcomes[1]
+            .sync_err("contested sync under live writes")
+            .to_string();
+        assert!(
+            error.contains(QUESTION),
+            "every pass must re-report the agent's own question: {error}"
+        );
+        let report = fleet
+            .latest_report(B)
+            .expect("the escalation keeps a conflict report");
+        assert_eq!(report.decision_question.as_deref(), Some(QUESTION));
+        report_ids.push(report.report_id);
+    }
+
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        1,
+        "a live write is not new evidence: sustained contention must not buy sustained agent spend"
+    );
+    assert_ne!(
+        report_ids.first(),
+        report_ids.last(),
+        "the divergence itself really did move under the standing question: {report_ids:?}"
+    );
+    assert!(
+        fleet.resolve_ref_names(B).is_empty(),
+        "the escalated resolution leaves no pinned operands behind"
+    );
+    assert!(
+        fleet.resolve_workspace_names(B).is_empty(),
+        "no workspace outlives the divergence it belongs to: {:?}",
+        fleet.resolve_workspace_names(B)
+    );
+
+    let outcomes = fleet.run(&[
+        Event::RecoveryRun {
+            node: B,
+            authority: StateRecoveryAuthority::Live,
+        },
+        Event::Sync { node: A },
+        Event::Sync { node: C },
+    ]);
+    let recovered = outcomes[0].recovery_ok("authority run over a held contention");
+    assert!(recovered.ok && recovered.recovered, "{recovered:#?}");
+    outcomes[1].sync_ok("converging sync a");
+    outcomes[2].sync_ok("converging sync c");
+    let head = fleet.assert_converged("standing_escalation_survives_a_working_node");
+    for node in [A, B, C] {
+        assert_eq!(fleet.live_goal_name(node, "AASTANDING"), "b-5");
+    }
+    fleet.assert_committed_versions_reachable(
+        B,
+        &head,
+        "standing_escalation_survives_a_working_node",
+    );
+}
+
+/// The contention budget bounds a divergence that escalates with NO question
+/// to stand on — an uninstalled agent answers every invocation the same way,
+/// so nothing above it holds. Spend stops after the contended record's
+/// budget; the hold is not a fence, and the daemon's automatic ownership
+/// policy converges the fleet exactly as it would have on the first pass.
+#[test]
+fn contention_budget_holds_without_fencing_auto_recovery() {
+    fn unavailable() -> ResolverOutcome {
+        ResolverOutcome::Unavailable
+    }
+    let mut fleet = SimulatedFleet::new("contention-budget-auto", NODE_IDS);
+    let outcomes = fleet.run(&[
+        Event::LiveWriteOwned {
+            node: A,
+            goal_id: "BBBUDGET",
+            name: "base",
+            owner: "node-b",
+        },
+        Event::Sync { node: A },
+        Event::Sync { node: B },
+        Event::LiveWriteOwned {
+            node: A,
+            goal_id: "BBBUDGET",
+            name: "a-edit",
+            owner: "node-b",
+        },
+        Event::Sync { node: A },
+    ]);
+    outcomes[4].sync_ok("publishing a-edit");
+
+    let calls = Arc::new(AtomicU32::new(0));
+    fleet.install_resolver(B, counting_script(&calls, 12, unavailable));
+    for name in ["b-1", "b-2", "b-3", "b-4", "b-5", "b-6"] {
+        let outcomes = fleet.run(&[
+            Event::LiveWriteOwned {
+                node: B,
+                goal_id: "BBBUDGET",
+                name,
+                owner: "node-b",
+            },
+            Event::Sync { node: B },
+        ]);
+        outcomes[1].sync_err("contested sync under live writes");
+    }
+
+    assert_eq!(
+        calls.load(Ordering::SeqCst),
+        CONTENTION_ATTEMPT_LIMIT,
+        "one contended record buys a bounded number of attempts against one remote head"
+    );
+    let report = fleet
+        .latest_report(B)
+        .expect("a held contention still reports what needs deciding");
+    assert!(
+        report.decision_question.is_none(),
+        "an unavailable resolver never mints a question: {report:#?}"
+    );
+    assert!(
+        fleet.resolve_ref_names(B).is_empty(),
+        "a held contention leaves no pinned operands behind"
+    );
+    assert!(
+        fleet.resolve_workspace_names(B).is_empty(),
+        "a held contention materializes no workspace: {:?}",
+        fleet.resolve_workspace_names(B)
+    );
+
+    // The daemon's fall-through policy is untouched by the hold: the same
+    // merge-base ownership decision the runner computes settles it.
+    let decision = fleet.nodes[B]
+        .service()
+        .merge_base_ownership_decision(&report, "node-b");
+    let run = fleet.nodes[B]
+        .service()
+        .run_state_recovery(decision)
+        .unwrap();
+    assert!(run.ok && run.recovered, "{run:#?}");
+
+    let outcomes = fleet.run(&[Event::Sync { node: A }, Event::Sync { node: C }]);
+    outcomes[0].sync_ok("converging sync a");
+    outcomes[1].sync_ok("converging sync c");
+    fleet.assert_converged("contention_budget_holds_without_fencing_auto_recovery");
+    for node in [A, B, C] {
+        assert_eq!(
+            fleet.live_goal_name(node, "BBBUDGET"),
+            "b-6",
+            "merge-base ownership keeps the owning node's work"
+        );
+    }
 }

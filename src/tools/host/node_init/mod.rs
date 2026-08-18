@@ -98,6 +98,20 @@ pub fn initialize_worker(options: WorkerInitOptions) -> RefineResult<serde_json:
                     );
                 }
             }
+            match crate::tools::git::merge::ensure_supported_git() {
+                Ok(()) => record(
+                    &mut steps,
+                    "verify_git_version",
+                    true,
+                    &crate::tools::git::merge::host_git_version()
+                        .map(|version| version.to_string())
+                        .unwrap_or_default(),
+                ),
+                Err(error) => {
+                    ok = false;
+                    record(&mut steps, "verify_git_version", false, &error.to_string());
+                }
+            }
             match HostAgentProviderService::new().detect() {
                 Ok(capabilities) => {
                     let installed = capabilities

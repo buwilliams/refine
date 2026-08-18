@@ -22,9 +22,9 @@ impl Drop for DisposableCheckout {
     }
 }
 
-fn stale_recovery(reason: &str) -> RefineError {
+fn raced_recovery(reason: &str) -> RefineError {
     RefineError::StateRecoveryConflict {
-        reason: crate::process::supervisor::errors::StateRecoveryConflictReason::StalePreview,
+        reason: crate::process::supervisor::errors::StateRecoveryConflictReason::StateMoved,
         message: format!("State recovery lost a race because {reason}; rerun the command."),
     }
 }

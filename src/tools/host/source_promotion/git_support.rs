@@ -133,6 +133,10 @@ pub(super) fn append_error_context(error: RefineError, context: &str) -> RefineE
         stale @ RefineError::StaleCandidate { .. } => {
             RefineError::Conflict(append(stale.to_string()))
         }
+        // An unsupported Git is a precondition of the node, not a fact about
+        // this candidate, so it travels unchanged rather than collecting
+        // cleanup context that would misdirect the operator.
+        unsupported @ RefineError::UnsupportedGitVersion { .. } => unsupported,
         advanced @ RefineError::TargetAdvanced { .. } => {
             RefineError::Conflict(append(advanced.to_string()))
         }

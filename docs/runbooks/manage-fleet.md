@@ -24,6 +24,12 @@ claim an operation succeeded until the fleet readback shows it.
   not infer publication from local state alone.
 - The target repository is reachable from every worker, including credentials
   for a private repository. Interactive Git prompting is disabled on workers.
+- **Git 2.42 or newer on every node.** Refine's state merge is `git
+  merge-tree`, so a node with an older Git cannot synchronize at all: its
+  daemon refuses to start with a message naming the required and observed
+  versions, and `refine fleet sync` reports it as `unsupported_git`. Upgrading
+  Git on that node is the whole fix, and the rest of the fleet keeps
+  converging in the meantime.
 - For any machine you create or destroy, the user has approved the
   infrastructure, account, size, and expected cost.
 
@@ -47,7 +53,8 @@ refine node list
 refine next
 ```
 
-`refine fleet list` reports each node's enablement, connection, and health.
+`refine fleet list` reports each node's enablement, connection, and health —
+including `pending_upgrade` for a node that has not been upgraded yet.
 `refine next` recommends the next fleet operations with exact commands.
 
 ## Add a worker
@@ -128,8 +135,54 @@ Goal by Goal:
    limits and Feature ordering.
 3. Apply each assignment: `refine fleet transfer <node-id> <goal-id>`.
 4. Publish the new ownership so every node observes it: `refine fleet sync`.
+   Its per-node statuses say which nodes were asked and what each answered —
+   `queued` is that node's receipt for the request, not proof it has already
+   reconciled. A node reported `pending_upgrade` still received the ownership
+   change through `refine/state`.
 5. Read back `refine fleet list` and `refine goal list`, and report the
    resulting placement to the user.
+
+## Upgrade the fleet
+
+Upgrade nodes **one at a time, in any order**. There is no fleet-wide upgrade
+step, no window in which every node must be on the same build, and no need to
+stop the fleet. Each node is upgraded by following
+[the install runbook](install.md) on that node; a node's CLI and daemon are one
+binary, so upgrading a node upgrades both at once and no node is ever running a
+mixture.
+
+While a rollout is in progress the fleet is mixed, and that is a supported
+state:
+
+- Synchronization keeps converging. Upgraded and not-yet-upgraded nodes publish
+  to the same `refine/state` branch and each reads the other's commits; neither
+  deletes nor loses the other's records.
+- `refine fleet sync` reports one status per node and succeeds. A node whose
+  daemon is still on the previous API contract is reported as
+  `pending_upgrade`, with the contract version it speaks and the one this node
+  speaks. The rest of the fleet still syncs. The statuses are that command's
+  output, not a rewrite of the fleet's registry: `refine fleet list` keeps
+  showing each node's provisioning health, which no sync answer changes.
+- A `pending_upgrade` node keeps its work and keeps receiving distributed work.
+  It is a working node whose turn has not come, not a broken one.
+
+To roll out:
+
+1. Pick a node and check the fleet first: `refine fleet list`.
+2. Upgrade that node and restart its daemon on the same port.
+3. Confirm from the control machine: `refine fleet sync`. The upgraded node's
+   status in that output must no longer be `pending_upgrade`. That answer is
+   what proves the build changed; the node's own reconciliation is reported by
+   that node, through its own `refine sync` and its state-sync health.
+4. Repeat for the next node. Stop and report if a node's status becomes
+   `failed` or stays `unreachable` after its daemon is back. A node reported
+   `unsupported_git` needs its Git upgraded to 2.42 or newer before it can
+   sync; like `pending_upgrade` it is that node's own condition and does not
+   hold up the rest of the rollout.
+
+Do not treat `pending_upgrade` on the nodes you have not reached yet as a
+failure, and do not "fix" it by editing synchronized state, forcing a sync, or
+upgrading everything at once.
 
 ## Retire a worker
 

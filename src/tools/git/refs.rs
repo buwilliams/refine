@@ -55,34 +55,6 @@ impl FileGitWorktreeService {
         Err(RefineError::Conflict(message))
     }
 
-    /// Delete only the exact Refine-owned remote ref previously inspected.
-    ///
-    /// The force-with-lease is a compare-and-delete fence, not a history
-    /// rewrite: if another process advances the branch, Git rejects deletion.
-    pub fn delete_remote_branch_if_matches(
-        &self,
-        remote: &str,
-        branch: &str,
-        expected_commit: &str,
-    ) -> RefineResult<()> {
-        validate_branch_name(branch)?;
-        validate_commitish(expected_commit)?;
-        let reference = format!("refs/heads/{branch}");
-        let lease = format!("--force-with-lease={reference}:{expected_commit}");
-        let deletion = format!(":{reference}");
-        self.git_output(&["push", &lease, remote, &deletion])?;
-        self.audit(
-            "remote_branch_delete",
-            "ok",
-            json!({
-                "remote": remote,
-                "branch": branch,
-                "expected_commit": expected_commit,
-                "exact_sha_fence": true
-            }),
-        )
-    }
-
     /// Atomically compare both advertised refs and delete only the branch.
     ///
     /// The target refspec is intentionally a no-op when the snapshot still

@@ -40,12 +40,40 @@ Current implementation details that matter to intent:
 - normal target-state mutations are routed to the daemon instead of directly writing files in normal operation.
 - `sync` is the single top-level state-convergence command; it replaced
   `project sync` and the `project state-recovery` subtree with no aliases.
-  Daemon-routed `sync` and `fleet sync` follow their durable operation
-  through success, failure, cancellation, interruption, or timeout. Success
-  prints the terminal structured result; every other terminal outcome is
-  nonzero and retains the structured reconciler error, the stable conflict
-  report id, the node-local report path, and per-path domain-terms summaries
-  instead of returning an initial `running` receipt.
+  That replacement is per node, not per fleet: a node's CLI and daemon are one
+  binary, so the retired spellings and the routes behind them disappear
+  together on the node being upgraded while every other node keeps its own.
+  Daemon-routed `sync`, and the local leg of `fleet sync`, follow their
+  durable operation through success, failure, cancellation, interruption, or
+  timeout. Success prints the terminal structured result; every other terminal
+  outcome is nonzero and retains the structured reconciler error, the stable
+  conflict report id, the node-local report path, and per-path domain-terms
+  summaries instead of returning an initial `running` receipt.
+- `fleet sync` is this node's own `sync` plus one status per other node,
+  asked over each node's daemon API. A node still on the previous build
+  rejects this build's API contract version and is reported as that node's
+  `pending upgrade`, carrying both contract versions; the rest of the fleet
+  still syncs and the command still succeeds. Nodes are upgraded one at a
+  time and in any order, so the condition is normal during a rollout rather
+  than a fleet failure — and it never withholds work from the node, which
+  keeps running its own build. A node whose Git is older than the one the
+  state merge requires is reported the same way, as that node's
+  `unsupported_git`: it cannot merge state at all until its Git is upgraded,
+  and that is one node's condition rather than the fleet's.
+  Unreachable and error answers stay per-node
+  conditions in the same way: no answer from another node's daemon changes
+  that node's recorded health, which is its provisioning verdict and the one
+  thing that withholds work from it. The statuses are this pass's own
+  observation and stay in this pass's output rather than being published to
+  the fleet, because whether one node can reach another is a fact about that
+  link and not shared truth. The other nodes' statuses are reported even when
+  this node's own `sync` fails: a standing conflict here is this node's
+  condition, and a rollout check must still be able to read the fleet.
+  What a reached node answers is a receipt — it `queued` its own pass — not a
+  verdict on its reconciliation, which that node runs under its own lock and
+  reports on its own sync surface and state-sync health. Following each node's
+  pass from here would hold the whole fan-out behind one node's agent
+  resolution, which takes minutes by design.
 - `sync --preview` is a read-only divergence summary — classification, both
   heads and the merge base, per-path sides, a domain-terms summary per
   contested path, and the recorded `decision_question` when a conflict report

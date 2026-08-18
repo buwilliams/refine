@@ -160,12 +160,40 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                     target_root: Some(target_root),
                 },
         } => {
-            let runtime_root = refine_dir_for_target_root(&target_root)?.join("runtime");
-            let sync = FileGitSyncService::new(&target_root, runtime_root)
+            let refine_dir = refine_dir_for_target_root(&target_root)?;
+            let runtime_root = refine_dir.join("runtime");
+            // This node synchronized in-process; every other node is asked
+            // over its daemon API and reports its own status. A node still on
+            // the previous build is one node's pending upgrade, so the pass
+            // continues and the command succeeds.
+            let sync = FileGitSyncService::new(&target_root, &runtime_root)
                 .with_agent_resolution()
-                .sync()?;
-            println!("{}", serde_json::to_string_pretty(&sync).unwrap());
-            Ok(())
+                .sync();
+            // The fan-out is not conditional on this node's own pass. A
+            // standing conflict here is this node's condition, and hiding
+            // every other node's status behind it is exactly what a rollout
+            // check must not do.
+            let fleet =
+                FileFleetService::with_runtime_root(&refine_dir, &runtime_root).sync_nodes();
+            match (sync, fleet) {
+                (Ok(sync), Ok(report)) => {
+                    print_json(&fleet_sync_response(
+                        serde_json::to_value(&sync).unwrap(),
+                        json!(report.nodes),
+                        json!(report.pending_upgrade),
+                    ));
+                    Ok(())
+                }
+                (Ok(_), Err(error)) => Err(error),
+                (Err(error), fleet) => {
+                    let (nodes, pending_upgrade, fleet_error) = match fleet {
+                        Ok(report) => (json!(report.nodes), json!(report.pending_upgrade), None),
+                        Err(fleet_error) => (json!([]), json!([]), Some(fleet_error.to_string())),
+                    };
+                    print_fleet_statuses_for_failed_local_sync(nodes, pending_upgrade, fleet_error);
+                    Err(error)
+                }
+            }
         }
         Commands::Fleet {
             action:
@@ -410,7 +438,41 @@ pub(super) fn dispatch_fleet_daemon(action: FleetAction) -> RefineResult<()> {
             })
         }
         FleetAction::Sync { target_root: None } => {
-            follow_daemon_operation(daemon_json("POST", "/sync", None)?)?
+            // This node's own pass first, then the fleet fan-out: one node
+            // that has not been upgraded yet is reported as that node's
+            // pending upgrade, never as a failure of the command. The fan-out
+            // runs whatever this node's own pass did — a standing conflict
+            // here is this node's condition, and it must not hide every other
+            // node's status from a rollout check.
+            let sync = follow_daemon_operation(daemon_json("POST", "/sync", None)?);
+            let fleet = daemon_json("POST", "/fleet/sync", None);
+            let statuses = |fleet: &serde_json::Value| {
+                (
+                    fleet.get("nodes").cloned().unwrap_or_else(|| json!([])),
+                    fleet
+                        .get("pending_upgrade")
+                        .cloned()
+                        .unwrap_or_else(|| json!([])),
+                )
+            };
+            match (sync, fleet) {
+                (Ok(sync), Ok(fleet)) => {
+                    let (nodes, pending_upgrade) = statuses(&fleet);
+                    fleet_sync_response(sync, nodes, pending_upgrade)
+                }
+                (Ok(_), Err(error)) => return Err(error),
+                (Err(error), fleet) => {
+                    let (nodes, pending_upgrade, fleet_error) = match fleet {
+                        Ok(fleet) => {
+                            let (nodes, pending_upgrade) = statuses(&fleet);
+                            (nodes, pending_upgrade, None)
+                        }
+                        Err(fleet_error) => (json!([]), json!([]), Some(fleet_error.to_string())),
+                    };
+                    print_fleet_statuses_for_failed_local_sync(nodes, pending_upgrade, fleet_error);
+                    return Err(error);
+                }
+            }
         }
         other => {
             return Err(RefineError::NotImplemented(format!(
@@ -420,6 +482,26 @@ pub(super) fn dispatch_fleet_daemon(action: FleetAction) -> RefineResult<()> {
     };
     print_json(&response);
     Ok(())
+}
+
+/// Print what the fan-out saw beside a failed local pass, then let the local
+/// failure end the command. The fan-out's own failure, when it also failed,
+/// is named here rather than dropped — this is the only place both can be
+/// reported at once, since the returned error is the local one.
+fn print_fleet_statuses_for_failed_local_sync(
+    nodes: serde_json::Value,
+    pending_upgrade: serde_json::Value,
+    fleet_error: Option<String>,
+) {
+    let mut response = json!({
+        "ok": false,
+        "nodes": nodes,
+        "pending_upgrade": pending_upgrade
+    });
+    if let Some(fleet_error) = fleet_error {
+        response["fleet_error"] = json!(fleet_error);
+    }
+    print_json(&response);
 }
 
 #[allow(clippy::too_many_arguments)]

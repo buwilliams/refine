@@ -119,6 +119,14 @@ fn fleet_commands_use_shared_fleet_service() {
         .unwrap(),
     )
     .unwrap();
+    // `fleet sync` asks every other node's daemon to sync; this suite has no
+    // fleet to reach, so the transport is stubbed instead of dialled.
+    let _daemons = install_node_daemon_client(
+        &refine_dir,
+        std::sync::Arc::new(StubNodeDaemon(NodeDaemonReply::Unreachable(
+            "no daemon in tests".to_string(),
+        ))),
+    );
 
     for argv in [
         vec![
@@ -264,6 +272,232 @@ fn fleet_commands_use_shared_fleet_service() {
     assert_eq!(node["archived"], true);
 
     fs::remove_dir_all(temp_root).unwrap();
+}
+
+/// `refine fleet sync` during a rolling upgrade: the node still on the
+/// previous build rejects this build's API contract, and that is reported as
+/// that node's pending upgrade. The command succeeds, this node's own state
+/// still syncs, and the rest of the fleet is still asked.
+#[test]
+fn fleet_sync_reports_a_not_yet_upgraded_node_as_pending_upgrade() {
+    let temp_root = unique_temp_dir("cli-fleet-sync-pending-upgrade");
+    let target_root = temp_root.clone();
+    let refine_dir = target_root.join(".refine");
+    dispatch(
+        Cli::try_parse_from([
+            "refine",
+            "goal",
+            "create",
+            "Fleet Goal",
+            "--target-root",
+            target_root.to_str().unwrap(),
+            "--id",
+            "GOAL1",
+        ])
+        .unwrap(),
+    )
+    .unwrap();
+    for id in ["worker-old", "worker-new"] {
+        dispatch(
+            Cli::try_parse_from([
+                "refine",
+                "fleet",
+                "edit-node",
+                id,
+                "--ssh-host",
+                "example.com",
+                "--refine-port",
+                "8082",
+                "--target-root",
+                target_root.to_str().unwrap(),
+            ])
+            .unwrap(),
+        )
+        .unwrap();
+    }
+
+    let _daemons = install_node_daemon_client(
+        &refine_dir,
+        std::sync::Arc::new(PerNodeStubDaemon {
+            pending_upgrade: "worker-old",
+        }),
+    );
+
+    dispatch(
+        Cli::try_parse_from([
+            "refine",
+            "fleet",
+            "sync",
+            "--target-root",
+            target_root.to_str().unwrap(),
+        ])
+        .unwrap(),
+    )
+    .expect("one node awaiting its upgrade must not fail the fleet sync");
+
+    // The per-node statuses are this pass's report, not a rewrite of the
+    // fleet's registry: a node's recorded health is its provisioning verdict
+    // and no sync answer may touch it.
+    let nodes: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(refine_dir.join("nodes.json")).unwrap()).unwrap();
+    for node in nodes["nodes"].as_array().unwrap() {
+        assert!(
+            node["health"].is_null(),
+            "fleet sync must not write node health: {node:#}"
+        );
+    }
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+/// A standing conflict on this node is this node's condition. `fleet sync`
+/// still asks every other node — an operator confirming a rollout must be
+/// able to read the fleet's statuses — and still fails on this node's own
+/// leg afterwards.
+#[test]
+fn fleet_sync_asks_every_node_even_when_this_nodes_own_sync_fails() {
+    let temp_root = unique_temp_dir("cli-fleet-sync-local-failure");
+    let target_root = temp_root.clone();
+    fs::create_dir_all(&target_root).unwrap();
+    for args in [
+        vec!["init", "-q", "-b", "main"],
+        vec!["remote", "add", "origin", "/refine/no/such/remote.git"],
+    ] {
+        let output = std::process::Command::new("git")
+            .args(&args)
+            .current_dir(&target_root)
+            .output()
+            .unwrap();
+        assert!(output.status.success(), "git {args:?} failed");
+    }
+    // A real repository keeps its state outside the checkout, so ask for the
+    // same directory the command will use rather than assuming `.refine`.
+    let refine_dir = crate::tools::host::project_layout::prepare_refine_dir(&target_root).unwrap();
+    dispatch(
+        Cli::try_parse_from([
+            "refine",
+            "goal",
+            "create",
+            "Fleet Goal",
+            "--target-root",
+            target_root.to_str().unwrap(),
+            "--id",
+            "GOAL1",
+        ])
+        .unwrap(),
+    )
+    .unwrap();
+    dispatch(
+        Cli::try_parse_from([
+            "refine",
+            "fleet",
+            "add-node",
+            "worker-1",
+            "--target-root",
+            target_root.to_str().unwrap(),
+        ])
+        .unwrap(),
+    )
+    .unwrap();
+    dispatch(
+        Cli::try_parse_from([
+            "refine",
+            "fleet",
+            "edit-node",
+            "worker-1",
+            "--ssh-host",
+            "example.com",
+            "--refine-port",
+            "8082",
+            "--target-root",
+            target_root.to_str().unwrap(),
+        ])
+        .unwrap(),
+    )
+    .unwrap();
+
+    let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let _daemons = install_node_daemon_client(
+        &refine_dir,
+        std::sync::Arc::new(CountingStubDaemon {
+            calls: calls.clone(),
+        }),
+    );
+
+    let result = dispatch(
+        Cli::try_parse_from([
+            "refine",
+            "fleet",
+            "sync",
+            "--target-root",
+            target_root.to_str().unwrap(),
+        ])
+        .unwrap(),
+    );
+
+    assert!(
+        result.is_err(),
+        "this node's own unreachable remote still fails the command"
+    );
+    assert_eq!(
+        calls.load(std::sync::atomic::Ordering::SeqCst),
+        1,
+        "every other node is asked even when this node's own pass failed"
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+/// Counts the nodes asked, so a fan-out that never happened is visible.
+struct CountingStubDaemon {
+    calls: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+}
+
+impl FleetNodeDaemonClient for CountingStubDaemon {
+    fn sync_node(&self, _node: &crate::model::node::Node) -> NodeDaemonReply {
+        self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        NodeDaemonReply::Answered {
+            status: 202,
+            body: json!({"operation": {"id": "op-1", "status": "running"}}),
+        }
+    }
+}
+
+/// One canned reply for every node.
+struct StubNodeDaemon(NodeDaemonReply);
+
+impl FleetNodeDaemonClient for StubNodeDaemon {
+    fn sync_node(&self, _node: &crate::model::node::Node) -> NodeDaemonReply {
+        self.0.clone()
+    }
+}
+
+/// The named node answers the API-contract gate the way a daemon on the
+/// previous build does; every other node accepts the request.
+struct PerNodeStubDaemon {
+    pending_upgrade: &'static str,
+}
+
+impl FleetNodeDaemonClient for PerNodeStubDaemon {
+    fn sync_node(&self, node: &crate::model::node::Node) -> NodeDaemonReply {
+        if node.id == self.pending_upgrade {
+            return NodeDaemonReply::Answered {
+                status: 426,
+                body: json!({
+                    "error": {
+                        "code": "api_version_mismatch",
+                        "message": "unsupported Refine API contract version"
+                    },
+                    "api_contract_version": "2",
+                    "supported_api_contract_versions": ["2"]
+                }),
+            };
+        }
+        NodeDaemonReply::Answered {
+            status: 200,
+            body: json!({"operation": {"id": "op-1", "status": "running"}}),
+        }
+    }
 }
 
 #[test]

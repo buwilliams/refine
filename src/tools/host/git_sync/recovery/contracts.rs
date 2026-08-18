@@ -61,8 +61,8 @@ pub struct StateRecoveryPreview {
     pub remote_state_head: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub merge_base: Option<String>,
-    /// `converged`, `local_ahead`, `remote_ahead`, `diverged`, `join`, or
-    /// `remote_missing`.
+    /// `converged`, `local_ahead`, `remote_ahead`, `diverged`, `unrelated`,
+    /// `join`, or `remote_missing`.
     pub ancestry: String,
     /// Live records not yet committed to the local state branch; they become
     /// the next pass's local delta.
@@ -77,8 +77,9 @@ pub struct StateRecoveryPreview {
     /// paths an authority decision would settle.
     pub conflicts: Vec<StateSyncConflictPath>,
     /// The domain-terms question agent resolution escalated with for exactly
-    /// this divergence, when one is on file: what is contested and what must
-    /// be chosen.
+    /// this contention — the same remote head and the same contested records
+    /// the sync surface keys on — when one is on file: what is contested and
+    /// what must be chosen.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub decision_question: Option<String>,
     pub detail: String,

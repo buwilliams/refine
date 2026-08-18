@@ -3,7 +3,8 @@ use super::*;
 use super::resolution::{LockAcquisition, StateResolutionHold, StateResolutionSlot};
 use crate::tools::git::ancestry::{Ancestry, classify};
 use crate::tools::git::merge::{
-    TreeOperation, build_tree, commit_tree, empty_tree_id, merge_commits, write_blob,
+    TreeOperation, build_tree, commit_tree, empty_tree_id, ensure_supported_git, merge_commits,
+    write_blob,
 };
 use crate::tools::git::state_driver::{merge_added_state_file, merge_state_file};
 
@@ -226,6 +227,11 @@ impl FileGitSyncService {
                 "Target app is not a Git worktree.",
             )));
         }
+        // The merge IS `git merge-tree`, so an unsupported Git cannot produce a
+        // pass at all. Failing here, typed, gives the operator the version
+        // sentence instead of an unrecognized-option failure from somewhere
+        // deep in the ladder. Cached, so this costs nothing per pass.
+        ensure_supported_git()?;
         let live_refine = prepare_refine_dir(&self.target_root)?;
         self.ensure_local_state_excluded()?;
         self.retire_legacy_baseline()?;
@@ -738,16 +744,12 @@ impl FileGitSyncService {
                         None => {}
                     }
                 }
-                // An escalation already on file for exactly this divergence
-                // keeps its question: a later pass that re-reports the same
-                // contested heads must not replace the agent's words with the
-                // generic headline.
-                let escalated = self.escalated_decision_question(
-                    merge_base,
-                    local_head,
-                    remote_head,
-                    &unresolved,
-                );
+                // An escalation already on file for this contention keeps its
+                // question: a later pass that re-reports the same contested
+                // records against the same remote head must not replace the
+                // agent's words with the generic headline — not even when
+                // this node's own live writes have moved the local head since.
+                let escalated = self.escalated_decision_question(remote_head, &unresolved);
                 let summary = self.record_conflict_report(
                     phase,
                     attempt,
@@ -917,7 +919,9 @@ impl FileGitSyncService {
         remote_head: &str,
         forced: &[(String, String)],
     ) -> RefineResult<(String, Vec<String>, Vec<StateSyncConflictPath>)> {
-        let merged = merge_commits(self, state_root, merge_base, local_head, remote_head)?;
+        // Git finds the merge base itself; `merge_base` stays the driver's
+        // reading base below, where the structural merge needs the bytes.
+        let merged = merge_commits(self, state_root, local_head, remote_head)?;
         let forced = forced.iter().cloned().collect::<BTreeMap<_, _>>();
         let mut operations = Vec::new();
         let mut resolved = Vec::new();
@@ -927,10 +931,7 @@ impl FileGitSyncService {
                 match self.state_bytes_at(state_root, source, path)? {
                     Some(bytes) => {
                         let blob = write_blob(self, state_root, &bytes)?;
-                        operations.push(TreeOperation::Set {
-                            path: path.clone(),
-                            blob,
-                        });
+                        operations.push(TreeOperation::set(path.clone(), blob));
                     }
                     None => operations.push(TreeOperation::Remove { path: path.clone() }),
                 }
@@ -968,10 +969,7 @@ impl FileGitSyncService {
             match driver_merged {
                 Some(bytes) => {
                     let blob = write_blob(self, state_root, &bytes)?;
-                    operations.push(TreeOperation::Set {
-                        path: path.clone(),
-                        blob,
-                    });
+                    operations.push(TreeOperation::set(path.clone(), blob));
                     resolved.push(relative.to_string());
                 }
                 None => unresolved.push(StateSyncConflictPath {

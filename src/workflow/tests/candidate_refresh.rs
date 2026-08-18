@@ -206,14 +206,15 @@ fn attempt_concurrent_refresh(
     context.worktree_path = Some(worktree.display().to_string());
     context.commit = Some(candidate);
     barrier.wait();
-    refresh_candidate_for_target_advancement(&mut context, 5)
+    refresh_candidate_for_target_advancement(&mut context, GoalStatus::Governance, 5)
 }
 
 #[test]
 fn target_advancement_rebases_a_provable_delta_and_records_both_identities() {
     let fixture = RefreshFixture::new(false);
     let mut context = fixture.context();
-    let outcome = refresh_candidate_for_target_advancement(&mut context, 5).unwrap();
+    let outcome =
+        refresh_candidate_for_target_advancement(&mut context, GoalStatus::Governance, 5).unwrap();
     let CandidateRefreshOutcome::Refreshed {
         replacement_candidate,
         ..
@@ -319,6 +320,7 @@ fn authority_loss_after_rebase_restores_the_original_candidate_branch() {
 
     let error = crate::workflow::candidate_refresh::persist_candidate_refresh_or_restore(
         &mut context,
+        &GoalStatus::Governance,
         &worktree_git,
         "refine/GOAL1/round-1",
         fixture.worktree.to_str().unwrap(),
@@ -351,7 +353,8 @@ fn refresh_conflict_aborts_and_queues_one_fenced_recovery_round() {
     let mut context = fixture.context();
     // Resolver disabled (`workflow_conflict_resolution` off): exactly the
     // pre-resolver behavior.
-    let outcome = refresh_candidate_with_resolver(&mut context, 5, None).unwrap();
+    let outcome =
+        refresh_candidate_with_resolver(&mut context, GoalStatus::Governance, 5, None).unwrap();
     assert!(matches!(
         outcome,
         CandidateRefreshOutcome::RecoveryQueued { .. }
@@ -387,7 +390,8 @@ fn refresh_conflict_aborts_and_queues_one_fenced_recovery_round() {
 fn refresh_conflict_records_explicit_exhaustion_without_a_successor_round() {
     let fixture = RefreshFixture::new_with_retry(true, Some(5));
     let mut context = fixture.context();
-    let outcome = refresh_candidate_with_resolver(&mut context, 5, None).unwrap();
+    let outcome =
+        refresh_candidate_with_resolver(&mut context, GoalStatus::Governance, 5, None).unwrap();
     assert!(matches!(
         outcome,
         CandidateRefreshOutcome::RecoveryExhausted { .. }
@@ -489,7 +493,8 @@ fn integration_merge_conflict_exhaustion_fails_with_integration_retry_exhausted(
 fn integration_recovery_uses_the_next_shared_automatic_retry_attempt() {
     let fixture = RefreshFixture::new_with_retry(true, Some(4));
     let mut context = fixture.context();
-    let outcome = refresh_candidate_with_resolver(&mut context, 5, None).unwrap();
+    let outcome =
+        refresh_candidate_with_resolver(&mut context, GoalStatus::Governance, 5, None).unwrap();
     assert!(matches!(
         outcome,
         CandidateRefreshOutcome::RecoveryQueued { .. }
@@ -561,7 +566,9 @@ fn conflicted_refresh_resolves_in_place_without_holding_the_repository_lock() {
         .unwrap();
     })]);
 
-    let outcome = refresh_candidate_with_resolver(&mut context, 5, Some(&resolver)).unwrap();
+    let outcome =
+        refresh_candidate_with_resolver(&mut context, GoalStatus::Governance, 5, Some(&resolver))
+            .unwrap();
 
     let CandidateRefreshOutcome::Refreshed {
         replacement_candidate,
@@ -631,7 +638,9 @@ fn rejected_resolutions_exhaust_the_budget_into_todays_fallback_with_a_question(
         }),
     ]);
 
-    let outcome = refresh_candidate_with_resolver(&mut context, 5, Some(&resolver)).unwrap();
+    let outcome =
+        refresh_candidate_with_resolver(&mut context, GoalStatus::Governance, 5, Some(&resolver))
+            .unwrap();
 
     let CandidateRefreshOutcome::RecoveryQueued { reason, evidence } = outcome else {
         panic!("expected today's recovery fallback");
@@ -677,7 +686,9 @@ fn an_unavailable_resolver_falls_back_immediately_without_more_attempts() {
         Ok(ResolverOutcome::Unavailable)
     }) as ScriptedStep]);
 
-    let outcome = refresh_candidate_with_resolver(&mut context, 5, Some(&resolver)).unwrap();
+    let outcome =
+        refresh_candidate_with_resolver(&mut context, GoalStatus::Governance, 5, Some(&resolver))
+            .unwrap();
 
     assert!(matches!(
         outcome,
@@ -718,7 +729,9 @@ fn a_target_tip_moved_during_resolution_retries_boundedly_then_resolves() {
         .unwrap();
     })]);
 
-    let error = refresh_candidate_with_resolver(&mut context, 5, Some(&resolver)).unwrap_err();
+    let error =
+        refresh_candidate_with_resolver(&mut context, GoalStatus::Governance, 5, Some(&resolver))
+            .unwrap_err();
     let RefineError::TargetAdvanced {
         expected, current, ..
     } = error
@@ -750,7 +763,13 @@ fn a_target_tip_moved_during_resolution_retries_boundedly_then_resolves() {
         )
         .unwrap();
     })]);
-    let outcome = refresh_candidate_with_resolver(&mut context, 5, Some(&retry_resolver)).unwrap();
+    let outcome = refresh_candidate_with_resolver(
+        &mut context,
+        GoalStatus::Governance,
+        5,
+        Some(&retry_resolver),
+    )
+    .unwrap();
     let CandidateRefreshOutcome::Refreshed {
         replacement_candidate,
         target_commit,
@@ -802,7 +821,9 @@ fn an_out_of_scope_edit_is_rejected_before_it_reaches_the_replacement() {
         }),
     ]);
 
-    let outcome = refresh_candidate_with_resolver(&mut context, 5, Some(&resolver)).unwrap();
+    let outcome =
+        refresh_candidate_with_resolver(&mut context, GoalStatus::Governance, 5, Some(&resolver))
+            .unwrap();
 
     let CandidateRefreshOutcome::Refreshed {
         replacement_candidate,
@@ -844,7 +865,9 @@ fn a_declared_decision_escalates_with_the_resolvers_own_question() {
         })
     }) as ScriptedStep]);
 
-    let outcome = refresh_candidate_with_resolver(&mut context, 5, Some(&resolver)).unwrap();
+    let outcome =
+        refresh_candidate_with_resolver(&mut context, GoalStatus::Governance, 5, Some(&resolver))
+            .unwrap();
 
     assert!(matches!(
         outcome,
@@ -876,7 +899,8 @@ fn an_interrupted_rebase_is_aborted_before_the_recovery_round_is_queued() {
     assert!(worktree_git.operation_in_progress().unwrap());
     let mut context = fixture.context();
 
-    let outcome = refresh_candidate_with_resolver(&mut context, 5, None).unwrap();
+    let outcome =
+        refresh_candidate_with_resolver(&mut context, GoalStatus::Governance, 5, None).unwrap();
 
     let CandidateRefreshOutcome::RecoveryQueued { evidence, .. } = outcome else {
         panic!("expected the recovery fallback");

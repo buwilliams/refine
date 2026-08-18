@@ -7,8 +7,7 @@ use crate::process::supervisor::lifecycle::DaemonStatus;
 use crate::tools::host::checkout::RefineCheckoutPaths;
 use crate::tools::product::project_projection::ProjectionSnapshot;
 
-// 3: `/sync` family replaced `/project/sync` and `/project/state-recovery/*`.
-pub const API_CONTRACT_VERSION: &str = "3";
+pub use crate::model::API_CONTRACT_VERSION;
 pub const IDEMPOTENCY_DIR: &str = "idempotency";
 pub const API_EVENTS_FILE: &str = "api-events.jsonl";
 

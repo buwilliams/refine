@@ -42,6 +42,7 @@ function browserRuntime() {
       previewFingerprint: (preview) => dashboardRecoveryFingerprint(preview),
       recoveryReady: () => dashboardRecoveryApplyReady(),
       recoveryPayload: () => dashboardRecoveryApplyPayload(),
+      exceptRecoveryPath: (path, excepted) => dashboardRecoveryToggleException(path, excepted),
       handleRecoveryConflict: (error) => dashboardRecoveryHandleConflict(error),
       recoveryState: () => ({
         phase: dashboardStateRecovery.phase,
@@ -240,7 +241,41 @@ test("authority and exact-preview confirmation are separate and invalidated safe
   assert.equal(runtime.recoveryState().confirmedFingerprint, "");
 });
 
-test("busy retains preview while stale rejection requires a fresh review", () => {
+test("a contested path can be excepted onto the other side and the exception invalidates confirmation", () => {
+  const runtime = browserRuntime();
+  runtime.resetRecovery();
+  const preview = recoveryPreview();
+  preview.conflicts = [
+    ...preview.conflicts,
+    { path: "goals/OTHER/goal.json", summary: "goal OTHER: both nodes changed title" },
+  ];
+  runtime.setRecoveryPreview(preview);
+
+  const html = runtime.renderRecovery(recoveryDashboard());
+  assert.match(html, /data-recovery-exception[\s\S]*goals\/SHARED\/goal\.json/);
+  assert.match(html, /data-recovery-exception[\s\S]*disabled/);
+
+  runtime.selectRecoveryAuthority("remote");
+  runtime.confirmRecovery(true, runtime.recoveryFingerprint());
+  assert.equal(runtime.recoveryReady(), true);
+
+  runtime.exceptRecoveryPath("goals/OTHER/goal.json", true);
+  assert.equal(runtime.recoveryReady(), false, "an exception is a decision change");
+  runtime.confirmRecovery(true, runtime.recoveryFingerprint());
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(runtime.recoveryPayload())),
+    { authority: "remote", paths: ["goals/OTHER/goal.json"] },
+  );
+
+  // A path the preview does not contest can never enter the decision.
+  runtime.exceptRecoveryPath("nodes.json", true);
+  assert.deepEqual(runtime.recoveryPayload().paths, ["goals/OTHER/goal.json"]);
+
+  runtime.exceptRecoveryPath("goals/OTHER/goal.json", false);
+  assert.deepEqual(runtime.recoveryPayload().paths, []);
+});
+
+test("an unrecognized rejection retains the preview while stale rejection requires a fresh review", () => {
   const runtime = browserRuntime();
   runtime.resetRecovery();
   runtime.setRecoveryPreview(recoveryPreview());
@@ -248,16 +283,16 @@ test("busy retains preview while stale rejection requires a fresh review", () =>
   runtime.confirmRecovery(true, runtime.recoveryFingerprint());
 
   runtime.handleRecoveryConflict({
-    message: "Git busy",
-    error: { reason: "git_busy" },
+    message: "Another operation is resolving this conflict",
+    error: { reason: "" },
   });
-  assert.equal(runtime.recoveryState().phase, "git_busy");
+  assert.equal(runtime.recoveryState().phase, "apply_error");
   assert.equal(runtime.recoveryState().preview.merge_base, "base-head");
   assert.equal(runtime.recoveryState().confirmedFingerprint, "");
 
   runtime.handleRecoveryConflict({
     message: "Preview stale",
-    error: { reason: "stale_preview" },
+    error: { reason: "state_moved" },
   });
   assert.equal(runtime.recoveryState().phase, "stale");
   assert.equal(runtime.recoveryState().preview, null);

@@ -22,7 +22,6 @@ impl StateSyncConflictPhase {
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct StateSyncRecoveryMetadata {
-    pub available: bool,
     /// One-shot recovery that re-derives and applies evidence atomically with
     /// bounded race retries. Reports written before this field existed
     /// deserialize with an empty command.
@@ -183,7 +182,6 @@ impl FileGitSyncService {
             conflicts: unresolved,
             decision_question: decision_question.map(str::to_string),
             recovery: StateSyncRecoveryMetadata {
-                available: true,
                 run_command: "refine sync --authority <live|remote> [--path <contested-path>]"
                     .to_string(),
                 preview_command: "refine sync --preview".to_string(),
@@ -211,29 +209,30 @@ impl FileGitSyncService {
         })
     }
 
-    /// The question a bounded agent resolution of exactly this divergence
-    /// already escalated with, if one is on file and still unanswered.
+    /// The question a bounded agent resolution of this contention already
+    /// escalated with, if one is on file and still unanswered.
     ///
-    /// The report's identity is the divergence, so a report for any other
-    /// operands or contested paths is stale and never carried forward. Two
-    /// things read this: the escalation is not asked again while it stands
-    /// (an unchanged divergence has no new answer to give, and the agent is
-    /// not free), and a later pass that re-reports the same divergence keeps
-    /// the agent's words instead of replacing them with the generic headline.
+    /// What identifies it is the CONTENTION — the contested records and the
+    /// remote head that must be reconciled with them — not the divergence. A
+    /// node that keeps working snapshots live state every pass, minting a new
+    /// local head and therefore a new divergence id while nothing the
+    /// question asked about has moved; keyed on the divergence, that churn
+    /// re-asked an unanswered question (spending an agent every pass) and
+    /// replaced the agent's words with the generic headline on the way. Two
+    /// things read this: the escalation is not asked again while it stands,
+    /// and a later pass that re-reports the same contention keeps the agent's
+    /// words. A report for any other remote head or contested set is stale
+    /// and never carried forward.
     pub(super) fn escalated_decision_question(
         &self,
-        merge_base: &str,
-        local_state_head: &str,
         remote_state_head: &str,
         unresolved: &[StateSyncConflictPath],
     ) -> Option<String> {
-        let mut unresolved = unresolved.to_vec();
-        unresolved.sort_by(|left, right| left.path.cmp(&right.path));
         let report = latest_state_sync_conflict_report(&self.runtime_root)
             .ok()
             .flatten()?;
-        (report.report_id
-            == conflict_report_id(merge_base, local_state_head, remote_state_head, &unresolved))
+        (report.remote_state_head == remote_state_head
+            && report.unresolved_paths == contended_records(unresolved))
         .then_some(report.decision_question)?
     }
 
@@ -256,6 +255,17 @@ impl FileGitSyncService {
             ))),
         }
     }
+}
+
+/// The contended records of one contention, in the sorted order the report
+/// and the resolution id both use.
+pub(super) fn contended_records(unresolved: &[StateSyncConflictPath]) -> Vec<String> {
+    let mut records = unresolved
+        .iter()
+        .map(|conflict| conflict.path.clone())
+        .collect::<Vec<_>>();
+    records.sort();
+    records
 }
 
 /// The report's identity is the divergence itself: same operands, same
