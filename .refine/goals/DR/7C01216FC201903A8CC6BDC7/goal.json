@@ -1,7 +1,7 @@
 {
   "base_commit": "827a23a8c5e609fad7bef0dcb98690a335da0228",
   "branch_name": "refine/DR7C01216FC201903A8CC6BDC7/round-2",
-  "candidate_commit": "07d27170c26d616c9d1db4badad069a17b8e1f02",
+  "candidate_commit": "fb6652ff7912f9eccd038b1e5ac29c2f67c33984",
   "created": "2026-08-18T11:01:58Z",
   "feature_id": null,
   "feature_order": null,
@@ -670,7 +670,28 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-18T11:34:17Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "827a23a8c5e609fad7bef0dcb98690a335da0228",
@@ -681,6 +702,7 @@
           "round_idx": 1,
           "target_branch": "main"
         },
+        "completed_at": "2026-08-18T11:34:17Z",
         "final_plan": {
           "completed_at": "2026-08-18T11:23:39Z",
           "git_after": {
@@ -703,6 +725,33 @@
             "summary": "Scoped quality recovery for Round 1: implement the current Round request directly on the retained candidate. Planning is skipped for this recovery; the full Quality and Governance gates still judge the result."
           },
           "started_at": "2026-08-18T11:23:39Z"
+        },
+        "implementation": {
+          "completed_at": "2026-08-18T11:34:17Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Implemented the current Round request on the retained candidate: introduced TerminalSessionLaunchSurface::Toolbar|Cli through request parsing, metadata, and prompt composition; made CLI the fail-closed default and rejected unknown/non-string surface values; marked browser and CLI callers explicitly; gated the toolbar workflow to surface=toolbar plus profile agent|plan; restored the original CLI Agent workflow prompt; preserved CLI Plan, Goal, standalone, and workflow-automation prompt behavior; refined the toolbar intent page; and added behavioral coverage for every requested inclusion/exclusion and the browser payload marker.",
+                "id": "R1",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "cargo fmt --all -- --check -> exit 0",
+              "git diff --check -> exit 0",
+              "git show 827a23a8c5e609fad7bef0dcb98690a335da0228:src/application/agent_io/prompts/terminal_profiles/general-agent-workflow.md | cmp - src/application/agent_io/prompts/terminal_profiles/general-agent-workflow.md -> exit 0 (pre-Round-1 template restored byte-for-byte)",
+              "cargo test --lib toolbar_agent_prompts_are_node_first_and_route_changes_through_refine_workflow -> 1 passed, 0 failed",
+              "cargo test --lib terminal_session_surface_is_typed_and_defaults_to_non_toolbar -> 1 passed, 0 failed",
+              "cargo test --lib static_surface::terminal:: -> 3 passed, 0 failed",
+              "cargo test --lib application::agent_io::prompts::tests -> 8 passed, 0 failed",
+              "cargo test --lib -> exit 101: 1092 passed, 1 failed, 6 ignored; unrelated application::system::source_promotion::tests::agent_tests::active_launch_reservation_is_not_settled_before_its_process_receipt observed queued instead of interrupted",
+              "cargo test --lib application::system::source_promotion::tests::agent_tests::active_launch_reservation_is_not_settled_before_its_process_receipt -- --exact -> 1 passed, 0 failed",
+              "cargo clippy --lib -- -D warnings -> exit 101 on four pre-existing unrelated warnings: two needless_pub_self in application/projects/projection/store.rs, module_inception in infrastructure/git/worktrees/mod.rs, and unnecessary_sort_by in surfaces/web_server/http/background_loops.rs",
+              "cargo clippy --lib -- -A clippy::needless-pub-self -A clippy::module-inception -A clippy::unnecessary-sort-by -D warnings -> exit 0"
+            ]
+          },
+          "report": "Corrected the retained Round 1 candidate with an explicit typed terminal-session launch surface that defaults to CLI and rejects unknown values; browser toolbar launches now send surface=toolbar, both CLI agent-open paths send surface=cli, and prompt composition applies TerminalProfileToolbarAgentWorkflow only to toolbar Agent and Plan profiles. Restored the pre-Round-1 general Agent workflow template byte-for-byte for CLI/default Agent sessions, preserved CLI Plan and Goal/standalone exclusions, recorded the surface in session metadata, refined only the focused toolbar intent contract, and added behavior-level prompt/surface regressions plus the toolbar payload marker assertion. Focused checks pass. The repository-wide library run reproduced one unrelated pre-existing source-promotion race (1092 passed, 1 failed, 6 ignored), which passed in exact isolation. Strict Clippy reproduced only four unrelated pre-existing warnings; the repository-valid command allowing those named baseline categories passed.",
+          "started_at": "2026-08-18T11:23:40Z"
         },
         "phase": "implement",
         "phase_started_at": "2026-08-18T11:23:40Z",
@@ -731,11 +780,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-08-18T11:23:39Z",
-        "state": "in_progress",
-        "updated_at": "2026-08-18T11:23:40Z"
+        "state": "completed",
+        "updated_at": "2026-08-18T11:34:17Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Corrected the retained Round 1 candidate with an explicit typed terminal-session launch surface that defaults to CLI and rejects unknown values; browser toolbar launches now send surface=toolbar, both CLI agent-open paths send surface=cli, and prompt composition applies TerminalProfileToolbarAgentWorkflow only to toolbar Agent and Plan profiles. Restored the pre-Round-1 general Agent workflow template byte-for-byte for CLI/default Agent sessions, preserved CLI Plan and Goal/standalone exclusions, recorded the surface in session metadata, refined only the focused toolbar intent contract, and added behavior-level prompt/surface regressions plus the toolbar payload marker assertion. Focused checks pass. The repository-wide library run reproduced one unrelated pre-existing source-promotion race (1092 passed, 1 failed, 6 ignored), which passed in exact isolation. Strict Clippy reproduced only four unrelated pre-existing warnings; the repository-valid command allowing those named baseline categories passed.",
+      "implementation_reported_at": "2026-08-18T11:34:17Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -746,7 +795,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T11:23:40Z",
+      "updated": "2026-08-18T11:34:17Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T11:23:39Z",
         "round_idx": 1,
@@ -756,8 +805,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-18T11:23:40Z",
-  "workflow_revision": 34
+  "updated": "2026-08-18T11:34:17Z",
+  "workflow_revision": 39
 }
