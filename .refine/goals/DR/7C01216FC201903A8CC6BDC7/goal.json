@@ -106,8 +106,25 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-08-18T11:03:36Z",
+        "criticism": {
+          "completed_at": "2026-08-18T11:04:52Z",
+          "git_after": {
+            "branch": "refine/DR7C01216FC201903A8CC6BDC7/round-1",
+            "head_commit": "827a23a8c5e609fad7bef0dcb98690a335da0228",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR7C01216FC201903A8CC6BDC7/round-1",
+            "head_commit": "827a23a8c5e609fad7bef0dcb98690a335da0228",
+            "status_porcelain": []
+          },
+          "result": {
+            "summary": "The proposed plan is complete and correctly scoped to the toolbar-agent guidance contract."
+          },
+          "started_at": "2026-08-18T11:03:36Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-08-18T11:04:52Z",
         "proposal": {
           "completed_at": "2026-08-18T11:03:36Z",
           "git_after": {
@@ -142,7 +159,7 @@
         "schema_version": 2,
         "started_at": "2026-08-18T11:02:00Z",
         "state": "in_progress",
-        "updated_at": "2026-08-18T11:03:36Z"
+        "updated_at": "2026-08-18T11:04:52Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -156,7 +173,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T11:03:36Z",
+      "updated": "2026-08-18T11:04:52Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T11:02:00Z",
         "round_idx": 0,
@@ -168,6 +185,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-18T11:03:36Z",
-  "workflow_revision": 9
+  "updated": "2026-08-18T11:04:52Z",
+  "workflow_revision": 11
 }
