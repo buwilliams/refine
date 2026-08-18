@@ -1,7 +1,7 @@
 {
   "base_commit": "148e3ff37f026e3861adbefd86edc5ddbd9a3662",
   "branch_name": "refine/00000T0570KRGG047J0RZG2000/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "d3fad6ba1527d238e385fe38c1e558bcea4df533",
   "created": "2026-08-18T12:37:40Z",
   "feature_id": null,
   "feature_order": null,
@@ -95,7 +95,28 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-08-18T12:58:22Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "148e3ff37f026e3861adbefd86edc5ddbd9a3662",
@@ -106,6 +127,7 @@
           "round_idx": 0,
           "target_branch": "main"
         },
+        "completed_at": "2026-08-18T12:58:21Z",
         "criticism": {
           "completed_at": "2026-08-18T12:41:07Z",
           "git_after": {
@@ -191,6 +213,56 @@
           "message": "The finalized plan does not require violating any governance rule or enabled guidance.",
           "status": "passed"
         },
+        "implementation": {
+          "completed_at": "2026-08-18T12:58:21Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Added the ToolbarAttach session command with a per-request UUID acknowledgment, persisted toolbar_timeout_protected state and acknowledgment identities in the exact managed process record, and exposed the protected state in session snapshots while leaving Input, Resize, and non-Toolbar routes unchanged.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "The Goal Agent runtime consumes ToolbarAttach commands at the top of its poll loop and registers the protected flag plus matching acknowledgment in one process-record update before inspecting exit/signals or evaluating either watchdog.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "The Toolbar Goal route now waits for the requested acknowledgment on the same process id and session id, rechecks liveness before returning the snapshot, returns conflict for an exited or changed session, and returns degraded/unavailable when acknowledgment is not established.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Only completion-timeout and idle-timeout verdicts are gated by the one-way protected state. Existing signal processing, needs-input attention, process exit, transcript capture, process-group cleanup, workflow settlement, cancellation, and Stop paths remain authoritative; regressions prove later valid completion and workflow-aware Stop still settle.",
+                "id": "P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added focused attachment tests for near-deadline acknowledgment winning before both watchdogs, survival after both deadlines, unique repeated acknowledgments, exact-session and non-Goal isolation, missing acknowledgment without false success, and later valid completion. Existing unattached hard-cap/idle tests remain green, and web lifecycle coverage verifies acknowledged open plus explicit Stop.",
+                "id": "P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated docs/intent Goal Agents and Toolbar pages with exact-session acknowledged attachment, the automatic-timeout exemption, fail-closed open races, and unchanged explicit/workflow lifecycle boundaries.",
+                "id": "P6",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "cargo fmt -- --check -> exit 0",
+              "cargo test --lib application::agents::sessions -- --nocapture -> 34 passed, 0 failed, 0 ignored",
+              "cargo test --lib surfaces::web_server::tests::goals::lifecycle -- --nocapture -> 10 passed, 0 failed, 0 ignored",
+              "node --test tests/web_supervisor_toolbar.test.js -> 37 passed, 0 failed, 0 skipped",
+              "cargo clippy --lib -- -D warnings -A clippy::needless-pub-self -A clippy::module-inception -A clippy::unnecessary-sort-by -> exit 0; allowances are limited to untouched repository baseline lint classes",
+              "cargo clippy --lib -- -D warnings -> failed on 4 pre-existing errors in untouched projection/store.rs, git/worktrees/mod.rs, and web/http/background_loops.rs",
+              "cargo test --lib -> 1095 passed, 1 failed, 6 ignored; unrelated failure application::system::source_promotion::tests::agent_tests::upgrade_reservation_without_agent_settles_interrupted_and_retryable_after_restart observed queued instead of interrupted",
+              "cargo test --lib application::system::source_promotion::tests::agent_tests::upgrade_reservation_without_agent_settles_interrupted_and_retryable_after_restart -- --exact --nocapture -> 1 passed, 0 failed",
+              "git diff --check -> exit 0"
+            ]
+          },
+          "report": "Implemented runtime-acknowledged Toolbar attachment for workflow Goal Agents. Toolbar opens now request a unique exact-session acknowledgment, wait for the same live process to persist one-way timeout protection, and fail closed on exit, mismatch, or missing acknowledgment. The runtime processes and persists attachment before watchdog evaluation, bypasses only idle and completion timeouts after protection, and preserves valid completion, needs-input, explicit Stop/cancellation, natural exit, transcript, worktree, and workflow settlement behavior. Updated Goal Agent and Toolbar intent documentation and added focused runtime and HTTP regressions. Verification: formatting, 34 Goal Agent session tests, 10 Goal lifecycle tests, 37 Toolbar browser tests, and changed-code Clippy passed. The 1,102-test library run had one unrelated source-promotion timing failure (1095 passed, 1 failed, 6 ignored); that exact untouched test passed on immediate isolated rerun.",
+          "started_at": "2026-08-18T12:42:33Z"
+        },
         "phase": "implement",
         "phase_started_at": "2026-08-18T12:42:33Z",
         "proposal": {
@@ -234,11 +306,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-08-18T12:37:40Z",
-        "state": "in_progress",
-        "updated_at": "2026-08-18T12:42:33Z"
+        "state": "completed",
+        "updated_at": "2026-08-18T12:58:21Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Implemented runtime-acknowledged Toolbar attachment for workflow Goal Agents. Toolbar opens now request a unique exact-session acknowledgment, wait for the same live process to persist one-way timeout protection, and fail closed on exit, mismatch, or missing acknowledgment. The runtime processes and persists attachment before watchdog evaluation, bypasses only idle and completion timeouts after protection, and preserves valid completion, needs-input, explicit Stop/cancellation, natural exit, transcript, worktree, and workflow settlement behavior. Updated Goal Agent and Toolbar intent documentation and added focused runtime and HTTP regressions. Verification: formatting, 34 Goal Agent session tests, 10 Goal lifecycle tests, 37 Toolbar browser tests, and changed-code Clippy passed. The 1,102-test library run had one unrelated source-promotion timing failure (1095 passed, 1 failed, 6 ignored); that exact untouched test passed on immediate isolated rerun.",
+      "implementation_reported_at": "2026-08-18T12:58:22Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -249,7 +321,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T12:42:33Z",
+      "updated": "2026-08-18T12:58:22Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T12:37:40Z",
         "round_idx": 0,
@@ -259,8 +331,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-18T12:42:33Z",
-  "workflow_revision": 15
+  "updated": "2026-08-18T12:58:22Z",
+  "workflow_revision": 20
 }
