@@ -134,6 +134,51 @@
           },
           "started_at": "2026-08-18T13:38:54Z"
         },
+        "final_plan": {
+          "completed_at": "2026-08-18T13:42:43Z",
+          "git_after": {
+            "branch": "refine/DR49680EE1475D2F2FFE46AC54/round-1",
+            "head_commit": "7240706a10f1d45dc387a41825c08891ed52cf41",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR49680EE1475D2F2FFE46AC54/round-1",
+            "head_commit": "7240706a10f1d45dc387a41825c08891ed52cf41",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Revise the host resource governor so automatic admission uses no more than one quarter of detected logical cores and one quarter of currently available memory, keeps at least one slot, reserves at least 2 GiB per agent, aggregates resident memory for each running managed agent root and all of its descendants, falls back to one automatic slot when host memory is unavailable, and rejects incomplete live process-tree samples as evidence for scaling above the conservative reservation.",
+                "id": "P1"
+              },
+              {
+                "description": "Keep a positive parallel_run_cap as the authoritative operator override and continue deriving unset node, provider, and target-app limits from the resulting global limit so conservative automatic admission does not weaken deliberate local controls.",
+                "id": "P2"
+              },
+              {
+                "description": "Change Node Runtime Config to render an unset parallel-run cap as automatic without displaying or persisting a fixed value of 5, and explain that entering a number overrides the conservative shared-host recommendation.",
+                "id": "P3"
+              },
+              {
+                "description": "Add resource-governor regression coverage for quarter-host budgeting, unavailable host memory, low samples constrained by the 2 GiB floor, and aggregate descendant workloads so Linux parent-only RSS and unsupported-platform behavior cannot restore aggressive admission.",
+                "id": "P4"
+              },
+              {
+                "description": "Update only the affected Process and browser Settings intent pages to define conservative automatic shared-host concurrency, complete managed-agent workload accounting, and the explicit node-level override.",
+                "id": "P5"
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "P1 now defines fail-conservative behavior when host memory or a live process-tree sample is unavailable and measures each managed agent together with all descendants, while P4 adds platform-fallback and descendant-workload regression coverage."
+              }
+            ],
+            "summary": "Make automatic agent concurrency reserve most CPU and memory for Docker and other expensive host work, count each managed agent's descendant workload, fail conservative when memory cannot be measured, preserve explicit caps such as 2, and make automatic versus manual Runtime Config behavior clear."
+          },
+          "started_at": "2026-08-18T13:41:17Z"
+        },
         "phase": "revise",
         "phase_started_at": "2026-08-18T13:41:17Z",
         "proposal": {
@@ -174,7 +219,7 @@
         "schema_version": 2,
         "started_at": "2026-08-18T13:36:01Z",
         "state": "in_progress",
-        "updated_at": "2026-08-18T13:41:17Z"
+        "updated_at": "2026-08-18T13:42:43Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -188,7 +233,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T13:41:17Z",
+      "updated": "2026-08-18T13:42:43Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T13:36:01Z",
         "round_idx": 0,
@@ -200,6 +245,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-18T13:41:17Z",
-  "workflow_revision": 11
+  "updated": "2026-08-18T13:42:43Z",
+  "workflow_revision": 12
 }

@@ -106,8 +106,38 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-08-18T13:39:08Z",
+        "criticism": {
+          "completed_at": "2026-08-18T13:42:45Z",
+          "git_after": {
+            "branch": "refine/DRF56D7E92608723E5E90C193C/round-1",
+            "head_commit": "7240706a10f1d45dc387a41825c08891ed52cf41",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRF56D7E92608723E5E90C193C/round-1",
+            "head_commit": "7240706a10f1d45dc387a41825c08891ed52cf41",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P1",
+                  "P2",
+                  "P3"
+                ],
+                "description": "P1 imports every shell export into repository-selected Quality commands while keeping API-key stripping Agent-only, newly exposing shell-only credentials despite describing a toolchain environment.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Define, test, and document a Quality-safe shell overlay that preserves PATH and toolchain discovery plus override precedence while excluding direct provider keys and other credential classes."
+              }
+            ],
+            "summary": "Revise the plan to keep Quality tool discovery without exposing shell-only credentials to repository-selected commands."
+          },
+          "started_at": "2026-08-18T13:39:08Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-08-18T13:42:45Z",
         "proposal": {
           "completed_at": "2026-08-18T13:39:08Z",
           "git_after": {
@@ -142,7 +172,7 @@
         "schema_version": 2,
         "started_at": "2026-08-18T13:36:09Z",
         "state": "in_progress",
-        "updated_at": "2026-08-18T13:39:08Z"
+        "updated_at": "2026-08-18T13:42:45Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -156,7 +186,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T13:39:08Z",
+      "updated": "2026-08-18T13:42:45Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T13:36:08Z",
         "round_idx": 0,
@@ -168,6 +198,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-18T13:39:08Z",
-  "workflow_revision": 9
+  "updated": "2026-08-18T13:42:45Z",
+  "workflow_revision": 11
 }
