@@ -1,5 +1,5 @@
 use super::*;
-use crate::tools::host::installation::InstallationService;
+use crate::application::system::installation::InstallationService;
 
 #[test]
 fn system_start_resolves_relative_runtime_root_before_spawning_daemon() {
@@ -77,11 +77,11 @@ fn activated_service_manager_owns_background_start_configuration() {
     let port = 4557;
     write_installed_binary(&temp_root);
     let installation =
-        crate::tools::host::installation::FileInstallationService::with_path_inputs_for_port(
+        crate::application::system::installation::FileInstallationService::with_path_inputs_for_port(
             &runtime_root,
             "1.0.0",
             port,
-            crate::process::supervisor::runtime::RuntimePathInputs {
+            crate::infrastructure::process::supervisor::runtime::RuntimePathInputs {
                 home: Some(temp_root.join("home")),
                 local_app_data: Some(temp_root.join("local-app-data")),
                 app_data: Some(temp_root.join("app-data")),
@@ -92,7 +92,7 @@ fn activated_service_manager_owns_background_start_configuration() {
             },
         );
     installation
-        .install(crate::tools::host::installation::InstallTarget::LinuxCliWeb)
+        .install(crate::application::system::installation::InstallTarget::LinuxCliWeb)
         .unwrap();
 
     let error = run_system_start(
@@ -108,7 +108,7 @@ fn activated_service_manager_owns_background_start_configuration() {
     assert!(
         matches!(
             &error,
-            crate::process::supervisor::errors::RefineError::InvalidInput(message)
+            crate::error::RefineError::InvalidInput(message)
                 if message.contains("activated systemd_user installation owns daemon configuration")
                     && message.contains("--foreground")
         ),
@@ -200,7 +200,7 @@ fn healthy_service_start_command_failure_preserves_health_and_exact_evidence() {
         std::time::Duration::ZERO,
         std::time::Duration::ZERO,
         || {
-            Err(crate::process::supervisor::errors::RefineError::Degraded(
+            Err(crate::error::RefineError::Degraded(
                 "systemctl start was denied".to_string(),
             ))
         },
@@ -251,9 +251,8 @@ fn healthy_service_managed_start_recovers_stale_durable_status() {
     let lifecycle = FileDaemonLifecycleService::new(RuntimeRoot {
         root: runtime_root.clone(),
     });
-    let stale_error = crate::process::supervisor::errors::RefineError::Degraded(
-        "failure from an earlier launch".to_string(),
-    );
+    let stale_error =
+        crate::error::RefineError::Degraded("failure from an earlier launch".to_string());
     lifecycle.mark_start_failed(port, &stale_error).unwrap();
 
     let status = run_service_managed_daemon_with(
@@ -334,15 +333,13 @@ fn service_managed_start_clears_stale_failure_but_observes_a_new_failure() {
     let lifecycle = FileDaemonLifecycleService::new(RuntimeRoot {
         root: runtime_root.clone(),
     });
-    let stale_error = crate::process::supervisor::errors::RefineError::Degraded(
-        "failure from an earlier launch".to_string(),
-    );
+    let stale_error =
+        crate::error::RefineError::Degraded("failure from an earlier launch".to_string());
     lifecycle.mark_start_failed(port, &stale_error).unwrap();
     assert_eq!(lifecycle.status(port).unwrap().worker_state, "failed");
 
-    let current_error = crate::process::supervisor::errors::RefineError::Degraded(
-        "failure from the current launch".to_string(),
-    );
+    let current_error =
+        crate::error::RefineError::Degraded("failure from the current launch".to_string());
     let probe_calls = std::cell::Cell::new(0);
     let error = run_service_managed_daemon_with(
         &lifecycle,
@@ -407,7 +404,7 @@ fn service_managed_stop_command_failure_keeps_active_status_and_recovery_evidenc
         std::time::Duration::ZERO,
         std::time::Duration::ZERO,
         || {
-            Err(crate::process::supervisor::errors::RefineError::Degraded(
+            Err(crate::error::RefineError::Degraded(
                 "systemctl stop failed while service remained active".to_string(),
             ))
         },
@@ -623,7 +620,7 @@ fn system_start_migrates_and_detaches_an_unavailable_port_scoped_project() {
         canonical["apps"][missing_project.display().to_string()]["path"],
         missing_project.display().to_string()
     );
-    let status: crate::process::supervisor::lifecycle::DaemonStatus =
+    let status: crate::infrastructure::process::supervisor::lifecycle::DaemonStatus =
         serde_json::from_slice(&fs::read(port_runtime_root.join("daemon-status.json")).unwrap())
             .unwrap();
     assert!(status.daemon_healthy);

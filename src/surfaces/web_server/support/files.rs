@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use serde_json::{Value, json};
 
-use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::error::{RefineError, RefineResult};
 
 pub(in crate::surfaces::web_server) fn resolve_project_utility_path(path: &str) -> PathBuf {
     let path = path.trim();

@@ -13,19 +13,19 @@ mod project_runtime;
 mod quality_guidance;
 mod static_surface;
 
-use crate::model::log::LogEntry;
-use crate::process::supervisor::config::{ConfigService, FileSettingsService};
-use crate::process::supervisor::operations::{
+use crate::application::chat::{ChatAttachment, ChatService, FileChatService};
+use crate::infrastructure::observability::activity::{ActivityService, FileActivityService};
+use crate::infrastructure::observability::logs::FileLogService;
+use crate::infrastructure::observability::metrics::{FileMetricsService, PerformanceQuery};
+use crate::infrastructure::process::supervisor::config::{ConfigService, FileSettingsService};
+use crate::infrastructure::process::supervisor::operations::{
     FileOperationRegistry, OperationHandle, OperationRegistry, OperationState,
 };
-use crate::tools::observability::activity::{ActivityService, FileActivityService};
-use crate::tools::observability::logs::FileLogService;
-use crate::tools::observability::metrics::{FileMetricsService, PerformanceQuery};
-use crate::tools::product::chat::{ChatAttachment, ChatService, FileChatService};
+use crate::model::log::LogEntry;
 use chrono::Utc;
 use serde_json::json;
 
-use crate::process::supervisor::errors::{RefineError, RefineResult};
+use crate::error::{RefineError, RefineResult};
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::{Read, Write};
@@ -37,29 +37,31 @@ use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use super::*;
-use crate::model::feature::{FeatureIndexProjection, FeatureRollup};
-use crate::model::goal::{GoalIndexProjection, GoalPriority};
-use crate::model::log::ActivityEntry;
-use crate::model::workflow::GoalStatus;
-use crate::process::agent_sessions::{GoalAgentLaunch, run_goal_agent};
-use crate::process::subprocess::{
-    FileProcessSupervisor, ManagedProcess, ManagedProcessSpec, ProcessOwner, ProcessResourceLimits,
-    ProcessSupervisor, install_after_process_enumeration_hook, managed_pid_is_alive,
-};
-use crate::process::supervisor::lifecycle::{DaemonRuntimeService, FileDaemonLifecycleService};
-use crate::process::supervisor::runtime::RuntimeRoot;
-use crate::surfaces::web_server::support::{
-    recent_operation_sse_events, runtime_process_status_value, runtime_process_summary_value,
-};
-use crate::tools::host::agent_providers::smoke_ai_env_lock;
-use crate::tools::host::project_layout::refine_dir_for_target_root;
-use crate::tools::product::project_projection::{
+use crate::application::agents::sessions::{GoalAgentLaunch, run_goal_agent};
+use crate::application::projects::projection::{
     ActivityProjectionQuery, DashboardProjection, FeatureSummaryProjection,
     FileProjectProjectionStore, GoalSummaryProjection, PROJECTION_SNAPSHOT_FILE,
     PROJECTION_SNAPSHOT_VERSION, PageRequest, ProjectionQuery, ProjectionSnapshot,
     RuntimeProjection,
 };
-use crate::tools::product::work_items::FileWorkItemService;
+use crate::application::work_items::FileWorkItemService;
+use crate::infrastructure::agents::invocation::smoke_ai_env_lock;
+use crate::infrastructure::process::subprocess::{
+    FileProcessSupervisor, ManagedProcess, ManagedProcessSpec, ProcessOwner, ProcessResourceLimits,
+    ProcessSupervisor, install_after_process_enumeration_hook, managed_pid_is_alive,
+};
+use crate::infrastructure::process::supervisor::lifecycle::{
+    DaemonRuntimeService, FileDaemonLifecycleService,
+};
+use crate::infrastructure::process::supervisor::runtime::RuntimeRoot;
+use crate::infrastructure::storage::project_layout::refine_dir_for_target_root;
+use crate::model::feature::{FeatureIndexProjection, FeatureRollup};
+use crate::model::goal::{GoalIndexProjection, GoalPriority};
+use crate::model::log::ActivityEntry;
+use crate::model::workflow::GoalStatus;
+use crate::surfaces::web_server::support::{
+    recent_operation_sse_events, runtime_process_status_value, runtime_process_summary_value,
+};
 
 fn releases_request_body_accepts_candidate_objects() -> bool {
     let source = fs::read_to_string(
@@ -317,14 +319,14 @@ fn seeded_remote_clone(temp_root: &Path) -> (PathBuf, PathBuf) {
 
 fn wait_for_http_request_metrics(
     runtime_root: &Path,
-) -> Vec<crate::tools::observability::metrics::PerformanceEvent> {
+) -> Vec<crate::infrastructure::observability::metrics::PerformanceEvent> {
     wait_for_http_request_metric_count(runtime_root, 1)
 }
 
 fn wait_for_http_request_metric_count(
     runtime_root: &Path,
     expected: usize,
-) -> Vec<crate::tools::observability::metrics::PerformanceEvent> {
+) -> Vec<crate::infrastructure::observability::metrics::PerformanceEvent> {
     let deadline = Instant::now() + Duration::from_secs(15);
     loop {
         let report = FileMetricsService::new(runtime_root)

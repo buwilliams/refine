@@ -35,7 +35,7 @@ fn web_server_serves_mcp_surface_through_daemon() {
 
 #[test]
 fn source_update_status_integration_drives_browser_states_across_reconnect() {
-    use crate::tools::host::source_promotion::{
+    use crate::application::system::source_promotion::{
         FileSourcePromotionService, SOURCE_PROMOTION_STATE_FILE, SourcePromotionOperation,
     };
 

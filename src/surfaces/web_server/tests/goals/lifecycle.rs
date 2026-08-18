@@ -625,7 +625,7 @@ fn browser_terminal_stop_fails_the_goal_after_stopping_its_local_agent() {
         std::env::set_var("REFINE_SMOKE_AI_PATH", &provider);
     }
 
-    let nodes = crate::tools::product::nodes::FileNodeRegistryService::with_active_root(
+    let nodes = crate::application::fleet::nodes::FileNodeRegistryService::with_active_root(
         &refine_dir,
         &runtime_root,
     );
@@ -835,7 +835,7 @@ fn goal_cancel_uses_port_scoped_active_node_and_preserves_foreign_goals() {
     let runtime_root = temp_root.join("run/8082");
     let active_node = "bo2lnxnevo03-buddy";
     let foreign_node = "bo2lnxnevo02-ethan";
-    let nodes = crate::tools::product::nodes::FileNodeRegistryService::with_active_root(
+    let nodes = crate::application::fleet::nodes::FileNodeRegistryService::with_active_root(
         &refine_dir,
         &runtime_root,
     );

@@ -63,7 +63,7 @@ fn goal_export_cli_writes_shared_jira_csv() {
     let temp_root = unique_temp_dir("cli-goal-jira-export");
     let refine_dir = temp_root.join(".refine");
     let output = temp_root.join("jira.csv");
-    let service = crate::tools::product::work_items::FileWorkItemService::new(&refine_dir);
+    let service = crate::application::work_items::FileWorkItemService::new(&refine_dir);
     service
         .create_goal_summary("CLI evidence export", Some("GOAL1"))
         .unwrap();

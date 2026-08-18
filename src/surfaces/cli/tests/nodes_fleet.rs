@@ -372,7 +372,8 @@ fn fleet_sync_asks_every_node_even_when_this_nodes_own_sync_fails() {
     }
     // A real repository keeps its state outside the checkout, so ask for the
     // same directory the command will use rather than assuming `.refine`.
-    let refine_dir = crate::tools::host::project_layout::prepare_refine_dir(&target_root).unwrap();
+    let refine_dir =
+        crate::infrastructure::storage::project_layout::prepare_refine_dir(&target_root).unwrap();
     dispatch(
         Cli::try_parse_from([
             "refine",

@@ -1,7 +1,7 @@
 use serde_json::json;
 
-use crate::tools::product::imports::ImportFeatureDestination;
-use crate::tools::product::work_items::BulkGoalUpdate;
+use crate::application::imports::ImportFeatureDestination;
+use crate::application::work_items::BulkGoalUpdate;
 
 use super::super::*;
 
@@ -57,7 +57,7 @@ pub(in crate::surfaces::web_server) fn import_feature_destination(
 }
 
 pub(in crate::surfaces::web_server) fn feature_import_response(
-    feature: &crate::tools::product::project_projection::FeatureSummaryProjection,
+    feature: &crate::application::projects::projection::FeatureSummaryProjection,
 ) -> serde_json::Value {
     json!({
         "id": feature.feature.id,

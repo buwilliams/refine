@@ -13,15 +13,17 @@ use portable_pty::{CommandBuilder, PtySize, native_pty_system};
 use serde_json::{Map, Value, json};
 use uuid::Uuid;
 
-use crate::process::agent_sessions::{
+use crate::application::agent_io::prompt_transport::{
+    PromptArtifactLease, PromptTransportMetadata,
+};
+use crate::application::agents::sessions::{
     agent_session_events_range, find_agent_session, resize_agent_session, send_agent_session_input,
 };
-use crate::process::subprocess::{
+use crate::application::operations::process_control::FileProcessControlService;
+use crate::error::{RefineError, RefineResult};
+use crate::infrastructure::process::subprocess::{
     FileProcessSupervisor, ManagedProcess, ManagedProcessSpec, ProcessOwner, ProcessResourceLimits,
 };
-use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::tools::host::agent_providers::{PromptArtifactLease, PromptTransportMetadata};
-use crate::tools::product::process_control::FileProcessControlService;
 
 const TERMINAL_INPUT_LIMIT: usize = 16_000;
 const TERMINAL_EVENT_BACKLOG: usize = 1_000;
@@ -75,7 +77,8 @@ pub(in crate::surfaces::web_server) struct TerminalLaunchSpec {
     pub prompt_transport: Option<PromptTransportMetadata>,
     pub prompt_artifact: Option<PromptArtifactLease>,
     pub authorization_command: Option<String>,
-    pub launch_environment: Option<crate::process::launch_environment::EffectiveLaunchEnvironment>,
+    pub launch_environment:
+        Option<crate::infrastructure::process::launch_environment::EffectiveLaunchEnvironment>,
 }
 
 pub(in crate::surfaces::web_server) fn terminal_session_start_response(
@@ -344,7 +347,7 @@ impl TerminalSession {
         command.cwd(&cwd);
         let environment = match launch.launch_environment.as_ref() {
             Some(environment) => environment.clone(),
-            None => crate::process::launch_environment::EffectiveLaunchEnvironment::assemble(
+            None => crate::infrastructure::process::launch_environment::EffectiveLaunchEnvironment::assemble(
                 &owner,
                 &managed_spec.env,
             )?,
@@ -704,7 +707,7 @@ mod tests {
         )
         .unwrap();
         fs::set_permissions(&provider, fs::Permissions::from_mode(0o755)).unwrap();
-        let service = crate::tools::host::agent_providers::HostAgentProviderService {
+        let service = crate::infrastructure::agents::invocation::HostAgentProviderService {
             path_override: Some(bin_dir.display().to_string()),
             runtime_root: Some(runtime_root.clone()),
         };
@@ -791,7 +794,7 @@ mod tests {
             "x".repeat(60_000 - "INTERACTIVE_FINAL_ENV_SECRET".len())
         );
         let expected_digest = format!("{:x}", Sha256::digest(prompt.as_bytes()));
-        let service = crate::tools::host::agent_providers::HostAgentProviderService {
+        let service = crate::infrastructure::agents::invocation::HostAgentProviderService {
             path_override: Some(bin_dir.display().to_string()),
             runtime_root: Some(runtime_root.clone()),
         };
@@ -800,7 +803,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             command.prompt_transport.kind,
-            crate::tools::host::agent_providers::PromptTransportKind::File
+            crate::application::agent_io::prompt_transport::PromptTransportKind::File
         );
         let response = terminal_session_start_response(
             TerminalLaunchSpec {

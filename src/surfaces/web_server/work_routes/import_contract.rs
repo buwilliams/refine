@@ -2,14 +2,14 @@ use std::path::Path;
 
 use serde_json::{Value, json};
 
-use crate::process::supervisor::config::{ConfigService, FileSettingsService};
-use crate::process::supervisor::errors::RefineError;
-use crate::process::supervisor::operations::{
-    FileOperationRegistry, OperationRegistry, OperationState,
-};
-use crate::tools::product::chat::FileChatService;
-use crate::tools::product::imports::{
+use crate::application::chat::FileChatService;
+use crate::application::imports::{
     ImportExtractionResult, ImportPersistObserver, ImportPersistProgress, ImportRollbackEvidence,
+};
+use crate::error::RefineError;
+use crate::infrastructure::process::supervisor::config::{ConfigService, FileSettingsService};
+use crate::infrastructure::process::supervisor::operations::{
+    FileOperationRegistry, OperationRegistry, OperationState,
 };
 
 use super::{ApiResponse, body_text, provider_status_value};

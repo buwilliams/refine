@@ -1,13 +1,13 @@
 use serde_json::{Value, json};
 
-use crate::process::subprocess::FileProcessSupervisor;
-use crate::process::supervisor::config::ConfigService;
-use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::tools::host::quality::{
+use crate::application::chat::{ChatAttachment, ChatService, StandaloneQualityRequest};
+use crate::application::system::target_apps::{FileTargetAppService, TargetAppSnapshot};
+use crate::application::workflow::phases::quality::{
     FileQualityService, QualityOperationRunner, QualityService, QualitySettingsPatch,
 };
-use crate::tools::host::target_apps::{FileTargetAppService, TargetAppSnapshot};
-use crate::tools::product::chat::{ChatAttachment, ChatService, StandaloneQualityRequest};
+use crate::error::{RefineError, RefineResult};
+use crate::infrastructure::process::subprocess::FileProcessSupervisor;
+use crate::infrastructure::process::supervisor::config::ConfigService;
 
 use super::support::*;
 use super::*;

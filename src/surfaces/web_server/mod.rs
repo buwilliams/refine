@@ -2,12 +2,12 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
-use crate::process::supervisor::errors::RefineResult;
-use crate::process::supervisor::lifecycle::DaemonStatus;
-use crate::tools::host::checkout::RefineCheckoutPaths;
-use crate::tools::product::project_projection::ProjectionSnapshot;
+use crate::application::projects::projection::ProjectionSnapshot;
+use crate::error::RefineResult;
+use crate::infrastructure::process::supervisor::lifecycle::DaemonStatus;
+use crate::infrastructure::runtime::checkout::RefineCheckoutPaths;
 
-pub use crate::model::API_CONTRACT_VERSION;
+pub use crate::application::protocol::API_CONTRACT_VERSION;
 pub const IDEMPOTENCY_DIR: &str = "idempotency";
 pub const API_EVENTS_FILE: &str = "api-events.jsonl";
 

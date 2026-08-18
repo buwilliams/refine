@@ -154,7 +154,7 @@ impl InProcessWebServer {
     pub(in crate::surfaces::web_server) fn handle_daemon_lifecycle_with(
         &self,
         action: DaemonLifecycleAction,
-        lifecycle: &impl crate::tools::host::daemon_lifecycle::HostDaemonLifecycleService,
+        lifecycle: &impl crate::application::system::daemon_lifecycle::HostDaemonLifecycleService,
     ) -> ApiResponse {
         match execute_daemon_lifecycle(
             lifecycle,
@@ -175,7 +175,7 @@ impl InProcessWebServer {
         action: DaemonLifecycleAction,
         executable: &std::path::Path,
         service_manager: Option<&str>,
-        launcher: &dyn crate::tools::host::daemon_lifecycle::RestartSafeHandoffLauncher,
+        launcher: &dyn crate::application::system::daemon_lifecycle::RestartSafeHandoffLauncher,
     ) -> ApiResponse {
         let operations = match self.system_lifecycle_operations() {
             Ok(operations) => operations,
@@ -300,7 +300,7 @@ impl InProcessWebServer {
 
     pub(in crate::surfaces::web_server) fn source_status_body(
         &self,
-        status: crate::tools::host::source_promotion::CachedSourcePromotionStatus,
+        status: crate::application::system::source_promotion::CachedSourcePromotionStatus,
     ) -> serde_json::Value {
         let source = status.source;
         let check = status.check;

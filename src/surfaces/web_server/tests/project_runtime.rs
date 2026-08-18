@@ -80,7 +80,7 @@ fn dashboard_marks_failed_state_sync_counts_non_authoritative() {
     let temp_root = unique_temp_dir("dashboard-state-sync-health");
     let runtime_root = temp_root.join("run/8080");
     fs::create_dir_all(temp_root.join(".refine")).unwrap();
-    crate::tools::host::state_sync_health::FileStateSyncHealthService::new(&runtime_root)
+    crate::application::persistence_sync::health::FileStateSyncHealthService::new(&runtime_root)
         .record_failure(
             &temp_root,
             "default",
@@ -179,7 +179,7 @@ fn project_status_uses_the_project_scoped_node_that_owns_and_filters_new_goals()
     assert!(!port_runtime_root.join("apps.json").exists());
 
     let refine_dir = refine_dir_for_target_root(&app_root).unwrap();
-    let base_nodes = crate::tools::product::nodes::FileNodeRegistryService::with_active_root(
+    let base_nodes = crate::application::fleet::nodes::FileNodeRegistryService::with_active_root(
         &refine_dir,
         &app_registry_root,
     );
@@ -343,7 +343,8 @@ fn web_server_reports_project_registry_and_updates_settings() {
     fs::create_dir_all(&legacy_refine_dir).unwrap();
     git(&app_root, &["init", "-q"]).unwrap();
     let refine_dir =
-        crate::tools::host::project_layout::refine_dir_for_target_root(&app_root).unwrap();
+        crate::infrastructure::storage::project_layout::refine_dir_for_target_root(&app_root)
+            .unwrap();
     let mut server = server_with_projection();
     server.target_root = Some(app_root.clone());
     server.runtime_root = Some(runtime_root.clone());

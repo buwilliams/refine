@@ -230,7 +230,7 @@ fn system_ps_lists_and_stops_nested_agent_processes() {
     assert!(
         matches!(
             &missing,
-            crate::process::supervisor::errors::RefineError::NotFound(message)
+            crate::error::RefineError::NotFound(message)
                 if message.contains(&stoppable.id)
         ),
         "{missing}"

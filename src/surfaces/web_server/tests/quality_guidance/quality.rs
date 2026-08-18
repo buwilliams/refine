@@ -10,7 +10,7 @@ fn daemon_startup_recovers_quality_cancellation_for_original_app_after_switch() 
     init_git_app(&app_b);
     let refine_a = refine_dir_for_target_root(&app_a).unwrap();
     let refine_b = refine_dir_for_target_root(&app_b).unwrap();
-    let apps = crate::tools::product::project_registry::FileProjectRegistryService::new(
+    let apps = crate::application::projects::registry::FileProjectRegistryService::new(
         &runtime_root,
         None,
     );

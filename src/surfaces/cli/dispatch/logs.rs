@@ -71,9 +71,9 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                 .into_iter()
                 .find(|entry| entry.id == id)
             else {
-                return Err(crate::process::supervisor::errors::RefineError::NotFound(
-                    format!("Log entry {id} was not found"),
-                ));
+                return Err(crate::error::RefineError::NotFound(format!(
+                    "Log entry {id} was not found"
+                )));
             };
             println!(
                 "{}",

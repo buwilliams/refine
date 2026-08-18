@@ -9,7 +9,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde_json::{Value, json};
 
-use refine::tools::host::git_sync::FileGitSyncService;
+use refine::application::persistence_sync::state::FileGitSyncService;
 
 #[path = "multi_instance_sync/state_replication.rs"]
 mod state_replication;

@@ -3,8 +3,8 @@ use std::path::PathBuf;
 
 use clap::{Parser, Subcommand, ValueEnum};
 
+use crate::application::system::installation::InstallTarget;
 use crate::model::workflow::GoalStatus;
-use crate::tools::host::installation::InstallTarget;
 
 mod agents;
 mod config;

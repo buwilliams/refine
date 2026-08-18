@@ -51,7 +51,7 @@ fn local_http_daemon_stays_responsive_while_plan_start_waits_for_git() {
     let (release_tx, release_rx) = std::sync::mpsc::channel();
     let lock_root = app_root.clone();
     let lock_thread = thread::spawn(move || {
-        crate::tools::git::with_repository_git_lock(&lock_root, || {
+        crate::infrastructure::git::with_repository_git_lock(&lock_root, || {
             locked_tx.send(()).unwrap();
             release_rx.recv().unwrap();
             Ok(())

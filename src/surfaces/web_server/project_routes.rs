@@ -4,7 +4,7 @@ mod projects;
 mod settings_governance;
 mod target_app;
 mod todos;
-use crate::process::supervisor::config::{
+use crate::infrastructure::process::supervisor::config::{
     ConfigService, FileGovernanceService, FileGuidanceService, FileReporterService,
     FileSettingsService,
 };
@@ -14,26 +14,32 @@ use std::thread;
 use chrono::Utc;
 use serde_json::{Value, json};
 
-use crate::model::workflow::GoalStatus;
-use crate::process::runner::FileRunnerWorkerService;
-use crate::process::subprocess::{FileProcessSupervisor, ProcessOwner, ProcessSupervisor};
-use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::process::supervisor::lifecycle::current_launch_executable;
-use crate::process::supervisor::operations::{
+use crate::application::agent_io::prompts::{PromptTemplate, render};
+use crate::application::fleet::nodes::{
+    FileNodeRegistryService, NodeUpdate, detached_nodes_response,
+};
+use crate::application::fleet::service::{FileFleetService, FleetService, NodeRemoteUpdate};
+use crate::application::guidance::FileNextActionsService;
+use crate::application::maintenance::worktrees::{
+    FileWorktreeCleanupService, WorktreeCleanupOptions,
+};
+use crate::application::projects::projection::{DashboardProjectionQuery, ProjectionQuery};
+use crate::application::projects::registry::{ProjectRegistryService, registry_apps_array};
+use crate::application::system::target_apps::TargetAppGeneratedConfig;
+use crate::application::todos::FileTodoService;
+use crate::application::work_items::BulkGoalSelection;
+use crate::application::workers::FileRunnerWorkerService;
+use crate::application::workflow::WorkflowEngine;
+use crate::error::{RefineError, RefineResult};
+use crate::infrastructure::agents::invocation::{AgentProviderService, ProviderInvocation};
+use crate::infrastructure::process::subprocess::{
+    FileProcessSupervisor, ProcessOwner, ProcessSupervisor,
+};
+use crate::infrastructure::process::supervisor::lifecycle::current_launch_executable;
+use crate::infrastructure::process::supervisor::operations::{
     FileOperationRegistry, OperationRegistry, OperationState,
 };
-use crate::prompts::{PromptTemplate, render};
-use crate::tools::host::agent_providers::{AgentProviderService, ProviderInvocation};
-use crate::tools::host::fleet::{FileFleetService, FleetService, NodeRemoteUpdate};
-use crate::tools::host::target_apps::TargetAppGeneratedConfig;
-use crate::tools::product::next_actions::FileNextActionsService;
-use crate::tools::product::nodes::{FileNodeRegistryService, NodeUpdate, detached_nodes_response};
-use crate::tools::product::project_projection::{DashboardProjectionQuery, ProjectionQuery};
-use crate::tools::product::project_registry::{ProjectRegistryService, registry_apps_array};
-use crate::tools::product::todos::FileTodoService;
-use crate::tools::product::work_items::BulkGoalSelection;
-use crate::tools::product::worktree_cleanup::{FileWorktreeCleanupService, WorktreeCleanupOptions};
-use crate::workflow::WorkflowEngine;
+use crate::model::workflow::GoalStatus;
 
 use super::support::*;
 use super::*;
@@ -79,7 +85,7 @@ pub(super) fn dashboard_attention_items(
     indicators: &[String],
     runner_reachable: bool,
     workflow_paused: bool,
-    state_sync_health: Option<&crate::tools::host::state_sync_health::StateSyncHealth>,
+    state_sync_health: Option<&crate::application::persistence_sync::health::StateSyncHealth>,
 ) -> Vec<Value> {
     let mut items = indicators
         .iter()
@@ -129,7 +135,7 @@ pub(super) fn dashboard_attention_items(
 
 fn dashboard_active_node(
     service: &FileNodeRegistryService,
-) -> RefineResult<crate::tools::product::nodes::ActiveNodeIdentity> {
+) -> RefineResult<crate::application::fleet::nodes::ActiveNodeIdentity> {
     service.active_identity()
 }
 
@@ -141,7 +147,9 @@ struct GeneratedGovernanceRulesContract {
     rules: Vec<String>,
 }
 
-impl crate::structured_output::Contract for GeneratedGovernanceRulesContract {
+impl crate::application::agent_io::structured_output::Contract
+    for GeneratedGovernanceRulesContract
+{
     const LABEL: &'static str = "generated Governance rules JSON";
 
     fn example() -> Self {
@@ -175,7 +183,7 @@ struct TargetAppConfigContract {
     notes: String,
 }
 
-impl crate::structured_output::Contract for TargetAppConfigContract {
+impl crate::application::agent_io::structured_output::Contract for TargetAppConfigContract {
     const LABEL: &'static str = "target-app config JSON";
 
     fn example() -> Self {
@@ -204,7 +212,7 @@ impl crate::structured_output::Contract for TargetAppConfigContract {
 
 fn governance_generation_prompt(product: &str, constitution: &str) -> String {
     let rules_contract =
-        <GeneratedGovernanceRulesContract as crate::structured_output::Contract>::contract_json();
+        <GeneratedGovernanceRulesContract as crate::application::agent_io::structured_output::Contract>::contract_json();
     render(
         PromptTemplate::GovernanceGeneration,
         &[
@@ -218,7 +226,7 @@ fn governance_generation_prompt(product: &str, constitution: &str) -> String {
 fn target_app_generation_prompt(target_root: &std::path::Path) -> String {
     let target_root = target_root.display().to_string();
     let target_app_contract =
-        <TargetAppConfigContract as crate::structured_output::Contract>::contract_json();
+        <TargetAppConfigContract as crate::application::agent_io::structured_output::Contract>::contract_json();
     render(
         PromptTemplate::TargetAppGeneration,
         &[
@@ -261,10 +269,10 @@ fn target_config_u64(value: &Value, key: &str, fallback: u64) -> u64 {
 }
 
 fn parse_generated_target_app_config(output: &str) -> Option<TargetAppGeneratedConfig> {
-    let value = crate::structured_output::json_candidates(
+    let value = crate::application::agent_io::structured_output::json_candidates(
         output,
-        &crate::structured_output::DecodeOptions::new(
-            <TargetAppConfigContract as crate::structured_output::Contract>::LABEL,
+        &crate::application::agent_io::structured_output::DecodeOptions::new(
+            <TargetAppConfigContract as crate::application::agent_io::structured_output::Contract>::LABEL,
         ),
     )
     .into_iter()
@@ -366,10 +374,10 @@ fn generated_governance_rule(text: &str, index: usize) -> Value {
 }
 
 fn parse_generated_governance_rules(output: &str) -> Vec<Value> {
-    for value in crate::structured_output::json_candidates(
+    for value in crate::application::agent_io::structured_output::json_candidates(
         output,
-        &crate::structured_output::DecodeOptions::new(
-            <GeneratedGovernanceRulesContract as crate::structured_output::Contract>::LABEL,
+        &crate::application::agent_io::structured_output::DecodeOptions::new(
+            <GeneratedGovernanceRulesContract as crate::application::agent_io::structured_output::Contract>::LABEL,
         ),
     ) {
         let rules = value

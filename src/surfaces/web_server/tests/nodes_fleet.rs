@@ -95,7 +95,7 @@ fn web_server_manages_fleet_operations_over_nodes() {
 /// simply not been upgraded yet.
 #[test]
 fn web_server_fleet_sync_reports_a_pending_upgrade_node_without_failing() {
-    use crate::tools::host::fleet::{
+    use crate::application::fleet::node_sync::{
         FleetNodeDaemonClient, NodeDaemonReply, install_node_daemon_client,
     };
 
@@ -160,7 +160,7 @@ fn web_server_fleet_sync_reports_a_pending_upgrade_node_without_failing() {
     assert_eq!(status("node-old")["api_contract_version"], "2");
     assert_eq!(
         status("node-old")["expected_api_contract_version"],
-        crate::model::API_CONTRACT_VERSION
+        crate::application::protocol::API_CONTRACT_VERSION
     );
     // The answer is the node's receipt for the request, not a verdict on its
     // reconciliation: that node runs and reports its own pass.
@@ -512,7 +512,7 @@ fn nodes_reports_local_state_sync_health_only_for_the_active_node() {
         path: "/api/nodes".to_string(),
         body: Some(json!({"id": "node-b"})),
     });
-    crate::tools::host::state_sync_health::FileStateSyncHealthService::new(&runtime_root)
+    crate::application::persistence_sync::health::FileStateSyncHealthService::new(&runtime_root)
         .record_success(&temp_root, "default")
         .unwrap();
 

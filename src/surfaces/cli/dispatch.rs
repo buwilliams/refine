@@ -63,52 +63,59 @@ use std::time::{Duration, Instant};
 use clap::Parser;
 use serde_json::{Value, json};
 
-use crate::model::workflow::GoalStatus;
-use crate::process::runner::run_worker;
-use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::process::supervisor::lifecycle::{
-    BackgroundDaemonConfig, DaemonStatus, FileDaemonLifecycleService, current_launch_executable,
-    current_launch_mode,
+use crate::application::agents::provider_selection::resolve_agent_provider;
+use crate::application::diagnostics::processes::FileProcessStatusService;
+use crate::application::diagnostics::support_bundle::{
+    FileSupportBundleService, SupportBundleService,
 };
-use crate::process::supervisor::runtime::RuntimeRoot;
-use crate::surfaces::web_server::{
-    API_CONTRACT_VERSION, API_GROUPS, InProcessWebServer, LocalHttpDaemon,
+use crate::application::diagnostics::{DiagnosticsService, FileDiagnosticsService};
+use crate::application::exports::jira::FileGoalExportService;
+use crate::application::fleet::node_init::{WorkerInitOptions, initialize_worker};
+use crate::application::fleet::node_sync::fleet_sync_response;
+use crate::application::fleet::nodes::FileNodeRegistryService;
+use crate::application::fleet::service::{
+    FLEET_RUNBOOK_PATH, FileFleetService, FleetService, NodeRemoteUpdate, fleet_manage_prompt,
 };
-use crate::tools::host::agent_providers::{
-    AgentProviderService, HostAgentProviderService, ProviderInvocation, resolve_agent_provider,
+use crate::application::guidance::FileNextActionsService;
+use crate::application::imports::FileImportService;
+use crate::application::maintenance::worktrees::{
+    FileWorktreeCleanupService, WorktreeCleanupOptions,
 };
-use crate::tools::host::checkout::{RefineCheckoutPaths, discover_refine_checkout};
-use crate::tools::host::daemon_lifecycle::{
+use crate::application::operations::process_control::FileProcessControlService;
+use crate::application::persistence_sync::state::FileGitSyncService;
+use crate::application::projects::projection::{
+    FileProjectProjectionStore, ProjectionQuery, ProjectionSnapshot,
+};
+use crate::application::projects::registry::{FileProjectRegistryService, ProjectRegistryService};
+use crate::application::system::daemon_lifecycle::{
     DaemonLifecycleAction, FileHostDaemonLifecycleService, execute_daemon_lifecycle,
     uninstall_daemon_installation,
 };
-use crate::tools::host::fleet::{
-    FLEET_RUNBOOK_PATH, FileFleetService, FleetService, NodeRemoteUpdate, fleet_manage_prompt,
-    fleet_sync_response,
+use crate::application::system::installation::{FileInstallationService, InstallationService};
+use crate::application::system::release::{FileReleaseService, ReleaseBump};
+use crate::application::system::source_promotion::FileSourcePromotionService;
+use crate::application::todos::FileTodoService;
+use crate::application::work_items::FileWorkItemService;
+use crate::application::workers::run_worker;
+use crate::application::workflow::governance::integration::FileGovernanceIntegrationService;
+use crate::error::{RefineError, RefineResult};
+use crate::infrastructure::agents::invocation::{
+    AgentProviderService, HostAgentProviderService, ProviderInvocation,
 };
-use crate::tools::host::git_sync::FileGitSyncService;
-use crate::tools::host::installation::{FileInstallationService, InstallationService};
-use crate::tools::host::node_init::{WorkerInitOptions, initialize_worker};
-use crate::tools::host::project_layout::prepare_refine_dir;
-use crate::tools::host::release::{FileReleaseService, ReleaseBump};
-use crate::tools::host::source_promotion::FileSourcePromotionService;
-use crate::tools::observability::activity::{ActivityQuery, ActivityService, FileActivityService};
-use crate::tools::observability::diagnostics::{DiagnosticsService, FileDiagnosticsService};
-use crate::tools::observability::processes::FileProcessStatusService;
-use crate::tools::observability::support_bundle::{FileSupportBundleService, SupportBundleService};
-use crate::tools::product::goal_exports::FileGoalExportService;
-use crate::tools::product::governance_integration::FileGovernanceIntegrationService;
-use crate::tools::product::imports::FileImportService;
-use crate::tools::product::next_actions::FileNextActionsService;
-use crate::tools::product::nodes::FileNodeRegistryService;
-use crate::tools::product::process_control::FileProcessControlService;
-use crate::tools::product::project_projection::{
-    FileProjectProjectionStore, ProjectionQuery, ProjectionSnapshot,
+use crate::infrastructure::observability::activity::{
+    ActivityQuery, ActivityService, FileActivityService,
 };
-use crate::tools::product::project_registry::{FileProjectRegistryService, ProjectRegistryService};
-use crate::tools::product::todos::FileTodoService;
-use crate::tools::product::work_items::FileWorkItemService;
-use crate::tools::product::worktree_cleanup::{FileWorktreeCleanupService, WorktreeCleanupOptions};
+use crate::infrastructure::process::supervisor::lifecycle::{
+    BackgroundDaemonConfig, DaemonStatus, FileDaemonLifecycleService, current_launch_executable,
+    current_launch_mode,
+};
+use crate::infrastructure::process::supervisor::runtime::RuntimeRoot;
+use crate::infrastructure::runtime::checkout::{RefineCheckoutPaths, discover_refine_checkout};
+use crate::infrastructure::storage::project_layout::prepare_refine_dir;
+use crate::model::workflow::GoalStatus;
+use crate::surfaces::web_server::{
+    API_CONTRACT_VERSION, API_GROUPS, InProcessWebServer, LocalHttpDaemon,
+};
 
 use super::actions::*;
 use super::helpers::*;
@@ -259,7 +266,7 @@ pub(super) fn run_system_start(
     // would serve happily and then fail every sync. Say so once, here, in the
     // sentence that names the fix — and record it as a start failure so a
     // service-managed daemon's readiness waiter sees the reason too.
-    if let Err(error) = crate::tools::git::merge::ensure_supported_git() {
+    if let Err(error) = crate::infrastructure::git::merge::ensure_supported_git() {
         let _ = lifecycle.mark_start_failed(actual_port, &error);
         return Err(error);
     }

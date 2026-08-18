@@ -1,8 +1,10 @@
 use serde_json::json;
 
-use crate::process::supervisor::lifecycle::{current_launch_executable, current_launch_mode};
+use crate::application::system::daemon_lifecycle::DaemonLifecycleAction;
+use crate::infrastructure::process::supervisor::lifecycle::{
+    current_launch_executable, current_launch_mode,
+};
 use crate::surfaces::mcp;
-use crate::tools::host::daemon_lifecycle::DaemonLifecycleAction;
 
 use super::support::*;
 use super::*;

@@ -461,7 +461,7 @@ fn stale_default_label_never_relabels_default_owned_goal_projections() {
     });
     assert_eq!(created.status, 201);
     fs::write(
-        refine_dir.join(crate::tools::product::nodes::NODE_REGISTRY_FILE),
+        refine_dir.join(crate::application::fleet::nodes::NODE_REGISTRY_FILE),
         serde_json::json!({
             "nodes": [{
                 "id": "default",

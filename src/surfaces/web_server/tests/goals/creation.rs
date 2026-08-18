@@ -6,7 +6,7 @@ fn web_server_creates_goal_from_new_goal_modal_payload() {
     let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
-    crate::process::supervisor::config::FileReporterService::new(&refine_dir)
+    crate::infrastructure::process::supervisor::config::FileReporterService::new(&refine_dir)
         .create("Existing")
         .unwrap();
 
@@ -205,7 +205,7 @@ fn warmed_goal_create_post_completes_under_fifty_milliseconds_at_current_scale()
     }
     // These fixtures bypass Goal authoring, so establish the durable invariant
     // that real Goal creation would have established before timing a warmed write.
-    crate::process::supervisor::config::FileReporterService::new(&refine_dir)
+    crate::infrastructure::process::supervisor::config::FileReporterService::new(&refine_dir)
         .create("Performance")
         .unwrap();
 

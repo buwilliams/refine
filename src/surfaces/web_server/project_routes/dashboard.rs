@@ -35,7 +35,7 @@ impl InProcessWebServer {
                     Err(error) => return error_response(error),
                 }
             }
-            None => crate::tools::product::nodes::ActiveNodeIdentity {
+            None => crate::application::fleet::nodes::ActiveNodeIdentity {
                 id: "default".to_string(),
                 display_name: "Default".to_string(),
                 diagnostics: Vec::new(),

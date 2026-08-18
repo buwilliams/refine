@@ -1,5 +1,5 @@
 use super::*;
-use crate::process::supervisor::errors::RefineError;
+use crate::error::RefineError;
 use std::sync::{Mutex, OnceLock};
 
 static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();

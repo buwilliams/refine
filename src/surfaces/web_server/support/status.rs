@@ -4,20 +4,20 @@ use std::time::{Duration, Instant};
 
 use serde_json::{Value, json};
 
-use crate::model::JsonObject;
-use crate::process::subprocess::ManagedProcess;
-use crate::process::supervisor::errors::RefineResult;
-use crate::process::supervisor::operations::OperationHandle;
-use crate::tools::host::agent_providers::{AgentProviderService, HostAgentProviderService};
-use crate::tools::host::installation::InstallTarget;
-use crate::tools::observability::activity::{ActivityService, FileActivityService};
-use crate::tools::observability::metrics::{FileMetricsService, PerformanceQuery};
 #[cfg(test)]
-pub(in crate::surfaces::web_server) use crate::tools::observability::processes::runtime_process_status_value;
-pub(in crate::surfaces::web_server) use crate::tools::observability::processes::{
+pub(in crate::surfaces::web_server) use crate::application::diagnostics::processes::runtime_process_status_value;
+pub(in crate::surfaces::web_server) use crate::application::diagnostics::processes::{
     process_status_value, process_summary_value_with_chat_sessions, runtime_process_summary_value,
 };
-use crate::tools::product::project_registry::registry_apps_array;
+use crate::application::projects::registry::registry_apps_array;
+use crate::application::system::installation::InstallTarget;
+use crate::error::RefineResult;
+use crate::infrastructure::agents::invocation::{AgentProviderService, HostAgentProviderService};
+use crate::infrastructure::observability::activity::{ActivityService, FileActivityService};
+use crate::infrastructure::observability::metrics::{FileMetricsService, PerformanceQuery};
+use crate::infrastructure::process::subprocess::ManagedProcess;
+use crate::infrastructure::process::supervisor::operations::OperationHandle;
+use crate::model::JsonObject;
 
 use super::super::*;
 use super::*;
@@ -233,9 +233,7 @@ pub(in crate::surfaces::web_server) fn provider_status_value_refresh() -> Refine
 fn cached_provider_status_value(refresh: bool) -> RefineResult<Value> {
     let cache = PROVIDER_STATUS_CACHE.get_or_init(|| Mutex::new(None));
     let mut cache = cache.lock().map_err(|_| {
-        crate::process::supervisor::errors::RefineError::Io(
-            "provider status cache lock was poisoned".to_string(),
-        )
+        crate::error::RefineError::Io("provider status cache lock was poisoned".to_string())
     })?;
     if !refresh
         && let Some(entry) = cache.as_ref()

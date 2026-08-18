@@ -292,7 +292,7 @@ impl InProcessWebServer {
             Ok(None) => return target_root_unavailable("settle state synchronization"),
             Err(error) => return error_response(error),
         };
-        use crate::tools::host::git_sync::{
+        use crate::application::persistence_sync::recovery::{
             StateRecoveryAuthority, StateRecoveryDecision, StateRecoveryOverride,
             StateRecoveryRunPolicy,
         };
@@ -339,7 +339,7 @@ impl InProcessWebServer {
                     .and(self.runtime_root.as_deref())
                     .zip(recovery_health.as_ref())
                     .and_then(|(runtime_root, expected_health)| {
-                        crate::process::runner::settle_state_recovery_success(
+                        crate::application::workers::settle_state_recovery_success(
                             runtime_root,
                             &target_root,
                             expected_health,

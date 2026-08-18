@@ -118,23 +118,27 @@ const SECURITY_AUDIT_ROTATE_BYTES: u64 = 5_000_000;
 
 fn run_retention_sweep(server: &Arc<InProcessWebServer>) {
     if let Ok(Some(refine_dir)) = server.current_refine_dir() {
-        let _ = crate::tools::observability::activity::FileActivityService::new(&refine_dir)
-            .cleanup(ACTIVITY_RETENTION_DAYS, false);
+        let _ =
+            crate::infrastructure::observability::activity::FileActivityService::new(&refine_dir)
+                .cleanup(ACTIVITY_RETENTION_DAYS, false);
         remove_files_older_than(&refine_dir.join("support-bundles"), 30 * RETENTION_DAY);
     }
     let Some(runtime_root) = server.runtime_root.clone() else {
         return;
     };
-    let _ =
-        crate::tools::observability::metrics::FileMetricsService::new(&runtime_root).cleanup(false);
-    let _ = crate::process::supervisor::operations::FileOperationRegistry::new(&runtime_root)
-        .cleanup_terminal_operations(7 * RETENTION_DAY);
+    let _ = crate::infrastructure::observability::metrics::FileMetricsService::new(&runtime_root)
+        .cleanup(false);
+    let _ = crate::infrastructure::process::supervisor::operations::FileOperationRegistry::new(
+        &runtime_root,
+    )
+    .cleanup_terminal_operations(7 * RETENTION_DAY);
     remove_files_older_than(&runtime_root.join("idempotency"), IDEMPOTENCY_RETENTION);
     remove_files_older_than(&runtime_root.join("process-history"), 30 * RETENTION_DAY);
     sweep_orphan_process_logs(&runtime_root.join("processes"), 7 * RETENTION_DAY);
     prune_all_but_newest(&runtime_root.join("source-promotion"), 2);
     rotate_if_large(
-        &runtime_root.join(crate::process::supervisor::security::SECURITY_AUDIT_FILE),
+        &runtime_root
+            .join(crate::infrastructure::process::supervisor::security::SECURITY_AUDIT_FILE),
         SECURITY_AUDIT_ROTATE_BYTES,
     );
 }
@@ -236,7 +240,7 @@ fn ensure_worker_failure(workers: &FileRunnerWorkerService, worker_kind: &str) -
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::process::subprocess::FileProcessSupervisor;
+    use crate::infrastructure::process::subprocess::FileProcessSupervisor;
 
     #[test]
     fn paused_workers_are_quiet_but_pause_state_faults_are_reported() {

@@ -1,5 +1,5 @@
 use super::*;
-use crate::process::subprocess::FileProcessSupervisor;
+use crate::infrastructure::process::subprocess::FileProcessSupervisor;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct SsePathFingerprint {
@@ -469,12 +469,15 @@ impl LocalHttpDaemon {
         }
         if let Some(runtime_root) = &self.server.runtime_root {
             let mut source_update_published = false;
-            if let Ok(checkout) = crate::tools::host::checkout::discover_refine_checkout() {
-                let service = crate::tools::host::source_promotion::FileSourcePromotionService::new(
-                    checkout,
-                    runtime_root,
-                    self.server.status.port,
-                );
+            if let Ok(checkout) =
+                crate::infrastructure::runtime::checkout::discover_refine_checkout()
+            {
+                let service =
+                    crate::application::system::source_promotion::FileSourcePromotionService::new(
+                        checkout,
+                        runtime_root,
+                        self.server.status.port,
+                    );
                 if let Ok(status) = service.inspect_cached() {
                     let combined = self.server.source_status_body(status);
                     events.push(SseEventFrame {

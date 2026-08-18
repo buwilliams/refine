@@ -6,7 +6,7 @@ fn web_server_appends_and_edits_latest_round() {
     let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
-    crate::process::supervisor::config::FileReporterService::new(&refine_dir)
+    crate::infrastructure::process::supervisor::config::FileReporterService::new(&refine_dir)
         .create("Existing")
         .unwrap();
     server.handle(ApiRequest {
@@ -216,7 +216,7 @@ fn native_sse_streams_projected_goal_round_logs() {
     let mut server = server_with_projection();
     server.projection.activity.insert(
         "round-log:GOAL1:0:0".to_string(),
-        crate::tools::product::project_projection::ActivitySummaryProjection {
+        crate::application::projects::projection::ActivitySummaryProjection {
             entry: ActivityEntry {
                 id: "round-log:GOAL1:0:0".to_string(),
                 datetime: "2026-07-21T12:00:00Z".to_string(),
@@ -247,7 +247,7 @@ fn goal_log_activity_page_returns_the_newest_entries() {
         let id = format!("round-log:GOAL1:0:{index:03}");
         server.projection.activity.insert(
             id.clone(),
-            crate::tools::product::project_projection::ActivitySummaryProjection {
+            crate::application::projects::projection::ActivitySummaryProjection {
                 entry: ActivityEntry {
                     id,
                     datetime: format!("2026-07-21T12:{:02}:{:02}Z", index / 60, index % 60),

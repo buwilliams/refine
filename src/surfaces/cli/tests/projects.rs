@@ -199,7 +199,7 @@ fn in_process_project_status_suppresses_ambiguous_legacy_default_label() {
     let refine_dir = refine_dir_for_target_root(&app_root).unwrap();
     fs::create_dir_all(&refine_dir).unwrap();
     fs::write(
-        refine_dir.join(crate::tools::product::nodes::NODE_REGISTRY_FILE),
+        refine_dir.join(crate::application::fleet::nodes::NODE_REGISTRY_FILE),
         serde_json::json!({
             "nodes": [{
                 "id": "default",
@@ -211,7 +211,7 @@ fn in_process_project_status_suppresses_ambiguous_legacy_default_label() {
         .to_string(),
     )
     .unwrap();
-    let service = crate::tools::product::project_registry::FileProjectRegistryService::new(
+    let service = crate::application::projects::registry::FileProjectRegistryService::new(
         &runtime_root,
         Some(app_root.clone()),
     );

@@ -373,7 +373,7 @@ fn web_server_sync_preview_and_terminal_authority_use_the_shared_service() {
     )
     .unwrap();
     fs::write(refine_a.join("shared.json"), "{\"node\":\"a\"}\n").unwrap();
-    crate::tools::host::git_sync::FileGitSyncService::new(&a, a.join("run"))
+    crate::application::persistence_sync::state::FileGitSyncService::new(&a, a.join("run"))
         .sync()
         .unwrap();
     fs::create_dir_all(refine_b.join("goals/LIVE")).unwrap();
@@ -386,7 +386,7 @@ fn web_server_sync_preview_and_terminal_authority_use_the_shared_service() {
     server.runtime_root = Some(runtime_root.clone());
     // The merge-base pipeline records conflicts without a typed recovery
     // kind; a recovered terminal run must settle exactly this record.
-    crate::tools::host::state_sync_health::FileStateSyncHealthService::new(&runtime_root)
+    crate::application::persistence_sync::health::FileStateSyncHealthService::new(&runtime_root)
         .record_failure(&b, "default", "state changed on multiple nodes")
         .unwrap();
     // The preview is a read-only divergence summary, never an apply token,
@@ -485,7 +485,7 @@ fn web_server_sync_queues_pipeline_and_terminal_decision_is_idempotent() {
         "{\"id\":\"REMOTE\"}\n",
     )
     .unwrap();
-    crate::tools::host::git_sync::FileGitSyncService::new(&a, a.join("run"))
+    crate::application::persistence_sync::state::FileGitSyncService::new(&a, a.join("run"))
         .sync()
         .unwrap();
     fs::create_dir_all(refine_b.join("goals/LIVE")).unwrap();
@@ -495,7 +495,7 @@ fn web_server_sync_queues_pipeline_and_terminal_decision_is_idempotent() {
     server.target_root = Some(b.clone());
     let runtime_root = b.join("run");
     server.runtime_root = Some(runtime_root.clone());
-    crate::tools::host::state_sync_health::FileStateSyncHealthService::new(&runtime_root)
+    crate::application::persistence_sync::health::FileStateSyncHealthService::new(&runtime_root)
         .record_failure(&b, "default", "baseline missing")
         .unwrap();
 
@@ -542,7 +542,7 @@ fn web_server_sync_returns_while_repository_worker_is_busy() {
     let (release_tx, release_rx) = std::sync::mpsc::channel();
     let lock_root = app_root.clone();
     let lock_thread = thread::spawn(move || {
-        crate::tools::git::with_repository_git_lock(&lock_root, || {
+        crate::infrastructure::git::with_repository_git_lock(&lock_root, || {
             locked_tx.send(()).unwrap();
             release_rx.recv().unwrap();
             Ok(())

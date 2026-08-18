@@ -1,6 +1,6 @@
 use super::*;
 
-use crate::tools::host::git_sync::{
+use crate::application::persistence_sync::recovery::{
     StateRecoveryAuthority, StateRecoveryDecision, StateRecoveryOverride, StateRecoveryRunPolicy,
 };
 

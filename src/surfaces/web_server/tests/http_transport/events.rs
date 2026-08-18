@@ -33,7 +33,7 @@ fn sse_exposes_typed_state_sync_health() {
     let temp_root = unique_temp_dir("http-sse-state-sync-health");
     let runtime_root = temp_root.join("run/8080");
     fs::create_dir_all(temp_root.join(".refine")).unwrap();
-    crate::tools::host::state_sync_health::FileStateSyncHealthService::new(&runtime_root)
+    crate::application::persistence_sync::health::FileStateSyncHealthService::new(&runtime_root)
         .record_failure(&temp_root, "default", "git fetch failed")
         .unwrap();
     let mut server = server_with_projection();
@@ -62,11 +62,13 @@ fn sse_rebuilds_when_state_sync_crosses_the_wall_clock_stale_boundary() {
         .update(&json!({"state_sync_stale_threshold_seconds": 1}))
         .unwrap();
     let health_service =
-        crate::tools::host::state_sync_health::FileStateSyncHealthService::new(&runtime_root);
+        crate::application::persistence_sync::health::FileStateSyncHealthService::new(
+            &runtime_root,
+        );
     health_service
         .record_success(&temp_root, "default")
         .unwrap();
-    let mut record: crate::tools::host::state_sync_health::StateSyncHealthRecord =
+    let mut record: crate::application::persistence_sync::health::StateSyncHealthRecord =
         serde_json::from_slice(&fs::read(health_service.path()).unwrap()).unwrap();
     let future_success = (Utc::now() + chrono::Duration::seconds(1))
         .to_rfc3339_opts(chrono::SecondsFormat::Secs, true);

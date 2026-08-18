@@ -36,28 +36,30 @@ use static_content::*;
 use tokio::sync::{Notify, broadcast, oneshot};
 use tokio_stream::wrappers::ReceiverStream;
 
-use crate::process::agent_sessions::find_agent_session;
-use crate::process::runner::{
+use crate::application::agents::sessions::find_agent_session;
+#[cfg(not(test))]
+use crate::application::development_requests::load_self_development_email_config;
+use crate::application::persistence_sync::health::StateSyncHealth;
+use crate::application::projects::projection::ProjectionQuery;
+use crate::application::workers::{
     BackgroundWorkerEnsure, FileRunnerWorkerService, GIT_SYNC_RUNNER, WORKTREE_CLEANUP_RUNNER,
 };
 #[cfg(not(test))]
-use crate::process::runner::{DEVELOPMENT_REQUEST_RUNNER, WORKFLOW_RUNNER};
+use crate::application::workers::{DEVELOPMENT_REQUEST_RUNNER, WORKFLOW_RUNNER};
 #[cfg(test)]
-use crate::process::supervisor::config::{ConfigService, FileSettingsService};
-use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::process::supervisor::lifecycle::{
+use crate::application::workflow::WorkflowEngine;
+use crate::application::workflow::phases::quality::QualityOperationRunner;
+use crate::error::{RefineError, RefineResult};
+use crate::infrastructure::observability::activity::{ActivityService, FileActivityService};
+use crate::infrastructure::observability::metrics::FileMetricsService;
+#[cfg(test)]
+use crate::infrastructure::process::supervisor::config::{ConfigService, FileSettingsService};
+use crate::infrastructure::process::supervisor::lifecycle::{
     DaemonRuntimeService, DaemonStatus, FileDaemonLifecycleService,
 };
-use crate::process::supervisor::operations::{FileOperationRegistry, OperationRegistry};
-use crate::tools::host::quality::QualityOperationRunner;
-use crate::tools::host::state_sync_health::StateSyncHealth;
-use crate::tools::observability::activity::{ActivityService, FileActivityService};
-use crate::tools::observability::metrics::FileMetricsService;
-#[cfg(not(test))]
-use crate::tools::product::development_requests::load_self_development_email_config;
-use crate::tools::product::project_projection::ProjectionQuery;
-#[cfg(test)]
-use crate::workflow::WorkflowEngine;
+use crate::infrastructure::process::supervisor::operations::{
+    FileOperationRegistry, OperationRegistry,
+};
 
 use super::support::*;
 use super::*;

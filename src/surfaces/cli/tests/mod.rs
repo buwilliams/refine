@@ -17,33 +17,33 @@ use super::dispatch::{
 };
 use super::*;
 
-use crate::model::log::LogEntry;
-use crate::model::workflow::GoalStatus;
-use crate::process::subprocess::{
+use crate::application::fleet::node_sync::{
+    FleetNodeDaemonClient, NodeDaemonReply, install_node_daemon_client,
+};
+use crate::application::projects::projection::FileProjectProjectionStore;
+use crate::application::projects::projection::PROJECTION_SNAPSHOT_FILE;
+use crate::application::system::daemon_lifecycle::{
+    run_service_managed_daemon_with, stop_service_managed_daemon_with,
+};
+use crate::application::system::installation::InstalledServiceAction;
+use crate::application::todos::FileTodoService;
+use crate::application::work_items::FileWorkItemService;
+use crate::infrastructure::observability::activity::ActivityService;
+use crate::infrastructure::observability::activity::FileActivityService;
+use crate::infrastructure::process::subprocess::{
     FileProcessSupervisor, ManagedProcess, ManagedProcessSpec, ProcessOwner, ProcessResourceLimits,
     ProcessSupervisor, managed_pid_is_alive,
 };
-use crate::process::supervisor::lifecycle::{
+use crate::infrastructure::process::supervisor::lifecycle::{
     DaemonReachability, DaemonRuntimeService, FileDaemonLifecycleService,
 };
-use crate::process::supervisor::operations::{
+use crate::infrastructure::process::supervisor::operations::{
     FileOperationRegistry, OperationRegistry, OperationState,
 };
-use crate::process::supervisor::runtime::RuntimeRoot;
-use crate::tools::host::daemon_lifecycle::{
-    run_service_managed_daemon_with, stop_service_managed_daemon_with,
-};
-use crate::tools::host::fleet::{
-    FleetNodeDaemonClient, NodeDaemonReply, install_node_daemon_client,
-};
-use crate::tools::host::installation::InstalledServiceAction;
-use crate::tools::host::project_layout::refine_dir_for_target_root;
-use crate::tools::observability::activity::ActivityService;
-use crate::tools::observability::activity::FileActivityService;
-use crate::tools::product::project_projection::FileProjectProjectionStore;
-use crate::tools::product::project_projection::PROJECTION_SNAPSHOT_FILE;
-use crate::tools::product::todos::FileTodoService;
-use crate::tools::product::work_items::FileWorkItemService;
+use crate::infrastructure::process::supervisor::runtime::RuntimeRoot;
+use crate::infrastructure::storage::project_layout::refine_dir_for_target_root;
+use crate::model::log::LogEntry;
+use crate::model::workflow::GoalStatus;
 use clap::Parser;
 use serde_json::json;
 use std::fs;
@@ -114,7 +114,7 @@ fn wait_for_cli_operation_state(
     registry: &FileOperationRegistry,
     operation_id: &str,
     expected: OperationState,
-) -> crate::process::supervisor::operations::OperationHandle {
+) -> crate::infrastructure::process::supervisor::operations::OperationHandle {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
     loop {
         let operation = registry.status(operation_id).unwrap();

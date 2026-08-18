@@ -1,6 +1,6 @@
 use super::*;
 
-use crate::tools::product::project_projection::goal_text_matches;
+use crate::application::projects::projection::goal_text_matches;
 
 impl InProcessWebServer {
     pub(crate) fn handle_import_extract(&self, request: ApiRequest) -> ApiResponse {

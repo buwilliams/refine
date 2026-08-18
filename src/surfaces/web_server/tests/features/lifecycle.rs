@@ -111,7 +111,7 @@ fn web_server_cancels_and_deletes_features() {
     let process = supervisor
         .register(ManagedProcess {
             id: "agent-goal2".to_string(),
-            owner: crate::process::subprocess::ProcessOwner::Agent,
+            owner: crate::infrastructure::process::subprocess::ProcessOwner::Agent,
             pid: None,
             state: "running".to_string(),
             label: Some("agent".to_string()),

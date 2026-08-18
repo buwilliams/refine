@@ -157,18 +157,14 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                 )?
             } else {
                 let Some(reporter) = reporter.as_deref() else {
-                    return Err(
-                        crate::process::supervisor::errors::RefineError::InvalidInput(
-                            "round reporter is required".to_string(),
-                        ),
-                    );
+                    return Err(crate::error::RefineError::InvalidInput(
+                        "round reporter is required".to_string(),
+                    ));
                 };
                 let Some(prompt) = prompt.as_deref() else {
-                    return Err(
-                        crate::process::supervisor::errors::RefineError::InvalidInput(
-                            "round prompt is required".to_string(),
-                        ),
-                    );
+                    return Err(crate::error::RefineError::InvalidInput(
+                        "round prompt is required".to_string(),
+                    ));
                 };
                 service.append_goal_round_summary(&id, reporter, prompt)?
             };
@@ -233,11 +229,9 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                 "quality" | "qa" => service.retry_goal_quality_summary(&id)?,
                 "governance" => service.retry_goal_governance_summary(&id)?,
                 _ => {
-                    return Err(
-                        crate::process::supervisor::errors::RefineError::InvalidInput(
-                            "retry stage must be quality or governance".to_string(),
-                        ),
-                    );
+                    return Err(crate::error::RefineError::InvalidInput(
+                        "retry stage must be quality or governance".to_string(),
+                    ));
                 }
             };
             println!(
@@ -336,11 +330,9 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
             let service = direct_work_item_service(&target_root)?;
             let current = service.show_goal_summary(&id)?;
             let Some(feature_id) = current.goal.feature_id.clone() else {
-                return Err(
-                    crate::process::supervisor::errors::RefineError::InvalidInput(format!(
-                        "Goal {id} is not assigned to a Feature"
-                    )),
-                );
+                return Err(crate::error::RefineError::InvalidInput(format!(
+                    "Goal {id} is not assigned to a Feature"
+                )));
             };
             let feature = service.remove_goal_from_feature(&feature_id, &id)?;
             println!(
@@ -518,11 +510,9 @@ pub(super) fn dispatch_goal_daemon(action: GoalAction) -> RefineResult<()> {
                 "quality" => "retry-quality",
                 "governance" => "retry-governance",
                 _ => {
-                    return Err(
-                        crate::process::supervisor::errors::RefineError::InvalidInput(
-                            "retry stage must be quality or governance".to_string(),
-                        ),
-                    );
+                    return Err(crate::error::RefineError::InvalidInput(
+                        "retry stage must be quality or governance".to_string(),
+                    ));
                 }
             };
             daemon_json(

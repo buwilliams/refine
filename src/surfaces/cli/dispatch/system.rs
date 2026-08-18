@@ -224,7 +224,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                 }
             };
             let runtime_root = resolve_system_runtime_root(runtime_root)?;
-            crate::tools::host::daemon_lifecycle::FileDaemonLifecycleOperationService::new(
+            crate::application::system::daemon_lifecycle::FileDaemonLifecycleOperationService::new(
                 RuntimeRoot { root: runtime_root },
                 env!("CARGO_PKG_VERSION"),
             )

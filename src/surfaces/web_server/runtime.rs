@@ -5,25 +5,25 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::UNIX_EPOCH;
 
-use crate::process::runner::{GIT_SYNC_RUNNER, state_sync_stale_threshold};
-use crate::process::subprocess::{FileProcessSupervisor, ProcessSupervisor};
-use crate::process::supervisor::config::FileSettingsService;
-use crate::process::supervisor::errors::{RefineError, RefineResult};
-use crate::process::supervisor::operations::{
-    FileOperationRegistry, OperationProjectionRefresher, OperationRegistry, OperationState,
-};
-use crate::tools::host::agent_providers::HostAgentProviderService;
-use crate::tools::host::git_sync::FileGitSyncService;
-use crate::tools::host::project_layout::prepare_refine_dir;
-use crate::tools::host::project_layout::refine_dir_for_target_root;
-use crate::tools::host::state_sync_health::{FileStateSyncHealthService, StateSyncHealth};
-use crate::tools::product::chat::FileChatService;
-use crate::tools::product::nodes::FileNodeRegistryService;
-use crate::tools::product::project_projection::{
+use crate::application::chat::FileChatService;
+use crate::application::fleet::nodes::FileNodeRegistryService;
+use crate::application::persistence_sync::health::{FileStateSyncHealthService, StateSyncHealth};
+use crate::application::persistence_sync::state::FileGitSyncService;
+use crate::application::projects::projection::{
     FileProjectProjectionStore, ProjectionSnapshot, RuntimeProjection,
 };
-use crate::tools::product::project_registry::FileProjectRegistryService;
-use crate::tools::product::work_items::FileWorkItemService;
+use crate::application::projects::registry::FileProjectRegistryService;
+use crate::application::work_items::FileWorkItemService;
+use crate::application::workers::{GIT_SYNC_RUNNER, state_sync_stale_threshold};
+use crate::error::{RefineError, RefineResult};
+use crate::infrastructure::agents::invocation::HostAgentProviderService;
+use crate::infrastructure::process::subprocess::{FileProcessSupervisor, ProcessSupervisor};
+use crate::infrastructure::process::supervisor::config::FileSettingsService;
+use crate::infrastructure::process::supervisor::operations::{
+    FileOperationRegistry, OperationProjectionRefresher, OperationRegistry, OperationState,
+};
+use crate::infrastructure::storage::project_layout::prepare_refine_dir;
+use crate::infrastructure::storage::project_layout::refine_dir_for_target_root;
 
 use super::support::*;
 use super::*;

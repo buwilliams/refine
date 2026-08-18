@@ -819,7 +819,7 @@ fn resolver_invalid_twice_needs_decision() {
 /// authority, overrides). The runner-side wiring around this decision (the
 /// `state_sync_auto_recovery` gate, health episodes, and the activity entry
 /// built from this same evidence) is `pub(super)` daemon machinery covered
-/// by `src/process/runner/tests.rs`; this scenario drives the identical
+/// by `src/application/workers/tests.rs`; this scenario drives the identical
 /// public pair the runner calls: `merge_base_ownership_decision` →
 /// `run_state_recovery`.
 #[test]

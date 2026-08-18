@@ -198,7 +198,7 @@ fn web_server_serves_project_utility_upgrade_health_and_sse_routes() {
     supervisor
         .register(ManagedProcess {
             id: "sse-process".to_string(),
-            owner: crate::process::subprocess::ProcessOwner::UserHelper,
+            owner: crate::infrastructure::process::subprocess::ProcessOwner::UserHelper,
             pid: Some(std::process::id()),
             state: "running".to_string(),
             label: Some("sse".to_string()),
@@ -272,11 +272,14 @@ fn http_lifecycle_routes_preserve_shared_status_and_evidence_for_every_action() 
         actions: std::cell::RefCell<Vec<&'static str>>,
     }
 
-    impl crate::tools::host::daemon_lifecycle::HostDaemonLifecycleService for RecordingLifecycle {
+    impl crate::application::system::daemon_lifecycle::HostDaemonLifecycleService
+        for RecordingLifecycle
+    {
         fn start(
             &self,
-            config: crate::process::supervisor::lifecycle::BackgroundDaemonConfig,
-        ) -> RefineResult<crate::process::supervisor::lifecycle::DaemonStatus> {
+            config: crate::infrastructure::process::supervisor::lifecycle::BackgroundDaemonConfig,
+        ) -> RefineResult<crate::infrastructure::process::supervisor::lifecycle::DaemonStatus>
+        {
             self.actions.borrow_mut().push("start");
             Ok(http_lifecycle_status(config.port, "start"))
         }
@@ -284,15 +287,17 @@ fn http_lifecycle_routes_preserve_shared_status_and_evidence_for_every_action() 
         fn stop(
             &self,
             port: u16,
-        ) -> RefineResult<crate::process::supervisor::lifecycle::DaemonStatus> {
+        ) -> RefineResult<crate::infrastructure::process::supervisor::lifecycle::DaemonStatus>
+        {
             self.actions.borrow_mut().push("stop");
             Ok(http_lifecycle_status(port, "stop"))
         }
 
         fn restart(
             &self,
-            config: crate::process::supervisor::lifecycle::BackgroundDaemonConfig,
-        ) -> RefineResult<crate::process::supervisor::lifecycle::DaemonStatus> {
+            config: crate::infrastructure::process::supervisor::lifecycle::BackgroundDaemonConfig,
+        ) -> RefineResult<crate::infrastructure::process::supervisor::lifecycle::DaemonStatus>
+        {
             self.actions.borrow_mut().push("restart");
             Ok(http_lifecycle_status(config.port, "restart"))
         }
@@ -302,15 +307,15 @@ fn http_lifecycle_routes_preserve_shared_status_and_evidence_for_every_action() 
     let lifecycle = RecordingLifecycle::default();
     for (action, expected) in [
         (
-            crate::tools::host::daemon_lifecycle::DaemonLifecycleAction::Start,
+            crate::application::system::daemon_lifecycle::DaemonLifecycleAction::Start,
             "start",
         ),
         (
-            crate::tools::host::daemon_lifecycle::DaemonLifecycleAction::Stop,
+            crate::application::system::daemon_lifecycle::DaemonLifecycleAction::Stop,
             "stop",
         ),
         (
-            crate::tools::host::daemon_lifecycle::DaemonLifecycleAction::Restart,
+            crate::application::system::daemon_lifecycle::DaemonLifecycleAction::Restart,
             "restart",
         ),
     ] {
@@ -340,10 +345,10 @@ fn http_stop_and_restart_return_durable_receipts_before_control_handoff() {
         actions: std::cell::RefCell<Vec<String>>,
     }
 
-    impl crate::tools::host::daemon_lifecycle::RestartSafeHandoffLauncher for RecordingHandoff {
+    impl crate::application::system::daemon_lifecycle::RestartSafeHandoffLauncher for RecordingHandoff {
         fn launch(
             &self,
-            handoff: &crate::tools::host::daemon_lifecycle::RestartSafeHandoff,
+            handoff: &crate::application::system::daemon_lifecycle::RestartSafeHandoff,
             service_manager: Option<&str>,
         ) -> RefineResult<()> {
             assert_eq!(service_manager, Some("systemd_user"));
@@ -359,11 +364,11 @@ fn http_stop_and_restart_return_durable_receipts_before_control_handoff() {
 
     for (action, expected) in [
         (
-            crate::tools::host::daemon_lifecycle::DaemonLifecycleAction::Stop,
+            crate::application::system::daemon_lifecycle::DaemonLifecycleAction::Stop,
             "stop",
         ),
         (
-            crate::tools::host::daemon_lifecycle::DaemonLifecycleAction::Restart,
+            crate::application::system::daemon_lifecycle::DaemonLifecycleAction::Restart,
             "restart",
         ),
     ] {
@@ -389,8 +394,8 @@ fn http_stop_and_restart_return_durable_receipts_before_control_handoff() {
 fn http_lifecycle_status(
     port: u16,
     action: &str,
-) -> crate::process::supervisor::lifecycle::DaemonStatus {
-    crate::process::supervisor::lifecycle::DaemonStatus {
+) -> crate::infrastructure::process::supervisor::lifecycle::DaemonStatus {
+    crate::infrastructure::process::supervisor::lifecycle::DaemonStatus {
         port,
         daemon_healthy: action != "stop",
         web_available: action != "stop",
@@ -401,7 +406,7 @@ fn http_lifecycle_status(
         active_operations: Vec::new(),
         degraded_integrations: Vec::new(),
         lifecycle_evidence: Some(
-            crate::process::supervisor::lifecycle::DaemonLifecycleEvidence {
+            crate::infrastructure::process::supervisor::lifecycle::DaemonLifecycleEvidence {
                 action: action.to_string(),
                 service_manager: "test".to_string(),
                 outcome: format!("{action}_shared"),
@@ -456,27 +461,29 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     // through the assertions below. A short-lived command would exit before the
     // summary call and be pruned by liveness recovery, racing the agent count.
     let launched_agent = supervisor
-        .launch(crate::process::subprocess::ManagedProcessSpec {
-            owner: crate::process::subprocess::ProcessOwner::Agent,
-            command: if cfg!(windows) { "cmd" } else { "sleep" }.to_string(),
-            args: if cfg!(windows) {
-                vec!["/C".to_string(), "ping -n 30 127.0.0.1 >NUL".to_string()]
-            } else {
-                vec!["30".to_string()]
+        .launch(
+            crate::infrastructure::process::subprocess::ManagedProcessSpec {
+                owner: crate::infrastructure::process::subprocess::ProcessOwner::Agent,
+                command: if cfg!(windows) { "cmd" } else { "sleep" }.to_string(),
+                args: if cfg!(windows) {
+                    vec!["/C".to_string(), "ping -n 30 127.0.0.1 >NUL".to_string()]
+                } else {
+                    vec!["30".to_string()]
+                },
+                cwd: None,
+                env: Vec::new(),
+                stdin: None,
+                limits: None,
+                authorization_command: None,
+                sensitive: false,
+                metadata: Default::default(),
             },
-            cwd: None,
-            env: Vec::new(),
-            stdin: None,
-            limits: None,
-            authorization_command: None,
-            sensitive: false,
-            metadata: Default::default(),
-        })
+        )
         .unwrap();
     supervisor
         .register(ManagedProcess {
             id: "agent-context".to_string(),
-            owner: crate::process::subprocess::ProcessOwner::Agent,
+            owner: crate::infrastructure::process::subprocess::ProcessOwner::Agent,
             pid: Some(std::process::id()),
             state: "running".to_string(),
             label: Some("Agent context".to_string()),
@@ -492,7 +499,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     FileProcessSupervisor::new(runtime_root.join("agents"))
         .register(ManagedProcess {
             id: "background-agent-context".to_string(),
-            owner: crate::process::subprocess::ProcessOwner::Agent,
+            owner: crate::infrastructure::process::subprocess::ProcessOwner::Agent,
             pid: Some(std::process::id()),
             state: "running".to_string(),
             label: Some("Background agent context".to_string()),
@@ -508,7 +515,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     supervisor
         .register(ManagedProcess {
             id: "chat-context".to_string(),
-            owner: crate::process::subprocess::ProcessOwner::UserHelper,
+            owner: crate::infrastructure::process::subprocess::ProcessOwner::UserHelper,
             pid: Some(std::process::id()),
             state: "running".to_string(),
             label: Some("Chat context".to_string()),
@@ -526,7 +533,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     supervisor
         .register(ManagedProcess {
             id: "ui-context".to_string(),
-            owner: crate::process::subprocess::ProcessOwner::UserHelper,
+            owner: crate::infrastructure::process::subprocess::ProcessOwner::UserHelper,
             pid: Some(std::process::id()),
             state: "running".to_string(),
             label: Some("UI context".to_string()),
@@ -542,7 +549,7 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     supervisor
         .register(ManagedProcess {
             id: "exited-agent-context".to_string(),
-            owner: crate::process::subprocess::ProcessOwner::Agent,
+            owner: crate::infrastructure::process::subprocess::ProcessOwner::Agent,
             pid: None,
             state: "exited".to_string(),
             label: Some("Exited agent context".to_string()),
@@ -754,9 +761,9 @@ fn web_server_lists_processes_and_updates_pause_controls() {
     fs::write(&stdout_path, "hello stdout\n").unwrap();
     fs::write(&stderr_path, "warn stderr\n").unwrap();
     supervisor
-        .register(crate::process::subprocess::ManagedProcess {
+        .register(crate::infrastructure::process::subprocess::ManagedProcess {
             id: "stream-test".to_string(),
-            owner: crate::process::subprocess::ProcessOwner::UserHelper,
+            owner: crate::infrastructure::process::subprocess::ProcessOwner::UserHelper,
             pid: Some(std::process::id()),
             state: "running".to_string(),
             label: Some("stream".to_string()),
@@ -789,9 +796,9 @@ fn web_server_lists_processes_and_updates_pause_controls() {
             .contains("warn stderr")
     );
     supervisor
-        .register(crate::process::subprocess::ManagedProcess {
+        .register(crate::infrastructure::process::subprocess::ManagedProcess {
             id: "stop-test".to_string(),
-            owner: crate::process::subprocess::ProcessOwner::UserHelper,
+            owner: crate::infrastructure::process::subprocess::ProcessOwner::UserHelper,
             pid: None,
             state: "running".to_string(),
             label: Some("stop".to_string()),

@@ -1,10 +1,10 @@
 use super::config_input::*;
 use super::*;
 
-use crate::process::supervisor::config::{
+use crate::application::workflow::phases::quality::{FileQualityService, QualitySettingsPatch};
+use crate::infrastructure::process::supervisor::config::{
     FileGovernanceService, FileGuidanceService, FileSettingsService,
 };
-use crate::tools::host::quality::{FileQualityService, QualitySettingsPatch};
 
 pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
     let Commands::Config { action } = command else {
@@ -395,16 +395,14 @@ pub(super) fn structured_config_error(error: RefineError) -> RefineError {
         "missing_active_app"
     } else {
         match error.category() {
-            crate::process::supervisor::errors::ErrorCategory::InvalidInput => "invalid_input",
-            crate::process::supervisor::errors::ErrorCategory::NotFound => "not_found",
-            crate::process::supervisor::errors::ErrorCategory::Unauthorized => "unauthorized",
-            crate::process::supervisor::errors::ErrorCategory::Conflict => "conflict",
-            crate::process::supervisor::errors::ErrorCategory::Degraded => "daemon_unavailable",
-            crate::process::supervisor::errors::ErrorCategory::Io => "io_error",
-            crate::process::supervisor::errors::ErrorCategory::Serialization => {
-                "serialization_error"
-            }
-            crate::process::supervisor::errors::ErrorCategory::NotImplemented => "not_implemented",
+            crate::error::ErrorCategory::InvalidInput => "invalid_input",
+            crate::error::ErrorCategory::NotFound => "not_found",
+            crate::error::ErrorCategory::Unauthorized => "unauthorized",
+            crate::error::ErrorCategory::Conflict => "conflict",
+            crate::error::ErrorCategory::Degraded => "daemon_unavailable",
+            crate::error::ErrorCategory::Io => "io_error",
+            crate::error::ErrorCategory::Serialization => "serialization_error",
+            crate::error::ErrorCategory::NotImplemented => "not_implemented",
         }
     };
     let encoded = serde_json::to_string_pretty(&json!({
@@ -412,27 +410,13 @@ pub(super) fn structured_config_error(error: RefineError) -> RefineError {
     }))
     .unwrap_or_else(|_| error.to_string());
     match error.category() {
-        crate::process::supervisor::errors::ErrorCategory::InvalidInput => {
-            RefineError::InvalidInput(encoded)
-        }
-        crate::process::supervisor::errors::ErrorCategory::NotFound => {
-            RefineError::NotFound(encoded)
-        }
-        crate::process::supervisor::errors::ErrorCategory::Unauthorized => {
-            RefineError::Unauthorized(encoded)
-        }
-        crate::process::supervisor::errors::ErrorCategory::Conflict => {
-            RefineError::Conflict(encoded)
-        }
-        crate::process::supervisor::errors::ErrorCategory::Degraded => {
-            RefineError::Degraded(encoded)
-        }
-        crate::process::supervisor::errors::ErrorCategory::Io => RefineError::Io(encoded),
-        crate::process::supervisor::errors::ErrorCategory::Serialization => {
-            RefineError::Serialization(encoded)
-        }
-        crate::process::supervisor::errors::ErrorCategory::NotImplemented => {
-            RefineError::NotImplemented(encoded)
-        }
+        crate::error::ErrorCategory::InvalidInput => RefineError::InvalidInput(encoded),
+        crate::error::ErrorCategory::NotFound => RefineError::NotFound(encoded),
+        crate::error::ErrorCategory::Unauthorized => RefineError::Unauthorized(encoded),
+        crate::error::ErrorCategory::Conflict => RefineError::Conflict(encoded),
+        crate::error::ErrorCategory::Degraded => RefineError::Degraded(encoded),
+        crate::error::ErrorCategory::Io => RefineError::Io(encoded),
+        crate::error::ErrorCategory::Serialization => RefineError::Serialization(encoded),
+        crate::error::ErrorCategory::NotImplemented => RefineError::NotImplemented(encoded),
     }
 }

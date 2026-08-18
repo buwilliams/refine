@@ -83,7 +83,7 @@ impl InProcessWebServer {
             .as_ref()
             .map(|paths| paths.checkout.clone())
             .unwrap_or_default();
-        let upgrade = crate::tools::host::runtime_status::FileRuntimeStatusService::new(
+        let upgrade = crate::application::system::runtime_status::FileRuntimeStatusService::new(
             checkout,
             self.runtime_root.clone(),
             self.status.port,

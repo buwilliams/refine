@@ -215,11 +215,9 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                 },
         } => {
             let Some(target) = GoalStatus::parse_wire(&target) else {
-                return Err(
-                    crate::process::supervisor::errors::RefineError::InvalidInput(
-                        "target must be backlog or todo".to_string(),
-                    ),
-                );
+                return Err(crate::error::RefineError::InvalidInput(
+                    "target must be backlog or todo".to_string(),
+                ));
             };
             let feature =
                 direct_work_item_service(&target_root)?.move_feature_workflow(&id, target)?;
@@ -334,11 +332,9 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                 service.import_from_file(file, csv, reporter.as_deref(), feature_id.as_deref())?
             } else {
                 let Some(text) = text.as_deref() else {
-                    return Err(
-                        crate::process::supervisor::errors::RefineError::InvalidInput(
-                            "feature import requires --text or --file".to_string(),
-                        ),
-                    );
+                    return Err(crate::error::RefineError::InvalidInput(
+                        "feature import requires --text or --file".to_string(),
+                    ));
                 };
                 service.import_from_text(text, csv, reporter.as_deref(), feature_id.as_deref())?
             };

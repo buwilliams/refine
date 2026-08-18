@@ -4,12 +4,12 @@ use std::path::{Path, PathBuf};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::process::supervisor::errors::RefineError;
-use crate::prompts::{PromptEngine, PromptTemplate, render};
-use crate::tools::git::with_repository_git_lock;
-use crate::tools::host::checkout::active_refine_paths;
-use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
-use crate::tools::product::work_items::FileWorkItemService;
+use crate::application::agent_io::prompts::{PromptEngine, PromptTemplate, render};
+use crate::application::work_items::FileWorkItemService;
+use crate::error::RefineError;
+use crate::infrastructure::git::with_repository_git_lock;
+use crate::infrastructure::git::worktrees::{FileGitWorktreeService, GitWorktreeService};
+use crate::infrastructure::runtime::checkout::active_refine_paths;
 
 use super::InProcessWebServer;
 

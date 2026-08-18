@@ -4,41 +4,41 @@ use std::thread;
 
 use serde_json::{Value, json};
 
-use crate::model::log::LogEntry;
-use crate::model::workflow::GoalStatus;
-use crate::process::agent_sessions::find_goal_agent_session;
-use crate::process::runner::FileRunnerWorkerService;
-use crate::process::supervisor::config::ConfigService;
-use crate::process::supervisor::errors::RefineError;
-use crate::process::supervisor::operations::{
-    FileOperationRegistry, OperationRegistry, OperationState,
-};
-use crate::tools::git::with_repository_git_lock;
-use crate::tools::host::agent_providers::{
-    AgentProviderService, HostAgentProviderService, ProviderInvocation,
-};
-use crate::tools::host::git_worktrees::{FileGitWorktreeService, GitWorktreeService};
-use crate::tools::observability::activity::{ActivityService, FileActivityService};
-use crate::tools::observability::logs::FileLogService;
-use crate::tools::observability::metrics::{FileMetricsService, PerformanceQuery};
-use crate::tools::product::goal_exports::FileGoalExportService;
-use crate::tools::product::governance_integration::FileGovernanceIntegrationService;
-use crate::tools::product::imports::{
+use crate::application::agents::sessions::find_goal_agent_session;
+use crate::application::exports::jira::FileGoalExportService;
+use crate::application::imports::{
     FileImportService, ImportPersistFailureKind, import_drafts_from_value,
     import_extraction_prompt, parse_provider_import_result, parse_structured_import_result,
     validate_import_extraction_result,
 };
-use crate::tools::product::process_control::FileProcessControlService;
-use crate::tools::product::project_projection::{
+use crate::application::operations::process_control::FileProcessControlService;
+use crate::application::projects::projection::{
     ActivityProjectionQuery, ChangeProjectionQuery, FeatureProjectionQuery, GoalProjectionQuery,
     PROJECTION_SNAPSHOT_FILE, PageRequest, ProjectionQuery,
 };
-use crate::tools::product::work_items::{
+use crate::application::work_items::{
     BulkFeatureSelection, BulkFeatureUpdate, BulkGoalSelection, BulkGoalUpdate,
     FeatureGoalAuthoringRequest, FileWorkItemService, GoalAuthoringRequest,
 };
-use crate::workflow::WorkflowEngine;
-use crate::workflow::promotion::BacklogPromotionService;
+use crate::application::workers::FileRunnerWorkerService;
+use crate::application::workflow::WorkflowEngine;
+use crate::application::workflow::engine::scheduling::BacklogPromotionService;
+use crate::application::workflow::governance::integration::FileGovernanceIntegrationService;
+use crate::error::RefineError;
+use crate::infrastructure::agents::invocation::{
+    AgentProviderService, HostAgentProviderService, ProviderInvocation,
+};
+use crate::infrastructure::git::with_repository_git_lock;
+use crate::infrastructure::git::worktrees::{FileGitWorktreeService, GitWorktreeService};
+use crate::infrastructure::observability::activity::{ActivityService, FileActivityService};
+use crate::infrastructure::observability::logs::FileLogService;
+use crate::infrastructure::observability::metrics::{FileMetricsService, PerformanceQuery};
+use crate::infrastructure::process::supervisor::config::ConfigService;
+use crate::infrastructure::process::supervisor::operations::{
+    FileOperationRegistry, OperationRegistry, OperationState,
+};
+use crate::model::log::LogEntry;
+use crate::model::workflow::GoalStatus;
 
 use super::support::*;
 use super::*;
@@ -55,7 +55,7 @@ impl InProcessWebServer {
 
     fn node_identities_for_routes(
         &self,
-    ) -> BTreeMap<String, crate::tools::product::nodes::NodeIdentity> {
+    ) -> BTreeMap<String, crate::application::fleet::nodes::NodeIdentity> {
         self.current_refine_dir()
             .ok()
             .flatten()

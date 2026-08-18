@@ -18,9 +18,11 @@ pub(crate) fn project_status_is_attached_to_test_app(fixture: &IntegrationFixtur
 pub(crate) fn daemon_backed_project_status_suppresses_ambiguous_default_label(
     fixture: &IntegrationFixture,
 ) {
-    let refine_dir =
-        refine::tools::host::project_layout::refine_dir_for_target_root(&fixture.app_root).unwrap();
-    let path = refine_dir.join(refine::tools::product::nodes::NODE_REGISTRY_FILE);
+    let refine_dir = refine::infrastructure::storage::project_layout::refine_dir_for_target_root(
+        &fixture.app_root,
+    )
+    .unwrap();
+    let path = refine_dir.join(refine::application::fleet::nodes::NODE_REGISTRY_FILE);
     let original = fs::read(&path).ok();
     let mut registry = original
         .as_deref()

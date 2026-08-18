@@ -14,7 +14,7 @@ impl LocalHttpDaemon {
             let operation_registry = FileOperationRegistry::new(runtime_root);
             operation_registry.recover_active_supervised()?;
             let source_upgrade_present = runtime_root
-                .join(crate::tools::host::source_promotion::SOURCE_PROMOTION_STATE_FILE)
+                .join(crate::application::system::source_promotion::SOURCE_PROMOTION_STATE_FILE)
                 .exists()
                 || operation_registry
                     .recover()?
@@ -23,7 +23,7 @@ impl LocalHttpDaemon {
             if source_upgrade_present && let Some(paths) = &self.server.product_paths {
                 paths.validate_source_checkout()?;
                 report("reconciling restart-safe source-upgrade attempt");
-                crate::tools::host::source_promotion::FileSourcePromotionService::new(
+                crate::application::system::source_promotion::FileSourcePromotionService::new(
                     paths.checkout.clone(),
                     runtime_root,
                     self.server.status.port,

@@ -18,7 +18,9 @@ use std::fs;
 use std::thread;
 use std::time::{Duration, Instant};
 
-use refine::process::subprocess::{FileProcessSupervisor, ManagedProcess, ProcessOwner};
+use refine::infrastructure::process::subprocess::{
+    FileProcessSupervisor, ManagedProcess, ProcessOwner,
+};
 use serde_json::json;
 use support::integration::IntegrationFixture;
 

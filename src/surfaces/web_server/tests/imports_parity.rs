@@ -34,11 +34,11 @@ fn direct_and_daemon_http_imports_have_the_same_durable_semantics() {
         }
     ]);
     let parsed_drafts =
-        crate::tools::product::imports::import_drafts_from_value(&drafts, None).unwrap();
-    let direct = crate::tools::product::imports::FileImportService::new(&direct_refine_dir)
+        crate::application::imports::import_drafts_from_value(&drafts, None).unwrap();
+    let direct = crate::application::imports::FileImportService::new(&direct_refine_dir)
         .persist_with_destination(
             parsed_drafts,
-            crate::tools::product::imports::ImportFeatureDestination::New {
+            crate::application::imports::ImportFeatureDestination::New {
                 name: "Parity Feature".to_string(),
                 description: Some("Same destination".to_string()),
                 reporter: Some("QA".to_string()),

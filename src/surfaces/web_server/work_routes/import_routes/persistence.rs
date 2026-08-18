@@ -199,7 +199,7 @@ impl InProcessWebServer {
     fn import_persist_success_response(
         &self,
         refine_dir: &std::path::Path,
-        result: crate::tools::product::imports::ImportPersistResult,
+        result: crate::application::imports::ImportPersistResult,
     ) -> ApiResponse {
         let service = self.work_item_service(refine_dir);
         let mut failures = Vec::new();
@@ -244,7 +244,7 @@ impl InProcessWebServer {
 
     fn import_persist_failure_response(
         &self,
-        failure: crate::tools::product::imports::ImportPersistFailure,
+        failure: crate::application::imports::ImportPersistFailure,
     ) -> ApiResponse {
         if !failure.rollback.rollback_failures.is_empty() {
             return import_partial_failure_response(failure);
@@ -283,7 +283,7 @@ fn import_api_draft_index(failed_draft_index_zero_based: Option<usize>) -> usize
 }
 
 fn import_partial_failure_response(
-    failure: crate::tools::product::imports::ImportPersistFailure,
+    failure: crate::application::imports::ImportPersistFailure,
 ) -> ApiResponse {
     let message = failure
         .error

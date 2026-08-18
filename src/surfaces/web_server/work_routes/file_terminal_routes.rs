@@ -8,7 +8,7 @@ use super::{
     terminal_profile_prompt, terminal_resize_response, terminal_session_start_response,
     terminal_status_response, terminal_stop_response,
 };
-use crate::tools::product::work_items::FileWorkItemService;
+use crate::application::work_items::FileWorkItemService;
 
 impl InProcessWebServer {
     pub(crate) fn handle_files_tree(&self, raw_path: &str) -> ApiResponse {

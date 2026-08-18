@@ -9,11 +9,12 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use refine::tools::host::git_sync::{
-    FileGitSyncService, StateRecoveryAuthority, StateRecoveryDecision,
-    latest_state_sync_conflict_report,
+use refine::application::persistence_sync::conflict_reports::latest_state_sync_conflict_report;
+use refine::application::persistence_sync::recovery::{
+    StateRecoveryAuthority, StateRecoveryDecision,
 };
-use refine::tools::host::project_layout::refine_dir_for_target_root;
+use refine::application::persistence_sync::state::FileGitSyncService;
+use refine::infrastructure::storage::project_layout::refine_dir_for_target_root;
 
 fn git(root: &Path, args: &[&str]) {
     let output = Command::new("git")
@@ -366,7 +367,7 @@ fn interrupted_resolution_publish_completes_on_rerun_without_reinvoking_the_reso
     use std::os::unix::fs::PermissionsExt;
     use std::sync::Arc;
 
-    use refine::tools::git::resolve::{
+    use refine::application::persistence_sync::resolution::{
         ResolutionRequest, ResolverOutcome, ScriptedResolver, ScriptedStep,
         install_resolver_override,
     };
@@ -433,9 +434,9 @@ fn interrupted_resolution_publish_completes_on_rerun_without_reinvoking_the_reso
     let _guard = install_resolver_override(
         &b,
         Arc::new(ScriptedResolver::new(vec![Box::new(
-            |_request: &ResolutionRequest<'_>| -> refine::process::supervisor::errors::RefineResult<
-                ResolverOutcome,
-            > { panic!("a surviving gated result must publish without re-invoking the resolver") },
+            |_request: &ResolutionRequest<'_>| -> refine::error::RefineResult<ResolverOutcome> {
+                panic!("a surviving gated result must publish without re-invoking the resolver")
+            },
         ) as ScriptedStep])),
     );
     let published = service(&b).sync().unwrap();

@@ -16,16 +16,19 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use refine::process::supervisor::errors::{RefineError, RefineResult};
-use refine::tools::git::resolve::{
+use refine::application::persistence_sync::conflict_reports::{
+    StateSyncConflictReport, latest_state_sync_conflict_report,
+};
+use refine::application::persistence_sync::recovery::{
+    StateRecoveryAuthority, StateRecoveryDecision, StateRecoveryRunResult,
+};
+use refine::application::persistence_sync::resolution::{
     CONTENTION_ATTEMPT_LIMIT, ResolutionRequest, ResolverOutcome, ResolverOverrideGuard,
     ScriptedResolver, ScriptedStep, install_resolver_override,
 };
-use refine::tools::host::git_sync::{
-    FileGitSyncService, GitSyncResult, StateRecoveryAuthority, StateRecoveryDecision,
-    StateRecoveryRunResult, StateSyncConflictReport, latest_state_sync_conflict_report,
-};
-use refine::tools::host::project_layout::refine_dir_for_target_root;
+use refine::application::persistence_sync::state::{FileGitSyncService, GitSyncResult};
+use refine::error::{RefineError, RefineResult};
+use refine::infrastructure::storage::project_layout::refine_dir_for_target_root;
 
 #[path = "sync_simulation/rolling_upgrade.rs"]
 mod rolling_upgrade;
@@ -1120,7 +1123,7 @@ fn state_fingerprint(bytes: &[u8]) -> String {
 
 /// The product's durable-state exclusions, as they apply to the files this
 /// harness creates: node-local evidence directories and in-flight scratch
-/// files never reach the branch (`src/tools/host/git_sync/state_files.rs`).
+/// files never reach the branch (`src/application/persistence_sync/state/state_files.rs`).
 fn excluded_from_durable_state(relative: &Path) -> bool {
     let leading = relative
         .components()
