@@ -143,6 +143,47 @@
           },
           "started_at": "2026-08-18T10:12:22Z"
         },
+        "final_plan": {
+          "completed_at": "2026-08-18T10:15:44Z",
+          "git_after": {
+            "branch": "refine/DR4CB7F755C63F9061BA7A7120/round-1",
+            "head_commit": "1037732c9b33d8574c66a026aa021ffc62dd96a7",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR4CB7F755C63F9061BA7A7120/round-1",
+            "head_commit": "1037732c9b33d8574c66a026aa021ffc62dd96a7",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Revise the workflow overview, Feature surface intent, and model intent pages to define ordered Feature Goals as a hard barrier until the preceding Goal reaches Review, Done, or Cancelled, state that failure blocks later ordered Goals, specify that a lower-priority Todo is ineligible while higher-priority authored and Feature-eligible Todo or automated-active work exists on the same node and becomes eligible only after that work exits the active lifecycle, identify linear Feature order plus priority as the canonical dependency model with no separate DAG, and distinguish current per-node enforcement from intended global enforcement.",
+                "id": "P1"
+              },
+              {
+                "description": "Move scheduling eligibility into a cohesive policy submodule and derive each node's blocking priority rank from every authored and Feature-eligible Todo or automated-active Goal, including runner-active Todo Goals, so already-active work continues while lower-priority Todo work remains unable to start until higher-priority work leaves the active lifecycle.",
+                "id": "P2"
+              },
+              {
+                "description": "Add focused scheduling-policy coverage for every automated-active status, runner-active Todo work, release and terminal statuses, Feature-blocked higher-priority Goals, equal priorities, and distinct nodes to lock in the lifecycle barrier without implying cross-node enforcement.",
+                "id": "P3"
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "P1 now states the exact same-node hard gate, including which higher-priority Todo and automated-active work blocks a lower-priority Todo and that eligibility returns only after the blocking work exits the active lifecycle."
+              },
+              {
+                "criticism_id": "C2",
+                "resolution": "P1 now includes docs/intent/02-model/02-models.md and requires replacing its future dependency-graph promise with the canonical linear Feature order plus priority model and an explicit statement that no separate DAG exists."
+              }
+            ],
+            "summary": "Document linear Feature order and priority as Refine's canonical hard sequencing model, then extend same-node priority enforcement across the active workflow lifecycle so lower-priority Todo work cannot start prematurely while the current per-node limitation remains explicit."
+          },
+          "started_at": "2026-08-18T10:14:45Z"
+        },
         "phase": "revise",
         "phase_started_at": "2026-08-18T10:14:45Z",
         "proposal": {
@@ -179,7 +220,7 @@
         "schema_version": 2,
         "started_at": "2026-08-18T10:09:45Z",
         "state": "in_progress",
-        "updated_at": "2026-08-18T10:14:45Z"
+        "updated_at": "2026-08-18T10:15:44Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -193,7 +234,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T10:14:45Z",
+      "updated": "2026-08-18T10:15:44Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T10:09:44Z",
         "round_idx": 0,
@@ -205,6 +246,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-18T10:14:45Z",
-  "workflow_revision": 11
+  "updated": "2026-08-18T10:15:44Z",
+  "workflow_revision": 12
 }
