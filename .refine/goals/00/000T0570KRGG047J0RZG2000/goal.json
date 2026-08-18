@@ -912,15 +912,35 @@
         "kind": "governance",
         "source_round": 1
       },
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-08-18T13:20:16Z",
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
-      "governance_candidate_commit": "",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_candidate_commit": "e9baf5be7d2c55a4165503b5f0f1ec465cf96286",
+      "governance_checked_at": "2026-08-18T13:47:57Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T0570KRGG047J0RZG2000-round-1",
+        "failed_actions": [],
+        "governance_configured": true,
+        "guidance_checked": 2,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No governance rule violations found.\",\"violations\":[],\"recovery_analysis\":\"\",\"recovery_round_prompt\":\"\"}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "No governance rule violations found.",
+          "recovery_analysis": "",
+          "recovery_round_prompt": "",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T0570KRGG047J0RZG2000-round-1"
+      },
+      "governance_message": "No governance rule violations found.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
       "governance_rule_actions": [],
       "guidance_decision": {
         "applied": [
@@ -1037,8 +1057,8 @@
       "implementation_report": "Committed e9baf5be7d2c55a4165503b5f0f1ec465cf96286. Replaced the blocking Toolbar Goal Agent attachment request with an immediate 202 background operation; the Toolbar waits for exact-session runtime acknowledgment before presenting the terminal, failures settle closed, and runtime acknowledgment metadata is capped at 32 entries while concurrent opens remain supported. Preserved watchdog ordering and explicit lifecycle authority, split background settlement into a cohesive route module, and updated only the affected Goal Agent and Toolbar intent pages. Exact verification passed: formatting, 36 session tests, 11 Goal lifecycle tests, 38 Toolbar tests, 3 static terminal contracts, warning-denied scoped Clippy, diff hygiene, and isolated API latency measurements of 7.166ms queue POST, 8.638ms operation-status GET, and 7.061ms missing-ack queue POST.",
       "implementation_reported_at": "2026-08-18T13:37:59Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Fresh Round for Goal 00000T0570KRGG047J0RZG2000: correct the Toolbar Goal Agent attachment implementation to satisfy the under-50ms non-external API budget without weakening lifecycle safety. Keep attachment one-way and scoped to the exact live workflow Goal Agent. The runtime must persist timeout protection and a matching acknowledgment before evaluating idle or completion watchdogs, and the Toolbar must not present the session as open until that acknowledgment is observed. Replace the synchronous 40ms polling loop and two-second request timeout with existing asynchronous operation/event infrastructure: queue attachment and return a pending result within 50ms, then let the Toolbar observe or poll settlement through requests that each remain under 50ms. Fail settlement on process exit, session or process identity change, or unavailable acknowledgment. Bound and prune pending or completed acknowledgment identities while supporting concurrent opens. Preserve valid completion, needs-input behavior, explicit Stop, Goal cancellation, natural exit, transcript capture, workflow settlement, CLI attachment, and non-Goal session behavior. Update only the affected Goal Agent and Toolbar intent pages while preserving their format. Add focused tests for deadline races, exact-session isolation, missing acknowledgments without blocking an API request, asynchronous Toolbar presentation, concurrent and repeated opens with bounded metadata, and unchanged explicit termination. Verify the exact candidate with formatting, focused Rust session and web lifecycle tests, Toolbar browser tests, scoped warning-denied Clippy, diff hygiene, and concrete request-latency evidence demonstrating every new local API request stays under 50ms.",
       "quality_agent_report": "Quality reviewed exact candidate e9baf5be7d2c55a4165503b5f0f1ec465cf96286. No corrections were required. The retained implementation replaces blocking Toolbar Goal Agent attachment with an immediate 202 background operation, keeps the Toolbar loading until exact-session runtime acknowledgment settles, fails unavailable or identity-changing settlement closed, caps persisted runtime acknowledgments at 32 while exercising concurrent and repeated opens, preserves explicit and workflow lifecycle authority, and updates only the affected Goal Agent and Toolbar intent pages. Exact verification passed: 36 focused session tests, 11 Goal lifecycle tests with observed 7.202ms queue POST and 8.328ms operation-status GET plus 6.847ms missing-ack queue POST, 38 Toolbar tests, 3 static terminal contracts, formatting, scoped warning-denied Clippy, exact commit and branch identity, clean worktree, and diff hygiene.",
       "quality_candidate_commit": "e9baf5be7d2c55a4165503b5f0f1ec465cf96286",
@@ -1096,19 +1116,29 @@
       "quality_message": "All Quality tests passed with observed supervised evidence.",
       "quality_state": "passed",
       "reporter": "Refine",
-      "rule_state": "unclassified",
-      "updated": "2026-08-18T13:44:49Z",
-      "workflow_attempt_authority": {
-        "claimed_at": "2026-08-18T13:20:16Z",
-        "round_idx": 1,
-        "workflow_revision": 28
+      "rule_state": "passed",
+      "updated": "2026-08-18T13:48:02Z",
+      "workflow_attempt_authority": null,
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "e9baf5be7d2c55a4165503b5f0f1ec465cf96286",
+        "integrated_at": "2026-08-18T13:48:01.892739577+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n .../03-application/01-agents/10-goal-agents.md     |   4 +-\n docs/intent/05-surfaces/03-browser/15-toolbar.md   |   6 +-\n .../agents/sessions/attachment_tests.rs            | 323 +++++++++++++++++++++\n src/application/agents/sessions/codec.rs           |   4 +\n src/application/agents/sessions/mod.rs             | 126 ++++++++\n src/application/agents/sessions/session_runtime.rs |  44 ++-\n src/surfaces/web/static/js/features/toolbar.js     |   8 +-\n src/surfaces/web_server/tests/goals/lifecycle.rs   | 146 +++++++++-\n src/surfaces/web_server/work_routes.rs             |   6 +-\n .../web_server/work_routes/file_terminal_routes.rs |   7 +\n .../web_server/work_routes/toolbar_attachment.rs   | 101 +++++++\n tests/web_supervisor_toolbar.test.js               |  53 ++++\n 12 files changed, 810 insertions(+), 18 deletions(-)\n create mode 100644 src/application/agents/sessions/attachment_tests.rs\n create mode 100644 src/surfaces/web_server/work_routes/toolbar_attachment.rs",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "24727c8fc1764c2ac99b48b7c1db488fe4393f2b"
       },
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "governance",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-08-18T13:44:49Z",
-  "workflow_revision": 45
+  "updated": "2026-08-18T13:48:02Z",
+  "workflow_revision": 49
 }
