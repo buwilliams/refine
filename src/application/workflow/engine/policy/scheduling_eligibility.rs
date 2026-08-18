@@ -26,6 +26,14 @@ fn blocks_lower_priority_start(status: &GoalStatus) -> bool {
     *status == GoalStatus::Todo || automated_active(status)
 }
 
+fn scheduling_node_key(goal: &GoalIndexProjection) -> String {
+    goal.node_id
+        .as_deref()
+        .unwrap_or("default")
+        .trim()
+        .to_ascii_lowercase()
+}
+
 pub(crate) struct SchedulingEligibility {
     feature_eligible: BTreeSet<String>,
     blocking_priority_rank: BTreeMap<String, u8>,
@@ -46,7 +54,7 @@ impl SchedulingEligibility {
             }
             let rank = priority_rank(&goal.priority);
             blocking_priority_rank
-                .entry(goal.node_id.as_deref().unwrap_or("default").to_string())
+                .entry(scheduling_node_key(goal))
                 .and_modify(|highest: &mut u8| *highest = (*highest).max(rank))
                 .or_insert(rank);
         }
@@ -64,7 +72,7 @@ impl SchedulingEligibility {
         goal.status != GoalStatus::Todo
             || self
                 .blocking_priority_rank
-                .get(goal.node_id.as_deref().unwrap_or("default"))
+                .get(&scheduling_node_key(goal))
                 .is_none_or(|highest| priority_rank(&goal.priority) >= *highest)
     }
 }
@@ -72,8 +80,8 @@ impl SchedulingEligibility {
 fn feature_eligible_goal_ids<'a>(
     goals: impl IntoIterator<Item = &'a GoalIndexProjection> + Clone,
 ) -> BTreeSet<String> {
-    let mut lowest_holding_order: BTreeMap<(&str, &str), i64> = BTreeMap::new();
-    let mut occupying_count: BTreeMap<(&str, &str), usize> = BTreeMap::new();
+    let mut lowest_holding_order: BTreeMap<(String, &str), i64> = BTreeMap::new();
+    let mut occupying_count: BTreeMap<(String, &str), usize> = BTreeMap::new();
     for goal in goals.clone() {
         if goal.round_count == 0 {
             continue;
@@ -82,10 +90,10 @@ fn feature_eligible_goal_ids<'a>(
         else {
             continue;
         };
-        let key = (goal.node_id.as_deref().unwrap_or("default"), feature_id);
+        let key = (scheduling_node_key(goal), feature_id);
         if !releases_feature_order(&goal.status) {
             lowest_holding_order
-                .entry(key)
+                .entry(key.clone())
                 .and_modify(|lowest| *lowest = (*lowest).min(order))
                 .or_insert(order);
         }
@@ -103,7 +111,7 @@ fn feature_eligible_goal_ids<'a>(
             else {
                 return true;
             };
-            let key = (goal.node_id.as_deref().unwrap_or("default"), feature_id);
+            let key = (scheduling_node_key(goal), feature_id);
             lowest_holding_order.get(&key).copied() == Some(order)
                 && (goal.status != GoalStatus::Todo
                     || occupying_count.get(&key).copied().unwrap_or(0) == 0)
@@ -190,6 +198,23 @@ mod tests {
 
         assert!(eligibility.priority_eligible(&same_node));
         assert!(eligibility.priority_eligible(&other_node));
+    }
+
+    #[test]
+    fn legacy_node_id_spellings_share_scheduling_gates() {
+        let blocker = goal("high", GoalStatus::Plan, GoalPriority::High, " NODE-A ");
+        let candidate = goal("low", GoalStatus::Todo, GoalPriority::Low, "node-a");
+        let goals = [&blocker, &candidate];
+        let eligibility = SchedulingEligibility::new(goals);
+
+        assert!(!eligibility.priority_eligible(&candidate));
+
+        let first = ordered_goal("first", GoalStatus::Todo, GoalPriority::Low, "NODE-A", 1);
+        let second = ordered_goal("second", GoalStatus::Todo, GoalPriority::Low, "node-a", 2);
+        let goals = [&first, &second];
+        let eligibility = SchedulingEligibility::new(goals);
+
+        assert!(!eligibility.feature_eligible("second"));
     }
 
     #[test]
