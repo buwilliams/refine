@@ -106,12 +106,43 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-08-18T12:44:09Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-08-18T12:46:40Z",
+        "proposal": {
+          "completed_at": "2026-08-18T12:46:40Z",
+          "git_after": {
+            "branch": "refine/DRBA412961C24FBEFBEDF9F675/round-1",
+            "head_commit": "148e3ff37f026e3861adbefd86edc5ddbd9a3662",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRBA412961C24FBEFBEDF9F675/round-1",
+            "head_commit": "148e3ff37f026e3861adbefd86edc5ddbd9a3662",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Extend the durable implementation checklist outcome model and generated Goal Agent contract to accept no_change_needed as a successful evidenced non-change, and make downstream status presentation treat it consistently with completed work.",
+                "id": "P1"
+              },
+              {
+                "description": "Separate recoverable JSON transport failures from terminal typed-schema failures so an unknown enum or other schema violation is archived with its path-aware diagnostic and ends the live session without sending any replacement instruction, while the existing grace period and bounded recovery remain for legacy partial or malformed writes.",
+                "id": "P2"
+              },
+              {
+                "description": "Update the Goal Agent intent page to document the aligned outcome vocabulary and the boundary between recoverable transport writes and fail-fast typed-schema rejection.",
+                "id": "P3"
+              }
+            ],
+            "summary": "Align Goal Agent implementation outcomes with the review vocabulary by accepting no_change_needed, and fail immediately after preserving any genuinely invalid typed completion signal so schema mistakes cannot trigger repeated expensive stop-hook cycles while legacy partial-write recovery remains intact."
+          },
+          "started_at": "2026-08-18T12:44:09Z"
+        },
         "schema_version": 2,
         "started_at": "2026-08-18T12:44:09Z",
         "state": "in_progress",
-        "updated_at": "2026-08-18T12:44:09Z"
+        "updated_at": "2026-08-18T12:46:40Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -125,7 +156,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T12:44:09Z",
+      "updated": "2026-08-18T12:46:40Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T12:44:08Z",
         "round_idx": 0,
@@ -137,6 +168,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-18T12:44:09Z",
-  "workflow_revision": 7
+  "updated": "2026-08-18T12:46:40Z",
+  "workflow_revision": 9
 }
