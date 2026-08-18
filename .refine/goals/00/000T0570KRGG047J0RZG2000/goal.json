@@ -1040,13 +1040,15 @@
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
       "prompt": "Fresh Round for Goal 00000T0570KRGG047J0RZG2000: correct the Toolbar Goal Agent attachment implementation to satisfy the under-50ms non-external API budget without weakening lifecycle safety. Keep attachment one-way and scoped to the exact live workflow Goal Agent. The runtime must persist timeout protection and a matching acknowledgment before evaluating idle or completion watchdogs, and the Toolbar must not present the session as open until that acknowledgment is observed. Replace the synchronous 40ms polling loop and two-second request timeout with existing asynchronous operation/event infrastructure: queue attachment and return a pending result within 50ms, then let the Toolbar observe or poll settlement through requests that each remain under 50ms. Fail settlement on process exit, session or process identity change, or unavailable acknowledgment. Bound and prune pending or completed acknowledgment identities while supporting concurrent opens. Preserve valid completion, needs-input behavior, explicit Stop, Goal cancellation, natural exit, transcript capture, workflow settlement, CLI attachment, and non-Goal session behavior. Update only the affected Goal Agent and Toolbar intent pages while preserving their format. Add focused tests for deadline races, exact-session isolation, missing acknowledgments without blocking an API request, asynchronous Toolbar presentation, concurrent and repeated opens with bounded metadata, and unchanged explicit termination. Verify the exact candidate with formatting, focused Rust session and web lifecycle tests, Toolbar browser tests, scoped warning-denied Clippy, diff hygiene, and concrete request-latency evidence demonstrating every new local API request stays under 50ms.",
+      "quality_agent_report": "Quality reviewed exact candidate e9baf5be7d2c55a4165503b5f0f1ec465cf96286. No corrections were required. The retained implementation replaces blocking Toolbar Goal Agent attachment with an immediate 202 background operation, keeps the Toolbar loading until exact-session runtime acknowledgment settles, fails unavailable or identity-changing settlement closed, caps persisted runtime acknowledgments at 32 while exercising concurrent and repeated opens, preserves explicit and workflow lifecycle authority, and updates only the affected Goal Agent and Toolbar intent pages. Exact verification passed: 36 focused session tests, 11 Goal lifecycle tests with observed 7.202ms queue POST and 8.328ms operation-status GET plus 6.847ms missing-ack queue POST, 38 Toolbar tests, 3 static terminal contracts, formatting, scoped warning-denied Clippy, exact commit and branch identity, clean worktree, and diff hygiene.",
+      "quality_candidate_commit": "e9baf5be7d2c55a4165503b5f0f1ec465cf96286",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T13:38:00Z",
+      "updated": "2026-08-18T13:41:58Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T13:20:16Z",
         "round_idx": 1,
@@ -1058,6 +1060,6 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-18T13:38:00Z",
-  "workflow_revision": 41
+  "updated": "2026-08-18T13:41:58Z",
+  "workflow_revision": 43
 }
