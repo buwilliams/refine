@@ -106,12 +106,43 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-08-18T13:36:09Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-08-18T13:39:08Z",
+        "proposal": {
+          "completed_at": "2026-08-18T13:39:08Z",
+          "git_after": {
+            "branch": "refine/DRF56D7E92608723E5E90C193C/round-1",
+            "head_commit": "7240706a10f1d45dc387a41825c08891ed52cf41",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRF56D7E92608723E5E90C193C/round-1",
+            "head_commit": "7240706a10f1d45dc387a41825c08891ed52cf41",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Extend the central effective launch-environment policy so Quality-owned subprocesses overlay the cached login and interactive shell exports on the daemon environment before process-specific overrides, while keeping direct API-key removal exclusive to Agent processes and treating shell-capture failure as a non-blocking fallback.",
+                "id": "P1"
+              },
+              {
+                "description": "Add focused launch-environment and Quality-command regression coverage proving that a tool directory exported only by a synthetic user shell reaches an observed daemon-launched Quality command while explicit overrides and unrelated process-owner behavior remain unchanged.",
+                "id": "P2"
+              },
+              {
+                "description": "Update the affected process intent documentation to state that daemon-launched Quality checks use the host shell toolchain environment, that no tool-specific home path is invented, and that shell changes take effect after daemon restart.",
+                "id": "P3"
+              }
+            ],
+            "summary": "Make daemon-launched Quality commands inherit the same cached user shell toolchain environment as agent CLIs so shell-configured tools such as dotnet remain discoverable, without hardcoding a tool path or weakening process-specific environment precedence."
+          },
+          "started_at": "2026-08-18T13:36:09Z"
+        },
         "schema_version": 2,
         "started_at": "2026-08-18T13:36:09Z",
         "state": "in_progress",
-        "updated_at": "2026-08-18T13:36:09Z"
+        "updated_at": "2026-08-18T13:39:08Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -125,7 +156,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T13:36:09Z",
+      "updated": "2026-08-18T13:39:08Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T13:36:08Z",
         "round_idx": 0,
@@ -137,6 +168,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-18T13:36:09Z",
-  "workflow_revision": 7
+  "updated": "2026-08-18T13:39:08Z",
+  "workflow_revision": 9
 }
