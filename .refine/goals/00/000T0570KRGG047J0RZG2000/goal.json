@@ -106,8 +106,38 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-08-18T12:39:22Z",
+        "criticism": {
+          "completed_at": "2026-08-18T12:41:07Z",
+          "git_after": {
+            "branch": "refine/00000T0570KRGG047J0RZG2000/round-1",
+            "head_commit": "148e3ff37f026e3861adbefd86edc5ddbd9a3662",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T0570KRGG047J0RZG2000/round-1",
+            "head_commit": "148e3ff37f026e3861adbefd86edc5ddbd9a3662",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P1",
+                  "P2",
+                  "P4"
+                ],
+                "description": "The file-backed command queue is asynchronous, so writing the marker before returning a snapshot does not prove the runtime observed it before an already-due watchdog check kills the session.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Require an acknowledgment or equivalent atomic coordination before returning success, and test attachment racing an idle or completion deadline."
+              }
+            ],
+            "summary": "Require a successful Toolbar attachment to win atomically against timeout enforcement."
+          },
+          "started_at": "2026-08-18T12:39:22Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-08-18T12:41:07Z",
         "proposal": {
           "completed_at": "2026-08-18T12:39:22Z",
           "git_after": {
@@ -150,7 +180,7 @@
         "schema_version": 2,
         "started_at": "2026-08-18T12:37:40Z",
         "state": "in_progress",
-        "updated_at": "2026-08-18T12:39:22Z"
+        "updated_at": "2026-08-18T12:41:07Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -164,7 +194,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T12:39:22Z",
+      "updated": "2026-08-18T12:41:07Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T12:37:40Z",
         "round_idx": 0,
@@ -176,6 +206,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-18T12:39:22Z",
-  "workflow_revision": 9
+  "updated": "2026-08-18T12:41:07Z",
+  "workflow_revision": 11
 }
