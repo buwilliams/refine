@@ -102,10 +102,10 @@ pub(super) enum AutoRecoveryOutcome {
 /// Basic syncing must not require CLI ceremony: when ordinary sync fails
 /// closed with the conflict that attempt just recorded, the daemon runs the
 /// same terminal `sync --authority` decision an operator would, with the ownership
-/// policy read from the merge base so no side votes for itself: remote
-/// authority by default, and a live override for each contested goal record
-/// whose merge-base bytes name this node as `node_id`. The displaced side
-/// stays reachable as a merge parent (or retained ref on a join). A node set
+/// established remote whole-record fallback for ordinary conflicts while the
+/// persistence-sync ownership policy preserves a proven one-sided transfer
+/// and fails closed on ambiguous Goal ownership. The displaced side stays
+/// reachable as a merge parent (or retained ref on a join). A node set
 /// to `state_sync_auto_recovery: off` keeps the fail-closed behavior for
 /// deliberate divergence work.
 ///
@@ -125,11 +125,15 @@ pub(super) fn attempt_automatic_state_recovery(
     if !state_sync_auto_recovery_enabled(runtime_root, target_root) {
         return Ok(AutoRecoveryOutcome::NotAttempted);
     }
-    let decision = service.merge_base_ownership_decision(report, node_id);
+    let decision = service.automatic_recovery_decision(report);
     let attempt_id =
         record_state_sync_attempt(runtime_root, target_root, node_id, AUTO_RECOVERY_SOURCE)?;
     let run = match run_background_repository_operation(runtime_root, GIT_SYNC_RUNNER, || {
-        service.run_state_recovery(decision.clone())
+        service.run_state_recovery_with_policy(
+            crate::application::persistence_sync::recovery::StateRecoveryRunPolicy::Automatic(
+                decision.clone(),
+            ),
+        )
     })? {
         BackgroundOperationOutcome::Completed(Ok(run)) => run,
         BackgroundOperationOutcome::Completed(Err(error)) => {
@@ -176,8 +180,8 @@ fn state_sync_auto_recovery_enabled(runtime_root: &Path, target_root: &Path) -> 
 
 /// Record the audit trail for a recovery the daemon chose on its own. Every
 /// displaced version stays reachable as a merge parent (or the named
-/// retained ref on a join), so the entry carries the settled paths and any
-/// ownership overrides the merge base granted this node.
+/// retained ref on a join), so the entry carries the settled paths, proven
+/// Goal owners, and any explicit per-path authority overrides.
 fn append_auto_recovery_activity(
     target_root: &Path,
     node_id: &str,
@@ -211,6 +215,7 @@ fn append_auto_recovery_activity(
         "authority": recovery.authority.as_str(),
         "attempts": run.attempts,
         "settled_paths": recovery.settled_paths,
+        "preserved_goal_owners": recovery.preserved_goal_owners,
         "ownership_overrides": recovery.overrides,
         "retained_refs": recovery.retained_refs,
         "local_only": true

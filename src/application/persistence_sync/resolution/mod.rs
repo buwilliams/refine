@@ -36,6 +36,7 @@ use fs2::FileExt;
 use serde_json::json;
 
 use crate::application::agent_io::prompts::PromptTemplate;
+use crate::application::persistence_sync::goal_ownership::GoalOwnershipPolicy;
 use crate::application::persistence_sync::state::FileGitSyncService;
 use crate::error::{RefineError, RefineResult};
 use crate::infrastructure::agents::invocation::{
@@ -78,14 +79,15 @@ pub const CONTENTION_ATTEMPT_LIMIT: u32 = 2;
 /// The ownership doctrine handed to the state resolver as guidance, quoted
 /// from `docs/intent/02-model/04-fleet.md` (a test pins the quote to the
 /// intent doc so the two cannot drift apart).
-pub const OWNERSHIP_DOCTRINE: &str = "Reconciliation never guesses a winner from circumstance: \
-timestamps, recency, and which node happens to run the merge decide nothing. Ownership is \
-declared doctrine, never circumstance: the node that owned a record at the merge base is \
-authoritative for contested members, and staleness alone never discards work only the owning \
-node could produce — a stale local understanding is not a wrong one. Round evidence and the \
-workflow authority that produced it (status, assignment, branch) move as one coupled unit: \
-Rounds and other identity-free ordered arrays are atomic and never split from that authority. \
-Nothing is silently destroyed: every losing side is retained as a ref before publication.";
+pub const OWNERSHIP_DOCTRINE: &str = "Goal ownership changes only through supported transfer \
+surfaces. A valid one-sided node_id change is an explicit transfer and remains authoritative \
+while every other member is reconciled. Different concurrent transfers, or missing or malformed \
+operands, remain ambiguous: automatic resolution must not delete the Goal or choose its owner. \
+Timestamps, recency, current host, merge location, retry order, and merge-base ownership decide \
+nothing. Round evidence and the workflow authority that produced it (status, assignment, branch) \
+move as one coupled unit: Rounds and other identity-free ordered arrays are atomic and never split \
+from that authority. Nothing is silently destroyed: every losing side is retained as a ref before \
+publication.";
 
 /// One conflicted path with its domain-terms summary (which goal, which
 /// members each side changed) — the vocabulary escalation speaks in.
@@ -947,9 +949,19 @@ pub fn state_conflict_block(conflicts: &[ConflictedPath], sides: &[PathSides]) -
 /// The state-file acceptance gates: no conflict markers remain, the bytes
 /// parse as JSON, and the record schema-validates — the same Goal
 /// deserialization and record invariants that used to veto the merge,
-/// repurposed as an acceptance gate. A path deleted by the resolver adopts a
-/// deletion and passes. Rejection is feedback, never a fence.
-pub struct StateFileGates;
+/// repurposed as an acceptance gate. A non-Goal path deleted by the resolver
+/// adopts a deletion; a Goal with proven ownership cannot be deleted or moved.
+/// Rejection is feedback, never a fence.
+#[derive(Default)]
+pub struct StateFileGates {
+    ownership: GoalOwnershipPolicy,
+}
+
+impl StateFileGates {
+    pub(crate) fn with_ownership(ownership: GoalOwnershipPolicy) -> Self {
+        Self { ownership }
+    }
+}
 
 impl AcceptanceGates for StateFileGates {
     fn review(
@@ -962,7 +974,14 @@ impl AcceptanceGates for StateFileGates {
             let path = workspace_dir.join(&conflict.path);
             let bytes = match fs::read(&path) {
                 Ok(bytes) => bytes,
-                Err(error) if error.kind() == ErrorKind::NotFound => continue,
+                Err(error) if error.kind() == ErrorKind::NotFound => {
+                    if let Some(decision) = self.ownership.decision(&conflict.path)
+                        && let Err(problem) = decision.validate_result(&conflict.path, None)
+                    {
+                        problems.push(problem);
+                    }
+                    continue;
+                }
                 Err(error) => {
                     return Err(RefineError::Io(format!(
                         "failed to read resolved workspace file {}: {error}",
@@ -979,6 +998,12 @@ impl AcceptanceGates for StateFileGates {
                 continue;
             }
             if let Err(problem) = state_schema_gate(&conflict.path, &bytes) {
+                problems.push(problem);
+                continue;
+            }
+            if let Some(decision) = self.ownership.decision(&conflict.path)
+                && let Err(problem) = decision.validate_result(&conflict.path, Some(&bytes))
+            {
                 problems.push(problem);
             }
         }
@@ -1270,8 +1295,8 @@ mod tests {
     fn state_prompt_carries_the_doctrine_and_the_conflicts() {
         let rendered = state_conflict_context("## goal GOALA\nboth nodes changed status");
         assert!(rendered.contains("goal GOALA"));
-        assert!(rendered.contains("never guesses a winner from circumstance"));
-        assert!(rendered.contains("prefer the side that owns workflow authority"));
+        assert!(rendered.contains("Goal ownership changes only through supported transfer"));
+        assert!(rendered.contains("preserve every explicit Goal owner"));
         // The channel the agent authors its own question through, spelled the
         // same way the reply is read back.
         assert!(rendered.contains(NEEDS_DECISION_MARKER));
@@ -1475,8 +1500,13 @@ mod tests {
             );
         })]);
 
-        let outcome =
-            resolve_conflict(&fixture.repo(), &prepared, &resolver, &StateFileGates).unwrap();
+        let outcome = resolve_conflict(
+            &fixture.repo(),
+            &prepared,
+            &resolver,
+            &StateFileGates::default(),
+        )
+        .unwrap();
 
         let ResolutionOutcome::Resolved { result_commit, .. } = outcome else {
             panic!("expected Resolved, got {outcome:?}");
@@ -1618,8 +1648,13 @@ mod tests {
             ) as ScriptedStep,
         ]);
 
-        let outcome =
-            resolve_conflict(&fixture.repo(), &prepared, &resolver, &StateFileGates).unwrap();
+        let outcome = resolve_conflict(
+            &fixture.repo(),
+            &prepared,
+            &resolver,
+            &StateFileGates::default(),
+        )
+        .unwrap();
 
         let ResolutionOutcome::NeedsDecision { question } = outcome else {
             panic!("expected NeedsDecision, got {outcome:?}");
@@ -1692,8 +1727,13 @@ mod tests {
             }),
         ]);
 
-        let outcome =
-            resolve_conflict(&fixture.repo(), &prepared, &resolver, &StateFileGates).unwrap();
+        let outcome = resolve_conflict(
+            &fixture.repo(),
+            &prepared,
+            &resolver,
+            &StateFileGates::default(),
+        )
+        .unwrap();
 
         assert!(matches!(outcome, ResolutionOutcome::Resolved { .. }));
         let feedback = seen_feedback.lock().unwrap().clone().unwrap();
@@ -1709,8 +1749,13 @@ mod tests {
             completing(|request| write_resolution(request, b"still not json".to_vec())),
         ]);
 
-        let outcome =
-            resolve_conflict(&fixture.repo(), &prepared, &resolver, &StateFileGates).unwrap();
+        let outcome = resolve_conflict(
+            &fixture.repo(),
+            &prepared,
+            &resolver,
+            &StateFileGates::default(),
+        )
+        .unwrap();
 
         let ResolutionOutcome::NeedsDecision { question } = outcome else {
             panic!("expected NeedsDecision, got {outcome:?}");
@@ -1739,8 +1784,13 @@ mod tests {
                 Ok(ResolverOutcome::Unavailable)
             }) as ScriptedStep]);
 
-        let outcome =
-            resolve_conflict(&fixture.repo(), &prepared, &resolver, &StateFileGates).unwrap();
+        let outcome = resolve_conflict(
+            &fixture.repo(),
+            &prepared,
+            &resolver,
+            &StateFileGates::default(),
+        )
+        .unwrap();
 
         assert!(matches!(outcome, ResolutionOutcome::Unavailable));
         assert_eq!(calls.load(Ordering::SeqCst), 1);
@@ -1778,8 +1828,13 @@ mod tests {
                 goal_record("GOALA", "done", "2026-08-17T09:30:00Z"),
             );
         })]);
-        let outcome =
-            resolve_conflict(&fixture.repo(), &prepared, &resolver, &StateFileGates).unwrap();
+        let outcome = resolve_conflict(
+            &fixture.repo(),
+            &prepared,
+            &resolver,
+            &StateFileGates::default(),
+        )
+        .unwrap();
         let ResolutionOutcome::Resolved { result_commit, .. } = outcome else {
             panic!("expected Resolved, got {outcome:?}");
         };
@@ -1794,8 +1849,13 @@ mod tests {
                 panic!("a surviving result must skip straight to publish");
             },
         ) as ScriptedStep]);
-        let outcome =
-            resolve_conflict(&fixture.repo(), &rerun, &untouched, &StateFileGates).unwrap();
+        let outcome = resolve_conflict(
+            &fixture.repo(),
+            &rerun,
+            &untouched,
+            &StateFileGates::default(),
+        )
+        .unwrap();
         let ResolutionOutcome::Resolved {
             result_commit: rerun_commit,
             ..
@@ -1850,8 +1910,13 @@ mod tests {
             }),
         ]);
 
-        let outcome =
-            resolve_conflict(&fixture.repo(), &prepared, &resolver, &StateFileGates).unwrap();
+        let outcome = resolve_conflict(
+            &fixture.repo(),
+            &prepared,
+            &resolver,
+            &StateFileGates::default(),
+        )
+        .unwrap();
 
         assert!(matches!(outcome, ResolutionOutcome::Resolved { .. }));
         let feedback = seen_feedback.lock().unwrap().clone().unwrap();
@@ -1930,7 +1995,7 @@ mod tests {
         )
         .unwrap();
 
-        let verdict = StateFileGates
+        let verdict = StateFileGates::default()
             .review(&prepared.workspace, &prepared.conflicts)
             .unwrap();
 

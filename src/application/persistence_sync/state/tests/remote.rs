@@ -99,9 +99,9 @@ fn push_race_retry_remerges_and_reports_contested_records_with_push_retry_phase(
         .collect::<Vec<_>>();
     assert_eq!(errors.len(), 1, "left={left:?}, right={right:?}");
     assert!(
-        errors[0].to_string().contains(
-            "needs a decision: this node and another changed the same record(s) (1 contested"
-        ),
+        errors[0]
+            .to_string()
+            .contains("a one-sided transfer cannot be proven"),
         "{}",
         errors[0]
     );

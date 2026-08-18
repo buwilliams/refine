@@ -48,7 +48,7 @@ use crate::application::persistence_sync::conflict_reports::{
     StateSyncConflictPath, StateSyncConflictPhase,
 };
 use crate::application::persistence_sync::recovery::{
-    StateRecoveryAuthority, StateRecoveryDecision,
+    StateRecoveryAuthority, StateRecoveryDecision, StateRecoveryGoalOwner,
 };
 #[cfg(test)]
 use crate::application::persistence_sync::recovery::{

@@ -8,13 +8,13 @@ use std::sync::TryLockError;
 use crate::application::persistence_sync::conflict_reports::{
     StateSyncConflictPath, StateSyncConflictPhase, conflict_report_id, contended_records,
 };
+use crate::application::persistence_sync::goal_ownership::GoalOwnershipPolicy;
 use crate::application::persistence_sync::resolution::{
     ConflictResolver, ConflictedPath, InstalledAgentResolver, PreparedResolution, ResolutionLock,
     ResolutionOutcome, StateFileGates, buy_contention_attempt, conflict_sides,
     contention_budget_available, materialize_conflicted_workspace, pin_resolution_inputs,
-    resolve_conflict, resolver_override, retire_resolution, state_conflict_block,
-    state_conflict_context, surviving_resolution_result, sweep_abandoned_resolutions,
-    try_claim_resolution,
+    resolve_conflict, resolver_override, result_ref, retire_resolution, state_conflict_block,
+    state_conflict_context, sweep_abandoned_resolutions, try_claim_resolution,
 };
 use crate::application::persistence_sync::state::service::{
     OUTSIDE_STATE_CONFLICT_SUMMARY, StateSyncPass,
@@ -34,6 +34,7 @@ const RESOLUTION_ROUND_LIMIT: u32 = 2;
 /// the report operands the entry needs to escalate in domain terms.
 pub(crate) struct PreparedStateResolution {
     pub(crate) resolution: PreparedResolution,
+    pub(crate) gates: StateFileGates,
     pub(crate) phase: StateSyncConflictPhase,
     pub(crate) remote: String,
     pub(crate) merge_base: String,
@@ -50,6 +51,8 @@ pub(crate) enum StateResolutionHold {
     Result { report_id: String, commit: String },
     /// A freshly pinned and materialized workspace for the unlocked attempt.
     Prepared(Box<PreparedStateResolution>),
+    /// Ownership evidence is ambiguous and no automatic resolver may choose.
+    NeedsDecision { question: String },
     /// Another operation already claimed this divergence and is resolving it
     /// unlocked right now. This pass neither resolves nor reports it.
     Busy { report_id: String },
@@ -175,7 +178,7 @@ impl FileGitSyncService {
                         self,
                         &prepared.resolution,
                         resolver.as_ref(),
-                        &StateFileGates,
+                        &prepared.gates,
                     )? {
                         // Rerun the locked pass: the surviving result ref
                         // publishes under the next hold, and heads that moved
@@ -223,7 +226,7 @@ impl FileGitSyncService {
     ) -> RefineResult<Option<StateSyncPass>> {
         match acquisition {
             LockAcquisition::Blocking => with_repository_git_lock(&self.target_root, || {
-                self.sync_locked_pass(fetch_scope, attempt, None, engaged, slot)
+                self.sync_locked_pass(fetch_scope, attempt, None, false, engaged, slot)
             })
             .map(Some),
             LockAcquisition::Try => {
@@ -240,7 +243,7 @@ impl FileGitSyncService {
                 let Some(_file_guard) = RepositoryFileLock::try_acquire(&self.target_root)? else {
                     return Ok(None);
                 };
-                self.sync_locked_pass(fetch_scope, attempt, None, engaged, slot)
+                self.sync_locked_pass(fetch_scope, attempt, None, false, engaged, slot)
                     .map(Some)
             }
         }
@@ -316,21 +319,7 @@ impl FileGitSyncService {
         // now, while a lock is held anyway, so no workspace outlives the
         // divergence it belongs to.
         let _ = sweep_abandoned_resolutions(&worktrees, self, &self.target_root, &report_id);
-        // A gated result an interrupted run left behind publishes without any
-        // agent, so it is never charged.
-        let publishable = surviving_resolution_result(self, state_root, &report_id)?.is_some();
-        let contended = contended_records(unresolved);
-        if !publishable && !contention_budget_available(self, state_root, remote_head, &contended)?
-        {
-            // Every contended record has spent its budget against this remote
-            // head. Holding is not fencing: the pass still reports the
-            // contention in domain terms, `--authority` and the daemon's
-            // ownership policy still settle it in one command, and movement
-            // on the side that needs deciding re-engages the resolver at once.
-            self.retire_state_resolution(&report_id, Some(&lock));
-            return Ok(None);
-        }
-        let pinned = pin_resolution_inputs(
+        let mut pinned = pin_resolution_inputs(
             self,
             state_root,
             &report_id,
@@ -338,13 +327,48 @@ impl FileGitSyncService {
             local_head,
             remote_head,
         )?;
-        if let Some(commit) = &pinned.result {
-            return Ok(Some(StateResolutionHold::Result {
-                report_id,
-                commit: commit.clone(),
-            }));
-        }
         let sides = conflict_sides(self, state_root, &pinned, &tree_paths)?;
+        let mut ownership = GoalOwnershipPolicy::default();
+        for side in &sides {
+            ownership.include(
+                &side.path,
+                side.base.as_deref(),
+                side.ours.as_deref(),
+                side.theirs.as_deref(),
+            );
+        }
+        if let Some(question) = ownership.decision_question() {
+            self.retire_state_resolution(&report_id, Some(&lock));
+            return Ok(Some(StateResolutionHold::NeedsDecision { question }));
+        }
+        if let Some(commit) = &pinned.result {
+            let mut violations = Vec::new();
+            for (path, decision) in ownership.iter() {
+                let bytes = self.state_bytes_at(state_root, commit, path)?;
+                if let Err(problem) = decision.validate_result(path, bytes.as_deref()) {
+                    violations.push(problem);
+                }
+            }
+            if violations.is_empty() {
+                return Ok(Some(StateResolutionHold::Result {
+                    report_id,
+                    commit: commit.clone(),
+                }));
+            }
+            // A crash-surviving result is only a cache of a previously gated
+            // answer. Fresh operands remain authoritative: discard a result
+            // that violates their ownership invariant and derive normally.
+            self.git_at_checked(state_root, &["update-ref", "-d", &result_ref(&report_id)])?;
+            pinned.result = None;
+        }
+        let contended = contended_records(unresolved);
+        if !contention_budget_available(self, state_root, remote_head, &contended)? {
+            // Every contended record has spent its budget against this remote
+            // head. The conflict remains inspectable and explicit authority
+            // still settles it; remote movement re-engages the resolver.
+            self.retire_state_resolution(&report_id, Some(&lock));
+            return Ok(None);
+        }
         let conflicts = unresolved
             .iter()
             .map(|conflict| ConflictedPath {
@@ -362,6 +386,7 @@ impl FileGitSyncService {
         let _ = buy_contention_attempt(self, state_root, remote_head, &contended)?;
         Ok(Some(StateResolutionHold::Prepared(Box::new(
             PreparedStateResolution {
+                gates: StateFileGates::with_ownership(ownership),
                 resolution: PreparedResolution {
                     lock,
                     pinned,

@@ -112,9 +112,19 @@ pub struct StateRecoveryResult {
     /// of the recovery merge commit, so every displaced version stays
     /// reachable without a side ledger.
     pub settled_paths: Vec<String>,
+    /// Goal owners independently proven from the three-way operands and
+    /// preserved across a coarser whole-record authority choice.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub preserved_goal_owners: Vec<StateRecoveryGoalOwner>,
     /// Refs retained for displaced state that is not otherwise reachable as a
     /// merge parent (a joining node's live store).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub retained_refs: Vec<String>,
     pub detail: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct StateRecoveryGoalOwner {
+    pub path: String,
+    pub node_id: String,
 }

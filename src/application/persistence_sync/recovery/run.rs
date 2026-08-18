@@ -15,6 +15,10 @@ pub enum StateRecoveryRunPolicy {
     /// Terminal: run the sync pipeline with the decision attached, so every
     /// contested path takes the decided side inside one merge commit.
     Decision(StateRecoveryDecision),
+    /// The daemon's unattended fallback. It retains whole-record remote
+    /// authority for ordinary conflicts, but ambiguous Goal ownership must
+    /// fail closed instead of borrowing authority from circumstance.
+    Automatic(StateRecoveryDecision),
     /// No authority: the ordinary sync pipeline. A conflict fails closed with
     /// its stable report id for the operator (or the daemon's ownership
     /// policy) to answer.
@@ -39,8 +43,9 @@ impl FileGitSyncService {
         &self,
         policy: StateRecoveryRunPolicy,
     ) -> RefineResult<StateRecoveryRunResult> {
-        let decision = match policy {
-            StateRecoveryRunPolicy::Decision(decision) => decision,
+        let (decision, automatic) = match policy {
+            StateRecoveryRunPolicy::Decision(decision) => (decision, false),
+            StateRecoveryRunPolicy::Automatic(decision) => (decision, true),
             StateRecoveryRunPolicy::SyncOnly => {
                 let context = StateSyncAttemptContext::new(
                     uuid::Uuid::new_v4().to_string(),
@@ -62,7 +67,7 @@ impl FileGitSyncService {
             if attempt > 1 {
                 thread::sleep(RUN_ATTEMPT_DELAY);
             }
-            match self.run_state_recovery_attempt(attempt, &decision) {
+            match self.run_state_recovery_attempt(attempt, &decision, automatic) {
                 Ok(result) => return Ok(result),
                 Err(
                     error @ RefineError::StateRecoveryConflict {
@@ -82,6 +87,7 @@ impl FileGitSyncService {
         &self,
         attempt: u32,
         decision: &StateRecoveryDecision,
+        automatic: bool,
     ) -> RefineResult<StateRecoveryRunResult> {
         with_repository_git_lock(&self.target_root, || {
             self.reject_foreign_git_operation()?;
@@ -93,6 +99,7 @@ impl FileGitSyncService {
                 GitFetchScope::All,
                 &context,
                 Some(decision),
+                automatic,
                 false,
                 &mut None,
             )?;
@@ -107,8 +114,16 @@ impl FileGitSyncService {
                 });
             }
             let (local_head, remote_head) = self.verify_recovery_converged()?;
+            let preserved = if pass.preserved_goal_owners.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    " and preserved {} explicit Goal transfer(s)",
+                    pass.preserved_goal_owners.len()
+                )
+            };
             let detail = format!(
-                "Recovery settled {} contested path(s) with {} authority; the displaced side stays reachable as a merge parent{}.",
+                "Recovery settled {} contested path(s) with {} authority{preserved}; the displaced side stays reachable as a merge parent{}.",
                 pass.settled.len(),
                 decision.default_authority.as_str(),
                 if pass.retained.is_empty() {
@@ -128,6 +143,7 @@ impl FileGitSyncService {
                     local_state_head: local_head,
                     remote_state_head: remote_head,
                     settled_paths: pass.settled,
+                    preserved_goal_owners: pass.preserved_goal_owners,
                     retained_refs: pass.retained,
                     detail: detail.clone(),
                 }),
@@ -169,49 +185,14 @@ impl FileGitSyncService {
         }
     }
 
-    /// The daemon's ownership policy, read from the merge base so no side
-    /// votes for itself: remote authority by default, with a live override
-    /// for each contested goal record whose merge-base bytes name this node
-    /// as `node_id`. First-contact conflicts have no merge base and settle
-    /// uniformly remote.
-    pub fn merge_base_ownership_decision(
+    /// The daemon keeps its established whole-record remote fallback for
+    /// ordinary conflicts. Goal ownership is not encoded as path authority:
+    /// every recovery attempt reclassifies the fresh three-way operands and
+    /// overlays a proven transfer (or fails closed on ambiguity) at merge time.
+    pub fn automatic_recovery_decision(
         &self,
-        report: &StateSyncConflictReport,
-        node_id: &str,
+        _report: &StateSyncConflictReport,
     ) -> StateRecoveryDecision {
-        let mut overrides = Vec::new();
-        if !report.merge_base.is_empty() {
-            for path in &report.unresolved_paths {
-                let relative = PathBuf::from(path);
-                if !is_goal_record(&relative) {
-                    continue;
-                }
-                let Ok(Some(bytes)) = self.state_bytes_at(
-                    &self.target_root,
-                    &report.merge_base,
-                    &format!(".refine/{path}"),
-                ) else {
-                    continue;
-                };
-                let owner = serde_json::from_slice::<serde_json::Value>(&bytes)
-                    .ok()
-                    .and_then(|record| {
-                        record
-                            .get("node_id")
-                            .and_then(serde_json::Value::as_str)
-                            .map(str::to_string)
-                    });
-                if owner.as_deref() == Some(node_id) {
-                    overrides.push(StateRecoveryOverride {
-                        path: path.clone(),
-                        authority: StateRecoveryAuthority::Live,
-                    });
-                }
-            }
-        }
-        StateRecoveryDecision {
-            default_authority: StateRecoveryAuthority::Remote,
-            overrides,
-        }
+        StateRecoveryDecision::uniform(StateRecoveryAuthority::Remote)
     }
 }
