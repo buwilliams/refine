@@ -106,12 +106,47 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-08-18T13:36:01Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-08-18T13:38:54Z",
+        "proposal": {
+          "completed_at": "2026-08-18T13:38:54Z",
+          "git_after": {
+            "branch": "refine/DR49680EE1475D2F2FFE46AC54/round-1",
+            "head_commit": "7240706a10f1d45dc387a41825c08891ed52cf41",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR49680EE1475D2F2FFE46AC54/round-1",
+            "head_commit": "7240706a10f1d45dc387a41825c08891ed52cf41",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Revise the host resource governor to budget at most one quarter of detected logical cores and one quarter of currently available memory for agents, retain a minimum concurrency of one, and use a 2 GiB per-agent floor so an early low RSS sample can only make admission more conservative rather than trigger a launch burst.",
+                "id": "P1"
+              },
+              {
+                "description": "Keep a positive parallel_run_cap as the authoritative operator override and continue deriving unset node, provider, and target-app limits from the resulting global limit so conservative automatic admission does not weaken deliberate local controls.",
+                "id": "P2"
+              },
+              {
+                "description": "Change Node Runtime Config to represent an unset parallel-run cap as automatic instead of displaying and accidentally persisting a fixed value of 5, and explain that entering a number overrides the shared-host recommendation.",
+                "id": "P3"
+              },
+              {
+                "description": "Update the affected Process and browser Settings intent pages to define automatic concurrency as a conservative shared-host default with an explicit node-level escape hatch.",
+                "id": "P4"
+              }
+            ],
+            "summary": "Make automatic agent concurrency reserve most host CPU and memory for Docker and other expensive work while preserving an explicit node cap such as 2 and making automatic versus manual behavior clear in Runtime Config."
+          },
+          "started_at": "2026-08-18T13:36:02Z"
+        },
         "schema_version": 2,
         "started_at": "2026-08-18T13:36:01Z",
         "state": "in_progress",
-        "updated_at": "2026-08-18T13:36:01Z"
+        "updated_at": "2026-08-18T13:38:54Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -125,7 +160,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T13:36:01Z",
+      "updated": "2026-08-18T13:38:54Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T13:36:01Z",
         "round_idx": 0,
@@ -137,6 +172,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-18T13:36:01Z",
-  "workflow_revision": 7
+  "updated": "2026-08-18T13:38:54Z",
+  "workflow_revision": 9
 }
