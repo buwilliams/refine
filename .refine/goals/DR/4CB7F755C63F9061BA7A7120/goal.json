@@ -106,12 +106,43 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-08-18T10:09:45Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-08-18T10:12:22Z",
+        "proposal": {
+          "completed_at": "2026-08-18T10:12:22Z",
+          "git_after": {
+            "branch": "refine/DR4CB7F755C63F9061BA7A7120/round-1",
+            "head_commit": "1037732c9b33d8574c66a026aa021ffc62dd96a7",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR4CB7F755C63F9061BA7A7120/round-1",
+            "head_commit": "1037732c9b33d8574c66a026aa021ffc62dd96a7",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Revise the workflow and Feature intent pages to define ordered Feature Goals as a hard barrier through Review, Done, or Cancelled, state that failure holds later ordered Goals, establish linear Feature order plus priority as the canonical dependency model rather than a DAG, and describe priority's current per-node scope and planned global scope.",
+                "id": "P1"
+              },
+              {
+                "description": "Move scheduling eligibility into a cohesive policy submodule and derive each node's priority ceiling from every authored, Feature-eligible Todo or automated-active Goal, including runner-active Todo Goals, so lower-priority Todo work cannot start until higher-priority work leaves active workflow while already-active work continues.",
+                "id": "P2"
+              },
+              {
+                "description": "Add focused scheduling-eligibility coverage for every automated-active status, runner-active Todo work, release and terminal statuses, Feature-blocked higher-priority Goals, equal priorities, and distinct nodes to preserve the lifecycle guarantee without claiming global enforcement.",
+                "id": "P3"
+              }
+            ],
+            "summary": "Make sequencing explicit and enforce priority as a per-node lifecycle barrier so users can rely on linear Feature completion order and priority without assuming a cross-node or DAG dependency model."
+          },
+          "started_at": "2026-08-18T10:09:45Z"
+        },
         "schema_version": 2,
         "started_at": "2026-08-18T10:09:45Z",
         "state": "in_progress",
-        "updated_at": "2026-08-18T10:09:45Z"
+        "updated_at": "2026-08-18T10:12:22Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -125,7 +156,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T10:09:45Z",
+      "updated": "2026-08-18T10:12:22Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T10:09:44Z",
         "round_idx": 0,
@@ -137,6 +168,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-18T10:09:45Z",
-  "workflow_revision": 7
+  "updated": "2026-08-18T10:12:22Z",
+  "workflow_revision": 9
 }
