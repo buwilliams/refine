@@ -1,5 +1,6 @@
 use super::*;
 
+#[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
 fn unique_temp_dir(name: &str) -> PathBuf {
@@ -86,6 +87,90 @@ fn toolbar_attachment_wins_a_deadline_race_then_completes() {
     send_agent_session_input(&runtime_root, &snapshot.id, "finish\r").unwrap();
     let result = run.join().unwrap().unwrap();
     assert_eq!(result.output, "toolbar-completed");
+
+    unsafe {
+        if let Some(previous) = previous {
+            std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
+        } else {
+            std::env::remove_var("REFINE_SMOKE_AI_PATH");
+        }
+    }
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[cfg(unix)]
+#[test]
+fn ordinary_commands_stay_unprotected_and_cannot_attach_after_the_deadline() {
+    let _env_guard = crate::infrastructure::agents::invocation::smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let root = unique_temp_dir("goal-agent-toolbar-losing-race");
+    let runtime_root = root.join("run/8082");
+    let app_root = root.join("app");
+    let provider = root.join("smoke-ai");
+    fs::create_dir_all(&app_root).unwrap();
+    fs::write(
+        &provider,
+        "#!/bin/sh\nprintf 'ready\\n'\nread answer\nsleep 10\n",
+    )
+    .unwrap();
+    let mut permissions = fs::metadata(&provider).unwrap().permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(&provider, permissions).unwrap();
+    let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
+    unsafe {
+        std::env::set_var("REFINE_SMOKE_AI_PATH", &provider);
+    }
+
+    let runtime_for_thread = runtime_root.clone();
+    let app_for_thread = app_root.clone();
+    let run = thread::spawn(move || {
+        run_goal_agent(
+            GoalAgentLaunch {
+                provider_session: None,
+                runtime_root: runtime_for_thread,
+                cwd: app_for_thread,
+                provider: "smoke-ai".to_string(),
+                prompt: "test non-Toolbar timeout isolation".to_string(),
+                metadata: Map::from_iter([("goal_id".to_string(), json!("GOAL-ORDINARY"))]),
+                completion_timeout: Some(Duration::from_millis(500)),
+                idle_timeout: Some(Duration::from_secs(5)),
+            },
+            |_| {},
+        )
+    });
+
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    let snapshot = loop {
+        if let Ok(snapshot) = find_goal_agent_session(&runtime_root, "GOAL-ORDINARY") {
+            break snapshot;
+        }
+        assert!(std::time::Instant::now() < deadline);
+        thread::sleep(Duration::from_millis(10));
+    };
+    send_agent_session_input(&runtime_root, &snapshot.id, "continue\r").unwrap();
+    resize_agent_session(&runtime_root, &snapshot.id, 100, 30).unwrap();
+    assert!(
+        !find_agent_session(&runtime_root, &snapshot.id)
+            .unwrap()
+            .toolbar_timeout_protected,
+        "ordinary input and resize must not grant the Toolbar exemption"
+    );
+
+    let error = run.join().unwrap().unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("did not produce a valid completion signal"),
+        "unexpected watchdog result: {error}"
+    );
+    assert!(
+        matches!(
+            attach_toolbar_goal_agent_session(&runtime_root, &snapshot.id),
+            Err(RefineError::Conflict(_))
+        ),
+        "an attachment request that loses the deadline race must not report success"
+    );
 
     unsafe {
         if let Some(previous) = previous {
