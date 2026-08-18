@@ -17,6 +17,7 @@ impl FileWorkItemService {
         original_candidate: &str,
         replacement_base: &str,
         replacement_candidate: &str,
+        conflict_resolution: Option<Value>,
     ) -> RefineResult<Value> {
         let _goal_lock = self.acquire_goal_mutation_lock(goal_id)?;
         let current = self.show_goal_summary(goal_id)?;
@@ -81,7 +82,7 @@ impl FileWorkItemService {
             );
             round.insert(key.to_string(), Value::Null);
         }
-        let evidence = json!({
+        let mut evidence = json!({
             "state": "refreshed",
             "round_idx": authority.round_idx,
             "workflow_revision": authority.workflow_revision,
@@ -95,6 +96,12 @@ impl FileWorkItemService {
             "previous_gate_evidence": prior_gates,
             "refreshed_at": now
         });
+        // The resolution note travels inside the refresh evidence, the same
+        // way the recovery path retains `rebase.conflicts`: workflow state is
+        // the single source of truth for how the conflict was resolved.
+        if let Some(resolution) = conflict_resolution {
+            evidence["conflict_resolution"] = resolution;
+        }
         round.insert("workflow_candidate_refresh".to_string(), evidence.clone());
         round.insert("updated".to_string(), json!(now));
         object.insert("base_commit".to_string(), json!(replacement_base));

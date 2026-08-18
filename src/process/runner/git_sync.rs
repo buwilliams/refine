@@ -47,7 +47,8 @@ pub(super) fn run_git_sync_worker(
                 failure_backoff.reset();
                 bind_state_sync_health(runtime_root, &target_root, &observed_node_id)?;
             }
-            let service = FileGitSyncService::new(&target_root, runtime_root);
+            let service =
+                FileGitSyncService::new(&target_root, runtime_root).with_agent_resolution();
             if let Ok(fingerprint) = service.durable_state_fingerprint() {
                 failure_backoff.observe(&root, &observed_node_id, fingerprint);
                 let schedule = git_sync_schedule(runtime_root, &target_root).unwrap_or_default();

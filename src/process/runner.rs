@@ -152,7 +152,11 @@ impl FileRunnerWorkerService {
             let _ = supervisor.signal(&process.id, "terminate");
         }
         #[cfg(test)]
-        run_background_worker_hook(worker_kind, BackgroundWorkerBoundary::EnsureLaunch);
+        run_background_worker_hook(
+            &self.runtime_root,
+            worker_kind,
+            BackgroundWorkerBoundary::EnsureLaunch,
+        );
         if supervisor
             .pause_state()?
             .disabled_background_workers
@@ -401,13 +405,21 @@ fn run_background_repository_operation<T>(
         return Ok(BackgroundOperationOutcome::Paused);
     }
     #[cfg(test)]
-    run_background_worker_hook(worker_kind, BackgroundWorkerBoundary::BeforeOperation);
+    run_background_worker_hook(
+        runtime_root,
+        worker_kind,
+        BackgroundWorkerBoundary::BeforeOperation,
+    );
     if background_automation_is_paused(runtime_root)? {
         return Ok(BackgroundOperationOutcome::Paused);
     }
     let result = operation();
     #[cfg(test)]
-    run_background_worker_hook(worker_kind, BackgroundWorkerBoundary::AfterOperation);
+    run_background_worker_hook(
+        runtime_root,
+        worker_kind,
+        BackgroundWorkerBoundary::AfterOperation,
+    );
     Ok(BackgroundOperationOutcome::Completed(result))
 }
 

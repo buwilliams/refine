@@ -1,5 +1,6 @@
 use super::*;
 
+use super::resolution::{LockAcquisition, StateResolutionHold, StateResolutionSlot};
 use crate::tools::git::ancestry::{Ancestry, classify};
 use crate::tools::git::merge::{
     TreeOperation, build_tree, commit_tree, empty_tree_id, merge_commits, write_blob,
@@ -45,6 +46,9 @@ pub(super) struct StateSyncPass {
     pub(super) settled: Vec<String>,
     /// Refs retained for displaced state not reachable as a merge parent.
     pub(super) retained: Vec<String>,
+    /// The conflict-report id of an agent resolution this pass published as
+    /// its merge commit; the entry retires its refs and clears the report.
+    pub(super) published_resolution: Option<String>,
 }
 
 impl StateSyncPass {
@@ -53,6 +57,7 @@ impl StateSyncPass {
             result,
             settled: Vec::new(),
             retained: Vec::new(),
+            published_resolution: None,
         }
     }
 }
@@ -62,7 +67,17 @@ impl FileGitSyncService {
         Self {
             target_root: target_root.into(),
             runtime_root: runtime_root.into(),
+            agent_resolution: false,
         }
+    }
+
+    /// Allow this entry point to resolve merge conflicts with the installed
+    /// agent (subject to the node's `state_sync_agent_resolution` setting).
+    /// The daemon's sync worker and the explicit `refine sync` surfaces opt
+    /// in; everything else keeps the fail-closed deterministic ladder.
+    pub fn with_agent_resolution(mut self) -> Self {
+        self.agent_resolution = true;
+        self
     }
 
     /// Synchronize durable `.refine` state through the dedicated
@@ -76,9 +91,7 @@ impl FileGitSyncService {
         &self,
         attempt: StateSyncAttemptContext,
     ) -> RefineResult<GitSyncResult> {
-        with_repository_git_lock(&self.target_root, || {
-            self.sync_locked(GitFetchScope::All, &attempt)
-        })
+        self.sync_resolving(GitFetchScope::All, &attempt, LockAcquisition::Blocking)
     }
 
     /// Attempt a best-effort background sync without delaying foreground work.
@@ -138,29 +151,7 @@ impl FileGitSyncService {
         fetch_scope: GitFetchScope,
         attempt: &StateSyncAttemptContext,
     ) -> RefineResult<GitSyncResult> {
-        let lock = repository_git_lock(&self.target_root)?;
-        let _guard = match lock.try_lock() {
-            Ok(guard) => guard,
-            Err(TryLockError::WouldBlock) => {
-                return Ok(deferred(
-                    "Repository Git operations are busy; sync will retry on the next cadence.",
-                ));
-            }
-            Err(TryLockError::Poisoned(_)) => {
-                return Err(RefineError::Conflict(
-                    "Repository Git lock was poisoned".to_string(),
-                ));
-            }
-        };
-        let _file_guard = match RepositoryFileLock::try_acquire(&self.target_root)? {
-            Some(guard) => guard,
-            None => {
-                return Ok(deferred(
-                    "Repository Git operations are busy; sync will retry on the next cadence.",
-                ));
-            }
-        };
-        self.sync_locked(fetch_scope, attempt)
+        self.sync_resolving(fetch_scope, attempt, LockAcquisition::Try)
     }
 
     /// Fingerprint durable Refine state without touching the user's checkout.
@@ -181,22 +172,21 @@ impl FileGitSyncService {
         Ok(hasher.finish())
     }
 
-    pub(super) fn sync_locked(
-        &self,
-        fetch_scope: GitFetchScope,
-        attempt: &StateSyncAttemptContext,
-    ) -> RefineResult<GitSyncResult> {
-        self.sync_locked_pass(fetch_scope, attempt, None)
-            .map(|pass| pass.result)
-    }
-
     pub(super) fn sync_locked_pass(
         &self,
         fetch_scope: GitFetchScope,
         attempt: &StateSyncAttemptContext,
         decision: Option<&StateRecoveryDecision>,
+        resolution_engaged: bool,
+        resolution_slot: &mut Option<StateResolutionSlot>,
     ) -> RefineResult<StateSyncPass> {
-        let result = self.sync_locked_inner(fetch_scope, attempt, decision);
+        let result = self.sync_locked_inner(
+            fetch_scope,
+            attempt,
+            decision,
+            resolution_engaged,
+            resolution_slot,
+        );
         if result.is_err() {
             // Sync owns only the managed state worktree. Any failure must leave
             // that checkout clean so a later retry starts from durable Git
@@ -220,9 +210,12 @@ impl FileGitSyncService {
         fetch_scope: GitFetchScope,
         attempt: &StateSyncAttemptContext,
         decision: Option<&StateRecoveryDecision>,
+        resolution_engaged: bool,
+        resolution_slot: &mut Option<StateResolutionSlot>,
     ) -> RefineResult<StateSyncPass> {
         let mut settled = Vec::new();
         let mut retained = Vec::new();
+        let mut published_resolution = None;
         if !self.target_root.join(".git").exists() {
             return Ok(StateSyncPass::clean(skipped(
                 "Target app is not a Git repository.",
@@ -295,6 +288,7 @@ impl FileGitSyncService {
                             "",
                             &remote_head,
                             &contested,
+                            None,
                         )?;
                         return Err(RefineError::Conflict(summary.to_string()));
                     };
@@ -529,8 +523,10 @@ impl FileGitSyncService {
                     };
                     // Settled paths from an attempt that loses its push are
                     // re-derived by the retry; only the published attempt's
-                    // settlements count once.
+                    // settlements count once. The same holds for a published
+                    // agent resolution.
                     let mut attempt_settled = Vec::new();
+                    let mut attempt_resolution = None;
                     let merge_commit = self.merge_diverged_state(
                         &state_root,
                         attempt,
@@ -540,6 +536,9 @@ impl FileGitSyncService {
                         &remote_head,
                         push_attempt,
                         decision,
+                        resolution_engaged,
+                        resolution_slot,
+                        &mut attempt_resolution,
                         &mut attempt_settled,
                         &mut details,
                     )?;
@@ -558,6 +557,7 @@ impl FileGitSyncService {
                     append_output_detail(&mut details, &push);
                     if push.success {
                         settled.append(&mut attempt_settled);
+                        published_resolution = attempt_resolution.take();
                         live_advanced |= self.hydrate_live_from_commit(
                             &state_root,
                             if adopt_branch_state {
@@ -612,6 +612,7 @@ impl FileGitSyncService {
             },
             settled,
             retained,
+            published_resolution,
         })
     }
 
@@ -669,7 +670,11 @@ impl FileGitSyncService {
     /// textually conflicted state files go to the structural driver; anything
     /// still contested fails closed with a conflict report — unless a
     /// recovery decision is attached, in which case each remaining path takes
-    /// its decided side and no conflict can survive.
+    /// its decided side and no conflict can survive. With agent resolution
+    /// engaged, the fail-closed path first performs lock Hold A (pin the
+    /// operands, materialize the conflicted workspace) so the entry can
+    /// resolve UNLOCKED, and a gated result surviving from an earlier run of
+    /// this exact divergence is published directly as the merge commit.
     #[allow(clippy::too_many_arguments)]
     fn merge_diverged_state(
         &self,
@@ -681,26 +686,77 @@ impl FileGitSyncService {
         remote_head: &str,
         push_attempt: usize,
         decision: Option<&StateRecoveryDecision>,
+        resolution_engaged: bool,
+        resolution_slot: &mut Option<StateResolutionSlot>,
+        published_resolution: &mut Option<String>,
         settled: &mut Vec<String>,
         details: &mut Vec<String>,
     ) -> RefineResult<String> {
-        let (mut tree, resolved, unresolved) =
+        let (mut tree, resolved, mut unresolved) =
             self.merge_diverged_trees(state_root, merge_base, local_head, remote_head, &[])?;
+        // The conflict-report id hashes the sorted unresolved paths; keep the
+        // resolution id, the report, and the prompt in that one stable order.
+        unresolved.sort_by(|left, right| left.path.cmp(&right.path));
         let mut parents_message = None;
         if !unresolved.is_empty() {
             let Some(decision) = decision else {
+                let phase = if push_attempt > 1 {
+                    StateSyncConflictPhase::PushRetry
+                } else {
+                    StateSyncConflictPhase::FirstPass
+                };
+                if resolution_engaged {
+                    match self.prepare_state_resolution(
+                        state_root,
+                        phase,
+                        remote,
+                        merge_base,
+                        local_head,
+                        remote_head,
+                        &tree,
+                        &unresolved,
+                    )? {
+                        Some(StateResolutionHold::Result { report_id, commit }) => {
+                            details.push(format!(
+                                "Published the agent-resolved merge for state conflict {report_id}."
+                            ));
+                            *published_resolution = Some(report_id);
+                            return Ok(commit);
+                        }
+                        Some(StateResolutionHold::Prepared(prepared)) => {
+                            *resolution_slot = Some(StateResolutionSlot::Prepared(prepared));
+                        }
+                        Some(StateResolutionHold::Busy { report_id }) => {
+                            // Reporting this divergence would race the
+                            // operation already resolving it: defer instead,
+                            // leaving its report — and its question — alone.
+                            *resolution_slot = Some(StateResolutionSlot::Busy);
+                            return Err(RefineError::Conflict(format!(
+                                "Another operation is resolving state conflict {report_id}."
+                            )));
+                        }
+                        None => {}
+                    }
+                }
+                // An escalation already on file for exactly this divergence
+                // keeps its question: a later pass that re-reports the same
+                // contested heads must not replace the agent's words with the
+                // generic headline.
+                let escalated = self.escalated_decision_question(
+                    merge_base,
+                    local_head,
+                    remote_head,
+                    &unresolved,
+                );
                 let summary = self.record_conflict_report(
-                    if push_attempt > 1 {
-                        StateSyncConflictPhase::PushRetry
-                    } else {
-                        StateSyncConflictPhase::FirstPass
-                    },
+                    phase,
                     attempt,
                     remote,
                     merge_base,
                     local_head,
                     remote_head,
                     &unresolved,
+                    escalated.as_deref(),
                 )?;
                 return Err(RefineError::Conflict(summary.to_string()));
             };
@@ -883,8 +939,7 @@ impl FileGitSyncService {
             let Some(relative) = path.strip_prefix(".refine/") else {
                 unresolved.push(StateSyncConflictPath {
                     path: path.clone(),
-                    summary: "path outside synchronized Refine state changed on both nodes"
-                        .to_string(),
+                    summary: OUTSIDE_STATE_CONFLICT_SUMMARY.to_string(),
                 });
                 continue;
             };
@@ -1123,6 +1178,11 @@ impl FileGitSyncService {
 }
 
 pub(super) const LIVE_ADVANCED_DETAIL: &str = "A newer local state mutation arrived during synchronization; it was preserved and will be published in the next batch.";
+
+/// The summary recorded for a conflicted path that is not synchronized Refine
+/// state. Agent resolution never judges these; they always fail closed.
+pub(super) const OUTSIDE_STATE_CONFLICT_SUMMARY: &str =
+    "path outside synchronized Refine state changed on both nodes";
 
 /// Make the state worktree's durable set mirror the live snapshot and report
 /// the change lines. Only differing records are rewritten, so an idle pass

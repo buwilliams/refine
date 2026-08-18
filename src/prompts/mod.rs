@@ -61,6 +61,8 @@ prompt_templates! {
     GoalWorkflowQualityRecovery => "quality/recovery.md",
     QualityDefaultInstructions => "quality/default-instructions.md",
     ReleaseGoal => "release/goal.md",
+    ResolveStateConflict => "sync/resolve-state-conflict.md",
+    ResolveCandidateConflict => "sync/resolve-candidate-conflict.md",
     TargetAppGeneration => "target_apps/generation.md",
     TargetAppLifecycle => "target_apps/lifecycle.md",
     TargetAppCommandStart => "target_apps/command-start.md",

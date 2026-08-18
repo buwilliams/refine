@@ -208,7 +208,8 @@ fn sync_reports_same_record_multi_node_conflicts() {
     fixture.service(&fixture.a).sync().unwrap();
 
     let error = fixture.service(&fixture.b).sync().unwrap_err();
-    assert!(error.to_string().contains("1 unresolved path"), "{error}");
+    assert!(error.to_string().contains("needs a decision"), "{error}");
+    assert!(error.to_string().contains("1 contested"), "{error}");
     let report = latest_state_sync_conflict_report(&fixture.b.join("run"))
         .unwrap()
         .unwrap();

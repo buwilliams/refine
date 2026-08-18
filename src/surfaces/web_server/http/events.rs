@@ -26,7 +26,6 @@ struct StateSyncHealthFingerprint {
     last_attempt_id: Option<u64>,
     last_attempt_source: Option<String>,
     last_conflict_report_id: Option<String>,
-    recovery_kind: Option<crate::tools::host::state_sync_health::StateSyncRecoveryKind>,
 }
 
 impl From<&StateSyncHealth> for StateSyncHealthFingerprint {
@@ -41,7 +40,6 @@ impl From<&StateSyncHealth> for StateSyncHealthFingerprint {
             last_attempt_id: health.last_attempt_id,
             last_attempt_source: health.last_attempt_source.clone(),
             last_conflict_report_id: health.last_conflict_report_id.clone(),
-            recovery_kind: health.recovery_kind,
         }
     }
 }

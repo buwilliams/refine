@@ -40,6 +40,7 @@ impl FileGitSyncService {
                 remote_paths: Vec::new(),
                 resolvable_paths: Vec::new(),
                 conflicts: Vec::new(),
+                decision_question: None,
                 detail,
             });
         }
@@ -64,6 +65,7 @@ impl FileGitSyncService {
             remote_paths: Vec::new(),
             resolvable_paths: Vec::new(),
             conflicts: Vec::new(),
+            decision_question: None,
             detail: String::new(),
         };
         match classify(self, &local_head, &remote_head)? {
@@ -103,6 +105,8 @@ impl FileGitSyncService {
                 );
             }
         }
+        preview.decision_question =
+            self.recorded_decision_question(Some(&local_head), &remote_head);
         Ok(preview)
     }
 
@@ -192,6 +196,7 @@ impl FileGitSyncService {
             remote_paths: Vec::new(),
             resolvable_paths: Vec::new(),
             conflicts: Vec::new(),
+            decision_question: None,
             detail: String::new(),
         };
         let live_keys = live
@@ -239,7 +244,24 @@ impl FileGitSyncService {
                 preview.conflicts.len()
             )
         };
+        preview.decision_question = self.recorded_decision_question(None, &remote_head);
         Ok(preview)
+    }
+
+    /// The question a bounded agent resolution of exactly this divergence
+    /// escalated with, read from the conflict report on file. Reports for
+    /// other head pairs are stale and never surfaced.
+    fn recorded_decision_question(
+        &self,
+        local_head: Option<&str>,
+        remote_head: &str,
+    ) -> Option<String> {
+        let report = latest_state_sync_conflict_report(&self.runtime_root)
+            .ok()
+            .flatten()?;
+        (report.local_state_head == local_head.unwrap_or("")
+            && report.remote_state_head == remote_head)
+            .then_some(report.decision_question)?
     }
 
     /// Live records whose bytes differ from the local branch head: the next

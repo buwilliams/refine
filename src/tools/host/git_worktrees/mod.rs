@@ -430,6 +430,8 @@ mod changes;
 mod commands;
 mod integration;
 mod service_adapter;
+
+use integration::BASE_IN_CONFLICT_MARKERS;
 #[cfg(test)]
 mod tests;
 mod worktrees;

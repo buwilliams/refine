@@ -1,6 +1,6 @@
 use super::*;
 
-const CONFLICT_REPORT_VERSION: u32 = 3;
+const CONFLICT_REPORT_VERSION: u32 = 4;
 const CONFLICT_REPORT_DIRECTORY: &str = "state-sync-conflicts";
 const CONFLICT_REPORT_FILE: &str = "latest.json";
 
@@ -59,6 +59,12 @@ pub struct StateSyncConflictReport {
     pub unresolved_paths: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub conflicts: Vec<StateSyncConflictPath>,
+    /// The domain-terms question agent resolution escalated with: what is
+    /// contested and what must be chosen. Present only after resolution ran
+    /// and genuinely needed help; reports written before this field existed
+    /// deserialize without one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decision_question: Option<String>,
     pub recovery: StateSyncRecoveryMetadata,
     pub report_location: String,
 }
@@ -71,19 +77,26 @@ pub struct StateSyncConflictSummary {
     pub report_location: String,
     pub recovery_command: String,
     pub diagnostics: Vec<String>,
+    pub decision_question: Option<String>,
 }
 
 impl std::fmt::Display for StateSyncConflictSummary {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if let Some(question) = &self.decision_question {
+            return write!(
+                formatter,
+                "State sync needs a decision. {question} Complete conflict report {} is at {}.",
+                self.report_id, self.report_location
+            );
+        }
         write!(
             formatter,
-            "Refine state changed on multiple nodes during {}: {} unresolved path(s){}; complete conflict report {} is at {}. Run `{}` for one-shot recovery, or `refine sync --preview` to review the comparison first.",
-            self.phase.as_str(),
+            "State sync needs a decision: this node and another changed the same record(s) ({} contested{}); complete conflict report {} is at {}. Run `{}` to choose a side, or `refine sync --preview` to review both sides first.",
             self.unresolved_count,
             if self.diagnostics.is_empty() {
                 String::new()
             } else {
-                format!(" ({})", self.diagnostics.join("; "))
+                format!(": {}", self.diagnostics.join("; "))
             },
             self.report_id,
             self.report_location,
@@ -125,6 +138,7 @@ impl FileGitSyncService {
         local_state_head: &str,
         remote_state_head: &str,
         unresolved: &[StateSyncConflictPath],
+        decision_question: Option<&str>,
     ) -> RefineResult<StateSyncConflictSummary> {
         use sha2::{Digest, Sha256};
 
@@ -167,6 +181,7 @@ impl FileGitSyncService {
                 .map(|conflict| conflict.path.clone())
                 .collect(),
             conflicts: unresolved,
+            decision_question: decision_question.map(str::to_string),
             recovery: StateSyncRecoveryMetadata {
                 available: true,
                 run_command: "refine sync --authority <live|remote> [--path <contested-path>]"
@@ -192,7 +207,54 @@ impl FileGitSyncService {
                 .iter()
                 .map(|conflict| conflict.summary.clone())
                 .collect(),
+            decision_question: report.decision_question,
         })
+    }
+
+    /// The question a bounded agent resolution of exactly this divergence
+    /// already escalated with, if one is on file and still unanswered.
+    ///
+    /// The report's identity is the divergence, so a report for any other
+    /// operands or contested paths is stale and never carried forward. Two
+    /// things read this: the escalation is not asked again while it stands
+    /// (an unchanged divergence has no new answer to give, and the agent is
+    /// not free), and a later pass that re-reports the same divergence keeps
+    /// the agent's words instead of replacing them with the generic headline.
+    pub(super) fn escalated_decision_question(
+        &self,
+        merge_base: &str,
+        local_state_head: &str,
+        remote_state_head: &str,
+        unresolved: &[StateSyncConflictPath],
+    ) -> Option<String> {
+        let mut unresolved = unresolved.to_vec();
+        unresolved.sort_by(|left, right| left.path.cmp(&right.path));
+        let report = latest_state_sync_conflict_report(&self.runtime_root)
+            .ok()
+            .flatten()?;
+        (report.report_id
+            == conflict_report_id(merge_base, local_state_head, remote_state_head, &unresolved))
+        .then_some(report.decision_question)?
+    }
+
+    /// Remove the conflict report a published resolution just settled. Scoped
+    /// by id so a report for a newer, different divergence is never destroyed.
+    pub(super) fn clear_conflict_report(&self, report_id: &str) -> RefineResult<()> {
+        let path = conflict_report_path(&self.runtime_root);
+        let Some(report) = latest_state_sync_conflict_report(&self.runtime_root)? else {
+            return Ok(());
+        };
+        if report.report_id != report_id {
+            return Ok(());
+        }
+        match fs::remove_file(&path) {
+            Ok(()) => Ok(()),
+            Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
+            Err(error) => Err(RefineError::Io(format!(
+                "failed to clear settled state-sync conflict report {}: {error}",
+                path.display()
+            ))),
+        }
     }
 }
 

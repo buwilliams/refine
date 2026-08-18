@@ -11,6 +11,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use refine::tools::host::git_sync::{
     FileGitSyncService, StateRecoveryAuthority, StateRecoveryDecision,
+    latest_state_sync_conflict_report,
 };
 use refine::tools::host::project_layout::refine_dir_for_target_root;
 
@@ -352,4 +353,119 @@ fn remote_authority_join_keeps_and_publishes_uncontested_local_records() {
         .is_some(),
         "the uncontested local-only record is published with the join"
     );
+}
+
+/// An agent resolution whose publication is interrupted (crash window between
+/// the gated result commit and the push) must complete on rerun from its
+/// durable refs alone: the surviving result publishes WITHOUT re-invoking the
+/// resolver, and the retired refs plus the cleared conflict report prove the
+/// resolution left nothing behind.
+#[test]
+#[cfg(unix)]
+fn interrupted_resolution_publish_completes_on_rerun_without_reinvoking_the_resolver() {
+    use std::os::unix::fs::PermissionsExt;
+    use std::sync::Arc;
+
+    use refine::tools::git::resolve::{
+        ResolutionRequest, ResolverOutcome, ScriptedResolver, ScriptedStep,
+        install_resolver_override,
+    };
+
+    let (root, remote) = fixture("resolve-publish-crash");
+    let a = node(&root, &remote, "node-a");
+    let b = node(&root, &remote, "node-b");
+    let shared = |target: &Path| {
+        refine_dir_for_target_root(target)
+            .unwrap()
+            .join("shared.json")
+    };
+
+    fs::write(shared(&a), b"{\"node\":\"base\"}\n").unwrap();
+    assert!(service(&a).sync().unwrap().pushed);
+    service(&b).sync().unwrap();
+    fs::write(shared(&a), b"{\"node\":\"a\"}\n").unwrap();
+    assert!(service(&a).sync().unwrap().pushed);
+    fs::write(shared(&b), b"{\"node\":\"b\"}\n").unwrap();
+
+    // Block state pushes: the resolution succeeds and records its result ref,
+    // but publication fails — the crash window this test exists for.
+    let hook = remote.join("hooks/pre-receive");
+    fs::write(
+        &hook,
+        "#!/bin/sh\nwhile read old new ref; do\n  if test \"$ref\" = refs/heads/refine/state; then exit 1; fi\ndone\nexit 0\n",
+    )
+    .unwrap();
+    fs::set_permissions(&hook, fs::Permissions::from_mode(0o755)).unwrap();
+
+    {
+        let _guard = install_resolver_override(
+            &b,
+            Arc::new(ScriptedResolver::new(vec![
+                Box::new(|request: &ResolutionRequest<'_>| {
+                    fs::write(
+                        request.workspace_dir.join(".refine/shared.json"),
+                        "{\"node\":\"merged\"}\n",
+                    )
+                    .unwrap();
+                    Ok(ResolverOutcome::Completed)
+                }) as ScriptedStep,
+            ])),
+        );
+        let interrupted = service(&b).sync();
+        assert!(
+            interrupted.is_err(),
+            "publication was blocked: {interrupted:?}"
+        );
+    }
+    let result_refs = git_out(
+        &b,
+        &["for-each-ref", "--format=%(refname)", "refs/refine/resolve"],
+    )
+    .unwrap();
+    assert!(
+        result_refs.lines().any(|line| line.ends_with("/result")),
+        "the gated result survives the interrupted publication as a ref: {result_refs}"
+    );
+
+    // The "crash" clears. The rerun must publish the surviving result without
+    // asking the resolver anything.
+    fs::remove_file(&hook).unwrap();
+    let _guard = install_resolver_override(
+        &b,
+        Arc::new(ScriptedResolver::new(vec![Box::new(
+            |_request: &ResolutionRequest<'_>| -> refine::process::supervisor::errors::RefineResult<
+                ResolverOutcome,
+            > { panic!("a surviving gated result must publish without re-invoking the resolver") },
+        ) as ScriptedStep])),
+    );
+    let published = service(&b).sync().unwrap();
+    assert!(published.ok && published.pushed, "{published:?}");
+    assert_eq!(
+        git_out(&remote, &["show", "refine/state:.refine/shared.json"]).as_deref(),
+        Some("{\"node\":\"merged\"}")
+    );
+    assert_eq!(
+        fs::read_to_string(shared(&b)).unwrap(),
+        "{\"node\":\"merged\"}\n"
+    );
+    assert_eq!(
+        git_out(&b, &["for-each-ref", "refs/refine/resolve"]).as_deref(),
+        Some(""),
+        "the bounded resolve namespace is retired after publication"
+    );
+    assert!(
+        latest_state_sync_conflict_report(&b.join("run"))
+            .unwrap()
+            .is_none(),
+        "the settled conflict report is cleared"
+    );
+
+    // The other node converges onto the resolved content and reruns are no-ops.
+    service(&a).sync().unwrap();
+    assert_eq!(
+        fs::read_to_string(shared(&a)).unwrap(),
+        "{\"node\":\"merged\"}\n"
+    );
+    let rerun = service(&b).sync().unwrap();
+    assert!(!rerun.pushed, "{rerun:?}");
 }

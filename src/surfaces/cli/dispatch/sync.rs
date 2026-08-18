@@ -50,7 +50,9 @@ fn dispatch_direct(
         .and_then(|cache_dir| cache_dir.parent())
         .map(Path::to_path_buf)
         .unwrap_or_else(|| refine_dir.join("runtime"));
-    let git_sync = FileGitSyncService::new(&target_root, &runtime_root).sync()?;
+    let git_sync = FileGitSyncService::new(&target_root, &runtime_root)
+        .with_agent_resolution()
+        .sync()?;
     let store = cache_dir
         .as_ref()
         .and_then(|cache_dir| cache_dir.parent())

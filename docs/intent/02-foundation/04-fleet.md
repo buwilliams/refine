@@ -24,7 +24,10 @@ State synchronizes symmetrically on `refine/state`; application branches remain 
 How divergent `refine/state` heads converge is the persistence-sync
 capability's policy, not Fleet's
 (`docs/intent/03-capabilities/05-persistence-sync.md`). Fleet keeps only the
-principles that outlast any mechanism. Reconciliation never guesses a winner
+principles that outlast any mechanism — and they are more than prose:
+persistence sync hands this doctrine verbatim to the resolving agent as its
+guidance, and a test pins that quote to this document so code and intent
+cannot drift. Reconciliation never guesses a winner
 from circumstance: timestamps, recency, and which node happens to run the
 merge decide nothing. Ownership is declared doctrine, never circumstance:
 the node that owned a record at the merge base is authoritative
@@ -36,7 +39,12 @@ ordered arrays are atomic and never split from that authority. Nothing is
 silently destroyed: every losing side is retained as a ref before
 publication. When resolution genuinely needs help, escalation carries a
 domain-terms question an operator can answer in one read, never a bare
-fence. The deterministic structural driver merges what it can prove
+fence — and escalation is ordered: the agent resolves first, and only after
+it declares a decision is needed or spends its bounded attempts (or
+resolution is unavailable or disabled) does the daemon's automatic recovery
+apply merge-base ownership
+deterministically, itself carrying an opt-out for nodes doing deliberate
+divergence work. The deterministic structural driver merges what it can prove
 disjoint, including the `nodes.json` registry, whose records union by
 canonical node id so absence never implies node deletion.
 

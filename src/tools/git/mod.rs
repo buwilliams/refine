@@ -8,6 +8,7 @@ pub mod locks;
 pub mod merge;
 pub mod refs;
 pub mod repo;
+pub mod resolve;
 pub mod state_driver;
 
 pub use ancestry::{Ancestry, classify};

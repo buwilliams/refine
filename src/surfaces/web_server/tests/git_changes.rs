@@ -496,12 +496,7 @@ fn web_server_sync_queues_pipeline_and_terminal_decision_is_idempotent() {
     let runtime_root = b.join("run");
     server.runtime_root = Some(runtime_root.clone());
     crate::tools::host::state_sync_health::FileStateSyncHealthService::new(&runtime_root)
-        .record_failure_with_recovery_kind(
-            &b,
-            "default",
-            "baseline missing",
-            Some(crate::tools::host::state_sync_health::StateSyncRecoveryKind::MissingBaseline),
-        )
+        .record_failure(&b, "default", "baseline missing")
         .unwrap();
 
     // No body: the queued run is the ordinary sync pipeline. The disjoint

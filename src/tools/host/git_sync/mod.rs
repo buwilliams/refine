@@ -38,16 +38,17 @@ static STATE_COPY_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 mod conflict_report;
 mod recovery;
+mod resolution;
 mod service;
 mod state_codec;
 mod state_files;
 mod state_worktree;
 
-use conflict_report::conflict_path_summary;
 pub use conflict_report::{
     StateSyncConflictPath, StateSyncConflictPhase, StateSyncConflictReport,
     StateSyncConflictSummary, latest_state_sync_conflict_report,
 };
+use conflict_report::{conflict_path_summary, conflict_report_id};
 pub use recovery::{
     StateRecoveryAuthority, StateRecoveryDecision, StateRecoveryOverride, StateRecoveryPreview,
     StateRecoveryResult, StateRecoveryRunPolicy, StateRecoveryRunResult,
@@ -123,6 +124,13 @@ impl StateSyncAttemptContext {
 pub struct FileGitSyncService {
     pub target_root: PathBuf,
     pub runtime_root: PathBuf,
+    /// Whether this entry point may call out to the installed agent for
+    /// conflicts the deterministic ladder cannot settle. Off by default so
+    /// bare constructions (fixtures, harnesses, read paths) keep the
+    /// fail-closed ladder; the daemon runner and the CLI sync surface opt in
+    /// with [`FileGitSyncService::with_agent_resolution`]. A resolver
+    /// override installed for the target root engages regardless.
+    agent_resolution: bool,
 }
 
 #[cfg(test)]

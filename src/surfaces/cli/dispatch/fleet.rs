@@ -161,7 +161,9 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                 },
         } => {
             let runtime_root = refine_dir_for_target_root(&target_root)?.join("runtime");
-            let sync = FileGitSyncService::new(&target_root, runtime_root).sync()?;
+            let sync = FileGitSyncService::new(&target_root, runtime_root)
+                .with_agent_resolution()
+                .sync()?;
             println!("{}", serde_json::to_string_pretty(&sync).unwrap());
             Ok(())
         }

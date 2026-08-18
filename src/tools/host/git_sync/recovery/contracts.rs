@@ -76,6 +76,11 @@ pub struct StateRecoveryPreview {
     /// Genuinely contested paths with domain-terms summaries; these are the
     /// paths an authority decision would settle.
     pub conflicts: Vec<StateSyncConflictPath>,
+    /// The domain-terms question agent resolution escalated with for exactly
+    /// this divergence, when one is on file: what is contested and what must
+    /// be chosen.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decision_question: Option<String>,
     pub detail: String,
 }
 

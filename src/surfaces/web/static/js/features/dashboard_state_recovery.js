@@ -235,8 +235,10 @@ function renderDashboardStateRecovery(d) {
   return `
     <section class="dashboard-state-recovery ${retrying || dashboardStateRecovery.phase === "apply_error" ? "degraded" : ""}"
              data-testid="state-recovery-preview">
-      <h3>Refine state needs a decision</h3>
-      <p>Refine state changed on multiple nodes. Review both sides and deliberately choose which state is authoritative; everything uncontested has already converged deterministically.</p>
+      <h3>State sync needs a decision</h3>
+      ${preview.decision_question
+        ? `<p data-testid="state-recovery-question">${htmlEscape(preview.decision_question)}</p>`
+        : `<p>This node and another node changed the same records, and no side can be chosen automatically. Review both sides and deliberately choose which state is authoritative; everything uncontested has already converged deterministically.</p>`}
       ${retrying ? `
         <div class="dashboard-recovery-warning" data-testid="state-recovery-git-busy">
           <strong>Git is busy.</strong> ${htmlEscape(dashboardStateRecovery.error)}

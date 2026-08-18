@@ -78,7 +78,6 @@ pub(super) fn record_state_sync_failure(
         report
             .as_ref()
             .map(|report| report.report_location.as_str()),
-        None,
     )?;
     append_state_sync_activity(target_root, node_id, activity, report.as_ref())
 }
@@ -230,7 +229,6 @@ pub(crate) fn settle_state_recovery_success(
     let (settled, activity) = health_service.record_recovery_success(
         target_root,
         &expected_health.node_id,
-        expected_health.recovery_kind,
         expected_health.revision,
     )?;
     append_state_sync_activity(target_root, &expected_health.node_id, activity, None)?;

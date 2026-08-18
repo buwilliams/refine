@@ -91,7 +91,13 @@ impl FileGitSyncService {
                 uuid::Uuid::new_v4().to_string(),
                 "state_recovery_run",
             );
-            let pass = self.sync_locked_pass(GitFetchScope::All, &context, Some(decision))?;
+            let pass = self.sync_locked_pass(
+                GitFetchScope::All,
+                &context,
+                Some(decision),
+                false,
+                &mut None,
+            )?;
             if pass.settled.is_empty() && pass.retained.is_empty() {
                 return Ok(StateRecoveryRunResult {
                     ok: true,

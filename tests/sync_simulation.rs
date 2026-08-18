@@ -12,9 +12,14 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use refine::process::supervisor::errors::{RefineError, RefineResult};
+use refine::tools::git::resolve::{
+    ResolutionRequest, ResolverOutcome, ResolverOverrideGuard, ScriptedResolver, ScriptedStep,
+    install_resolver_override,
+};
 use refine::tools::host::git_sync::{
     FileGitSyncService, GitSyncResult, StateRecoveryAuthority, StateRecoveryDecision,
     StateRecoveryRunResult, StateSyncConflictReport, latest_state_sync_conflict_report,
@@ -48,17 +53,38 @@ enum Event {
     },
     /// Run the real sync pipeline on the node.
     Sync { node: usize },
+    /// Write a goal record carrying an explicit `node_id` owner member, so a
+    /// merge-base ownership decision can read who owned the record at the
+    /// shared base.
+    LiveWriteOwned {
+        node: usize,
+        goal_id: &'static str,
+        name: &'static str,
+        owner: &'static str,
+    },
     /// Run the one-shot operator recovery on the node with a uniform
     /// authority.
     RecoveryRun {
         node: usize,
         authority: StateRecoveryAuthority,
     },
+    /// Simulate a daemon crash on the node: every piece of in-process service
+    /// state is dropped and rebuilt — the resolver the daemon had installed
+    /// dies with it, and the node value is reconstructed from its identity
+    /// and path alone. Durable state (target root repository, live dir,
+    /// refs) is untouched: crash-only means the rerun must re-derive
+    /// everything from it. (`FileGitSyncService` itself is stateless and is
+    /// already constructed fresh per event; the crash-window *placement*
+    /// comes from induced failures — a rejected push, an unwritable
+    /// hydration destination, a resolver that dies mid-attempt — that stop a
+    /// pass exactly where the process would have died.)
+    Crash { node: usize },
 }
 
 /// What one event produced, in scenario order.
 enum Outcome {
     Write,
+    Crash,
     Sync(RefineResult<GitSyncResult>),
     Recovery(RefineResult<StateRecoveryRunResult>),
 }
@@ -122,6 +148,10 @@ struct SimulatedFleet {
     push_block_marker: PathBuf,
     push_race_marker: PathBuf,
     nodes: Vec<SimulatedNode>,
+    /// The scripted conflict resolver installed on each node, if any — the
+    /// injection point the wiring exposed for the harness. Held as a guard so
+    /// a crash (or the fleet's end) uninstalls it.
+    resolvers: Vec<Option<ResolverOverrideGuard>>,
     /// Live writes not yet durably committed by a sync on their node, keyed
     /// by state-relative path. A rewrite before any sync supersedes the
     /// pending version — it was never committed anywhere.
@@ -183,6 +213,7 @@ impl SimulatedFleet {
             remote,
             push_block_marker,
             push_race_marker,
+            resolvers: (0..nodes.len()).map(|_| None).collect(),
             pending: vec![BTreeMap::new(); nodes.len()],
             committed: Vec::new(),
             nodes,
@@ -218,6 +249,29 @@ impl SimulatedFleet {
                 goal_id,
                 goal_record_bytes_with(goal_id, name, status),
             ),
+            Event::LiveWriteOwned {
+                node,
+                goal_id,
+                name,
+                owner,
+            } => self.write_goal(
+                *node,
+                goal_id,
+                goal_record_bytes_owned(goal_id, name, owner),
+            ),
+            Event::Crash { node } => {
+                // The resolver the crashed daemon had installed dies with the
+                // process; the node's in-process value is rebuilt from its
+                // durable identity and path. Nothing under the target root is
+                // touched.
+                self.resolvers[*node] = None;
+                let id = self.nodes[*node].id;
+                self.nodes[*node] = SimulatedNode {
+                    id,
+                    target_root: self.root.join(id),
+                };
+                Outcome::Crash
+            }
             Event::Sync { node } => {
                 let result = self.nodes[*node].service().sync();
                 self.record_durably_committed(*node);
@@ -259,8 +313,46 @@ impl SimulatedFleet {
         let node = SimulatedNode { id, target_root };
         write_active_node_identity(&node);
         self.nodes.push(node);
+        self.resolvers.push(None);
         self.pending.push(BTreeMap::new());
         self.nodes.len() - 1
+    }
+
+    /// Install a scripted conflict resolver on the node, the way the daemon
+    /// would carry an installed agent. Replaces any previous one; a
+    /// `Crash { node }` event uninstalls it.
+    fn install_resolver(&mut self, node: usize, steps: Vec<ScriptedStep>) {
+        self.resolvers[node] = Some(install_resolver_override(
+            &self.nodes[node].target_root,
+            Arc::new(ScriptedResolver::new(steps)),
+        ));
+    }
+
+    /// Every ref currently pinned under the node's bounded resolve namespace.
+    fn resolve_ref_names(&self, node: usize) -> Vec<String> {
+        git_stdout(
+            &self.nodes[node].target_root,
+            &["for-each-ref", "--format=%(refname)", "refs/refine/resolve"],
+        )
+        .lines()
+        .map(str::to_string)
+        .collect()
+    }
+
+    /// Every resolution workspace and lock still on disk for the node. A
+    /// workspace is a full checkout of the state tree, so one left behind per
+    /// divergence is the disk-growth class this capability must not have.
+    fn resolve_workspace_names(&self, node: usize) -> Vec<String> {
+        let root = self.nodes[node].target_root.join(".git/refine-resolve");
+        let Ok(entries) = fs::read_dir(&root) else {
+            return Vec::new();
+        };
+        let mut names = entries
+            .flatten()
+            .map(|entry| entry.file_name().to_string_lossy().into_owned())
+            .collect::<Vec<_>>();
+        names.sort();
+        names
     }
 
     /// Move a node's pending versions into the committed ledger by consulting
@@ -463,6 +555,59 @@ fn goal_record_bytes(goal_id: &str, name: &str) -> Vec<u8> {
 
 fn goal_record_bytes_with(goal_id: &str, name: &str, status: &str) -> Vec<u8> {
     format!(r#"{{"id":"{goal_id}","name":"{name}","status":"{status}","rounds":[]}}"#).into_bytes()
+}
+
+/// A minimal record carrying an explicit `node_id` owner, so the merge base
+/// can testify who owned it when a merge-base ownership decision asks.
+fn goal_record_bytes_owned(goal_id: &str, name: &str, owner: &str) -> Vec<u8> {
+    format!(
+        r#"{{"id":"{goal_id}","name":"{name}","status":"todo","node_id":"{owner}","rounds":[]}}"#
+    )
+    .into_bytes()
+}
+
+/// A complete, schema-valid Goal record — what an accepted agent resolution
+/// must produce, because the state acceptance gates deserialize the resolved
+/// bytes as a Goal and hold its id to the record path.
+fn full_goal_record_bytes(goal_id: &str, name: &str) -> Vec<u8> {
+    serde_json::to_vec_pretty(&serde_json::json!({
+        "id": goal_id,
+        "name": name,
+        "status": "todo",
+        "priority": "low",
+        "reporter": null,
+        "branch_name": null,
+        "feature_id": null,
+        "feature_order": null,
+        "node_id": "node-a",
+        "created": "2026-08-17T07:00:00Z",
+        "updated": "2026-08-17T09:00:00Z",
+        "notes": [],
+        "rounds": []
+    }))
+    .unwrap()
+}
+
+/// A scripted resolver step that edits the workspace and claims completion —
+/// the acceptance gates decide whether the claim holds.
+fn completing(edit: impl FnMut(&ResolutionRequest<'_>) + Send + 'static) -> ScriptedStep {
+    let mut edit = edit;
+    Box::new(move |request| {
+        edit(request);
+        Ok(ResolverOutcome::Completed)
+    })
+}
+
+/// A scripted resolver step that resolves one contested goal record by
+/// writing a complete Goal whose `name` composes both sides' intents.
+fn resolving_goal(goal_id: &'static str, merged_name: &'static str) -> ScriptedStep {
+    completing(move |request| {
+        let destination = request
+            .workspace_dir
+            .join(".refine")
+            .join(goal_record_path(goal_id));
+        fs::write(destination, full_goal_record_bytes(goal_id, merged_name)).unwrap();
+    })
 }
 
 /// Record the machine-local active-node selection where identity resolution

@@ -1,5 +1,6 @@
 mod recovery;
 mod remote;
+mod resolution;
 mod safety;
 mod synchronization;
 

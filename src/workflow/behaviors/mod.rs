@@ -1188,18 +1188,18 @@ impl WorkflowBehavior for WorkflowGovernance {
             ctx.refine_dir(),
             ctx.target_root,
         );
-        // The repository lock covers only Git work: one hold refreshes the
-        // candidate onto the target tip, and a second hold proves that tip is
+        // The repository lock covers only Git work: the refresh manages its
+        // own short holds (a conflicted rebase releases the lock while the
+        // conflict resolver runs, then re-acquires it to continue and prove
+        // the tip unchanged), and a second hold here proves that tip is still
         // unchanged and merges. The quality proof and the governance verdict —
-        // agent invocations that can run for minutes — execute between the two
+        // agent invocations that can run for minutes — execute between the
         // holds so they can never stall every other Goal's commits and
         // worktree operations behind this Goal's review.
         let mut settled = None;
         for _ in 0..INTEGRATION_REFRESH_ATTEMPTS {
             let step = (|| -> RefineResult<GovernanceIntegrationStep> {
-                let refresh = with_repository_git_lock(&target_root, || {
-                    refresh_candidate_for_target_advancement(ctx, max_retries)
-                })?;
+                let refresh = refresh_candidate_for_target_advancement(ctx, max_retries)?;
                 let expected_target = match refresh {
                     CandidateRefreshOutcome::RecoveryQueued { reason, evidence } => {
                         ctx.log(

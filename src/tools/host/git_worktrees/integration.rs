@@ -1,6 +1,39 @@
 use super::*;
 
+/// Write conflict markers that carry the merge base as well as both sides.
+///
+/// A conflict a resolver is asked to understand is not readable from two
+/// versions alone: without the base section it cannot tell which side changed
+/// what. Refine's state workspaces render the base explicitly; a conflicted
+/// rebase gets it from Git, whatever the user's own `merge.conflictStyle`
+/// happens to be, through this per-invocation configuration.
+pub(super) const BASE_IN_CONFLICT_MARKERS: [(&str, &str); 3] = [
+    ("GIT_CONFIG_COUNT", "1"),
+    ("GIT_CONFIG_KEY_0", "merge.conflictStyle"),
+    ("GIT_CONFIG_VALUE_0", "diff3"),
+];
+
 impl FileGitWorktreeService {
+    /// Whether a merge, rebase, revert, or cherry-pick is stopped
+    /// mid-operation in this worktree. A crash between Refine's two holds
+    /// leaves exactly that, and the checkout stays wedged until something
+    /// aborts it.
+    pub fn operation_in_progress(&self) -> RefineResult<bool> {
+        let rebase_merge = self.git_path("rebase-merge")?;
+        let Some(git_dir) = rebase_merge.parent() else {
+            return Ok(false);
+        };
+        Ok([
+            "rebase-merge",
+            "rebase-apply",
+            "MERGE_HEAD",
+            "REVERT_HEAD",
+            "CHERRY_PICK_HEAD",
+        ]
+        .iter()
+        .any(|marker| git_dir.join(marker).exists()))
+    }
+
     pub fn remote_exists(&self, remote: &str) -> RefineResult<bool> {
         if remote.trim().is_empty() {
             return Ok(false);
@@ -200,6 +233,54 @@ impl FileGitWorktreeService {
             .filter(|path| !path.is_empty())
             .map(|path| String::from_utf8_lossy(path).to_string())
             .collect())
+    }
+
+    /// Stage the resolved paths of a stopped rebase and continue it. Refine
+    /// never skips a pick: a further conflicted stop or any other failure
+    /// comes back as a non-ok `MergeResult` for the caller to route.
+    pub fn rebase_continue(&self, resolved_paths: &[String]) -> RefineResult<MergeResult> {
+        if resolved_paths.is_empty() {
+            return Err(RefineError::InvalidInput(
+                "rebase continue requires the resolved paths of the current stop".to_string(),
+            ));
+        }
+        let mut add_args = vec!["add", "--"];
+        add_args.extend(resolved_paths.iter().map(String::as_str));
+        self.git_output(&add_args)?;
+        let mut env = vec![("GIT_EDITOR", "true")];
+        env.extend(BASE_IN_CONFLICT_MARKERS);
+        let output = self.git_raw_with_env(&["rebase", "--continue"], &env)?;
+        let result = MergeResult {
+            ok: output.success,
+            conflicts: self.conflicts().unwrap_or_default(),
+            message: Some(trimmed_command_text(&output)),
+        };
+        if result.ok {
+            self.audit("rebase_continue", "ok", json!({"result": &result}))?;
+        } else {
+            let _ = self.audit("rebase_continue", "conflict", json!({"result": &result}));
+        }
+        Ok(result)
+    }
+
+    /// Commits in `base..tip` that touched any of `paths`, newest first,
+    /// capped so provenance lookups over the conflicting range stay bounded.
+    pub fn commits_in_range_touching(
+        &self,
+        base: &str,
+        tip: &str,
+        paths: &[String],
+    ) -> RefineResult<Vec<String>> {
+        validate_commitish(base)?;
+        validate_commitish(tip)?;
+        if paths.is_empty() {
+            return Ok(Vec::new());
+        }
+        let range = format!("{base}..{tip}");
+        let mut args = vec!["rev-list", "-n", "50", &range, "--"];
+        args.extend(paths.iter().map(String::as_str));
+        let output = stdout(self.git_output(&args)?)?;
+        Ok(output.split_whitespace().map(str::to_string).collect())
     }
 
     pub fn merge_commit_no_ff(&self, commit: &str) -> RefineResult<MergeResult> {
