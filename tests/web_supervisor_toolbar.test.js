@@ -921,6 +921,10 @@ test("each terminal profile sends its launch context and keeps an independent ma
   assert.deepEqual(starts.map((request) => request.body.profile), [
     "plan", "goal", "terminal", "agent", "standalone",
   ]);
+  assert.deepEqual(
+    starts.map((request) => request.body.surface),
+    ["toolbar", "toolbar", "toolbar", "toolbar", "toolbar"],
+  );
   assert.equal(starts.find((request) => request.body.profile === "goal").body.goal_id, "GOAL1");
   assert.equal(starts.find((request) => request.body.profile === "plan").body.initial_prompt, "Design a retry queue");
   assert.equal(browser.runtime.tab("standalone").worktree.path, "/tmp/worktree-5");

@@ -84,7 +84,7 @@ use import_contract::{
     WebImportPersistObserver, import_extraction_response, import_extraction_text,
     import_provider_from_settings,
 };
-pub(super) use terminal_profiles::terminal_profile_prompt;
+pub(super) use terminal_profiles::{TerminalSessionLaunchSurface, terminal_profile_prompt};
 use terminal_profiles::{
     cleanup_failed_terminal_worktree, create_terminal_standalone_worktree,
     resume_terminal_standalone_worktree,

@@ -7,6 +7,7 @@ fn static_plan_mode_uses_managed_terminal_with_initial_context() {
 
     assert!(toolbar.contains("INTERACTIVE_TERMINAL_MODES"));
     assert!(toolbar.contains(r#"profile: tab.mode"#));
+    assert!(toolbar.contains(r#"surface: "toolbar""#));
     assert!(toolbar.contains(r#"initial_prompt: tab.initialPrompt"#));
     assert!(toolbar.contains(r#"data-testid="terminal-start""#));
     assert!(toolbar.contains(r#"data-testid="terminal-stop""#));

@@ -20,6 +20,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                 "/terminal/session",
                 Some(json!({
                     "profile": profile.as_str(),
+                    "surface": "cli",
                     "goal_id": goal_id,
                     "initial_prompt": prompt
                 })),
@@ -198,6 +199,7 @@ pub(super) fn attach_agent(
         "/terminal/session",
         Some(json!({
             "profile": profile.as_str(),
+            "surface": "cli",
             "goal_id": goal_id,
             "initial_prompt": prompt
         })),

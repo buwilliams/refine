@@ -1249,6 +1249,7 @@ async function startTerminalSession(tab = currentToolbarTab()) {
     const result = await api("POST", "/api/terminal/session", {
       ...size,
       profile: tab.mode,
+      surface: "toolbar",
       goal_id: tab.goalId || undefined,
       feature_id: tab.featureId || undefined,
       initial_prompt: tab.initialPrompt || undefined,
