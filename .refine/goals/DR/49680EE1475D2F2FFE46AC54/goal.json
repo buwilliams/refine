@@ -845,15 +845,35 @@
         "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
       },
       "assignee": "Buddy Williams",
-      "constitution_state": null,
+      "constitution_state": "passed",
       "created": "2026-08-18T15:05:26Z",
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
-      "governance_candidate_commit": null,
-      "governance_checked_at": null,
-      "governance_details": null,
-      "governance_message": null,
+      "governance_candidate_commit": "807c16aee9814a52205ca1ee16189e5733c8ac4c",
+      "governance_checked_at": "2026-08-18T15:42:13Z",
+      "governance_details": {
+        "configured": true,
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR49680EE1475D2F2FFE46AC54-round-2",
+        "failed_actions": [],
+        "governance_configured": true,
+        "guidance_checked": 2,
+        "phase": "post_implementation",
+        "provider": "codex",
+        "raw_output": "{\"status\":\"passed\",\"message\":\"No actual governance rule violations found.\",\"violations\":[],\"recovery_analysis\":\"\",\"recovery_round_prompt\":\"\"}",
+        "rules_checked": 4,
+        "verdict": {
+          "message": "No actual governance rule violations found.",
+          "recovery_analysis": "",
+          "recovery_round_prompt": "",
+          "status": "passed",
+          "violations": []
+        },
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR49680EE1475D2F2FFE46AC54-round-2"
+      },
+      "governance_message": "No actual governance rule violations found.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
       "governance_rule_actions": [],
       "guidance_decision": {
         "applied": [
@@ -1089,8 +1109,8 @@
       "implementation_report": "Implemented node-configurable Automatic agent resource budgeting with a 70 percent default, real locked copy-between-node Runtime Config behavior, preserved explicit caps and conservative telemetry safeguards, updated Runtime Config and Guide surfaces, and updated only the affected intent pages. All required focused verification passed; strict Clippy reported only the unchanged baseline categories and passed when those categories were allowed.",
       "implementation_reported_at": "2026-08-18T15:25:34Z",
       "logs": [],
-      "meta_rule_state": null,
-      "product_state": null,
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Round 2 correction to the integrated Round 1 resource governor:\n\nChange automatic agent admission to use 70 percent of detected host capacity instead of the hard-coded 25 percent. The percentage applies consistently to both detected logical CPU cores and currently available memory, so the default leaves 30 percent for Docker, target applications, and other host work.\n\nMake this percentage an existing-architecture, node-scoped Refine Runtime Config setting named automatic_agent_resource_budget_percent. Its product default is 70. Supported settings load, patch, persistence, and copy-between-node behavior must carry it; legacy state where the key is absent must also behave as 70. Validate supported writes as an integer percentage in the inclusive range 1 through 100, and do not silently accept malformed or out-of-range values.\n\nThread the configured percentage into HostResources automatic-concurrency calculation. Use overflow-safe integer arithmetic and retain the minimum one-slot progress guarantee. Preserve Round 1 safeguards: unknown host memory still falls back to one automatic slot, the per-agent reservation remains at least 2 GiB, complete managed process-tree memory accounting remains required before observed usage can influence scaling, and disk-headroom behavior is unchanged.\n\nKeep a positive parallel_run_cap as the authoritative absolute operator override. The percentage only governs Automatic mode when parallel_run_cap is blank or unset; unset subordinate node, provider, and target-app caps must continue to inherit the resulting global limit.\n\nExpose Automatic resource budget percent in Node -> Runtime Config with a default/current value of 70, clear percent semantics, numeric bounds, and autosave through the existing settings API. Update the matching Guide and only the affected docs/intent pages so they describe the configurable 70 percent default rather than quarter-host behavior.\n\nAdd focused regression coverage proving: default and missing-key behavior are 70 percent; an explicit valid percentage changes both CPU- and memory-limited concurrency; invalid supported writes are rejected; the explicit parallel-run cap still wins; Runtime Config renders and saves the field; and the conservative telemetry/process-tree fallbacks from Round 1 remain intact. Verify the exact candidate with cargo fmt --all -- --check, git diff --check, JavaScript syntax checks for changed static files, and focused cargo test --lib filters for the settings codec, workflow policy, host resource governor, and static Runtime Config surface.",
       "quality_agent_report": "Quality reviewed and corrected the round-2 candidate. The configured 70 percent Automatic CPU and available-memory budget, strict node settings codec, explicit-cap precedence, locked copy-between-node behavior, Runtime Config and Guide surfaces, and affected intent pages satisfy the finalized plan. Quality narrowed nodes.json lock scope so remote bootstrap runs outside the registry lock, reloads before health settlement, preserves concurrent Runtime Config writes, and rejects settlement when bootstrap authority changed. Exact verification passed: cargo fmt, diff hygiene, both changed JavaScript syntax checks, 14 settings tests, 3 workflow-policy tests, 11 host-resource tests, the copy API and static Runtime Config tests, the new bootstrap settlement regression, all 13 fleet-service tests, and adjusted strict Clippy.",
       "quality_candidate_commit": "807c16aee9814a52205ca1ee16189e5733c8ac4c",
@@ -1148,13 +1168,9 @@
       "quality_message": "All Quality tests passed with observed supervised evidence.",
       "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": null,
-      "updated": "2026-08-18T15:38:54Z",
-      "workflow_attempt_authority": {
-        "claimed_at": "2026-08-18T15:05:26Z",
-        "round_idx": 1,
-        "workflow_revision": 37
-      },
+      "rule_state": "passed",
+      "updated": "2026-08-18T15:42:19Z",
+      "workflow_attempt_authority": null,
       "workflow_candidate_refresh": {
         "authorizing_status": "governance",
         "branch": "refine/DR49680EE1475D2F2FFE46AC54/round-2",
@@ -1233,12 +1249,26 @@
         "workflow_revision": 37,
         "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR49680EE1475D2F2FFE46AC54-round-2"
       },
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "807c16aee9814a52205ca1ee16189e5733c8ac4c",
+        "integrated_at": "2026-08-18T15:42:19.292040565+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n docs/intent/04-infrastructure/01-process.md        |  19 +-\n docs/intent/05-surfaces/03-browser/12-settings.md  |   2 +-\n src/application/fleet/nodes/mod.rs                 | 226 ++++++++++++---------\n src/application/fleet/service/mod.rs               | 107 ++++++++--\n src/application/fleet/service/tests.rs             |  46 +++++\n src/application/workflow/engine/policy/mod.rs      |   9 +-\n src/application/workflow/engine/policy/settings.rs |  26 ++-\n .../workflow/phases/quality/service/settings.rs    |  55 ++---\n .../process/supervisor/config/mod.rs               |   3 +\n .../process/supervisor/config/settings.rs          | 113 +++++++++--\n .../process/supervisor/config/settings_codec.rs    |   5 +\n .../process/supervisor/config/settings_sections.rs |  56 +++++\n .../process/supervisor/config/tests.rs             | 121 +++++++++++\n src/infrastructure/runtime/host_resources/mod.rs   |  55 +++--\n src/surfaces/web/static/js/features/guide.js       |   6 +-\n .../web/static/js/features/settings_runtime.js     |  14 +-\n .../web_server/project_routes/nodes_fleet.rs       |  27 ++-\n src/surfaces/web_server/tests/nodes_fleet.rs       |  47 +++++\n .../web_server/tests/static_surface/settings.rs    |   7 +\n 19 files changed, 736 insertions(+), 208 deletions(-)\n create mode 100644 src/infrastructure/process/supervisor/config/settings_sections.rs",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "c0c3fc6bc5f8f78208e77598bc3c5f2a4a9fd311"
+      },
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "governance",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-08-18T15:38:54Z",
-  "workflow_revision": 61
+  "updated": "2026-08-18T15:42:19Z",
+  "workflow_revision": 65
 }
