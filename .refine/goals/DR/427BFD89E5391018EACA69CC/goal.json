@@ -106,8 +106,36 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-08-18T15:41:37Z",
+        "criticism": {
+          "completed_at": "2026-08-18T15:44:37Z",
+          "git_after": {
+            "branch": "refine/DR427BFD89E5391018EACA69CC/round-1",
+            "head_commit": "34fcb147a5e372a66c2004c3688702e0dc6851fd",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR427BFD89E5391018EACA69CC/round-1",
+            "head_commit": "34fcb147a5e372a66c2004c3688702e0dc6851fd",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P5"
+                ],
+                "description": "P5 excludes docs/runbooks/manage-fleet.md, which currently tells operators that ordinary divergence and contested first contact converge automatically and only opted-out nodes need manual authority.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Add docs/runbooks/manage-fleet.md to P5 and rewrite its contested-sync procedure so every unresolved ownership conflict remains failed until an operator chooses authority through a supported surface."
+              }
+            ],
+            "summary": "The plan is implementation-ready after adding the affected fleet-management runbook to its documentation scope."
+          },
+          "started_at": "2026-08-18T15:41:37Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-08-18T15:44:37Z",
         "proposal": {
           "completed_at": "2026-08-18T15:41:37Z",
           "git_after": {
@@ -150,7 +178,7 @@
         "schema_version": 2,
         "started_at": "2026-08-18T15:39:06Z",
         "state": "in_progress",
-        "updated_at": "2026-08-18T15:41:37Z"
+        "updated_at": "2026-08-18T15:44:37Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -164,7 +192,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T15:41:37Z",
+      "updated": "2026-08-18T15:44:37Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T15:39:05Z",
         "round_idx": 0,
@@ -176,6 +204,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-18T15:41:37Z",
-  "workflow_revision": 10
+  "updated": "2026-08-18T15:44:37Z",
+  "workflow_revision": 12
 }
