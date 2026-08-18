@@ -106,12 +106,47 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-08-18T14:47:27Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-08-18T14:50:26Z",
+        "proposal": {
+          "completed_at": "2026-08-18T14:50:26Z",
+          "git_after": {
+            "branch": "refine/DR1084498777E10360982E5D51/round-1",
+            "head_commit": "ff07e292388a2b3cfe2fcb1c3fb52bec4bb0ab4a",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR1084498777E10360982E5D51/round-1",
+            "head_commit": "ff07e292388a2b3cfe2fcb1c3fb52bec4bb0ab4a",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Render each enabled Guidance candidate with an explicit zero-based completion index while omitting its internal stable string ID from the agent-facing specification so values such as guidance-1 are not suggested for guidance_applied.",
+                "id": "P1"
+              },
+              {
+                "description": "Keep the shared Plan, Criticize, Revise, and Implement completion contracts aligned with the typed integer-index schema and preserve an immediate terminal diagnostic for string-valued guidance_applied entries rather than allowing retries to consume the session timeout.",
+                "id": "P2"
+              },
+              {
+                "description": "Clarify the affected Guidance and Goal Agent intent wording that stable configuration IDs and display names are not completion-signal identifiers.",
+                "id": "P3"
+              },
+              {
+                "description": "Add focused rendered-prompt and signal-contract regressions using an internal guidance-1 ID to cover every workflow phase, valid integer indexes, and rejected string IDs.",
+                "id": "P4"
+              }
+            ],
+            "summary": "Make Goal Agent Guidance selection unambiguous end to end by presenting zero-based indexes as the sole completion identifiers, preserving strict integer decoding, and failing invalid string-ID signals promptly so completed work can hand off instead of timing out."
+          },
+          "started_at": "2026-08-18T14:47:28Z"
+        },
         "schema_version": 2,
         "started_at": "2026-08-18T14:47:27Z",
         "state": "in_progress",
-        "updated_at": "2026-08-18T14:47:27Z"
+        "updated_at": "2026-08-18T14:50:26Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -125,7 +160,7 @@
       "quality_state": "unclassified",
       "reporter": "buddy.williams@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T14:47:27Z",
+      "updated": "2026-08-18T14:50:26Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T14:47:27Z",
         "round_idx": 0,
@@ -137,6 +172,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-18T14:47:27Z",
-  "workflow_revision": 7
+  "updated": "2026-08-18T14:50:26Z",
+  "workflow_revision": 9
 }
