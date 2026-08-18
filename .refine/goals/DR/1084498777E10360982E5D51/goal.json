@@ -123,6 +123,41 @@
           },
           "started_at": "2026-08-18T14:50:26Z"
         },
+        "final_plan": {
+          "completed_at": "2026-08-18T14:53:32Z",
+          "git_after": {
+            "branch": "refine/DR1084498777E10360982E5D51/round-1",
+            "head_commit": "ff07e292388a2b3cfe2fcb1c3fb52bec4bb0ab4a",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR1084498777E10360982E5D51/round-1",
+            "head_commit": "ff07e292388a2b3cfe2fcb1c3fb52bec4bb0ab4a",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Render each enabled Guidance candidate with its zero-based completion index and omit the internal stable string ID from the agent-facing Goal specification so values such as guidance-1 are not presented as guidance_applied choices.",
+                "id": "P1"
+              },
+              {
+                "description": "Align the Plan, Criticize, Revise, and Implement completion instructions around the integer-index contract and preserve typed-schema rejection as an immediate terminal diagnostic for string-valued guidance_applied entries.",
+                "id": "P2"
+              },
+              {
+                "description": "Update the affected Guidance and Goal Agent intent pages to distinguish stable configuration IDs and display names from the positional indexes used only by completion signals.",
+                "id": "P3"
+              },
+              {
+                "description": "Add focused specification, phase-prompt, signal-decoding, and session-settlement regressions using an internal guidance-1 ID to cover every Goal Agent phase, valid integer indexes, omitted string IDs, and terminal rejection of string values without repair retries.",
+                "id": "P4"
+              }
+            ],
+            "summary": "Make Goal Agent Guidance selection unambiguous end to end by exposing zero-based candidate indexes as the only completion identifiers, preserving strict integer decoding, and terminating invalid string-ID signals promptly so completed work can hand off without retrying until timeout."
+          },
+          "started_at": "2026-08-18T14:51:58Z"
+        },
         "phase": "revise",
         "phase_started_at": "2026-08-18T14:51:58Z",
         "proposal": {
@@ -163,7 +198,7 @@
         "schema_version": 2,
         "started_at": "2026-08-18T14:47:27Z",
         "state": "in_progress",
-        "updated_at": "2026-08-18T14:51:58Z"
+        "updated_at": "2026-08-18T14:53:32Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -177,7 +212,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T14:51:58Z",
+      "updated": "2026-08-18T14:53:32Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T14:47:27Z",
         "round_idx": 0,
@@ -189,6 +224,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-18T14:51:58Z",
-  "workflow_revision": 12
+  "updated": "2026-08-18T14:53:32Z",
+  "workflow_revision": 13
 }
