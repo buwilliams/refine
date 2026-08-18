@@ -30,37 +30,42 @@ fn workflow_goal_agent_prompt_excludes_interactive_checkout_guidance() {
 }
 
 #[test]
-fn planning_sessions_require_the_phase_specific_structured_result() {
+fn every_goal_agent_phase_uses_the_integer_guidance_completion_contract() {
     let signal = Path::new("/runtime/processes/goal-agent.signal.json");
     let plan = goal_agent_protocol_prompt("PLAN_SENTINEL", signal, Some("plan"));
     let criticize = goal_agent_protocol_prompt("CRITICIZE_SENTINEL", signal, Some("criticize"));
     let revise = goal_agent_protocol_prompt("REVISE_SENTINEL", signal, Some("revise"));
+    let implement = goal_agent_protocol_prompt("IMPLEMENT_SENTINEL", signal, Some("implement"));
 
+    for prompt in [&plan, &criticize, &revise, &implement] {
+        assert!(prompt.contains("zero-based integer Completion Index"));
+        assert!(prompt.contains("never use candidate names or stable configuration IDs"));
+        assert!(prompt.contains("\"guidance_applied\":[0]"));
+        assert!(prompt.contains(signal.to_str().unwrap()));
+        assert!(!prompt.contains("{{"));
+    }
     for prompt in [&plan, &criticize, &revise] {
         assert!(prompt.contains("required `planning_result`"));
         assert!(prompt.contains("never omitted or quoted as a string"));
-        assert!(prompt.contains("zero-based integer indexes"));
-        assert!(prompt.contains("never use names"));
-        assert!(prompt.contains("\"guidance_applied\":[0]"));
         assert!(!prompt.contains("implementation_evidence"));
-        assert!(prompt.contains(signal.to_str().unwrap()));
-        assert!(!prompt.contains("{{"));
     }
     assert!(plan.contains("\"checklist\""));
     assert!(criticize.contains("\"findings\""));
     assert!(revise.contains("\"criticism_resolutions\""));
     assert!(revise.contains("\"criticism_id\":\"C1\""));
     assert!(revise.contains("\"resolution\":\"how the revised plan resolves"));
+    assert!(implement.contains("implementation_evidence"));
+    assert!(!implement.contains("planning_result"));
 }
 
 #[test]
-fn completion_signal_rejects_guidance_names_as_a_schema_error() {
+fn completion_signal_rejects_stable_guidance_ids_as_a_schema_error() {
     let root = unique_temp_dir("goal-agent-invalid-guidance-signal");
     fs::create_dir_all(&root).unwrap();
     let signal_path = root.join("goal-agent.signal.json");
     fs::write(
         &signal_path,
-        r#"{"state":"completed","message":"planned","guidance_applied":["Intent and architecture"],"planning_result":{"summary":"Plan summary.","checklist":[]}}"#,
+        r#"{"state":"completed","message":"planned","guidance_applied":["guidance-1"],"planning_result":{"summary":"Plan summary.","checklist":[]}}"#,
     )
     .unwrap();
 
@@ -70,8 +75,28 @@ fn completion_signal_rejects_guidance_names_as_a_schema_error() {
     };
 
     assert!(diagnostic.contains("does not match the required schema"));
-    assert!(diagnostic.contains("guidance_applied"));
+    assert!(diagnostic.contains("guidance_applied[0]"));
+    assert!(diagnostic.contains("expected usize"));
     assert!(signal_path.is_file());
+    fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn completion_signal_accepts_zero_based_guidance_indexes() {
+    let root = unique_temp_dir("goal-agent-valid-guidance-signal");
+    fs::create_dir_all(&root).unwrap();
+    let signal_path = root.join("goal-agent.signal.json");
+    fs::write(
+        &signal_path,
+        r#"{"state":"completed","message":"planned","guidance_applied":[0,2],"planning_result":{"summary":"Plan summary.","checklist":[]}}"#,
+    )
+    .unwrap();
+
+    let SignalRead::Valid(signal) = SignalReader::default().take(&signal_path).unwrap() else {
+        panic!("integer Guidance indexes must satisfy the completion schema");
+    };
+    assert_eq!(signal.guidance_applied, Some(vec![0, 2]));
+    assert!(!signal_path.exists());
     fs::remove_dir_all(root).unwrap();
 }
 
@@ -160,7 +185,7 @@ fn planning_session_returns_the_structured_result_from_its_completion_signal() {
     fs::create_dir_all(&app_root).unwrap();
     fs::write(
         &provider,
-        "#!/bin/sh\nprintf '%s\\n' '{\"state\":\"completed\",\"message\":\"planned\",\"guidance_applied\":[],\"planning_result\":{\"summary\":\"Change the boundary so debug workers use the active executable.\",\"checklist\":[{\"id\":\"P1\",\"description\":\"Pass the active executable to supervised workers.\"}]}}' > \"$REFINE_AGENT_SIGNAL_PATH\"\nsleep 10\n",
+        "#!/bin/sh\nprintf '%s\\n' '{\"state\":\"completed\",\"message\":\"planned\",\"guidance_applied\":[0],\"planning_result\":{\"summary\":\"Change the boundary so debug workers use the active executable.\",\"checklist\":[{\"id\":\"P1\",\"description\":\"Pass the active executable to supervised workers.\"}]}}' > \"$REFINE_AGENT_SIGNAL_PATH\"\nsleep 10\n",
     )
     .unwrap();
     let mut permissions = fs::metadata(&provider).unwrap().permissions();
@@ -190,6 +215,7 @@ fn planning_session_returns_the_structured_result_from_its_completion_signal() {
     .unwrap();
 
     assert_eq!(result.output, "planned");
+    assert_eq!(result.guidance_applied, Some(vec![0]));
     assert_eq!(
         result.planning_result,
         Some(json!({

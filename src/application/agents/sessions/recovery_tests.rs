@@ -110,12 +110,12 @@ sleep 10
 
 #[cfg(unix)]
 #[test]
-fn typed_schema_rejection_is_terminal_without_a_replacement_instruction() {
+fn string_guidance_id_rejection_is_terminal_without_a_replacement_instruction() {
     let _env_guard = crate::infrastructure::agents::invocation::smoke_ai_env_lock()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let script = r#"#!/bin/sh
-printf '%s\n' '{"state":"completed","implementation_evidence":{"checklist":[{"id":"P1","outcome":"no_work_needed","evidence":"nothing changed"}],"verification":[]}}' > "$REFINE_AGENT_SIGNAL_PATH"
+printf '%s\n' '{"state":"completed","message":"implemented","guidance_applied":["guidance-1"],"implementation_evidence":{"checklist":[{"id":"P1","outcome":"completed","evidence":"implemented"}],"verification":["verified"]}}' > "$REFINE_AGENT_SIGNAL_PATH"
 if IFS= read -r instruction; then
   printf '%s\n' "$instruction" > recovery-instruction.txt
 fi
@@ -130,9 +130,8 @@ sleep 10
 
     assert!(error.contains("typed-schema failures are terminal"));
     assert!(error.contains("does not match the required schema"));
-    assert!(error.contains("implementation_evidence.checklist[0].outcome"));
-    assert!(error.contains("unknown variant `no_work_needed`"));
-    assert!(error.contains("no_change_needed"));
+    assert!(error.contains("guidance_applied[0]"));
+    assert!(error.contains("invalid type: string \"guidance-1\", expected usize"));
     assert!(!root.join("app/recovery-instruction.txt").exists());
     let process_dir = runtime_root.join("processes");
     let invalid_payloads = fs::read_dir(&process_dir)

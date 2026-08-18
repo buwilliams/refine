@@ -367,6 +367,7 @@ pub(super) fn goal_agent_protocol_prompt(
 
 fn completion_contract(signal_path: &Path, implementation_phase: Option<&str>) -> String {
     let destination = signal_path.display();
+    let guidance_contract = "`guidance_applied` must contain only the displayed zero-based integer Completion Index for each applicable Guidance candidate, such as `[0]`; use `[]` when none apply, and never use candidate names or stable configuration IDs.";
     let write_protocol = format!(
         "Write the complete JSON to `{destination}.tmp`, parse-check that temporary file with `jq .` or another JSON parser, and only after it parses atomically replace `{destination}` with `mv` or an equivalent rename. Never write the completion payload directly to `{destination}`."
     );
@@ -375,28 +376,28 @@ fn completion_contract(signal_path: &Path, implementation_phase: Option<&str>) -
             let planning_result =
                 crate::application::agent_io::prompts::implementation_planning::plan_result_contract_json();
             format!(
-                "Choose applicable Guidance. On completion, produce one JSON object with `state`, a brief `message`, `guidance_applied`, and the required `planning_result`. `guidance_applied` must contain zero-based integer indexes, such as `[0]`, for applicable Guidance candidates; use `[]` when none apply, and never use names. `planning_result` must be a JSON object, never omitted or quoted as a string. Use this complete signal shape: `{{\"state\":\"completed\",\"message\":\"brief planning summary\",\"guidance_applied\":[0],\"planning_result\":{planning_result}}}`. {write_protocol}"
+                "Choose applicable Guidance. On completion, produce one JSON object with `state`, a brief `message`, `guidance_applied`, and the required `planning_result`. {guidance_contract} `planning_result` must be a JSON object, never omitted or quoted as a string. Use this complete signal shape: `{{\"state\":\"completed\",\"message\":\"brief planning summary\",\"guidance_applied\":[0],\"planning_result\":{planning_result}}}`. {write_protocol}"
             )
         }
         Some("criticize") => {
             let planning_result =
                 crate::application::agent_io::prompts::implementation_planning::criticism_result_contract_json();
             format!(
-                "Choose applicable Guidance. On completion, produce one JSON object with `state`, a brief `message`, `guidance_applied`, and the required `planning_result`. `guidance_applied` must contain zero-based integer indexes, such as `[0]`, for applicable Guidance candidates; use `[]` when none apply, and never use names. `planning_result` must be a JSON object, never omitted or quoted as a string. Use this complete signal shape, with `findings` empty when nothing material was found: `{{\"state\":\"completed\",\"message\":\"brief criticism summary\",\"guidance_applied\":[0],\"planning_result\":{planning_result}}}`. {write_protocol}"
+                "Choose applicable Guidance. On completion, produce one JSON object with `state`, a brief `message`, `guidance_applied`, and the required `planning_result`. {guidance_contract} `planning_result` must be a JSON object, never omitted or quoted as a string. Use this complete signal shape, with `findings` empty when nothing material was found: `{{\"state\":\"completed\",\"message\":\"brief criticism summary\",\"guidance_applied\":[0],\"planning_result\":{planning_result}}}`. {write_protocol}"
             )
         }
         Some("revise") => {
             let planning_result =
                 crate::application::agent_io::prompts::implementation_planning::revision_result_contract_json();
             format!(
-                "Choose applicable Guidance. On completion, produce one JSON object with `state`, a brief `message`, `guidance_applied`, and the required `planning_result`. `guidance_applied` must contain zero-based integer indexes, such as `[0]`, for applicable Guidance candidates; use `[]` when none apply, and never use names. `planning_result` must be a JSON object, never omitted or quoted as a string. Use this complete signal shape with one populated canonical `criticism_id` and `resolution` entry per material finding: `{{\"state\":\"completed\",\"message\":\"brief revision summary\",\"guidance_applied\":[0],\"planning_result\":{planning_result}}}`. {write_protocol}"
+                "Choose applicable Guidance. On completion, produce one JSON object with `state`, a brief `message`, `guidance_applied`, and the required `planning_result`. {guidance_contract} `planning_result` must be a JSON object, never omitted or quoted as a string. Use this complete signal shape with one populated canonical `criticism_id` and `resolution` entry per material finding: `{{\"state\":\"completed\",\"message\":\"brief revision summary\",\"guidance_applied\":[0],\"planning_result\":{planning_result}}}`. {write_protocol}"
             )
         }
         _ => {
             let implementation_evidence =
                 crate::application::agent_io::prompts::implementation_planning::implementation_evidence_contract_json();
             format!(
-                "Report changes and exact verification. Choose applicable Guidance. On completion, produce `{{\"state\":\"completed\",\"message\":\"changes and exact verification\",\"guidance_applied\":[0],\"implementation_evidence\":{implementation_evidence}}}`, replacing `[0]` with applicable indexes and each checklist `outcome` with one of `completed|no_change_needed|deviated|rejected|blocked`. Guidance makes the field required, though it may be empty. A governed implementation checklist requires evidence for every stable ID without altering the accepted plan. {write_protocol}"
+                "Report changes and exact verification. Choose applicable Guidance. On completion, produce `{{\"state\":\"completed\",\"message\":\"changes and exact verification\",\"guidance_applied\":[0],\"implementation_evidence\":{implementation_evidence}}}`. {guidance_contract} Guidance makes the field required, though it may be empty. Replace each checklist `outcome` with one of `completed|no_change_needed|deviated|rejected|blocked`. A governed implementation checklist requires evidence for every stable ID without altering the accepted plan. {write_protocol}"
             )
         }
     }
