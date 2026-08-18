@@ -1,7 +1,7 @@
 {
-  "base_commit": "34fcb147a5e372a66c2004c3688702e0dc6851fd",
+  "base_commit": "c0c3fc6bc5f8f78208e77598bc3c5f2a4a9fd311",
   "branch_name": "refine/DR427BFD89E5391018EACA69CC/round-1",
-  "candidate_commit": "71fe6f126cc43371dfbb3ec68b6862b23fae684d",
+  "candidate_commit": "c536c2250e94818ae4d0f72ad0d5c2839ce47644",
   "created": "2026-08-18T15:39:04Z",
   "feature_id": null,
   "feature_order": null,
@@ -85,15 +85,15 @@
         "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
       },
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": null,
       "created": "2026-08-18T15:39:04Z",
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
-      "governance_candidate_commit": "",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_candidate_commit": null,
+      "governance_checked_at": null,
+      "governance_details": null,
+      "governance_message": null,
       "governance_rule_actions": [],
       "guidance_decision": {
         "applied": [
@@ -304,20 +304,65 @@
       "implementation_report": "Removed the automatic state-sync ownership arbitration pipeline. Background conflicts now remain failed with stable report, health, and backoff evidence until an operator uses an explicit sync-authority or Goal-transfer surface. One-sided Goal transfers are preserved, conflicting concurrent transfers fail closed before agent invocation, the retired setting and web control migrate away, and affected intent/runbook contracts and simulations now require manual authority. Verification passed: full Rust library suite (1112 passed, 0 failed, 6 ignored), full sync simulation suite (26 passed), sync regressions (5 passed), worker tests (18 passed), config tests (12 passed), browser settings tests (5 passed), formatting, diff validation, and Clippy with only the repository's six pre-existing untouched lint classes allowed.",
       "implementation_reported_at": "2026-08-18T16:16:35Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": null,
+      "product_state": null,
       "prompt": "From: Buddy Williams <buddy.williams@insurity.com>\nSubject: Remove automatic sync ownership arbitration pipeline\n\nBody:\nRequest: Remove automatic sync ownership arbitration pipeline. Goals stay where they are transferred unless manually moved via surface (CLI, web UI, etc.)\r\nDetails:\r\nFound it. The Refine 4.2.0 binary (deployed today at 09:13) introduced a new automatic sync ownership arbitration pipeline. Here's exactly what happened and why:\r\n\r\n  Why they moved: The commit message explains it directly — before 4.2.0, whenever two nodes had conflicting state on the same goal, the sync would wedge and require a manual operator. This was causing mass blockage at scale (67 unresolved\r\n  path(s) in production). So 4.2.0 added an auto-resolve rule: \"the node that owned the record at the last agreed baseline is authoritative.\"\r\n\r\n  Your 35 failed goals were originally assigned to the default node (the QA machine, bo2lnxnevo04). This node (bo2lnxipsapp01) had picked them up and advanced them through the workflow — but at the last sync baseline, default was the\r\n  declared owner. When 4.2.0's sync ran, it saw the conflict, applied the baseline-ownership policy, and moved those goals back to default.\r\n\r\n  Where they went: The default node — which now has 56 failed goals (up from 16 before). Your 35 plus others from around the fleet that were similarly repatriated.\r\n\r\n  They're not lost — they're on default in failed state. The catch is that they're also still carrying the signal schema failure (guidance_applied string vs integer) from the 4.2.0 agent prompt mismatch. So they'll keep failing on default\r\n  too until that's fixed.\r\n\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nBuddy Williams\r\nBuddy.Williams@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_candidate_commit": null,
+      "quality_checked_at": null,
+      "quality_details": null,
+      "quality_message": null,
+      "quality_state": null,
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-08-18T16:16:35Z",
+      "rule_state": null,
+      "updated": "2026-08-18T16:17:33Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T15:39:05Z",
         "round_idx": 0,
         "workflow_revision": 2
+      },
+      "workflow_candidate_refresh": {
+        "authorizing_status": "quality",
+        "branch": "refine/DR427BFD89E5391018EACA69CC/round-1",
+        "conflict_resolution": {
+          "attempts": [
+            {
+              "attempt": 1,
+              "files": [
+                "src/surfaces/web/static/js/features/settings_runtime.js"
+              ],
+              "outcome": "accepted"
+            }
+          ],
+          "files": [
+            "src/surfaces/web/static/js/features/settings_runtime.js"
+          ],
+          "outcome": "resolved"
+        },
+        "node_id": "default",
+        "original_base_commit": "34fcb147a5e372a66c2004c3688702e0dc6851fd",
+        "original_candidate_commit": "71fe6f126cc43371dfbb3ec68b6862b23fae684d",
+        "previous_gate_evidence": {
+          "constitution_state": "unclassified",
+          "governance_candidate_commit": "",
+          "governance_checked_at": "",
+          "governance_details": "",
+          "governance_message": "",
+          "meta_rule_state": "unclassified",
+          "product_state": "unclassified",
+          "quality_candidate_commit": null,
+          "quality_checked_at": "",
+          "quality_details": "",
+          "quality_message": "",
+          "quality_state": "unclassified",
+          "rule_state": "unclassified"
+        },
+        "refreshed_at": "2026-08-18T16:17:33Z",
+        "replacement_base_commit": "c0c3fc6bc5f8f78208e77598bc3c5f2a4a9fd311",
+        "replacement_candidate_commit": "c536c2250e94818ae4d0f72ad0d5c2839ce47644",
+        "round_idx": 0,
+        "state": "refreshed",
+        "workflow_revision": 2,
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR427BFD89E5391018EACA69CC-round-1"
       },
       "workflow_reconciliation": null,
       "workflow_recovery": null
@@ -325,6 +370,6 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-18T16:16:35Z",
-  "workflow_revision": 21
+  "updated": "2026-08-18T16:17:33Z",
+  "workflow_revision": 22
 }
