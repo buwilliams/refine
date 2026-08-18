@@ -109,6 +109,7 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
         guideItemId: "runtime-parallel-run-cap",
         description: "Automatic reserves most CPU and memory for Docker and other shared-host work. Enter a number to override that conservative recommendation.",
         valueLabel: parallelRunCap || "Automatic",
+        emptyLabel: "Automatic",
         control: `<input type="number" id="s-cap" data-testid="runtime-parallel-run-cap" min="1" placeholder="Automatic" value="${htmlEscape(parallelRunCap)}">`,
       })}
       ${renderSettingsEditableField({

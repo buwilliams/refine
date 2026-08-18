@@ -10,6 +10,7 @@ fn static_runtime_settings_expose_state_sync_controls() {
     assert!(runtime.contains(r#"data-testid="runtime-state-sync-now""#));
     assert!(runtime.contains(r#"placeholder="Automatic""#));
     assert!(runtime.contains(r#"valueLabel: parallelRunCap || "Automatic""#));
+    assert!(runtime.contains(r#"emptyLabel: "Automatic""#));
     assert!(runtime.contains("Enter a number to override that conservative recommendation"));
     assert!(!runtime.contains("s.parallel_run_cap || 5"));
     assert!(runtime.contains(r#"data-testid="runtime-state-sync-debounce""#));
