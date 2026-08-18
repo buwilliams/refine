@@ -295,52 +295,65 @@ fn web_server_reports_provider_diagnostics_for_agents_and_recheck() {
 }
 
 #[test]
-fn general_agent_prompt_routes_repository_changes_through_refine_workflow() {
-    let prompt = crate::surfaces::web_server::work_routes::terminal_profile_prompt(
-        &server_with_projection(),
-        "agent",
-        None,
-        None,
-        None,
+fn toolbar_agent_prompts_are_node_first_and_route_changes_through_refine_workflow() {
+    let server = server_with_projection();
+    let agent_prompt = crate::surfaces::web_server::work_routes::terminal_profile_prompt(
+        &server, "agent", None, None, None,
+    )
+    .unwrap();
+    let plan_prompt = crate::surfaces::web_server::work_routes::terminal_profile_prompt(
+        &server, "plan", None, None, None,
     )
     .unwrap();
 
-    assert!(prompt.contains("general-purpose native Agent"));
-    assert!(prompt.contains("Treat Refine as the execution path for repository changes"));
-    assert!(prompt.contains("inspect source, runtime state, logs, Git history"));
-    assert!(prompt.contains("answer conversational questions"));
-    assert!(prompt.contains("do not modify the repository ad hoc in this session"));
-    assert!(prompt.contains("Autonomously translate the desired outcome"));
-    assert!(prompt.contains("complete Refine Goal"));
-    assert!(prompt.contains("actionable Round"));
-    assert!(prompt.contains("make the Goal eligible for workflow execution"));
-    assert!(prompt.contains("do not require the user to recite lifecycle commands"));
-    assert!(prompt.contains("preserve that attempt"));
-    assert!(prompt.contains("append a new Round"));
-    assert!(prompt.contains("return the Goal to an eligible workflow state"));
-    assert!(prompt.contains("Honor Refine's confirmation and audit boundaries"));
-    assert!(prompt.contains("never directly edit durable Goal state"));
-    assert!(prompt.contains("conceal failures"));
-    assert!(prompt.contains("approve or merge on the user's behalf"));
-    assert!(prompt.contains("destructively discard retained work"));
-    assert!(prompt.contains("begin ongoing supervision unless the user requests it"));
-    assert!(prompt.contains("Active Refine executable:"));
-    assert!(prompt.contains("Resolved Refine source checkout:"));
-    assert!(prompt.contains("checkout-local `./r`"));
-    assert!(!prompt.contains("monitor the targeted app"));
+    for (profile, prompt) in [("agent", &agent_prompt), ("plan", &plan_prompt)] {
+        for required in [
+            "Begin with the existing Refine Node",
+            "investigating and managing the current Node",
+            "answering the user's questions",
+            "answer directly when no repository change is needed",
+            "do not modify the repository ad hoc in this session",
+            "new complete Goal",
+            "actionable Round",
+            "make it eligible for workflow execution",
+            "without requiring the user to recite lifecycle commands",
+            "continues a failed Goal",
+            "preserve its recorded attempt and retained work",
+            "evidence-preserving recovery Round",
+            "return the Goal to an eligible workflow state",
+            "Honor Refine's confirmation and audit boundaries",
+            "never directly edit durable Goal state",
+            "conceal failures",
+            "approve or merge on the user's behalf",
+            "destructively discard retained work",
+            "begin ongoing supervision unless the user requests it",
+        ] {
+            assert!(
+                prompt.contains(required),
+                "{profile} prompt must contain {required:?}"
+            );
+        }
+    }
 
-    for profile in ["plan", "goal", "standalone"] {
+    assert!(agent_prompt.contains("general-purpose native Agent"));
+    assert!(agent_prompt.contains("Active Refine executable:"));
+    assert!(agent_prompt.contains("Resolved Refine source checkout:"));
+    assert!(agent_prompt.contains("checkout-local `./r`"));
+    assert!(!agent_prompt.contains("Co-design software from the user's intent"));
+    assert!(!agent_prompt.contains("monitor the targeted app"));
+
+    assert!(plan_prompt.contains("Co-design software from the user's intent"));
+    assert!(plan_prompt.contains("Use Refine's CLI when the user asks you to persist"));
+    assert!(!plan_prompt.contains("general-purpose native Agent"));
+
+    for profile in ["goal", "standalone"] {
         let other_prompt = crate::surfaces::web_server::work_routes::terminal_profile_prompt(
-            &server_with_projection(),
-            profile,
-            None,
-            None,
-            None,
+            &server, profile, None, None, None,
         )
         .unwrap();
         assert!(
-            !other_prompt.contains("Treat Refine as the execution path for repository changes"),
-            "{profile} must retain its existing profile contract"
+            !other_prompt.contains("Begin with the existing Refine Node"),
+            "{profile} must not receive the toolbar Agent contract"
         );
     }
 }

@@ -32,10 +32,12 @@ pub(crate) fn terminal_profile_prompt(
         }
     };
     let mut sections = vec![PromptEngine::load(template).trim().to_string()];
-    if profile == "agent" {
+    if matches!(profile, "agent" | "plan") {
         sections.push(
-            PromptEngine::load(PromptTemplate::TerminalProfileGeneralAgentWorkflow).to_string(),
+            PromptEngine::load(PromptTemplate::TerminalProfileToolbarAgentWorkflow).to_string(),
         );
+    }
+    if profile == "agent" {
         let (executable, checkout) = active_refine_paths()?;
         let executable = executable.display().to_string();
         let checkout = checkout.display().to_string();

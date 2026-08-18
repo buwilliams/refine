@@ -59,8 +59,13 @@ Each selection creates or opens only the requested surface. Repeated Agent selec
 - reselecting an Agent, Planing Agent, Goal, or Standalone terminal preserves
   its session and scrollback while presenting its latest output at the bottom;
 - every Agent terminal receives the resolved active Refine executable and checkout so it can reliably use the correct CLI;
-- a general Agent may investigate and answer directly, but routes requested repository changes into a complete eligible Goal rather than implementing outside the workflow;
-- when continuing an unsuccessful Goal attempt, the Agent preserves its evidence and retained work, appends an actionable recovery Round, and returns the Goal to workflow eligibility through supported Refine interfaces;
+- normal Agent and Planing Agent toolbar sessions begin with the existing Refine
+  Node, prioritizing investigation, current-Node management, and direct answers;
+- those toolbar agents route requested repository changes into a new complete,
+  eligible Goal rather than implementing outside the workflow;
+- when continuing a failed Goal, those toolbar agents preserve its evidence and
+  retained work, append an evidence-preserving recovery Round, and return the
+  Goal to workflow eligibility through supported Refine interfaces;
 - changing target apps stops live target-scoped interactive terminals before clearing project-specific browser state.
 - Todo List keeps named lists in a compact rail and gives the selected list the
   rest of the workspace. Adding and completing todos are primary actions;
@@ -80,5 +85,8 @@ request. Todo data is authoritative in
 the target app's inspectable Refine state; the tab only renders and invokes the
 shared todo API. The toolbar does not implement workflow transitions, duplicate
 Goal ownership, agent turn scheduling, or an alternate conversation protocol.
+The node-first operating contract applies only to normal Agent and Planing Agent
+toolbar sessions; it does not alter Goal diagnostics, Agent in Worktree, or the
+planning, implementation, Quality, and Governance workflow agents.
 
 Future versions may add fleet-level views for active Goals, pending approvals, process health, Goal evidence, and multiple native agents while retaining lazy creation and explicit lifecycle ownership.
