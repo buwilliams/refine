@@ -1,7 +1,7 @@
 {
   "base_commit": "148e3ff37f026e3861adbefd86edc5ddbd9a3662",
   "branch_name": "refine/00000T0570KRGG047J0RZG2000/round-1",
-  "candidate_commit": "d3fad6ba1527d238e385fe38c1e558bcea4df533",
+  "candidate_commit": "c833aba9a6e5d7151d4696151dfe71c5504cc130",
   "created": "2026-08-18T12:37:40Z",
   "feature_id": null,
   "feature_order": null,
@@ -315,13 +315,15 @@
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
       "prompt": "Agent timeouts should not kill toolbar sessions the user has opened.",
+      "quality_agent_report": "Quality reviewed the exact candidate and found the runtime/Toolbar contract correct. Added a focused watchdog-losing regression proving ordinary input and resize remain unprotected and a session terminated by its completion deadline cannot later report successful Toolbar attachment; also made the Unix-only test import platform-conditional. Formatting, diff hygiene, 35 Goal Agent session tests, 10 Goal lifecycle tests, 37 Toolbar tests, scoped warning-denied Clippy, and the full 1,103-test library suite passed. Strict unscoped Clippy remains blocked only by four pre-existing warnings in untouched files.",
+      "quality_candidate_commit": "c833aba9a6e5d7151d4696151dfe71c5504cc130",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T12:58:22Z",
+      "updated": "2026-08-18T13:08:24Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T12:37:40Z",
         "round_idx": 0,
@@ -333,6 +335,6 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-08-18T12:58:22Z",
-  "workflow_revision": 20
+  "updated": "2026-08-18T13:08:24Z",
+  "workflow_revision": 22
 }
