@@ -134,6 +134,51 @@
           },
           "started_at": "2026-08-18T15:41:37Z"
         },
+        "final_plan": {
+          "completed_at": "2026-08-18T15:45:38Z",
+          "git_after": {
+            "branch": "refine/DR427BFD89E5391018EACA69CC/round-1",
+            "head_commit": "34fcb147a5e372a66c2004c3688702e0dc6851fd",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR427BFD89E5391018EACA69CC/round-1",
+            "head_commit": "34fcb147a5e372a66c2004c3688702e0dc6851fd",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Remove the background worker's post-conflict automatic recovery branch, merge-base ownership decision helper, and daemon-only recovery activity so an unresolved sync remains failed with its stable conflict evidence and backoff state instead of invoking terminal recovery.",
+                "id": "P1"
+              },
+              {
+                "description": "Constrain deterministic and agent-assisted state resolution to preserve an unambiguous one-sided Goal transfer, escalate concurrent conflicting owner changes for a manual surface decision, and remove the merge-base-owner doctrine that can repatriate a Goal.",
+                "id": "P2"
+              },
+              {
+                "description": "Retire state_sync_auto_recovery across defaults, validation, stored-setting migration, and the web runtime settings control while preserving explicit sync authority and Goal transfer surfaces.",
+                "id": "P3"
+              },
+              {
+                "description": "Replace the worker and fleet simulation scenarios that expect automatic convergence with contracts for stable transferred ownership, fail-closed unresolved conflicts, and explicit operator recovery.",
+                "id": "P4"
+              },
+              {
+                "description": "Update only the affected Fleet, Persistence Sync, CLI, API, and activity-evidence intent pages plus the state-sync recovery and fleet-management runbooks to document manual ownership movement and require supported-surface operator authority for every unresolved ownership conflict.",
+                "id": "P5"
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "P5 now includes docs/runbooks/manage-fleet.md and replaces its automatic contested-sync convergence procedure with fail-closed handling until an operator chooses authority through a supported surface."
+              }
+            ],
+            "summary": "State sync will stop making automatic ownership decisions so explicit Goal transfers remain stable, ambiguous ownership conflicts stay visible until resolved through a supported surface, and the obsolete fallback setting, activity contract, and documentation are removed."
+          },
+          "started_at": "2026-08-18T15:44:37Z"
+        },
         "phase": "revise",
         "phase_started_at": "2026-08-18T15:44:37Z",
         "proposal": {
@@ -178,7 +223,7 @@
         "schema_version": 2,
         "started_at": "2026-08-18T15:39:06Z",
         "state": "in_progress",
-        "updated_at": "2026-08-18T15:44:37Z"
+        "updated_at": "2026-08-18T15:45:38Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -192,7 +237,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-08-18T15:44:37Z",
+      "updated": "2026-08-18T15:45:38Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-08-18T15:39:05Z",
         "round_idx": 0,
@@ -204,6 +249,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-08-18T15:44:37Z",
-  "workflow_revision": 12
+  "updated": "2026-08-18T15:45:38Z",
+  "workflow_revision": 13
 }
