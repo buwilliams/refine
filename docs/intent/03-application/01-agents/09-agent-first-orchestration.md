@@ -4,7 +4,7 @@
 
 - **Agents Do Adaptable Work**: use native agents for reasoning, implementation, testing, diagnosis, and recovery instead of rebuilding those abilities as brittle product logic.
 - **Refine Owns Coordination**: Goals, Features, workflow, Nodes, Git synchronization and isolation, process supervision, durable evidence, quality, governance, and recovery are Refine's orchestration substrate.
-- **Shared Surfaces**: UI, CLI, API, MCP, and agent conversations expose the same capabilities; no surface should become a separate product.
+- **Shared Application**: UI, CLI, API, MCP, and agent conversations expose the same Application behavior; no Surface should become a separate product.
 - **Agent-First Is Not Agent-Only**: first-class interfaces remain valuable when they improve access, understanding, control, speed, or safety for people and agents.
 - **Deterministic Integrity**: agent judgment complements, but does not replace, deterministic state transitions, persistence, identity, protocol, Git, and process-lifecycle guarantees.
 
@@ -16,7 +16,7 @@ Refine exists because capable agents alone do not provide a coherent software-de
 
 ## Expected Role
 
-When adding behavior, first ask whether an installed agent can perform it reliably from existing context and tools. Adaptable work such as planning details, selecting verification methods, interpreting failures, proposing recovery, and summarizing review should normally remain agent work. Refine should expose the necessary context and shared capability instead of adding a specialized wizard, rule engine, or surface-only control for each case.
+When adding behavior, first ask whether an installed agent can perform it reliably from existing context and tools. Adaptable work such as planning details, selecting verification methods, interpreting failures, proposing recovery, and summarizing review should normally remain agent work. Refine should expose the necessary context through shared Application behavior instead of adding a specialized wizard, rule engine, or Surface-only control for each case.
 
 First-class Refine behavior is justified when it supplies durable product value that individual agent turns cannot provide consistently:
 

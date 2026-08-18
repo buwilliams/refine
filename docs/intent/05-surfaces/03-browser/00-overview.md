@@ -3,8 +3,8 @@
 ## Key Ideas
 
 - **Primary Human Surface**: the browser makes Refine understandable and operable for people.
-- **Shared Product Model**: browser behavior should remain a thin adapter over shared capabilities.
-- **Static App, Local Daemon**: the UI should stay lightweight and call the local daemon for capability.
+- **Shared Product Model**: browser behavior should remain a thin adapter over Model and Application behavior.
+- **Static App, Local Daemon**: the UI should stay lightweight and call the local daemon for Application behavior.
 - **SSE-Driven State**: live browser state should arrive through server-sent events, never periodic UI polling.
 - **Operational Console**: the surface should combine work management, system visibility, chat, files, terminal, settings, and review.
 - **Agent-First Compatibility**: the UI should expose intent and state without becoming the only way to operate Refine.
@@ -28,7 +28,7 @@ Current implementation details that matter to intent:
 - initial loads and reconnects reconcile authoritative HTTP state once, while SSE exclusively drives subsequent live updates and background-operation progress;
 - local and remote browser sessions should expose the same product semantics.
 
-The UI should not become a second product implementation. Product rules belong in shared services and workflow capabilities.
+The UI should not become a second product implementation. Product rules and orchestration belong in Application; host mechanisms belong in Infrastructure.
 
 ## Future Direction
 

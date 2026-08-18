@@ -12,7 +12,7 @@
 
 The CLI exists for reliable operation. It should let users and agents start, stop, inspect, repair, install, update, attach projects, manage work, query diagnostics, and automate flows without depending on browser state.
 
-The CLI is not meant to bypass the product model. It should expose the same shared capabilities as other surfaces.
+The CLI is not meant to bypass the Model or Application. It should adapt the same Application behavior as other Surfaces.
 
 ## Expected Role
 
@@ -98,7 +98,7 @@ Current implementation details that matter to intent:
 - source status reads the same hourly cached identity used by the browser and API; refresh queues one coalesced supervised fetch. Source upgrade launches the configured installed Agent outside Goal claims, and its hidden granular capability/helper commands carry the durable operation and handoff-attempt identifiers. The raw claim nonce is process fencing only and is never returned in command output or public status.
 - CLI tests verify daemon routing and shared service behavior.
 
-The CLI should avoid becoming a second implementation of Refine. It should remain a reliable adapter to the same daemon, model, workflow, process, and tool capabilities.
+The CLI should avoid becoming a second implementation of Refine. It should remain a reliable adapter to the same Application and Model, while host execution remains an Infrastructure concern.
 
 ## Future Direction
 

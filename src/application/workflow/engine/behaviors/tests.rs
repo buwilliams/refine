@@ -133,7 +133,7 @@ fn code_path_detection_fails_safe_for_unlisted_languages() {
     assert!(is_code_path("src/worker.exs"));
     assert!(is_code_path("Makefile"));
     assert!(is_code_path("config/toolchain.toml"));
-    assert!(!is_code_path("docs/architecture.md"));
+    assert!(!is_code_path("docs/intent/01-design.md"));
     assert!(!is_code_path("website/diagram.png"));
 }
 

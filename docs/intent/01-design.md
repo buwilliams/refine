@@ -2,7 +2,7 @@
 
 ## Key Ideas
 
-- **AI Agent First**: separate surfaces from the shared model and capabilities to make Refine agent first. Prefer installed AI agents through CLIs over direct provider APIs.
+- **AI Agent First**: keep surfaces replaceable, application behavior shared, and the model legible so agents can operate Refine directly. Prefer installed AI agents through CLIs over direct provider APIs.
 - **Decentralized**: use flat files + Git + system caching instead of leveraging databases.
 - **Simple Nomenclature**: anyone can describe "a goal", what something does today and what it should do next. AIs do well when they are given outcomes with enough environmental considerations (context).
 - **Performant**: use low-level programming language (Rust) for maximum performance.
@@ -18,13 +18,14 @@
 
 Most software systems are commonly explained in terms of presentation, business logic, and persistence. That framing helps explain the kinds of concerns Refine must handle: interaction, action, and durable state.
 
-Refine names those concerns by product intent:
+Refine separates those concerns by responsibility:
 
-- Surfaces are the interaction points for people and agents.
-- Capabilities are the active powers that move work, run processes, and use tools.
-- Foundation is the durable conceptual base: node, model, and target app.
+- Model defines domain concepts, invariants, status policies, and pure derivations.
+- Application turns intent into behavior by orchestrating Refine's workflows and use cases.
+- Infrastructure provides Git, process, host, storage, provider, and telemetry mechanisms.
+- Surfaces adapt Refine for people and machines through CLI, MCP, HTTP, browser, website, and future interfaces.
 
-State and storage are part of the target-app foundation because flat files, Git, runtime state, and caches are not just implementation details. They protect local ownership, inspectability, performance, recoverability, and agent readability.
+Durable state crosses these responsibilities without blurring them. Model defines what the state means, Application decides how it may change, Infrastructure stores and transports it, and Surfaces expose it. Flat files, Git, runtime state, and caches protect local ownership, inspectability, performance, recoverability, and agent readability without becoming one undifferentiated architectural layer.
 
 ### Surfaces
 
@@ -38,19 +39,22 @@ This is currently the most user-friendly version of Refine, but I expect it to b
 
 The CLI is the most reliable (because of limited UI statefulness) surface.
 
-## Foundation, Capabilities, And Surfaces
+## Model, Application, Infrastructure, And Surfaces
 
-Refine should be understood through three system levels:
+Refine should be understood through four semantic areas:
 
-- Foundation: the durable node, model, and target-app concepts.
-- Capabilities: the active powers that run processes, let agents act, and move work through workflow.
-- Surfaces: the ways people and agents interact with those capabilities.
+- Model is the stable language of Goals, Features, Nodes, projects, workflow states, evidence, and policy.
+- Application owns Refine behavior: orchestration, workflow, synchronization, agents, projects, diagnostics, maintenance, and system operations.
+- Infrastructure owns mechanisms supplied by the host environment: Git, subprocesses, runtime discovery, storage layout, provider invocation, and observability.
+- Surfaces translate human or machine interaction into Application behavior without owning product meaning.
 
-The foundation should remain small. It defines the concepts future agents must preserve: node, Goal, Feature, target app, target-app state, logs, settings, and runtime state. These concepts should be simple enough for people to explain and structured enough for agents to operate on without guessing.
+The Model should remain small and independent of runtime, filesystem, process, and surface concerns. Its concepts should be simple enough for people to explain and structured enough for agents to operate on without guessing.
 
-The capabilities should be shared. Process, Agents, and Workflow should not belong to one UI, command, or integration. They are the system's durable powers. Agents contains the supporting capabilities that let agents act well: tools, guidance, import, quality, governance, merge, review, Git worktrees, activity, and evidence. Every surface should call into these capabilities rather than reimplementing them.
+Application behavior should be shared. Agents, Workflow, synchronization, projects, diagnostics, and system operations should not belong to one UI, command, or integration. Application may use concrete Infrastructure where current substitution does not justify another abstraction, but product decisions, authority, and orchestration remain in Application.
 
-The surfaces should be replaceable. Browser, CLI, API, voice, and agent-native interfaces will evolve quickly. Refine should treat them as adapters over the same model and capabilities so a new surface can appear without changing what work means.
+Infrastructure should provide mechanisms without deciding what Refine work means. Git operations, process supervision, provider invocation, storage, runtime discovery, and telemetry should preserve the authority and evidence requirements supplied by Application rather than inventing parallel product policy.
+
+The Surfaces should be replaceable. Browser, CLI, API, voice, and agent-native interfaces will evolve quickly. Refine should treat them as adapters over the same Application and Model so a new surface can appear without changing what work means.
 
 ## Intended Outcome
 
@@ -61,7 +65,7 @@ The long-term direction is software composition at scale: workflow, persistence,
 - work is represented as understandable goals and features,
 - agents receive enough context and guidance to act well,
 - state is durable, inspectable, and owned by the user,
-- surfaces are conveniences over shared capability,
+- surfaces are conveniences over shared Application behavior,
 - process execution is observable and recoverable,
 - safety comes from mitigation, auditability, Git, governance, and quality checks rather than capability denial,
 - prompts and workflow leave room for current agents to discover stronger solutions than the initial specification anticipated.
@@ -70,7 +74,7 @@ The long-term direction is software composition at scale: workflow, persistence,
 
 Refine should resist becoming a centralized SaaS-shaped system by default. Centralization may become useful at some scale, but the first design pressure is local ownership: the user's code, files, Git history, settings, runtime state, and agent outputs should remain close to the work.
 
-Refine should also resist becoming a UI-shaped system. The browser matters because it makes the product accessible, but the core system should be understandable and operable by agents directly. As AI gets better, the highest-value surface may be an agent reading the intent docs, inspecting the flat files, and using the shared capabilities without needing a human-style screen.
+Refine should also resist becoming a UI-shaped system. The browser matters because it makes the product accessible, but the core system should be understandable and operable by agents directly. As AI gets better, the highest-value surface may be an agent reading the intent docs, inspecting the flat files, and using the shared Application without needing a human-style screen.
 
 ## Architecture Direction
 
@@ -82,5 +86,7 @@ The current implementation uses Rust, flat files, Git, a local daemon, shared se
 - The daemon gives surfaces a single local authority for runtime state and process control.
 - Shared services keep CLI, browser, API, and agent surfaces aligned.
 - Static browser assets keep the user interface deployable without a separate frontend infrastructure stack.
+
+The Rust crate mirrors the philosophy through `model`, `application`, `infrastructure`, and `surfaces`, with `error.rs` as a neutral shared boundary. Model does not depend on the other areas, and code outside Surfaces does not depend on surface adapters. These boundaries are semantic guidance, not a demand for a mechanical ports-and-adapters rewrite: later abstractions should earn their place while preserving workflow authority, exact-candidate evidence, synchronization fencing, durable records, and repository-lock ordering.
 
 These choices are not sacred on their own. They are important because they protect performance, ownership, infrastructure simplicity, surface independence, and agent readability.

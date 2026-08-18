@@ -93,71 +93,71 @@ const DOCS_NAV_GROUPS: &[DocsNavGroup] = &[
         ],
     },
     DocsNavGroup {
-        title: "Foundation",
+        title: "Model",
         items: &[
             DocsNavEntry {
                 title: "Node",
-                path: "docs/intent/02-foundation/01-node.md",
+                path: "docs/intent/02-model/01-node.md",
                 summary: "How Refine understands local and distributed execution.",
             },
             DocsNavEntry {
                 title: "Models",
-                path: "docs/intent/02-foundation/02-models.md",
+                path: "docs/intent/02-model/02-models.md",
                 summary: "The durable records agents and people work through.",
             },
             DocsNavEntry {
                 title: "Target App",
-                path: "docs/intent/02-foundation/03-target-app.md",
+                path: "docs/intent/02-model/03-target-app.md",
                 summary: "The software project Refine is helping improve.",
+            },
+            DocsNavEntry {
+                title: "Fleet",
+                path: "docs/intent/02-model/04-fleet.md",
+                summary: "The domain model for distributing work across nodes.",
             },
         ],
     },
     DocsNavGroup {
-        title: "Capabilities",
+        title: "Application",
         items: &[
             DocsNavEntry {
-                title: "Process",
-                path: "docs/intent/03-capabilities/01-process.md",
-                summary: "Observable local processes, checks, and runtime work.",
-            },
-            DocsNavEntry {
                 title: "Agents",
-                path: "docs/intent/03-capabilities/02-agents/00-overview.md",
+                path: "docs/intent/03-application/01-agents/00-overview.md",
                 summary: "How agents receive context, act, and leave evidence.",
             },
             DocsNavEntry {
-                title: "Agent Tools",
-                path: "docs/intent/03-capabilities/02-agents/01-tools/00-overview.md",
+                title: "Agent Operations",
+                path: "docs/intent/03-application/01-agents/01-agent-operations/00-overview.md",
                 summary: "Shared operations that let agents work consistently.",
             },
             DocsNavEntry {
                 title: "Import",
-                path: "docs/intent/03-capabilities/02-agents/01-tools/01-import.md",
+                path: "docs/intent/03-application/01-agents/01-agent-operations/01-import.md",
                 summary: "Turning external input into structured Refine work.",
             },
             DocsNavEntry {
                 title: "Guidance",
-                path: "docs/intent/03-capabilities/02-agents/02-guidance.md",
+                path: "docs/intent/03-application/01-agents/02-guidance.md",
                 summary: "The context agents need before they change code.",
             },
             DocsNavEntry {
                 title: "Quality",
-                path: "docs/intent/03-capabilities/02-agents/03-quality.md",
+                path: "docs/intent/03-application/01-agents/03-quality.md",
                 summary: "How Refine keeps checks close to the work.",
             },
             DocsNavEntry {
                 title: "Governance",
-                path: "docs/intent/03-capabilities/02-agents/04-governance.md",
+                path: "docs/intent/03-application/01-agents/04-governance.md",
                 summary: "Product rules and review constraints for agent work.",
             },
             DocsNavEntry {
                 title: "Merge, Review, And Git Worktrees",
-                path: "docs/intent/03-capabilities/02-agents/05-merge-review-git-worktrees.md",
+                path: "docs/intent/03-application/01-agents/05-merge-review-git-worktrees.md",
                 summary: "How agent work becomes reviewable Git history.",
             },
             DocsNavEntry {
                 title: "Activity And Evidence",
-                path: "docs/intent/03-capabilities/02-agents/06-activity-evidence.md",
+                path: "docs/intent/03-application/01-agents/06-activity-evidence.md",
                 summary: "The audit trail that makes automation inspectable.",
             },
         ],
@@ -167,92 +167,105 @@ const DOCS_NAV_GROUPS: &[DocsNavGroup] = &[
         items: &[
             DocsNavEntry {
                 title: "Workflow Overview",
-                path: "docs/intent/03-capabilities/03-workflow/00-overview.md",
+                path: "docs/intent/03-application/02-workflow/00-overview.md",
                 summary: "The lifecycle that carries Goals from idea to done.",
             },
             DocsNavEntry {
                 title: "Backlog",
-                path: "docs/intent/03-capabilities/03-workflow/01-backlog.md",
+                path: "docs/intent/03-application/02-workflow/01-backlog.md",
                 summary: "Captured work that is not ready to consume capacity.",
             },
             DocsNavEntry {
                 title: "Todo",
-                path: "docs/intent/03-capabilities/03-workflow/02-todo.md",
+                path: "docs/intent/03-application/02-workflow/02-todo.md",
                 summary: "Ready work that agents or people can pick up.",
             },
             DocsNavEntry {
                 title: "Plan",
-                path: "docs/intent/03-capabilities/03-workflow/03-plan.md",
+                path: "docs/intent/03-application/02-workflow/03-plan.md",
                 summary: "Governed proposal, critique, and final implementation plan.",
             },
             DocsNavEntry {
                 title: "Implement",
-                path: "docs/intent/03-capabilities/03-workflow/04-implement.md",
+                path: "docs/intent/03-application/02-workflow/04-implement.md",
                 summary: "Plan-guided work in an isolated candidate.",
             },
             DocsNavEntry {
                 title: "Quality",
-                path: "docs/intent/03-capabilities/03-workflow/05-quality.md",
+                path: "docs/intent/03-application/02-workflow/05-quality.md",
                 summary: "Independent correction and passing test evidence.",
             },
             DocsNavEntry {
                 title: "Governance",
-                path: "docs/intent/03-capabilities/03-workflow/06-governance.md",
+                path: "docs/intent/03-application/02-workflow/06-governance.md",
                 summary: "Governed integration or bounded recovery Rounds.",
             },
             DocsNavEntry {
                 title: "Review",
-                path: "docs/intent/03-capabilities/03-workflow/07-review.md",
+                path: "docs/intent/03-application/02-workflow/07-review.md",
                 summary: "Human and automated inspection of changes.",
             },
             DocsNavEntry {
                 title: "Done",
-                path: "docs/intent/03-capabilities/03-workflow/08-done.md",
+                path: "docs/intent/03-application/02-workflow/08-done.md",
                 summary: "Completed work with preserved evidence.",
             },
             DocsNavEntry {
                 title: "Failed",
-                path: "docs/intent/03-capabilities/03-workflow/09-failed.md",
+                path: "docs/intent/03-application/02-workflow/09-failed.md",
                 summary: "Failures that remain inspectable and recoverable.",
             },
             DocsNavEntry {
                 title: "Cancelled",
-                path: "docs/intent/03-capabilities/03-workflow/10-cancelled.md",
+                path: "docs/intent/03-application/02-workflow/10-cancelled.md",
                 summary: "Work intentionally stopped without losing context.",
             },
             DocsNavEntry {
                 title: "Execution Ownership",
-                path: "docs/intent/03-capabilities/04-execution-ownership.md",
+                path: "docs/intent/03-application/03-execution-ownership.md",
                 summary: "Synchronized Goal authority with replaceable node-local workers.",
             },
+            DocsNavEntry {
+                title: "Persistence Sync",
+                path: "docs/intent/03-application/04-persistence-sync.md",
+                summary: "Application policy for converging durable project state.",
+            },
         ],
+    },
+    DocsNavGroup {
+        title: "Infrastructure",
+        items: &[DocsNavEntry {
+            title: "Process",
+            path: "docs/intent/04-infrastructure/01-process.md",
+            summary: "Observable local processes, checks, and runtime work.",
+        }],
     },
     DocsNavGroup {
         title: "Surfaces",
         items: &[
             DocsNavEntry {
                 title: "Surface Principles",
-                path: "docs/intent/04-surfaces/01-surface-principles.md",
-                summary: "Why interfaces are adapters over shared capability.",
+                path: "docs/intent/05-surfaces/01-surface-principles.md",
+                summary: "Why interfaces adapt shared Application behavior.",
             },
             DocsNavEntry {
                 title: "CLI",
-                path: "docs/intent/04-surfaces/02-cli.md",
+                path: "docs/intent/05-surfaces/02-cli.md",
                 summary: "The most reliable surface for people and agents.",
             },
             DocsNavEntry {
                 title: "Browser",
-                path: "docs/intent/04-surfaces/03-browser/00-overview.md",
+                path: "docs/intent/05-surfaces/03-browser/00-overview.md",
                 summary: "The visual product surface for local software work.",
             },
             DocsNavEntry {
                 title: "API",
-                path: "docs/intent/04-surfaces/04-api.md",
+                path: "docs/intent/05-surfaces/04-api.md",
                 summary: "Shared local access for product operations.",
             },
             DocsNavEntry {
                 title: "Agent",
-                path: "docs/intent/04-surfaces/05-agent.md",
+                path: "docs/intent/05-surfaces/05-agent.md",
                 summary: "How agents understand Refine through the CLI.",
             },
         ],
@@ -262,122 +275,122 @@ const DOCS_NAV_GROUPS: &[DocsNavGroup] = &[
         items: &[
             DocsNavEntry {
                 title: "Shared Components",
-                path: "docs/intent/04-surfaces/03-browser/01-shared-components/00-overview.md",
+                path: "docs/intent/05-surfaces/03-browser/01-shared-components/00-overview.md",
                 summary: "Reusable interaction patterns for the visual UI.",
             },
             DocsNavEntry {
                 title: "Table",
-                path: "docs/intent/04-surfaces/03-browser/01-shared-components/01-table.md",
+                path: "docs/intent/05-surfaces/03-browser/01-shared-components/01-table.md",
                 summary: "Dense, scannable data views for repeated work.",
             },
             DocsNavEntry {
                 title: "Pagination",
-                path: "docs/intent/04-surfaces/03-browser/01-shared-components/02-pagination.md",
+                path: "docs/intent/05-surfaces/03-browser/01-shared-components/02-pagination.md",
                 summary: "Navigation for long local records without losing context.",
             },
             DocsNavEntry {
                 title: "Nav",
-                path: "docs/intent/04-surfaces/03-browser/02-nav.md",
+                path: "docs/intent/05-surfaces/03-browser/02-nav.md",
                 summary: "Orientation and movement through the browser product.",
             },
             DocsNavEntry {
                 title: "Command Palette",
-                path: "docs/intent/04-surfaces/03-browser/03-command-palette.md",
+                path: "docs/intent/05-surfaces/03-browser/03-command-palette.md",
                 summary: "Fast command access without hunting through screens.",
             },
             DocsNavEntry {
                 title: "Main",
-                path: "docs/intent/04-surfaces/03-browser/04-main.md",
+                path: "docs/intent/05-surfaces/03-browser/04-main.md",
                 summary: "The primary browser workspace.",
             },
             DocsNavEntry {
                 title: "Dashboard",
-                path: "docs/intent/04-surfaces/03-browser/05-dashboard.md",
+                path: "docs/intent/05-surfaces/03-browser/05-dashboard.md",
                 summary: "A high-level view of work, state, and attention.",
             },
             DocsNavEntry {
                 title: "Workflow",
-                path: "docs/intent/04-surfaces/03-browser/06-workflow.md",
+                path: "docs/intent/05-surfaces/03-browser/06-workflow.md",
                 summary: "The browser view of work movement.",
             },
             DocsNavEntry {
                 title: "Feature",
-                path: "docs/intent/04-surfaces/03-browser/07-feature.md",
+                path: "docs/intent/05-surfaces/03-browser/07-feature.md",
                 summary: "Larger product goals composed from Goals.",
             },
             DocsNavEntry {
                 title: "Goal",
-                path: "docs/intent/04-surfaces/03-browser/08-goal.md",
+                path: "docs/intent/05-surfaces/03-browser/08-goal.md",
                 summary: "The core unit of product difference and repair.",
             },
             DocsNavEntry {
                 title: "Import",
-                path: "docs/intent/04-surfaces/03-browser/09-import.md",
+                path: "docs/intent/05-surfaces/03-browser/09-import.md",
                 summary: "Bringing outside work into the browser surface.",
             },
             DocsNavEntry {
                 title: "Changes Visualizations",
-                path: "docs/intent/04-surfaces/03-browser/10-changes-visualizations.md",
+                path: "docs/intent/05-surfaces/03-browser/10-changes-visualizations.md",
                 summary: "Readable change views for review and understanding.",
             },
             DocsNavEntry {
                 title: "Log",
-                path: "docs/intent/04-surfaces/03-browser/11-log.md",
+                path: "docs/intent/05-surfaces/03-browser/11-log.md",
                 summary: "Evidence and event history in the browser.",
             },
             DocsNavEntry {
                 title: "Settings",
-                path: "docs/intent/04-surfaces/03-browser/12-settings.md",
+                path: "docs/intent/05-surfaces/03-browser/12-settings.md",
                 summary: "Project configuration, governance, and local controls.",
             },
             DocsNavEntry {
                 title: "Guide",
-                path: "docs/intent/04-surfaces/03-browser/13-guide.md",
+                path: "docs/intent/05-surfaces/03-browser/13-guide.md",
                 summary: "Contextual help close to the current task.",
             },
             DocsNavEntry {
                 title: "Target App",
-                path: "docs/intent/04-surfaces/03-browser/14-target-app.md",
+                path: "docs/intent/05-surfaces/03-browser/14-target-app.md",
                 summary: "The attached software project inside the UI.",
             },
             DocsNavEntry {
                 title: "Toolbar",
-                path: "docs/intent/04-surfaces/03-browser/15-toolbar.md",
+                path: "docs/intent/05-surfaces/03-browser/15-toolbar.md",
                 summary: "Persistent tools, chat, files, and terminal access.",
             },
             DocsNavEntry {
                 title: "System",
-                path: "docs/intent/04-surfaces/03-browser/16-system.md",
+                path: "docs/intent/05-surfaces/03-browser/16-system.md",
                 summary: "Runtime, install, and operational state.",
             },
             DocsNavEntry {
                 title: "Processes",
-                path: "docs/intent/04-surfaces/03-browser/17-processes.md",
+                path: "docs/intent/05-surfaces/03-browser/17-processes.md",
                 summary: "Process visibility and control in the browser.",
             },
             DocsNavEntry {
                 title: "Files",
-                path: "docs/intent/04-surfaces/03-browser/18-files.md",
+                path: "docs/intent/05-surfaces/03-browser/18-files.md",
                 summary: "File inspection close to agent work.",
             },
             DocsNavEntry {
                 title: "Terminal",
-                path: "docs/intent/04-surfaces/03-browser/19-terminal.md",
+                path: "docs/intent/05-surfaces/03-browser/19-terminal.md",
                 summary: "Command execution without leaving the product context.",
             },
             DocsNavEntry {
                 title: "Chat",
-                path: "docs/intent/04-surfaces/03-browser/20-chat.md",
+                path: "docs/intent/05-surfaces/03-browser/20-chat.md",
                 summary: "Conversation tied to work and evidence.",
             },
             DocsNavEntry {
                 title: "Standalone",
-                path: "docs/intent/04-surfaces/03-browser/21-standalone.md",
+                path: "docs/intent/05-surfaces/03-browser/21-standalone.md",
                 summary: "Focused browser use outside the primary workspace.",
             },
             DocsNavEntry {
                 title: "Footer",
-                path: "docs/intent/04-surfaces/03-browser/22-footer.md",
+                path: "docs/intent/05-surfaces/03-browser/22-footer.md",
                 summary: "Low-priority navigation and product affordances.",
             },
         ],
@@ -538,21 +551,26 @@ pub(super) fn render_docs_landing_page() -> WireResponse {
       <section class="docs-orientation" aria-labelledby="docs-orientation-title">
         <div>
           <p class="eyebrow">The Model</p>
-          <h2 id="docs-orientation-title">One product, three layers.</h2>
+          <h2 id="docs-orientation-title">One product, four responsibilities.</h2>
         </div>
         <div class="docs-orientation-grid">
           <article>
             <span>01</span>
-            <h3>Foundation</h3>
-            <p>Node, model, and target-app concepts keep state durable, local, and readable.</p>
+            <h3>Model</h3>
+            <p>Domain concepts, invariants, states, and policies preserve what Refine work means.</p>
           </article>
           <article>
             <span>02</span>
-            <h3>Capabilities</h3>
-            <p>Process, agents, and workflow are shared powers that every surface can use.</p>
+            <h3>Application</h3>
+            <p>Agents, workflow, synchronization, and system operations turn intent into behavior.</p>
           </article>
           <article>
             <span>03</span>
+            <h3>Infrastructure</h3>
+            <p>Git, processes, storage, providers, runtime discovery, and telemetry supply mechanisms.</p>
+          </article>
+          <article>
+            <span>04</span>
             <h3>Surfaces</h3>
             <p>CLI, browser, API, MCP, and agent interfaces adapt the same underlying system.</p>
           </article>

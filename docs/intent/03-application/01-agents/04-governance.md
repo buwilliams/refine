@@ -23,7 +23,7 @@ Governance should not become broad capability denial. Refine's design favors mit
 
 Governance should judge actual changes against explicit project intent. It should not turn a familiar implementation pattern into a rule, report imagined violations, or require agents to accept a standard good-fast-cheap trade-off. An ambitious or unconventional solution is valid when it preserves the project's real boundaries and supplies evidence proportional to its risk.
 
-Governance also applies to Refine's own agent design. Internal prompts remain reviewable Markdown templates grouped under `src/application/agent_io/prompts/<feature>/`; they should be concise enough to use current model capability overhang and should direct agents toward repository evidence, blind-spot discovery, prototypes, and focused user interviews. Safety-critical limits still belong in the relevant prompt and shared capability boundary, not in repetitive general instruction.
+Governance also applies to Refine's own agent design. Internal prompts remain reviewable Markdown templates grouped under `src/application/agent_io/prompts/<feature>/`; they should be concise enough to use current model capability overhang and should direct agents toward repository evidence, blind-spot discovery, prototypes, and focused user interviews. Safety-critical limits still belong in the relevant prompt and Application boundary, not in repetitive general instruction.
 
 Current implementation details that matter to intent:
 

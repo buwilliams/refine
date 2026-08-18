@@ -37,7 +37,7 @@ Preparation and non-retryable failures move an unchanged active Goal to failed. 
 
 Bulk status correction protects automated states from generic replacement. Explicit cancellation is the lifecycle exception: it writes `cancelled` as Goal intent and then performs best-effort local cleanup per Goal.
 
-The [Shared Workflow Consistency Contract](11-consistency-contract.md) and [Execution Ownership](../04-execution-ownership.md) define the authority and recovery rules.
+The [Shared Workflow Consistency Contract](11-consistency-contract.md) and [Execution Ownership](../03-execution-ownership.md) define the authority and recovery rules.
 
 ## Future Direction
 

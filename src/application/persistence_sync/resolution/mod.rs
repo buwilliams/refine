@@ -76,7 +76,7 @@ const CONTENTION_REF_NAMESPACE: &str = "refs/refine/contention";
 pub const CONTENTION_ATTEMPT_LIMIT: u32 = 2;
 
 /// The ownership doctrine handed to the state resolver as guidance, quoted
-/// from `docs/intent/02-foundation/04-fleet.md` (a test pins the quote to the
+/// from `docs/intent/02-model/04-fleet.md` (a test pins the quote to the
 /// intent doc so the two cannot drift apart).
 pub const OWNERSHIP_DOCTRINE: &str = "Reconciliation never guesses a winner from circumstance: \
 timestamps, recency, and which node happens to run the merge decide nothing. Ownership is \
@@ -1258,11 +1258,11 @@ mod tests {
 
     #[test]
     fn ownership_doctrine_is_quoted_from_the_fleet_intent() {
-        let intent = include_str!("../../../../docs/intent/02-foundation/04-fleet.md");
+        let intent = include_str!("../../../../docs/intent/02-model/04-fleet.md");
         let normalize = |text: &str| text.split_whitespace().collect::<Vec<_>>().join(" ");
         assert!(
             normalize(intent).contains(&normalize(OWNERSHIP_DOCTRINE)),
-            "the doctrine quote drifted from docs/intent/02-foundation/04-fleet.md"
+            "the doctrine quote drifted from docs/intent/02-model/04-fleet.md"
         );
     }
 

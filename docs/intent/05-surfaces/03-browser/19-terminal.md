@@ -35,7 +35,7 @@ Current implementation details that matter to intent:
 - terminal sessions run through the local daemon rather than raw browser execution;
 - worktree-aware terminal behavior supports merge and standalone workflows.
 
-Terminal should remain an operational tool. Product workflow state should still be changed through shared Refine capabilities, not by undocumented shell side effects.
+Terminal should remain an operational tool. Product workflow state should still be changed through shared Application behavior, not by undocumented shell side effects.
 
 ## Future Direction
 

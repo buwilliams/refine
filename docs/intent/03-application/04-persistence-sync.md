@@ -12,7 +12,7 @@
 
 Fleet management only works if every node can trust that its durable state converges with every other node's. Persistence sync provides that convergence for everything Refine keeps in git: the synchronized state branch, candidate branches, and target-app fetches. It exists as one capability because state sync, candidate refresh, candidate integration, and operator recovery are the same problem — merging divergent lines of files — and splitting them multiplies locking disciplines, error shapes, and failure policies without adding judgment anywhere.
 
-The capability's rule is that convergence should almost never require a person. Divergence without overlap is resolved deterministically and instantly. Divergence with overlap is resolved by an agent that understands both intents. Only genuine ambiguity — a choice the system cannot understand on its own — surfaces to an operator, and it surfaces as a domain-terms question about goals and intents, never as a fence or a raw git failure.
+The Application rule is that convergence should almost never require a person. Divergence without overlap is resolved deterministically and instantly. Divergence with overlap is resolved by an agent that understands both intents. Only genuine ambiguity — a choice the system cannot understand on its own — surfaces to an operator, and it surfaces as a domain-terms question about goals and intents, never as a fence or a raw Git failure.
 
 ## Expected Role
 

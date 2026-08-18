@@ -11,7 +11,7 @@
 
 ## Purpose
 
-Models give Refine a shared language for software work. They let people, agents, the workflow engine, tools, and surfaces agree on what exists without depending on one screen or command.
+Models give Refine a shared language for software work. They let Application behavior, Infrastructure mechanisms, people, agents, and Surfaces agree on what exists without depending on one screen or command.
 
 The central product model is the Goal. A Goal records an actionable prompt, notes, rounds, status, priority, reporter, assignee, Feature membership, node ownership, and logs needed to understand and advance work. The model is intentionally ordinary: it should be possible to open the file, read it, and understand what the work is.
 
@@ -19,7 +19,7 @@ Features exist to preserve intent across multiple Goals. A Feature should not re
 
 ## Expected Role
 
-Models should be the stable center of the system. Surfaces may rename controls, workflows may gain new steps, and tools may change providers, but the model should preserve the meaning of work.
+Models should be the stable center of the system. Surfaces may rename controls, Application workflows may gain new steps, and Infrastructure may change providers or storage mechanisms, but the Model should preserve the meaning of work.
 
 Current implementation details that matter to intent:
 

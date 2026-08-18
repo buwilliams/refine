@@ -50,7 +50,7 @@ Preparation and behavior failures use one Goal-record mutation that verifies the
 
 Synchronization resolves one narrow ownership race: when a queued Goal is reassigned concurrently with automated work starting on its previously authoritative node, the start wins and the reassignment request is discarded. Other competing lifecycle changes remain conflicts.
 
-Browser, CLI, API, MCP, and agent tools submit Goal or process intent through shared capabilities. They do not expose a parallel workflow-execution resource or infer authority from a local process identifier.
+Browser, CLI, API, MCP, and agent tools submit Goal or process intent through shared Application behavior. They do not expose a parallel workflow-execution resource or infer authority from a local process identifier.
 
 ## Future Direction
 

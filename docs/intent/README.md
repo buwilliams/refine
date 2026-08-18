@@ -1,74 +1,75 @@
 # Table of Contents
 
 - [Design](01-design.md)
-- Foundation
-  - [Node](02-foundation/01-node.md)
-  - [Models](02-foundation/02-models.md)
-  - [Target App](02-foundation/03-target-app.md)
-  - [Fleet](02-foundation/04-fleet.md)
-- Capabilities
-  - [Process](03-capabilities/01-process.md)
+- Model
+  - [Node](02-model/01-node.md)
+  - [Models](02-model/02-models.md)
+  - [Target App](02-model/03-target-app.md)
+  - [Fleet](02-model/04-fleet.md)
+- Application
   - Agents
-    - [Overview](03-capabilities/02-agents/00-overview.md)
-    - Tools
-      - [Overview](03-capabilities/02-agents/01-tools/00-overview.md)
-      - [Import](03-capabilities/02-agents/01-tools/01-import.md)
-    - [Guidance](03-capabilities/02-agents/02-guidance.md)
-    - [Quality](03-capabilities/02-agents/03-quality.md)
-    - [Governance](03-capabilities/02-agents/04-governance.md)
-    - [Merge, Review, And Git Worktrees](03-capabilities/02-agents/05-merge-review-git-worktrees.md)
-    - [Activity And Evidence](03-capabilities/02-agents/06-activity-evidence.md)
-    - [Planning](03-capabilities/02-agents/07-planning.md)
-    - [Agent-First Orchestration](03-capabilities/02-agents/09-agent-first-orchestration.md)
-    - [Goal Agents](03-capabilities/02-agents/10-goal-agents.md)
+    - [Overview](03-application/01-agents/00-overview.md)
+    - Agent Operations
+      - [Overview](03-application/01-agents/01-agent-operations/00-overview.md)
+      - [Import](03-application/01-agents/01-agent-operations/01-import.md)
+    - [Guidance](03-application/01-agents/02-guidance.md)
+    - [Quality](03-application/01-agents/03-quality.md)
+    - [Governance](03-application/01-agents/04-governance.md)
+    - [Merge, Review, And Git Worktrees](03-application/01-agents/05-merge-review-git-worktrees.md)
+    - [Activity And Evidence](03-application/01-agents/06-activity-evidence.md)
+    - [Planning](03-application/01-agents/07-planning.md)
+    - [Agent-First Orchestration](03-application/01-agents/09-agent-first-orchestration.md)
+    - [Goal Agents](03-application/01-agents/10-goal-agents.md)
   - Workflow
-    - [Overview](03-capabilities/03-workflow/00-overview.md)
-    - [Backlog](03-capabilities/03-workflow/01-backlog.md)
-    - [Todo](03-capabilities/03-workflow/02-todo.md)
-    - [Plan](03-capabilities/03-workflow/03-plan.md)
-    - [Implement](03-capabilities/03-workflow/04-implement.md)
-    - [Quality](03-capabilities/03-workflow/05-quality.md)
-    - [Governance](03-capabilities/03-workflow/06-governance.md)
-    - [Review](03-capabilities/03-workflow/07-review.md)
-    - [Done](03-capabilities/03-workflow/08-done.md)
-    - [Failed](03-capabilities/03-workflow/09-failed.md)
-    - [Cancelled](03-capabilities/03-workflow/10-cancelled.md)
-    - [Shared Workflow Consistency Contract](03-capabilities/03-workflow/11-consistency-contract.md)
-  - [Execution Ownership](03-capabilities/04-execution-ownership.md)
-  - [Persistence Sync](03-capabilities/05-persistence-sync.md)
+    - [Overview](03-application/02-workflow/00-overview.md)
+    - [Backlog](03-application/02-workflow/01-backlog.md)
+    - [Todo](03-application/02-workflow/02-todo.md)
+    - [Plan](03-application/02-workflow/03-plan.md)
+    - [Implement](03-application/02-workflow/04-implement.md)
+    - [Quality](03-application/02-workflow/05-quality.md)
+    - [Governance](03-application/02-workflow/06-governance.md)
+    - [Review](03-application/02-workflow/07-review.md)
+    - [Done](03-application/02-workflow/08-done.md)
+    - [Failed](03-application/02-workflow/09-failed.md)
+    - [Cancelled](03-application/02-workflow/10-cancelled.md)
+    - [Shared Workflow Consistency Contract](03-application/02-workflow/11-consistency-contract.md)
+  - [Execution Ownership](03-application/03-execution-ownership.md)
+  - [Persistence Sync](03-application/04-persistence-sync.md)
+- Infrastructure
+  - [Process](04-infrastructure/01-process.md)
 - Surfaces
-  - [Surface Principles](04-surfaces/01-surface-principles.md)
-  - [CLI](04-surfaces/02-cli.md)
+  - [Surface Principles](05-surfaces/01-surface-principles.md)
+  - [CLI](05-surfaces/02-cli.md)
   - Browser
-    - [Overview](04-surfaces/03-browser/00-overview.md)
+    - [Overview](05-surfaces/03-browser/00-overview.md)
     - Shared Components
-      - [Overview](04-surfaces/03-browser/01-shared-components/00-overview.md)
-      - [Table](04-surfaces/03-browser/01-shared-components/01-table.md)
-      - [Pagination](04-surfaces/03-browser/01-shared-components/02-pagination.md)
-    - [Nav](04-surfaces/03-browser/02-nav.md)
-    - [Command Palette](04-surfaces/03-browser/03-command-palette.md)
-    - [Main](04-surfaces/03-browser/04-main.md)
-    - [Dashboard](04-surfaces/03-browser/05-dashboard.md)
-    - [Workflow](04-surfaces/03-browser/06-workflow.md)
-    - [Feature](04-surfaces/03-browser/07-feature.md)
-    - [Goal](04-surfaces/03-browser/08-goal.md)
-    - [Import](04-surfaces/03-browser/09-import.md)
-    - [Changes Visualizations](04-surfaces/03-browser/10-changes-visualizations.md)
-    - [Log](04-surfaces/03-browser/11-log.md)
-    - [Settings](04-surfaces/03-browser/12-settings.md)
-    - [Guide](04-surfaces/03-browser/13-guide.md)
-    - [Target App](04-surfaces/03-browser/14-target-app.md)
-    - [Toolbar](04-surfaces/03-browser/15-toolbar.md)
-    - [System](04-surfaces/03-browser/16-system.md)
-    - [Processes](04-surfaces/03-browser/17-processes.md)
-    - [Files](04-surfaces/03-browser/18-files.md)
-    - [Terminal](04-surfaces/03-browser/19-terminal.md)
-    - [Chat](04-surfaces/03-browser/20-chat.md)
-    - [Standalone](04-surfaces/03-browser/21-standalone.md)
-    - [Footer](04-surfaces/03-browser/22-footer.md)
-  - [API](04-surfaces/04-api.md)
-  - [Agent](04-surfaces/05-agent.md)
-  - [MCP](04-surfaces/06-mcp.md)
+      - [Overview](05-surfaces/03-browser/01-shared-components/00-overview.md)
+      - [Table](05-surfaces/03-browser/01-shared-components/01-table.md)
+      - [Pagination](05-surfaces/03-browser/01-shared-components/02-pagination.md)
+    - [Nav](05-surfaces/03-browser/02-nav.md)
+    - [Command Palette](05-surfaces/03-browser/03-command-palette.md)
+    - [Main](05-surfaces/03-browser/04-main.md)
+    - [Dashboard](05-surfaces/03-browser/05-dashboard.md)
+    - [Workflow](05-surfaces/03-browser/06-workflow.md)
+    - [Feature](05-surfaces/03-browser/07-feature.md)
+    - [Goal](05-surfaces/03-browser/08-goal.md)
+    - [Import](05-surfaces/03-browser/09-import.md)
+    - [Changes Visualizations](05-surfaces/03-browser/10-changes-visualizations.md)
+    - [Log](05-surfaces/03-browser/11-log.md)
+    - [Settings](05-surfaces/03-browser/12-settings.md)
+    - [Guide](05-surfaces/03-browser/13-guide.md)
+    - [Target App](05-surfaces/03-browser/14-target-app.md)
+    - [Toolbar](05-surfaces/03-browser/15-toolbar.md)
+    - [System](05-surfaces/03-browser/16-system.md)
+    - [Processes](05-surfaces/03-browser/17-processes.md)
+    - [Files](05-surfaces/03-browser/18-files.md)
+    - [Terminal](05-surfaces/03-browser/19-terminal.md)
+    - [Chat](05-surfaces/03-browser/20-chat.md)
+    - [Standalone](05-surfaces/03-browser/21-standalone.md)
+    - [Footer](05-surfaces/03-browser/22-footer.md)
+  - [API](05-surfaces/04-api.md)
+  - [Agent](05-surfaces/05-agent.md)
+  - [MCP](05-surfaces/06-mcp.md)
 
 ## Key Ideas
 
@@ -106,11 +107,12 @@ The sections may be adapted when a topic needs a different shape, but the docume
 
 The root document, `01-design.md`, explains the whole-system design.
 
-The remaining documents are organized by system level:
+The remaining documents are organized by semantic responsibility:
 
-- **Foundation**: the concepts Refine depends on.
-- **Capabilities**: the active powers Refine provides.
-- **Surfaces**: the ways people and agents interact with Refine.
+- **Model**: domain concepts, invariants, states, and policies.
+- **Application**: Refine behavior and orchestration.
+- **Infrastructure**: Git, process, host, storage, provider, and telemetry mechanisms.
+- **Surfaces**: adapters for people and machines.
 
 Each section should be discrete enough to read on its own and connected enough to make the whole system easier to understand.
 

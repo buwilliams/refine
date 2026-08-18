@@ -29,11 +29,16 @@ fn local_http_daemon_serves_website_and_markdown_from_repo_root() {
     assert_eq!(docs_home.content_type, "text/html; charset=utf-8");
     let docs_home = String::from_utf8(docs_home.body).unwrap();
     assert!(docs_home.contains("<h1 id=\"docs-home-title\">How Refine works.</h1>"));
+    assert!(docs_home.contains("One product, four responsibilities."));
+    assert!(docs_home.contains("<h3>Model</h3>"));
+    assert!(docs_home.contains("<h3>Application</h3>"));
+    assert!(docs_home.contains("<h3>Infrastructure</h3>"));
+    assert!(docs_home.contains("<h3>Surfaces</h3>"));
     assert!(docs_home.contains("Browser Details"));
     assert!(
-        docs_home.contains(r#"href="/read/docs/intent/04-surfaces/03-browser/00-overview.md""#)
+        docs_home.contains(r#"href="/read/docs/intent/05-surfaces/03-browser/00-overview.md""#)
     );
-    assert!(docs_home.contains(r#"href="/read/docs/intent/04-surfaces/05-agent.md""#));
+    assert!(docs_home.contains(r#"href="/read/docs/intent/05-surfaces/05-agent.md""#));
 
     let raw_doc = daemon.handle_wire_request(HttpRequest {
         method: "GET".to_string(),
@@ -80,7 +85,7 @@ fn local_http_daemon_serves_website_and_markdown_from_repo_root() {
     assert_eq!(rendered_doc.matches(r#"class="doc-pager""#).count(), 2);
     assert!(rendered_doc.contains(r#">Docs home</a>"#));
     assert!(rendered_doc.contains(r#"href="/docs""#));
-    assert!(rendered_doc.contains("/read/docs/intent/02-foundation/01-node.md"));
+    assert!(rendered_doc.contains("/read/docs/intent/02-model/01-node.md"));
 
     let design_doc = daemon.handle_wire_request(HttpRequest {
         method: "GET".to_string(),
@@ -95,7 +100,7 @@ fn local_http_daemon_serves_website_and_markdown_from_repo_root() {
         r#"<a class="doc-pager-link" href="/read/docs/intent/README.md"><span>Previous</span><strong>Design Intent</strong></a>"#
     ));
     assert!(
-        design_doc.contains(r#"<a class="doc-pager-link" href="/read/docs/intent/02-foundation/01-node.md"><span>Next</span><strong>Node</strong></a>"#)
+        design_doc.contains(r#"<a class="doc-pager-link" href="/read/docs/intent/02-model/01-node.md"><span>Next</span><strong>Node</strong></a>"#)
     );
 
     let intent_toc = daemon.handle_wire_request(HttpRequest {
@@ -111,7 +116,7 @@ fn local_http_daemon_serves_website_and_markdown_from_repo_root() {
     assert!(intent_toc.contains(r#"href="/read/docs/intent/01-design.md""#));
     assert!(
         intent_toc
-            .contains(r#"href="/read/docs/intent/03-capabilities/03-workflow/00-overview.md""#)
+            .contains(r#"href="/read/docs/intent/03-application/02-workflow/00-overview.md""#)
     );
 
     let hidden = daemon.handle_wire_request(HttpRequest {

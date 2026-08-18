@@ -20,7 +20,7 @@ Standalone is a permanent toolbar tab. Selecting it starts the session automatic
 
 Stopping ends the agent process but does not delete or discard the worktree. Restart validates and reuses the recorded Refine worktree. The agent or user can inspect the result and use ordinary Refine commands or product surfaces to create Goals, Features, or merge handoffs.
 
-Standalone should not become a separate workflow engine or a Refine-owned chat protocol. Its successful output should become durable work through existing Refine capabilities.
+Standalone should not become a separate workflow engine or a Refine-owned chat protocol. Its successful output should become durable work through existing Application behavior.
 
 ## Future Direction
 

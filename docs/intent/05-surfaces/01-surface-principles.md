@@ -2,17 +2,17 @@
 
 ## Key Ideas
 
-- **Surfaces Are Adapters**: they expose model, workflow, process, and tools without owning their meaning.
-- **Same Capability, Different Ergonomics**: CLI, browser, API, and agent surfaces should differ by interaction style, not by product semantics.
+- **Surfaces Are Adapters**: they expose Model and Application behavior without owning product meaning or Infrastructure mechanisms.
+- **Same Application, Different Ergonomics**: CLI, browser, API, and agent surfaces should differ by interaction style, not by product semantics.
 - **Agent-First Direction**: surfaces should increasingly support direct agent operation.
 - **Human Accessibility**: the browser surface should make Refine usable by people who do not want to operate only through a terminal.
 - **No Surface Monoculture**: the system should not depend on one interface surviving forever.
 
 ## Purpose
 
-Surfaces exist so different actors can use Refine well. A person may need visual overview, command palette navigation, settings, logs, or review affordances. A CLI user may need reliable commands and JSON output. A future agent may need direct capability access with little or no human-style UI.
+Surfaces exist so different actors can use Refine well. A person may need visual overview, command palette navigation, settings, logs, or review affordances. A CLI user may need reliable commands and JSON output. A future agent may need direct Application access with little or no human-style UI.
 
-The purpose of a surface is to make shared capability usable in a context, not to create a separate product.
+The purpose of a Surface is to adapt shared Application behavior to a context, not to create a separate product.
 
 ## Expected Role
 
@@ -20,7 +20,7 @@ Every surface should preserve the same underlying model and workflow semantics. 
 
 Surfaces should:
 
-- call shared services or daemon routes,
+- call Application services or daemon routes,
 - expose state clearly,
 - avoid duplicating workflow logic,
 - make errors visible and recoverable,
@@ -33,4 +33,4 @@ The current implementation has CLI, web, web server/API, and MCP modules. The br
 
 Future surfaces may be voice, IDE-native, agent-native, MCP-style, terminal-first, or fully autonomous. Refine should be ready for that by keeping the system's meaning below the surface layer.
 
-The eventual dominant surface may be no visible UI at all: an AI system reading intent, inspecting state, and operating shared capabilities directly. The browser should still remain valuable for oversight, review, explanation, and manual intervention.
+The eventual dominant Surface may be no visible UI at all: an AI system reading intent, inspecting state, and operating the shared Application directly. The browser should still remain valuable for oversight, review, explanation, and manual intervention.

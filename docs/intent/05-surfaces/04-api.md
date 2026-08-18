@@ -3,7 +3,7 @@
 ## Key Ideas
 
 - **Local Daemon Contract**: the API is primarily the contract between surfaces and the local Refine daemon.
-- **Capability Groups**: routes should map to real system capabilities, not arbitrary page needs.
+- **Application Groups**: routes should map to real Application responsibilities, not arbitrary page needs.
 - **Surface Alignment**: browser, CLI, MCP, and agent integrations should share API behavior where appropriate.
 - **Not A SaaS Boundary By Default**: the API should not imply that Refine must become a centralized hosted service.
 - **Recoverable Mutations**: API writes should flow through shared services with idempotency, logging, and state repair where needed.
@@ -12,11 +12,11 @@
 
 The API exists so surfaces can talk to the local daemon consistently. It gives browser JavaScript, CLI daemon routing, MCP tools, and future agent integrations a shared way to access project status, work items, workflow, processes, chat, settings, files, terminal sessions, diagnostics, and more.
 
-The API should be treated as local capability plumbing. It is important, but it is not the product center.
+The API should be treated as local Application transport. It is important, but it is not the product center.
 
 ## Expected Role
 
-The API should expose system capability groups that match Refine's product design. Current route groups include system, apps, project, sync, target app, work, workflow, activity, import, dashboard, agents, operations, runner workers, processes, events, quality, chat, settings, governance, guidance, reporters, Reporter-scoped todos, nodes, fleet, changes, cache, performance, files, terminal, diagnostics, and upgrade.
+The API should expose groups that match Refine's Application design. Current route groups include system, apps, project, sync, target app, work, workflow, activity, import, dashboard, agents, operations, runner workers, processes, events, quality, chat, settings, governance, guidance, reporters, Reporter-scoped todos, nodes, fleet, changes, cache, performance, files, terminal, diagnostics, and upgrade.
 
 The daemon stores the checkout identity resolved at bootstrap and passes that
 request-scoped authority through system, install, update, source, process, and
@@ -24,7 +24,7 @@ provider handlers. Handlers do not rediscover a checkout from their own CWD or
 construct a user-global runtime service. Port status responses include the
 canonical checkout-local runtime root so clients can diagnose ownership.
 
-Those groups are useful because they map surfaces onto shared behavior. They should not drift into page-specific endpoints when a shared service would express the capability better.
+Those groups are useful because they map Surfaces onto shared Application behavior. They should not drift into page-specific endpoints when an Application service would express the operation better.
 
 Dashboard responses include typed node-local state-sync health, freshness timestamps, the configured stale threshold, and whether all-node counts are authoritative. Health carries no recovery-kind classification: the merge-base pipeline records every failure the same way, and a `recovery_kind` written by an older binary is simply an unknown member that reads back ignored. Nodes responses attach that evidence only to the serving daemon's active node and explicitly mark other nodes unknown, without changing fleet bootstrap health. The event stream publishes typed `state_sync_health` state whose semantic fingerprint changes on failure, recovery eligibility, the wall-clock stale boundary, and recovery; clients reconcile Dashboard, Nodes, and Logs from their authoritative read endpoints on those events and after reconnect.
 

@@ -13,13 +13,13 @@
 
 Target App exists because software work only becomes meaningful when it is attached to the system being changed. A Goal, Feature, chat, process, quality run, import, or merge action needs to know which repository, runtime, guidance, commands, state, and Git context it belongs to.
 
-This foundation concept also explains state and storage. Refine should know what app it is acting on, what it knows about that app, where that knowledge lives, and which runtime context is currently active.
+This model concept anchors state and storage without owning their mechanisms. Refine should know what app it is acting on, what it knows about that app, where that knowledge lives, and which runtime context is currently active.
 
 Without durable target-app context, agentic work becomes chat transcript memory and shell side effects. Refine should instead make work explicit, local, inspectable, and recoverable.
 
 ## Expected Role
 
-Target App should be the foundation that ties durable work to the real project. It should connect:
+Target App should be the model anchor that ties durable work to the real project. Application behavior and Infrastructure mechanisms should connect it to:
 
 - the active app and project registry;
 - durable product state in the repository's Git-owned Refine layout, with `.refine` checked out only in the isolated `refine/state` worktree;
@@ -48,7 +48,7 @@ The current implementation details that matter to intent are:
   namespace. They must remain readable on the node that observed them without
   being published as durable `refine/state` project history;
 - Git provides history, isolation, rollback, and merge discipline;
-- shared services and daemon routes should coordinate state mutation so surfaces do not compete for authority.
+- Application services and daemon routes should coordinate state mutation so Surfaces do not compete for authority.
 - the active checkout-owned daemon is the normal configuration mutation authority for browser and CLI. Guidance and Governance collection revisions make stale writers explicit while stable item ids preserve unrelated entries; no surface writes `.git/refine-live-state` directly or creates a parallel configuration model.
 - state synchronization has no separate baseline artifact: the Git merge base
   of the local and remote `refine/state` heads is the reconciliation baseline,
@@ -56,7 +56,7 @@ The current implementation details that matter to intent are:
   once as a commit, classifies the commit pair, fast-forwards ancestor-related
   heads without merging, and merges genuinely diverged heads from their real
   merge base — the mechanism and its policies live in the persistence-sync
-  capability (`docs/intent/03-capabilities/05-persistence-sync.md`). A
+  capability (`docs/intent/03-application/04-persistence-sync.md`). A
   contested path fails closed with a node-local conflict report whose id is
   stable across attempts, and `sync --authority live|remote [--path]` settles
   it terminally as one merge commit with both heads as parents, the losing
@@ -73,7 +73,7 @@ The current implementation details that matter to intent are:
 
 The important boundary is source of truth. Caches, indexes, projections, and UI state are allowed and necessary for performance, but they should not replace durable target-app state. If a cache is wrong, the repair path should be refresh or rebuild, not manual database surgery.
 
-Surfaces should make attached and detached states obvious. Tools and workflow should not guess which app they are operating on when shared target-app context can make the answer explicit.
+Surfaces should make attached and detached states obvious. Application workflow and Infrastructure mechanisms should not guess which app they are operating on when shared target-app context can make the answer explicit.
 
 Target App should not become a hosted account model by default. Its first job is local clarity: Refine knows the software it is helping with, and that knowledge is durable enough for people and agents to inspect.
 
