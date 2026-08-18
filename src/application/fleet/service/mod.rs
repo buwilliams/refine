@@ -111,6 +111,10 @@ impl FileFleetService {
     }
 
     pub fn add_node(&self, id: &str) -> RefineResult<serde_json::Value> {
+        self.nodes().with_registry_lock(|| self.add_node_locked(id))
+    }
+
+    fn add_node_locked(&self, id: &str) -> RefineResult<serde_json::Value> {
         if !valid_node_id(id) {
             return Err(RefineError::InvalidInput(
                 "node id must be lowercase alphanumeric, underscore, or hyphen".to_string(),
@@ -130,6 +134,15 @@ impl FileFleetService {
     }
 
     pub fn upsert_node(
+        &self,
+        id: &str,
+        update: NodeRemoteUpdate,
+    ) -> RefineResult<serde_json::Value> {
+        self.nodes()
+            .with_registry_lock(|| self.upsert_node_locked(id, update))
+    }
+
+    fn upsert_node_locked(
         &self,
         id: &str,
         update: NodeRemoteUpdate,
@@ -202,6 +215,15 @@ impl FileFleetService {
         node_id: &str,
         dry_run: bool,
     ) -> RefineResult<serde_json::Value> {
+        self.nodes()
+            .with_registry_lock(|| self.bootstrap_node_response_locked(node_id, dry_run))
+    }
+
+    fn bootstrap_node_response_locked(
+        &self,
+        node_id: &str,
+        dry_run: bool,
+    ) -> RefineResult<serde_json::Value> {
         let mut registry = self.load_node_registry_with_legacy_fleet()?;
         let Some(index) = registry
             .nodes
@@ -250,6 +272,11 @@ impl FileFleetService {
     }
 
     pub fn set_enabled(&self, id: &str, enabled: bool) -> RefineResult<serde_json::Value> {
+        self.nodes()
+            .with_registry_lock(|| self.set_enabled_locked(id, enabled))
+    }
+
+    fn set_enabled_locked(&self, id: &str, enabled: bool) -> RefineResult<serde_json::Value> {
         let mut registry = self.load_node_registry_with_legacy_fleet()?;
         let Some(node) = registry
             .nodes
@@ -372,6 +399,11 @@ impl FileFleetService {
     }
 
     pub(crate) fn load_node_registry_with_legacy_fleet(&self) -> RefineResult<NodeRegistry> {
+        self.nodes()
+            .with_registry_lock(|| self.load_node_registry_with_legacy_fleet_locked())
+    }
+
+    fn load_node_registry_with_legacy_fleet_locked(&self) -> RefineResult<NodeRegistry> {
         let mut registry = self.nodes().load_registry()?;
         let Some(legacy) = self.load_legacy_fleet()? else {
             return Ok(registry);

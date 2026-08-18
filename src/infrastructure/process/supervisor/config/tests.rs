@@ -9,6 +9,10 @@ fn file_settings_service_lists_defaults_and_persists_updates() {
 
     assert_eq!(service.load().unwrap()["agent_cli"], "claude");
     assert_eq!(
+        service.load().unwrap()["automatic_agent_resource_budget_percent"],
+        "70"
+    );
+    assert_eq!(
         service.load().unwrap()["state_sync_stale_threshold_seconds"],
         "900"
     );
@@ -51,6 +55,20 @@ fn file_settings_service_lists_defaults_and_persists_updates() {
         threshold["settings"]["state_sync_stale_threshold_seconds"],
         "1800"
     );
+    let resource_budget = service
+        .update(&serde_json::json!({"automatic_agent_resource_budget_percent": 55}))
+        .unwrap();
+    assert_eq!(
+        resource_budget["settings"]["automatic_agent_resource_budget_percent"],
+        "55"
+    );
+    for invalid in [json!(0), json!(101), json!("70.5"), json!("seventy")] {
+        assert!(
+            service
+                .update(&json!({"automatic_agent_resource_budget_percent": invalid}))
+                .is_err()
+        );
+    }
 
     fs::remove_dir_all(temp_root).unwrap();
 }
@@ -538,6 +556,109 @@ fn concurrency_caps_are_unset_until_an_operator_chooses_one() {
     assert!(
         service
             .update(&serde_json::json!({"parallel_run_cap": 0}))
+            .is_err()
+    );
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn legacy_missing_resource_budget_defaults_but_malformed_stored_values_fail() {
+    let temp_root = unique_temp_dir("settings-resource-budget-legacy");
+    let refine_dir = temp_root.join(".refine");
+    let service = FileSettingsService::new(&refine_dir);
+
+    assert_eq!(
+        service.load().unwrap()["automatic_agent_resource_budget_percent"],
+        AUTOMATIC_AGENT_RESOURCE_BUDGET_PERCENT_DEFAULT.to_string()
+    );
+    service
+        .update(&json!({"automatic_agent_resource_budget_percent": 65}))
+        .unwrap();
+    let mut registry = FileNodeRegistryService::new(&refine_dir)
+        .load_registry()
+        .unwrap();
+    registry.nodes[0].settings.insert(
+        "automatic_agent_resource_budget_percent".to_string(),
+        Value::String("invalid".to_string()),
+    );
+    FileNodeRegistryService::new(&refine_dir)
+        .save_registry(&registry)
+        .unwrap();
+    assert!(matches!(service.load(), Err(RefineError::InvalidInput(_))));
+
+    fs::remove_dir_all(temp_root).unwrap();
+}
+
+#[test]
+fn runtime_settings_copy_is_real_validated_and_serialized_with_other_writers() {
+    use std::sync::{Arc, Barrier};
+
+    let temp_root = unique_temp_dir("settings-copy-runtime");
+    let refine_dir = temp_root.join(".refine");
+    let nodes = FileNodeRegistryService::new(&refine_dir);
+    nodes.create("node-b").unwrap();
+    FileSettingsService::for_node(&refine_dir, "node-b")
+        .update(&json!({
+            "automatic_agent_resource_budget_percent": 45,
+            "parallel_run_cap": 3,
+            "target_app_url": "https://source.invalid"
+        }))
+        .unwrap();
+    FileSettingsService::new(&refine_dir)
+        .update(&json!({"target_app_url": "https://destination.invalid"}))
+        .unwrap();
+
+    let start = Arc::new(Barrier::new(4));
+    let copy_root = refine_dir.clone();
+    let copy_start = Arc::clone(&start);
+    let copy = std::thread::spawn(move || {
+        copy_start.wait();
+        FileSettingsService::new(copy_root).copy_from_node("node-b", "runtime")
+    });
+    let update_root = refine_dir.clone();
+    let update_start = Arc::clone(&start);
+    let update = std::thread::spawn(move || {
+        update_start.wait();
+        FileSettingsService::new(update_root)
+            .update(&json!({"target_app_url": "https://concurrent.invalid"}))
+    });
+    let node_root = refine_dir.clone();
+    let node_start = Arc::clone(&start);
+    let node_update = std::thread::spawn(move || {
+        node_start.wait();
+        FileNodeRegistryService::new(node_root).update(
+            "default",
+            crate::application::fleet::nodes::NodeUpdate {
+                display_name: Some("Concurrent destination".to_string()),
+                archived: None,
+            },
+        )
+    });
+    start.wait();
+    let copied = copy.join().unwrap().unwrap();
+    update.join().unwrap().unwrap();
+    node_update.join().unwrap().unwrap();
+
+    assert!(copied["copied_count"].as_u64().unwrap() >= 2);
+    let destination = FileSettingsService::new(&refine_dir).load().unwrap();
+    assert_eq!(destination["automatic_agent_resource_budget_percent"], "45");
+    assert_eq!(destination["parallel_run_cap"], "3");
+    assert_eq!(destination["target_app_url"], "https://concurrent.invalid");
+    assert_eq!(
+        FileNodeRegistryService::new(&refine_dir)
+            .show("default")
+            .unwrap()["node"]["display_name"],
+        "Concurrent destination"
+    );
+    assert!(
+        FileSettingsService::new(&refine_dir)
+            .copy_from_node("node-b", "unknown")
+            .is_err()
+    );
+    assert!(
+        FileSettingsService::new(&refine_dir)
+            .copy_from_node("default", "runtime")
             .is_err()
     );
 

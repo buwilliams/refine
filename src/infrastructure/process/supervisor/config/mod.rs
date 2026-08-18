@@ -40,17 +40,20 @@ mod reporter_codec;
 mod reporters;
 mod settings;
 mod settings_codec;
+mod settings_sections;
 
 pub use governance::FileGovernanceService;
 pub use guidance::FileGuidanceService;
 pub use reporters::FileReporterService;
 pub use settings::FileSettingsService;
+pub use settings_codec::AUTOMATIC_AGENT_RESOURCE_BUDGET_PERCENT_DEFAULT;
 
 use governance_codec::*;
 use guidance_codec::*;
 use persistence::*;
 use reporter_codec::*;
 use settings_codec::*;
+use settings_sections::*;
 
 pub trait ConfigService {
     fn load(&self) -> RefineResult<JsonObject>;

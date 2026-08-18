@@ -126,16 +126,23 @@ impl InProcessWebServer {
 
     pub(crate) fn handle_node_copy_settings(&self, request: ApiRequest) -> ApiResponse {
         let body = request.body.unwrap_or_else(|| json!({}));
-        ApiResponse::json(
-            200,
-            json!({
-                "ok": true,
-                "source_node_id": body.get("source_node_id").and_then(|value| value.as_str()).unwrap_or(""),
-                "section": body.get("section").and_then(|value| value.as_str()).unwrap_or(""),
-                "copied_count": 0,
-                "message": "node-scoped settings copy has no native per-node settings to copy yet"
-            }),
-        )
+        let refine_dir = match self.current_refine_dir() {
+            Ok(Some(path)) => path,
+            Ok(None) => return ApiResponse::json(404, json!({"error": "no active project"})),
+            Err(error) => return error_response(error),
+        };
+        let source_node_id = body
+            .get("source_node_id")
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        let section = body.get("section").and_then(Value::as_str).unwrap_or("");
+        match self
+            .settings_service(refine_dir)
+            .copy_from_node(source_node_id, section)
+        {
+            Ok(result) => ApiResponse::json(200, result),
+            Err(error) => error_response(error),
+        }
     }
 
     pub(crate) fn handle_fleet(&self) -> ApiResponse {

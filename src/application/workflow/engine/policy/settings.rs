@@ -12,6 +12,14 @@ pub(crate) fn setting_usize(settings: &JsonObject, key: &str, fallback: usize) -
         .unwrap_or(fallback)
 }
 
+pub(crate) fn automatic_resource_budget_percent(settings: &JsonObject) -> usize {
+    setting_usize(
+        settings,
+        "automatic_agent_resource_budget_percent",
+        crate::infrastructure::process::supervisor::config::AUTOMATIC_AGENT_RESOURCE_BUDGET_PERCENT_DEFAULT,
+    )
+}
+
 /// The Goal Agent stall budget from `agent_idle_timeout_seconds`. Distinct
 /// from `agent_hard_cap_seconds`: the idle budget resets on every sign of
 /// agent activity, so a hung session fails in minutes while a slow-but-working
@@ -61,11 +69,25 @@ mod tests {
 
     #[test]
     fn positive_parallel_run_cap_remains_authoritative() {
-        let settings = serde_json::json!({"parallel_run_cap": "2"})
+        let settings = serde_json::json!({
+            "parallel_run_cap": "2",
+            "automatic_agent_resource_budget_percent": "100"
+        })
+        .as_object()
+        .unwrap()
+        .clone();
+        assert_eq!(setting_usize(&settings, "parallel_run_cap", 1), 2);
+    }
+
+    #[test]
+    fn automatic_resource_budget_defaults_to_seventy_for_missing_legacy_state() {
+        let settings = JsonObject::new();
+        assert_eq!(automatic_resource_budget_percent(&settings), 70);
+        let explicit = serde_json::json!({"automatic_agent_resource_budget_percent": "45"})
             .as_object()
             .unwrap()
             .clone();
-        assert_eq!(setting_usize(&settings, "parallel_run_cap", 1), 2);
+        assert_eq!(automatic_resource_budget_percent(&explicit), 45);
     }
 
     #[test]

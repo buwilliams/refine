@@ -8,7 +8,8 @@ mod scheduling_eligibility;
 mod settings;
 pub(crate) use scheduling_eligibility::SchedulingEligibility;
 pub(crate) use settings::{
-    agent_idle_timeout, setting_cap_with_default_values, setting_string, setting_usize,
+    agent_idle_timeout, automatic_resource_budget_percent, setting_cap_with_default_values,
+    setting_string, setting_usize,
 };
 
 use crate::application::fleet::nodes::FileNodeRegistryService;
@@ -110,8 +111,12 @@ impl WorkflowEngine {
         let mut policy = WorkflowPolicy::default();
         if let Some(target_root) = &self.target_root {
             let settings = FileSettingsService::for_node(refine_dir, node_id).load()?;
+            let resource_budget_percent = automatic_resource_budget_percent(&settings);
             let governed_limit = HostResources::current(&self.runtime_root)
-                .recommended_agent_concurrency(observed_agent_memory_bytes(&self.runtime_root));
+                .recommended_agent_concurrency(
+                    observed_agent_memory_bytes(&self.runtime_root),
+                    resource_budget_percent,
+                );
             policy.global_limit = setting_usize(&settings, "parallel_run_cap", governed_limit);
             policy.per_node_limit = setting_cap_with_default_values(
                 &settings,

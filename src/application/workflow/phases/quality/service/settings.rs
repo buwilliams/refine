@@ -86,34 +86,37 @@ impl FileQualityService {
         };
         if stored.migration_version < SETTINGS_MIGRATION_VERSION {
             let node_service = FileNodeRegistryService::new(&self.refine_dir);
-            let mut registry = node_service.load_registry()?;
-            let mut commands = stored.legacy_commands.clone();
-            for node in &registry.nodes {
-                if legacy_quality_enabled(&node.settings) {
-                    commands.extend(enabled_legacy_commands(&node.settings));
+            node_service.with_registry_lock(|| {
+                let mut registry = node_service.load_registry()?;
+                let mut commands = stored.legacy_commands.clone();
+                for node in &registry.nodes {
+                    if legacy_quality_enabled(&node.settings) {
+                        commands.extend(enabled_legacy_commands(&node.settings));
+                    }
                 }
-            }
-            stored.legacy_commands = normalize_commands(commands);
+                stored.legacy_commands = normalize_commands(commands);
 
-            // Stage imported state without advancing the migration marker. If Node cleanup or
-            // the final write fails, retry sees both the staged commands and remaining legacy
-            // state, so enforced Quality cannot disappear between attempts.
-            self.write_stored_settings(&stored)?;
-            #[cfg(test)]
-            if self.migration_failure_after_stage {
-                return Err(RefineError::Io(
-                    "injected Quality migration failure after staged settings write".to_string(),
-                ));
-            }
-            let mut registry_changed = false;
-            for node in &mut registry.nodes {
-                registry_changed |= node.settings.remove("quality_timing").is_some();
-            }
-            if registry_changed {
-                node_service.save_registry(&registry)?;
-            }
-            stored.migration_version = SETTINGS_MIGRATION_VERSION;
-            self.write_stored_settings(&stored)?;
+                // Stage imported state without advancing the migration marker. If Node cleanup or
+                // the final write fails, retry sees both the staged commands and remaining legacy
+                // state, so enforced Quality cannot disappear between attempts.
+                self.write_stored_settings(&stored)?;
+                #[cfg(test)]
+                if self.migration_failure_after_stage {
+                    return Err(RefineError::Io(
+                        "injected Quality migration failure after staged settings write"
+                            .to_string(),
+                    ));
+                }
+                let mut registry_changed = false;
+                for node in &mut registry.nodes {
+                    registry_changed |= node.settings.remove("quality_timing").is_some();
+                }
+                if registry_changed {
+                    node_service.save_registry(&registry)?;
+                }
+                stored.migration_version = SETTINGS_MIGRATION_VERSION;
+                self.write_stored_settings(&stored)
+            })?;
         }
         Ok(stored.normalized())
     }

@@ -13,6 +13,13 @@ fn static_runtime_settings_expose_state_sync_controls() {
     assert!(runtime.contains(r#"emptyLabel: "Automatic""#));
     assert!(runtime.contains("Enter a number to override that conservative recommendation"));
     assert!(!runtime.contains("s.parallel_run_cap || 5"));
+    assert!(runtime.contains(r#"data-testid="runtime-automatic-resource-budget-percent""#));
+    assert!(runtime.contains(r#"min="1" max="100""#));
+    assert!(runtime.contains(r#"s.automatic_agent_resource_budget_percent ?? "70""#));
+    assert!(runtime.contains(
+        r##"automatic_agent_resource_budget_percent: $("#s-automatic-resource-budget-percent").value"##
+    ));
+    assert!(runtime.contains("leaving the remainder for Docker"));
     assert!(runtime.contains(r#"data-testid="runtime-state-sync-debounce""#));
     assert!(runtime.contains(r#"data-testid="runtime-project-update-pulse""#));
     assert!(runtime.contains(r#"data-testid="runtime-worktree-cleanup-delay""#));

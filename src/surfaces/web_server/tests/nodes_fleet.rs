@@ -89,6 +89,53 @@ fn web_server_manages_fleet_operations_over_nodes() {
     remove_temp_dir(&temp_root);
 }
 
+#[test]
+fn web_server_copies_validated_runtime_settings_between_nodes() {
+    let temp_root = unique_temp_dir("http-node-copy-runtime-settings");
+    let refine_dir = temp_root.join(".refine");
+    let mut server = server_with_projection();
+    server.target_root = Some(temp_root.clone());
+
+    let registered = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/fleet/nodes".to_string(),
+        body: Some(json!({"id": "node-b"})),
+    });
+    assert_eq!(registered.status, 200, "{:?}", registered.body);
+    FileSettingsService::for_node(&refine_dir, "node-b")
+        .update(&json!({
+            "automatic_agent_resource_budget_percent": 40,
+            "parallel_run_cap": 2,
+            "target_app_url": "https://source.invalid"
+        }))
+        .unwrap();
+    FileSettingsService::new(&refine_dir)
+        .update(&json!({"target_app_url": "https://destination.invalid"}))
+        .unwrap();
+
+    let copied = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/nodes/copy-settings".to_string(),
+        body: Some(json!({"source_node_id": "node-b", "section": "runtime"})),
+    });
+    assert_eq!(copied.status, 200, "{:?}", copied.body);
+    assert_eq!(copied.body["source_node_id"], "node-b");
+    assert_eq!(copied.body["destination_node_id"], "default");
+    let destination = FileSettingsService::new(&refine_dir).load().unwrap();
+    assert_eq!(destination["automatic_agent_resource_budget_percent"], "40");
+    assert_eq!(destination["parallel_run_cap"], "2");
+    assert_eq!(destination["target_app_url"], "https://destination.invalid");
+
+    let invalid = server.handle(ApiRequest {
+        method: "POST".to_string(),
+        path: "/api/nodes/copy-settings".to_string(),
+        body: Some(json!({"source_node_id": "node-b", "section": "quality"})),
+    });
+    assert_eq!(invalid.status, 400, "{:?}", invalid.body);
+
+    remove_temp_dir(&temp_root);
+}
+
 /// The daemon's fleet fan-out during a rolling upgrade: the node still on the
 /// previous build answers the API-contract gate, and the route reports that
 /// node as pending upgrade with a 200 — the fleet did not fail, one node has
