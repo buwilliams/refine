@@ -13,7 +13,7 @@ pub(super) struct InvalidSignalRecovery {
     last_rejection: Option<InvalidSignalEvidence>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 struct InvalidSignalEvidence {
     archive_path: PathBuf,
     diagnostic_path: PathBuf,
@@ -31,12 +31,60 @@ impl Default for InvalidSignalRecovery {
 }
 
 impl InvalidSignalRecovery {
-    pub(super) fn reject(
+    pub(super) fn reject_malformed_transport(
         &mut self,
         signal_path: &Path,
         diagnostic: &str,
         agent_running: bool,
     ) -> RefineResult<InvalidSignalDisposition> {
+        let evidence = self.preserve(signal_path, diagnostic)?;
+        let attempt = self.rejected_payloads;
+
+        if !agent_running || attempt > self.replacement_limit {
+            let reason = if agent_running {
+                format!(
+                    "exhausted the limit of {} rejected replacement payloads",
+                    self.replacement_limit
+                )
+            } else {
+                "the Goal Agent exited before it could rewrite the payload".to_string()
+            };
+            return Ok(InvalidSignalDisposition::Fail(RefineError::InvalidInput(
+                format!(
+                    "Goal Agent completion signal {} was rejected ({reason}); final diagnostic: {diagnostic}; invalid payload preserved at {} and diagnostic preserved at {}",
+                    signal_path.display(),
+                    evidence.archive_path.display(),
+                    evidence.diagnostic_path.display()
+                ),
+            )));
+        }
+
+        Ok(InvalidSignalDisposition::Retry(format!(
+            "Refine rejected your completion signal: {diagnostic}. Rewrite it with exactly the same required JSON shape (replacement attempt {attempt} of {limit}). Write and parse-check `{signal_path}.tmp`, then atomically rename it over `{signal_path}`.\r",
+            limit = self.replacement_limit,
+            signal_path = signal_path.display()
+        )))
+    }
+
+    pub(super) fn reject_invalid_contract(
+        &mut self,
+        signal_path: &Path,
+        diagnostic: &str,
+    ) -> RefineResult<RefineError> {
+        let evidence = self.preserve(signal_path, diagnostic)?;
+        Ok(RefineError::InvalidInput(format!(
+            "Goal Agent completion signal {} was rejected because typed-schema failures are terminal; final diagnostic: {diagnostic}; invalid payload preserved at {} and diagnostic preserved at {}",
+            signal_path.display(),
+            evidence.archive_path.display(),
+            evidence.diagnostic_path.display()
+        )))
+    }
+
+    fn preserve(
+        &mut self,
+        signal_path: &Path,
+        diagnostic: &str,
+    ) -> RefineResult<InvalidSignalEvidence> {
         self.rejected_payloads += 1;
         let attempt = self.rejected_payloads;
         let archive_path = invalid_signal_archive_path(signal_path, attempt)?;
@@ -54,36 +102,13 @@ impl InvalidSignalRecovery {
                 diagnostic_path.display()
             ))
         })?;
-        self.last_rejection = Some(InvalidSignalEvidence {
+        let evidence = InvalidSignalEvidence {
             archive_path: archive_path.clone(),
             diagnostic_path: diagnostic_path.clone(),
             diagnostic: diagnostic.to_string(),
-        });
-
-        if !agent_running || attempt > self.replacement_limit {
-            let reason = if agent_running {
-                format!(
-                    "exhausted the limit of {} rejected replacement payloads",
-                    self.replacement_limit
-                )
-            } else {
-                "the Goal Agent exited before it could rewrite the payload".to_string()
-            };
-            return Ok(InvalidSignalDisposition::Fail(RefineError::InvalidInput(
-                format!(
-                    "Goal Agent completion signal {} was rejected ({reason}); final diagnostic: {diagnostic}; invalid payload preserved at {} and diagnostic preserved at {}",
-                    signal_path.display(),
-                    archive_path.display(),
-                    diagnostic_path.display()
-                ),
-            )));
-        }
-
-        Ok(InvalidSignalDisposition::Retry(format!(
-            "Refine rejected your completion signal: {diagnostic}. Rewrite it with exactly the same required JSON shape (replacement attempt {attempt} of {limit}). Write and parse-check `{signal_path}.tmp`, then atomically rename it over `{signal_path}`.\r",
-            limit = self.replacement_limit,
-            signal_path = signal_path.display()
-        )))
+        };
+        self.last_rejection = Some(evidence.clone());
+        Ok(evidence)
     }
 
     pub(super) fn accept_valid(&mut self) {

@@ -489,8 +489,8 @@ where
                         return Err(error);
                     }
                 }
-                SignalRead::Rejected(diagnostic) => {
-                    match invalid_signal_recovery.reject(
+                SignalRead::MalformedTransport(diagnostic) => {
+                    match invalid_signal_recovery.reject_malformed_transport(
                         &signal_path,
                         &diagnostic,
                         process_exit.is_none(),
@@ -507,6 +507,10 @@ where
                         }
                         InvalidSignalDisposition::Fail(error) => return Err(error),
                     }
+                }
+                SignalRead::InvalidContract(diagnostic) => {
+                    return Err(invalid_signal_recovery
+                        .reject_invalid_contract(&signal_path, &diagnostic)?);
                 }
                 SignalRead::Valid(signal) => {
                     invalid_signal_recovery.accept_valid();

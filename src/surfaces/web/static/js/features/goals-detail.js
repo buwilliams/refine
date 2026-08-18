@@ -812,7 +812,7 @@ function renderImplementationChecklist(items, implementation) {
       const result = results.get(item.id);
       return `<li data-checklist-id="${htmlEscape(item.id)}">
         <div><code>${htmlEscape(item.id)}</code> ${htmlEscape(item.description || "")}
-          ${result ? `<span class="status-pill ${result.outcome === "completed" ? "done" : "failed"}" data-testid="goal-implementation-checklist-outcome">${htmlEscape(result.outcome)}</span>` : ""}
+          ${result ? `<span class="status-pill ${["completed", "no_change_needed"].includes(result.outcome) ? "done" : "failed"}" data-testid="goal-implementation-checklist-outcome">${htmlEscape(result.outcome)}</span>` : ""}
         </div>
         ${item.affected_behavior?.length ? `<div class="muted small">Affected: ${item.affected_behavior.map(htmlEscape).join(", ")}</div>` : ""}
         ${item.governance_rationale ? `<div class="muted small">Governance: ${htmlEscape(item.governance_rationale)}</div>` : ""}

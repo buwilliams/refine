@@ -183,11 +183,11 @@ test("Implementation Plan renders final checklist, immutable history, outcomes, 
         result: { summary: "Material gaps", findings: [{ id: "C1", description: "Missing <recovery>", recommendation: "Add & test it" }] },
       },
       final_plan: {
-        result: { summary: "Final safe plan", checklist: [{ id: "P1", description: "Implement safely", affected_behavior: ["API & UI"], verification: ["node --test <focused>"] }] },
+        result: { summary: "Final safe plan", checklist: [{ id: "P1", description: "Implement safely", affected_behavior: ["API & UI"], verification: ["node --test <focused>"] }, { id: "P2", description: "Retain existing behavior" }] },
       },
       implementation: {
         execution: {
-          checklist: [{ id: "P1", outcome: "deviated", evidence: "Changed <API> only" }],
+          checklist: [{ id: "P1", outcome: "deviated", evidence: "Changed <API> only" }, { id: "P2", outcome: "no_change_needed", evidence: "Already correct" }],
           verification: ["cargo test --lib: passed"],
         },
       },
@@ -199,6 +199,7 @@ test("Implementation Plan renders final checklist, immutable history, outcomes, 
   assert.match(html, /Active operation op-implement · process goal-agent-1/);
   assert.match(html, /goal-implementation-plan-checklist/);
   assert.match(html, /goal-implementation-checklist-outcome">deviated/);
+  assert.match(html, /status-pill done" data-testid="goal-implementation-checklist-outcome">no_change_needed/);
   assert.match(html, /Original &lt;proposal&gt;/);
   assert.match(html, /data-plan-history="proposal"[^>]* open/);
   assert.match(html, /Missing &lt;recovery&gt;/);
