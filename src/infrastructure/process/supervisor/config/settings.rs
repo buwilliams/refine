@@ -45,23 +45,95 @@ impl FileSettingsService {
 
     pub fn update(&self, body: &serde_json::Value) -> RefineResult<serde_json::Value> {
         let updates = normalize_settings_patch(body)?;
-        let mut current = self.load()?;
-        let mut updated_test_command = false;
-        let mut updated_test_commands = false;
-        for (key, value) in updates {
-            current.insert(key.clone(), value);
-            if key == "target_app_test_command" {
-                updated_test_command = true;
-            } else if key == "target_app_test_commands" {
-                updated_test_commands = true;
+        self.node_registry_service().with_registry_lock(|| {
+            let mut current = self.load()?;
+            let mut updated_test_command = false;
+            let mut updated_test_commands = false;
+            for (key, value) in updates {
+                current.insert(key.clone(), value);
+                if key == "target_app_test_command" {
+                    updated_test_command = true;
+                } else if key == "target_app_test_commands" {
+                    updated_test_commands = true;
+                }
             }
+            if updated_test_command || updated_test_commands {
+                sync_target_app_test_settings(&mut current, updated_test_commands)?;
+            }
+            self.validate(&current)?;
+            self.write(&current)?;
+            Ok(serde_json::json!({"ok": true, "settings": current}))
+        })
+    }
+
+    pub fn copy_from_node(
+        &self,
+        source_node_id: &str,
+        section: &str,
+    ) -> RefineResult<serde_json::Value> {
+        let source_node_id = source_node_id.trim();
+        if source_node_id.is_empty() {
+            return Err(RefineError::InvalidInput(
+                "source_node_id is required".to_string(),
+            ));
         }
-        if updated_test_command || updated_test_commands {
-            sync_target_app_test_settings(&mut current, updated_test_commands)?;
-        }
-        self.validate(&current)?;
-        self.write(&current)?;
-        Ok(serde_json::json!({"ok": true, "settings": current}))
+        let section = section.trim();
+        let keys = match section {
+            "runtime" => RUNTIME_SETTINGS,
+            "application" => APPLICATION_SETTINGS,
+            other => {
+                return Err(RefineError::InvalidInput(format!(
+                    "unsupported settings section: {other}"
+                )));
+            }
+        };
+        let registry_service = self.node_registry_service();
+        registry_service.with_registry_lock(|| {
+            let destination_node_id = self.active_node_id()?;
+            if source_node_id == destination_node_id {
+                return Err(RefineError::InvalidInput(
+                    "source node must differ from the active destination node".to_string(),
+                ));
+            }
+            let registry = registry_service.load_registry()?;
+            if !registry.active_node_allowed(source_node_id) {
+                return Err(RefineError::NotFound(format!(
+                    "source node {source_node_id} was not found or is archived"
+                )));
+            }
+            if !registry.active_node_allowed(&destination_node_id) {
+                return Err(RefineError::NotFound(format!(
+                    "destination node {destination_node_id} was not found or is archived"
+                )));
+            }
+
+            // Loading through the supported codec makes malformed stored source
+            // values visible instead of copying them into another node.
+            let source = FileSettingsService::for_node(&self.refine_dir, source_node_id).load()?;
+            let mut destination = self.load()?;
+            let mut copied_count = 0usize;
+            for key in keys {
+                if let Some(value) = source.get(*key) {
+                    if destination.get(*key) != Some(value) {
+                        copied_count += 1;
+                    }
+                    destination.insert((*key).to_string(), value.clone());
+                } else {
+                    destination.remove(*key);
+                }
+            }
+            sync_target_app_test_settings(&mut destination, section == "application")?;
+            self.validate(&destination)?;
+            self.write(&destination)?;
+            Ok(serde_json::json!({
+                "ok": true,
+                "source_node_id": source_node_id,
+                "destination_node_id": destination_node_id,
+                "section": section,
+                "copied_count": copied_count,
+                "settings": destination
+            }))
+        })
     }
 
     pub fn validate_update(body: &serde_json::Value) -> RefineResult<()> {
@@ -123,10 +195,8 @@ impl FileSettingsService {
             ))
         })
     }
-}
 
-impl ConfigService for FileSettingsService {
-    fn load(&self) -> RefineResult<JsonObject> {
+    fn load_locked(&self) -> RefineResult<JsonObject> {
         let service = self.node_registry_service();
         let active_node_id = self.active_node_id()?;
         let registry = service.load_registry()?;
@@ -166,6 +236,13 @@ impl ConfigService for FileSettingsService {
             self.write(&settings)?;
         }
         Ok(settings)
+    }
+}
+
+impl ConfigService for FileSettingsService {
+    fn load(&self) -> RefineResult<JsonObject> {
+        self.node_registry_service()
+            .with_registry_lock(|| self.load_locked())
     }
 
     fn validate(&self, config: &JsonObject) -> RefineResult<()> {

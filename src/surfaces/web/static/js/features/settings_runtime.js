@@ -94,6 +94,9 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
   const agentResolution = String(s.state_sync_agent_resolution ?? "on");
   const conflictResolution = String(s.workflow_conflict_resolution ?? "on");
   const parallelRunCap = String(s.parallel_run_cap ?? "").trim();
+  const automaticResourceBudgetPercent = String(
+    s.automatic_agent_resource_budget_percent ?? "70",
+  ).trim();
   return `
     <section class="settings-section">
       <h3>Runtime configuration</h3>
@@ -111,6 +114,14 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
         valueLabel: parallelRunCap || "Automatic",
         emptyLabel: "Automatic",
         control: `<input type="number" id="s-cap" data-testid="runtime-parallel-run-cap" min="1" placeholder="Automatic" value="${htmlEscape(parallelRunCap)}">`,
+      })}
+      ${renderSettingsEditableField({
+        id: "s-automatic-resource-budget-percent",
+        label: "Automatic resource budget percent",
+        guideItemId: "runtime-automatic-resource-budget-percent",
+        description: "Automatic mode applies this percentage to detected logical CPU cores and currently available memory, leaving the remainder for Docker, target applications, and other shared-host work.",
+        valueLabel: `${htmlEscape(automaticResourceBudgetPercent)}%`,
+        control: `<input type="number" id="s-automatic-resource-budget-percent" data-testid="runtime-automatic-resource-budget-percent" min="1" max="100" value="${htmlEscape(automaticResourceBudgetPercent)}">`,
       })}
       ${renderSettingsEditableField({
         id: "s-pattern",
@@ -419,6 +430,7 @@ async function autosaveSettingsRuntime(options = {}) {
   const chosen = $("#s-cli").value;
   await api("PATCH", "/api/settings", {
     parallel_run_cap: $("#s-cap").value,
+    automatic_agent_resource_budget_percent: $("#s-automatic-resource-budget-percent").value,
     branch_name_pattern: $("#s-pattern").value,
     agent_idle_timeout_seconds: $("#s-idle").value,
     agent_hard_cap_seconds: $("#s-hard").value,
@@ -449,7 +461,7 @@ function bindNodeRuntimeConfigControls() {
   const root = document.querySelector('[data-tab-pane="runtime"]');
   const autosaveRuntime = bindSettingsAutosave(
     root,
-    "#s-cap, #s-pattern, #s-idle, #s-hard, #s-worker-memory, #s-ui-memory, #s-worker-cpu-priority, #s-resource-isolation, #s-agent-limit-pause, #s-chat-idle, #s-backlog-promote, #s-worktree-cleanup-delay, #s-state-sync-debounce, #s-project-update-pulse, #s-state-sync-stale-threshold, #s-state-sync-auto-recovery, #s-state-sync-agent-resolution, #s-workflow-conflict-resolution, #s-file-browser-ignore",
+    "#s-cap, #s-automatic-resource-budget-percent, #s-pattern, #s-idle, #s-hard, #s-worker-memory, #s-ui-memory, #s-worker-cpu-priority, #s-resource-isolation, #s-agent-limit-pause, #s-chat-idle, #s-backlog-promote, #s-worktree-cleanup-delay, #s-state-sync-debounce, #s-project-update-pulse, #s-state-sync-stale-threshold, #s-state-sync-auto-recovery, #s-state-sync-agent-resolution, #s-workflow-conflict-resolution, #s-file-browser-ignore",
     autosaveSettingsRuntime,
     { event: "settings-editable-commit" },
   );

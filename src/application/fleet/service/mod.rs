@@ -111,6 +111,10 @@ impl FileFleetService {
     }
 
     pub fn add_node(&self, id: &str) -> RefineResult<serde_json::Value> {
+        self.nodes().with_registry_lock(|| self.add_node_locked(id))
+    }
+
+    fn add_node_locked(&self, id: &str) -> RefineResult<serde_json::Value> {
         if !valid_node_id(id) {
             return Err(RefineError::InvalidInput(
                 "node id must be lowercase alphanumeric, underscore, or hyphen".to_string(),
@@ -130,6 +134,15 @@ impl FileFleetService {
     }
 
     pub fn upsert_node(
+        &self,
+        id: &str,
+        update: NodeRemoteUpdate,
+    ) -> RefineResult<serde_json::Value> {
+        self.nodes()
+            .with_registry_lock(|| self.upsert_node_locked(id, update))
+    }
+
+    fn upsert_node_locked(
         &self,
         id: &str,
         update: NodeRemoteUpdate,
@@ -202,34 +215,82 @@ impl FileFleetService {
         node_id: &str,
         dry_run: bool,
     ) -> RefineResult<serde_json::Value> {
-        let mut registry = self.load_node_registry_with_legacy_fleet()?;
-        let Some(index) = registry
-            .nodes
-            .iter()
-            .position(|node| node.id == node_id && !node.archived)
-        else {
-            return Err(RefineError::NotFound(format!(
-                "node {node_id} was not found"
-            )));
-        };
-        let node = registry.nodes[index].clone();
-        let request = FleetBootstrapRequest {
-            node_id: node_id.to_string(),
-            ssh_host: node.ssh_host,
-            ssh_user: node.ssh_user,
-            ssh_identity_path: node.ssh_identity_path,
-            ssh_port: node.ssh_port,
-            refine_checkout: node.refine_checkout,
-            target_app_path: node.target_app_path,
-            refine_port: node.refine_port,
-            dry_run,
-        };
+        let request = self
+            .nodes()
+            .with_registry_lock(|| self.bootstrap_node_request_locked(node_id, dry_run))?;
+        let request_snapshot = request.clone();
         let security = self.security()?;
         let result = bootstrap_remote_node_with_runtime(
             request,
             security.runtime_root,
             security.allowed_commands.iter().cloned(),
         )?;
+        self.nodes().with_registry_lock(|| {
+            self.settle_bootstrap_node_response_locked(&request_snapshot, result)
+        })
+    }
+
+    fn bootstrap_node_request_locked(
+        &self,
+        node_id: &str,
+        dry_run: bool,
+    ) -> RefineResult<FleetBootstrapRequest> {
+        let registry = self.load_node_registry_with_legacy_fleet()?;
+        let Some(node) = registry
+            .nodes
+            .iter()
+            .find(|node| node.id == node_id && !node.archived)
+        else {
+            return Err(RefineError::NotFound(format!(
+                "node {node_id} was not found"
+            )));
+        };
+        Ok(FleetBootstrapRequest {
+            node_id: node_id.to_string(),
+            ssh_host: node.ssh_host.clone(),
+            ssh_user: node.ssh_user.clone(),
+            ssh_identity_path: node.ssh_identity_path.clone(),
+            ssh_port: node.ssh_port,
+            refine_checkout: node.refine_checkout.clone(),
+            target_app_path: node.target_app_path.clone(),
+            refine_port: node.refine_port,
+            dry_run,
+        })
+    }
+
+    fn settle_bootstrap_node_response_locked(
+        &self,
+        request: &FleetBootstrapRequest,
+        result: RemoteRunResult,
+    ) -> RefineResult<serde_json::Value> {
+        // Reload after the external bootstrap so the health settlement merges
+        // into the latest registry instead of holding the registry lock across
+        // SSH or overwriting settings and node edits made while it ran.
+        let mut registry = self.load_node_registry_with_legacy_fleet()?;
+        let Some(index) = registry
+            .nodes
+            .iter()
+            .position(|node| node.id == request.node_id && !node.archived)
+        else {
+            return Err(RefineError::Conflict(format!(
+                "node {} was removed or archived while bootstrap was running",
+                request.node_id
+            )));
+        };
+        let node = &registry.nodes[index];
+        if node.ssh_host != request.ssh_host
+            || node.ssh_user != request.ssh_user
+            || node.ssh_identity_path != request.ssh_identity_path
+            || node.ssh_port != request.ssh_port
+            || node.refine_checkout != request.refine_checkout
+            || node.target_app_path != request.target_app_path
+            || node.refine_port != request.refine_port
+        {
+            return Err(RefineError::Conflict(format!(
+                "node {} bootstrap settings changed while bootstrap was running",
+                request.node_id
+            )));
+        }
         let mut details = serde_json::Map::new();
         details.insert("bootstrap".to_string(), serde_json::json!(result.clone()));
         registry.nodes[index].health = Some(FleetHealth {
@@ -242,14 +303,19 @@ impl FileFleetService {
         let fleet = self.fleet_from_registry(registry);
         Ok(serde_json::json!({
             "ok": result.ok,
-            "node_id": node_id,
-            "dry_run": dry_run,
+            "node_id": request.node_id,
+            "dry_run": request.dry_run,
             "result": result,
             "fleet": self.identity_safe_fleet_response(fleet)?
         }))
     }
 
     pub fn set_enabled(&self, id: &str, enabled: bool) -> RefineResult<serde_json::Value> {
+        self.nodes()
+            .with_registry_lock(|| self.set_enabled_locked(id, enabled))
+    }
+
+    fn set_enabled_locked(&self, id: &str, enabled: bool) -> RefineResult<serde_json::Value> {
         let mut registry = self.load_node_registry_with_legacy_fleet()?;
         let Some(node) = registry
             .nodes
@@ -372,6 +438,11 @@ impl FileFleetService {
     }
 
     pub(crate) fn load_node_registry_with_legacy_fleet(&self) -> RefineResult<NodeRegistry> {
+        self.nodes()
+            .with_registry_lock(|| self.load_node_registry_with_legacy_fleet_locked())
+    }
+
+    fn load_node_registry_with_legacy_fleet_locked(&self) -> RefineResult<NodeRegistry> {
         let mut registry = self.nodes().load_registry()?;
         let Some(legacy) = self.load_legacy_fleet()? else {
             return Ok(registry);

@@ -6,6 +6,7 @@ use chrono::Utc;
 use serde_json::{Value, json};
 
 use crate::error::{RefineError, RefineResult};
+use crate::infrastructure::process::supervisor::coordination::{record_lock_key, with_record_lock};
 use crate::model::JsonObject;
 use crate::model::node::{Node, NodeDisplayNameAuthority, NodeRegistry};
 
@@ -63,6 +64,17 @@ impl FileNodeRegistryService {
 
     pub fn registry_path(&self) -> PathBuf {
         self.refine_dir.join(NODE_REGISTRY_FILE)
+    }
+
+    /// Serialize a complete nodes.json read-validate-modify-persist transaction
+    /// with settings writes and state hydration of the same durable record.
+    pub(crate) fn with_registry_lock<T>(
+        &self,
+        action: impl FnOnce() -> RefineResult<T>,
+    ) -> RefineResult<T> {
+        let path = self.registry_path();
+        let key = record_lock_key(&path);
+        with_record_lock(&self.refine_dir, &key, action)
     }
 
     /// The single authoritative location of this machine's active-node
@@ -134,30 +146,32 @@ impl FileNodeRegistryService {
 
     pub fn create(&self, id: &str) -> RefineResult<serde_json::Value> {
         let id = clean_node_id(id)?;
-        let mut registry = self.load_registry()?;
-        if registry.nodes.iter().any(|node| node.id == id) {
-            return Err(RefineError::Conflict(format!("node {id} already exists")));
-        }
-        let now = now_timestamp();
-        registry.nodes.push(Node {
-            id: id.clone(),
-            display_name: id.clone(),
-            display_name_authority: Some(NodeDisplayNameAuthority::System),
-            created_at: now.clone(),
-            updated_at: now,
-            settings: JsonObject::new(),
-            enabled: true,
-            ssh_host: String::new(),
-            ssh_user: String::new(),
-            ssh_identity_path: String::new(),
-            ssh_port: 22,
-            refine_checkout: "~/refine".to_string(),
-            target_app_path: String::new(),
-            refine_port: 8082,
-            health: None,
-            archived: false,
-        });
-        self.save_registry(&registry)?;
+        self.with_registry_lock(|| {
+            let mut registry = self.load_registry()?;
+            if registry.nodes.iter().any(|node| node.id == id) {
+                return Err(RefineError::Conflict(format!("node {id} already exists")));
+            }
+            let now = now_timestamp();
+            registry.nodes.push(Node {
+                id: id.clone(),
+                display_name: id.clone(),
+                display_name_authority: Some(NodeDisplayNameAuthority::System),
+                created_at: now.clone(),
+                updated_at: now,
+                settings: JsonObject::new(),
+                enabled: true,
+                ssh_host: String::new(),
+                ssh_user: String::new(),
+                ssh_identity_path: String::new(),
+                ssh_port: 22,
+                refine_checkout: "~/refine".to_string(),
+                target_app_path: String::new(),
+                refine_port: 8082,
+                health: None,
+                archived: false,
+            });
+            self.save_registry(&registry)
+        })?;
         self.show(&id)
     }
 
@@ -168,88 +182,96 @@ impl FileNodeRegistryService {
                 "display_name is required".to_string(),
             ));
         }
-        let mut registry = self.load_registry()?;
-        let id = unique_node_id(&registry, display_name);
-        let now = now_timestamp();
-        let node = Node {
-            id,
-            display_name: display_name.to_string(),
-            display_name_authority: Some(NodeDisplayNameAuthority::User),
-            created_at: now.clone(),
-            updated_at: now,
-            settings: JsonObject::new(),
-            enabled: true,
-            ssh_host: String::new(),
-            ssh_user: String::new(),
-            ssh_identity_path: String::new(),
-            ssh_port: 22,
-            refine_checkout: "~/refine".to_string(),
-            target_app_path: String::new(),
-            refine_port: 8082,
-            health: None,
-            archived: false,
-        };
-        registry.nodes.push(node.clone());
-        self.save_registry(&registry)?;
-        Ok(node)
+        self.with_registry_lock(|| {
+            let mut registry = self.load_registry()?;
+            let id = unique_node_id(&registry, display_name);
+            let now = now_timestamp();
+            let node = Node {
+                id,
+                display_name: display_name.to_string(),
+                display_name_authority: Some(NodeDisplayNameAuthority::User),
+                created_at: now.clone(),
+                updated_at: now,
+                settings: JsonObject::new(),
+                enabled: true,
+                ssh_host: String::new(),
+                ssh_user: String::new(),
+                ssh_identity_path: String::new(),
+                ssh_port: 22,
+                refine_checkout: "~/refine".to_string(),
+                target_app_path: String::new(),
+                refine_port: 8082,
+                health: None,
+                archived: false,
+            };
+            registry.nodes.push(node.clone());
+            self.save_registry(&registry)?;
+            Ok(node)
+        })
     }
 
     pub fn activate(&self, id: &str) -> RefineResult<serde_json::Value> {
-        let registry = self.load_registry()?;
-        if !registry.active_node_allowed(id) {
-            return Err(RefineError::NotFound(format!(
-                "node {id} was not found or is archived"
-            )));
-        }
-        self.save_active_node_id(id)?;
+        self.with_registry_lock(|| {
+            let registry = self.load_registry()?;
+            if !registry.active_node_allowed(id) {
+                return Err(RefineError::NotFound(format!(
+                    "node {id} was not found or is archived"
+                )));
+            }
+            self.save_active_node_id(id)
+        })?;
         self.list_response()
     }
 
     pub fn archive(&self, id: &str) -> RefineResult<serde_json::Value> {
-        let mut registry = self.load_registry()?;
-        let active_node_id = self.active_identity_for_nodes(&registry.nodes)?.id;
-        if id == active_node_id {
-            return Err(RefineError::Conflict(
-                "active node cannot be archived".to_string(),
-            ));
-        }
-        let Some(node) = registry.nodes.iter_mut().find(|node| node.id == id) else {
-            return Err(RefineError::NotFound(format!("node {id} was not found")));
-        };
-        node.archived = true;
-        node.updated_at = now_timestamp();
-        self.save_registry(&registry)?;
-        self.show(id)
-    }
-
-    pub fn update(&self, id: &str, update: NodeUpdate) -> RefineResult<Node> {
-        let mut registry = self.load_registry()?;
-        let active_node_id = self.active_identity_for_nodes(&registry.nodes)?.id;
-        let Some(node) = registry.nodes.iter_mut().find(|node| node.id == id) else {
-            return Err(RefineError::NotFound(format!("node {id} was not found")));
-        };
-        if let Some(display_name) = update.display_name {
-            let display_name = display_name.trim();
-            if display_name.is_empty() {
-                return Err(RefineError::InvalidInput(
-                    "display name cannot be empty".to_string(),
-                ));
-            }
-            node.display_name = display_name.to_string();
-            node.display_name_authority = Some(NodeDisplayNameAuthority::User);
-        }
-        if let Some(archived) = update.archived {
-            if archived && id == active_node_id {
+        self.with_registry_lock(|| {
+            let mut registry = self.load_registry()?;
+            let active_node_id = self.active_identity_for_nodes(&registry.nodes)?.id;
+            if id == active_node_id {
                 return Err(RefineError::Conflict(
                     "active node cannot be archived".to_string(),
                 ));
             }
-            node.archived = archived;
-        }
-        node.updated_at = now_timestamp();
-        let node = node.clone();
-        self.save_registry(&registry)?;
-        Ok(node)
+            let Some(node) = registry.nodes.iter_mut().find(|node| node.id == id) else {
+                return Err(RefineError::NotFound(format!("node {id} was not found")));
+            };
+            node.archived = true;
+            node.updated_at = now_timestamp();
+            self.save_registry(&registry)
+        })?;
+        self.show(id)
+    }
+
+    pub fn update(&self, id: &str, update: NodeUpdate) -> RefineResult<Node> {
+        self.with_registry_lock(|| {
+            let mut registry = self.load_registry()?;
+            let active_node_id = self.active_identity_for_nodes(&registry.nodes)?.id;
+            let Some(node) = registry.nodes.iter_mut().find(|node| node.id == id) else {
+                return Err(RefineError::NotFound(format!("node {id} was not found")));
+            };
+            if let Some(display_name) = update.display_name {
+                let display_name = display_name.trim();
+                if display_name.is_empty() {
+                    return Err(RefineError::InvalidInput(
+                        "display name cannot be empty".to_string(),
+                    ));
+                }
+                node.display_name = display_name.to_string();
+                node.display_name_authority = Some(NodeDisplayNameAuthority::User);
+            }
+            if let Some(archived) = update.archived {
+                if archived && id == active_node_id {
+                    return Err(RefineError::Conflict(
+                        "active node cannot be archived".to_string(),
+                    ));
+                }
+                node.archived = archived;
+            }
+            node.updated_at = now_timestamp();
+            let node = node.clone();
+            self.save_registry(&registry)?;
+            Ok(node)
+        })
     }
 
     pub fn rename(&self, id: &str, name: &str) -> RefineResult<serde_json::Value> {
@@ -259,14 +281,16 @@ impl FileNodeRegistryService {
                 "display name cannot be empty".to_string(),
             ));
         }
-        let mut registry = self.load_registry()?;
-        let Some(node) = registry.nodes.iter_mut().find(|node| node.id == id) else {
-            return Err(RefineError::NotFound(format!("node {id} was not found")));
-        };
-        node.display_name = name.to_string();
-        node.display_name_authority = Some(NodeDisplayNameAuthority::User);
-        node.updated_at = now_timestamp();
-        self.save_registry(&registry)?;
+        self.with_registry_lock(|| {
+            let mut registry = self.load_registry()?;
+            let Some(node) = registry.nodes.iter_mut().find(|node| node.id == id) else {
+                return Err(RefineError::NotFound(format!("node {id} was not found")));
+            };
+            node.display_name = name.to_string();
+            node.display_name_authority = Some(NodeDisplayNameAuthority::User);
+            node.updated_at = now_timestamp();
+            self.save_registry(&registry)
+        })?;
         self.show(id)
     }
 

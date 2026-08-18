@@ -9,10 +9,6 @@ use crate::infrastructure::process::subprocess::{FileProcessSupervisor, ProcessO
 /// usage may raise this reservation, but a small or incomplete sample must not
 /// make automatic admission more aggressive.
 const MIN_AGENT_MEMORY_BYTES: u64 = 2 * 1024 * 1024 * 1024;
-/// Automatic admission spends at most one quarter of the host resources visible
-/// to Refine, leaving the majority available to Docker, target apps, and other
-/// expensive work that is not under Refine's process supervision.
-const SHARED_HOST_BUDGET_DIVISOR: usize = 4;
 /// How long a sample stays current. The scheduler asks for policy about once a
 /// second; resampling that often would be wasted work, and host capacity does
 /// not move meaningfully at that resolution.
@@ -65,14 +61,19 @@ impl HostResources {
 
     /// How many agents this host should run concurrently.
     ///
-    /// Automatic admission reserves three quarters of detected logical cores
-    /// and currently available memory for shared-host work. A complete observed
+    /// Automatic admission spends the configured percentage of detected logical
+    /// cores and currently available memory. A complete observed
     /// workload can raise the two-GiB per-agent reservation, but never lower it.
     /// Unknown host memory permits one agent so unsupported or unreadable host
     /// telemetry cannot restore aggressive admission. Never returns zero:
     /// making no progress is worse than making slow progress.
-    pub fn recommended_agent_concurrency(&self, observed_agent_memory_bytes: Option<u64>) -> usize {
-        let by_cores = (self.cores / SHARED_HOST_BUDGET_DIVISOR).max(1);
+    pub fn recommended_agent_concurrency(
+        &self,
+        observed_agent_memory_bytes: Option<u64>,
+        resource_budget_percent: usize,
+    ) -> usize {
+        let resource_budget_percent = resource_budget_percent.clamp(1, 100);
+        let by_cores = percent_of_usize(self.cores, resource_budget_percent).max(1);
         let Some(available) = self.available_memory_bytes else {
             return 1;
         };
@@ -80,7 +81,7 @@ impl HostResources {
             .filter(|bytes| *bytes > 0)
             .unwrap_or(MIN_AGENT_MEMORY_BYTES)
             .max(MIN_AGENT_MEMORY_BYTES);
-        let memory_budget = available / SHARED_HOST_BUDGET_DIVISOR as u64;
+        let memory_budget = percent_of_u64(available, resource_budget_percent);
         let by_memory = (memory_budget / per_agent) as usize;
         by_cores.min(by_memory).max(1)
     }
@@ -95,6 +96,14 @@ impl HostResources {
         };
         free.saturating_sub(required_bytes) >= RESERVED_DISK_BYTES
     }
+}
+
+fn percent_of_usize(capacity: usize, percent: usize) -> usize {
+    ((capacity as u128).saturating_mul(percent as u128) / 100).min(usize::MAX as u128) as usize
+}
+
+fn percent_of_u64(capacity: u64, percent: usize) -> u64 {
+    ((capacity as u128).saturating_mul(percent as u128) / 100).min(u64::MAX as u128) as u64
 }
 
 /// Free space kept in reserve so that filling the disk degrades into a refusal
@@ -326,23 +335,25 @@ mod tests {
     use super::*;
 
     #[test]
-    fn automatic_concurrency_uses_one_quarter_of_host_capacity() {
+    fn automatic_concurrency_uses_default_percent_of_host_capacity() {
         let host = HostResources {
             cores: 32,
             available_memory_bytes: Some(128 * 1024 * 1024 * 1024),
             free_disk_bytes: Some(500 * 1024 * 1024 * 1024),
         };
-        assert_eq!(host.recommended_agent_concurrency(None), 8);
+        assert_eq!(host.recommended_agent_concurrency(None, 70), 22);
+        assert_eq!(host.recommended_agent_concurrency(None, 50), 16);
     }
 
     #[test]
-    fn automatic_concurrency_uses_one_quarter_of_available_memory() {
+    fn automatic_concurrency_uses_default_percent_of_available_memory() {
         let host = HostResources {
             cores: 32,
             available_memory_bytes: Some(24 * 1024 * 1024 * 1024),
             free_disk_bytes: Some(250 * 1024 * 1024 * 1024),
         };
-        assert_eq!(host.recommended_agent_concurrency(None), 3);
+        assert_eq!(host.recommended_agent_concurrency(None, 70), 8);
+        assert_eq!(host.recommended_agent_concurrency(None, 50), 6);
     }
 
     #[test]
@@ -353,8 +364,8 @@ mod tests {
             free_disk_bytes: None,
         };
         assert_eq!(
-            host.recommended_agent_concurrency(Some(128 * 1024 * 1024)),
-            8
+            host.recommended_agent_concurrency(Some(128 * 1024 * 1024), 70),
+            22
         );
     }
 
@@ -365,7 +376,7 @@ mod tests {
             available_memory_bytes: Some(0),
             free_disk_bytes: Some(0),
         };
-        assert_eq!(host.recommended_agent_concurrency(None), 1);
+        assert_eq!(host.recommended_agent_concurrency(None, 70), 1);
     }
 
     #[test]
@@ -375,7 +386,7 @@ mod tests {
             available_memory_bytes: None,
             free_disk_bytes: None,
         };
-        assert_eq!(host.recommended_agent_concurrency(None), 1);
+        assert_eq!(host.recommended_agent_concurrency(None, 70), 1);
         assert!(host.has_disk_headroom(u64::MAX));
     }
 
@@ -416,7 +427,7 @@ mod tests {
             available_memory_bytes: Some(32 * gib),
             free_disk_bytes: None,
         };
-        assert_eq!(host.recommended_agent_concurrency(observed), 2);
+        assert_eq!(host.recommended_agent_concurrency(observed, 70), 7);
     }
 
     #[test]
@@ -494,6 +505,12 @@ mod tests {
     fn sampling_the_real_host_reports_usable_values() {
         let host = HostResources::sample(&std::env::temp_dir());
         assert!(host.cores >= 1);
-        assert!(host.recommended_agent_concurrency(None) >= 1);
+        assert!(host.recommended_agent_concurrency(None, 70) >= 1);
+    }
+
+    #[test]
+    fn percentage_arithmetic_is_overflow_safe() {
+        assert_eq!(percent_of_usize(usize::MAX, 100), usize::MAX);
+        assert_eq!(percent_of_u64(u64::MAX, 100), u64::MAX);
     }
 }

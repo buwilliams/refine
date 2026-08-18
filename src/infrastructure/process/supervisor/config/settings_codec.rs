@@ -1,5 +1,7 @@
 use super::*;
 
+pub const AUTOMATIC_AGENT_RESOURCE_BUDGET_PERCENT_DEFAULT: usize = 70;
+
 pub(super) fn default_settings() -> JsonObject {
     // The concurrency caps are deliberately absent.
     //
@@ -12,6 +14,7 @@ pub(super) fn default_settings() -> JsonObject {
     let mut settings = JsonObject::new();
     for (key, value) in [
         ("branch_name_pattern", "refine/{goal_id}"),
+        ("automatic_agent_resource_budget_percent", "70"),
         ("agent_idle_timeout_seconds", "900"),
         ("agent_hard_cap_seconds", "7200"),
         ("agent_limit_pause_seconds", "60"),
@@ -70,6 +73,7 @@ pub(super) fn allowed_settings() -> BTreeSet<&'static str> {
         "parallel_per_node_cap",
         "parallel_per_provider_cap",
         "parallel_per_target_app_cap",
+        "automatic_agent_resource_budget_percent",
         "branch_name_pattern",
         "agent_idle_timeout_seconds",
         "agent_hard_cap_seconds",
@@ -234,6 +238,7 @@ pub(super) fn normalize_setting(key: &str, value: &Value) -> RefineResult<String
                 normalize_range(key, value, 1, 100)
             }
         }
+        "automatic_agent_resource_budget_percent" => normalize_range(key, value, 1, 100),
         "target_app_tcp_check_port" => {
             let text = as_string(value);
             if text.trim().is_empty() {
