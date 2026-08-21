@@ -74,6 +74,7 @@ fn projection_query_filters_sorts_and_pages_goals_and_features() {
         source_fingerprints: BTreeMap::new(),
         goals,
         features,
+        missions: BTreeMap::new(),
         activity,
         changes: BTreeMap::new(),
         dashboard: DashboardProjection::default(),

@@ -21,6 +21,7 @@ fn web_server_routes_work_goal_queries_through_projection() {
                 feature_id: Some("FEA1".to_string()),
                 feature_order: Some(1),
                 json_path: "goals/02/GOAL2/goal.json".to_string(),
+                mission: None,
             },
             node_display_name: Some("Node B".to_string()),
             latest_round_prompt: None,

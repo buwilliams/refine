@@ -1,0 +1,60 @@
+/* ---- Missions -------------------------------------------------------------- */
+
+.mission-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mission-detail-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mission-detail-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.mission-detail-title-row h2 {
+  margin: 0;
+}
+
+.mission-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.mission-detail-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.mission-new-card {
+  max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mission-new-card textarea {
+  min-height: 120px;
+}
+
+.missions-table .missions-col-status {
+  width: 140px;
+}
+
+.missions-table .missions-col-round,
+.missions-table .missions-col-wave {
+  width: 80px;
+}
+
+.missions-table .missions-col-outcome {
+  width: 110px;
+}

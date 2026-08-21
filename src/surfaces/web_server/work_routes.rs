@@ -78,6 +78,7 @@ mod file_terminal_routes;
 mod goal_routes;
 mod import_contract;
 mod import_routes;
+mod mission_routes;
 mod terminal_profiles;
 #[cfg(test)]
 mod tests;

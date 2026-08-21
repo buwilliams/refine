@@ -9,6 +9,7 @@ mod features;
 mod fleet;
 mod goals;
 mod logs;
+mod missions;
 mod nodes;
 mod projects;
 mod sync;
@@ -35,6 +36,8 @@ use goals::dispatch_goal_daemon;
 pub(super) use goals::resolve_merged_daemon_route;
 #[cfg(not(test))]
 use logs::dispatch_log_daemon;
+#[cfg(not(test))]
+use missions::dispatch_mission_daemon;
 #[cfg(not(test))]
 use nodes::dispatch_node_daemon;
 #[cfg(not(test))]
@@ -81,6 +84,7 @@ use crate::application::imports::FileImportService;
 use crate::application::maintenance::worktrees::{
     FileWorktreeCleanupService, WorktreeCleanupOptions,
 };
+use crate::application::missions::FileMissionService;
 use crate::application::operations::process_control::FileProcessControlService;
 use crate::application::persistence_sync::state::FileGitSyncService;
 use crate::application::projects::projection::{
@@ -150,6 +154,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         } => return sync::dispatch_daemon(preview, authority, paths),
         Commands::Goal { action } => return dispatch_goal_daemon(action),
         Commands::Feature { action } => return dispatch_feature_daemon(action),
+        Commands::Mission { action } => return dispatch_mission_daemon(action),
         Commands::Todo { action } => return dispatch_todo(action),
         Commands::Workflow { action } => return dispatch_workflow_daemon(action),
         Commands::Node { action } => return dispatch_node_daemon(action),
@@ -199,6 +204,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
         command @ Commands::Sync { .. } => sync::dispatch_command(command),
         command @ Commands::Goal { .. } => goals::dispatch_command(command),
         command @ Commands::Feature { .. } => features::dispatch_command(command),
+        command @ Commands::Mission { .. } => missions::dispatch_command(command),
         command @ Commands::Todo { .. } => todos::dispatch_command(command),
         command @ Commands::Workflow { .. } => workflow::dispatch_command(command),
     }
@@ -579,6 +585,11 @@ fn direct_work_item_service(target_root: &Path) -> RefineResult<FileWorkItemServ
     ))
 }
 
+fn direct_mission_service(target_root: &Path) -> RefineResult<FileMissionService> {
+    let refine_dir = refine_dir_for_target_root(target_root)?;
+    Ok(FileMissionService::new(refine_dir))
+}
+
 pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> {
     match command {
         Commands::Config { action } => match action {
@@ -654,6 +665,18 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
             | FeatureAction::Cancel { target_root, .. }
             | FeatureAction::Delete { target_root, .. } => target_root.as_ref(),
             FeatureAction::Import { target_root, .. } => Some(target_root),
+        },
+        Commands::Mission { action } => match action {
+            MissionAction::Create { target_root, .. }
+            | MissionAction::List { target_root }
+            | MissionAction::Show { target_root, .. }
+            | MissionAction::Edit { target_root, .. }
+            | MissionAction::Round { target_root, .. }
+            | MissionAction::Start { target_root, .. }
+            | MissionAction::ApprovePlan { target_root, .. }
+            | MissionAction::ApproveOutcome { target_root, .. }
+            | MissionAction::Cancel { target_root, .. }
+            | MissionAction::Outcome { target_root, .. } => target_root.as_ref(),
         },
         Commands::Todo { action } => match action {
             TodoAction::List { target_root, .. }

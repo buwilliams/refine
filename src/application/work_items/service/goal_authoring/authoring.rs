@@ -492,6 +492,7 @@ impl FileWorkItemService {
                 feature_id: feature_id.map(str::to_string),
                 feature_order: None,
                 json_path,
+                mission: None,
             },
             node_display_name: None,
             latest_round_prompt,

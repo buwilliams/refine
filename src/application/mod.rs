@@ -10,6 +10,7 @@ pub mod fleet;
 pub mod guidance;
 pub mod imports;
 pub mod maintenance;
+pub mod missions;
 pub mod operations;
 pub mod persistence_sync;
 pub mod projects;

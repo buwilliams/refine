@@ -11,6 +11,8 @@ const routes = {
   goals_new: renderGoalNew,
   goals_import: renderGoalImport,
   goals_plan: renderGoalPlan,
+  missions: renderMissionsList,
+  missions_new: renderMissionNew,
   logs: renderLogs,
   changes: renderChanges,
   settings: renderSettings,
@@ -37,6 +39,11 @@ function parseHash() {
     if (parts.length === 1) return { route: "features" };
     if (parts[1] === "new") return { route: "features_new" };
     return { route: "features_detail", id: parts[1] };
+  }
+  if (parts[0] === "missions") {
+    if (parts.length === 1) return { route: "missions" };
+    if (parts[1] === "new") return { route: "missions_new" };
+    return { route: "missions_detail", id: parts[1] };
   }
   if (parts[0] === "chat") return { route: "chat_redirect" };
   if (parts[0] === "logs") return { route: "logs" };
@@ -130,6 +137,15 @@ function navigate() {
     return;
   }
 
+  if (r.route === "missions_detail") {
+    state.currentRoute = "missions_detail";
+    state.currentGoal = null;
+    state.underlayHash = location.hash || "#/missions";
+    highlightNav("missions");
+    renderMissionDetail(r);
+    return;
+  }
+
   // Leaving a Goal detail modal — close it (without rewriting the hash,
   // since we're already moving to a different one).
   if (_goalModalRoot) closeGoalDetailModal({ navigateAway: false });
@@ -172,7 +188,8 @@ function highlightNav(route) {
     a.classList.toggle("active",
       r === route ||
       (r === "goals" && route.startsWith("goals")) ||
-      (r === "features" && route.startsWith("features")));
+      (r === "features" && route.startsWith("features")) ||
+      (r === "missions" && route.startsWith("missions")));
   }
 }
 

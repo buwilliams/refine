@@ -299,6 +299,7 @@ mod tests {
             feature_id: None,
             feature_order: None,
             json_path: format!("goals/{id}/goal.json"),
+            mission: None,
         }
     }
 }

@@ -84,9 +84,12 @@ impl FileProjectProjectionStore {
         let mut source_fingerprints = BTreeMap::new();
         let mut goals = BTreeMap::new();
         let mut features = BTreeMap::new();
+        let mut missions = BTreeMap::new();
         let goal_paths = Self::collect_json_files(&self.refine_dir.join("goals"), "goal.json")?;
         let feature_paths =
             Self::collect_json_files(&self.refine_dir.join("features"), "feature.json")?;
+        let mission_paths =
+            Self::collect_json_files(&self.refine_dir.join("missions"), "mission.json")?;
         let activity_path = self.refine_dir.join(ACTIVITY_LOG_FILE);
 
         for path in goal_paths {
@@ -106,6 +109,14 @@ impl FileProjectProjectionStore {
             }
         }
         features.extend(derive_features(&goals, feature_records));
+
+        for path in mission_paths {
+            let rel_path = self.relative_path(&path)?;
+            source_fingerprints.insert(rel_path.clone(), Self::metadata_fingerprint(&path)?);
+            if let Some(mission) = self.project_mission(&path)? {
+                missions.insert(mission.id.clone(), mission);
+            }
+        }
 
         let mut activity = self.project_activity()?;
         activity.extend(self.project_goal_round_activity(&goals)?);
@@ -132,6 +143,7 @@ impl FileProjectProjectionStore {
             source_fingerprints,
             goals,
             features,
+            missions,
             activity,
             changes,
             dashboard,

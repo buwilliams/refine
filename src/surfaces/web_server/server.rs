@@ -699,10 +699,67 @@ impl InProcessWebServer {
             return self.handle_chat_stop(request);
         }
 
+        if request.method == "POST" && request.path == "/work/missions" {
+            return self.handle_mission_create(request);
+        }
+
+        if request.method == "POST"
+            && request.path.starts_with("/work/missions/")
+            && request.path.ends_with("/rounds")
+        {
+            return self.handle_mission_round(request);
+        }
+
+        if request.method == "POST"
+            && request.path.starts_with("/work/missions/")
+            && request.path.ends_with("/start")
+        {
+            return self.handle_mission_start(request);
+        }
+
+        if request.method == "POST"
+            && request.path.starts_with("/work/missions/")
+            && request.path.ends_with("/approve-plan")
+        {
+            return self.handle_mission_approve_plan(request);
+        }
+
+        if request.method == "POST"
+            && request.path.starts_with("/work/missions/")
+            && request.path.ends_with("/approve-outcome")
+        {
+            return self.handle_mission_approve_outcome(request);
+        }
+
+        if request.method == "POST"
+            && request.path.starts_with("/work/missions/")
+            && request.path.ends_with("/cancel")
+        {
+            return self.handle_mission_cancel(request);
+        }
+
+        if request.method == "GET"
+            && request.path.starts_with("/work/missions/")
+            && request.path.ends_with("/outcome")
+        {
+            return self.handle_mission_outcome(request);
+        }
+
+        if request.method == "PATCH" && request.path.starts_with("/work/missions/") {
+            return self.handle_mission_update(request);
+        }
+
+        if request.method == "GET" && request.path.starts_with("/work/missions/") {
+            return self.handle_mission_show(request);
+        }
+
+        if request.method == "GET" && request.path == "/work/missions" {
+            return self.handle_missions_list(&raw_path);
+        }
+
         if request.method == "POST" && request.path == "/work/goals" {
             return self.handle_goal_create(request);
         }
-
         if request.method == "POST" && request.path == "/work/goals/bulk" {
             return self.handle_goal_bulk_update(request);
         }

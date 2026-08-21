@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 
 use crate::model::feature::FeatureRollup;
 use crate::model::goal::{GoalIndexProjection, GoalPriority};
+use crate::model::mission::MissionIndexProjection;
 use crate::model::workflow::GoalStatus;
 
 use super::deep_search::{goal_matches_deep_text, resident_text_is_complete};
@@ -16,6 +17,7 @@ pub trait ProjectionQuery {
     fn feature_rollup(&self, feature_id: &str) -> Option<FeatureRollup>;
     fn list_goals(&self, query: GoalProjectionQuery) -> GoalProjectionList;
     fn list_features(&self, query: FeatureProjectionQuery) -> FeatureProjectionList;
+    fn list_missions(&self, query: MissionProjectionQuery) -> MissionProjectionList;
     fn list_activity(&self, query: ActivityProjectionQuery) -> ActivityProjectionList;
     fn list_changes(&self, query: ChangeProjectionQuery) -> ChangeProjectionList;
     fn cache_path_for_port(&self, runtime_root: &Path, port: u16) -> PathBuf {
@@ -185,6 +187,31 @@ impl ProjectionQuery for ProjectionSnapshot {
             .collect();
         FeatureProjectionList {
             features,
+            total,
+            matching_ids,
+        }
+    }
+
+    fn list_missions(&self, query: MissionProjectionQuery) -> MissionProjectionList {
+        let mut rows = self
+            .missions
+            .values()
+            .filter(|projection| mission_matches(projection, &query))
+            .cloned()
+            .collect::<Vec<_>>();
+        sort_missions(&mut rows, &query.page.sort, &query.page.dir);
+        let total = rows.len();
+        let matching_ids = rows
+            .iter()
+            .map(|mission| mission.id.clone())
+            .collect::<Vec<_>>();
+        let missions = rows
+            .into_iter()
+            .skip(query.page.offset)
+            .take(query.page.limit)
+            .collect();
+        MissionProjectionList {
+            missions,
             total,
             matching_ids,
         }
@@ -600,7 +627,6 @@ fn feature_matches(projection: &FeatureSummaryProjection, query: &FeatureProject
     }
     true
 }
-
 fn goal_matches_node(owner: Option<&str>, node: &str, current_node_id: Option<&str>) -> bool {
     match node {
         "all" => true,
@@ -608,6 +634,86 @@ fn goal_matches_node(owner: Option<&str>, node: &str, current_node_id: Option<&s
         "unknown" => owner.is_none(),
         value => owner == Some(value),
     }
+}
+
+fn mission_matches(projection: &MissionIndexProjection, query: &MissionProjectionQuery) -> bool {
+    if query
+        .status
+        .as_ref()
+        .is_some_and(|status| &projection.status != status)
+    {
+        return false;
+    }
+    if query
+        .reporter
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .is_some_and(|reporter| projection.reporter.as_deref() != Some(reporter))
+    {
+        return false;
+    }
+    if query
+        .assignee
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .is_some_and(|assignee| projection.assignee.as_deref() != Some(assignee))
+    {
+        return false;
+    }
+    if query
+        .coordinator
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+        .is_some_and(|coordinator| projection.coordinator_node_id.as_deref() != Some(coordinator))
+    {
+        return false;
+    }
+    if query
+        .outcome
+        .is_some_and(|outcome| projection.outcome_available != outcome)
+    {
+        return false;
+    }
+    if let Some(q) = query.q.as_deref().filter(|value| !value.trim().is_empty()) {
+        let q = q.to_lowercase();
+        if !projection.id.to_lowercase().contains(&q)
+            && !projection.name.to_lowercase().contains(&q)
+            && !projection
+                .reporter
+                .as_deref()
+                .map(|reporter| reporter.to_lowercase().contains(&q))
+                .unwrap_or(false)
+            && !projection
+                .assignee
+                .as_deref()
+                .map(|assignee| assignee.to_lowercase().contains(&q))
+                .unwrap_or(false)
+        {
+            return false;
+        }
+    }
+    true
+}
+
+fn sort_missions(rows: &mut [MissionIndexProjection], sort: &str, dir: &str) {
+    rows.sort_by(|a, b| {
+        let ordering = match sort {
+            "name" => a.name.cmp(&b.name),
+            "status" => a.status.cmp(&b.status),
+            "reporter" => a.reporter.cmp(&b.reporter),
+            "assignee" => a.assignee.cmp(&b.assignee),
+            "coordinator" => a.coordinator_node_id.cmp(&b.coordinator_node_id),
+            "created" => a.created.cmp(&b.created),
+            "id" => a.id.cmp(&b.id),
+            _ => a.updated.cmp(&b.updated),
+        }
+        .then_with(|| a.id.cmp(&b.id));
+        if dir == "asc" {
+            ordering
+        } else {
+            ordering.reverse()
+        }
+    });
 }
 
 fn sort_goals(rows: &mut [GoalIndexProjection], sort: &str, dir: &str) {

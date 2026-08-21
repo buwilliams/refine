@@ -8,6 +8,7 @@ mod cli_surface {
     pub(super) mod fleet;
     pub(super) mod goals;
     pub(super) mod logs;
+    pub(super) mod missions;
     pub(super) mod nodes;
     pub(super) mod projects;
     pub(super) mod system_diagnostics;
@@ -31,6 +32,7 @@ use cli_surface::features::*;
 use cli_surface::fleet::*;
 use cli_surface::goals::*;
 use cli_surface::logs::*;
+use cli_surface::missions::*;
 use cli_surface::nodes::*;
 use cli_surface::projects::*;
 use cli_surface::system_diagnostics::*;
@@ -54,6 +56,7 @@ fn cli_surface_suite() {
     goal_cancel_uses_active_node_and_rejects_foreign_owner(&fixture);
     feature_create_membership_rollup_and_delete(&fixture);
     feature_show_edit_reorder_move_cancel_and_import(&fixture);
+    mission_create_list_show_start_cancel(&fixture);
     todo_commands_share_reporter_scoped_api_capability(&fixture);
     node_create_activate_archive(&fixture);
     node_show_rename_settings_and_transfer(&fixture);

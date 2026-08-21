@@ -247,6 +247,24 @@ registerCommand({
 });
 
 registerCommand({
+  id: "mission.new",
+  title: "New Mission",
+  group: "Create",
+  aliases: ["new-mission", "mission"],
+  keywords: ["create", "outcome", "governed"],
+  run: () => navigateCommand("#/missions/new"),
+});
+
+registerCommand({
+  id: "mission.open",
+  title: "Open Missions",
+  group: "Navigate",
+  aliases: ["missions", "mission-list"],
+  keywords: ["outcome", "governed"],
+  run: () => navigateCommand("#/missions"),
+});
+
+registerCommand({
   id: "goal.import",
   title: "Import",
   group: "Create",

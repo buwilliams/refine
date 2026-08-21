@@ -56,6 +56,17 @@ impl FileProjectProjectionStore {
                 feature_id: nullable_text(object.get("feature_id")),
                 feature_order: nullable_i64(object.get("feature_order")),
                 json_path: rel_path,
+                mission: object
+                    .get("mission")
+                    .and_then(Value::as_object)
+                    .and_then(|mission| {
+                        let mission_id = mission.get("mission_id")?.as_str()?;
+                        let mission_goal_key = mission.get("mission_goal_key")?.as_str()?;
+                        Some(crate::model::mission::MissionGoalBinding {
+                            mission_id: mission_id.to_string(),
+                            mission_goal_key: mission_goal_key.to_string(),
+                        })
+                    }),
             },
             node_display_name: None,
             latest_round_prompt,

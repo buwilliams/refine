@@ -300,6 +300,7 @@ mod tests {
             feature_id: Some("FEA1".to_string()),
             feature_order,
             json_path: format!("goals/{id}/goal.json"),
+            mission: None,
         }
     }
 }

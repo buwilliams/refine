@@ -6,6 +6,7 @@ pub mod feature;
 pub mod fleet;
 pub mod goal;
 pub mod log;
+pub mod mission;
 pub mod node;
 pub mod project;
 pub mod workflow;

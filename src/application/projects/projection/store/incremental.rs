@@ -23,6 +23,8 @@ pub(super) struct SourceDelta {
     pub(super) goals_removed: Vec<String>,
     pub(super) features_changed: Vec<String>,
     pub(super) features_removed: Vec<String>,
+    pub(super) missions_changed: Vec<String>,
+    pub(super) missions_removed: Vec<String>,
     pub(super) activity_changed: bool,
     pub(super) git_head_changed: bool,
     pub(super) fingerprints: BTreeMap<String, SourceFingerprint>,
@@ -34,6 +36,8 @@ impl SourceDelta {
             && self.goals_removed.is_empty()
             && self.features_changed.is_empty()
             && self.features_removed.is_empty()
+            && self.missions_changed.is_empty()
+            && self.missions_removed.is_empty()
             && !self.activity_changed
             && !self.git_head_changed
     }
@@ -63,6 +67,7 @@ impl FileProjectProjectionStore {
         let mut delta = SourceDelta::default();
         let mut observed_goal_paths = BTreeSet::new();
         let mut observed_feature_paths = BTreeSet::new();
+        let mut observed_mission_paths = BTreeSet::new();
 
         for path in Self::collect_json_files(&self.refine_dir.join("goals"), "goal.json")? {
             let rel_path = self.relative_path(&path)?;
@@ -89,6 +94,19 @@ impl FileProjectProjectionStore {
                 delta.features_changed.push(rel_path.clone());
             }
             observed_feature_paths.insert(rel_path.clone());
+            delta.fingerprints.insert(rel_path, fingerprint);
+        }
+
+        for path in Self::collect_json_files(&self.refine_dir.join("missions"), "mission.json")? {
+            let rel_path = self.relative_path(&path)?;
+            let fingerprint = Self::metadata_fingerprint(&path)?;
+            if !expected
+                .get(&rel_path)
+                .is_some_and(|previous| fingerprint_matches(previous, &fingerprint))
+            {
+                delta.missions_changed.push(rel_path.clone());
+            }
+            observed_mission_paths.insert(rel_path.clone());
             delta.fingerprints.insert(rel_path, fingerprint);
         }
 
@@ -140,6 +158,8 @@ impl FileProjectProjectionStore {
                 delta.goals_removed.push(rel_path.clone());
             } else if rel_path.ends_with("/feature.json") {
                 delta.features_removed.push(rel_path.clone());
+            } else if rel_path.ends_with("/mission.json") {
+                delta.missions_removed.push(rel_path.clone());
             } else if rel_path.ends_with("logs.jsonl") || rel_path.ends_with(ACTIVITY_LOG_FILE) {
                 delta.activity_changed = true;
             } else if rel_path != "git:HEAD" {
@@ -202,6 +222,20 @@ impl FileProjectProjectionStore {
         // Rollups depend on every Goal in the Feature, so they are rederived
         // even for Features whose own record did not change.
         snapshot.features = derive_features(&snapshot.goals, feature_records);
+
+        for rel_path in &delta.missions_removed {
+            snapshot
+                .missions
+                .retain(|_, projection| projection.json_path != *rel_path);
+        }
+        for rel_path in &delta.missions_changed {
+            snapshot
+                .missions
+                .retain(|_, projection| projection.json_path != *rel_path);
+            if let Some(mission) = self.project_mission(&self.refine_dir.join(rel_path))? {
+                snapshot.missions.insert(mission.id.clone(), mission);
+            }
+        }
 
         // Activity is derived from which Goals exist and what their sidecars
         // contain, so editing a Goal record cannot affect it. Rescanning only

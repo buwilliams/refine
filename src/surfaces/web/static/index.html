@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="/static/css/common.css">
   <link rel="stylesheet" href="/static/css/modals.css">
   <link rel="stylesheet" href="/static/css/goals.css">
+  <link rel="stylesheet" href="/static/css/missions.css">
   <link rel="stylesheet" href="/static/css/guide.css">
   <link rel="stylesheet" href="/static/css/toolbar.css">
   <link rel="stylesheet" href="/static/css/toolbar-todo.css">
@@ -26,6 +27,7 @@
     </a>
     <nav class="nav" data-testid="primary-nav">
       <a href="#/" data-route="dashboard" data-node-scope-destination="dashboard" data-testid="nav-dashboard">Dashboard</a>
+      <a href="#/missions" data-route="missions" data-testid="nav-missions">Missions</a>
       <a href="#/features" data-route="features" data-testid="nav-features">Features</a>
       <a href="#/goals" data-route="goals" data-node-scope-destination="goals" data-testid="nav-goals">Goals</a>
       <a href="#/changes" data-route="changes" data-testid="nav-changes">Changes</a>
@@ -153,6 +155,7 @@
         <details class="nav-menu nav-create-menu" id="nav-create-menu">
           <summary class="btn nav-action nav-create-more" aria-label="More create actions" data-testid="create-menu-toggle"></summary>
           <div class="nav-menu-panel nav-create-panel">
+            <a class="nav-menu-item" href="#/missions/new" id="btn-new-mission" data-testid="nav-new-mission">New Mission</a>
             <a class="nav-menu-item" href="#/features/new" id="btn-new-feature" data-testid="nav-new-feature">New Feature</a>
             <a class="nav-menu-item" href="#/goals/import" id="btn-import" data-testid="nav-import-goals">Import</a>
             <a class="nav-menu-item" href="https://github.com/buwilliams/refine/issues/new"
@@ -190,6 +193,9 @@
   <script src="/static/js/features/dashboard.js"></script>
   <script src="/static/js/features/feature-goal-inline.js"></script>
   <script src="/static/js/features/features.js"></script>
+  <script src="/static/js/features/missions-list.js"></script>
+  <script src="/static/js/features/missions-new.js"></script>
+  <script src="/static/js/features/missions-detail.js"></script>
   <script src="/static/js/features/goals-list.js"></script>
   <script src="/static/js/features/goals-bulk.js"></script>
   <script src="/static/js/features/goals-detail.js"></script>

@@ -80,7 +80,7 @@ pub fn record_lock_key(path: &Path) -> String {
         .map(|component| component.as_os_str().to_string_lossy().into_owned())
         .collect::<Vec<_>>();
     for (index, component) in components.iter().enumerate() {
-        if matches!(component.as_str(), "goals" | "features") {
+        if matches!(component.as_str(), "goals" | "features" | "missions") {
             let identity = components
                 .get(index + 1..components.len().saturating_sub(1))
                 .unwrap_or_default()

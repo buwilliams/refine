@@ -241,6 +241,36 @@ pub fn tool_catalog() -> Vec<McpTool> {
             },
         },
         McpTool {
+            name: "refine_list_missions",
+            description: "List Missions (governed system-level outcomes) for the active app.",
+            input_schema: empty_schema,
+            binding: ToolBinding::Api {
+                method: "GET",
+                path: "/work/missions",
+                path_params: &[],
+            },
+        },
+        McpTool {
+            name: "refine_show_mission",
+            description: "Show authoritative Mission detail by id, including Rounds, plan, snapshots, and current workflow state.",
+            input_schema: mission_id_schema,
+            binding: ToolBinding::Api {
+                method: "GET",
+                path: "/work/missions/{mission_id}",
+                path_params: &["mission_id"],
+            },
+        },
+        McpTool {
+            name: "refine_show_mission_outcome",
+            description: "Read a Mission's published Outcome manifest by id.",
+            input_schema: mission_id_schema,
+            binding: ToolBinding::Api {
+                method: "GET",
+                path: "/work/missions/{mission_id}/outcome",
+                path_params: &["mission_id"],
+            },
+        },
+        McpTool {
             name: "refine_next",
             description: "Recommend the next operations for the active project and its fleet, each with the exact CLI command to run. Start here when deciding what to do: it reports failed nodes, work that should be distributed, and reviewable work waiting to converge.",
             input_schema: empty_schema,
@@ -277,6 +307,20 @@ fn goal_id_schema() -> Value {
             },
         },
         "required": ["goal_id"],
+        "additionalProperties": false,
+    })
+}
+
+fn mission_id_schema() -> Value {
+    json!({
+        "type": "object",
+        "properties": {
+            "mission_id": {
+                "type": "string",
+                "description": "Mission identifier",
+            },
+        },
+        "required": ["mission_id"],
         "additionalProperties": false,
     })
 }

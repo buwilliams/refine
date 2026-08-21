@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::model::log::RoundLogEntry;
+use crate::model::mission::{GoalContribution, GoalRoundMissionContext, MissionGoalBinding};
 use crate::model::workflow::GoalStatus;
 use crate::model::{JsonObject, Timestamp};
 
@@ -53,6 +54,10 @@ pub struct Goal {
     pub updated: Timestamp,
     pub notes: Vec<GoalNote>,
     pub rounds: Vec<GoalRound>,
+    /// Optional Mission membership. Mission membership is authoritative on
+    /// Goal; Mission stores no competing mutable member list.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mission: Option<MissionGoalBinding>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -72,6 +77,9 @@ pub struct GoalIndexProjection {
     pub feature_id: Option<String>,
     pub feature_order: Option<i64>,
     pub json_path: String,
+    /// Optional Mission membership, projected from the Goal record.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mission: Option<MissionGoalBinding>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -124,6 +132,12 @@ pub struct GoalRound {
     pub governance: Option<RoundGovernance>,
     pub quality: Option<RoundQuality>,
     pub logs: Vec<RoundLogEntry>,
+    /// Typed Mission context binding for a Mission-bound GoalRound.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mission_context: Option<GoalRoundMissionContext>,
+    /// A Mission-bound GoalRound's settled contribution.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mission_contribution: Option<GoalContribution>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

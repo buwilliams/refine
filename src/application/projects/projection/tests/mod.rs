@@ -38,6 +38,7 @@ fn goal_projection(id: &str, status: GoalStatus, node_id: Option<&str>) -> GoalS
             feature_id: None,
             feature_order: None,
             json_path: format!("{id}/goal.json"),
+            mission: None,
         },
         node_display_name: None,
         latest_round_prompt: None,

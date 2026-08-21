@@ -18,6 +18,7 @@ use crate::infrastructure::storage::project_layout::target_root_for_refine_dir;
 use crate::model::feature::{FeatureIndexProjection, FeatureRollup, compare_feature_goal_order};
 use crate::model::goal::GoalIndexProjection;
 use crate::model::log::{ActivityEntry, RoundLogEntry};
+use crate::model::mission::{MissionCriteriaSummary, MissionIndexProjection, MissionStatus};
 use crate::model::workflow::GoalStatus;
 
 use super::helpers::*;
@@ -76,6 +77,7 @@ mod features;
 mod goals;
 mod helpers;
 mod incremental;
+mod missions;
 mod projection_store;
 
 use helpers::*;

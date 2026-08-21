@@ -54,6 +54,9 @@ fn tools_list_exposes_the_catalog() {
     assert!(names.contains(&"refine_export_goal_jira"));
     assert!(names.contains(&"refine_stop_process"));
     assert!(names.contains(&"refine_request"));
+    assert!(names.contains(&"refine_list_missions"));
+    assert!(names.contains(&"refine_show_mission"));
+    assert!(names.contains(&"refine_show_mission_outcome"));
     // Every advertised tool must carry an input schema.
     assert!(tools.iter().all(|tool| tool["inputSchema"].is_object()));
 }

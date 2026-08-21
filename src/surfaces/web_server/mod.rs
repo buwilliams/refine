@@ -40,7 +40,7 @@ pub const API_GROUPS: &[ApiRouteGroup] = &[
     },
     ApiRouteGroup {
         prefix: "/work",
-        capability: "Goals, Features, imports, state transitions",
+        capability: "Goals, Features, Missions, imports, state transitions",
     },
     ApiRouteGroup {
         prefix: "/activity",
