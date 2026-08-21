@@ -495,6 +495,9 @@ impl FileWorkItemService {
         for key in [
             "agent_context",
             "guidance_decision",
+            "mission_context",
+            "mission_capsule",
+            "mission_contribution",
             "rule_state",
             "meta_rule_state",
             "product_state",

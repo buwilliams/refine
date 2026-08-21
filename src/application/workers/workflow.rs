@@ -61,6 +61,23 @@ pub(super) fn run_workflow_worker(
                     eprintln!("refine workflow runner: {error}");
                 }
             }
+            // Mission readiness is evaluated alongside Goal readiness; the
+            // engine advances at most one Mission per tick through one
+            // fenced transition or one-shot agent phase.
+            match crate::application::missions::MissionWorkflowEngine::new(
+                runtime_root,
+                &target_root,
+            )
+            .evaluate_missions()
+            {
+                Ok(evaluation) if evaluation.advanced.is_some() => {
+                    let _ = refresh_projection(runtime_root, &target_root);
+                }
+                Ok(_) => {}
+                Err(error) => {
+                    eprintln!("refine mission runner: {error}");
+                }
+            }
         }
         thread::sleep(WORKFLOW_INTERVAL);
     }

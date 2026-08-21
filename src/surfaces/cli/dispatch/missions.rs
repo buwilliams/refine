@@ -211,6 +211,39 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
             );
             Ok(())
         }
+        Commands::Mission {
+            action:
+                MissionAction::Contribute {
+                    goal,
+                    file,
+                    target_root: Some(target_root),
+                },
+        } => {
+            let contribution = fs::read_to_string(&file).map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to read contribution file {}: {error}",
+                    file.display()
+                ))
+            })?;
+            let contribution: crate::model::mission::GoalContribution =
+                serde_json::from_str(&contribution).map_err(|error| {
+                    RefineError::InvalidInput(format!(
+                        "contribution file {} is not valid contribution JSON: {error}",
+                        file.display()
+                    ))
+                })?;
+            let refine_dir =
+                crate::infrastructure::storage::project_layout::refine_dir_for_target_root(
+                    &target_root,
+                )?;
+            let work_items = crate::application::work_items::FileWorkItemService::new(&refine_dir);
+            let goal = work_items.settle_goal_mission_contribution(&goal, contribution)?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({"goal": goal})).unwrap()
+            );
+            Ok(())
+        }
         Commands::Mission { action } => dispatch_mission_daemon(action),
         _ => unreachable!("command family was routed incorrectly"),
     }
@@ -308,6 +341,38 @@ pub(super) fn dispatch_mission_daemon(action: MissionAction) -> RefineResult<()>
             &format!("/work/missions/{}/cancel", path_segment(&id)),
             None,
         )?,
+        MissionAction::Advance {
+            id,
+            target_root: None,
+        } => daemon_json(
+            "POST",
+            &format!("/work/missions/{}/advance", path_segment(&id)),
+            None,
+        )?,
+        MissionAction::Contribute {
+            goal,
+            file,
+            target_root: None,
+        } => {
+            let contribution = fs::read_to_string(&file).map_err(|error| {
+                RefineError::Io(format!(
+                    "failed to read contribution file {}: {error}",
+                    file.display()
+                ))
+            })?;
+            let contribution: serde_json::Value =
+                serde_json::from_str(&contribution).map_err(|error| {
+                    RefineError::InvalidInput(format!(
+                        "contribution file {} is not valid JSON: {error}",
+                        file.display()
+                    ))
+                })?;
+            daemon_json(
+                "POST",
+                &format!("/work/goals/{}/mission-contribution", path_segment(&goal)),
+                Some(json!({ "contribution": contribution })),
+            )?
+        }
         MissionAction::Outcome {
             id,
             target_root: None,

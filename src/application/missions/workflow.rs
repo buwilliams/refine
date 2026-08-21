@@ -483,6 +483,58 @@ impl FileMissionService {
         parse_mission(&written)
     }
 
+    /// Fail the current Round with a recorded reason. A Failed Round is
+    /// immutable; continuing the Mission appends a new Round with an
+    /// explicit recovery request.
+    pub fn fail_round(&self, mission_id: &str, round: &str, reason: &str) -> RefineResult<Mission> {
+        let mission_id = mission_id.trim().to_uppercase();
+        let mut value = self.show_mission_value(&mission_id)?;
+        let object = value.as_object_mut().ok_or_else(|| {
+            RefineError::Serialization(format!("Mission {mission_id} is not a JSON object"))
+        })?;
+        let current_round = object
+            .get("current_round")
+            .and_then(Value::as_u64)
+            .map(|round| round as usize)
+            .ok_or_else(|| {
+                RefineError::InvalidInput(format!("Mission {mission_id} has no current Round"))
+            })?;
+        if round != current_round.to_string() {
+            return Err(RefineError::Conflict(format!(
+                "Mission {mission_id} current Round is {current_round}, not {round}"
+            )));
+        }
+        let rounds = object
+            .get_mut("rounds")
+            .and_then(Value::as_array_mut)
+            .ok_or_else(|| {
+                RefineError::Serialization(format!("Mission {mission_id} has no rounds array"))
+            })?;
+        let round_value = rounds
+            .iter_mut()
+            .find(|round| round.get("number").and_then(Value::as_u64) == Some(current_round as u64))
+            .ok_or_else(|| {
+                RefineError::NotFound(format!(
+                    "Mission {mission_id} Round {current_round} was not found"
+                ))
+            })?;
+        let round_object = round_value.as_object_mut().ok_or_else(|| {
+            RefineError::Serialization("MissionRound is not a JSON object".to_string())
+        })?;
+        round_object.insert(
+            "failure".to_string(),
+            serde_json::json!({
+                "reason": reason,
+                "created": Self::now_timestamp(),
+            }),
+        );
+        round_object.insert("updated".to_string(), Value::String(Self::now_timestamp()));
+        object.insert("status".to_string(), Value::String("failed".to_string()));
+        object.insert("updated".to_string(), Value::String(Self::now_timestamp()));
+        let written = write_mission_atomically(&self.refine_dir, &mission_id, &value)?;
+        parse_mission(&written)
+    }
+
     /// Compile a scoped, deterministic context capsule for a Goal specification
     /// from the selected MissionSnapshot.
     ///

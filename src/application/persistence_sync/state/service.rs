@@ -1208,6 +1208,18 @@ impl FileGitSyncService {
         Ok(output.success.then_some(output.stdout))
     }
 
+    /// Read one state path's exact bytes back from a state commit. The
+    /// consumer of a publication receipt uses this to prove the committed
+    /// bytes match what was written; `None` means the path is absent at that
+    /// commit.
+    pub fn state_bytes_at_commit(
+        &self,
+        commitish: &str,
+        path: &str,
+    ) -> RefineResult<Option<Vec<u8>>> {
+        self.state_bytes_at(&self.target_root, commitish, path)
+    }
+
     /// The baseline system is gone: `git merge-base` is the baseline, shared
     /// and durable by construction. The first sync of an upgraded node
     /// retires the legacy fingerprint file and its retained anchor refs.

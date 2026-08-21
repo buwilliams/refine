@@ -1069,23 +1069,32 @@ fn deterministic_assertion_id(
     opened: &OpenedAttempt,
     assertion: &KnowledgeAssertion,
 ) -> RefineResult<String> {
+    deterministic_assertion_id_for(
+        &opened.mission.id,
+        opened.mission.current_round.unwrap_or(0),
+        opened.parent_snapshot,
+        assertion,
+    )
+}
+
+/// The standalone deterministic assertion identity used outside a fenced
+/// reconciliation attempt (for example the investigation snapshot), so ids
+/// derive the same way everywhere: content, Mission, Round, and parent
+/// snapshot.
+pub fn deterministic_assertion_id_for(
+    mission_id: &str,
+    round: usize,
+    parent_snapshot: usize,
+    assertion: &KnowledgeAssertion,
+) -> RefineResult<String> {
     let mut value = serde_json::to_value(assertion).map_err(|error| {
         RefineError::Serialization(format!("failed to encode assertion: {error}"))
     })?;
     if let Some(object) = value.as_object_mut() {
         object.insert("assertion_id".to_string(), Value::String(String::new()));
-        object.insert(
-            "mission".to_string(),
-            Value::String(opened.mission.id.clone()),
-        );
-        object.insert(
-            "round".to_string(),
-            Value::from(opened.mission.current_round.unwrap_or(0)),
-        );
-        object.insert(
-            "parent_snapshot".to_string(),
-            Value::from(opened.parent_snapshot),
-        );
+        object.insert("mission".to_string(), Value::String(mission_id.to_string()));
+        object.insert("round".to_string(), Value::from(round));
+        object.insert("parent_snapshot".to_string(), Value::from(parent_snapshot));
     }
     Ok(format!(
         "a{}",
@@ -1113,6 +1122,13 @@ fn hex_digest(bytes: &[u8]) -> String {
         .iter()
         .map(|byte| format!("{byte:02x}"))
         .collect()
+}
+
+/// A bare sha256 digest over arbitrary canonical bytes, used for
+/// contribution digests and other content identities outside the snapshot
+/// shape.
+pub fn compute_snapshot_digest_bytes(bytes: &[u8]) -> String {
+    format!("sha256:{}", hex_digest(bytes))
 }
 
 #[cfg(test)]

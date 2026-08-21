@@ -97,6 +97,28 @@ pub enum MissionAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
+    /// Advance one Mission by one engine step (investigation, wave
+    /// admission, reconciliation, synthesis, quality, governance, or
+    /// consolidation).
+    Advance {
+        /// Mission id.
+        id: String,
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
+        target_root: Option<PathBuf>,
+    },
+    /// Settle a Mission contribution for a Goal at Review with valid
+    /// evidence.
+    Contribute {
+        /// Goal id.
+        goal: String,
+        /// File containing the contribution JSON.
+        #[arg(long)]
+        file: PathBuf,
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
+        target_root: Option<PathBuf>,
+    },
     /// Read a Mission's published Outcome.
     Outcome {
         /// Mission id.

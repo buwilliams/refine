@@ -1,14 +1,16 @@
 use serde_json::json;
 
 use crate::application::missions::FileMissionService;
+use crate::application::missions::runner::MissionWorkflowEngine;
 use crate::application::projects::projection::{
     MissionProjectionQuery, PageRequest, ProjectionQuery,
 };
-use crate::model::mission::{MissionPlan, MissionStatus};
+use crate::application::work_items::FileWorkItemService;
+use crate::model::mission::{GoalContribution, MissionPlan, MissionStatus};
 
 use super::{
     ApiRequest, ApiResponse, InProcessWebServer, Value, bounded_query_usize, error_response,
-    query_param, target_root_unavailable,
+    query_param, runtime_root_unavailable, target_root_unavailable,
 };
 
 impl InProcessWebServer {
@@ -375,6 +377,101 @@ impl InProcessWebServer {
             observed_revision,
         ) {
             Ok(mission) => ApiResponse::json(200, json!({"mission": mission})),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(crate) fn handle_mission_advance(&self, request: ApiRequest) -> ApiResponse {
+        let Some(target_root) = self.target_root.clone() else {
+            return target_root_unavailable("advance Missions");
+        };
+        let Some(runtime_root) = self.runtime_root.clone() else {
+            return runtime_root_unavailable("advance Missions");
+        };
+        let Some(mission_id) = self.mission_id_from_path(&request.path, "/advance") else {
+            return ApiResponse::json(
+                404,
+                json!({
+                    "error": {
+                        "code": "not_found",
+                        "message": "Mission advance route requires a Mission id"
+                    }
+                }),
+            );
+        };
+        let refine_dir = require_refine_dir!(self, "advance Missions");
+        let service = self.mission_service(&refine_dir);
+        let engine = MissionWorkflowEngine::new(&runtime_root, &target_root);
+        match engine.evaluate_one(&service, mission_id) {
+            Ok(Some(detail)) => {
+                let mission = match service.show_mission(mission_id) {
+                    Ok(mission) => mission,
+                    Err(error) => return error_response(error),
+                };
+                ApiResponse::json(
+                    200,
+                    json!({"mission": mission, "advanced": true, "detail": detail}),
+                )
+            }
+            Ok(None) => {
+                let mission = match service.show_mission(mission_id) {
+                    Ok(mission) => mission,
+                    Err(error) => return error_response(error),
+                };
+                ApiResponse::json(200, json!({"mission": mission, "advanced": false}))
+            }
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(crate) fn handle_goal_mission_contribution(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "settle Mission contributions");
+        let Some(goal_id) = request
+            .path
+            .strip_prefix("/work/goals/")
+            .and_then(|rest| rest.strip_suffix("/mission-contribution"))
+            .filter(|id| !id.is_empty() && !id.contains('/'))
+        else {
+            return ApiResponse::json(
+                404,
+                json!({
+                    "error": {
+                        "code": "not_found",
+                        "message": "Mission contribution route requires a Goal id"
+                    }
+                }),
+            );
+        };
+        let Some(body) = request.body.as_ref() else {
+            return ApiResponse::json(
+                400,
+                json!({
+                    "error": {
+                        "code": "invalid_body",
+                        "message": "a contribution body is required"
+                    }
+                }),
+            );
+        };
+        let contribution = match serde_json::from_value::<GoalContribution>(
+            body.get("contribution").cloned().unwrap_or_default(),
+        ) {
+            Ok(contribution) => contribution,
+            Err(error) => {
+                return ApiResponse::json(
+                    400,
+                    json!({
+                        "error": {
+                            "code": "invalid_contribution",
+                            "message": format!("body.contribution is invalid: {error}")
+                        }
+                    }),
+                );
+            }
+        };
+        let work_items = FileWorkItemService::new(&refine_dir);
+        match work_items.settle_goal_mission_contribution(goal_id, contribution) {
+            Ok(goal) => ApiResponse::json(200, json!({"goal": goal})),
             Err(error) => error_response(error),
         }
     }

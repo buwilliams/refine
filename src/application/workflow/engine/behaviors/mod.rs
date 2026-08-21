@@ -1981,7 +1981,14 @@ fn goal_agent_context(
         .filter(|item| item.get("enabled").and_then(Value::as_bool) != Some(false))
         .cloned()
         .collect::<Vec<_>>();
-    Ok(json!({
+    // A Mission-bound GoalRound carries its pinned capsule; the capsule is
+    // frozen inside the agent context exactly like every other member and a
+    // later Mission update never changes an active GoalRound.
+    let mission_capsule = current_round
+        .get("mission_capsule")
+        .filter(|capsule| !capsule.is_null())
+        .cloned();
+    let mut context = json!({
         "version": 1,
         "assembled_at": now_timestamp(),
         "governance": {
@@ -1995,7 +2002,13 @@ fn goal_agent_context(
         "goal": goal_context,
         "previous_rounds": previous_rounds,
         "current_round": round_agent_context(current_round, round_idx),
-    }))
+    });
+    if let Some(capsule) = mission_capsule {
+        if let Some(object) = context.as_object_mut() {
+            object.insert("mission".to_string(), capsule);
+        }
+    }
+    Ok(context)
 }
 
 const CODE_FILE_GUIDANCE_RULE: &str =

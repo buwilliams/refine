@@ -676,6 +676,8 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
             | MissionAction::ApprovePlan { target_root, .. }
             | MissionAction::ApproveOutcome { target_root, .. }
             | MissionAction::Cancel { target_root, .. }
+            | MissionAction::Advance { target_root, .. }
+            | MissionAction::Contribute { target_root, .. }
             | MissionAction::Outcome { target_root, .. } => target_root.as_ref(),
         },
         Commands::Todo { action } => match action {

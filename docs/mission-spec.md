@@ -1,6 +1,6 @@
 # Mission Specification
 
-Status: proposed design
+Status: implemented through consolidation (agent phases, Goal materialization, wave admission, contribution settlement, reconciliation, synthesis, Quality, Governance, and the two-commit Outcome read-back); fleet distribution compilation and Mission prompt-template browser surfaces remain
 Scope: Mission model, workflow, Goal composition, durable artifacts, and Refine surface changes
 Target: one attached Target App and its existing Git-backed Refine state
 

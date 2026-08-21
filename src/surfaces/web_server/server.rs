@@ -738,6 +738,20 @@ impl InProcessWebServer {
             return self.handle_mission_cancel(request);
         }
 
+        if request.method == "POST"
+            && request.path.starts_with("/work/missions/")
+            && request.path.ends_with("/advance")
+        {
+            return self.handle_mission_advance(request);
+        }
+
+        if request.method == "POST"
+            && request.path.starts_with("/work/goals/")
+            && request.path.ends_with("/mission-contribution")
+        {
+            return self.handle_goal_mission_contribution(request);
+        }
+
         if request.method == "GET"
             && request.path.starts_with("/work/missions/")
             && request.path.ends_with("/outcome")

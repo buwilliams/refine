@@ -31,8 +31,10 @@ Current implementation details that matter to intent:
 - A GoalRound is affected by an invalidation only if its pinned capsule actually included the invalidated assertion.
 - Wave boundaries should produce near-zero human interrupts; recurring decision volume is a plan-quality signal, not a world problem.
 - Late evidence is never lost: it carries to the next boundary, and a mandatory sweep precedes synthesis.
+- Agent phases (investigation, reduction, criticism, synthesis, holistic quality, governance) run as one-shot supervised operations with stable ownership and typed structured-output contracts; the engine, not the agents, assigns ids, enforces authority, and publishes.
+- Final approval triggers deterministic consolidation: the Outcome manifest is written, proven from its state commit by Git read-back, recorded in a publication receipt, and exposed Done only after the terminal record is durably synchronized.
 
-Future work should preserve these properties while deeper execution phases (agent-invoked investigation, synthesis, fleet distribution) are built out.
+Future work should preserve these properties while remaining phases (fleet distribution compilation, deeper Goal-agent contribution contracts) are built out.
 
 ## Future Direction
 
