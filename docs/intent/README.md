@@ -6,6 +6,7 @@
   - [Models](02-model/02-models.md)
   - [Target App](02-model/03-target-app.md)
   - [Fleet](02-model/04-fleet.md)
+  - [Mission](02-model/05-mission.md)
 - Application
   - Agents
     - [Overview](03-application/01-agents/00-overview.md)

@@ -287,16 +287,13 @@ fn derive(
         );
     }
     for premise in &assertion.derived_from {
-        let (state, reason) = derive(premise, ledger, invalidated_sources, depth + 1);
+        let (state, _) = derive(premise, ledger, invalidated_sources, depth + 1);
         if state == AssertionState::Invalidated {
             return (
                 AssertionState::Invalidated,
                 Some(InvalidatedBecause::DerivedFrom {
                     premise: premise.clone(),
-                })
-                .or(reason.map(|_| InvalidatedBecause::DerivedFrom {
-                    premise: premise.clone(),
-                })),
+                }),
             );
         }
     }
@@ -313,7 +310,8 @@ fn derive(
 }
 
 /// The surviving corrector of one assertion: a later assertion listing it in
-/// `corrects` that is itself neither superseded nor invalidated.
+/// `corrects` that is itself active. The closure rule requires `b is active`,
+/// so a contested or invalidated corrector does not invalidate its target.
 fn surviving_corrector_of(
     assertion: &KnowledgeAssertion,
     ledger: &Ledger,
@@ -325,7 +323,7 @@ fn surviving_corrector_of(
             continue;
         }
         let state = derive(&other.assertion_id, ledger, invalidated_sources, depth + 1).0;
-        if matches!(state, AssertionState::Active | AssertionState::Contested) {
+        if state == AssertionState::Active {
             return Some(other.assertion_id.clone());
         }
     }
@@ -536,6 +534,30 @@ mod tests {
         let report = compute_invalidation(&mission, &BTreeSet::new(), &[]);
         assert!(report.invalidated.contains_key("a2"));
         assert!(!report.invalidated.contains_key("a1"));
+    }
+
+    #[test]
+    fn correction_by_contested_corrector_does_not_hold() {
+        // The closure rule requires the corrector to be active. A contested
+        // corrector (an open contradiction names it) does not invalidate its
+        // target; the contested pair is surfaced instead, and only a human
+        // decision or a surviving correction resolves it.
+        let mut a2 = assertion("a2");
+        a2.corrects = vec!["a1".to_string()];
+        let mut contradiction = assertion("c1");
+        contradiction.kind = AssertionKind::Contradiction;
+        contradiction.members = vec!["a2".to_string(), "a3".to_string()];
+        contradiction.resolution = None;
+        let mission = mission_with_snapshots(vec![vec![
+            assertion("a1"),
+            a2,
+            assertion("a3"),
+            contradiction,
+        ]]);
+        let states = derive_assertion_states(&mission, &BTreeSet::new());
+        assert_eq!(states.get("a2"), Some(&AssertionState::Contested));
+        // a1 stays active: the corrector is contested, not surviving.
+        assert_eq!(states.get("a1"), Some(&AssertionState::Active));
     }
 
     #[test]

@@ -56,10 +56,8 @@ pub use verify::{
 mod integration_tests {
     use super::*;
     use crate::application::missions::FileMissionService;
-    use crate::application::missions::workflow::MissionPlanApproval;
     use crate::model::mission::{
-        ArtifactObligation, AssertionKind, ContradictionResolution, Finding, MissionCriterion,
-        MissionPlan, MissionSnapshot, MissionWave,
+        ArtifactObligation, AssertionKind, Finding, MissionPlan, MissionSnapshot, MissionWave,
     };
 
     fn temp_dir() -> std::path::PathBuf {
@@ -363,7 +361,7 @@ mod integration_tests {
 
         // The Goal leaves Review: its contribution source is invalidated.
         let mut sources = std::collections::BTreeSet::new();
-        sources.insert(format!("contribution:G1/1"));
+        sources.insert("contribution:G1/1".to_string());
         let before = ledger::compute_invalidation(&published, &sources, &[]);
         assert!(before.invalidated.contains_key(&accepted_id));
 
@@ -487,6 +485,85 @@ mod integration_tests {
             capsule["assertions"].as_array().unwrap().len(),
             1,
             "capsule renders the included assertion body"
+        );
+        std::fs::remove_dir_all(service.refine_dir).unwrap();
+    }
+
+    #[test]
+    fn capsule_renders_assertions_from_the_whole_snapshot_chain() {
+        let (service, mission_id) = service_with_mission();
+        let mut mission = service.show_mission(&mission_id).unwrap();
+        let mut revision = mission.revision;
+        // Wave 1 publishes snapshot 2 with one accepted assertion.
+        let input = engine::ReconciliationInput {
+            wave: Some(1),
+            claims: vec![verified_claim("digest-1", "tokens rotate hourly")],
+            verification: context(),
+            budgets: Default::default(),
+            decision_volume_threshold: None,
+            correction: None,
+        };
+        let opened = engine::open_attempt(&mission, &input).unwrap();
+        let verified = engine::verify_claims(&opened);
+        let applied = engine::apply_reduction(
+            &verified,
+            &engine::ReductionDraft::default(),
+            &engine::CriticismReport::default(),
+        )
+        .unwrap();
+        mission = service
+            .publish_reconciliation(&mission_id, &applied, Some(revision))
+            .unwrap();
+        revision = mission.revision;
+        // Wave 2 publishes snapshot 3 with a second accepted assertion.
+        let input = engine::ReconciliationInput {
+            wave: Some(2),
+            claims: vec![verified_claim("digest-2", "refresh tokens live 15 minutes")],
+            verification: context(),
+            budgets: Default::default(),
+            decision_volume_threshold: None,
+            correction: None,
+        };
+        let opened = engine::open_attempt(&mission, &input).unwrap();
+        let verified = engine::verify_claims(&opened);
+        let applied = engine::apply_reduction(
+            &verified,
+            &engine::ReductionDraft::default(),
+            &engine::CriticismReport::default(),
+        )
+        .unwrap();
+        mission = service
+            .publish_reconciliation(&mission_id, &applied, Some(revision))
+            .unwrap();
+
+        // The latest snapshot's own knowledge_index holds only the wave-2
+        // assertion; the wave-1 assertion lives in the earlier snapshot of
+        // the same chain. The capsule must render both: the manifest and the
+        // rendered bodies may never disagree.
+        let latest = mission.rounds[0].snapshots.last().unwrap().clone();
+        assert_eq!(
+            latest.knowledge_index.len(),
+            1,
+            "snapshot 3 carries only its own accepted assertion"
+        );
+        let capsule = service
+            .compile_context_capsule(&mission, &latest, "k1")
+            .unwrap();
+        let manifest_ids: Vec<&str> = capsule["capsule_manifest"]["assertions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(|inclusion| inclusion["id"].as_str())
+            .collect();
+        assert_eq!(
+            manifest_ids.len(),
+            2,
+            "the manifest accumulates the whole chain"
+        );
+        assert_eq!(
+            capsule["assertions"].as_array().unwrap().len(),
+            manifest_ids.len(),
+            "every manifest-included assertion renders a body, including assertions accepted by earlier snapshots"
         );
         std::fs::remove_dir_all(service.refine_dir).unwrap();
     }

@@ -59,14 +59,18 @@ impl FileMissionService {
         }
         let mission_id = id
             .map(|id| id.trim().to_uppercase())
-            .filter(|id| !id.is_empty())
+            .filter(|id| id.len() >= 3)
             .unwrap_or_else(new_mission_id);
         if mission_id.len() < 3 {
             return Err(RefineError::InvalidInput(
                 "Mission id must be at least three characters".to_string(),
             ));
         }
-        let path = mission_json_path(&self.refine_dir, &mission_id);
+        let Some(path) = mission_json_path(&self.refine_dir, &mission_id) else {
+            return Err(RefineError::InvalidInput(
+                "Mission id must be at least three characters".to_string(),
+            ));
+        };
         if path.exists() {
             return Err(RefineError::Conflict(format!(
                 "Mission {mission_id} already exists"
@@ -154,8 +158,11 @@ impl FileMissionService {
             created: mission.created.clone(),
             updated: mission.updated.clone(),
             json_path: mission_json_path(&self.refine_dir, &mission.id)
-                .strip_prefix(&self.refine_dir)
-                .map(|path| path.to_string_lossy().replace('\\', "/"))
+                .and_then(|path| {
+                    path.strip_prefix(&self.refine_dir)
+                        .map(|path| path.to_string_lossy().replace('\\', "/"))
+                        .ok()
+                })
                 .unwrap_or_default(),
         }
     }

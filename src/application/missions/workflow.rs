@@ -179,7 +179,7 @@ impl FileMissionService {
                 ))
             })?;
         let round_object = round.as_object_mut().ok_or_else(|| {
-            RefineError::Serialization(format!("MissionRound is not a JSON object"))
+            RefineError::Serialization("MissionRound is not a JSON object".to_string())
         })?;
         round_object.insert(
             "plan".to_string(),
@@ -250,13 +250,13 @@ impl FileMissionService {
                 ))
             })?;
         let round_object = round.as_object_mut().ok_or_else(|| {
-            RefineError::Serialization(format!("MissionRound is not a JSON object"))
+            RefineError::Serialization("MissionRound is not a JSON object".to_string())
         })?;
         let snapshots = round_object
             .get_mut("snapshots")
             .and_then(Value::as_array_mut)
             .ok_or_else(|| {
-                RefineError::Serialization(format!("MissionRound has no snapshots array"))
+                RefineError::Serialization("MissionRound has no snapshots array".to_string())
             })?;
         snapshots.push(serde_json::to_value(&snapshot).map_err(|error| {
             RefineError::Serialization(format!("failed to encode MissionSnapshot: {error}"))
@@ -309,15 +309,15 @@ impl FileMissionService {
                 ))
             })?;
         let round_object = round.as_object_mut().ok_or_else(|| {
-            RefineError::Serialization(format!("MissionRound is not a JSON object"))
+            RefineError::Serialization("MissionRound is not a JSON object".to_string())
         })?;
         let receipts = round_object
             .get_mut("reconciliation_receipts")
             .and_then(Value::as_array_mut)
             .ok_or_else(|| {
-                RefineError::Serialization(format!(
-                    "MissionRound has no reconciliation_receipts array"
-                ))
+                RefineError::Serialization(
+                    "MissionRound has no reconciliation_receipts array".to_string(),
+                )
             })?;
         receipts.push(serde_json::to_value(&receipt).map_err(|error| {
             RefineError::Serialization(format!("failed to encode ReconciliationReceipt: {error}"))
@@ -413,7 +413,7 @@ impl FileMissionService {
                 ))
             })?;
         let round_object = round.as_object_mut().ok_or_else(|| {
-            RefineError::Serialization(format!("MissionRound is not a JSON object"))
+            RefineError::Serialization("MissionRound is not a JSON object".to_string())
         })?;
         round_object.insert(
             "outcome".to_string(),
@@ -469,7 +469,7 @@ impl FileMissionService {
                 ))
             })?;
         let round_object = round.as_object_mut().ok_or_else(|| {
-            RefineError::Serialization(format!("MissionRound is not a JSON object"))
+            RefineError::Serialization("MissionRound is not a JSON object".to_string())
         })?;
         round_object.insert(
             "outcome_publication".to_string(),
@@ -526,14 +526,23 @@ impl FileMissionService {
             goal_spec,
             &std::collections::BTreeSet::new(),
         )?;
+        // The manifest accumulates the whole snapshot chain, so the rendering
+        // lookup must too: an assertion accepted by an earlier snapshot still
+        // renders when a later snapshot is selected.
+        let chain: std::collections::BTreeMap<String, _> =
+            super::reconciliation::assertions_through(
+                mission,
+                snapshot.version,
+                &std::collections::BTreeSet::new(),
+            )
+            .into_iter()
+            .map(|(assertion, _)| (assertion.assertion_id.clone(), assertion))
+            .collect();
         let included_assertions: Vec<Value> = manifest
             .assertions
             .iter()
             .filter_map(|inclusion| {
-                let assertion = snapshot
-                    .knowledge_index
-                    .iter()
-                    .find(|assertion| assertion.assertion_id == inclusion.id)?;
+                let assertion = chain.get(&inclusion.id)?;
                 Some(serde_json::json!({
                     "assertion_id": assertion.assertion_id,
                     "kind": assertion.kind.as_str(),

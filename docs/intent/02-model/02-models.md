@@ -4,6 +4,7 @@
 
 - **Goal**: the smallest useful unit of work, framed as the difference between what exists and what should exist.
 - **Feature**: an organized set of Goals that together produce a larger product outcome.
+- **Mission**: a governed system-level outcome composed of Goal workflows (see [Mission](05-mission.md)).
 - **Workflow State**: the current position of a Goal in the system's work lifecycle.
 - **Node**: the local or distributed actor that owns active work.
 - **Projection**: a fast, queryable view over durable flat-file state.
@@ -16,6 +17,8 @@ Models give Refine a shared language for software work. They let Application beh
 The central product model is the Goal. A Goal records an actionable prompt, notes, rounds, status, priority, reporter, assignee, Feature membership, node ownership, and logs needed to understand and advance work. The model is intentionally ordinary: it should be possible to open the file, read it, and understand what the work is.
 
 Features exist to preserve intent across multiple Goals. A Feature should not replace the Goal model; it groups Goals, preserves ordering when order matters, and lets the system explain larger outcomes without losing the smaller work units that agents can execute.
+
+Missions exist for outcomes that are larger than a Feature's grouping and ordering: they preserve system-level intent across parallel Goals and own the reconciliation of what the work learned. Mission is a separate model concept, not a larger Goal record, and it is described in its own document.
 
 ## Expected Role
 

@@ -14,13 +14,20 @@ use crate::infrastructure::process::supervisor::coordination::{
 use crate::model::mission::Mission;
 
 /// The durable path for a Mission record, sharded like Goals and Features.
-pub(crate) fn mission_json_path(refine_dir: &Path, mission_id: &str) -> PathBuf {
+/// Ids shorter than two characters cannot be sharded and never name a
+/// Mission, since creation enforces a minimum length.
+pub(crate) fn mission_json_path(refine_dir: &Path, mission_id: &str) -> Option<PathBuf> {
     let mission_id = mission_id.to_uppercase();
-    refine_dir
-        .join("missions")
-        .join(&mission_id[..2])
-        .join(&mission_id[2..])
-        .join("mission.json")
+    if mission_id.len() < 3 {
+        return None;
+    }
+    Some(
+        refine_dir
+            .join("missions")
+            .join(&mission_id[..2])
+            .join(&mission_id[2..])
+            .join("mission.json"),
+    )
 }
 
 /// The durable path for an immutable snapshot manifest.
@@ -29,27 +36,41 @@ pub(crate) fn snapshot_json_path(
     mission_id: &str,
     round: usize,
     version: usize,
-) -> PathBuf {
+) -> Option<PathBuf> {
     let mission_id = mission_id.to_uppercase();
-    refine_dir
-        .join("missions")
-        .join(&mission_id[..2])
-        .join(&mission_id[2..])
-        .join("snapshots")
-        .join(round.to_string())
-        .join(format!("{version}.json"))
+    if mission_id.len() < 3 {
+        return None;
+    }
+    Some(
+        refine_dir
+            .join("missions")
+            .join(&mission_id[..2])
+            .join(&mission_id[2..])
+            .join("snapshots")
+            .join(round.to_string())
+            .join(format!("{version}.json")),
+    )
 }
 
 /// The durable path for an immutable Outcome manifest.
-pub(crate) fn outcome_manifest_path(refine_dir: &Path, mission_id: &str, round: usize) -> PathBuf {
+pub(crate) fn outcome_manifest_path(
+    refine_dir: &Path,
+    mission_id: &str,
+    round: usize,
+) -> Option<PathBuf> {
     let mission_id = mission_id.to_uppercase();
-    refine_dir
-        .join("missions")
-        .join(&mission_id[..2])
-        .join(&mission_id[2..])
-        .join("outcomes")
-        .join(round.to_string())
-        .join("manifest.json")
+    if mission_id.len() < 3 {
+        return None;
+    }
+    Some(
+        refine_dir
+            .join("missions")
+            .join(&mission_id[..2])
+            .join(&mission_id[2..])
+            .join("outcomes")
+            .join(round.to_string())
+            .join("manifest.json"),
+    )
 }
 
 /// The durable path for an immutable artifact file.
@@ -59,15 +80,20 @@ pub(crate) fn artifact_path(
     artifact_key: &str,
     sha256: &str,
     extension: &str,
-) -> PathBuf {
+) -> Option<PathBuf> {
     let mission_id = mission_id.to_uppercase();
-    refine_dir
-        .join("missions")
-        .join(&mission_id[..2])
-        .join(&mission_id[2..])
-        .join("artifacts")
-        .join(artifact_key)
-        .join(format!("{sha256}.{extension}"))
+    if mission_id.len() < 3 {
+        return None;
+    }
+    Some(
+        refine_dir
+            .join("missions")
+            .join(&mission_id[..2])
+            .join(&mission_id[2..])
+            .join("artifacts")
+            .join(artifact_key)
+            .join(format!("{sha256}.{extension}")),
+    )
 }
 
 /// The durable path for an immutable pending-contribution file.
@@ -78,16 +104,21 @@ pub(crate) fn contribution_path(
     goal_round: usize,
     sha256: &str,
     extension: &str,
-) -> PathBuf {
+) -> Option<PathBuf> {
     let mission_id = mission_id.to_uppercase();
-    refine_dir
-        .join("missions")
-        .join(&mission_id[..2])
-        .join(&mission_id[2..])
-        .join("contributions")
-        .join(goal_id)
-        .join(goal_round.to_string())
-        .join(format!("{sha256}.{extension}"))
+    if mission_id.len() < 3 {
+        return None;
+    }
+    Some(
+        refine_dir
+            .join("missions")
+            .join(&mission_id[..2])
+            .join(&mission_id[2..])
+            .join("contributions")
+            .join(goal_id)
+            .join(goal_round.to_string())
+            .join(format!("{sha256}.{extension}")),
+    )
 }
 
 /// Read a Mission record, returning `None` when it does not exist.
@@ -95,7 +126,9 @@ pub(crate) fn read_mission_value(
     refine_dir: &Path,
     mission_id: &str,
 ) -> RefineResult<Option<Value>> {
-    let path = mission_json_path(refine_dir, mission_id);
+    let Some(path) = mission_json_path(refine_dir, mission_id) else {
+        return Ok(None);
+    };
     match fs::read(&path) {
         Ok(bytes) => serde_json::from_slice(&bytes).map(Some).map_err(|error| {
             RefineError::Serialization(format!(
@@ -128,7 +161,11 @@ pub(crate) fn write_mission_atomically(
     mission_id: &str,
     value: &Value,
 ) -> RefineResult<Value> {
-    let path = mission_json_path(refine_dir, mission_id);
+    let Some(path) = mission_json_path(refine_dir, mission_id) else {
+        return Err(RefineError::InvalidInput(format!(
+            "Mission id must be at least three characters: {mission_id}"
+        )));
+    };
     let key = record_lock_key(&path);
     let _lease = acquire_record_lock(refine_dir, &key)?;
     let expected_revision = mission_revision(value);

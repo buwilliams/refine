@@ -44,7 +44,7 @@ static PROJECTION_REBUILD_COUNTS: OnceLock<Mutex<BTreeMap<PathBuf, u64>>> = Once
 static SNAPSHOT_MEMORY_CACHE: OnceLock<Mutex<BTreeMap<String, Arc<ProjectionSnapshot>>>> =
     OnceLock::new();
 
-pub(self) fn cached_snapshot(key: &str) -> Option<Arc<ProjectionSnapshot>> {
+fn cached_snapshot(key: &str) -> Option<Arc<ProjectionSnapshot>> {
     SNAPSHOT_MEMORY_CACHE
         .get_or_init(|| Mutex::new(BTreeMap::new()))
         .lock()
@@ -52,7 +52,7 @@ pub(self) fn cached_snapshot(key: &str) -> Option<Arc<ProjectionSnapshot>> {
         .and_then(|cache| cache.get(key).cloned())
 }
 
-pub(self) fn store_cached_snapshot(key: String, snapshot: Arc<ProjectionSnapshot>) {
+fn store_cached_snapshot(key: String, snapshot: Arc<ProjectionSnapshot>) {
     if let Ok(mut cache) = SNAPSHOT_MEMORY_CACHE
         .get_or_init(|| Mutex::new(BTreeMap::new()))
         .lock()
