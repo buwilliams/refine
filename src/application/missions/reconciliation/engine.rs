@@ -20,7 +20,7 @@ use sha2::{Digest as Sha256Digest, Sha256};
 use crate::error::{RefineError, RefineResult};
 use crate::model::mission::{
     ArtifactAuthority, ArtifactRef, AssertionKind, BudgetReport, ContradictionResolution,
-    DecisionRequest, GoalContribution, KnowledgeAssertion, Mission, MissionSnapshot,
+    DecisionRequest, GoalContribution, KnowledgeAssertion, Mission, MissionPlan, MissionSnapshot,
     ReconciliationBudgets, ReconciliationReceipt, VerifierResult,
 };
 
@@ -1110,6 +1110,18 @@ pub fn compute_snapshot_digest(snapshot: &MissionSnapshot) -> String {
     if let Some(object) = value.as_object_mut() {
         object.insert("digest".to_string(), Value::Null);
         object.insert("created".to_string(), Value::String(String::new()));
+    }
+    format!("sha256:{}", hex_digest(value.to_string().as_bytes()))
+}
+
+/// The effective plan digest: sha256 over the canonical JSON of the plan with
+/// the digest itself excluded, so approving a digest binds the exact plan
+/// content. The charter digest stays in the hashed content: a plan binds the
+/// charter it was drafted against.
+pub fn compute_plan_digest(plan: &MissionPlan) -> String {
+    let mut value = serde_json::to_value(plan).unwrap_or_default();
+    if let Some(object) = value.as_object_mut() {
+        object.insert("effective_digest".to_string(), Value::Null);
     }
     format!("sha256:{}", hex_digest(value.to_string().as_bytes()))
 }

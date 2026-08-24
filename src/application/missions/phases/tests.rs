@@ -82,6 +82,24 @@ impl AgentProviderService for StubMissionProvider {
                 "artifact_promotions": [],
                 "open_questions": ["what rotation policy applies"]
             })
+        } else if invocation.prompt.contains("Mission planning JSON") {
+            // The proposal and revision agents both answer with the same
+            // one-wave plan; the revision is the recorded draft.
+            json!({
+                "summary": "one wave documenting the auth surface",
+                "criteria_coverage": ["crit:tokens"],
+                "waves": [{
+                    "number": 1,
+                    "purpose": "document tokens",
+                    "goal_specs": [{
+                        "mission_goal_key": "k1",
+                        "name": "Document tokens",
+                        "prompt": "Document the token invariant of the auth service",
+                        "required": true,
+                        "criterion_ids": ["crit:tokens"]
+                    }]
+                }]
+            })
         } else if invocation.prompt.contains("Mission reduction JSON") {
             json!({
                 "accepts": [],
@@ -204,40 +222,6 @@ fn force_goal_review_ready(refine_dir: &Path, goal_id: &str) {
     std::fs::write(&path, serde_json::to_vec_pretty(&value).unwrap()).unwrap();
 }
 
-fn test_plan() -> MissionPlan {
-    MissionPlan {
-        charter_digest: None,
-        summary: "one wave documenting the auth surface".to_string(),
-        assumptions: vec![],
-        risks: vec![],
-        criteria_coverage: vec!["crit:tokens".to_string()],
-        waves: vec![MissionWave {
-            number: 1,
-            purpose: "document tokens".to_string(),
-            goal_specs: vec![MissionGoalSpec {
-                mission_goal_key: "k1".to_string(),
-                name: "Document tokens".to_string(),
-                prompt: "Document the token invariant of the auth service".to_string(),
-                role: None,
-                required: true,
-                criterion_ids: vec!["crit:tokens".to_string()],
-                input_artifact_keys: vec![],
-                output_artifact_keys: vec![],
-                expected_findings: vec![],
-                feature_id: None,
-                feature_order: None,
-                preferred_node: None,
-            }],
-            required_snapshot: None,
-            completion_condition: None,
-        }],
-        artifact_obligations: vec![],
-        criticism: None,
-        resolutions: vec![],
-        effective_digest: Some("plan-digest-1".to_string()),
-    }
-}
-
 #[test]
 fn mission_engine_runs_the_full_lifecycle_to_done() {
     let root = unique_temp_dir("lifecycle");
@@ -301,11 +285,23 @@ fn mission_engine_runs_the_full_lifecycle_to_done() {
     assert_eq!(round.snapshots[0].knowledge_index.len(), 1);
     assert!(round.phase_evidence.get("investigation").is_some());
 
-    // Plan approval is the human gate.
+    // The planning trio drafts the plan; approval is the human gate.
+    let outcome = engine.evaluate_one(&service, &mission.id).unwrap();
+    assert_eq!(
+        outcome.as_deref(),
+        Some("planning drafted the plan; approval awaits")
+    );
+    let mission = service.show_mission(&mission.id).unwrap();
+    let round = &mission.rounds[0];
+    let drafted = round.plan.as_ref().expect("planning drafted a plan");
+    assert_eq!(drafted.waves.len(), 1);
+    assert!(drafted.effective_digest.is_some());
+    assert!(round.phase_evidence.get("planning").is_some());
+    let plan_digest = drafted.effective_digest.clone().unwrap();
     let outcome = engine.evaluate_one(&service, &mission.id).unwrap();
     assert_eq!(outcome, None, "unapproved plan waits");
     let mission = service
-        .approve_plan(&mission.id, test_plan(), "Buddy", "looks right", None)
+        .approve_plan(&mission.id, &plan_digest, "Buddy", "looks right", None)
         .unwrap();
 
     // Execute: materialize and admit wave 1. The first step enters Execute;
@@ -527,8 +523,16 @@ fn unverified_evidence_defers_rather_than_promoting() {
         .transition_mission(&mission.id, MissionStatus::Investigate, None)
         .unwrap();
     engine.evaluate_one(&service, &mission.id).unwrap();
+    // Planning drafts the plan; approval binds its exact digest.
+    engine.evaluate_one(&service, &mission.id).unwrap();
+    let mission = service.show_mission(&mission.id).unwrap();
+    let plan_digest = mission.rounds[0]
+        .plan
+        .as_ref()
+        .and_then(|plan| plan.effective_digest.clone())
+        .expect("planning drafted a plan");
     service
-        .approve_plan(&mission.id, test_plan(), "Buddy", "ok", None)
+        .approve_plan(&mission.id, &plan_digest, "Buddy", "ok", None)
         .unwrap();
     engine.evaluate_one(&service, &mission.id).unwrap();
     engine.evaluate_one(&service, &mission.id).unwrap();
@@ -588,5 +592,228 @@ fn draft_missions_wait_for_the_human_start() {
     // Draft consumes no agent or fleet capacity; the engine never
     // auto-starts a Mission.
     assert_eq!(engine.evaluate_one(&service, &mission.id).unwrap(), None);
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
+fn distribution_compiles_preference_capacity_and_receipts() {
+    let root = unique_temp_dir("distribution");
+    let target_root = root.join("target");
+    let runtime_root = root.join("runtime");
+    std::fs::create_dir_all(&target_root).unwrap();
+    std::fs::create_dir_all(&runtime_root).unwrap();
+    git(&target_root, &["init", "-q"]);
+    git(&target_root, &["config", "user.email", "test@refine"]);
+    git(&target_root, &["config", "user.name", "refine test"]);
+    std::fs::write(target_root.join("README.md"), "auth service\n").unwrap();
+    git(&target_root, &["add", "README.md"]);
+    git(&target_root, &["commit", "-q", "-m", "initial"]);
+    let head = git_stdout(&target_root, &["rev-parse", "HEAD"]);
+
+    let refine_dir = refine_dir_for_target_root(&target_root).unwrap();
+    let service = FileMissionService::new(&refine_dir);
+    let work_items = FileWorkItemService::new(&refine_dir);
+    let nodes = crate::application::fleet::nodes::FileNodeRegistryService::new(&refine_dir);
+    nodes.create("worker-1").unwrap();
+    nodes.create("worker-2").unwrap();
+    let provider = Arc::new(StubMissionProvider {
+        target_head: head.clone(),
+    });
+    let engine = MissionWorkflowEngine::new(&runtime_root, &target_root)
+        .with_provider(provider.clone(), "stub");
+
+    let mission = service
+        .create_mission("M", "intent", Some("Buddy"), None, None)
+        .unwrap();
+    let criteria = json!([{"id": "crit:tokens", "description": "d"}]);
+    service
+        .edit_mission_frame(&mission.id, None, None, Some(&criteria), None, None)
+        .unwrap();
+    service
+        .append_round(&mission.id, "Buddy", "go", None)
+        .unwrap();
+    service
+        .transition_mission(&mission.id, MissionStatus::Investigate, None)
+        .unwrap();
+    engine.evaluate_one(&service, &mission.id).unwrap();
+    engine.evaluate_one(&service, &mission.id).unwrap();
+    let mission = service.show_mission(&mission.id).unwrap();
+    let digest = mission.rounds[0]
+        .plan
+        .as_ref()
+        .and_then(|plan| plan.effective_digest.clone())
+        .unwrap();
+    service
+        .approve_plan(&mission.id, &digest, "Buddy", "ok", None)
+        .unwrap();
+    engine.evaluate_one(&service, &mission.id).unwrap();
+
+    // Preview before materialization: nothing is placed yet.
+    let preview =
+        super::distribution::preview_wave_distribution(&service, &work_items, &mission.id, 1)
+            .unwrap();
+    assert_eq!(preview.dry_run, true);
+    assert!(
+        preview.eligible_nodes.contains(&"default".to_string()),
+        "the default node is an eligible candidate: {:?}",
+        preview.eligible_nodes
+    );
+
+    // Materialize + distribute + admit in one engine step.
+    let outcome = engine.evaluate_one(&service, &mission.id).unwrap();
+    let detail = outcome.unwrap_or_default();
+    assert!(
+        detail.contains("materialized 1") && detail.contains("admitted 1"),
+        "engine said: {detail}"
+    );
+    let goals = super::execution::mission_bound_goals(&refine_dir, &mission.id).unwrap();
+    let goal_id = goals[0].goal_id.clone();
+    assert_eq!(goals[0].status, crate::model::workflow::GoalStatus::Todo);
+
+    // The durable distribution receipt exists in phase evidence.
+    let mission = service.show_mission(&mission.id).unwrap();
+    let receipt = &mission.rounds[0].phase_evidence["distribution"]["1"];
+    assert!(receipt["assignments"].as_array().unwrap().len() == 1);
+
+    // Idempotent re-run: the Goal is already placed, nothing moves.
+    let report =
+        super::distribution::distribute_wave(&service, &work_items, &mission.id, 1).unwrap();
+    assert_eq!(report.moved, 0);
+    assert!(
+        report.assignments[0]
+            .reason
+            .as_deref()
+            .is_some_and(|reason| reason == "already-placed"),
+        "re-distribution is idempotent: {:?}",
+        report.assignments
+    );
+
+    // A preferred node is honored when it is eligible.
+    let mut mission = service.show_mission(&mission.id).unwrap();
+    let plan = mission.rounds[0].plan.as_mut().unwrap();
+    plan.waves[0].goal_specs[0].preferred_node = Some("worker-2".to_string());
+    plan.effective_digest = None;
+    crate::application::missions::MissionService::update_mission(&service, mission.clone())
+        .unwrap();
+    // Simulate the Goal back in Backlog so placement re-compiles.
+    let goal_path = refine_dir
+        .join("goals")
+        .join(&goal_id[..2])
+        .join(&goal_id[2..])
+        .join("goal.json");
+    let mut value: Value = serde_json::from_slice(&std::fs::read(&goal_path).unwrap()).unwrap();
+    value
+        .as_object_mut()
+        .unwrap()
+        .insert("status".to_string(), json!("backlog"));
+    std::fs::write(&goal_path, serde_json::to_vec_pretty(&value).unwrap()).unwrap();
+    let report =
+        super::distribution::distribute_wave(&service, &work_items, &mission.id, 1).unwrap();
+    assert_eq!(
+        report.assignments[0].target_node_id.as_deref(),
+        Some("worker-2"),
+        "preferred node wins when eligible: {:?}",
+        report.assignments
+    );
+    let updated =
+        FileWorkItemService::for_node(&refine_dir, "worker-2").show_goal_summary(&goal_id);
+    assert_eq!(updated.unwrap().goal.node_id.as_deref(), Some("worker-2"));
+    let _ = std::fs::remove_dir_all(&root);
+}
+
+#[test]
+fn distribution_reports_no_eligible_nodes_as_skips() {
+    let root = unique_temp_dir("no-nodes");
+    let target_root = root.join("target");
+    std::fs::create_dir_all(&target_root).unwrap();
+    let refine_dir = refine_dir_for_target_root(&target_root).unwrap();
+    let service = FileMissionService::new(&refine_dir);
+    let work_items = FileWorkItemService::new(&refine_dir);
+    // No node registry file at all: the default node is still a candidate,
+    // so disable it to force the no-eligible-node path.
+    let fleet = crate::application::fleet::service::FileFleetService::new(&refine_dir);
+    fleet.set_enabled("default", false).unwrap();
+
+    let mission = service
+        .create_mission("M", "intent", Some("Buddy"), None, None)
+        .unwrap();
+    let criteria = json!([{"id": "crit:tokens", "description": "d"}]);
+    service
+        .edit_mission_frame(&mission.id, None, None, Some(&criteria), None, None)
+        .unwrap();
+    service
+        .append_round(&mission.id, "Buddy", "go", None)
+        .unwrap();
+    let snapshot = crate::model::mission::MissionSnapshot {
+        version: 1,
+        parent_version: None,
+        target_head: Some("head0".to_string()),
+        plan_digest: None,
+        artifact_refs: vec![],
+        input_refs: vec![],
+        consumed_contribution_refs: vec![],
+        knowledge_index: vec![],
+        corrects_snapshot: None,
+        digest: None,
+        created: String::new(),
+    };
+    service
+        .publish_snapshot(&mission.id, snapshot, None)
+        .unwrap();
+    let spec = MissionGoalSpec {
+        mission_goal_key: "k1".to_string(),
+        name: "Document tokens".to_string(),
+        prompt: "document tokens".to_string(),
+        role: None,
+        required: true,
+        criterion_ids: vec!["crit:tokens".to_string()],
+        input_artifact_keys: vec![],
+        output_artifact_keys: vec![],
+        expected_findings: vec![],
+        feature_id: None,
+        feature_order: None,
+        preferred_node: None,
+    };
+    let plan = MissionPlan {
+        charter_digest: None,
+        summary: "one wave".to_string(),
+        assumptions: vec![],
+        risks: vec![],
+        criteria_coverage: vec!["crit:tokens".to_string()],
+        waves: vec![MissionWave {
+            number: 1,
+            purpose: "p".to_string(),
+            goal_specs: vec![spec],
+            required_snapshot: None,
+            completion_condition: None,
+        }],
+        artifact_obligations: vec![],
+        criticism: None,
+        resolutions: vec![],
+        effective_digest: None,
+    };
+    let mission = service.record_plan(&mission.id, plan, None).unwrap();
+    let digest = mission.rounds[0]
+        .plan
+        .as_ref()
+        .and_then(|plan| plan.effective_digest.clone())
+        .unwrap();
+    service
+        .approve_plan(&mission.id, &digest, "Buddy", "ok", None)
+        .unwrap();
+
+    let report =
+        super::distribution::preview_wave_distribution(&service, &work_items, &mission.id, 1)
+            .unwrap();
+    assert!(report.eligible_nodes.is_empty());
+    assert_eq!(report.skipped, 1);
+    assert!(
+        report.assignments[0]
+            .reason
+            .as_deref()
+            .is_some_and(|reason| reason == "no eligible node"),
+        "missing capacity is a recorded exclusion: {:?}",
+        report.assignments
+    );
     let _ = std::fs::remove_dir_all(&root);
 }

@@ -746,6 +746,38 @@ impl InProcessWebServer {
         }
 
         if request.method == "POST"
+            && request.path.starts_with("/work/missions/")
+            && request.path.ends_with("/retry")
+        {
+            return self.handle_mission_retry(request);
+        }
+
+        if request.method == "POST"
+            && request.path.starts_with("/work/missions/")
+            && request.path.ends_with("/transfer")
+        {
+            return self.handle_mission_transfer(request);
+        }
+
+        if request.method == "POST"
+            && request.path.starts_with("/work/missions/")
+            && request.path.ends_with("/goals")
+        {
+            return self.handle_mission_add_goal(request);
+        }
+
+        if request.method == "DELETE" && request.path.starts_with("/work/missions/") {
+            return self.handle_mission_remove_goal(request);
+        }
+
+        if request.method == "POST"
+            && request.path.starts_with("/work/missions/")
+            && request.path.contains("/decisions/")
+        {
+            return self.handle_mission_decision(request);
+        }
+
+        if request.method == "POST"
             && request.path.starts_with("/work/goals/")
             && request.path.ends_with("/mission-contribution")
         {
@@ -757,6 +789,20 @@ impl InProcessWebServer {
             && request.path.ends_with("/outcome")
         {
             return self.handle_mission_outcome(request);
+        }
+
+        if request.method == "GET"
+            && request.path.starts_with("/work/missions/")
+            && request.path.ends_with("/context")
+        {
+            return self.handle_mission_context(request);
+        }
+
+        if request.method == "GET"
+            && request.path.starts_with("/work/missions/")
+            && request.path.ends_with("/distribution")
+        {
+            return self.handle_mission_distribution(&raw_path);
         }
 
         if request.method == "PATCH" && request.path.starts_with("/work/missions/") {

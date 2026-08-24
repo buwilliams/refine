@@ -16,7 +16,7 @@ use crate::error::StructuredOutputError;
 use super::reconciliation::engine::{CriticismReport, ReductionDraft};
 use crate::model::mission::{
     ArtifactAuthority, ArtifactRef, AssertionKind, ContradictionResolution, CriterionOutcome,
-    KnowledgeAssertion,
+    KnowledgeAssertion, MissionGoalSpec, MissionPlan, MissionWave,
 };
 
 fn example_assertion() -> KnowledgeAssertion {
@@ -176,6 +176,110 @@ impl Contract for CriticismReport {
             }
         }
         Ok(())
+    }
+}
+
+fn example_plan() -> MissionPlan {
+    MissionPlan {
+        charter_digest: None,
+        summary: "what this plan achieves".to_string(),
+        assumptions: vec!["an assumption the plan depends on".to_string()],
+        risks: vec!["a material risk".to_string()],
+        criteria_coverage: vec!["criterion id".to_string()],
+        waves: vec![MissionWave {
+            number: 1,
+            purpose: "why these Goals run together".to_string(),
+            goal_specs: vec![MissionGoalSpec {
+                mission_goal_key: "stable-key".to_string(),
+                name: "Goal name".to_string(),
+                prompt: "the prompt the Goal agent executes".to_string(),
+                role: Some("implementer".to_string()),
+                required: true,
+                criterion_ids: vec!["criterion id".to_string()],
+                input_artifact_keys: vec![],
+                output_artifact_keys: vec![],
+                expected_findings: vec!["what evidence this Goal should return".to_string()],
+                feature_id: None,
+                feature_order: None,
+                preferred_node: None,
+            }],
+            required_snapshot: None,
+            completion_condition: None,
+        }],
+        artifact_obligations: vec![],
+        criticism: None,
+        resolutions: vec![],
+        effective_digest: None,
+    }
+}
+
+fn validate_plan_shape(plan: &MissionPlan) -> Result<(), StructuredOutputError> {
+    if plan.summary.trim().is_empty() {
+        return Err(StructuredOutputError::validation(
+            "Mission planning JSON",
+            "a plan requires a summary",
+        ));
+    }
+    let mut keys = std::collections::BTreeSet::new();
+    let mut waves = std::collections::BTreeSet::new();
+    for wave in &plan.waves {
+        if !waves.insert(wave.number) {
+            return Err(StructuredOutputError::validation(
+                "Mission planning JSON",
+                "wave numbers must be unique",
+            ));
+        }
+        for spec in &wave.goal_specs {
+            if spec.mission_goal_key.trim().is_empty()
+                || !keys.insert(spec.mission_goal_key.trim().to_string())
+            {
+                return Err(StructuredOutputError::validation(
+                    "Mission planning JSON",
+                    "every Goal specification requires a unique mission_goal_key",
+                ));
+            }
+            if spec.prompt.trim().is_empty() {
+                return Err(StructuredOutputError::validation(
+                    "Mission planning JSON",
+                    "every Goal specification requires a prompt",
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// The planning-proposal agent's typed output: one drafted Mission plan.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct MissionPlanProposal(pub MissionPlan);
+
+impl Contract for MissionPlanProposal {
+    const LABEL: &'static str = "Mission planning JSON";
+    const ENVELOPE_FIELDS: &'static [&'static str] = &["proposal", "plan", "result"];
+
+    fn example() -> Self {
+        Self(example_plan())
+    }
+
+    fn validate(&self) -> Result<(), StructuredOutputError> {
+        validate_plan_shape(&self.0)
+    }
+}
+
+/// The planning-revision agent's typed output: the revised Mission plan.
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct MissionPlanRevision(pub MissionPlan);
+
+impl Contract for MissionPlanRevision {
+    const LABEL: &'static str = "Mission planning JSON";
+    const ENVELOPE_FIELDS: &'static [&'static str] = &["revision", "plan", "result"];
+
+    fn example() -> Self {
+        Self(example_plan())
+    }
+
+    fn validate(&self) -> Result<(), StructuredOutputError> {
+        validate_plan_shape(&self.0)
     }
 }
 
@@ -393,6 +497,12 @@ mod tests {
         >();
         crate::application::agent_io::structured_output::contract::assert_contract_roundtrip::<
             CriticismReport,
+        >();
+        crate::application::agent_io::structured_output::contract::assert_contract_roundtrip::<
+            MissionPlanProposal,
+        >();
+        crate::application::agent_io::structured_output::contract::assert_contract_roundtrip::<
+            MissionPlanRevision,
         >();
         crate::application::agent_io::structured_output::contract::assert_contract_roundtrip::<
             SynthesisOutput,

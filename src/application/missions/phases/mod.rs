@@ -8,9 +8,11 @@
 //! authority.
 
 pub mod consolidation;
+pub mod distribution;
 pub mod execution;
 pub mod governance;
 pub mod investigation;
+pub mod planning;
 pub mod quality;
 pub mod reconcile;
 pub mod synthesis;
@@ -44,6 +46,29 @@ pub fn write_phase_evidence(
     stage: &str,
     evidence: Value,
 ) -> RefineResult<Mission> {
+    write_nested_phase_evidence(service, mission_id, stage, None, evidence)
+}
+
+/// Record one phase's evidence under a per-wave key of the stage entry, so a
+/// repeated stage (distribution per wave) appends keyed history instead of
+/// overwriting its own receipts.
+pub fn write_wave_phase_evidence(
+    service: &FileMissionService,
+    mission_id: &str,
+    stage: &str,
+    wave: usize,
+    evidence: Value,
+) -> RefineResult<Mission> {
+    write_nested_phase_evidence(service, mission_id, stage, Some(wave), evidence)
+}
+
+fn write_nested_phase_evidence(
+    service: &FileMissionService,
+    mission_id: &str,
+    stage: &str,
+    wave: Option<usize>,
+    evidence: Value,
+) -> RefineResult<Mission> {
     let mission = service.show_mission(mission_id)?;
     let round_number = mission.current_round.ok_or_else(|| {
         RefineError::InvalidInput(format!("Mission {mission_id} has no current Round"))
@@ -70,7 +95,20 @@ pub fn write_phase_evidence(
         .and_then(Value::as_object)
         .cloned()
         .unwrap_or_default();
-    phase_evidence.insert(stage.to_string(), evidence);
+    match wave {
+        None => {
+            phase_evidence.insert(stage.to_string(), evidence);
+        }
+        Some(wave) => {
+            let mut stage_entry = phase_evidence
+                .get(stage)
+                .and_then(Value::as_object)
+                .cloned()
+                .unwrap_or_default();
+            stage_entry.insert(wave.to_string(), evidence);
+            phase_evidence.insert(stage.to_string(), Value::Object(stage_entry));
+        }
+    }
     round_object.insert("phase_evidence".to_string(), Value::Object(phase_evidence));
     let written = crate::application::missions::persistence::write_mission_atomically(
         &service.refine_dir,
@@ -144,4 +182,131 @@ pub fn phase_summary(operation_id: &str, extra: Value) -> Value {
         "operation_id": operation_id,
         "extra": extra,
     })
+}
+
+/// Mark one stage attempt as a retryable stage failure. The Mission stays in
+/// its current nonterminal phase; the engine stops re-attempting until a
+/// user-authorized retry clears the marker. Existing evidence is preserved
+/// and augmented, never replaced.
+pub fn mark_stage_failed(
+    service: &FileMissionService,
+    mission_id: &str,
+    stage: &str,
+    message: &str,
+) -> RefineResult<Mission> {
+    let mission = service.show_mission(mission_id)?;
+    let round_number = mission.current_round.ok_or_else(|| {
+        RefineError::InvalidInput(format!("Mission {mission_id} has no current Round"))
+    })?;
+    let mut value = service.show_mission_value(mission_id)?;
+    let object = value
+        .as_object_mut()
+        .ok_or_else(|| RefineError::Serialization("Mission is not a JSON object".to_string()))?;
+    let rounds = object
+        .get_mut("rounds")
+        .and_then(Value::as_array_mut)
+        .ok_or_else(|| RefineError::Serialization("Mission has no rounds array".to_string()))?;
+    let round = rounds
+        .iter_mut()
+        .find(|round| round.get("number").and_then(Value::as_u64) == Some(round_number as u64))
+        .ok_or_else(|| {
+            RefineError::NotFound(format!("Mission Round {round_number} was not found"))
+        })?;
+    let round_object = round.as_object_mut().ok_or_else(|| {
+        RefineError::Serialization("MissionRound is not a JSON object".to_string())
+    })?;
+    let mut phase_evidence = round_object
+        .get("phase_evidence")
+        .and_then(Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+    let mut stage_entry = phase_evidence
+        .get(stage)
+        .and_then(Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+    stage_entry.insert("stage_failed".to_string(), Value::Bool(true));
+    stage_entry.insert("retry_authorized".to_string(), Value::Bool(false));
+    stage_entry.insert("last_error".to_string(), Value::String(message.to_string()));
+    stage_entry.insert(
+        "failed_at".to_string(),
+        Value::String(crate::application::missions::service::FileMissionService::now_timestamp()),
+    );
+    phase_evidence.insert(stage.to_string(), Value::Object(stage_entry));
+    round_object.insert("phase_evidence".to_string(), Value::Object(phase_evidence));
+    let written = crate::application::missions::persistence::write_mission_atomically(
+        &service.refine_dir,
+        mission_id,
+        &value,
+    )?;
+    crate::application::missions::persistence::parse_mission(&written)
+}
+
+/// Clear one stage's failure state so the engine may re-attempt it. Only a
+/// user-authorized retry reaches this; the engine itself never retries a
+/// failed stage.
+pub fn authorize_stage_retry(
+    service: &FileMissionService,
+    mission_id: &str,
+    stage: &str,
+) -> RefineResult<Mission> {
+    let mission = service.show_mission(mission_id)?;
+    let round_number = mission.current_round.ok_or_else(|| {
+        RefineError::InvalidInput(format!("Mission {mission_id} has no current Round"))
+    })?;
+    let failed = mission
+        .rounds
+        .iter()
+        .find(|round| round.number == round_number)
+        .and_then(|round| round.phase_evidence.get(stage))
+        .and_then(Value::as_object)
+        .is_some_and(|evidence| {
+            evidence
+                .get("stage_failed")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+        });
+    if !failed {
+        return Err(RefineError::Conflict(format!(
+            "Mission {mission_id} has no retryable stage failure for {stage}"
+        )));
+    }
+    let mut value = service.show_mission_value(mission_id)?;
+    let object = value
+        .as_object_mut()
+        .ok_or_else(|| RefineError::Serialization("Mission is not a JSON object".to_string()))?;
+    let rounds = object
+        .get_mut("rounds")
+        .and_then(Value::as_array_mut)
+        .ok_or_else(|| RefineError::Serialization("Mission has no rounds array".to_string()))?;
+    let round = rounds
+        .iter_mut()
+        .find(|round| round.get("number").and_then(Value::as_u64) == Some(round_number as u64))
+        .ok_or_else(|| {
+            RefineError::NotFound(format!("Mission Round {round_number} was not found"))
+        })?;
+    let round_object = round.as_object_mut().ok_or_else(|| {
+        RefineError::Serialization("MissionRound is not a JSON object".to_string())
+    })?;
+    let mut phase_evidence = round_object
+        .get("phase_evidence")
+        .and_then(Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+    if let Some(stage_entry) = phase_evidence.get_mut(stage).and_then(Value::as_object_mut) {
+        stage_entry.insert("retry_authorized".to_string(), Value::Bool(true));
+        stage_entry.insert(
+            "retry_authorized_at".to_string(),
+            Value::String(
+                crate::application::missions::service::FileMissionService::now_timestamp(),
+            ),
+        );
+    }
+    round_object.insert("phase_evidence".to_string(), Value::Object(phase_evidence));
+    let written = crate::application::missions::persistence::write_mission_atomically(
+        &service.refine_dir,
+        mission_id,
+        &value,
+    )?;
+    crate::application::missions::persistence::parse_mission(&written)
 }

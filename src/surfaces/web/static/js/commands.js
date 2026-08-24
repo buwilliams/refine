@@ -265,6 +265,24 @@ registerCommand({
 });
 
 registerCommand({
+  id: "mission.plan_approvals",
+  title: "Missions awaiting plan approval",
+  group: "Navigate",
+  aliases: ["mission-plan", "plan-approvals"],
+  keywords: ["mission", "plan", "approval"],
+  run: () => navigateCommand("#/missions?status=plan"),
+});
+
+registerCommand({
+  id: "mission.outcome_reviews",
+  title: "Missions awaiting Outcome review",
+  group: "Navigate",
+  aliases: ["mission-review", "outcome-reviews"],
+  keywords: ["mission", "outcome", "review"],
+  run: () => navigateCommand("#/missions?status=review"),
+});
+
+registerCommand({
   id: "goal.import",
   title: "Import",
   group: "Create",

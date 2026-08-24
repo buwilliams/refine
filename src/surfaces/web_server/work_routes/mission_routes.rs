@@ -291,39 +291,58 @@ impl InProcessWebServer {
                 }),
             );
         };
-        let Some(body) = request.body.as_ref() else {
+        let body = request.body.as_ref();
+        let plan_digest = body
+            .and_then(|body| body.get("plan_digest"))
+            .and_then(Value::as_str)
+            .map(str::to_string);
+        // An explicit plan body records (or re-records) the draft first, so
+        // the approval binds the exact content that was just submitted.
+        if let Some(plan_value) = body.and_then(|body| body.get("plan")) {
+            let plan = match serde_json::from_value::<MissionPlan>(plan_value.clone()) {
+                Ok(plan) => plan,
+                Err(error) => {
+                    return ApiResponse::json(
+                        400,
+                        json!({
+                            "error": {
+                                "code": "invalid_plan",
+                                "message": format!("body.plan is invalid: {error}")
+                            }
+                        }),
+                    );
+                }
+            };
+            let service = self.mission_service(&refine_dir);
+            // The record is a draft submission; the consequential fence is
+            // the approval itself, which revalidates the observed revision.
+            if let Err(error) = service.record_plan(mission_id, plan, None) {
+                return error_response(error);
+            }
+        }
+        let Some(plan_digest) = plan_digest else {
             return ApiResponse::json(
                 400,
                 json!({
                     "error": {
-                        "code": "invalid_body",
-                        "message": "a plan body is required"
+                        "code": "invalid_plan_digest",
+                        "message": "body.plan_digest is required"
                     }
                 }),
             );
         };
-        let plan = match serde_json::from_value::<MissionPlan>(
-            body.get("plan").cloned().unwrap_or_default(),
-        ) {
-            Ok(plan) => plan,
-            Err(error) => {
-                return ApiResponse::json(
-                    400,
-                    json!({
-                        "error": {
-                            "code": "invalid_plan",
-                            "message": format!("body.plan is invalid: {error}")
-                        }
-                    }),
-                );
-            }
-        };
-        let actor = body.get("actor").and_then(Value::as_str).unwrap_or("");
-        let rationale = body.get("rationale").and_then(Value::as_str).unwrap_or("");
+        let actor = body
+            .and_then(|body| body.get("actor"))
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        let rationale = body
+            .and_then(|body| body.get("rationale"))
+            .and_then(Value::as_str)
+            .unwrap_or("");
         let observed_revision = self.observed_revision(&request);
         match self.mission_service(refine_dir).approve_plan(
             mission_id,
-            plan,
+            &plan_digest,
             actor,
             rationale,
             observed_revision,
@@ -508,6 +527,337 @@ impl InProcessWebServer {
                         }),
                     ),
                 }
+            }
+            Err(error) => error_response(error),
+        }
+    }
+}
+
+impl InProcessWebServer {
+    /// Parse `/work/missions/<id>/<suffix...>` into (mission_id, rest).
+    fn mission_path_segments<'a>(&self, path: &'a str) -> Option<(&'a str, &'a str)> {
+        let rest = path.strip_prefix("/work/missions/")?;
+        if rest.is_empty() {
+            return None;
+        }
+        let (mission_id, remainder) = match rest.split_once('/') {
+            Some((mission_id, remainder)) => (mission_id, remainder),
+            None => (rest, ""),
+        };
+        if mission_id.is_empty() || mission_id.contains('/') {
+            return None;
+        }
+        Some((mission_id, remainder))
+    }
+
+    pub(crate) fn handle_mission_decision(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "answer Mission decisions");
+        let Some((mission_id, remainder)) = self.mission_path_segments(&request.path) else {
+            return ApiResponse::json(
+                404,
+                json!({
+                    "error": {
+                        "code": "not_found",
+                        "message": "Mission decision route requires a Mission id"
+                    }
+                }),
+            );
+        };
+        let Some(decision_id) = remainder
+            .strip_prefix("decisions/")
+            .filter(|id| !id.is_empty() && !id.contains('/'))
+        else {
+            return ApiResponse::json(
+                404,
+                json!({
+                    "error": {
+                        "code": "not_found",
+                        "message": "Mission decision route requires a decision id"
+                    }
+                }),
+            );
+        };
+        let body = request.body.as_ref();
+        let Some(choice) = body
+            .and_then(|body| body.get("choice"))
+            .and_then(Value::as_str)
+            .map(str::to_string)
+            .filter(|choice| !choice.trim().is_empty())
+        else {
+            return ApiResponse::json(
+                400,
+                json!({
+                    "error": {
+                        "code": "invalid_choice",
+                        "message": "body.choice is required"
+                    }
+                }),
+            );
+        };
+        let rationale = body
+            .and_then(|body| body.get("rationale"))
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        let actor = body
+            .and_then(|body| body.get("actor"))
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        let observed_revision = self.observed_revision(&request);
+        match self.mission_service(refine_dir).answer_decision(
+            mission_id,
+            decision_id,
+            &choice,
+            rationale,
+            actor,
+            observed_revision,
+        ) {
+            Ok(mission) => ApiResponse::json(200, json!({"mission": mission})),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(crate) fn handle_mission_retry(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "retry Mission stages");
+        let Some(mission_id) = self.mission_id_from_path(&request.path, "/retry") else {
+            return ApiResponse::json(
+                404,
+                json!({
+                    "error": {
+                        "code": "not_found",
+                        "message": "Mission retry route requires a Mission id"
+                    }
+                }),
+            );
+        };
+        let stage = request
+            .body
+            .as_ref()
+            .and_then(|body| body.get("stage"))
+            .and_then(Value::as_str)
+            .unwrap_or("");
+        if stage.is_empty() {
+            return ApiResponse::json(
+                400,
+                json!({
+                    "error": {
+                        "code": "invalid_stage",
+                        "message": "body.stage is required"
+                    }
+                }),
+            );
+        }
+        let observed_revision = self.observed_revision(&request);
+        match self
+            .mission_service(refine_dir)
+            .retry_stage(mission_id, stage, observed_revision)
+        {
+            Ok(mission) => ApiResponse::json(200, json!({"mission": mission})),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(crate) fn handle_mission_transfer(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "transfer Missions");
+        let Some(mission_id) = self.mission_id_from_path(&request.path, "/transfer") else {
+            return ApiResponse::json(
+                404,
+                json!({
+                    "error": {
+                        "code": "not_found",
+                        "message": "Mission transfer route requires a Mission id"
+                    }
+                }),
+            );
+        };
+        let Some(node_id) = request
+            .body
+            .as_ref()
+            .and_then(|body| body.get("node_id"))
+            .and_then(Value::as_str)
+            .map(str::to_string)
+            .filter(|node_id| !node_id.trim().is_empty())
+        else {
+            return ApiResponse::json(
+                400,
+                json!({
+                    "error": {
+                        "code": "invalid_node",
+                        "message": "body.node_id is required"
+                    }
+                }),
+            );
+        };
+        let observed_revision = self.observed_revision(&request);
+        match self.mission_service(refine_dir).transfer_mission(
+            mission_id,
+            &node_id,
+            observed_revision,
+        ) {
+            Ok(mission) => ApiResponse::json(200, json!({"mission": mission})),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(crate) fn handle_mission_add_goal(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "adopt Goals into Mission plans");
+        let Some(mission_id) = self.mission_id_from_path(&request.path, "/goals") else {
+            return ApiResponse::json(
+                404,
+                json!({
+                    "error": {
+                        "code": "not_found",
+                        "message": "Mission goal adoption route requires a Mission id"
+                    }
+                }),
+            );
+        };
+        let Some(body) = request.body.as_ref() else {
+            return ApiResponse::json(
+                400,
+                json!({
+                    "error": {
+                        "code": "invalid_body",
+                        "message": "an adoption body is required"
+                    }
+                }),
+            );
+        };
+        let Some(goal_id) = body
+            .get("goal_id")
+            .and_then(Value::as_str)
+            .map(str::to_string)
+            .filter(|goal_id| !goal_id.trim().is_empty())
+        else {
+            return ApiResponse::json(
+                400,
+                json!({
+                    "error": {
+                        "code": "invalid_goal",
+                        "message": "body.goal_id is required"
+                    }
+                }),
+            );
+        };
+        let wave = body.get("wave").and_then(Value::as_u64).unwrap_or(1).max(1) as usize;
+        let role = body
+            .get("role")
+            .and_then(Value::as_str)
+            .map(str::to_string)
+            .filter(|role| !role.trim().is_empty());
+        let required = body
+            .get("required")
+            .and_then(Value::as_bool)
+            .unwrap_or(true);
+        let criterion_ids: Vec<String> = body
+            .get("criterion_ids")
+            .and_then(Value::as_array)
+            .map(|ids| {
+                ids.iter()
+                    .filter_map(|id| id.as_str().map(str::to_string))
+                    .collect()
+            })
+            .unwrap_or_default();
+        let observed_revision = self.observed_revision(&request);
+        match self.mission_service(refine_dir).add_plan_goal(
+            mission_id,
+            &goal_id,
+            wave,
+            role.as_deref(),
+            required,
+            &criterion_ids,
+            observed_revision,
+        ) {
+            Ok(mission) => ApiResponse::json(200, json!({"mission": mission})),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(crate) fn handle_mission_remove_goal(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "remove Goals from Mission plans");
+        let Some((mission_id, goal_id)) =
+            self.mission_path_segments(&request.path)
+                .and_then(|(mission_id, remainder)| {
+                    remainder
+                        .strip_prefix("goals/")
+                        .filter(|goal_id| !goal_id.is_empty() && !goal_id.contains('/'))
+                        .map(|goal_id| (mission_id, goal_id))
+                })
+        else {
+            return ApiResponse::json(
+                404,
+                json!({
+                    "error": {
+                        "code": "not_found",
+                        "message": "Mission goal removal route requires a Mission id and Goal id"
+                    }
+                }),
+            );
+        };
+        let observed_revision = self.observed_revision(&request);
+        match self.mission_service(refine_dir).remove_plan_goal(
+            mission_id,
+            goal_id,
+            observed_revision,
+        ) {
+            Ok(mission) => ApiResponse::json(200, json!({"mission": mission})),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(crate) fn handle_mission_context(&self, request: ApiRequest) -> ApiResponse {
+        let refine_dir = require_refine_dir!(self, "read Mission context");
+        let Some(mission_id) = self.mission_id_from_path(&request.path, "/context") else {
+            return ApiResponse::json(
+                404,
+                json!({
+                    "error": {
+                        "code": "not_found",
+                        "message": "Mission context route requires a Mission id"
+                    }
+                }),
+            );
+        };
+        match self
+            .mission_service(refine_dir)
+            .mission_context_summary(mission_id)
+        {
+            Ok(context) => ApiResponse::json(200, json!({"context": context})),
+            Err(error) => error_response(error),
+        }
+    }
+
+    pub(crate) fn handle_mission_distribution(&self, raw_path: &str) -> ApiResponse {
+        let path = raw_path.split('?').next().unwrap_or(raw_path);
+        let Some(mission_id) = self.mission_id_from_path(path, "/distribution") else {
+            return ApiResponse::json(
+                404,
+                json!({
+                    "error": {
+                        "code": "not_found",
+                        "message": "Mission distribution route requires a Mission id"
+                    }
+                }),
+            );
+        };
+        let Some(target_root) = self.target_root.clone() else {
+            return target_root_unavailable("preview Mission distribution");
+        };
+        let refine_dir = require_refine_dir!(self, "preview Mission distribution");
+        let wave = query_param(raw_path, "wave")
+            .and_then(|value| value.parse::<usize>().ok())
+            .unwrap_or(1)
+            .max(1);
+        let mission_service = self.mission_service(&refine_dir);
+        let work_items = FileWorkItemService::new(&refine_dir);
+        match crate::application::missions::phases::distribution::preview_wave_distribution(
+            &mission_service,
+            &work_items,
+            mission_id,
+            wave,
+        ) {
+            Ok(distribution) => {
+                let _ = target_root;
+                ApiResponse::json(200, json!({"distribution": distribution}))
             }
             Err(error) => error_response(error),
         }

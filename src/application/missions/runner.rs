@@ -89,7 +89,8 @@ impl MissionWorkflowEngine {
     }
 
     /// Advance one Mission by exactly one step. `None` means the Mission is
-    /// legitimately waiting (human gate, unsettled wave, no eligible work).
+    /// legitimately waiting (human gate, unsettled wave, stage failure
+    /// awaiting an authorized retry, no eligible work).
     pub fn evaluate_one(
         &self,
         service: &FileMissionService,
@@ -98,8 +99,11 @@ impl MissionWorkflowEngine {
         let mission = service.show_mission(mission_id)?;
         match mission.status {
             MissionStatus::Draft => Ok(None),
-            MissionStatus::Investigate => self
-                .with_agents(|provider, provider_name| {
+            MissionStatus::Investigate => {
+                if self.stage_failed_awaiting_retry(service, mission_id, "investigation")? {
+                    return Ok(None);
+                }
+                match self.with_agents(|provider, provider_name| {
                     phases::investigation::run_investigation(
                         service,
                         provider.as_ref(),
@@ -109,33 +113,71 @@ impl MissionWorkflowEngine {
                         mission_id,
                         &Default::default(),
                     )
-                })
-                .map(|_| Some("investigation published the initial snapshot".to_string())),
+                }) {
+                    Ok(_) => Ok(Some(
+                        "investigation published the initial snapshot".to_string(),
+                    )),
+                    Err(error) => {
+                        phases::mark_stage_failed(
+                            service,
+                            mission_id,
+                            "investigation",
+                            &error.to_string(),
+                        )?;
+                        Err(error)
+                    }
+                }
+            }
             MissionStatus::Plan => {
-                // The engine may enter Execute only after the plan approval
-                // evidence exists; approval itself is a human gate.
                 let round = phases::current_round(&mission)?;
-                let approved = round
-                    .phase_evidence
-                    .get("plan_approval")
-                    .map(|approval| !approval.is_null())
-                    .unwrap_or(false);
-                if !approved {
-                    return Ok(None);
+                if crate::application::missions::workflow::plan_is_approved(round) {
+                    if round.snapshots.is_empty() {
+                        return Ok(None);
+                    }
+                    service.transition_mission(
+                        mission_id,
+                        MissionStatus::Execute,
+                        Some(mission.revision),
+                    )?;
+                    return Ok(Some("plan approved; Execute begins".to_string()));
                 }
-                if round.snapshots.is_empty() {
-                    return Ok(None);
+                if round.plan.is_none() && !round.snapshots.is_empty() {
+                    if self.stage_failed_awaiting_retry(service, mission_id, "planning")? {
+                        return Ok(None);
+                    }
+                    return match self.with_agents(|provider, provider_name| {
+                        phases::planning::run_planning(
+                            service,
+                            provider.as_ref(),
+                            provider_name,
+                            &self.runtime_root,
+                            &self.target_root,
+                            mission_id,
+                        )
+                    }) {
+                        Ok(_) => Ok(Some(
+                            "planning drafted the plan; approval awaits".to_string(),
+                        )),
+                        Err(error) => {
+                            phases::mark_stage_failed(
+                                service,
+                                mission_id,
+                                "planning",
+                                &error.to_string(),
+                            )?;
+                            Err(error)
+                        }
+                    };
                 }
-                service.transition_mission(
-                    mission_id,
-                    MissionStatus::Execute,
-                    Some(mission.revision),
-                )?;
-                Ok(Some("plan approved; Execute begins".to_string()))
+                // A drafted plan waits for the human approval gate.
+                Ok(None)
             }
             MissionStatus::Execute => self.advance_execute(service, &mission),
-            MissionStatus::Synthesize => self
-                .with_agents(|provider, provider_name| {
+            MissionStatus::Synthesize => {
+                if self.stage_failed_awaiting_retry(service, mission_id, "synthesis")? {
+                    return Ok(None);
+                }
+                match self.with_agents(|provider, provider_name| {
                     phases::synthesis::run_synthesis(
                         service,
                         provider.as_ref(),
@@ -144,12 +186,26 @@ impl MissionWorkflowEngine {
                         &self.target_root,
                         mission_id,
                     )
-                })
-                .map(|_| Some("synthesis settled the candidate Outcome".to_string())),
+                }) {
+                    Ok(_) => Ok(Some("synthesis settled the candidate Outcome".to_string())),
+                    Err(error) => {
+                        phases::mark_stage_failed(
+                            service,
+                            mission_id,
+                            "synthesis",
+                            &error.to_string(),
+                        )?;
+                        Err(error)
+                    }
+                }
+            }
             MissionStatus::Quality => {
+                if self.stage_failed_awaiting_retry(service, mission_id, "quality")? {
+                    return Ok(None);
+                }
                 let refine_dir = prepare_refine_dir(&self.target_root)?;
                 let work_items = FileWorkItemService::new(&refine_dir);
-                self.with_agents(|provider, provider_name| {
+                match self.with_agents(|provider, provider_name| {
                     phases::quality::run_mission_quality(
                         service,
                         &work_items,
@@ -159,8 +215,18 @@ impl MissionWorkflowEngine {
                         &self.target_root,
                         mission_id,
                     )
-                })
-                .map(|_| Some("quality passed".to_string()))
+                }) {
+                    Ok(_) => Ok(Some("quality passed".to_string())),
+                    Err(error) => {
+                        phases::mark_stage_failed(
+                            service,
+                            mission_id,
+                            "quality",
+                            &error.to_string(),
+                        )?;
+                        Err(error)
+                    }
+                }
             }
             MissionStatus::Governance => self
                 .with_agents(|provider, provider_name| {
@@ -184,6 +250,31 @@ impl MissionWorkflowEngine {
             .map(|_| Some("outcome consolidated and published".to_string())),
             MissionStatus::Done | MissionStatus::Failed | MissionStatus::Cancelled => Ok(None),
         }
+    }
+
+    /// Whether one agent stage previously failed and no authorized retry
+    /// has arrived. A failed stage attempt is retryable attention, not a
+    /// failed Round: the engine waits instead of looping.
+    fn stage_failed_awaiting_retry(
+        &self,
+        service: &FileMissionService,
+        mission_id: &str,
+        stage: &str,
+    ) -> RefineResult<bool> {
+        let mission = service.show_mission(mission_id)?;
+        let round = phases::current_round(&mission)?;
+        let Some(evidence) = round.phase_evidence.get(stage) else {
+            return Ok(false);
+        };
+        let failed = evidence
+            .get("stage_failed")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false);
+        let authorized = evidence
+            .get("retry_authorized")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false);
+        Ok(failed && !authorized)
     }
 
     /// The Execute loop: materialize and admit the current wave, reconcile
@@ -214,8 +305,10 @@ impl MissionWorkflowEngine {
         }
 
         if let Some(wave) = active_wave {
-            // Materialize idempotently, then admit anything still in
-            // Backlog; a wave in flight reports its pending state.
+            // Materialize idempotently, compile the wave's fleet distribution,
+            // then admit anything still in Backlog; a wave in flight reports
+            // its pending state. Node assignment and Todo admission happen as
+            // one engine step per Goal or Feature unit.
             let materialized =
                 phases::execution::materialize_wave_goals(service, &work_items, &mission.id, wave)?;
             let created = materialized
@@ -223,11 +316,14 @@ impl MissionWorkflowEngine {
                 .iter()
                 .filter(|goal| goal.created)
                 .count();
+            let distribution =
+                phases::distribution::distribute_wave(service, &work_items, &mission.id, wave)?;
+            let moved = distribution.moved;
             let admission = phases::execution::admit_wave(service, &work_items, &mission.id, wave)?;
             let admitted = admission.goals.iter().filter(|goal| goal.admitted).count();
-            if created > 0 || admitted > 0 {
+            if created > 0 || moved > 0 || admitted > 0 {
                 return Ok(Some(format!(
-                    "wave {wave}: materialized {created}, admitted {admitted}"
+                    "wave {wave}: materialized {created}, distributed {moved}, admitted {admitted}"
                 )));
             }
             return Ok(None);

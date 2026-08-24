@@ -206,6 +206,8 @@ impl FileMissionService {
     }
 
     /// Transition a Mission to a new status, enforcing the status policy.
+    /// Starting a Draft Mission appends the first MissionRound when none
+    /// exists, freezing the current charter into the Round request.
     pub fn transition_mission(
         &self,
         mission_id: &str,
@@ -237,6 +239,59 @@ impl FileMissionService {
         let object = value.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!("Mission {mission_id} is not a JSON object"))
         })?;
+        // Starting the Mission appends the first Round if one does not exist.
+        if target == MissionStatus::Investigate
+            && current_status == MissionStatus::Draft
+            && object
+                .get("rounds")
+                .and_then(Value::as_array)
+                .map(Vec::is_empty)
+                .unwrap_or(true)
+        {
+            let intent = object
+                .get("intent")
+                .and_then(Value::as_str)
+                .unwrap_or_default()
+                .to_string();
+            let criteria = object
+                .get("success_criteria")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default();
+            let artifact_contract = object
+                .get("artifact_contract")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default();
+            let now = Self::now_timestamp();
+            object.insert(
+                "rounds".to_string(),
+                serde_json::json!([{
+                    "number": 1,
+                    "request": {
+                        "intent": intent,
+                        "constraints": [],
+                        "criteria": criteria,
+                        "artifact_obligations": artifact_contract,
+                        "authorizing_request": "mission started",
+                        "charter_digest": null,
+                    },
+                    "input_bindings": [],
+                    "plan": null,
+                    "plan_amendments": [],
+                    "snapshots": [],
+                    "reconciliation_receipts": [],
+                    "phase_evidence": {},
+                    "review": null,
+                    "outcome": null,
+                    "outcome_publication": null,
+                    "failure": null,
+                    "created": now,
+                    "updated": now,
+                }]),
+            );
+            object.insert("current_round".to_string(), Value::from(1));
+        }
         object.insert(
             "status".to_string(),
             Value::String(target.as_str().to_string()),

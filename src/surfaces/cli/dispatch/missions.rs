@@ -132,21 +132,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
                 },
         } => {
             let service = direct_mission_service(&target_root)?;
-            let mission = service.show_mission(&id)?;
-            let plan = mission
-                .rounds
-                .iter()
-                .rev()
-                .find_map(|round| round.plan.clone())
-                .ok_or_else(|| {
-                    RefineError::NotFound(format!("Mission {id} has no plan to approve"))
-                })?;
-            if plan.effective_digest.as_deref() != Some(plan_digest.as_str()) {
-                return Err(RefineError::Conflict(format!(
-                    "plan digest {plan_digest} does not match the current effective plan digest"
-                )));
-            }
-            let mission = service.approve_plan(&id, plan, "", "", None)?;
+            let mission = service.approve_plan(&id, &plan_digest, "", "", None)?;
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"mission": mission})).unwrap()
@@ -241,6 +227,119 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
             println!(
                 "{}",
                 serde_json::to_string_pretty(&json!({"goal": goal})).unwrap()
+            );
+            Ok(())
+        }
+        Commands::Mission {
+            action:
+                MissionAction::Decide {
+                    id,
+                    decision_id,
+                    choice,
+                    rationale,
+                    actor,
+                    target_root: Some(target_root),
+                },
+        } => {
+            let mission = direct_mission_service(&target_root)?.answer_decision(
+                &id,
+                &decision_id,
+                &choice,
+                &rationale,
+                actor.as_deref().unwrap_or(""),
+                None,
+            )?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({"mission": mission})).unwrap()
+            );
+            Ok(())
+        }
+        Commands::Mission {
+            action:
+                MissionAction::Retry {
+                    id,
+                    stage,
+                    target_root: Some(target_root),
+                },
+        } => {
+            let mission = direct_mission_service(&target_root)?.retry_stage(&id, &stage, None)?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({"mission": mission})).unwrap()
+            );
+            Ok(())
+        }
+        Commands::Mission {
+            action:
+                MissionAction::Transfer {
+                    id,
+                    node_id,
+                    target_root: Some(target_root),
+                },
+        } => {
+            let mission =
+                direct_mission_service(&target_root)?.transfer_mission(&id, &node_id, None)?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({"mission": mission})).unwrap()
+            );
+            Ok(())
+        }
+        Commands::Mission {
+            action:
+                MissionAction::AddGoal {
+                    id,
+                    goal_id,
+                    wave,
+                    role,
+                    optional,
+                    criteria,
+                    target_root: Some(target_root),
+                },
+        } => {
+            let mission = direct_mission_service(&target_root)?.add_plan_goal(
+                &id,
+                &goal_id,
+                wave,
+                role.as_deref(),
+                !optional,
+                &criteria,
+                None,
+            )?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({"mission": mission})).unwrap()
+            );
+            Ok(())
+        }
+        Commands::Mission {
+            action:
+                MissionAction::RemoveGoal {
+                    id,
+                    goal_id,
+                    target_root: Some(target_root),
+                },
+        } => {
+            let mission =
+                direct_mission_service(&target_root)?.remove_plan_goal(&id, &goal_id, None)?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({"mission": mission})).unwrap()
+            );
+            Ok(())
+        }
+        Commands::Mission {
+            action:
+                MissionAction::Context {
+                    id,
+                    target_root: Some(target_root),
+                },
+        } => {
+            let context = direct_mission_service(&target_root)?.mission_context_summary(&id)?;
+            println!(
+                "{}",
+                serde_json::to_string_pretty(&json!({"context": context})).unwrap()
             );
             Ok(())
         }
@@ -379,6 +478,84 @@ pub(super) fn dispatch_mission_daemon(action: MissionAction) -> RefineResult<()>
         } => daemon_json(
             "GET",
             &format!("/work/missions/{}/outcome", path_segment(&id)),
+            None,
+        )?,
+        MissionAction::Decide {
+            id,
+            decision_id,
+            choice,
+            rationale,
+            actor,
+            target_root: None,
+        } => daemon_json(
+            "POST",
+            &format!(
+                "/work/missions/{}/decisions/{}",
+                path_segment(&id),
+                path_segment(&decision_id)
+            ),
+            Some(json!({
+                "choice": choice,
+                "rationale": rationale,
+                "actor": actor
+            })),
+        )?,
+        MissionAction::Retry {
+            id,
+            stage,
+            target_root: None,
+        } => daemon_json(
+            "POST",
+            &format!("/work/missions/{}/retry", path_segment(&id)),
+            Some(json!({ "stage": stage })),
+        )?,
+        MissionAction::Transfer {
+            id,
+            node_id,
+            target_root: None,
+        } => daemon_json(
+            "POST",
+            &format!("/work/missions/{}/transfer", path_segment(&id)),
+            Some(json!({ "node_id": node_id })),
+        )?,
+        MissionAction::AddGoal {
+            id,
+            goal_id,
+            wave,
+            role,
+            optional,
+            criteria,
+            target_root: None,
+        } => daemon_json(
+            "POST",
+            &format!("/work/missions/{}/goals", path_segment(&id)),
+            Some(json!({
+                "goal_id": goal_id,
+                "wave": wave,
+                "role": role,
+                "required": !optional,
+                "criterion_ids": criteria,
+            })),
+        )?,
+        MissionAction::RemoveGoal {
+            id,
+            goal_id,
+            target_root: None,
+        } => daemon_json(
+            "DELETE",
+            &format!(
+                "/work/missions/{}/goals/{}",
+                path_segment(&id),
+                path_segment(&goal_id)
+            ),
+            None,
+        )?,
+        MissionAction::Context {
+            id,
+            target_root: None,
+        } => daemon_json(
+            "GET",
+            &format!("/work/missions/{}/context", path_segment(&id)),
             None,
         )?,
         other => {

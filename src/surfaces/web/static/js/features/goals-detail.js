@@ -187,6 +187,28 @@ function renderGoalFeatureAssociation(goal) {
     </div>`;
 }
 
+// The Mission association of a Mission-bound Goal: binding, pinned snapshot,
+// and contribution state. Standalone Goals render nothing — no empty
+// Mission placeholders appear in standalone views.
+function renderGoalMissionAssociation(goal) {
+  const binding = goal.mission;
+  if (!binding || !binding.mission_id) return "";
+  const latest = (goal.rounds || [])[goal.rounds.length - 1] || {};
+  const context = latest.mission_context;
+  const contribution = latest.mission_contribution;
+  const contextLine = context
+    ? `pinned to Mission Round ${context.mission_round}, snapshot ${context.snapshot_version}`
+      + (context.capsule_manifest_digest ? ` (capsule <code>${htmlEscape(String(context.capsule_manifest_digest).slice(0, 19))}…</code>)` : "")
+    : "no pinned Mission context yet";
+  return `
+    <div class="goal-mission-row muted small" style="margin-bottom:14px" data-testid="goal-mission-association">
+      Mission <a href="#/missions/${encodeURIComponent(binding.mission_id)}">${htmlEscape(binding.mission_id)}</a>
+      · key <code>${htmlEscape(binding.mission_goal_key)}</code>
+      · ${contextLine}
+      ${contribution ? " · contribution settled" : ""}
+    </div>`;
+}
+
 function goalTransferToActiveNodeTarget(goal) {
   const activeNodeId = String(nodeContextActiveNodeId() || "").trim();
   const ownerNodeId = String(goal?.node_id || "default").trim();
@@ -373,6 +395,7 @@ function drawGoalDetail(goal) {
         ${goal.branch_name ? ` · branch <code>${goal.branch_name}</code>` : ""}
       </div>
       ${renderGoalFeatureAssociation(goal)}
+      ${renderGoalMissionAssociation(goal)}
 
       ${failureBanner ? `
         <div class="banner ${failureBanner.severity}" data-testid="goal-failure-banner">

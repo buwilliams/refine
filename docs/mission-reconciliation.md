@@ -1,6 +1,6 @@
 # Mission Reconciliation
 
-Status: proposed design
+Status: implemented (the reconciliation reducer, knowledge lineage, verification tiers, wave-boundary semantics, contested knowledge, and reduction-error recovery; decision requests are answerable through every surface)
 Scope: the reconciliation reducer, knowledge lineage, verification tiers, wave-boundary semantics, contested knowledge, and reduction-error recovery
 Relationship: extends `mission-spec.md`; every addition is listed in [Spec deltas](#spec-deltas). Where this doc is silent, mission-spec.md governs.
 Implementation: `src/application/missions/reconciliation/` (`ledger`, `verify`, `settlement`, `engine`, `capsule`) plus the orchestrator in `src/application/missions/phases/reconcile.rs`; the deterministic steps, the repository-backed verification sources, and the reduction/criticism agent contracts are implemented and tested.

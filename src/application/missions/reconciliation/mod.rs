@@ -36,7 +36,7 @@ pub use engine::{
     CriticismVerdictEntry, DEFAULT_DECISION_VOLUME_THRESHOLD, DraftedAssertion,
     DraftedContradiction, DraftedRejection, OpenedAttempt, ReconciliationInput, ReductionDraft,
     VerifiedAttempt, VerifiedCandidate, VerifiedFinding, apply_correction, apply_reduction,
-    compute_snapshot_digest, next_attempt_id, open_attempt, verify_claims,
+    compute_plan_digest, compute_snapshot_digest, next_attempt_id, open_attempt, verify_claims,
 };
 pub use ledger::{
     AffectedGoalRound, AffectedGoalSpec, AssertionState, CapsuleBinding, InvalidatedBecause,
@@ -101,6 +101,24 @@ mod integration_tests {
         let mission = service
             .append_round(&mission.id, "Buddy", "begin round 1", None)
             .unwrap();
+        // Planning runs against the investigation snapshot; approval binds
+        // the recorded plan's exact effective digest.
+        let snapshot = MissionSnapshot {
+            version: 1,
+            parent_version: None,
+            target_head: Some("head0".to_string()),
+            plan_digest: None,
+            artifact_refs: vec![],
+            input_refs: vec![],
+            consumed_contribution_refs: vec![],
+            knowledge_index: vec![],
+            corrects_snapshot: None,
+            digest: None,
+            created: String::new(),
+        };
+        let mission = service
+            .publish_snapshot(&mission.id, snapshot, None)
+            .unwrap();
         let plan = MissionPlan {
             charter_digest: None,
             summary: "one wave".to_string(),
@@ -137,32 +155,25 @@ mod integration_tests {
             }],
             criticism: None,
             resolutions: vec![],
-            effective_digest: Some("plan-1".to_string()),
+            effective_digest: None,
         };
+        let mission = service
+            .record_plan(&mission.id, plan, Some(mission.revision))
+            .unwrap();
+        let plan_digest = mission
+            .rounds
+            .last()
+            .and_then(|round| round.plan.as_ref())
+            .and_then(|plan| plan.effective_digest.clone())
+            .expect("recorded plan carries its effective digest");
         let mission = service
             .approve_plan(
                 &mission.id,
-                plan,
+                &plan_digest,
                 "Buddy",
                 "looks right",
                 Some(mission.revision),
             )
-            .unwrap();
-        let snapshot = MissionSnapshot {
-            version: 1,
-            parent_version: None,
-            target_head: Some("head0".to_string()),
-            plan_digest: Some("plan-1".to_string()),
-            artifact_refs: vec![],
-            input_refs: vec![],
-            consumed_contribution_refs: vec![],
-            knowledge_index: vec![],
-            corrects_snapshot: None,
-            digest: None,
-            created: String::new(),
-        };
-        let mission = service
-            .publish_snapshot(&mission.id, snapshot, None)
             .unwrap();
         assert_eq!(mission.rounds[0].snapshots.len(), 1);
         (service, mission.id.clone())

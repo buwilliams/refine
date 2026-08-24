@@ -316,6 +316,26 @@ impl FileNodeRegistryService {
         }
     }
 
+    /// Nodes eligible to receive distributed work: enabled, not archived, and
+    /// not last-reported failed or deprovisioned. Health is reported, not
+    /// assumed: a node without a recorded health check is distributable.
+    pub fn distribution_candidate_nodes(&self) -> RefineResult<Vec<Node>> {
+        let registry = self.load_registry()?;
+        Ok(registry
+            .nodes
+            .into_iter()
+            .filter(|node| {
+                node.enabled
+                    && !node.archived
+                    && node
+                        .health
+                        .as_ref()
+                        .map(|health| health.status != "failed" && health.status != "deprovisioned")
+                        .unwrap_or(true)
+            })
+            .collect())
+    }
+
     pub(crate) fn load_registry(&self) -> RefineResult<NodeRegistry> {
         let path = self.registry_path();
         if !path.exists() {

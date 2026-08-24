@@ -67,6 +67,50 @@ impl FileWorkItemService {
         self.show_goal_summary(goal_id)
     }
 
+    /// Remove one Goal's Mission binding. Safe removal only: once any Round
+    /// pinned Mission context the membership is historical and stays; later
+    /// exclusion is a plan amendment, not a deleted binding.
+    pub fn remove_goal_mission_binding(
+        &self,
+        goal_id: &str,
+    ) -> RefineResult<GoalSummaryProjection> {
+        let current = self.show_goal_summary(goal_id)?;
+        self.ensure_goal_owned(&current)?;
+        let (_goal_lock, goal_path, mut value) = self.read_goal_value_unchecked(&current)?;
+        let rounds = value
+            .get("rounds")
+            .and_then(Value::as_array)
+            .ok_or_else(|| RefineError::NotFound(format!("Goal {goal_id} has no rounds")))?;
+        let pinned = rounds.iter().any(|round| {
+            round
+                .get("mission_context")
+                .map(|context| !context.is_null())
+                .unwrap_or(false)
+        });
+        if pinned {
+            return Err(RefineError::Conflict(format!(
+                "Goal {goal_id} has a GoalRound with pinned Mission context; its Mission membership is historical and cannot be removed"
+            )));
+        }
+        let object = value.as_object_mut().ok_or_else(|| {
+            RefineError::Serialization(format!("Goal {} is not a JSON object", goal_path.display()))
+        })?;
+        if object
+            .get("mission")
+            .map(|mission| mission.is_null())
+            .unwrap_or(true)
+        {
+            return self.show_goal_summary(goal_id);
+        }
+        object.insert("mission".to_string(), Value::Null);
+        object.insert(
+            "updated".to_string(),
+            Value::String(super::goal_filters::now_timestamp()),
+        );
+        super::record_persistence::write_json_atomically(&goal_path, &value)?;
+        self.show_goal_summary(goal_id)
+    }
+
     /// Pin the typed Mission context binding and the compiled capsule onto
     /// the Goal's latest Round. The capsule becomes the `mission` member of
     /// the pinned agent context; once the workflow pins that context the

@@ -678,7 +678,13 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
             | MissionAction::Cancel { target_root, .. }
             | MissionAction::Advance { target_root, .. }
             | MissionAction::Contribute { target_root, .. }
-            | MissionAction::Outcome { target_root, .. } => target_root.as_ref(),
+            | MissionAction::Outcome { target_root, .. }
+            | MissionAction::Decide { target_root, .. }
+            | MissionAction::Retry { target_root, .. }
+            | MissionAction::Transfer { target_root, .. }
+            | MissionAction::AddGoal { target_root, .. }
+            | MissionAction::RemoveGoal { target_root, .. }
+            | MissionAction::Context { target_root, .. } => target_root.as_ref(),
         },
         Commands::Todo { action } => match action {
             TodoAction::List { target_root, .. }

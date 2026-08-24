@@ -6,6 +6,7 @@
 
 pub mod agent_phase;
 pub mod contracts;
+mod operations;
 mod persistence;
 pub mod phases;
 pub mod reconciliation;

@@ -127,4 +127,86 @@ pub enum MissionAction {
         #[cfg_attr(not(test), arg(skip = None))]
         target_root: Option<PathBuf>,
     },
+    /// Answer one Mission decision request raised by reconciliation.
+    Decide {
+        /// Mission id.
+        id: String,
+        /// The decision request id.
+        decision_id: String,
+        /// The chosen answer; must be one of the request's choices.
+        #[arg(long)]
+        choice: String,
+        /// Why this choice was made.
+        #[arg(long)]
+        rationale: String,
+        /// Who answered.
+        #[arg(long)]
+        actor: Option<String>,
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
+        target_root: Option<PathBuf>,
+    },
+    /// Authorize the retry of one retryable Mission stage failure.
+    Retry {
+        /// Mission id.
+        id: String,
+        /// The failed stage to retry (investigation, planning, synthesis, quality).
+        #[arg(long)]
+        stage: String,
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
+        target_root: Option<PathBuf>,
+    },
+    /// Transfer Mission coordination to another Node. Child Goals never move.
+    Transfer {
+        /// Mission id.
+        id: String,
+        /// The Node that becomes coordinator.
+        node_id: String,
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
+        target_root: Option<PathBuf>,
+    },
+    /// Adopt an existing Goal into the Mission plan. Binds only when the
+    /// resulting plan digest is approved.
+    AddGoal {
+        /// Mission id.
+        id: String,
+        /// The Goal to adopt.
+        goal_id: String,
+        /// The wave the Goal joins.
+        #[arg(long, default_value_t = 1)]
+        wave: usize,
+        /// The Goal's role in the Mission.
+        #[arg(long)]
+        role: Option<String>,
+        /// Mark the Goal optional instead of required.
+        #[arg(long)]
+        optional: bool,
+        /// A criterion id this Goal advances; repeatable.
+        #[arg(long = "criterion")]
+        criteria: Vec<String>,
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
+        target_root: Option<PathBuf>,
+    },
+    /// Exclude a Goal specification from the Mission plan.
+    RemoveGoal {
+        /// Mission id.
+        id: String,
+        /// The Goal to remove from the plan.
+        goal_id: String,
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
+        target_root: Option<PathBuf>,
+    },
+    /// Read the Mission context projection: snapshots, accepted knowledge,
+    /// artifacts, contradictions, and open decisions.
+    Context {
+        /// Mission id.
+        id: String,
+        #[cfg_attr(test, arg(long, hide = true))]
+        #[cfg_attr(not(test), arg(skip = None))]
+        target_root: Option<PathBuf>,
+    },
 }

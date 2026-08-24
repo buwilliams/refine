@@ -31,10 +31,11 @@ Current implementation details that matter to intent:
 - A GoalRound is affected by an invalidation only if its pinned capsule actually included the invalidated assertion.
 - Wave boundaries should produce near-zero human interrupts; recurring decision volume is a plan-quality signal, not a world problem.
 - Late evidence is never lost: it carries to the next boundary, and a mandatory sweep precedes synthesis.
-- Agent phases (investigation, reduction, criticism, synthesis, holistic quality, governance) run as one-shot supervised operations with stable ownership and typed structured-output contracts; the engine, not the agents, assigns ids, enforces authority, and publishes.
+- Agent phases (investigation, planning proposal, independent plan criticism, plan revision, reduction, criticism, synthesis, holistic quality, governance) run as one-shot supervised operations with stable ownership and typed structured-output contracts; the engine, not the agents, assigns ids, enforces authority, and publishes.
+- Fleet distribution compiles an approved wave into the existing Goal and Feature placement operations: preferred-node placement, least-load spread, one-unit Feature placement, recorded exclusions, durable per-wave receipts, and a preview that agrees with the applied result.
 - Final approval triggers deterministic consolidation: the Outcome manifest is written, proven from its state commit by Git read-back, recorded in a publication receipt, and exposed Done only after the terminal record is durably synchronized.
 
-Future work should preserve these properties while remaining phases (fleet distribution compilation, deeper Goal-agent contribution contracts) are built out.
+Future work should preserve these properties as the loop meets real fleets and long-lived Missions: deeper Goal-agent contribution contracts, richer Outcome lineage surfaces, and scale limits calibrated from live wave volumes.
 
 ## Future Direction
 
