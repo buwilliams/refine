@@ -18,7 +18,6 @@ use crate::infrastructure::storage::project_layout::target_root_for_refine_dir;
 use crate::model::feature::{FeatureIndexProjection, FeatureRollup, compare_feature_goal_order};
 use crate::model::goal::GoalIndexProjection;
 use crate::model::log::{ActivityEntry, RoundLogEntry};
-use crate::model::mission::{MissionCriteriaSummary, MissionIndexProjection, MissionStatus};
 use crate::model::workflow::GoalStatus;
 
 use super::helpers::*;
@@ -44,7 +43,7 @@ static PROJECTION_REBUILD_COUNTS: OnceLock<Mutex<BTreeMap<PathBuf, u64>>> = Once
 static SNAPSHOT_MEMORY_CACHE: OnceLock<Mutex<BTreeMap<String, Arc<ProjectionSnapshot>>>> =
     OnceLock::new();
 
-fn cached_snapshot(key: &str) -> Option<Arc<ProjectionSnapshot>> {
+pub(self) fn cached_snapshot(key: &str) -> Option<Arc<ProjectionSnapshot>> {
     SNAPSHOT_MEMORY_CACHE
         .get_or_init(|| Mutex::new(BTreeMap::new()))
         .lock()
@@ -52,7 +51,7 @@ fn cached_snapshot(key: &str) -> Option<Arc<ProjectionSnapshot>> {
         .and_then(|cache| cache.get(key).cloned())
 }
 
-fn store_cached_snapshot(key: String, snapshot: Arc<ProjectionSnapshot>) {
+pub(self) fn store_cached_snapshot(key: String, snapshot: Arc<ProjectionSnapshot>) {
     if let Ok(mut cache) = SNAPSHOT_MEMORY_CACHE
         .get_or_init(|| Mutex::new(BTreeMap::new()))
         .lock()
@@ -77,7 +76,6 @@ mod features;
 mod goals;
 mod helpers;
 mod incremental;
-mod missions;
 mod projection_store;
 
 use helpers::*;

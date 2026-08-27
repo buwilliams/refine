@@ -7,7 +7,6 @@ mod goals;
 mod http_transport;
 mod imports;
 mod imports_parity;
-mod missions;
 mod nodes_fleet;
 mod operations_processes;
 mod project_runtime;
@@ -193,7 +192,6 @@ fn server_with_projection() -> InProcessWebServer {
                 feature_id: None,
                 feature_order: None,
                 json_path: "goals/01/GOAL1/goal.json".to_string(),
-                mission: None,
             },
             node_display_name: None,
             latest_round_prompt: None,
@@ -222,7 +220,6 @@ fn server_with_projection() -> InProcessWebServer {
             source_fingerprints: BTreeMap::new(),
             goals,
             features: BTreeMap::new(),
-            missions: BTreeMap::new(),
             activity: BTreeMap::new(),
             changes: BTreeMap::new(),
             dashboard: DashboardProjection::default(),

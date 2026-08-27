@@ -12,7 +12,6 @@ mod features;
 mod fleet;
 mod goals;
 mod logs;
-mod missions;
 mod nodes;
 mod projects;
 mod sync;
@@ -29,7 +28,6 @@ pub use features::FeatureAction;
 pub use fleet::FleetAction;
 pub use goals::GoalAction;
 pub use logs::LogAction;
-pub use missions::MissionAction;
 pub use nodes::NodeAction;
 pub use projects::ProjectAction;
 pub use sync::CliSyncAuthority;
@@ -94,12 +92,6 @@ pub enum Commands {
     Feature {
         #[command(subcommand)]
         action: FeatureAction,
-    },
-    /// Create and drive Missions — governed system-level outcomes that own
-    /// waves of Goals, shared context, and an immutable published Outcome.
-    Mission {
-        #[command(subcommand)]
-        action: MissionAction,
     },
     /// Manage Reporter-owned Todo lists and items.
     /// Uses the same durable capability as the web UI and daemon API.

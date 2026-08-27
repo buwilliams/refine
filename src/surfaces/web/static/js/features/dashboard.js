@@ -97,14 +97,11 @@ async function refreshDashboard() {
     const reporter = state.lastReporter || "";
     const scope = dashboardScopeFromHash();
     const nodeParam = encodeURIComponent(scope);
-    const [d, reviews, missionsResult] = await Promise.all([
+    const [d, reviews] = await Promise.all([
       dashboardApi("GET", `/api/dashboard?node=${nodeParam}`),
       reporter
         ? dashboardApi("GET", "/api/goals?status=review&assignee=" + encodeURIComponent(reporter) + `&node=${nodeParam}&limit=200`)
         : Promise.resolve({ goals: [] }),
-      // The Mission summary is orientation and routing; a transient failure
-      // renders an empty panel rather than failing the whole dashboard.
-      dashboardApi("GET", "/api/missions?limit=100").catch(() => ({ missions: [] })),
     ]);
     if (refreshSeq !== dashboardRefreshSeq || state.currentRoute !== "dashboard"
         || !isNodeContextGenerationCurrent(nodeGeneration)) return;
@@ -114,7 +111,6 @@ async function refreshDashboard() {
         || !isNodeContextGenerationCurrent(nodeGeneration)) return;
     state.dashboard = d;
     state.dashboardReviewSnapshot = { reviewsForReporter: reviews.goals || [], reporter };
-    state.dashboardMissions = missionsResult.missions || [];
     drawDashboard(d, state.dashboardReviewSnapshot);
   } catch (e) {
     if (refreshSeq !== dashboardRefreshSeq || state.currentRoute !== "dashboard"
@@ -153,49 +149,6 @@ function scheduleDashboardRetry() {
     dashboardRetryTimer = null;
     if (state.currentRoute === "dashboard") refreshDashboard();
   }, 2000);
-}
-
-function renderDashboardMissionsPanel() {
-  const missions = state.dashboardMissions || [];
-  const active = missions.filter((mission) => !["done", "failed", "cancelled"].includes(mission.status));
-  const awaitingPlan = missions.filter((mission) => mission.status === "plan");
-  const awaitingReview = missions.filter((mission) => ["review", "consolidate"].includes(mission.status));
-  const terminal = missions.length - active.length;
-  const open = dashboardPanelOpen("dashboard-missions-card", false);
-  if (!missions.length) return "";
-  return `
-    <details class="filter-shell dashboard-collapsible-shell" id="dashboard-missions-card" data-testid="dashboard-missions-panel"${open ? " open" : ""}>
-      <summary data-testid="dashboard-missions-summary">
-        <span class="filter-shell-title">Missions</span>
-        <span class="filter-pill" data-testid="dashboard-missions-active">${fmtCount(active.length)} active</span>
-        ${awaitingPlan.length ? `<span class="filter-pill">Plan approval</span>` : ""}
-        ${awaitingReview.length ? `<span class="filter-pill">Outcome review</span>` : ""}
-      </summary>
-      <div class="filter-shell-body">
-        ${active.length === 0
-          ? `<p class="muted">No active Missions.</p>`
-          : `<table class="table">
-              <thead><tr><th>Mission</th><th>Status</th><th>Round</th><th>Criteria</th><th>Updated</th></tr></thead>
-              <tbody>
-                ${active.map((mission) => `
-                  <tr data-testid="dashboard-mission-row">
-                    <td><a href="#/missions/${encodeURIComponent(mission.id)}">${htmlEscape(mission.name || mission.id)}</a></td>
-                    <td><span class="status-pill ${htmlEscape(mission.status)}">${htmlEscape(mission.status)}</span></td>
-                    <td class="muted small">${mission.current_round ? `#${mission.current_round}` : "—"}</td>
-                    <td class="muted small">${missionCriteriaSummaryText(mission)}</td>
-                    <td class="muted small">${fmtTime(mission.updated)}</td>
-                  </tr>`).join("")}
-              </tbody>
-            </table>`}
-        ${terminal > 0 ? `<p class="muted small">${terminal} settled Mission(s).</p>` : ""}
-      </div>
-    </details>`;
-}
-
-function missionCriteriaSummaryText(mission) {
-  const criteria = mission.criteria_summary || {};
-  if (!criteria.total) return "—";
-  return `${criteria.met || 0}/${criteria.total} met`;
 }
 
 function renderDashboardStateSyncHealth(d) {
@@ -282,7 +235,6 @@ function drawDashboard(d, opts = {}) {
     })}
     ${renderDashboardStateSyncHealth(d)}
     ${renderDashboardStateRecovery(d)}
-    ${renderDashboardMissionsPanel()}
 
     ${showReviewPanel ? `
     <details class="filter-shell dashboard-collapsible-shell" id="reviews-for-reporter-card" data-testid="dashboard-review-panel"${reviewsShellOpen ? " open" : ""}>
@@ -396,7 +348,6 @@ function drawDashboard(d, opts = {}) {
 
     wireDashboardPanelPersistence("reviews-for-reporter-card");
     wireDashboardPanelPersistence("dashboard-contributor-rankings-shell");
-    wireDashboardPanelPersistence("dashboard-missions-card");
     wireDashboardStateRecovery();
     wireReviewsForReporter(reviewsForReporter);
   });

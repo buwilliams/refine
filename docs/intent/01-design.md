@@ -58,7 +58,7 @@ The Surfaces should be replaceable. Browser, CLI, API, voice, and agent-native i
 
 ## Intended Outcome
 
-Refine should become the local operating layer for agentic software work. It should let people and AI systems express work as direct Goal prompts, organize those Goals into larger Features, compose governed system-level outcomes as Missions, preserve the context needed to act on them, and move the work through implementation, quality, review, and merge.
+Refine should become the local operating layer for agentic software work. It should let people and AI systems express work as direct Goal prompts, organize those Goals into larger Features, converge on outcomes larger than any one change as Missions, preserve the context needed to act on them, and move the work through implementation, quality, review, and merge.
 
 The long-term direction is software composition at scale: workflow, persistence, and orchestration for fleets of agents. If future AI systems find better internal designs, they should still preserve the product intent:
 

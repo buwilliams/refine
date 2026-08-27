@@ -94,10 +94,6 @@ impl FileProjectProjectionStore {
             let rel_path = self.relative_path(&path)?;
             observed.insert(rel_path, Self::metadata_fingerprint(&path)?);
         }
-        for path in Self::collect_json_files(&self.refine_dir.join("missions"), "mission.json")? {
-            let rel_path = self.relative_path(&path)?;
-            observed.insert(rel_path, Self::metadata_fingerprint(&path)?);
-        }
         for path in Self::collect_json_files(&goal_logs_root(&self.refine_dir), "logs.jsonl")? {
             let rel_path = self.relative_path(&path)?;
             observed.insert(rel_path, Self::metadata_fingerprint(&path)?);
@@ -131,10 +127,6 @@ impl FileProjectProjectionStore {
             source_fingerprints.insert(rel_path, Self::metadata_fingerprint(&path)?);
         }
         for path in Self::collect_json_files(&self.refine_dir.join("features"), "feature.json")? {
-            let rel_path = self.relative_path(&path)?;
-            source_fingerprints.insert(rel_path, Self::metadata_fingerprint(&path)?);
-        }
-        for path in Self::collect_json_files(&self.refine_dir.join("missions"), "mission.json")? {
             let rel_path = self.relative_path(&path)?;
             source_fingerprints.insert(rel_path, Self::metadata_fingerprint(&path)?);
         }

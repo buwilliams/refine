@@ -6,11 +6,10 @@ use serde::{Deserialize, Serialize};
 use crate::model::feature::{FeatureIndexProjection, FeatureRollup};
 use crate::model::goal::GoalIndexProjection;
 use crate::model::log::ActivityEntry;
-use crate::model::mission::{MissionIndexProjection, MissionStatus};
 use crate::model::workflow::GoalStatus;
 use crate::model::{JsonObject, Timestamp};
 
-pub const PROJECTION_SNAPSHOT_VERSION: u64 = 3;
+pub const PROJECTION_SNAPSHOT_VERSION: u64 = 2;
 pub const PROJECTION_SNAPSHOT_FILE: &str = "projection-snapshot.json";
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -28,7 +27,6 @@ pub struct ProjectionSnapshot {
     pub source_fingerprints: BTreeMap<String, SourceFingerprint>,
     pub goals: BTreeMap<String, GoalSummaryProjection>,
     pub features: BTreeMap<String, FeatureSummaryProjection>,
-    pub missions: BTreeMap<String, MissionIndexProjection>,
     pub activity: BTreeMap<String, ActivitySummaryProjection>,
     pub changes: BTreeMap<String, ChangeSummaryProjection>,
     pub dashboard: DashboardProjection,
@@ -44,7 +42,6 @@ impl Default for ProjectionSnapshot {
             source_fingerprints: BTreeMap::new(),
             goals: BTreeMap::new(),
             features: BTreeMap::new(),
-            missions: BTreeMap::new(),
             activity: BTreeMap::new(),
             changes: BTreeMap::new(),
             dashboard: DashboardProjection::default(),
@@ -204,24 +201,6 @@ pub struct FeatureProjectionQuery {
     pub assignee: Option<String>,
     pub node: Option<String>,
     pub current_node_id: Option<String>,
-}
-
-#[derive(Clone, Debug, Default, Eq, PartialEq)]
-pub struct MissionProjectionQuery {
-    pub page: PageRequest,
-    pub q: Option<String>,
-    pub status: Option<MissionStatus>,
-    pub reporter: Option<String>,
-    pub assignee: Option<String>,
-    pub coordinator: Option<String>,
-    pub outcome: Option<bool>,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct MissionProjectionList {
-    pub missions: Vec<MissionIndexProjection>,
-    pub total: usize,
-    pub matching_ids: Vec<String>,
 }
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]

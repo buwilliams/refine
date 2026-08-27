@@ -6,7 +6,6 @@ mod goal_authoring;
 mod goal_filters;
 mod implementation_planning;
 mod integration_recovery;
-mod mission_binding;
 mod persistence;
 mod record_persistence;
 mod round_helpers;
