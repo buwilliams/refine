@@ -100,6 +100,45 @@ pub(crate) fn sync_human_checkout_after_ref_move(
     }
 }
 
+/// Record a checkout sync that is *about* to be attempted, before the ref
+/// moves.
+///
+/// Integration attributes an interruption between the ref-CAS and the sync to
+/// its own transaction marker, which recovery replays. A caller outside that
+/// transaction — the Todo boundary's fast-forward — has no marker to attribute
+/// to, so without this a crash in that window would leave the ref advanced, the
+/// checkout showing the delta staged-reverse, and nothing durable saying so.
+///
+/// The record needs no explicit clearing: once the sync has landed,
+/// [`repair_pending_checkout_sync`] replays it against the branch's current tip,
+/// which for an already-caught-up checkout is a Git no-op that removes the
+/// record. Recording only when the checkout actually sits on the branch keeps
+/// the marker out of the ordinary case, where the sync is a no-op anyway.
+pub(crate) fn record_intended_checkout_sync(
+    repo_git: &FileGitWorktreeService,
+    target_branch: &str,
+    from_commit: &str,
+    to_commit: &str,
+) -> RefineResult<()> {
+    let reference = format!("refs/heads/{target_branch}");
+    if repo_git.symbolic_head_branch()?.as_deref() != Some(reference.as_str()) {
+        return Ok(());
+    }
+    record_pending_sync(
+        repo_git,
+        &reference,
+        from_commit,
+        to_commit,
+        |from_commit| {
+            format!(
+                "the {from_commit}..{to_commit} sync was about to run outside an integration \
+                 transaction; if it did not complete, the human checkout shows the delta as \
+                 staged-reverse until repair_pending_checkout_sync replays it"
+            )
+        },
+    )
+}
+
 /// Retry a skipped checkout sync for the branch the checkout is on. The
 /// record survives until one retry succeeds while the checkout is on the
 /// record's branch; a sync of an already-caught-up checkout is a Git no-op

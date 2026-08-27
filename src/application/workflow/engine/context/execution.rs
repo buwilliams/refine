@@ -258,8 +258,8 @@ fn ensure_resumed_candidate_worktree(
 ///
 /// Plan or Implement may have stopped anywhere between the durable status transition and the first
 /// candidate commit. The branch name is deterministic, completed planning artifacts live on the
-/// Round, and `ensure_worktree` is idempotent, so restarting is cheaper and safer than persisting
-/// a worker identity.
+/// Round, and `ensure_worktree_from_base` is idempotent, so restarting is cheaper and safer than
+/// persisting a worker identity.
 pub(crate) fn hydrate_plan_or_implement_context(
     ctx: &mut WorkflowContext<'_>,
     branch_pattern: &str,
@@ -285,7 +285,11 @@ pub(crate) fn hydrate_plan_or_implement_context(
         .git_path("refine-worktrees")?
         .join(branch.replace('/', "-"));
     let (worktree, handoff) = with_repository_git_lock(ctx.target_root, || {
-        let worktree = git.ensure_worktree(&branch, &worktree_target)?;
+        // Resumption recreates the branch only when it is gone, and then at the
+        // Goal's recorded base rather than at the shared checkout's HEAD — the same
+        // birth rule the first materialization follows. An existing branch is reused
+        // exactly as it stands: it may hold the interrupted Round's commits.
+        let worktree = git.ensure_worktree_from_base(&branch, &worktree_target, &base)?;
         let handoff = register_candidate_handoff(
             ctx.runtime_root,
             ctx.target_root,

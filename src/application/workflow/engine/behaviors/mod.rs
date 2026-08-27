@@ -13,7 +13,8 @@ use crate::application::workflow::engine::behaviors::contract::{
 };
 use crate::application::workflow::engine::context::WorkflowContext;
 use crate::application::workflow::governance::integration::{
-    AlreadyMergedResolutionDisposition, FileGovernanceIntegrationService,
+    AlreadyMergedResolutionDisposition, FileGovernanceIntegrationService, TargetRefresh,
+    refresh_target_from_remote,
 };
 use crate::application::workflow::phases::implementation_planning::begin_implementation_phase;
 use crate::application::workflow::phases::quality::{
@@ -133,6 +134,12 @@ impl WorkflowBehavior for WorkflowTodo {
             ctx.round_idx,
         );
         let target_branch = setting_string(&ctx.settings, "merge_target_branch", "main");
+        // The base is pinned from the local ref, so the local ref is brought up to
+        // its remote first. Advisory: the Round starts on whatever the ref holds if
+        // the remote is absent or unreachable. The remote itself is read from the
+        // node setting rather than the Round's pin, because Todo may run before the
+        // Round exists to carry one.
+        refresh_todo_target_from_remote(ctx, &app_git, &target_branch)?;
         let base_commit = match app_git.resolve_commit(&target_branch) {
             Ok(commit) => commit,
             Err(error) => return fail(ctx, "branch", error),
@@ -146,12 +153,18 @@ impl WorkflowBehavior for WorkflowTodo {
                 Ok(materialized) => materialized,
                 Err(error) => return fail(ctx, "branch", error),
             };
+        // The branch tip travels with the creation log so the Round branch's actual
+        // birth commit is inspectable next to the base the Goal records. A silent
+        // disagreement between the two is what made "stale" unreadable before.
+        let branch_tip = app_git.resolve_commit(&branch).ok();
         ctx.log(
             "git",
             &format!("Created implementation worktree for {branch}"),
             Some(json_object(json!({
                 "branch": branch,
-                "worktree": worktree_path
+                "worktree": worktree_path,
+                "base_commit": base_commit,
+                "branch_commit": branch_tip
             }))),
         )?;
         if let Err(error) = ctx.work_items.update_goal_git_refs(
@@ -526,6 +539,71 @@ fn enter_already_merged_quality(
     }))
 }
 
+/// Refresh the local target branch from its remote before the Round pins its
+/// base, and record what happened on the Round.
+///
+/// The refresh itself never fails the Goal — every outcome, including an
+/// unreachable remote, leaves a legible Round log and lets the Round proceed on
+/// the local ref. Only writing that log can fail, and that is a durable-state
+/// failure the caller must not swallow.
+fn refresh_todo_target_from_remote(
+    ctx: &WorkflowContext<'_>,
+    app_git: &FileGitWorktreeService,
+    target_branch: &str,
+) -> RefineResult<()> {
+    let remote = setting_string(&ctx.settings, "git_remote", "origin");
+    let refresh = refresh_target_from_remote(app_git, ctx.target_root, &remote, target_branch);
+    let (message, detail) = match &refresh {
+        TargetRefresh::Unavailable { reason } => (
+            format!("Pinned the base from local {target_branch}; its remote was unavailable"),
+            json!({"remote": remote, "target_branch": target_branch, "reason": reason}),
+        ),
+        TargetRefresh::AlreadyCurrent { target_commit } => (
+            format!("Local {target_branch} already carried the fetched tip"),
+            json!({
+                "remote": remote,
+                "target_branch": target_branch,
+                "target_commit": target_commit
+            }),
+        ),
+        TargetRefresh::FastForwarded {
+            from_commit,
+            to_commit,
+        } => (
+            format!("Fast-forwarded {target_branch} to its remote before pinning the base"),
+            json!({
+                "remote": remote,
+                "target_branch": target_branch,
+                "from_commit": from_commit,
+                "to_commit": to_commit
+            }),
+        ),
+        TargetRefresh::Raced { target_commit } => (
+            format!("Another writer advanced {target_branch} during the refresh"),
+            json!({
+                "remote": remote,
+                "target_branch": target_branch,
+                "target_commit": target_commit
+            }),
+        ),
+        TargetRefresh::Diverged {
+            local_commit,
+            remote_commit,
+        } => (
+            format!(
+                "Local {target_branch} carries commits its remote does not; integration owns the merge"
+            ),
+            json!({
+                "remote": remote,
+                "target_branch": target_branch,
+                "local_commit": local_commit,
+                "remote_commit": remote_commit
+            }),
+        ),
+    };
+    ctx.log("git", &message, Some(json_object(detail)))
+}
+
 fn materialize_plan_worktree(
     ctx: &WorkflowContext<'_>,
     app_git: &FileGitWorktreeService,
@@ -547,7 +625,12 @@ fn materialize_plan_worktree(
         .git_path("refine-worktrees")?
         .join(branch.replace('/', "-"));
     with_repository_git_lock(ctx.target_root, || {
-        let worktree_path = app_git.ensure_worktree(branch, &worktree_target)?;
+        // The branch is born at the recorded base, never at the shared checkout's
+        // HEAD: a human sitting on any branch other than the merge target used to
+        // decide where every Round branch started, which made the recorded base a
+        // non-ancestor of the candidate and failed integration as "stale".
+        let worktree_path =
+            app_git.ensure_worktree_from_base(branch, &worktree_target, base_commit)?;
         let handoff = register_candidate_handoff(
             ctx.runtime_root,
             ctx.target_root,
@@ -1572,6 +1655,14 @@ impl WorkflowBehavior for WorkflowGovernance {
                 {
                     return Err(error);
                 }
+                // A candidate the target branch no longer descends from is the
+                // same fenced-recovery shape as the race above, not a dead end:
+                // when the target genuinely moved, a fresh Round from a fresh
+                // base is exactly the recovery. `settle_stale_candidate` keeps
+                // the one case a fresh Round cannot help terminal.
+                Err(stale @ RefineError::StaleCandidate { .. }) => {
+                    return settle_stale_candidate(ctx, stale, max_retries);
+                }
                 // A conflicted `merge --no-ff` is the rebase conflict's twin:
                 // the candidate no longer applies to the advanced target.
                 // Route it into the same fenced integration recovery instead
@@ -1665,6 +1756,95 @@ impl WorkflowBehavior for WorkflowGovernance {
             reason: "Governance passed and integrated the implementation candidate".to_string(),
         })
     }
+}
+
+/// Settle a stale-candidate integration through the same fenced integration
+/// recovery its siblings use — with one discrimination the siblings do not need.
+///
+/// Two different causes reach the ancestry gate looking identical. Either the
+/// target advanced under an in-flight Round, leaving a genuinely obsolete
+/// candidate that a fresh Round from a fresh base is exactly the cure for; or
+/// the candidate never descended from the recorded base in the first place, in
+/// which case a retry differs in nothing and each automatic Round spends a full
+/// plan/implement/quality cycle reproducing the same failure before the budget
+/// finally runs out.
+///
+/// The target's own commit separates them. When it still names the recorded
+/// base, the target never moved at all, so no race can account for the
+/// candidate's lineage and repeating the Round cannot change the outcome. That
+/// case fails immediately under its own category, which is also the honest
+/// signal: a lineage that was wrong before any Round ran is a Refine defect,
+/// not a race, and it should read that way in the ledger.
+pub(crate) fn settle_stale_candidate(
+    ctx: &mut WorkflowContext<'_>,
+    error: RefineError,
+    max_automatic_round_retries: u32,
+) -> RefineResult<WorkflowAdvanceOutcome> {
+    let RefineError::StaleCandidate {
+        candidate_commit,
+        recorded_base,
+        target_branch,
+        target_commit,
+    } = &error
+    else {
+        return fail(ctx, "governance_integration", error);
+    };
+    let retained = json!({
+        "candidate_commit": candidate_commit,
+        "recorded_base": recorded_base,
+        "target_branch": target_branch,
+        "target_commit": target_commit
+    });
+    let target_never_moved = target_commit == recorded_base;
+    if target_never_moved {
+        ctx.log(
+            "governance_integration",
+            "Candidate does not descend from its recorded base and the target never moved; \
+             a recovery Round would reproduce this exactly",
+            Some(json_object(retained)),
+        )?;
+        return fail(ctx, "governance_candidate_lineage", error);
+    }
+    let reason = "candidate is stale against the advanced target";
+    let recovery = ctx.work_items.queue_integration_recovery_summary(
+        &ctx.goal_id,
+        ctx.attempt_authority,
+        &GoalStatus::Governance,
+        &ctx.node_id,
+        reason,
+        retained.clone(),
+        max_automatic_round_retries,
+    )?;
+    let final_status = recovery.goal.status;
+    if final_status == GoalStatus::Todo {
+        ctx.log(
+            "governance_integration",
+            "Queued a fresh recovery Round for a candidate left stale by the advanced target",
+            Some(json_object(json!({
+                "reason": reason,
+                "retained_evidence": retained
+            }))),
+        )?;
+    } else {
+        ctx.log(
+            "governance_integration",
+            "A stale candidate exhausted the shared automatic Round budget",
+            Some(json_object(json!({
+                "reason": reason,
+                "retained_evidence": retained,
+                "max_automatic_round_retries": max_automatic_round_retries
+            }))),
+        )?;
+    }
+    ctx.final_status = Some(final_status.clone());
+    Ok(WorkflowAdvanceOutcome::Completed {
+        final_status: final_status.clone(),
+        reason: if final_status == GoalStatus::Todo {
+            "Stale candidate queued a fresh recovery Round".to_string()
+        } else {
+            "Stale candidate exhausted the shared automatic Round budget".to_string()
+        },
+    })
 }
 
 /// Settle a conflicted Governance integration merge through the same fenced

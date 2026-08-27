@@ -59,6 +59,40 @@ impl FileGitWorktreeService {
         self.ensure_worktree(branch, target)
     }
 
+    /// Materialize a managed branch/worktree whose branch is *born* at `base_commit`,
+    /// reusing an existing branch exactly as it stands.
+    ///
+    /// `git worktree add -b` takes its start point from the repository's current
+    /// HEAD, which is whatever branch a human happened to leave checked out in the
+    /// shared checkout. A Round branch born that way descends from an unrelated
+    /// branch while the Goal records the configured merge target as its base, so
+    /// the recorded base is not an ancestor of the candidate by construction and
+    /// every downstream ancestry gate rejects the finished work. Naming the start
+    /// point removes that coupling to the human checkout entirely.
+    ///
+    /// Unlike [`Self::ensure_worktree_at_commit`], an existing branch is reused
+    /// wherever it points: this serves resumption, where the branch may already
+    /// carry an interrupted Round's commits that must be preserved.
+    pub fn ensure_worktree_from_base(
+        &self,
+        branch: &str,
+        target: &Path,
+        base_commit: &str,
+    ) -> RefineResult<String> {
+        validate_branch_name(branch)?;
+        validate_commitish(base_commit)?;
+        if !self.branch_exists(branch)? {
+            let resolved_base = self.resolve_commit(base_commit)?;
+            self.git_output(&["branch", branch, &resolved_base])?;
+            self.audit(
+                "branch",
+                "ok",
+                json!({"name": branch, "commit": resolved_base, "base": true, "reused": false}),
+            )?;
+        }
+        self.ensure_worktree(branch, target)
+    }
+
     /// Resolve an already materialized candidate worktree without creating or switching it.
     pub fn existing_worktree_for_branch(&self, branch: &str) -> RefineResult<Option<PathBuf>> {
         self.worktree_for_branch(branch)

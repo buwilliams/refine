@@ -7,6 +7,7 @@ mod governance;
 mod planning_repair;
 mod quality_base_refresh;
 mod quality_recovery;
+mod round_base;
 mod worktree_resume;
 
 use super::*;

@@ -25,7 +25,10 @@ mod reconciliation;
 // durable transaction lifecycle (recovery, marker, checkout-sync window) here.
 pub(crate) mod transaction;
 
-use checkout_sync::{CheckoutSyncOutcome, sync_human_checkout_after_ref_move};
+use checkout_sync::{
+    CheckoutSyncOutcome, record_intended_checkout_sync, repair_pending_checkout_sync,
+    sync_human_checkout_after_ref_move,
+};
 use integration_worktree::ensure_integration_worktree;
 use transaction::{CheckoutSyncWindow, clear_checkout_sync_window, record_checkout_sync_window};
 
@@ -54,9 +57,35 @@ pub struct ReconciliationRequest<'a> {
 }
 
 /// Result of one compare-and-swap advance of the target branch ref.
-enum TargetAdvanceOutcome {
+pub(crate) enum TargetAdvanceOutcome {
     Applied,
     CasLost { current: String },
+}
+
+/// What refreshing the local target branch from its remote did, before a Round
+/// pins the base it will be judged against.
+#[derive(Clone, Debug)]
+pub(crate) enum TargetRefresh {
+    /// No remote is configured, or the fetch did not complete. The local ref
+    /// stands exactly as it did; the Round proceeds on it.
+    Unavailable { reason: String },
+    /// The local ref already carried the fetched tip.
+    AlreadyCurrent { target_commit: String },
+    /// The local ref fast-forwarded onto the fetched tip.
+    FastForwarded {
+        from_commit: String,
+        to_commit: String,
+    },
+    /// Another writer moved the ref between the read and the compare-and-swap.
+    /// The base resolves from the ref immediately after, so the race is benign.
+    Raced { target_commit: String },
+    /// The local ref carries commits the remote does not. Merging is
+    /// integration's job, under its own evidence and conflict handling; Todo
+    /// leaves the ref alone.
+    Diverged {
+        local_commit: String,
+        remote_commit: String,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -67,6 +96,160 @@ struct GovernanceAuthority {
     branch: String,
     candidate: String,
     remote: String,
+}
+
+/// Compare-and-swap `refs/heads/<target_branch>` from `from_commit` to
+/// `to_commit`, then mirror the advance into the shared human checkout.
+///
+/// For integration the merge was computed in the detached integration worktree
+/// before any ref motion, so ref-CAS then checkout-sync is the whole
+/// publication. A checkout-sync collision leaves the pending marker and is
+/// never an error; only losing the CAS itself aborts the caller.
+///
+/// This is deliberately not a method: the Todo boundary fast-forwards the same
+/// ref from the same remote, and one ref-motion implementation must serve both
+/// so the checkout-sync window can never be opened by one path and skipped by
+/// the other. It carries no Governance state — the caller supplies everything.
+///
+/// Callers must already hold the repository Git lock.
+pub(crate) fn apply_target_advance(
+    git: &FileGitWorktreeService,
+    target_root: &Path,
+    target_branch: &str,
+    from_commit: &str,
+    to_commit: &str,
+) -> RefineResult<TargetAdvanceOutcome> {
+    if from_commit == to_commit {
+        return Ok(TargetAdvanceOutcome::Applied);
+    }
+    let reference = format!("refs/heads/{target_branch}");
+    // Attribute an interruption anywhere in the CAS-to-sync publication to
+    // this exact phase on the integrated-target transaction marker (a
+    // no-op when no lane marker is open); recovery then re-attempts the
+    // sync instead of touching the shared checkout blindly. The window
+    // MUST open before the ref moves: a death between the CAS and a later
+    // record would leave the ref advanced with no durable trace of the
+    // unsynced checkout. Recovery replays the window against the branch's
+    // current tip, so a window whose CAS never happened degrades to a
+    // no-op sync.
+    record_checkout_sync_window(
+        target_root,
+        CheckoutSyncWindow {
+            branch: target_branch.to_string(),
+            from: from_commit.to_string(),
+            to: to_commit.to_string(),
+        },
+    )?;
+    match git.update_ref_cas(&reference, to_commit, from_commit) {
+        Ok(()) => {}
+        Err(RefineError::TargetAdvanced { current, .. }) => {
+            clear_checkout_sync_window(target_root)?;
+            return Ok(TargetAdvanceOutcome::CasLost { current });
+        }
+        // An unclassified CAS failure leaves it unknown whether the ref
+        // moved; the window stays open so recovery's replay-to-current-tip
+        // resolves either way.
+        Err(error) => return Err(error),
+    }
+    let outcome = sync_human_checkout_after_ref_move(
+        git,
+        target_root,
+        target_branch,
+        from_commit,
+        to_commit,
+    )?;
+    clear_checkout_sync_window(target_root)?;
+    if let CheckoutSyncOutcome::SkippedDirtyCollision { detail } = outcome {
+        eprintln!(
+            "refine: a working-tree collision at {} skipped the checkout sync for {reference} ({detail}); \
+             the human checkout shows the integration delta as staged-reverse until repair_pending_checkout_sync succeeds",
+            target_root.display()
+        );
+    }
+    Ok(TargetAdvanceOutcome::Applied)
+}
+
+/// Bring the local target branch up to its remote before a Round pins its base.
+///
+/// Without this the base is whatever the local ref happened to hold, which on a
+/// checkout nobody pulls can trail the remote by days: the Round implements
+/// against stale code, and the drift is only discovered at integration, after a
+/// full plan/implement/quality cycle has already been spent on it.
+///
+/// The whole operation is advisory. Every failure — no remote, an unreachable
+/// one, a lost compare-and-swap — degrades to leaving the local ref alone,
+/// because a Goal that cannot start because the network is down is a far worse
+/// failure than one that starts from a slightly older base.
+///
+/// Only a fast-forward is taken. A local ref carrying commits the remote does
+/// not is a merge, and merges belong to integration, which computes them in the
+/// detached worktree with conflict handling and evidence.
+///
+/// The fetch runs *outside* the repository lock — it writes only
+/// remote-tracking refs and objects, which Git locks itself — so network
+/// latency never sits inside a hold that every other Goal on the node queues
+/// behind. Only the ref motion takes the lock.
+pub(crate) fn refresh_target_from_remote(
+    git: &FileGitWorktreeService,
+    target_root: &Path,
+    remote: &str,
+    target_branch: &str,
+) -> TargetRefresh {
+    let unavailable = |reason: String| TargetRefresh::Unavailable { reason };
+    match git.remote_exists(remote) {
+        Ok(true) => {}
+        Ok(false) => return unavailable(format!("Git remote {remote} is not configured")),
+        Err(error) => return unavailable(error.to_string()),
+    }
+    if let Err(error) = git.fetch_branch(remote, target_branch) {
+        return unavailable(error.to_string());
+    }
+    let advanced = with_repository_git_lock(target_root, || {
+        // A sync an earlier advance could not finish is replayed first: the
+        // checkout must not still be showing that delta staged-reverse while
+        // this one moves the ref further ahead of it.
+        repair_pending_checkout_sync(git, target_root)?;
+        // Re-resolved inside the hold: another node's fetch may have landed
+        // since, and the compare-and-swap below must judge what is there now.
+        let remote_commit = git.resolve_commit(&format!("{remote}/{target_branch}"))?;
+        let local_commit = git.resolve_commit(target_branch)?;
+        if local_commit == remote_commit {
+            return Ok(TargetRefresh::AlreadyCurrent {
+                target_commit: local_commit,
+            });
+        }
+        if !git.commit_is_ancestor(&local_commit, &remote_commit)? {
+            return Ok(TargetRefresh::Diverged {
+                local_commit,
+                remote_commit,
+            });
+        }
+        // Todo runs outside the integrated-target transaction, so the marker
+        // that would attribute an interrupted CAS-to-sync window has no lane to
+        // attach to. The pending-sync record is this path's durable trace
+        // instead, written before the ref moves and replayed by the repair
+        // above if the sync never lands.
+        record_intended_checkout_sync(git, target_branch, &local_commit, &remote_commit)?;
+        match apply_target_advance(
+            git,
+            target_root,
+            target_branch,
+            &local_commit,
+            &remote_commit,
+        )? {
+            TargetAdvanceOutcome::Applied => Ok(TargetRefresh::FastForwarded {
+                from_commit: local_commit,
+                to_commit: remote_commit,
+            }),
+            TargetAdvanceOutcome::CasLost { current } => Ok(TargetRefresh::Raced {
+                target_commit: current,
+            }),
+        }
+    });
+    match advanced {
+        Ok(refresh) => refresh,
+        Err(error) => unavailable(error.to_string()),
+    }
 }
 
 impl FileGovernanceIntegrationService {
@@ -503,7 +686,7 @@ impl FileGovernanceIntegrationService {
                 // Counter-CAS: restore the ref only while it still points at
                 // the unpublished revert, then mirror the restore into the
                 // human checkout the same way the advance was mirrored.
-                let rollback = match self.apply_target_advance(
+                let rollback = match apply_target_advance(
                     &git,
                     &target_root,
                     &integration.target_branch,
@@ -581,7 +764,7 @@ impl FileGovernanceIntegrationService {
         // self-heals here, under the same repository lock, once the colliding
         // dirt is gone. Best-effort: a still-pending sync must not block an
         // unrelated integration.
-        if let Err(error) = checkout_sync::repair_pending_checkout_sync(&git, target_root) {
+        if let Err(error) = repair_pending_checkout_sync(&git, target_root) {
             eprintln!("refine: pending checkout sync repair failed: {error}");
         }
         if let Some(existing) = round_integration(round)? {
@@ -768,7 +951,7 @@ impl FileGovernanceIntegrationService {
         from_commit: &str,
         to_commit: &str,
     ) -> RefineResult<()> {
-        match self.apply_target_advance(git, target_root, target_branch, from_commit, to_commit)? {
+        match apply_target_advance(git, target_root, target_branch, from_commit, to_commit)? {
             TargetAdvanceOutcome::Applied => Ok(()),
             TargetAdvanceOutcome::CasLost { current } => Err(RefineError::TargetAdvanced {
                 reference: format!("refs/heads/{target_branch}"),
@@ -776,71 +959,6 @@ impl FileGovernanceIntegrationService {
                 current,
             }),
         }
-    }
-
-    /// Compare-and-swap `refs/heads/<target_branch>` from `from_commit` to
-    /// `to_commit`, then mirror the advance into the shared human checkout.
-    ///
-    /// The merge was computed in the detached integration worktree before any
-    /// ref motion, so ref-CAS then checkout-sync is the whole publication. A
-    /// checkout-sync collision leaves the pending marker and is never an
-    /// error; only losing the CAS itself aborts the integration.
-    fn apply_target_advance(
-        &self,
-        git: &FileGitWorktreeService,
-        target_root: &Path,
-        target_branch: &str,
-        from_commit: &str,
-        to_commit: &str,
-    ) -> RefineResult<TargetAdvanceOutcome> {
-        if from_commit == to_commit {
-            return Ok(TargetAdvanceOutcome::Applied);
-        }
-        let reference = format!("refs/heads/{target_branch}");
-        // Attribute an interruption anywhere in the CAS-to-sync publication to
-        // this exact phase on the integrated-target transaction marker (a
-        // no-op when no lane marker is open); recovery then re-attempts the
-        // sync instead of touching the shared checkout blindly. The window
-        // MUST open before the ref moves: a death between the CAS and a later
-        // record would leave the ref advanced with no durable trace of the
-        // unsynced checkout. Recovery replays the window against the branch's
-        // current tip, so a window whose CAS never happened degrades to a
-        // no-op sync.
-        record_checkout_sync_window(
-            target_root,
-            CheckoutSyncWindow {
-                branch: target_branch.to_string(),
-                from: from_commit.to_string(),
-                to: to_commit.to_string(),
-            },
-        )?;
-        match git.update_ref_cas(&reference, to_commit, from_commit) {
-            Ok(()) => {}
-            Err(RefineError::TargetAdvanced { current, .. }) => {
-                clear_checkout_sync_window(target_root)?;
-                return Ok(TargetAdvanceOutcome::CasLost { current });
-            }
-            // An unclassified CAS failure leaves it unknown whether the ref
-            // moved; the window stays open so recovery's replay-to-current-tip
-            // resolves either way.
-            Err(error) => return Err(error),
-        }
-        let outcome = sync_human_checkout_after_ref_move(
-            git,
-            target_root,
-            target_branch,
-            from_commit,
-            to_commit,
-        )?;
-        clear_checkout_sync_window(target_root)?;
-        if let CheckoutSyncOutcome::SkippedDirtyCollision { detail } = outcome {
-            eprintln!(
-                "refine: a working-tree collision at {} skipped the checkout sync for {reference} ({detail}); \
-                 the human checkout shows the integration delta as staged-reverse until repair_pending_checkout_sync succeeds",
-                target_root.display()
-            );
-        }
-        Ok(TargetAdvanceOutcome::Applied)
     }
 
     fn verify_integration_authority(
