@@ -1592,10 +1592,13 @@ function flushTerminalInput(
   terminal.inputBuffer = "";
   terminal.inputSessionId = "";
   terminal.inputFlushTimer = null;
-  if (!data || terminal.sessionId !== sessionId) return;
+  if (!data || terminal.sessionId !== sessionId || terminal.exited) return;
   terminal.inputSendPromise = terminal.inputSendPromise
     .catch(() => undefined)
     .then(async () => {
+      // Earlier input may still be in flight when this batch is flushed.
+      // Recheck the originating session immediately before its deferred send.
+      if (terminal.sessionId !== sessionId || terminal.exited) return;
       try {
         await api("POST", `/api/terminal/${encodeURIComponent(sessionId)}/input`, { data });
       } catch (e) {

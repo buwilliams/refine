@@ -225,6 +225,60 @@ test("session replacement before flush discards buffered Alt arrows", { skip: SK
   } finally { await app.close(); }
 });
 
+test("session exit before flush discards buffered Alt arrows", { skip: SKIP }, async () => {
+  const app = await openTerminalApp();
+  try {
+    await app.addTab();
+    await app.page.evaluate(() => {
+      const terminal = terminalStateFor();
+      terminal.term.textarea.dispatchEvent(new KeyboardEvent("keydown", {
+        key: "ArrowUp", keyCode: 38, altKey: true, bubbles: true, cancelable: true,
+      }));
+      finishTerminalExit(currentToolbarTab(), terminal);
+      flushTerminalInput(terminal);
+    });
+    await app.settle();
+    assert.deepEqual(app.inputs, [], "buffered input must not be sent after observed exit");
+    assert.deepEqual(app.errors, []);
+  } finally { await app.close(); }
+});
+
+test("Alt arrows waiting behind a request are discarded when their session becomes unusable", { skip: SKIP }, async () => {
+  for (const change of ["exit", "missing-session", "replacement"]) {
+    let releaseRequest;
+    const requestBlocked = new Promise(resolve => { releaseRequest = resolve; });
+    const app = await openTerminalApp({ onInput: async data => {
+      if (data === "x") await requestBlocked;
+    } });
+    try {
+      await app.addTab();
+      const requestStarted = app.page.waitForRequest(request =>
+        request.url().endsWith("/input") && request.postDataJSON().data === "x");
+      await app.page.keyboard.press("x");
+      await requestStarted;
+      await app.page.keyboard.press("Alt+ArrowUp");
+      await app.page.evaluate(change => {
+        const terminal = terminalStateFor();
+        flushTerminalInput(terminal);
+        if (change === "exit") finishTerminalExit(currentToolbarTab(), terminal);
+        else terminal.sessionId = change === "replacement" ? "replacement" : "";
+      }, change);
+      releaseRequest();
+      await app.settle();
+      assert.deepEqual(app.inputs.splice(0), [{ path: "/api/terminal/session-agent/input", data: "x" }], change);
+      if (change === "replacement") {
+        await app.page.keyboard.press("Alt+ArrowDown");
+        await app.settle();
+        assert.deepEqual(app.inputs, [{ path: "/api/terminal/replacement/input", data: "\x1b[1;3B" }]);
+      }
+      assert.deepEqual(app.errors, []);
+    } finally {
+      releaseRequest();
+      await app.close();
+    }
+  }
+});
+
 test("all profiles and provider fixtures preserve Alt arrows and existing control keys", { skip: SKIP }, async () => {
   const app = await openTerminalApp();
   try {
