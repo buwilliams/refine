@@ -1,7 +1,7 @@
 {
   "base_commit": "b47569adb8d4c5d1d7335ba91729a3e486a38fe0",
   "branch_name": "refine/DR07C216F3E4EC22A57C60BE0B/round-2",
-  "candidate_commit": "2015f58d6b2c6e8b1edfaee09e770240b23d9359",
+  "candidate_commit": "ab318054adf5a5418ee3ae8bec348c98232916f2",
   "created": "2026-09-10T08:26:00Z",
   "event_generation": 4,
   "feature_id": null,
@@ -1141,6 +1141,110 @@
           },
           "source": "workflow.implement.enter",
           "state": "succeeded"
+        },
+        "feb9d4115e47d28b42253e7d0a604fb0fea632ff3937e131c8ab3b67d93e1c5a": {
+          "candidate_commit": "2015f58d6b2c6e8b1edfaee09e770240b23d9359",
+          "results": {
+            "default-quality": {
+              "artifacts": {
+                "tests": [
+                  {
+                    "command": "cargo test --lib workflow -- --test-threads=1 --skip multiple_plan_skills_contribute_separate_namespaced_checklists",
+                    "evidence": "236 passed; one confirmed baseline fixture explicitly excluded.",
+                    "status": "passed",
+                    "test": "Failure containment, authority preservation, follow-up admission and shared workflow health"
+                  },
+                  {
+                    "command": "cargo test --lib application::workers -- --test-threads=1",
+                    "evidence": "33 passed.",
+                    "status": "passed",
+                    "test": "Worker watchdog recovery and independent deadline maintenance"
+                  },
+                  {
+                    "command": "cargo test --lib application::maintenance::worktrees -- --test-threads=1",
+                    "evidence": "19 passed.",
+                    "status": "passed",
+                    "test": "Cleanup preserves retained and live work"
+                  },
+                  {
+                    "command": "cargo test --lib infrastructure::process::subprocess -- --test-threads=1",
+                    "evidence": "24 passed, including four new ownership/termination regressions.",
+                    "status": "passed",
+                    "test": "Process ownership, termination races and failure-path survivor recovery"
+                  },
+                  {
+                    "command": "cargo test --lib infrastructure::process::supervisor -- --test-threads=1",
+                    "evidence": "52 passed.",
+                    "status": "passed",
+                    "test": "Process supervision and operation recovery"
+                  },
+                  {
+                    "command": "cargo test --lib application::agents::sessions -- --test-threads=1",
+                    "evidence": "37 passed.",
+                    "status": "passed",
+                    "test": "Interactive session activity, deadlines and exemptions"
+                  },
+                  {
+                    "command": "cargo test --lib surfaces::web_server::tests::http_transport::runtime -- --test-threads=1",
+                    "evidence": "8 passed.",
+                    "status": "passed",
+                    "test": "HTTP runtime remains reachable with unhealthy workflow evidence"
+                  },
+                  {
+                    "command": "cargo test --lib application::guidance -- --test-threads=1",
+                    "evidence": "3 passed.",
+                    "status": "passed",
+                    "test": "Next-action guidance"
+                  },
+                  {
+                    "command": "cargo test --lib application::events -- --test-threads=1",
+                    "evidence": "20 passed.",
+                    "status": "passed",
+                    "test": "Event and Skill execution contracts"
+                  },
+                  {
+                    "command": "cargo check --lib",
+                    "evidence": "Exit 0.",
+                    "status": "passed",
+                    "test": "Library compilation"
+                  },
+                  {
+                    "command": "cargo clippy --lib --message-format=json",
+                    "evidence": "Exit 0; five warnings on unchanged code.",
+                    "status": "passed",
+                    "test": "Static analysis"
+                  },
+                  {
+                    "command": "rustfmt --edition 2024 --config skip_children=true --check src/application/workers/maintenance.rs src/application/workers/maintenance/tests.rs src/infrastructure/process/subprocess/owned_groups.rs src/infrastructure/process/subprocess/owned_groups/quiescence.rs src/infrastructure/process/subprocess/owned_groups/tests.rs",
+                    "evidence": "Exit 0.",
+                    "status": "passed",
+                    "test": "Formatting of Quality corrections"
+                  },
+                  {
+                    "command": "git diff --check",
+                    "evidence": "Exit 0.",
+                    "status": "passed",
+                    "test": "Patch whitespace"
+                  }
+                ]
+              },
+              "binding_id": "default-quality",
+              "evidence": [
+                "Reviewed candidate 2015f58d6b2c6e8b1edfaee09e770240b23d9359 against the finalized plan and affected intent. Corrections remain in the pinned worktree for Refine to capture.",
+                "Reproduced and corrected reused process-group identity acceptance, an isolated child escaping termination, and competing tree stops. Termination now uses shared bounded coordination, verifies a quiescent process tree, and resumes suspended survivors when inspection fails.",
+                "Reproduced and corrected idle maintenance ignoring attached input and signal activity, and missing idle expiry before output files exist. Original hard caps and human-input/Toolbar exceptions remain covered.",
+                "Unfiltered cargo test --lib workflow -- --test-threads=1 produced 236 passes and one planning-fixture failure. The same fixture failed in an archive of refreshed base b47569adb8d4c5d1d7335ba91729a3e486a38fe0 because a Skill was assigned multiple triggers. That unchanged baseline fixture is explicitly excluded below.",
+                "Final command results and log paths: /tmp/refine-quality-r2-final-results.json. Baseline comparison: /tmp/refine-quality-r2-refreshed-base-planning.log.",
+                "Linux process recovery was exercised. Other platforms and the original August production incident were not reproduced. No Goal state changes, merge, push, deployment, or serving-daemon restart were performed."
+              ],
+              "invocation_id": "feb9d4115e47d28b42253e7d0a604fb0fea632ff3937e131c8ab3b67d93e1c5a",
+              "outcome": "success",
+              "role": "quality",
+              "summary": "Reviewed the refreshed candidate, corrected termination races and idle-deadline defects, added six regression tests, and passed focused verification."
+            }
+          },
+          "source": "workflow.quality.enter",
+          "state": "succeeded"
         }
       },
       "failure_at": "",
@@ -1382,14 +1486,114 @@
       "meta_rule_state": null,
       "product_state": null,
       "prompt": "Keep a per-Goal error from stopping workflow scheduling, and detect a live worker whose scheduling loop has stopped making progress.\n\nThe August field report is a hypothesis to reproduce, not proof that a specific stale-candidate error kills today's worker. Current execution already catches some task panics, but preparation runs in the scheduling path and scheduler_error suppresses admission until the pass ends. There is no scheduler-tick health evidence in the current runner. Round 1 retained unfinished failure-containment and watchdog changes without a candidate; its final log reports an unsuccessful agent exit and superseded attempt.\n\nContain preparation, Skill execution, result handling and failure-settlement errors at the owning Goal boundary. Ensure ended attempts release their local active entry and unrelated eligible work continues. Distinguish an authoritative failure, a superseded attempt and failure to persist evidence; retry transient persistence failures within a bound while rechecking authority. Never overwrite a newer Round or cancellation to make an old failure appear settled. Keep blocking Git, lock or settlement work from freezing the admission control path, without releasing capacity while owned work is still alive.\n\nPublish runtime-local health tied to the actual worker incarnation and target, with ticks emitted by the scheduling loop itself. Use independent existing daemon supervision to detect stale ticks. Recover with bounded restart backoff only after safely stopping the old worker and its owned work, or report unhealthy with a concrete remedy if this cannot be proved. Keep daemon reachability and shutdown control available.\n\nUse one shared health assessment in system status and refine next, distinguishing a stall from pause, missing required Plan/Implement Skills, scope or ordering blocks, long-running tasks and unavailable evidence. Keep worktree cleanup and deadline enforcement independently responsive. Share the latter and operation-recovery changes with Goal DR74050DA12C5442DF797B8AB6 instead of adding competing supervision.\n\nVerify a superseded integration failure, preparation and settlement faults, and a task panic cannot stop the next eligible Goal entering Plan after capacity is available. Inject a non-ticking worker and verify detection plus safe recovery or unhealthy reporting. Test pause and legitimate waiting without false alarms, and confirm cleanup and deadline checks remain responsive without deleting retained work.\n\nThis is a recovery Round following the Skills review on 10 September 2026. Start from current main in a new managed Round worktree. Preserve Round 1, its plans, logs, branches, commits and uncommitted files; inspect and selectively reuse useful work instead of replaying the whole old attempt. Use the current Skills and docs/intent contracts, not archived Governance, Quality or Guidance configuration or the old fixed planning sequence. Refine owns workflow advancement and integration; human approval remains separate. Update only affected documentation and report focused verification with actual results.",
-      "quality_candidate_commit": null,
+      "quality_agent_report": "workflow.quality.enter:default-quality: Reviewed the refreshed candidate, corrected termination races and idle-deadline defects, added six regression tests, and passed focused verification.",
+      "quality_candidate_commit": "ab318054adf5a5418ee3ae8bec348c98232916f2",
       "quality_checked_at": null,
       "quality_details": null,
       "quality_message": null,
+      "quality_skill_results": [
+        {
+          "artifacts": {
+            "tests": [
+              {
+                "command": "cargo test --lib workflow -- --test-threads=1 --skip multiple_plan_skills_contribute_separate_namespaced_checklists",
+                "evidence": "236 passed; one confirmed baseline fixture explicitly excluded.",
+                "status": "passed",
+                "test": "Failure containment, authority preservation, follow-up admission and shared workflow health"
+              },
+              {
+                "command": "cargo test --lib application::workers -- --test-threads=1",
+                "evidence": "33 passed.",
+                "status": "passed",
+                "test": "Worker watchdog recovery and independent deadline maintenance"
+              },
+              {
+                "command": "cargo test --lib application::maintenance::worktrees -- --test-threads=1",
+                "evidence": "19 passed.",
+                "status": "passed",
+                "test": "Cleanup preserves retained and live work"
+              },
+              {
+                "command": "cargo test --lib infrastructure::process::subprocess -- --test-threads=1",
+                "evidence": "24 passed, including four new ownership/termination regressions.",
+                "status": "passed",
+                "test": "Process ownership, termination races and failure-path survivor recovery"
+              },
+              {
+                "command": "cargo test --lib infrastructure::process::supervisor -- --test-threads=1",
+                "evidence": "52 passed.",
+                "status": "passed",
+                "test": "Process supervision and operation recovery"
+              },
+              {
+                "command": "cargo test --lib application::agents::sessions -- --test-threads=1",
+                "evidence": "37 passed.",
+                "status": "passed",
+                "test": "Interactive session activity, deadlines and exemptions"
+              },
+              {
+                "command": "cargo test --lib surfaces::web_server::tests::http_transport::runtime -- --test-threads=1",
+                "evidence": "8 passed.",
+                "status": "passed",
+                "test": "HTTP runtime remains reachable with unhealthy workflow evidence"
+              },
+              {
+                "command": "cargo test --lib application::guidance -- --test-threads=1",
+                "evidence": "3 passed.",
+                "status": "passed",
+                "test": "Next-action guidance"
+              },
+              {
+                "command": "cargo test --lib application::events -- --test-threads=1",
+                "evidence": "20 passed.",
+                "status": "passed",
+                "test": "Event and Skill execution contracts"
+              },
+              {
+                "command": "cargo check --lib",
+                "evidence": "Exit 0.",
+                "status": "passed",
+                "test": "Library compilation"
+              },
+              {
+                "command": "cargo clippy --lib --message-format=json",
+                "evidence": "Exit 0; five warnings on unchanged code.",
+                "status": "passed",
+                "test": "Static analysis"
+              },
+              {
+                "command": "rustfmt --edition 2024 --config skip_children=true --check src/application/workers/maintenance.rs src/application/workers/maintenance/tests.rs src/infrastructure/process/subprocess/owned_groups.rs src/infrastructure/process/subprocess/owned_groups/quiescence.rs src/infrastructure/process/subprocess/owned_groups/tests.rs",
+                "evidence": "Exit 0.",
+                "status": "passed",
+                "test": "Formatting of Quality corrections"
+              },
+              {
+                "command": "git diff --check",
+                "evidence": "Exit 0.",
+                "status": "passed",
+                "test": "Patch whitespace"
+              }
+            ]
+          },
+          "binding_id": "workflow.quality.enter:default-quality",
+          "evidence": [
+            "Reviewed candidate 2015f58d6b2c6e8b1edfaee09e770240b23d9359 against the finalized plan and affected intent. Corrections remain in the pinned worktree for Refine to capture.",
+            "Reproduced and corrected reused process-group identity acceptance, an isolated child escaping termination, and competing tree stops. Termination now uses shared bounded coordination, verifies a quiescent process tree, and resumes suspended survivors when inspection fails.",
+            "Reproduced and corrected idle maintenance ignoring attached input and signal activity, and missing idle expiry before output files exist. Original hard caps and human-input/Toolbar exceptions remain covered.",
+            "Unfiltered cargo test --lib workflow -- --test-threads=1 produced 236 passes and one planning-fixture failure. The same fixture failed in an archive of refreshed base b47569adb8d4c5d1d7335ba91729a3e486a38fe0 because a Skill was assigned multiple triggers. That unchanged baseline fixture is explicitly excluded below.",
+            "Final command results and log paths: /tmp/refine-quality-r2-final-results.json. Baseline comparison: /tmp/refine-quality-r2-refreshed-base-planning.log.",
+            "Linux process recovery was exercised. Other platforms and the original August production incident were not reproduced. No Goal state changes, merge, push, deployment, or serving-daemon restart were performed."
+          ],
+          "invocation_id": "feb9d4115e47d28b42253e7d0a604fb0fea632ff3937e131c8ab3b67d93e1c5a",
+          "outcome": "success",
+          "role": "quality",
+          "summary": "Reviewed the refreshed candidate, corrected termination races and idle-deadline defects, added six regression tests, and passed focused verification."
+        }
+      ],
       "quality_state": null,
       "reporter": "Buddy Williams",
       "rule_state": null,
-      "updated": "2026-09-10T14:59:15Z",
+      "updated": "2026-09-10T15:24:34Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T13:42:58Z",
         "round_idx": 1,
@@ -1430,7 +1634,7 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-10T14:59:15Z",
+  "updated": "2026-09-10T15:24:34Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:37.178169037+00:00",
@@ -1469,5 +1673,5 @@
       "to": "quality"
     }
   ],
-  "workflow_revision": 41
+  "workflow_revision": 45
 }
