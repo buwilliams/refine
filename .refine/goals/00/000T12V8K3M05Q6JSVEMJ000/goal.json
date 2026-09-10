@@ -1,9 +1,9 @@
 {
   "base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
   "branch_name": "refine/00000T12V8K3M05Q6JSVEMJ000/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "1b7d840ec589f55affe645d87f661b2fbda2e8bd",
   "created": "2026-09-10T13:01:23Z",
-  "event_generation": 4,
+  "event_generation": 5,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T12V8K3M05Q6JSVEMJ000",
@@ -600,6 +600,70 @@
           },
           "source": "workflow.plan.enter",
           "state": "succeeded"
+        },
+        "a987513e90310b025801c17a2b13f025cf63f5753e6af2cfe5e95494a50fe350": {
+          "candidate_commit": null,
+          "results": {
+            "default-implement": {
+              "artifacts": {
+                "implementation_evidence": {
+                  "checklist": [
+                    {
+                      "evidence": "Added tests/web_terminal_clipboard_browser.test.js using the shipped xterm renderer and an isolated static server/API fixture. Covered native keyboard and menu clipboard paths with asynchronous access allowed, denied, and unavailable. Isolated Claude 2.1.247 and 2.1.267 sessions passed real browser copy/paste checks.",
+                      "id": "workflow.plan.enter:default-plan:P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Extracted clipboard handling into the 91-line features/terminal-clipboard.js with explicit renderer/session callbacks. Loaded it before toolbar.js and updated affected test loaders. Native shortcuts preserve browser defaults; Ctrl+Shift+C/V uses a separate fallback with visible errors. Browser tests verify one clipboard write and one paste operation.",
+                      "id": "workflow.plan.enter:default-plan:P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Enabled macOptionClickForcesSelection and added an accessible selection hint. Actual browser gestures verified Shift-drag and Option-drag selection during alternate-screen mouse capture, preserved ordinary TUI mouse reporting, and copied selection without sending an interrupt.",
+                      "id": "workflow.plan.enter:default-plan:P3",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Paste remains on Terminal.paste → onData → existing managed input queue. Verified newline normalization, bracketed mode enabled/disabled, duplicate suppression, buffered replacement-session fencing, and pending-read fencing across session, renderer, tab, focus, and exit changes. Claude smoke copying used native browser events and emitted no OSC 52; no OSC extension was needed.",
+                      "id": "workflow.plan.enter:default-plan:P4",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Browser coverage exercises all six profiles with Claude and Codex fixtures, Unicode/multiline paste, retained renderer remounts, tab changes, and outside focus. Verified Ctrl+C semantics, Ctrl+Enter, Agent Ctrl+Z suppression, shell job control, and command-palette precedence. Reusable scaffolding resides in tests/support.",
+                      "id": "workflow.plan.enter:default-plan:P5",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Updated only docs/intent/05-surfaces/03-browser/19-terminal.md within the intent documentation. Required suite passed 74/74 with zero skips; the additional affected loader suite passed 7/7. Claude smoke reports record trusted browser events, bracketed multiline input, successful selected-text copying, and no interrupt.",
+                      "id": "workflow.plan.enter:default-plan:P6",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal_clipboard.test.js tests/web_terminal_clipboard_browser.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js — exit 0; 74 passed, 0 failed, 0 skipped. Log: /tmp/refine-clipboard-round1-fqes06ao/required-verification-final.log",
+                    "node --test tests/web_goal_log_tail.test.js — exit 0; 7 passed, 0 failed, 0 skipped.",
+                    "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules:/home/linuxbrew/.linuxbrew/lib/node_modules/openclaw/node_modules node tests/support/claude-clipboard-smoke.js /tmp/refine-clipboard-round1-fqes06ao/claude-smoke-final — exit 0; Claude 2.1.267 copy/paste passed. Claude 2.1.247 also passed using CLAUDE_BIN=/home/buddy/.local/share/claude/versions/2.1.247; evidence in claude-smoke-pinned-v2.",
+                    "git diff --check — exit 0.",
+                    "Playwright was installed in a temporary tooling directory; cached Chromium was available. No browser verification was skipped."
+                  ]
+                }
+              },
+              "binding_id": "default-implement",
+              "evidence": [
+                "Worked in the pinned Round worktree on refine/00000T12V8K3M05Q6JSVEMJ000/round-1; HEAD remains f880b7767149e4de43d5bc4d4786247d1e536a8c.",
+                "Baseline browser tests reproduced clipboard permission failure and missing macOS Option-drag selection.",
+                "Preserved diagnostic logs, Claude transcripts, screenshots, and smoke reports under /tmp/refine-clipboard-round1-fqes06ao/.",
+                "Browser verification ran on Linux Chromium with Windows/macOS platform emulation. Context-menu coverage used right-click followed by Chromium native editing commands; it did not automate the OS menu UI.",
+                "No candidate commit, Goal transition, merge, push, source promotion, or serving-daemon restart was performed."
+              ],
+              "invocation_id": "a987513e90310b025801c17a2b13f025cf63f5753e6af2cfe5e95494a50fe350",
+              "outcome": "success",
+              "role": "implement",
+              "summary": "Implemented provider-independent terminal clipboard handling. Required verification passed: 74 tests, including 14 executed browser tests, with no skips. Isolated Claude copy/paste smoke checks passed."
+            }
+          },
+          "source": "workflow.implement.enter",
+          "state": "succeeded"
         }
       },
       "failure_at": "",
@@ -610,7 +674,12 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [],
+        "context_version": 1,
+        "recorded_at": "2026-09-10T14:07:52Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
@@ -621,6 +690,7 @@
           "round_idx": 0,
           "target_branch": "main"
         },
+        "completed_at": "2026-09-10T14:07:52Z",
         "final_plan": {
           "completed_at": "2026-09-10T13:49:17Z",
           "git_after": {
@@ -663,6 +733,52 @@
             "summary": "workflow.plan.enter:default-plan: Use a regression-led repair of the shared browser terminal clipboard behavior. Make native browser copy/paste reliable across agents, preserve selection during terminal mouse capture, and retain xterm paste framing and session isolation. Perform implementation and verification in the pinned Round worktree at f880b7767149e4de43d5bc4d4786247d1e536a8c."
           },
           "started_at": "2026-09-10T13:43:07Z"
+        },
+        "implementation": {
+          "completed_at": "2026-09-10T14:07:52Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Added tests/web_terminal_clipboard_browser.test.js using the shipped xterm renderer and an isolated static server/API fixture. Covered native keyboard and menu clipboard paths with asynchronous access allowed, denied, and unavailable. Isolated Claude 2.1.247 and 2.1.267 sessions passed real browser copy/paste checks.",
+                "id": "workflow.plan.enter:default-plan:P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Extracted clipboard handling into the 91-line features/terminal-clipboard.js with explicit renderer/session callbacks. Loaded it before toolbar.js and updated affected test loaders. Native shortcuts preserve browser defaults; Ctrl+Shift+C/V uses a separate fallback with visible errors. Browser tests verify one clipboard write and one paste operation.",
+                "id": "workflow.plan.enter:default-plan:P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Enabled macOptionClickForcesSelection and added an accessible selection hint. Actual browser gestures verified Shift-drag and Option-drag selection during alternate-screen mouse capture, preserved ordinary TUI mouse reporting, and copied selection without sending an interrupt.",
+                "id": "workflow.plan.enter:default-plan:P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Paste remains on Terminal.paste → onData → existing managed input queue. Verified newline normalization, bracketed mode enabled/disabled, duplicate suppression, buffered replacement-session fencing, and pending-read fencing across session, renderer, tab, focus, and exit changes. Claude smoke copying used native browser events and emitted no OSC 52; no OSC extension was needed.",
+                "id": "workflow.plan.enter:default-plan:P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Browser coverage exercises all six profiles with Claude and Codex fixtures, Unicode/multiline paste, retained renderer remounts, tab changes, and outside focus. Verified Ctrl+C semantics, Ctrl+Enter, Agent Ctrl+Z suppression, shell job control, and command-palette precedence. Reusable scaffolding resides in tests/support.",
+                "id": "workflow.plan.enter:default-plan:P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated only docs/intent/05-surfaces/03-browser/19-terminal.md within the intent documentation. Required suite passed 74/74 with zero skips; the additional affected loader suite passed 7/7. Claude smoke reports record trusted browser events, bracketed multiline input, successful selected-text copying, and no interrupt.",
+                "id": "workflow.plan.enter:default-plan:P6",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal_clipboard.test.js tests/web_terminal_clipboard_browser.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js — exit 0; 74 passed, 0 failed, 0 skipped. Log: /tmp/refine-clipboard-round1-fqes06ao/required-verification-final.log",
+              "node --test tests/web_goal_log_tail.test.js — exit 0; 7 passed, 0 failed, 0 skipped.",
+              "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules:/home/linuxbrew/.linuxbrew/lib/node_modules/openclaw/node_modules node tests/support/claude-clipboard-smoke.js /tmp/refine-clipboard-round1-fqes06ao/claude-smoke-final — exit 0; Claude 2.1.267 copy/paste passed. Claude 2.1.247 also passed using CLAUDE_BIN=/home/buddy/.local/share/claude/versions/2.1.247; evidence in claude-smoke-pinned-v2.",
+              "git diff --check — exit 0.",
+              "Playwright was installed in a temporary tooling directory; cached Chromium was available. No browser verification was skipped."
+            ]
+          },
+          "report": "workflow.implement.enter:default-implement: Implemented provider-independent terminal clipboard handling. Required verification passed: 74 tests, including 14 executed browser tests, with no skips. Isolated Claude copy/paste smoke checks passed.",
+          "started_at": "2026-09-10T13:49:17Z"
         },
         "phase": "implement",
         "phase_started_at": "2026-09-10T13:49:17Z",
@@ -711,11 +827,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-09-10T13:43:07Z",
-        "state": "in_progress",
-        "updated_at": "2026-09-10T13:49:17Z"
+        "state": "completed",
+        "updated_at": "2026-09-10T14:07:52Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "workflow.implement.enter:default-implement: Implemented provider-independent terminal clipboard handling. Required verification passed: 74 tests, including 14 executed browser tests, with no skips. Isolated Claude copy/paste smoke checks passed.",
+      "implementation_reported_at": "2026-09-10T14:07:52Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -726,7 +842,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T13:49:17Z",
+      "updated": "2026-09-10T14:07:53Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T13:43:06Z",
         "round_idx": 0,
@@ -736,9 +852,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-10T13:49:17Z",
+  "updated": "2026-09-10T14:07:53Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:01:23.048199482+00:00",
@@ -775,7 +891,16 @@
       "node_id": "default",
       "round_idx": 0,
       "to": "implement"
+    },
+    {
+      "at": "2026-09-10T14:07:53.225438082+00:00",
+      "forced": false,
+      "from": "implement",
+      "generation": 5,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "quality"
     }
   ],
-  "workflow_revision": 16
+  "workflow_revision": 24
 }
