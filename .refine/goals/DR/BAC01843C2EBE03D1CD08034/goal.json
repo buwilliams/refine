@@ -1,7 +1,7 @@
 {
-  "base_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+  "base_commit": "f182ac503ec3a226baaa2b43e865bf494230cda4",
   "branch_name": "refine/DRBAC01843C2EBE03D1CD08034/round-1",
-  "candidate_commit": "7f6988c7ea0b441ad71ec5fc0eb508451674caab",
+  "candidate_commit": "be1f6f0366dd855f93f505d470dd4e2ca5c6d1b5",
   "created": "2026-09-10T08:26:07Z",
   "feature_id": null,
   "feature_order": null,
@@ -85,15 +85,15 @@
         "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
       },
       "assignee": "ethan.jacobson@insurity.com",
-      "constitution_state": "unclassified",
+      "constitution_state": null,
       "created": "2026-09-10T08:26:07Z",
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
-      "governance_candidate_commit": "",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_candidate_commit": null,
+      "governance_checked_at": null,
+      "governance_details": null,
+      "governance_message": null,
       "governance_rule_actions": [],
       "guidance_decision": {
         "applied": [
@@ -290,29 +290,107 @@
       "implementation_report": "Implemented selection gestures, Copy selection, copying retained output, focused shortcuts, and clipboard recovery in local commit 7f6988c7ea0b441ad71ec5fc0eb508451674caab. Focused verification passed: 59 logic/lifecycle tests and 7 Chromium clipboard tests. Full web suite: 240 passed, 5 failures reproduced on the unchanged baseline. Working tree clean; no merge or push.",
       "implementation_reported_at": "2026-09-10T08:44:53Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": null,
+      "product_state": null,
       "prompt": "From: Ethan Jacobson <ethan.jacobson@insurity.com>\nSubject: copy text from xterm window\n\nBody:\nNone of the standard methods worked for copying text from the Agent's  window.  That would be nice if it worked.\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nEthan Jacobson\r\nEthan.Jacobson@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
       "quality_agent_report": "Quality reviewed candidate 7f6988c7ea0b441ad71ec5fc0eb508451674caab against parent 8f6de519c62a8a373b19482d5c7842068acfb35d. The candidate implements terminal selection gestures, shared clipboard routing, an accessible Copy selection control, retained-output copying, scoped shortcuts, clipboard fallback and recovery, and the Terminal intent update. No corrective source or test changes were needed. Focused verification: 59 logic/lifecycle tests, 7 Chromium clipboard tests, and 3 Rust terminal surface tests passed. Full web suite: 242 passed, 5 failed, 0 skipped; all five failures reproduced on the unchanged pinned parent. Worktree clean; no commit, merge, push, or Governance approval performed by Quality.",
-      "quality_candidate_commit": "7f6988c7ea0b441ad71ec5fc0eb508451674caab",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_candidate_commit": null,
+      "quality_checked_at": null,
+      "quality_details": null,
+      "quality_message": null,
+      "quality_state": null,
       "reporter": "ethan.jacobson@insurity.com",
-      "rule_state": "unclassified",
-      "updated": "2026-09-10T08:49:33Z",
+      "rule_state": null,
+      "updated": "2026-09-10T08:53:34Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T08:26:09Z",
         "round_idx": 0,
         "workflow_revision": 2
       },
+      "workflow_candidate_refresh": {
+        "authorizing_status": "governance",
+        "branch": "refine/DRBAC01843C2EBE03D1CD08034/round-1",
+        "node_id": "default",
+        "original_base_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+        "original_candidate_commit": "7f6988c7ea0b441ad71ec5fc0eb508451674caab",
+        "previous_gate_evidence": {
+          "constitution_state": "unclassified",
+          "governance_candidate_commit": "",
+          "governance_checked_at": "",
+          "governance_details": "",
+          "governance_message": "",
+          "meta_rule_state": "unclassified",
+          "product_state": "unclassified",
+          "quality_candidate_commit": "7f6988c7ea0b441ad71ec5fc0eb508451674caab",
+          "quality_checked_at": "2026-09-10T08:53:32Z",
+          "quality_details": {
+            "candidate_commit": "7f6988c7ea0b441ad71ec5fc0eb508451674caab",
+            "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRBAC01843C2EBE03D1CD08034-round-1",
+            "diagnostics": [
+              "{\"ok\":true,\"summary\":\"Passed: candidate satisfies the Goal and relevant intent contracts; 71 focused regressions passed. No edits.\",\"results\":[{\"test\":\"The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\",\"status\":\"passed\",\"evidence\":\"Command exited 0. Verified clean candidate 7f6988c7ea0b441ad71ec5fc0eb508451674caab against recorded base 8f6de519c62a8a373b19482d5c7842068acfb35d. Reviewed finalized Goal checklist P1–P6 and Design, Surface Principles, Toolbar, and Terminal intent. Clipboard behavior is shared across terminal profiles; backend authority and durable state remain unchanged. All 71 focused checks passed, including 12 Chromium checks, with zero failures, cancellations, or skips. Covered selection gestures, retained-output copying, blocked-copy recovery, focus isolation, interruption, paste framing, session fencing, lifecycle, geometry, and renderer retention. Nine JavaScript syntax checks and diff validation passed. Limits: macOS platform simulated in Linux Chromium; native Windows/macOS and live-daemon integration were not exercised.\",\"command\":\"timeout 180s env NODE_PATH=/home/buddy/projects/refine/node_modules node <<'NODE'\\nconst assert = require('node:assert/strict');\\nconst fs = require('node:fs');\\nconst {execFileSync, spawnSync} = require('node:child_process');\\nprocess.chdir('/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRBAC01843C2EBE03D1CD08034-round-1');\\nconst candidate = '7f6988c7ea0b441ad71ec5fc0eb508451674caab';\\nconst base = '8f6de519c62a8a373b19482d5c7842068acfb35d';\\nconst git = (...args) => execFileSync('git', args, {encoding:'utf8'}).trim();\\nfunction fence() {\\n  assert.equal(git('rev-parse','HEAD'), candidate);\\n  assert.equal(git('rev-parse','HEAD^'), base);\\n  assert.equal(git('status','--porcelain'), '');\\n  const goal = JSON.parse(fs.readFileSync('/home/buddy/projects/refine-next/.git/refine-live-state/goals/DR/BAC01843C2EBE03D1CD08034/goal.json','utf8'));\\n  assert.equal(goal.id, 'DRBAC01843C2EBE03D1CD08034');\\n  assert.equal(goal.candidate_commit, candidate);\\n  assert.equal(goal.base_commit, base);\\n}\\nfence();\\ngit('diff','--check',base,candidate);\\nconst changed = git('diff','--name-only',base,candidate).split('\\\\n');\\nfor (const file of changed.filter(file => file.endsWith('.js'))) execFileSync(process.execPath,['--check',file]);\\nassert.equal(require('./tests/support/web_app').SKIP, false);\\nfunction run(expected, args) {\\n  const result = spawnSync(process.execPath,['--test','--test-reporter=tap','--test-concurrency=1',...args], {encoding:'utf8',timeout:75000,maxBuffer:8388608});\\n  process.stdout.write(result.stdout || '');\\n  process.stderr.write(result.stderr || '');\\n  assert.ifError(result.error);\\n  assert.equal(result.status, 0);\\n  for (const [key,value] of Object.entries({tests:expected,pass:expected,fail:0,cancelled:0,skipped:0})) assert.match(result.stdout,new RegExp('^# '+key+' '+value+'$','m'));\\n}\\nrun(66,['tests/web_terminal_clipboard.test.js','tests/web_supervisor_toolbar.test.js','tests/web_goal_log_tail.test.js','tests/web_terminal_clipboard_browser.test.js']);\\nrun(5,['--test-name-pattern=^(Toolbar add menu closes|a toolbar Agent|Agent terminal refits|Agent tab round trip|switching from Agent to Files)','tests/web_screen_render.test.js']);\\nfence();\\nconsole.log('QUALITY PASS: pinned clean candidate; 9 JavaScript syntax checks; 71 focused regressions passed; zero failures, cancellations, or skips.');\\nNODE\"}]}",
+              "Observed supervised process proc-1789030382079-5172-274 exited 0. stdout:  standard field scoped to the originating tab\nok 64 - blocked copying offers a standard field scoped to the originating tab\n  ---\n  duration_ms: 1085.462564\n  type: 'test'\n  ...\n# Subtest: failed browser fallbacks expose captured text and never claim success\nok 65 - failed browser fallbacks expose captured text and never claim success\n  ---\n  duration_ms: 1170.055647\n  type: 'test'\n  ...\n# Subtest: real xterm preserves interruption and exactly-once bracketed paste\nok 66 - real xterm preserves interruption and exactly-once bracketed paste\n  ---\n  duration_ms: 1356.522952\n  type: 'test'\n  ...\n1..66\n# tests 66\n# suites 0\n# pass 66\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 14354.456822\nTAP version 13\n# Subtest: Toolbar add menu closes when the user clicks outside it\nok 1 - Toolbar add menu closes when the user clicks outside it\n  ---\n  duration_ms: 2074.077117\n  type: 'test'\n  ...\n# Subtest: a toolbar Agent's morphed Start button dispatches Stop\nok 2 - a toolbar Agent's morphed Start button dispatches Stop\n  ---\n  duration_ms: 2420.477164\n  type: 'test'\n  ...\n# Subtest: Agent terminal refits from visible geometry after minimize and fullscreen\nok 3 - Agent terminal refits from visible geometry after minimize and fullscreen\n  ---\n  duration_ms: 2981.258912\n  type: 'test'\n  ...\n# Subtest: Agent tab round trip retains xterm and scrollback while returning to latest output\nok 4 - Agent tab round trip retains xterm and scrollback while returning to latest output\n  ---\n  duration_ms: 2159.735505\n  type: 'test'\n  ...\n# Subtest: switching from Agent to Files and back restores the terminal renderer\nok 5 - switching from Agent to Files and back restores the terminal renderer\n  ---\n  duration_ms: 2664.642311\n  type: 'test'\n  ...\n1..5\n# tests 5\n# suites 0\n# pass 5\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 13472.783525\nQUALITY PASS: pinned clean candidate; 9 JavaScript syntax checks; 71 focused regressions passed; zero failures, cancellations, or skips."
+            ],
+            "evaluation_scope": "isolated_candidate",
+            "operation_id": "1a08a820dd51434a",
+            "provider_attempts": [
+              {
+                "accepted": true,
+                "attempt": 1,
+                "process_id": "proc-1789030174536-5172-264",
+                "raw_output": "{\"ok\":true,\"summary\":\"Passed: candidate satisfies the Goal and relevant intent contracts; 71 focused regressions passed. No edits.\",\"results\":[{\"test\":\"The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\",\"status\":\"passed\",\"evidence\":\"Command exited 0. Verified clean candidate 7f6988c7ea0b441ad71ec5fc0eb508451674caab against recorded base 8f6de519c62a8a373b19482d5c7842068acfb35d. Reviewed finalized Goal checklist P1–P6 and Design, Surface Principles, Toolbar, and Terminal intent. Clipboard behavior is shared across terminal profiles; backend authority and durable state remain unchanged. All 71 focused checks passed, including 12 Chromium checks, with zero failures, cancellations, or skips. Covered selection gestures, retained-output copying, blocked-copy recovery, focus isolation, interruption, paste framing, session fencing, lifecycle, geometry, and renderer retention. Nine JavaScript syntax checks and diff validation passed. Limits: macOS platform simulated in Linux Chromium; native Windows/macOS and live-daemon integration were not exercised.\",\"command\":\"timeout 180s env NODE_PATH=/home/buddy/projects/refine/node_modules node <<'NODE'\\nconst assert = require('node:assert/strict');\\nconst fs = require('node:fs');\\nconst {execFileSync, spawnSync} = require('node:child_process');\\nprocess.chdir('/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRBAC01843C2EBE03D1CD08034-round-1');\\nconst candidate = '7f6988c7ea0b441ad71ec5fc0eb508451674caab';\\nconst base = '8f6de519c62a8a373b19482d5c7842068acfb35d';\\nconst git = (...args) => execFileSync('git', args, {encoding:'utf8'}).trim();\\nfunction fence() {\\n  assert.equal(git('rev-parse','HEAD'), candidate);\\n  assert.equal(git('rev-parse','HEAD^'), base);\\n  assert.equal(git('status','--porcelain'), '');\\n  const goal = JSON.parse(fs.readFileSync('/home/buddy/projects/refine-next/.git/refine-live-state/goals/DR/BAC01843C2EBE03D1CD08034/goal.json','utf8'));\\n  assert.equal(goal.id, 'DRBAC01843C2EBE03D1CD08034');\\n  assert.equal(goal.candidate_commit, candidate);\\n  assert.equal(goal.base_commit, base);\\n}\\nfence();\\ngit('diff','--check',base,candidate);\\nconst changed = git('diff','--name-only',base,candidate).split('\\\\n');\\nfor (const file of changed.filter(file => file.endsWith('.js'))) execFileSync(process.execPath,['--check',file]);\\nassert.equal(require('./tests/support/web_app').SKIP, false);\\nfunction run(expected, args) {\\n  const result = spawnSync(process.execPath,['--test','--test-reporter=tap','--test-concurrency=1',...args], {encoding:'utf8',timeout:75000,maxBuffer:8388608});\\n  process.stdout.write(result.stdout || '');\\n  process.stderr.write(result.stderr || '');\\n  assert.ifError(result.error);\\n  assert.equal(result.status, 0);\\n  for (const [key,value] of Object.entries({tests:expected,pass:expected,fail:0,cancelled:0,skipped:0})) assert.match(result.stdout,new RegExp('^# '+key+' '+value+'$','m'));\\n}\\nrun(66,['tests/web_terminal_clipboard.test.js','tests/web_supervisor_toolbar.test.js','tests/web_goal_log_tail.test.js','tests/web_terminal_clipboard_browser.test.js']);\\nrun(5,['--test-name-pattern=^(Toolbar add menu closes|a toolbar Agent|Agent terminal refits|Agent tab round trip|switching from Agent to Files)','tests/web_screen_render.test.js']);\\nfence();\\nconsole.log('QUALITY PASS: pinned clean candidate; 9 JavaScript syntax checks; 71 focused regressions passed; zero failures, cancellations, or skips.');\\nNODE\"}]}\n"
+              }
+            ],
+            "quality_proof": {
+              "checked_at": "2026-09-10T08:53:32Z",
+              "checked_candidate_commit": "7f6988c7ea0b441ad71ec5fc0eb508451674caab",
+              "evaluation_scope": "isolated_candidate",
+              "goal_id": "DRBAC01843C2EBE03D1CD08034",
+              "operation_id": "1a08a820dd51434a",
+              "results": [
+                {
+                  "command": "timeout 180s env NODE_PATH=/home/buddy/projects/refine/node_modules node <<'NODE'\nconst assert = require('node:assert/strict');\nconst fs = require('node:fs');\nconst {execFileSync, spawnSync} = require('node:child_process');\nprocess.chdir('/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRBAC01843C2EBE03D1CD08034-round-1');\nconst candidate = '7f6988c7ea0b441ad71ec5fc0eb508451674caab';\nconst base = '8f6de519c62a8a373b19482d5c7842068acfb35d';\nconst git = (...args) => execFileSync('git', args, {encoding:'utf8'}).trim();\nfunction fence() {\n  assert.equal(git('rev-parse','HEAD'), candidate);\n  assert.equal(git('rev-parse','HEAD^'), base);\n  assert.equal(git('status','--porcelain'), '');\n  const goal = JSON.parse(fs.readFileSync('/home/buddy/projects/refine-next/.git/refine-live-state/goals/DR/BAC01843C2EBE03D1CD08034/goal.json','utf8'));\n  assert.equal(goal.id, 'DRBAC01843C2EBE03D1CD08034');\n  assert.equal(goal.candidate_commit, candidate);\n  assert.equal(goal.base_commit, base);\n}\nfence();\ngit('diff','--check',base,candidate);\nconst changed = git('diff','--name-only',base,candidate).split('\\n');\nfor (const file of changed.filter(file => file.endsWith('.js'))) execFileSync(process.execPath,['--check',file]);\nassert.equal(require('./tests/support/web_app').SKIP, false);\nfunction run(expected, args) {\n  const result = spawnSync(process.execPath,['--test','--test-reporter=tap','--test-concurrency=1',...args], {encoding:'utf8',timeout:75000,maxBuffer:8388608});\n  process.stdout.write(result.stdout || '');\n  process.stderr.write(result.stderr || '');\n  assert.ifError(result.error);\n  assert.equal(result.status, 0);\n  for (const [key,value] of Object.entries({tests:expected,pass:expected,fail:0,cancelled:0,skipped:0})) assert.match(result.stdout,new RegExp('^# '+key+' '+value+'$','m'));\n}\nrun(66,['tests/web_terminal_clipboard.test.js','tests/web_supervisor_toolbar.test.js','tests/web_goal_log_tail.test.js','tests/web_terminal_clipboard_browser.test.js']);\nrun(5,['--test-name-pattern=^(Toolbar add menu closes|a toolbar Agent|Agent terminal refits|Agent tab round trip|switching from Agent to Files)','tests/web_screen_render.test.js']);\nfence();\nconsole.log('QUALITY PASS: pinned clean candidate; 9 JavaScript syntax checks; 71 focused regressions passed; zero failures, cancellations, or skips.');\nNODE",
+                  "evidence": "Observed supervised process proc-1789030382079-5172-274 exited 0. stdout:  standard field scoped to the originating tab\nok 64 - blocked copying offers a standard field scoped to the originating tab\n  ---\n  duration_ms: 1085.462564\n  type: 'test'\n  ...\n# Subtest: failed browser fallbacks expose captured text and never claim success\nok 65 - failed browser fallbacks expose captured text and never claim success\n  ---\n  duration_ms: 1170.055647\n  type: 'test'\n  ...\n# Subtest: real xterm preserves interruption and exactly-once bracketed paste\nok 66 - real xterm preserves interruption and exactly-once bracketed paste\n  ---\n  duration_ms: 1356.522952\n  type: 'test'\n  ...\n1..66\n# tests 66\n# suites 0\n# pass 66\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 14354.456822\nTAP version 13\n# Subtest: Toolbar add menu closes when the user clicks outside it\nok 1 - Toolbar add menu closes when the user clicks outside it\n  ---\n  duration_ms: 2074.077117\n  type: 'test'\n  ...\n# Subtest: a toolbar Agent's morphed Start button dispatches Stop\nok 2 - a toolbar Agent's morphed Start button dispatches Stop\n  ---\n  duration_ms: 2420.477164\n  type: 'test'\n  ...\n# Subtest: Agent terminal refits from visible geometry after minimize and fullscreen\nok 3 - Agent terminal refits from visible geometry after minimize and fullscreen\n  ---\n  duration_ms: 2981.258912\n  type: 'test'\n  ...\n# Subtest: Agent tab round trip retains xterm and scrollback while returning to latest output\nok 4 - Agent tab round trip retains xterm and scrollback while returning to latest output\n  ---\n  duration_ms: 2159.735505\n  type: 'test'\n  ...\n# Subtest: switching from Agent to Files and back restores the terminal renderer\nok 5 - switching from Agent to Files and back restores the terminal renderer\n  ---\n  duration_ms: 2664.642311\n  type: 'test'\n  ...\n1..5\n# tests 5\n# suites 0\n# pass 5\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 13472.783525\nQUALITY PASS: pinned clean candidate; 9 JavaScript syntax checks; 71 focused regressions passed; zero failures, cancellations, or skips. Agent report: Command exited 0. Verified clean candidate 7f6988c7ea0b441ad71ec5fc0eb508451674caab against recorded base 8f6de519c62a8a373b19482d5c7842068acfb35d. Reviewed finalized Goal checklist P1–P6 and Design, Surface Principles, Toolbar, and Terminal intent. Clipboard behavior is shared across terminal profiles; backend authority and durable state remain unchanged. All 71 focused checks passed, including 12 Chromium checks, with zero failures, cancellations, or skips. Covered selection gestures, retained-output copying, blocked-copy recovery, focus isolation, interruption, paste framing, session fencing, lifecycle, geometry, and renderer retention. Nine JavaScript syntax checks and diff validation passed. Limits: macOS platform simulated in Linux Chromium; native Windows/macOS and live-daemon integration were not exercised.",
+                  "exit_code": 0,
+                  "process_id": "proc-1789030382079-5172-274",
+                  "status": "passed",
+                  "test": "The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks."
+                }
+              ],
+              "round_idx": 0,
+              "schema_version": 1,
+              "source_candidate_commit": "7f6988c7ea0b441ad71ec5fc0eb508451674caab",
+              "state": "passed"
+            },
+            "results": [
+              {
+                "command": "timeout 180s env NODE_PATH=/home/buddy/projects/refine/node_modules node <<'NODE'\nconst assert = require('node:assert/strict');\nconst fs = require('node:fs');\nconst {execFileSync, spawnSync} = require('node:child_process');\nprocess.chdir('/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRBAC01843C2EBE03D1CD08034-round-1');\nconst candidate = '7f6988c7ea0b441ad71ec5fc0eb508451674caab';\nconst base = '8f6de519c62a8a373b19482d5c7842068acfb35d';\nconst git = (...args) => execFileSync('git', args, {encoding:'utf8'}).trim();\nfunction fence() {\n  assert.equal(git('rev-parse','HEAD'), candidate);\n  assert.equal(git('rev-parse','HEAD^'), base);\n  assert.equal(git('status','--porcelain'), '');\n  const goal = JSON.parse(fs.readFileSync('/home/buddy/projects/refine-next/.git/refine-live-state/goals/DR/BAC01843C2EBE03D1CD08034/goal.json','utf8'));\n  assert.equal(goal.id, 'DRBAC01843C2EBE03D1CD08034');\n  assert.equal(goal.candidate_commit, candidate);\n  assert.equal(goal.base_commit, base);\n}\nfence();\ngit('diff','--check',base,candidate);\nconst changed = git('diff','--name-only',base,candidate).split('\\n');\nfor (const file of changed.filter(file => file.endsWith('.js'))) execFileSync(process.execPath,['--check',file]);\nassert.equal(require('./tests/support/web_app').SKIP, false);\nfunction run(expected, args) {\n  const result = spawnSync(process.execPath,['--test','--test-reporter=tap','--test-concurrency=1',...args], {encoding:'utf8',timeout:75000,maxBuffer:8388608});\n  process.stdout.write(result.stdout || '');\n  process.stderr.write(result.stderr || '');\n  assert.ifError(result.error);\n  assert.equal(result.status, 0);\n  for (const [key,value] of Object.entries({tests:expected,pass:expected,fail:0,cancelled:0,skipped:0})) assert.match(result.stdout,new RegExp('^# '+key+' '+value+'$','m'));\n}\nrun(66,['tests/web_terminal_clipboard.test.js','tests/web_supervisor_toolbar.test.js','tests/web_goal_log_tail.test.js','tests/web_terminal_clipboard_browser.test.js']);\nrun(5,['--test-name-pattern=^(Toolbar add menu closes|a toolbar Agent|Agent terminal refits|Agent tab round trip|switching from Agent to Files)','tests/web_screen_render.test.js']);\nfence();\nconsole.log('QUALITY PASS: pinned clean candidate; 9 JavaScript syntax checks; 71 focused regressions passed; zero failures, cancellations, or skips.');\nNODE",
+                "evidence": "Observed supervised process proc-1789030382079-5172-274 exited 0. stdout:  standard field scoped to the originating tab\nok 64 - blocked copying offers a standard field scoped to the originating tab\n  ---\n  duration_ms: 1085.462564\n  type: 'test'\n  ...\n# Subtest: failed browser fallbacks expose captured text and never claim success\nok 65 - failed browser fallbacks expose captured text and never claim success\n  ---\n  duration_ms: 1170.055647\n  type: 'test'\n  ...\n# Subtest: real xterm preserves interruption and exactly-once bracketed paste\nok 66 - real xterm preserves interruption and exactly-once bracketed paste\n  ---\n  duration_ms: 1356.522952\n  type: 'test'\n  ...\n1..66\n# tests 66\n# suites 0\n# pass 66\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 14354.456822\nTAP version 13\n# Subtest: Toolbar add menu closes when the user clicks outside it\nok 1 - Toolbar add menu closes when the user clicks outside it\n  ---\n  duration_ms: 2074.077117\n  type: 'test'\n  ...\n# Subtest: a toolbar Agent's morphed Start button dispatches Stop\nok 2 - a toolbar Agent's morphed Start button dispatches Stop\n  ---\n  duration_ms: 2420.477164\n  type: 'test'\n  ...\n# Subtest: Agent terminal refits from visible geometry after minimize and fullscreen\nok 3 - Agent terminal refits from visible geometry after minimize and fullscreen\n  ---\n  duration_ms: 2981.258912\n  type: 'test'\n  ...\n# Subtest: Agent tab round trip retains xterm and scrollback while returning to latest output\nok 4 - Agent tab round trip retains xterm and scrollback while returning to latest output\n  ---\n  duration_ms: 2159.735505\n  type: 'test'\n  ...\n# Subtest: switching from Agent to Files and back restores the terminal renderer\nok 5 - switching from Agent to Files and back restores the terminal renderer\n  ---\n  duration_ms: 2664.642311\n  type: 'test'\n  ...\n1..5\n# tests 5\n# suites 0\n# pass 5\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 13472.783525\nQUALITY PASS: pinned clean candidate; 9 JavaScript syntax checks; 71 focused regressions passed; zero failures, cancellations, or skips. Agent report: Command exited 0. Verified clean candidate 7f6988c7ea0b441ad71ec5fc0eb508451674caab against recorded base 8f6de519c62a8a373b19482d5c7842068acfb35d. Reviewed finalized Goal checklist P1–P6 and Design, Surface Principles, Toolbar, and Terminal intent. Clipboard behavior is shared across terminal profiles; backend authority and durable state remain unchanged. All 71 focused checks passed, including 12 Chromium checks, with zero failures, cancellations, or skips. Covered selection gestures, retained-output copying, blocked-copy recovery, focus isolation, interruption, paste framing, session fencing, lifecycle, geometry, and renderer retention. Nine JavaScript syntax checks and diff validation passed. Limits: macOS platform simulated in Linux Chromium; native Windows/macOS and live-daemon integration were not exercised.",
+                "exit_code": 0,
+                "process_id": "proc-1789030382079-5172-274",
+                "status": "passed",
+                "test": "The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks."
+              }
+            ],
+            "source_candidate_commit": "7f6988c7ea0b441ad71ec5fc0eb508451674caab"
+          },
+          "quality_message": "All Quality tests passed with observed supervised evidence.",
+          "quality_state": "passed",
+          "rule_state": "unclassified"
+        },
+        "refreshed_at": "2026-09-10T08:53:34Z",
+        "replacement_base_commit": "f182ac503ec3a226baaa2b43e865bf494230cda4",
+        "replacement_candidate_commit": "be1f6f0366dd855f93f505d470dd4e2ca5c6d1b5",
+        "round_idx": 0,
+        "state": "refreshed",
+        "workflow_revision": 2,
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRBAC01843C2EBE03D1CD08034-round-1"
+      },
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "quality",
+  "status": "governance",
   "target_branch": "main",
-  "updated": "2026-09-10T08:49:33Z",
-  "workflow_revision": 22
+  "updated": "2026-09-10T08:53:34Z",
+  "workflow_revision": 25
 }
