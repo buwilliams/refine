@@ -933,11 +933,84 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-quality": {
+      "invocation_id": "6846623d03c6a51a2318adbcb7e712bea91a7691a5af5cc798085286e2b52b0c",
+      "binding_id": "default-quality",
+      "role": "quality",
+      "outcome": "success",
+      "summary": "Observational review found no new material defects. Read-only checks passed; behavioral checks are proposed for Refine supervision.",
+      "evidence": [
+        "Confirmed clean branch refine/DR54BF57DCE017ED8EC68A5EEB/round-2 at pinned candidate 9baf06e5524dcc10c1a12dfa9db765d86f42ff6e before and after review.",
+        "Reviewed the finalized Round 2 plan, candidate changes against base 7b430a6a3bc0d692f03e71da68d06f3e9534dead, architecture intent, and the seven affected worktree, workflow and Skills intent pages.",
+        "Inspected pre-agent lineage validation, proven replay ranges, successor worktree preservation, replay journals, authority-fenced persistence, replacement checks and exact-SHA publication leases. Application retains workflow decisions; Infrastructure supplies Git and durable-operation mechanisms.",
+        "Existing regression coverage addresses wrong bases, advanced targets, unrelated developer commits, ambiguous history, dirty work, authority loss, conflicts, interrupted replay, publication races and replacement Skill evidence. The prior Quality corrections include regressions for resumed replacement checks and edits outside conflicting paths.",
+        "Executed rustfmt --check --edition 2024 --config skip_children=true with the 40 changed Rust paths selected by git diff --name-only between the pinned base and candidate; exit 0.",
+        "git diff --exit-code 7b430a6a3bc0d692f03e71da68d06f3e9534dead HEAD -- src/application/workflow/tests/planning_repair.rs src/model/automation.rs returned exit 0. The previously reported failing multi-Plan fixture duplicates one Skill assignment, contrary to the unchanged one-trigger validator; exclude only that fixture.",
+        "No source files, Goal state or Git state were changed. No compilation, behavioral tests, merge, push, deployment or daemon restart was performed. Pending commands below are proposals, not observed passes; earlier test and lint results were not counted as verification by this invocation."
+      ],
+      "artifacts": {
+        "tests": [
+          {
+            "command": "git diff --check 7b430a6a3bc0d692f03e71da68d06f3e9534dead 9baf06e5524dcc10c1a12dfa9db765d86f42ff6e",
+            "evidence": "Executed during this invocation; exit 0, no diagnostics.",
+            "status": "passed",
+            "test": "Pinned candidate diff has no whitespace errors"
+          },
+          {
+            "command": "cargo test --lib application::workflow -- --test-threads=1 --skip multiple_plan_skills_contribute_separate_namespaced_checklists",
+            "evidence": "Proposed for supervised execution against the pinned candidate; excludes the verified unchanged invalid fixture.",
+            "status": "pending",
+            "test": "Workflow lineage, replay, retries, replacement gates, conflicts and publication recovery"
+          },
+          {
+            "command": "cargo test --lib application::events::tests -- --test-threads=1",
+            "evidence": "Proposed for supervised execution.",
+            "status": "pending",
+            "test": "Skill invocation identity and execution semantics"
+          },
+          {
+            "command": "cargo test --lib infrastructure::git::worktrees -- --test-threads=1",
+            "evidence": "Proposed for supervised execution.",
+            "status": "pending",
+            "test": "Shared Git worktree creation and recovery contracts"
+          },
+          {
+            "command": "cargo test --lib infrastructure::process::supervisor::operations -- --test-threads=1",
+            "evidence": "Proposed for supervised execution.",
+            "status": "pending",
+            "test": "Durable operation coordination and recovery"
+          },
+          {
+            "command": "cargo test --lib architecture_tests -- --test-threads=1",
+            "evidence": "Proposed for supervised execution.",
+            "status": "pending",
+            "test": "Semantic architecture boundaries"
+          },
+          {
+            "command": "cargo check --all-targets",
+            "evidence": "Proposed for supervised execution.",
+            "status": "pending",
+            "test": "All-target compilation after workflow module restructuring"
+          }
+        ]
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-quality",
+      "diagnostic": null,
+      "operation_id": "1a08bcd4c12113c762f",
+      "process_id": "proc-1789051883343-1129590-421",
+      "raw_output": "{\n  \"binding_id\": \"default-quality\",\n  \"invocation_id\": \"6846623d03c6a51a2318adbcb7e712bea91a7691a5af5cc798085286e2b52b0c\",\n  \"role\": \"quality\",\n  \"outcome\": \"success\",\n  \"summary\": \"Observational review found no new material defects. Read-only checks passed; behavioral checks are proposed for Refine supervision.\",\n  \"evidence\": [\n    \"Confirmed clean branch refine/DR54BF57DCE017ED8EC68A5EEB/round-2 at pinned candidate 9baf06e5524dcc10c1a12dfa9db765d86f42ff6e before and after review.\",\n    \"Reviewed the finalized Round 2 plan, candidate changes against base 7b430a6a3bc0d692f03e71da68d06f3e9534dead, architecture intent, and the seven affected worktree, workflow and Skills intent pages.\",\n    \"Inspected pre-agent lineage validation, proven replay ranges, successor worktree preservation, replay journals, authority-fenced persistence, replacement checks and exact-SHA publication leases. Application retains workflow decisions; Infrastructure supplies Git and durable-operation mechanisms.\",\n    \"Existing regression coverage addresses wrong bases, advanced targets, unrelated developer commits, ambiguous history, dirty work, authority loss, conflicts, interrupted replay, publication races and replacement Skill evidence. The prior Quality corrections include regressions for resumed replacement checks and edits outside conflicting paths.\",\n    \"Executed rustfmt --check --edition 2024 --config skip_children=true with the 40 changed Rust paths selected by git diff --name-only between the pinned base and candidate; exit 0.\",\n    \"git diff --exit-code 7b430a6a3bc0d692f03e71da68d06f3e9534dead HEAD -- src/application/workflow/tests/planning_repair.rs src/model/automation.rs returned exit 0. The previously reported failing multi-Plan fixture duplicates one Skill assignment, contrary to the unchanged one-trigger validator; exclude only that fixture.\",\n    \"No source files, Goal state or Git state were changed. No compilation, behavioral tests, merge, push, deployment or daemon restart was performed. Pending commands below are proposals, not observed passes; earlier test and lint results were not counted as verification by this invocation.\"\n  ],\n  \"artifacts\": {\n    \"tests\": [\n      {\n        \"test\": \"Pinned candidate diff has no whitespace errors\",\n        \"command\": \"git diff --check 7b430a6a3bc0d692f03e71da68d06f3e9534dead 9baf06e5524dcc10c1a12dfa9db765d86f42ff6e\",\n        \"status\": \"passed\",\n        \"evidence\": \"Executed during this invocation; exit 0, no diagnostics.\"\n      },\n      {\n        \"test\": \"Workflow lineage, replay, retries, replacement gates, conflicts and publication recovery\",\n        \"command\": \"cargo test --lib application::workflow -- --test-threads=1 --skip multiple_plan_skills_contribute_separate_namespaced_checklists\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed for supervised execution against the pinned candidate; excludes the verified unchanged invalid fixture.\"\n      },\n      {\n        \"test\": \"Skill invocation identity and execution semantics\",\n        \"command\": \"cargo test --lib application::events::tests -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed for supervised execution.\"\n      },\n      {\n        \"test\": \"Shared Git worktree creation and recovery contracts\",\n        \"command\": \"cargo test --lib infrastructure::git::worktrees -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed for supervised execution.\"\n      },\n      {\n        \"test\": \"Durable operation coordination and recovery\",\n        \"command\": \"cargo test --lib infrastructure::process::supervisor::operations -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed for supervised execution.\"\n      },\n      {\n        \"test\": \"Semantic architecture boundaries\",\n        \"command\": \"cargo test --lib architecture_tests -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed for supervised execution.\"\n      },\n      {\n        \"test\": \"All-target compilation after workflow module restructuring\",\n        \"command\": \"cargo check --all-targets\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed for supervised execution.\"\n      }\n    ]\n  }\n}\n",
+      "workflow_revision": 18
+    }
+  ],
   "created_at": "2026-09-10T14:51:23.003425385+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-10T14:55:56.211652128+00:00",
   "error": null,
   "action_applied": false
 }
