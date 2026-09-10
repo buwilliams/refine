@@ -1,9 +1,9 @@
 {
-  "base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+  "base_commit": "b47569adb8d4c5d1d7335ba91729a3e486a38fe0",
   "branch_name": "refine/DRA87E5F985A1FFE2919BE7EC2/round-3",
-  "candidate_commit": "f0bcaaac7feb35efec438cbcc4bf36bfa57cd993",
+  "candidate_commit": "59af87d23c3c14881f3969ef316146e7aa2e3273",
   "created": "2026-09-10T08:26:05Z",
-  "event_generation": 7,
+  "event_generation": 8,
   "feature_id": null,
   "feature_order": null,
   "id": "DRA87E5F985A1FFE2919BE7EC2",
@@ -2030,7 +2030,7 @@
         "kind": "quality",
         "source_round": 2
       },
-      "constitution_state": "unclassified",
+      "constitution_state": null,
       "created": "2026-09-10T14:56:18Z",
       "event_configuration": {
         "events": {
@@ -2519,6 +2519,82 @@
         }
       },
       "event_results": {
+        "3fc6cbf7e95a5ae312372d81af7ecd40eac96a4a37e79c5eaec73427075f18b1": {
+          "candidate_commit": null,
+          "results": {
+            "default-implement": {
+              "artifacts": {
+                "implementation_evidence": {
+                  "checklist": [
+                    {
+                      "evidence": "Continued in the invocation-pinned Round 3 checkout. Limited changes to Q1, regression coverage and two affected intent pages; preserved prior branches, files and Skill corrections.",
+                      "id": "workflow.plan.enter:default-plan:P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added crash_after_ref_motion_with_pending_publication_preserves_attempt_effects beside the existing crash regression. Before production changes it failed because A had no completed effect; after correction it passed.",
+                      "id": "workflow.plan.enter:default-plan:P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "resume.rs now reconciles local integration intents before returning for incomplete publication. Validation requires matching candidate, target, remote and originating Round, a valid revision, successful merge, canonical integration identity and exact candidate-to-integration-to-local ancestry.",
+                      "id": "workflow.plan.enter:default-plan:P3",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Reused integration_effects to retain A’s local phase without replacing settlement projections. Preserved original identity, timestamp, diagnostics, pushed=false and publication requirement. Deduplication distinguishes originating attempt, exact integration and completion phase.",
+                      "id": "workflow.plan.enter:default-plan:P4",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Regression exercises two rejected publications, successful B publication, interruption before settlement, repeated recovery and atomic workflow completion to Review. Both attempts’ evidence survives; stale A cannot publish, settle or advance work; settled retry requests are idempotent.",
+                      "id": "workflow.plan.enter:default-plan:P5",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added coverage for 16 malformed, mismatched or unproved intents, including a candidate-descendant integration commit absent from the target. Verified duplicate observations preserve original evidence. Existing no-remote, cancellation, supersession, content-identity and Skill receipt regressions pass.",
+                      "id": "workflow.plan.enter:default-plan:P6",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Updated only merge/review and Governance intent pages. Completed requested Rust, CLI/API, JavaScript, formatting and whitespace verification. All seven changed/new files match the verification manifest.",
+                      "id": "workflow.plan.enter:default-plan:P7",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "cargo test --lib crash_after_ref_motion_with_pending_publication_preserves_attempt_effects -- --test-threads=1: before correction, exit 101 with the expected missing-A-effect assertion; afterward, 1 passed.",
+                    "cargo test --lib governance_recovery_leaves_malformed_mismatched_and_unproved_intents_unconfirmed -- --test-threads=1: 1 passed.",
+                    "cargo test --lib governance -- --test-threads=1: final run 86 passed. Initial run had 85 passed and one new-test setup failure; corrected the fixture to record observations through the existing API.",
+                    "cargo test --lib application::events:: -- --test-threads=1: 24 passed.",
+                    "cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1: 6 passed.",
+                    "cargo test --lib candidate_refresh -- --test-threads=1: 16 passed.",
+                    "cargo test --lib application::work_items::tests::workflow -- --test-threads=1: 12 passed.",
+                    "cargo test --lib surfaces::cli::tests::goals::lifecycle -- --test-threads=1: 5 passed.",
+                    "cargo test --lib web_server_governance_retry_from_review -- --test-threads=1: 1 passed.",
+                    "node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js: 6 passed, no skips.",
+                    "rustfmt --check --edition 2024 --config skip_children=true src/application/work_items/service/integration_effects.rs src/application/workflow/engine/behaviors/governance/tests.rs src/application/workflow/engine/behaviors/governance/tests/skill_gates.rs src/application/workflow/governance/integration/resume.rs src/application/workflow/engine/behaviors/governance/tests/integration_intents.rs: passed.",
+                    "git diff --check: passed.",
+                    "All final selected Rust runs had zero failures and zero ignored tests. No baseline failures were observed. All requested checks ran; the full test suite and live-environment recovery were not exercised."
+                  ]
+                }
+              },
+              "binding_id": "default-implement",
+              "evidence": [
+                "Implemented in the pinned Round 3 branch at retained candidate f0bcaaac7feb35efec438cbcc4bf36bfa57cd993.",
+                "Preservation checks passed for all 27 retained Round 1 files and all three Round branch tips. The Skill configuration pinning/replay correction remains intact.",
+                "Verification logs, failure evidence and file manifests are retained in /tmp/refine-DRA87-round3-implementation.",
+                "No manual Goal advancement, candidate commit, merge, push, deployment or serving-installation restart was performed."
+              ],
+              "invocation_id": "3fc6cbf7e95a5ae312372d81af7ecd40eac96a4a37e79c5eaec73427075f18b1",
+              "outcome": "success",
+              "role": "implement",
+              "summary": "Corrected Q1: recovery retains the originating attempt’s proven local integration before publication, preserves distinct publication attribution, and deduplicates replay."
+            }
+          },
+          "source": "workflow.implement.enter",
+          "state": "succeeded"
+        },
         "f8ce4c2cd35101b783a100cf4bd8f1cfda15a9fd0a9660a222df925b714d2118": {
           "candidate_commit": null,
           "results": {
@@ -2602,12 +2678,17 @@
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
-      "governance_candidate_commit": "",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_candidate_commit": null,
+      "governance_checked_at": null,
+      "governance_details": null,
+      "governance_message": null,
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [],
+        "context_version": 1,
+        "recorded_at": "2026-09-10T15:10:17Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
@@ -2618,6 +2699,7 @@
           "round_idx": 2,
           "target_branch": "main"
         },
+        "completed_at": "2026-09-10T15:10:17Z",
         "final_plan": {
           "completed_at": "2026-09-10T15:00:31Z",
           "git_after": {
@@ -2664,6 +2746,65 @@
             "summary": "workflow.plan.enter:default-plan: Correct Q1 on the retained candidate so recovery preserves the originating attempt’s completed local integration before publication, while the authoritative replacement publishes and settles Review with distinct, replay-safe evidence."
           },
           "started_at": "2026-09-10T14:56:19Z"
+        },
+        "implementation": {
+          "completed_at": "2026-09-10T15:10:17Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Continued in the invocation-pinned Round 3 checkout. Limited changes to Q1, regression coverage and two affected intent pages; preserved prior branches, files and Skill corrections.",
+                "id": "workflow.plan.enter:default-plan:P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added crash_after_ref_motion_with_pending_publication_preserves_attempt_effects beside the existing crash regression. Before production changes it failed because A had no completed effect; after correction it passed.",
+                "id": "workflow.plan.enter:default-plan:P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "resume.rs now reconciles local integration intents before returning for incomplete publication. Validation requires matching candidate, target, remote and originating Round, a valid revision, successful merge, canonical integration identity and exact candidate-to-integration-to-local ancestry.",
+                "id": "workflow.plan.enter:default-plan:P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Reused integration_effects to retain A’s local phase without replacing settlement projections. Preserved original identity, timestamp, diagnostics, pushed=false and publication requirement. Deduplication distinguishes originating attempt, exact integration and completion phase.",
+                "id": "workflow.plan.enter:default-plan:P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Regression exercises two rejected publications, successful B publication, interruption before settlement, repeated recovery and atomic workflow completion to Review. Both attempts’ evidence survives; stale A cannot publish, settle or advance work; settled retry requests are idempotent.",
+                "id": "workflow.plan.enter:default-plan:P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added coverage for 16 malformed, mismatched or unproved intents, including a candidate-descendant integration commit absent from the target. Verified duplicate observations preserve original evidence. Existing no-remote, cancellation, supersession, content-identity and Skill receipt regressions pass.",
+                "id": "workflow.plan.enter:default-plan:P6",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated only merge/review and Governance intent pages. Completed requested Rust, CLI/API, JavaScript, formatting and whitespace verification. All seven changed/new files match the verification manifest.",
+                "id": "workflow.plan.enter:default-plan:P7",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "cargo test --lib crash_after_ref_motion_with_pending_publication_preserves_attempt_effects -- --test-threads=1: before correction, exit 101 with the expected missing-A-effect assertion; afterward, 1 passed.",
+              "cargo test --lib governance_recovery_leaves_malformed_mismatched_and_unproved_intents_unconfirmed -- --test-threads=1: 1 passed.",
+              "cargo test --lib governance -- --test-threads=1: final run 86 passed. Initial run had 85 passed and one new-test setup failure; corrected the fixture to record observations through the existing API.",
+              "cargo test --lib application::events:: -- --test-threads=1: 24 passed.",
+              "cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1: 6 passed.",
+              "cargo test --lib candidate_refresh -- --test-threads=1: 16 passed.",
+              "cargo test --lib application::work_items::tests::workflow -- --test-threads=1: 12 passed.",
+              "cargo test --lib surfaces::cli::tests::goals::lifecycle -- --test-threads=1: 5 passed.",
+              "cargo test --lib web_server_governance_retry_from_review -- --test-threads=1: 1 passed.",
+              "node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js: 6 passed, no skips.",
+              "rustfmt --check --edition 2024 --config skip_children=true src/application/work_items/service/integration_effects.rs src/application/workflow/engine/behaviors/governance/tests.rs src/application/workflow/engine/behaviors/governance/tests/skill_gates.rs src/application/workflow/governance/integration/resume.rs src/application/workflow/engine/behaviors/governance/tests/integration_intents.rs: passed.",
+              "git diff --check: passed.",
+              "All final selected Rust runs had zero failures and zero ignored tests. No baseline failures were observed. All requested checks ran; the full test suite and live-environment recovery were not exercised."
+            ]
+          },
+          "report": "workflow.implement.enter:default-implement: Corrected Q1: recovery retains the originating attempt’s proven local integration before publication, preserves distinct publication attribution, and deduplicates replay.",
+          "started_at": "2026-09-10T15:00:31Z"
         },
         "phase": "implement",
         "phase_started_at": "2026-09-10T15:00:31Z",
@@ -2716,34 +2857,64 @@
         },
         "schema_version": 2,
         "started_at": "2026-09-10T14:56:19Z",
-        "state": "in_progress",
-        "updated_at": "2026-09-10T15:00:31Z"
+        "state": "completed",
+        "updated_at": "2026-09-10T15:10:17Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "workflow.implement.enter:default-implement: Corrected Q1: recovery retains the originating attempt’s proven local integration before publication, preserves distinct publication attribution, and deduplicates replay.",
+      "implementation_reported_at": "2026-09-10T15:10:17Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": null,
+      "product_state": null,
       "prompt": "Implement a fresh managed recovery Round for Goal DRA87E5F985A1FFE2919BE7EC2 from current main. Preserve both previous Rounds, including their branches, commits, uncommitted files, plans, logs and failure evidence. Inspect and selectively reuse Round 2 candidate f0bcaaac7feb35efec438cbcc4bf36bfa57cd993, including its Quality correction that pins Skill configuration before invocation and preserves configuration on replay. Complete the supported Review integration-settlement recovery behavior under current Skills and docs/intent contracts.\n\nFix Quality finding Q1 from invocation f4577f5a926319479c8c06b7e3834c2cba05e45a842b0d2fdb142df218bdc506. In src/application/workflow/governance/integration/resume.rs, recover_integrated_candidate_locked currently requires publication before reconciling prepared integration effects. Under the existing target lease, repository lock and authority checks, reconcile retained integration_intent records against freshly observed exact local ancestry before returning for incomplete publication. Validate the candidate and recorded integration identity against the applicable target. When attempt A completed the local merge but crashed before recording its effect, append that proven local effect to A's originating Round and workflow revision, retaining its original integration identity, pushed=false and publication_required=true. Reuse the existing integration_effects capability; historical retention must not grant A authority, replace current settlement projections, or advance replacement work. An intent whose exact integration commit is absent from the local target remains unconfirmed.\n\nLet authoritative attempt B finish required publication through the existing workflow and retain publication under B. Keep local completion distinct from publication completion; subsequent recovery must not relabel B's publication as A's. Preserve original observations and diagnostics, and make replay retain stable, deduplicated effects. Require fresh local and required published target proof before atomic settlement with Review. Preserve strict human approval, lifecycle Skill gates, candidate-bound supervised Quality proof, explicit completed no-required-Skills receipts, and rejection of missing, failed, pending or mismatched evidence. Content equality cannot transfer proof between commit identities. Retain existing bounded handling of publication rejection and concurrent target movement without force-pushing.\n\nAdd a deterministic regression beside crash_after_ref_motion_recovers_the_prepared_effect_on_its_originating_attempt. Configure a temporary remote still at the base; retain A's integration intent and completed local target movement, omit A's completed-effect record, then claim B and resume through the normal workflow to Review. Assert A retains its exact completed local effect with publication still distinguished, B retains successful publication, and stale A cannot settle or advance work. Exercise interruption or failed publication followed by retry, repeated recovery before and after settlement, and preservation of both attempts' evidence. Retain coverage for no-remote recovery, interruption after publication, cancellation, supersession and unproved intents. Demonstrate the new regression fails before the correction and passes afterward within the new managed worktree.\n\nRun the new regression and focused checks using cargo test --lib governance -- --test-threads=1, cargo test --lib application::events:: -- --test-threads=1, cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1, and cargo test --lib candidate_refresh -- --test-threads=1. Verify retained surface behavior with the existing CLI/API recovery tests and node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js. Check changed Rust formatting and patch whitespace. Report actual commands, selected test counts, results and any baseline failures or unexecuted checks. Update only documentation affected by the correction. Refine owns candidate publication, integration and workflow advancement; do not manually change Goal state, approve, merge, push, deploy or restart the serving installation.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_candidate_commit": null,
+      "quality_checked_at": null,
+      "quality_details": null,
+      "quality_message": null,
+      "quality_state": null,
       "reporter": "Refine",
-      "rule_state": "unclassified",
-      "updated": "2026-09-10T15:00:31Z",
+      "rule_state": null,
+      "updated": "2026-09-10T15:10:18Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T14:56:18Z",
         "round_idx": 2,
         "workflow_revision": 48
       },
+      "workflow_candidate_refresh": {
+        "authorizing_status": "quality",
+        "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-3",
+        "node_id": "default",
+        "original_base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+        "original_candidate_commit": "0fffab0d0810b79b8b14f8fe4aa0262ff1e6bdd7",
+        "previous_gate_evidence": {
+          "constitution_state": "unclassified",
+          "governance_candidate_commit": "",
+          "governance_checked_at": "",
+          "governance_details": "",
+          "governance_message": "",
+          "meta_rule_state": "unclassified",
+          "product_state": "unclassified",
+          "quality_candidate_commit": null,
+          "quality_checked_at": "",
+          "quality_details": "",
+          "quality_message": "",
+          "quality_state": "unclassified",
+          "rule_state": "unclassified"
+        },
+        "refreshed_at": "2026-09-10T15:10:17Z",
+        "replacement_base_commit": "b47569adb8d4c5d1d7335ba91729a3e486a38fe0",
+        "replacement_candidate_commit": "59af87d23c3c14881f3969ef316146e7aa2e3273",
+        "round_idx": 2,
+        "state": "refreshed",
+        "workflow_revision": 48,
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRA87E5F985A1FFE2919BE7EC2-round-2"
+      },
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-10T15:00:31Z",
+  "updated": "2026-09-10T15:10:18Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:37.079960889+00:00",
@@ -2807,7 +2978,16 @@
       "node_id": "default",
       "round_idx": 2,
       "to": "implement"
+    },
+    {
+      "at": "2026-09-10T15:10:17.713536882+00:00",
+      "forced": false,
+      "from": "implement",
+      "generation": 8,
+      "node_id": "default",
+      "round_idx": 2,
+      "to": "quality"
     }
   ],
-  "workflow_revision": 62
+  "workflow_revision": 71
 }
