@@ -1,9 +1,9 @@
 {
   "base_commit": "b47569adb8d4c5d1d7335ba91729a3e486a38fe0",
   "branch_name": "refine/DR72ED9B21E7CB9369DBCACF88/round-4",
-  "candidate_commit": "be1356af9c29c6467f03f0d38341acb2d676ceba",
+  "candidate_commit": "39ae4cfa4d28739d41a6bc3c9465e064d9f92106",
   "created": "2026-09-10T08:26:05Z",
-  "event_generation": 11,
+  "event_generation": 12,
   "feature_id": null,
   "feature_order": null,
   "id": "DR72ED9B21E7CB9369DBCACF88",
@@ -4493,6 +4493,95 @@
         }
       },
       "event_results": {
+        "39a1f09d1ea510c77cd6b24796d1bb897ff80f5a9660552fc087ddb8120205da": {
+          "candidate_commit": null,
+          "results": {
+            "default-implement": {
+              "artifacts": {
+                "implementation_evidence": {
+                  "checklist": [
+                    {
+                      "evidence": "Continued from be1356af in the supplied Round 4 checkout. Captured preservation snapshots and inspected retained Quality evidence. Compared divergent main 0b6cc819; overlapping independent changes remain for Refine integration.",
+                      "id": "workflow.plan.enter:default-plan:P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Reproduced cancelled Todo Entry incorrectly advancing to Plan. The corrected regression rejects admission before approval or implementation materialization, preserving cancellation, lifecycle workspace and primary-checkout bytes.",
+                      "id": "workflow.plan.enter:default-plan:P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added shared blocking-result validation covering state, complete results, invocation/binding/role identity and artifact validity. Missing results identify the invocation and binding. Aggregation and cached-success validation reuse this capability.",
+                      "id": "workflow.plan.enter:default-plan:P3",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Required invocation, binding and original workspace commitments are retained independently of returned results and reread during settlement.",
+                      "id": "workflow.plan.enter:default-plan:P4",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Scheduler and manual transitions share settlement validation under short record locks after Skills finish. Failed/cancelled records remain terminal; background verdicts remain nonblocking.",
+                      "id": "workflow.plan.enter:default-plan:P5",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Five new regressions cover cancellation, repeated dispatch, restart, partial results, invalid cached success, late Entry-record changes and background semantics. Existing authority, workspace, cached-success, registration and implementation-isolation regressions pass.",
+                      "id": "workflow.plan.enter:default-plan:P6",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Updated only affected Skills, Events and Todo intent passages. Shared validation and regression coverage use cohesive modules.",
+                      "id": "workflow.plan.enter:default-plan:P7",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "All 15 required serial test commands passed: 237 executions, zero failures or ignored tests. Compilation, formatting and whitespace passed. Clippy reported eight unchanged warnings. Preservation comparisons passed.",
+                      "id": "workflow.plan.enter:default-plan:P8",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "cargo test --lib cancelled_todo_entry_rejects_scheduler_admission_without_materializing_implementation -- --test-threads=1: before correction exit 101, 1 failed with incorrect Todo-to-Plan admission; final exit 0, 1 passed including restart and repeated dispatch.",
+                    "cargo test --lib fresh_goal_backlog_exit_skill_remains_runnable_before_round_materialization -- --test-threads=1: 1 passed.",
+                    "cargo test --lib application::events:: -- --test-threads=1: 49 passed.",
+                    "cargo test --lib application::workflow::tests::execution_ownership -- --test-threads=1: 7 passed, including backlog_promotion_changes_only_goal_state_and_does_not_create_worktrees.",
+                    "cargo test --lib authored_todo_start -- --test-threads=1: 3 passed.",
+                    "cargo test --lib infrastructure::git::worktrees::tests -- --test-threads=1: 45 passed.",
+                    "cargo test --lib worktree_resume -- --test-threads=1: 3 passed.",
+                    "cargo test --lib quality::tests:: -- --test-threads=1: 38 passed.",
+                    "cargo test --lib application::workflow::tests::candidate_refresh -- --test-threads=1: 16 passed.",
+                    "cargo test --lib application::workflow::tests::quality_recovery -- --test-threads=1: 1 passed.",
+                    "cargo test --lib application::workflow::tests::quality_base_refresh -- --test-threads=1: 9 passed.",
+                    "cargo test --lib round_base -- --test-threads=1: 9 passed.",
+                    "cargo test --lib workflow::engine::behaviors::tests:: -- --test-threads=1: 15 passed.",
+                    "cargo test --lib launch_environment -- --test-threads=1: 5 passed.",
+                    "cargo test --lib infrastructure::agents::invocation::tests -- --test-threads=1: 16 passed.",
+                    "cargo test --lib infrastructure::process::subprocess:: -- --test-threads=1: 20 passed.",
+                    "cargo check --all-targets: exit 0.",
+                    "cargo clippy --all-targets: exit 0; eight warnings match retained baseline diagnostics and unchanged source files.",
+                    "rustfmt --check --edition 2024 --config skip_children=true on all 10 changed Rust files: exit 0.",
+                    "git diff --check and git diff --check be1356af9c29c6467f03f0d38341acb2d676ceba: exit 0.",
+                    "Preservation comparison: primary HEAD/status/index unchanged; Round 1 HEAD/status/index and all 36 retained files unchanged; Goal refs, original worktree paths and 61 historical evidence files preserved."
+                  ]
+                }
+              },
+              "binding_id": "default-implement",
+              "evidence": [
+                "13 files contain uncommitted implementation changes. Candidate HEAD remains be1356af9c29c6467f03f0d38341acb2d676ceba.",
+                "Logs, reproduction, changes, preservation comparisons and the parse-checked implementation report are retained in /tmp/dr72-round4-evidence/.",
+                "Verification used deterministic local provider fixtures; live external providers and Windows were not exercised.",
+                "Refine retains ownership of candidate commits, workflow advancement, Quality, Governance and integration. No merge, push, deployment or serving-daemon restart was performed."
+              ],
+              "invocation_id": "39a1f09d1ea510c77cd6b24796d1bb897ff80f5a9660552fc087ddb8120205da",
+              "outcome": "success",
+              "role": "implement",
+              "summary": "Closed the cancelled blocking lifecycle Skill admission bypass and verified complete blocking results and original workspace commitments before settlement."
+            }
+          },
+          "source": "workflow.implement.enter",
+          "state": "succeeded"
+        },
         "ca9bf4b652053c2bf4938fe4decd63667b33c3cd597a66262f8d7f0708ca132e": {
           "candidate_commit": null,
           "results": {
@@ -4585,7 +4674,12 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [],
+        "context_version": 1,
+        "recorded_at": "2026-09-10T16:04:06Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "b47569adb8d4c5d1d7335ba91729a3e486a38fe0",
@@ -4596,6 +4690,7 @@
           "round_idx": 3,
           "target_branch": "main"
         },
+        "completed_at": "2026-09-10T16:04:06Z",
         "final_plan": {
           "completed_at": "2026-09-10T15:48:18Z",
           "git_after": {
@@ -4646,6 +4741,78 @@
             "summary": "workflow.plan.enter:default-plan: Close the cancelled blocking lifecycle Skill admission bypass while preserving retained evidence, workspace isolation and atomic Todo-to-Plan admission."
           },
           "started_at": "2026-09-10T15:40:59Z"
+        },
+        "implementation": {
+          "completed_at": "2026-09-10T16:04:06Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Continued from be1356af in the supplied Round 4 checkout. Captured preservation snapshots and inspected retained Quality evidence. Compared divergent main 0b6cc819; overlapping independent changes remain for Refine integration.",
+                "id": "workflow.plan.enter:default-plan:P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Reproduced cancelled Todo Entry incorrectly advancing to Plan. The corrected regression rejects admission before approval or implementation materialization, preserving cancellation, lifecycle workspace and primary-checkout bytes.",
+                "id": "workflow.plan.enter:default-plan:P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added shared blocking-result validation covering state, complete results, invocation/binding/role identity and artifact validity. Missing results identify the invocation and binding. Aggregation and cached-success validation reuse this capability.",
+                "id": "workflow.plan.enter:default-plan:P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Required invocation, binding and original workspace commitments are retained independently of returned results and reread during settlement.",
+                "id": "workflow.plan.enter:default-plan:P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Scheduler and manual transitions share settlement validation under short record locks after Skills finish. Failed/cancelled records remain terminal; background verdicts remain nonblocking.",
+                "id": "workflow.plan.enter:default-plan:P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Five new regressions cover cancellation, repeated dispatch, restart, partial results, invalid cached success, late Entry-record changes and background semantics. Existing authority, workspace, cached-success, registration and implementation-isolation regressions pass.",
+                "id": "workflow.plan.enter:default-plan:P6",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated only affected Skills, Events and Todo intent passages. Shared validation and regression coverage use cohesive modules.",
+                "id": "workflow.plan.enter:default-plan:P7",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "All 15 required serial test commands passed: 237 executions, zero failures or ignored tests. Compilation, formatting and whitespace passed. Clippy reported eight unchanged warnings. Preservation comparisons passed.",
+                "id": "workflow.plan.enter:default-plan:P8",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "cargo test --lib cancelled_todo_entry_rejects_scheduler_admission_without_materializing_implementation -- --test-threads=1: before correction exit 101, 1 failed with incorrect Todo-to-Plan admission; final exit 0, 1 passed including restart and repeated dispatch.",
+              "cargo test --lib fresh_goal_backlog_exit_skill_remains_runnable_before_round_materialization -- --test-threads=1: 1 passed.",
+              "cargo test --lib application::events:: -- --test-threads=1: 49 passed.",
+              "cargo test --lib application::workflow::tests::execution_ownership -- --test-threads=1: 7 passed, including backlog_promotion_changes_only_goal_state_and_does_not_create_worktrees.",
+              "cargo test --lib authored_todo_start -- --test-threads=1: 3 passed.",
+              "cargo test --lib infrastructure::git::worktrees::tests -- --test-threads=1: 45 passed.",
+              "cargo test --lib worktree_resume -- --test-threads=1: 3 passed.",
+              "cargo test --lib quality::tests:: -- --test-threads=1: 38 passed.",
+              "cargo test --lib application::workflow::tests::candidate_refresh -- --test-threads=1: 16 passed.",
+              "cargo test --lib application::workflow::tests::quality_recovery -- --test-threads=1: 1 passed.",
+              "cargo test --lib application::workflow::tests::quality_base_refresh -- --test-threads=1: 9 passed.",
+              "cargo test --lib round_base -- --test-threads=1: 9 passed.",
+              "cargo test --lib workflow::engine::behaviors::tests:: -- --test-threads=1: 15 passed.",
+              "cargo test --lib launch_environment -- --test-threads=1: 5 passed.",
+              "cargo test --lib infrastructure::agents::invocation::tests -- --test-threads=1: 16 passed.",
+              "cargo test --lib infrastructure::process::subprocess:: -- --test-threads=1: 20 passed.",
+              "cargo check --all-targets: exit 0.",
+              "cargo clippy --all-targets: exit 0; eight warnings match retained baseline diagnostics and unchanged source files.",
+              "rustfmt --check --edition 2024 --config skip_children=true on all 10 changed Rust files: exit 0.",
+              "git diff --check and git diff --check be1356af9c29c6467f03f0d38341acb2d676ceba: exit 0.",
+              "Preservation comparison: primary HEAD/status/index unchanged; Round 1 HEAD/status/index and all 36 retained files unchanged; Goal refs, original worktree paths and 61 historical evidence files preserved."
+            ]
+          },
+          "report": "workflow.implement.enter:default-implement: Closed the cancelled blocking lifecycle Skill admission bypass and verified complete blocking results and original workspace commitments before settlement.",
+          "started_at": "2026-09-10T15:48:18Z"
         },
         "phase": "implement",
         "phase_started_at": "2026-09-10T15:48:18Z",
@@ -4702,11 +4869,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-09-10T15:40:59Z",
-        "state": "in_progress",
-        "updated_at": "2026-09-10T15:48:18Z"
+        "state": "completed",
+        "updated_at": "2026-09-10T16:04:06Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "workflow.implement.enter:default-implement: Closed the cancelled blocking lifecycle Skill admission bypass and verified complete blocking results and original workspace commitments before settlement.",
+      "implementation_reported_at": "2026-09-10T16:04:06Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -4717,7 +4884,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T15:48:18Z",
+      "updated": "2026-09-10T16:04:06Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T15:40:59Z",
         "round_idx": 3,
@@ -4727,9 +4894,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-10T15:48:18Z",
+  "updated": "2026-09-10T16:04:06Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:36.706264729+00:00",
@@ -4829,7 +4996,16 @@
       "node_id": "default",
       "round_idx": 3,
       "to": "implement"
+    },
+    {
+      "at": "2026-09-10T16:04:06.933061533+00:00",
+      "forced": false,
+      "from": "implement",
+      "generation": 12,
+      "node_id": "default",
+      "round_idx": 3,
+      "to": "quality"
     }
   ],
-  "workflow_revision": 92
+  "workflow_revision": 99
 }
