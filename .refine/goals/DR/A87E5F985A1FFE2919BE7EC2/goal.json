@@ -106,12 +106,59 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-09-10T08:26:08Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-09-10T08:29:38Z",
+        "proposal": {
+          "completed_at": "2026-09-10T08:29:38Z",
+          "git_after": {
+            "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Allow the existing Governance retry operation from Review only when the current Round has passed Quality and Governance evidence bound to its recorded candidate but lacks integration settlement, atomically preserving the recovery reason and prior diagnostics while retiring stale attempt authority so the scheduler can claim a fresh attempt.",
+                "id": "P1"
+              },
+              {
+                "description": "At Governance resume, inspect the durable candidate and freshly observed local and required published targets before workspace preparation, candidate refresh, or Round-branch publication, reconstructing missing integration evidence only when normalized passed Quality proof and candidate-bound Governance evidence authorize that exact integrated ancestor.",
+                "id": "P2"
+              },
+              {
+                "description": "When the exact candidate is not fully integrated and published, resume the existing integration workflow from its recorded identity, treating content-equal commits with different identities as requiring ordinary integration or candidate refresh with replacement Quality and Governance rather than transferring the old verdict to another commit.",
+                "id": "P3"
+              },
+              {
+                "description": "Route an authoritative retry's non-fast-forward Round-branch publication failure through the existing bounded integration recovery with retained candidate identities, local and remote tips, and failure diagnostics, preserving conflicting refs and leaving replacement work untouched when the attempt is superseded.",
+                "id": "P4"
+              },
+              {
+                "description": "Concentrate integration settlement in a focused module within the existing workflow and work-item capabilities that rechecks Round, node, attempt, candidate, and gate authority under the Goal lock, atomically records successful integration with Review, guards other automated Review entry paths against missing evidence, and makes interrupted or repeated settlement recoverable while retaining completed Git effects on their originating Round after cancellation or supersession.",
+                "id": "P5"
+              },
+              {
+                "description": "Route the existing CLI and API Governance retry handlers through the shared recovery eligibility check and make missing-settlement approval errors identify the supported retry path while keeping approval limited to accepting the durably settled integration.",
+                "id": "P6"
+              },
+              {
+                "description": "Update the affected Governance, Review, merge-and-review, and CLI intent pages in their established format to describe the recovery entry condition, exact-candidate and publication requirements, and retained failure boundaries.",
+                "id": "P7"
+              }
+            ],
+            "summary": "Add a guarded Governance retry for Goals stranded in Review so Refine can recover or complete exact-candidate integration, durably record its success, and return the Goal to an approvable Review state while preserving prior evidence and fencing superseded attempts."
+          },
+          "started_at": "2026-09-10T08:26:08Z"
+        },
         "schema_version": 2,
         "started_at": "2026-09-10T08:26:08Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T08:26:08Z"
+        "updated_at": "2026-09-10T08:29:38Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -125,7 +172,7 @@
       "quality_state": "unclassified",
       "reporter": "ethan.jacobson@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T08:26:08Z",
+      "updated": "2026-09-10T08:29:38Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T08:26:07Z",
         "round_idx": 0,
@@ -137,6 +184,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-09-10T08:26:08Z",
-  "workflow_revision": 7
+  "updated": "2026-09-10T08:29:38Z",
+  "workflow_revision": 9
 }
