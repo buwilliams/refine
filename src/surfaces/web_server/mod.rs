@@ -76,11 +76,11 @@ pub const API_GROUPS: &[ApiRouteGroup] = &[
     },
     ApiRouteGroup {
         prefix: "/event-definitions",
-        capability: "system catalog, scoped Event bindings, custom Event invocation",
+        capability: "internal system occurrences and legacy configuration compatibility",
     },
     ApiRouteGroup {
         prefix: "/skills",
-        capability: "scoped reusable Skill instructions and result roles",
+        capability: "Skills with one trigger, typed inputs, cloning support and manual execution",
     },
     ApiRouteGroup {
         prefix: "/event-invocations",

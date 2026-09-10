@@ -18,7 +18,7 @@ source code:
 
 Runbooks:
 
-- [Configure Events and Skills](configure-events-and-skills.md) — bind reusable
+- [Configure Skills](configure-skills.md) — bind reusable
   agent instructions to workflow activity and custom actions, with scoped settings,
   parameters, migration, and execution evidence.
 

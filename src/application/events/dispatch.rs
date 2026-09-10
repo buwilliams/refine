@@ -6,7 +6,10 @@ use crate::error::{RefineError, RefineResult};
 use crate::infrastructure::process::supervisor::config::{ConfigService, FileSettingsService};
 use crate::infrastructure::process::supervisor::coordination::with_record_lock;
 use crate::infrastructure::storage::automation::{read_json, write_json};
-use crate::model::automation::{EventKind, valid_id};
+use crate::model::automation::{
+    AutomationConfig, BindingMode, CUSTOM_EVENT_ID, EventDefinition, EventKind, custom_event,
+    valid_id,
+};
 use crate::model::workflow::GoalStatus;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -35,6 +38,148 @@ pub(crate) fn reservations(runtime: &Path) -> Vec<EventReservation> {
 }
 
 impl FileEventService {
+    pub(crate) fn manual_skill_event(
+        &self,
+        config: &AutomationConfig,
+        skill_id: &str,
+        node: &str,
+    ) -> RefineResult<EventDefinition> {
+        let skill = config
+            .skills
+            .get(skill_id)
+            .ok_or_else(|| RefineError::NotFound(format!("Skill {skill_id}")))?;
+        let selected: Vec<_> = config
+            .events
+            .values()
+            .filter(|event| event.kind == EventKind::Custom)
+            .flat_map(|event| {
+                config
+                    .bindings(event, node)
+                    .into_iter()
+                    .map(move |(binding, _)| (event, binding))
+            })
+            .filter(|(_, binding)| {
+                binding.skill_id == skill_id && binding.mode != BindingMode::Context
+            })
+            .collect();
+        if selected.len() != 1 {
+            return Err(RefineError::InvalidInput("Manual launch requires one enabled Custom trigger for this Skill on the selected node".into()));
+        }
+        let mut event = custom_event();
+        event.name = skill.name.clone();
+        event.parameters = selected[0].0.parameters.clone();
+        let mut binding = selected[0].1.clone();
+        // Scope and override selection are already resolved. A manual Skill has
+        // one result and no Goal action, regardless of workflow execution mode.
+        binding.overrides = None;
+        binding.scope.node_id = Some(node.into());
+        binding.mode = BindingMode::Blocking;
+        event.bindings.push(binding);
+        Ok(event)
+    }
+
+    pub fn skill_inputs(&self, skill_id: &str, target: &Path) -> RefineResult<Value> {
+        let context = self.manual_context(target, &json!({}))?;
+        let config = self.config()?;
+        let event = self.manual_skill_event(&config, skill_id, &context.node_id)?;
+        Ok(
+            json!({"revision":config.revision, "name":event.name, "parameters":self.launch_parameters(&config, &event, &context)?}),
+        )
+    }
+
+    /// Interactive web runs reuse managed terminal lifecycle and transcripts.
+    /// Resolve exactly the same selected Skill and typed inputs as headless runs.
+    pub fn terminal_skill_prompt(
+        &self,
+        skill_id: &str,
+        target: &Path,
+        parameters: &Value,
+    ) -> RefineResult<(String, Value)> {
+        let mut context = self.manual_context(target, &json!({}))?;
+        let config = self.config()?;
+        let event = self.manual_skill_event(&config, skill_id, &context.node_id)?;
+        let inputs = serde_json::from_value(parameters.clone())
+            .map_err(|e| RefineError::InvalidInput(e.to_string()))?;
+        let bindings = self.resolve_bindings(&config, &event, &mut context, &inputs)?;
+        let pinned = bindings.first().ok_or_else(|| {
+            RefineError::InvalidInput("This Skill has no enabled Custom trigger".into())
+        })?;
+        let prompt = format!(
+            "Run this standalone Skill in the selected project. Follow its instructions and report what you did. This run is independent of Goal workflows; do not create or change a Goal unless the user explicitly asks.\n\nSkill: {}\n{}\n\nParameters:\n{}\n\nSystem context:\n{}",
+            pinned.skill.name,
+            pinned.skill.prompt,
+            json!(pinned.parameters),
+            context.data["system"]
+        );
+        Ok((
+            prompt,
+            json!({"skill_id": skill_id, "skill_name": pinned.skill.name, "skill_configuration_revision": config.revision, "skill_parameters": pinned.parameters, "node_id": context.node_id}),
+        ))
+    }
+
+    pub fn trigger_skill(
+        &self,
+        skill_id: &str,
+        target: &Path,
+        body: &Value,
+    ) -> RefineResult<EventInvocation> {
+        if !valid_id(skill_id) {
+            return Err(RefineError::InvalidInput("invalid Skill ID".into()));
+        }
+        let object = body
+            .as_object()
+            .ok_or_else(|| RefineError::InvalidInput("Skill input must be an object".into()))?;
+        if object
+            .keys()
+            .any(|key| !["parameters", "node_id", "request_id"].contains(&key.as_str()))
+        {
+            return Err(RefineError::InvalidInput("Manual Skills take parameters, node_id, and request_id; they run independently of Goals".into()));
+        }
+        for key in ["node_id", "request_id"] {
+            if body
+                .get(key)
+                .is_some_and(|v| !v.is_null() && !v.is_string())
+            {
+                return Err(RefineError::InvalidInput(format!("{key} must be a string")));
+            }
+        }
+        let mut context = self.manual_context(target, body)?;
+        let inputs: BTreeMap<String, Value> =
+            serde_json::from_value(body.get("parameters").cloned().unwrap_or_else(|| json!({})))
+                .map_err(|e| RefineError::InvalidInput(e.to_string()))?;
+        let request_id = body
+            .get("request_id")
+            .and_then(Value::as_str)
+            .map(str::to_string)
+            .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+        if !valid_id(&request_id) {
+            return Err(RefineError::InvalidInput("invalid request_id".into()));
+        }
+        context
+            .metadata
+            .insert("requested_parameters".into(), json!(inputs));
+        context
+            .metadata
+            .insert("manual_skill_id".into(), json!(skill_id));
+        let occurrence = format!("manual-skill:{skill_id}:{request_id}");
+        let id = super::execution::stable_id(&format!("{occurrence}:{CUSTOM_EVENT_ID}"));
+        if self.invocation_path(&id)?.exists() {
+            let existing = self.invocation(&id)?;
+            if existing.context.node_id != context.node_id
+                || existing.context.metadata.get("requested_parameters")
+                    != context.metadata.get("requested_parameters")
+            {
+                return Err(RefineError::Conflict(
+                    "request_id already identifies a different Skill request".into(),
+                ));
+            }
+            return Ok(existing);
+        }
+        let config = self.config()?;
+        let event = self.manual_skill_event(&config, skill_id, &context.node_id)?;
+        self.prepare_pinned(&config, &event, context, inputs, &occurrence)
+    }
+
     pub fn trigger(
         &self,
         event_id: &str,

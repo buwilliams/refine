@@ -10,7 +10,7 @@
 
 ## Purpose
 
-The Guide surface exists to help users configure and understand Refine in context. It should make setup, target-app attachment, settings, Events, Skills, and system concepts discoverable without turning the product into a tutorial.
+The Guide surface exists to help users configure and understand Refine in context. It should make setup, target-app attachment, settings, Skills, and system concepts discoverable without turning the product into a tutorial.
 
 It also helps future agents and maintainers see where the UI expects explanatory support.
 

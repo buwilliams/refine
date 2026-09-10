@@ -22,7 +22,8 @@ pub(super) fn migrate(root: &Path) -> RefineResult<AutomationConfig> {
             .load_settings()?;
     let quality = serde_json::to_value(&quality_settings)
         .map_err(|e| RefineError::Serialization(e.to_string()))?;
-    let config = build_config(&originals, &quality);
+    let mut config = build_config(&originals, &quality);
+    single_trigger_skills(&mut config)?;
     // The source snapshot is written first. A crash retries deterministic conversion; once
     // config.json is installed the legacy files never regain configuration authority.
     let archive = root.join("automation/migration-v1.json");
@@ -173,4 +174,79 @@ pub(crate) fn pristine_config_bytes() -> Vec<u8> {
     let quality = json!({"configured":false,"business_requirements":"","instructions":PromptEngine::load(PromptTemplate::QualityDefaultInstructions),"tests":[],"legacy_commands":[],"enabled":"1"});
     serde_json::to_vec_pretty(&build_config(&Default::default(), &quality))
         .expect("static defaults are serializable")
+}
+
+/// Split authored assignments without changing binding identities, ordering,
+/// overrides, parameters or historical invocation snapshots.
+pub(super) fn single_trigger_skills(config: &mut AutomationConfig) -> RefineResult<()> {
+    let originals = config.skills.clone();
+    // Keep workflow defaults at their original phase so imported Quality checks
+    // and established references retain their identity after splitting copies.
+    let primary: BTreeMap<_, _> = originals
+        .values()
+        .filter_map(|skill| {
+            let role = skill.id.strip_prefix("default-").unwrap_or(&skill.role);
+            let preferred = format!("workflow.{role}.enter");
+            config
+                .events
+                .values()
+                .flat_map(|event| {
+                    event
+                        .bindings
+                        .iter()
+                        .filter(|binding| binding.skill_id == skill.id)
+                        .map(move |binding| (event, binding))
+                })
+                .min_by_key(|(event, binding)| {
+                    (
+                        event.source.as_deref() != Some(preferred.as_str()),
+                        binding.scope.node_id.is_some(),
+                        &event.id,
+                        &binding.id,
+                    )
+                })
+                .map(|(event, binding)| (skill.id.clone(), (event.id.clone(), binding.id.clone())))
+        })
+        .collect();
+    for event in config.events.values_mut() {
+        for binding in &mut event.bindings {
+            let original = originals.get(&binding.skill_id).ok_or_else(|| {
+                RefineError::InvalidInput("Missing Skill during trigger migration".into())
+            })?;
+            let mut skill = original.clone();
+            if primary.get(&original.id) != Some(&(event.id.clone(), binding.id.clone())) {
+                let hash = super::execution::stable_id(&format!(
+                    "{}:{}:{}",
+                    original.id, event.id, binding.id
+                ));
+                skill.id = format!("skill-copy-{}", &hash[..24]);
+                if config.skills.contains_key(&skill.id) {
+                    return Err(RefineError::Conflict(
+                        "A migrated Skill ID already exists; configuration was preserved".into(),
+                    ));
+                }
+                skill.name = format!("{} · {}", original.name, event.name);
+            }
+            skill.scope = binding
+                .scope
+                .node_id
+                .as_ref()
+                .or(event.scope.node_id.as_ref())
+                .map(|node| Scope {
+                    node_id: Some(node.clone()),
+                })
+                .unwrap_or_else(|| original.scope.clone());
+            skill.enabled &= binding.enabled && event.enabled;
+            binding.skill_id = skill.id.clone();
+            binding.enabled = true;
+            binding.scope = skill.scope.clone();
+            config.skills.insert(skill.id.clone(), skill);
+        }
+    }
+    for event in config.events.values_mut() {
+        event.enabled = true;
+        event.scope = Scope::default();
+    }
+    config.schema_version = SCHEMA_VERSION;
+    config.validate().map_err(RefineError::InvalidInput)
 }

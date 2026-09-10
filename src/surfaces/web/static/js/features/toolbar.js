@@ -5,8 +5,8 @@
 // PTY session while Files, System, and Goal Logs keep their specialized panels.
 const CHAT_TABS_STORAGE_KEY = "refine_chat_tabs";
 const CHAT_TABS_STORAGE_VERSION = 2;
-const INTERACTIVE_TERMINAL_MODES = new Set(["terminal", "agent", "plan", "goal", "standalone"]);
-const AGENT_TERMINAL_MODES = new Set(["agent", "plan", "goal", "standalone"]);
+const INTERACTIVE_TERMINAL_MODES = new Set(["terminal", "agent", "plan", "goal", "standalone", "skill"]);
+const AGENT_TERMINAL_MODES = new Set(["agent", "plan", "goal", "standalone", "skill"]);
 const SYSTEM_OPERATION_LOG_LIMIT = 250;
 const GOAL_LOG_TAIL_LIMIT = 200;
 const GOAL_LOG_DEFAULT_ORDER = "tail";
@@ -207,6 +207,7 @@ function saveChatStateToStorage() {
         worktree: t.worktree || null,
         exited: !!t.exited,
         initialPrompt: String(t.initialPrompt || "").slice(-50_000),
+        skillLaunch: t.skillLaunch || null,
         logEntries: t.mode === "goal_logs"
           ? normalizeGoalLogEntries(t.logEntries).slice(-GOAL_LOG_TAIL_LIMIT)
           : undefined,
@@ -396,7 +397,7 @@ function nextToolbarLabel(mode) {
 }
 
 async function createToolbarTab(mode, options = {}) {
-  if (!["agent", "standalone", "system", "files", "todo", "terminal", "plan"].includes(mode)) return;
+  if (!["agent", "standalone", "system", "files", "todo", "terminal", "plan", "skill"].includes(mode)) return;
   if (mode === "todo") {
     const existing = Object.keys(chatState.tabs).find((id) => chatState.tabs[id]?.mode === "todo");
     if (existing) return activateToolbarTab(existing);
@@ -404,10 +405,11 @@ async function createToolbarTab(mode, options = {}) {
   const tabId = nextToolbarTabId(mode);
   chatState.tabs[tabId] = normalizeInteractiveTerminalTab({
     goalId: null,
-    label: nextToolbarLabel(mode),
+    label: options.label || nextToolbarLabel(mode),
     mode,
     sessionId: null,
     initialPrompt: String(options.initialPrompt || "").trim(),
+    skillLaunch: options.skillLaunch || null,
   });
   chatState.activeTabId = tabId;
   chatState.open = true;
@@ -1253,6 +1255,7 @@ async function startTerminalSession(tab = currentToolbarTab()) {
       goal_id: tab.goalId || undefined,
       feature_id: tab.featureId || undefined,
       initial_prompt: tab.initialPrompt || undefined,
+      ...(tab.mode === "skill" ? {skill_id: tab.skillLaunch?.id, parameters: tab.skillLaunch?.parameters || {}} : {}),
       worktree: tab.mode === "standalone" ? tab.worktree || undefined : undefined,
     });
     // Goal attachment is runtime-owned. Keep the tab in its loading state

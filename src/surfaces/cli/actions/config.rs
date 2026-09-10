@@ -3,7 +3,6 @@ use super::*;
 #[derive(Clone, Debug, ValueEnum)]
 pub enum ConfigDomain {
     Settings,
-    Events,
     Skills,
 }
 

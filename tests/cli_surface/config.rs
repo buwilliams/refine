@@ -4,7 +4,7 @@ pub(crate) fn config_commands_route_through_the_active_daemon(fixture: &Integrat
     let shown = fixture.run_refine(&["config", "show"]);
     fixture.assert_success("config show", &shown);
     let shown = fixture.json_stdout(&shown);
-    for domain in ["settings", "events", "skills"] {
+    for domain in ["settings", "skills"] {
         assert!(shown[domain].is_object(), "missing {domain}: {shown:#}");
     }
     let revision = shown["skills"]["revision"].as_u64().unwrap().to_string();
@@ -15,21 +15,19 @@ pub(crate) fn config_commands_route_through_the_active_daemon(fixture: &Integrat
         "--revision",
         &revision,
         "--json",
-        r#"{"name":"CLI check","prompt":"Verify authoritative readback","role":"task"}"#,
+        r#"{"name":"CLI check","prompt":"Verify authoritative readback","trigger":{"source":"custom"}}"#,
     ]);
     fixture.assert_success("skills save", &saved);
     let saved = fixture.json_stdout(&saved);
     assert_eq!(saved["item"]["name"], "CLI check");
-    let event = fixture.run_refine(&["events", "save", "cli-event", "--revision", &saved["revision"].as_u64().unwrap().to_string(), "--json", r#"{"name":"CLI Event","kind":"custom","bindings":[{"id":"check","skill_id":"cli-check"}]}"#]);
-    fixture.assert_success("events save", &event);
-    let catalog = fixture.run_refine(&["events", "catalog"]);
-    fixture.assert_success("events catalog", &catalog);
+    let catalog = fixture.run_refine(&["skills", "triggers"]);
+    fixture.assert_success("skills triggers", &catalog);
     assert_eq!(
         fixture.json_stdout(&catalog)["sources"]
             .as_array()
             .unwrap()
             .len(),
-        21
+        22
     );
     for retired in ["quality", "governance", "guidance"] {
         assert!(

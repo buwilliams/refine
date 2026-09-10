@@ -268,3 +268,28 @@ fn batch_payloads_answer_each_request() {
     // The notification produces no reply, so only the two requests are answered.
     assert_eq!(responses.len(), 2);
 }
+
+#[test]
+fn skills_replace_event_tools_and_preserve_typed_manual_parameters() {
+    let response = call(json!({"jsonrpc":"2.0","id":30,"method":"tools/list"}));
+    let names: Vec<_> = response["result"]["tools"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|tool| tool["name"].as_str())
+        .collect();
+    assert!(names.contains(&"refine_skill_triggers"));
+    assert!(names.contains(&"refine_trigger_skill"));
+    assert!(!names.contains(&"refine_trigger_event"));
+    assert!(!names.contains(&"refine_list_events"));
+    let response = call(
+        json!({"jsonrpc":"2.0","id":31,"method":"tools/call","params":{"name":"refine_trigger_skill","arguments":{"skill_id":"check","parameters":{"count":3,"strict":true},"request_id":"retry-1"}}}),
+    );
+    let request = &response["result"]["structuredContent"];
+    assert_eq!(request["path"], "/skills/check/trigger");
+    assert_eq!(
+        request["body"]["parameters"],
+        json!({"count":3,"strict":true})
+    );
+    assert!(request["body"].get("goal_id").is_none());
+}

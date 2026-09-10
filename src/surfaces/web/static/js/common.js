@@ -1972,7 +1972,7 @@ function initSSE() {
     }
   });
   sseSource.addEventListener("api_mutation", (event) => {
-    if (/event-definitions|skills/.test(event.data) && typeof refreshCustomEvents === "function") refreshCustomEvents();
+    if (/event-definitions|skills/.test(event.data) && typeof refreshManualSkills === "function") refreshManualSkills();
     if (typeof handleNodeContextMutationEvent === "function") {
       handleNodeContextMutationEvent(event);
     }

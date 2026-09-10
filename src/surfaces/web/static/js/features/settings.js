@@ -136,7 +136,7 @@ async function loadSettingsSurfaceData() {
     </option>`).join("");
   return {
     noProject: false,
-    automation: (needs.events || needs.skills) ? await loadAutomationSettings(activeSlug) : null,
+    automation: needs.skills ? await loadAutomationSettings(activeSlug) : null,
     s: settings,
     diag: diag || {},
     reps: state.reporters,
@@ -160,7 +160,6 @@ async function loadSettingsSurfaceData() {
 function settingsSurfaceDataNeeds(surface, slug) {
   const needs = {
     settings: false,
-    events: false,
     skills: false,
     diagnostics: false,
     reporters: false,
@@ -175,7 +174,7 @@ function settingsSurfaceDataNeeds(surface, slug) {
   else if (slug === "reporters") { needs.reporters = true; needs.nodes = true; }
   else if (slug === "target-app" || slug === "runtime") { needs.settings = true; needs.nodes = true; }
   else if (slug === "processes") { needs.processes = true; needs.source = true; }
-  else if (slug === "events" || slug === "skills") needs[slug] = true;
+  else if (slug === "skills") needs[slug] = true;
   return needs;
 }
 
@@ -692,7 +691,6 @@ const SETTINGS_SURFACES = {
       { slug: "application", label: "Application" },
       { slug: "reporters", label: "Reporters" },
       { slug: "skills", label: "Skills" },
-      { slug: "events", label: "Events" },
       { slug: "target-app", label: "Target App" },
       { slug: "runtime", label: "Runtime" },
       { slug: "releases", label: "Refine (dev)" },
@@ -712,6 +710,7 @@ function isSettingsRoute(route = state.currentRoute) {
 }
 
 function normalizeSettingsTab(slug, surface = settingsSurfaceForRoute()) {
+  if (slug === "events") return "skills";
   if (slug === "system") return "processes";
   if (slug === "agents") return "processes";
   if (surface === SETTINGS_SURFACES.settings && (slug === "application-config" || slug === "target-app-config")) {
@@ -922,7 +921,7 @@ function renderSettingsTabBody(surface, slug, data) {
       return renderNodeRuntimeConfigSections(data.s, data.activeNodeLabel, data.cli);
     }
   }
-  if (slug === "events" || slug === "skills") return renderAutomationSettings(slug, data.automation);
+  if (slug === "skills") return renderAutomationSettings(slug, data.automation);
   return `<p class="muted">Unknown settings tab.</p>`;
 }
 
@@ -988,7 +987,7 @@ function bindSettingsTabBody(surface, slug, data) {
     else if (slug === "runtime") bindNodeRuntimeConfigControls();
 
   }
-  if (slug === "events" || slug === "skills") bindAutomationSettings(slug, data.automation);
+  if (slug === "skills") bindAutomationSettings(slug, data.automation);
 }
 
 function drawSettingsSurface(surface, data, activeSlugOverride = null) {

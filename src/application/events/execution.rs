@@ -358,33 +358,7 @@ impl FileEventService {
                     "Event success action requires a Goal".into(),
                 ));
             }
-            let effective = config.bindings(event, &context.node_id);
-            let mut data = context.data.as_object().cloned().unwrap_or_default();
-            let parameters = self.launch_parameters(config, event, &context)?;
-            let values = resolve_parameters(&parameters, &inputs, &BTreeMap::new())?;
-            data.insert("event".into(), json!(values));
-            context.data = Value::Object(data);
-            let mut bindings = Vec::new();
-            for (binding, skill) in effective {
-                let mut mapped: BTreeMap<String, Value> = values
-                    .iter()
-                    .filter(|(name, _)| skill.parameters.iter().any(|p| &p.name == *name))
-                    .map(|(k, v)| (k.clone(), v.clone()))
-                    .collect();
-                mapped.extend(binding.inputs.iter().filter_map(|(name, path)| {
-                    field(&context.data, path).map(|v| (name.clone(), v.clone()))
-                }));
-                let explicit = inputs
-                    .iter()
-                    .filter(|(name, _)| skill.parameters.iter().any(|p| &p.name == *name))
-                    .map(|(k, v)| (k.clone(), v.clone()))
-                    .collect();
-                bindings.push(PinnedBinding {
-                    binding: binding.clone(),
-                    skill: skill.clone(),
-                    parameters: resolve_parameters(&skill.parameters, &explicit, &mapped)?,
-                });
-            }
+            let bindings = self.resolve_bindings(config, event, &mut context, &inputs)?;
             let invocation = EventInvocation {
                 id: id.clone(),
                 event: event.clone(),
@@ -421,6 +395,47 @@ impl FileEventService {
             })?;
         }
         prepared
+    }
+
+    pub(crate) fn resolve_bindings(
+        &self,
+        config: &AutomationConfig,
+        event: &EventDefinition,
+        context: &mut InvocationContext,
+        inputs: &BTreeMap<String, Value>,
+    ) -> RefineResult<Vec<PinnedBinding>> {
+        let effective = config.bindings(event, &context.node_id);
+        let mut data = context.data.as_object().cloned().unwrap_or_default();
+        let parameters = self.launch_parameters(config, event, context)?;
+        let values = resolve_parameters(&parameters, inputs, &BTreeMap::new())?;
+        data.insert("event".into(), json!(values));
+        context.data = Value::Object(data);
+        let mut bindings = Vec::new();
+        for (binding, skill) in effective {
+            let mut mapped: BTreeMap<String, Value> = values
+                .iter()
+                .filter(|(name, _)| skill.parameters.iter().any(|p| &p.name == *name))
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect();
+            mapped.extend(binding.inputs.iter().filter_map(|(name, path)| {
+                field(&context.data, path).map(|v| (name.clone(), v.clone()))
+            }));
+            let explicit = inputs
+                .iter()
+                .filter(|(name, _)| skill.parameters.iter().any(|p| &p.name == *name))
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect();
+            bindings.push(PinnedBinding {
+                binding: binding.clone(),
+                skill: {
+                    let mut snapshot = skill.clone();
+                    snapshot.role = event.result_role().into();
+                    snapshot
+                },
+                parameters: resolve_parameters(&skill.parameters, &explicit, &mapped)?,
+            });
+        }
+        Ok(bindings)
     }
 
     pub fn launch_parameters(

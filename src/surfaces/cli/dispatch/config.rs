@@ -72,17 +72,13 @@ fn dispatch_settings(action: ConfigSettingsAction) -> RefineResult<Value> {
 
 fn read_all(target_root: Option<PathBuf>) -> RefineResult<Value> {
     let settings = read_domain(ConfigDomain::Settings, target_root.clone())?;
-    let events = read_domain(ConfigDomain::Events, target_root.clone())?;
     let skills = read_domain(ConfigDomain::Skills, target_root)?;
-    Ok(
-        json!({"settings": settings.get("settings").unwrap_or(&settings), "events": events, "skills": skills}),
-    )
+    Ok(json!({"settings": settings.get("settings").unwrap_or(&settings), "skills": skills}))
 }
 
 fn read_domain(domain: ConfigDomain, target_root: Option<PathBuf>) -> RefineResult<Value> {
     let path = match domain {
         ConfigDomain::Settings => "/settings",
-        ConfigDomain::Events => "/event-definitions",
         ConfigDomain::Skills => "/skills",
     };
     match target_root {
@@ -91,10 +87,6 @@ fn read_domain(domain: ConfigDomain, target_root: Option<PathBuf>) -> RefineResu
             let refine_dir = refine_dir_for_target_root(&target_root)?;
             match domain {
                 ConfigDomain::Settings => FileSettingsService::new(refine_dir).list_response(),
-                ConfigDomain::Events => {
-                    crate::application::events::FileEventService::new(refine_dir)
-                        .list("events", None)
-                }
                 ConfigDomain::Skills => {
                     crate::application::events::FileEventService::new(refine_dir)
                         .list("skills", None)

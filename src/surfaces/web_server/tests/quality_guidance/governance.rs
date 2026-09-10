@@ -23,11 +23,11 @@ fn web_server_manages_events_skills_and_reporters() {
 
     let catalog = server.handle(ApiRequest {
         method: "GET".into(),
-        path: "/api/event-definitions/catalog".into(),
+        path: "/api/skills/catalog".into(),
         body: None,
     });
     assert_eq!(catalog.status, 200);
-    assert_eq!(catalog.body["sources"].as_array().unwrap().len(), 21);
+    assert_eq!(catalog.body["sources"].as_array().unwrap().len(), 22);
     let skills = server.handle(ApiRequest {
         method: "GET".into(),
         path: "/api/skills".into(),
@@ -35,7 +35,7 @@ fn web_server_manages_events_skills_and_reporters() {
     });
     assert_eq!(skills.status, 200);
     let revision = skills.body["revision"].clone();
-    let saved = server.handle(ApiRequest { method: "PUT".into(), path: "/api/skills/accessibility".into(), body: Some(json!({"revision": revision,"item":{"name":"Accessibility", "prompt":"Check keyboard behavior", "role":"task"}})) });
+    let saved = server.handle(ApiRequest { method: "PUT".into(), path: "/api/skills/accessibility".into(), body: Some(json!({"revision": revision,"item":{"name":"Accessibility", "prompt":"Check keyboard behavior"},"trigger":{"source":"custom"}})) });
     assert_eq!(saved.status, 200);
     let stale = server.handle(ApiRequest {
         method: "PUT".into(),
@@ -45,14 +45,19 @@ fn web_server_manages_events_skills_and_reporters() {
         ),
     });
     assert_eq!(stale.status, 409);
-    let event = server.handle(ApiRequest { method:"PUT".into(), path:"/api/event-definitions/check-ui".into(), body:Some(json!({"revision":saved.body["revision"],"item":{"name":"Check UI", "kind":"custom", "bindings":[{"id":"check", "skill_id":"accessibility"}]}})) });
-    assert_eq!(event.status, 200);
-    let referenced = server.handle(ApiRequest {
+    let shown = server.handle(ApiRequest {
+        method: "GET".into(),
+        path: "/api/skills/accessibility".into(),
+        body: None,
+    });
+    assert_eq!(shown.body["trigger"]["source"], "custom");
+    assert!(shown.body["item"].get("role").is_none());
+    let removed = server.handle(ApiRequest {
         method: "DELETE".into(),
         path: "/api/skills/accessibility".into(),
-        body: Some(json!({"revision":event.body["revision"]})),
+        body: Some(json!({"revision":saved.body["revision"]})),
     });
-    assert_eq!(referenced.status, 409);
+    assert_eq!(removed.status, 200);
     for retired in ["/api/quality", "/api/governance", "/api/guidance"] {
         assert_eq!(
             server

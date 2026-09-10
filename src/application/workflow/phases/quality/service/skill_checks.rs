@@ -75,10 +75,7 @@ impl FileQualityService {
                 let selected = config
                     .bindings(event, &request.node_id)
                     .into_iter()
-                    .filter(|(b, s)| {
-                        b.mode == BindingMode::Context
-                            || (b.mode == BindingMode::Blocking && s.role == "quality")
-                    })
+                    .filter(|(b, _)| matches!(b.mode, BindingMode::Context | BindingMode::Blocking))
                     .map(|(b, _)| b.id.clone())
                     .collect::<std::collections::BTreeSet<_>>();
                 proof_event.bindings.retain(|b| selected.contains(&b.id));

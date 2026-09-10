@@ -19,11 +19,11 @@ fn events_skills_and_runtime_command_trees_parse_and_retired_editors_are_rejecte
             "--set",
             "agent_cli=codex",
         ],
-        vec!["refine", "events", "catalog"],
-        vec!["refine", "events", "list", "--node-id", "default"],
+        vec!["refine", "skills", "triggers"],
+        vec!["refine", "skills", "list", "--node-id", "default"],
         vec![
             "refine",
-            "events",
+            "skills",
             "trigger",
             "deploy",
             "--param",
@@ -33,16 +33,15 @@ fn events_skills_and_runtime_command_trees_parse_and_retired_editors_are_rejecte
         ],
         vec![
             "refine",
-            "events",
-            "bind",
-            "deploy",
-            "--revision",
-            "3",
-            "--json",
-            "{}",
+            "skills",
+            "clone",
+            "check",
+            "copy",
+            "--trigger",
+            "custom",
         ],
-        vec!["refine", "events", "runs"],
-        vec!["refine", "events", "cancel", "invocation-1"],
+        vec!["refine", "skills", "runs"],
+        vec!["refine", "skills", "cancel", "invocation-1"],
         vec![
             "refine",
             "skills",
@@ -58,6 +57,12 @@ fn events_skills_and_runtime_command_trees_parse_and_retired_editors_are_rejecte
     ] {
         Cli::try_parse_from(&args).unwrap_or_else(|error| panic!("failed {args:?}: {error}"));
     }
+    assert!(Cli::try_parse_from(["refine", "events", "list"]).is_err());
+    assert!(Cli::try_parse_from(["refine", "config", "show", "events"]).is_err());
+    assert!(
+        Cli::try_parse_from(["refine", "skills", "trigger", "check", "--goal-id", "GOAL1"])
+            .is_err()
+    );
     for retired in ["quality", "governance", "guidance"] {
         assert!(Cli::try_parse_from(["refine", "config", retired, "show"]).is_err());
     }
@@ -132,7 +137,7 @@ fn config_target_root_adapter_uses_shared_services_and_returns_saved_readback() 
     )
     .unwrap();
     assert_eq!(all["skills"]["items"].as_array().unwrap().len(), 4);
-    assert_eq!(all["events"]["items"].as_array().unwrap().len(), 21);
+    assert!(all.get("events").is_none());
     assert!(all.get("governance").is_none());
     fs::remove_dir_all(root).unwrap();
 }

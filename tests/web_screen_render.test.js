@@ -140,6 +140,7 @@ function apiFixture(pathname) {
   }
   if (pathname.startsWith("/api/diagnostics")) return {};
   if (pathname.startsWith("/api/quality")) return {};
+  if (pathname === "/api/skills/catalog") return {sources:["custom", "workflow.quality.enter", "workflow.quality.exit", "node.startup.ready"]};
   if (pathname === "/api/event-definitions/catalog") return {sources: ["workflow.quality.enter"], roles: ["task", "plan", "implement", "quality", "governance"]};
   if (pathname === "/api/event-definitions" || pathname === "/api/skills") return {revision:1, items:[]};
   if (pathname === "/api/event-invocations") return {items:[], offset:0, total:0};
@@ -1405,7 +1406,7 @@ test("every Node, Project, and legacy Settings tab renders and refreshes", { ski
       ["#/node/runtime", '[data-testid="runtime-recheck-auth"]'],
       ["#/node/releases", '[data-testid="release-bump"]'],
       ["#/project/governance", '[data-testid="settings-skills"]'],
-      ["#/settings/events", '[data-testid="settings-events"]'],
+      ["#/settings/events", '[data-testid="settings-skills"]'],
       ["#/settings/skills", '[data-testid="settings-skills"]'],
       ["#/settings", '[data-testid="settings-pane-processes"].active'],
     ]) {
@@ -1735,55 +1736,7 @@ test("changed settings refresh preserves focus, dirty controls, scroll, and one 
   }
 });
 
-test("Events and Skills editors save revisions and custom Events launch typed defaults from Controls", {skip: SKIP}, async () => {
-  let revision = 7;
-  const skills = [];
-  const event = {id:"check",name:"Check release",kind:"custom",enabled:true,scope:{node_id:null},parameters:[{name:"count",kind:"number",required:true,default:3},{name:"strict",kind:"boolean",default:true}],bindings:[],on_success:null};
-  const invocation = {id:"test-invocation",event,state:"pending",results:{},attempts:[]};
-  const launches = [];
-  const app = await openApp({fixture: (pathname, request) => {
-    if (pathname === "/api/skills") return {revision,items:skills};
-    if (pathname.startsWith("/api/skills/") && request.method() === "PUT") {
-      const body = request.postDataJSON(); assert.equal(body.revision, revision);
-      skills.push({...body.item,id:pathname.split("/").at(-1)}); return {revision:++revision,item:skills.at(-1)};
-    }
-    if (pathname === "/api/event-definitions") return {revision,items:[event]};
-    if (pathname === "/api/event-definitions/check") return {revision,item:event};
-    if (pathname.endsWith("/check/inputs")) return {revision,parameters:event.parameters};
-    if (pathname.endsWith("/check/trigger")) { launches.push(request.postDataJSON()); return invocation; }
-    if (pathname === "/api/event-invocations/test-invocation") return invocation;
-    if (pathname === "/api/event-invocations/test-invocation/cancel") { invocation.state="cancelled"; return invocation; }
-    return apiFixture(pathname);
-  }});
-  try {
-    await app.page.goto(`${app.origin}/#/settings/skills`);
-    await app.page.locator("[data-automation-new]").click();
-    const modal = app.page.locator('[data-testid="automation-modal"]');
-    await modal.locator('[data-name]').first().fill("Release review");
-    await modal.locator('[data-prompt]').fill("Inspect the release and report evidence.");
-    await modal.locator('[data-save]').click();
-    await app.page.waitForFunction(() => !document.querySelector('[data-testid="automation-modal"]'));
-    assert.equal(skills[0].prompt, "Inspect the release and report evidence.");
-    await app.page.locator('#nav-context-menu > summary').click();
-    await app.page.locator('[data-custom-event="check"]').click();
-    await modal.locator('[data-parameter-index="0"]').waitFor();
-    assert.equal(await modal.locator('[data-parameter-index="0"]').inputValue(), "3");
-    assert.equal(await modal.locator('[data-parameter-index="1"]').inputValue(), "true");
-    await modal.locator('[data-save]').click();
-    await app.page.waitForFunction(() => document.querySelector('[data-testid="automation-modal"]')?.textContent.includes('pending'));
-    assert.deepEqual(launches[0].parameters,{count:3,strict:true});
-    assert.equal(launches[0].node_id, "node-a");
-    assert.ok(launches[0].request_id);
-    await modal.locator('[data-delete]').click();
-    await app.page.waitForFunction(() => document.querySelector('[data-testid="automation-modal"]')?.textContent.includes('cancelled'));
-    await app.page.keyboard.press("Escape");
-    assert.equal(await modal.count(),0);
-    assert.deepEqual(app.pageErrors, []);
-    assert.equal(await app.page.evaluate(() => commandRegistry.has("event.custom.check")),true);
-  } finally { await app.close(); }
-});
-
-test("Goal Event agents open scoped invocation evidence during workflow execution", {skip: SKIP}, async () => {
+test("Goal Skill runs open scoped invocation evidence during workflow execution", {skip: SKIP}, async () => {
   const goal = {...GOAL,status:"implement",rounds:[{...GOAL.rounds[0],event_configuration:{revision:1}}]};
   let historyGoal = null;
   const app = await openApp({fixture: (pathname, request) => {
@@ -1796,133 +1749,163 @@ test("Goal Event agents open scoped invocation evidence during workflow executio
     await app.page.locator('[data-testid="goal-open-agent"]').click();
     await app.page.locator('[data-testid="automation-modal"]').waitFor();
     assert.equal(historyGoal,"GOAL1");
-    assert.match(await app.page.locator('[data-testid="automation-modal"]').textContent(),/Event agents · GOAL1/);
+    assert.match(await app.page.locator('[data-testid="automation-modal"]').textContent(),/Skill runs · GOAL1/);
     assert.deepEqual(app.pageErrors,[]);
   } finally { await app.close(); }
 });
 
-test("Settings rows, Event creation, and Skill assignments use shared controls and preserve edits", {skip: SKIP}, async () => {
-  let revision = 1;
-  const skill = {id:"inspect", name:"Inspect", prompt:"Inspect the changes.", role:"task", enabled:true, scope:{node_id:null}, parameters:[]};
-  const otherBinding = {id:"quality-default", skill_id:"quality", mode:"blocking", order:0, enabled:true, scope:{node_id:null}, inputs:{}};
-  const events = [
-    {id:"workflow.quality.enter", name:"Workflow Quality Enter", source:"workflow.quality.enter", kind:"system", enabled:true, scope:{node_id:null}, parameters:[], bindings:[otherBinding]},
-    {id:"check", name:"Check release", source:null, kind:"custom", enabled:true, scope:{node_id:null}, parameters:[], bindings:[], on_success:null},
-  ];
-  const writes = [];
-  const app = await openApp({fixture: (pathname, request) => {
-    if (pathname === "/api/skills") return {revision, items:[skill]};
-    if (pathname === "/api/event-definitions") return {revision, items:events};
-    if (request.method() === "PUT" && (pathname.startsWith("/api/skills/") || pathname.startsWith("/api/event-definitions/"))) {
-      const body = request.postDataJSON(); assert.equal(body.revision, revision); writes.push(body);
-      if (pathname.startsWith("/api/skills/")) {
-        Object.assign(skill, body.item);
-        for (const event of events) event.bindings = event.bindings.filter(b => b.skill_id !== skill.id);
-        for (const assignment of body.event_bindings) events.find(e => e.id === assignment.event_id).bindings.push(assignment.binding);
-      } else {
-        const existing = events.findIndex(e => e.id === body.item.id);
-        if (existing === -1) events.push(body.item); else events[existing] = body.item;
+function skillFixture() {
+  let revision = 7;
+  const records = [{item:{id:"inspect",name:"Inspect release",prompt:"Inspect the release.",enabled:true,scope:{node_id:null},parameters:[{name:"count",kind:"number",required:true,default:3}]},trigger:{id:"inspect-trigger",source:"custom",enabled:true,mode:"blocking",order:0,scope:{node_id:null},inputs:{}}}];
+  const writes = [], launches = [];
+  const fixture = (pathname, request) => {
+    if (pathname === "/api/skills") return {revision, items:records.map(r => ({...r.item,trigger_source:r.trigger.source})), manual_skill_ids:records.filter(r => r.item.enabled && r.trigger.source === "custom").map(r => r.item.id)};
+    if (pathname.startsWith("/api/skills/") && pathname !== "/api/skills/catalog") {
+      const id = pathname.split("/")[3]; const record = records.find(r => r.item.id === id);
+      if (pathname.endsWith("/inputs")) { assert.equal(new URL(request.url()).searchParams.has("goal_id"),false); return {revision,parameters:record.item.parameters}; }
+      if (request.method() === "PUT") {
+        const body = request.postDataJSON(); assert.equal(body.revision,revision); writes.push(body);
+        const saved = record || {}; saved.item = body.item;
+        if (body.trigger) saved.trigger = {...body.trigger,id:body.trigger.id || "new-trigger"};
+        if (!record) records.push(saved);
+        return {revision:++revision,item:saved.item};
       }
-      return {revision:++revision, item:body.item};
+      return {revision,...record};
     }
+    if (pathname === "/api/terminal/session") {
+      launches.push(request.postDataJSON());
+      return {id:"skill-session",process_id:"skill-process",profile:"skill",provider:"codex",cwd:"/tmp/app"};
+    }
+    if (pathname === "/api/terminal/skill-session") return {id:"skill-session",process_id:"skill-process",state:"running",profile:"skill",provider:"codex",cwd:"/tmp/app"};
     return apiFixture(pathname);
-  }});
+  };
+  return {fixture,records,writes,launches};
+}
+
+test("Custom Skills open a selected agent tab with typed inputs and no Goal context", {skip:SKIP}, async () => {
+  const data = skillFixture();
+  data.records.push({item:{...data.records[0].item,id:"automatic",name:"Quality check"},trigger:{...data.records[0].trigger,source:"workflow.quality.enter"}});
+  const app = await openApp({fixture:data.fixture});
   try {
     const page = app.page;
     await page.goto(`${app.origin}/#/settings/skills`);
-    await page.locator('[data-automation-row]').waitFor();
-    assert.deepEqual(await page.locator('.settings-tab').allTextContents().then(labels => labels.map(s => s.trim())), ["Processes", "Application", "Reporters", "Skills", "Events", "Target App", "Runtime", "Refine (dev)"]);
-    assert.equal(await page.locator('[data-testid="automation-table"] button').count(), 0);
-    await page.locator('[data-automation-row]').focus();
-    await page.keyboard.press("Enter");
+    await page.evaluate(() => { state.currentGoal = "GOAL1"; });
+    await page.locator('#nav-context-menu > summary').click();
+    const nav = page.locator('#nav-manual-skills');
+    await nav.locator('[data-manual-skill="inspect"]').waitFor();
+    assert.equal(await nav.locator('.nav-menu-label.nav-context-section-label').textContent(),"Skills");
+    assert.equal(await nav.locator('[data-manual-skill]').count(),1);
+    assert.equal(await nav.locator('button').last().textContent(),"Add skill...");
+    await nav.locator('[data-manual-skill="inspect"]').click();
+    const modal = page.locator('[data-testid="automation-modal"]');
+    assert.equal(await modal.locator('[data-parameter-index="0"]').inputValue(),"3");
+    await modal.locator('[data-parameter-index="0"]').fill("5");
+    await modal.locator('[data-save]').click();
+    await modal.waitFor({state:"detached"});
+    await page.locator('[data-testid="terminal-profile"]').filter({hasText:"Inspect release"}).waitFor();
+    assert.equal(data.launches.length,1);
+    assert.equal(data.launches[0].profile,"skill");
+    assert.equal(data.launches[0].surface,"toolbar");
+    assert.equal(data.launches[0].skill_id,"inspect");
+    assert.deepEqual(data.launches[0].parameters,{count:5});
+    assert.equal(data.launches[0].goal_id,undefined);
+    assert.equal(data.launches[0].feature_id,undefined);
+    assert.equal(await page.evaluate(() => commandRegistry.has('skill.manual.inspect')),true);
+    const saved = await page.evaluate(() => JSON.parse(sessionStorage.getItem('refine_chat_tabs')));
+    assert.equal(Object.values(saved.tabs).find(tab => tab.mode === 'skill').sessionId,"skill-session");
+    assert.deepEqual(app.pageErrors,[]);
+  } finally { await app.close(); }
+});
+
+test("Skills use one trigger, shared modal controls and clickable rows with cloning", {skip:SKIP}, async () => {
+  const data = skillFixture();
+  const app = await openApp({fixture:data.fixture});
+  try {
+    const page = app.page;
+    await page.goto(`${app.origin}/#/settings/events`);
+    await page.locator('[data-testid="settings-skills"]').waitFor();
+    assert.equal(new URL(page.url()).hash,"#/settings/skills");
+    assert.deepEqual(await page.locator('.settings-tab').allTextContents().then(labels=>labels.map(s=>s.trim())),["Processes","Application","Reporters","Skills","Target App","Runtime","Refine (dev)"]);
+    assert.equal(await page.locator('[data-testid="automation-table"] td:first-child button').count(),0);
+    await page.locator('[data-automation-row]').focus(); await page.keyboard.press('Enter');
     const modal = page.locator('[data-testid="automation-modal"]');
     await modal.locator('#automation-name').waitFor();
-    assert.equal(await modal.locator('[data-delete]').isVisible(), true);
-    assert.equal(await modal.locator('label input, label select, label textarea').count(), 0);
-    await modal.locator('[data-role] [data-choice="quality"]').click();
-    await modal.locator('[data-enabled] [data-choice="false"]').click();
+    assert.equal(await modal.locator('[data-trigger-source]').count(),1);
+    assert.equal(await modal.locator('[data-role], [data-add-binding], [data-overrides]').count(),0);
+    assert.doesNotMatch(await modal.textContent(),/Result role|Override project assignment/);
+    assert.equal(await modal.locator('[data-automatic-options]').isVisible(),false);
+    await modal.locator('[data-trigger-source]').selectOption('workflow.quality.enter');
+    assert.equal(await modal.locator('[data-automatic-options]').getAttribute('open'),null);
+    await modal.locator('[data-automatic-options] > summary').click();
+    await modal.locator('[data-mode] [data-choice="background"]').click();
+    await modal.locator('[data-order]').fill('3');
     await modal.locator('[data-scope] [data-choice="node"]').click();
-    assert.equal(await modal.locator('[data-scope-node]').inputValue(), "node-a");
-    await modal.locator('[data-add-parameter]').click();
+    assert.equal(await modal.locator('[data-scope-node]').inputValue(),'node-a');
     const parameter = modal.locator('[data-parameter]');
-    await parameter.locator('[data-name]').fill("channel");
-    await parameter.locator('[data-kind]').selectOption("choice");
-    assert.equal(await parameter.locator('[data-kind]').inputValue(), "choice");
-    assert.equal(await parameter.locator('[data-choices]').isVisible(), true);
-    await parameter.locator('[data-choices]').fill("stable, beta");
-    await parameter.locator('[data-choices]').press("Tab");
-    await parameter.locator('[data-default]').selectOption("beta");
-    await parameter.locator('[data-required] [data-choice="true"]').click();
-    await modal.locator('[data-add-binding]').click();
-    const assignment = modal.locator('[data-binding]').first();
-    assert.equal(await assignment.locator('[data-event]').inputValue(), "workflow.quality.enter");
-    assert.equal(await assignment.locator('[data-event] optgroup[label="Custom events"] option').count(), 1);
-    await assignment.locator('[data-input-name="channel"]').fill("event.channel");
-    await assignment.locator('[data-order]').fill("3");
-    await assignment.locator('[data-mode] [data-choice="background"]').click();
-    await modal.locator('[data-add-binding]').click();
-    await modal.locator('[data-binding]').last().locator('[data-event]').selectOption("check");
-    await modal.locator('[data-binding]').last().locator('[data-input-name="channel"]').fill("system.node_id");
+    await parameter.locator('[data-name]').fill('channel'); await parameter.locator('[data-name]').press('Tab');
+    await parameter.locator('[data-kind]').selectOption('choice');
+    await parameter.locator('[data-choices]').fill('stable, beta'); await parameter.locator('[data-choices]').press('Tab');
+    await parameter.locator('[data-default]').selectOption('beta');
+    await modal.locator('[data-context-options] > summary').click();
+    await modal.locator('[data-input-name="channel"]').fill('system.node_id');
     await modal.locator('#automation-name').focus();
-    const styles = await modal.locator('#automation-name').evaluate(input => {
-      const style = getComputedStyle(input);
-      return {height:style.height, weight:style.fontWeight, radius:style.borderRadius, outline:style.outlineColor, border:style.borderColor};
-    });
-    assert.equal(styles.height, "34px");
-    assert.equal(styles.weight, "400");
-    assert.notEqual(styles.radius, "0px");
-    assert.equal(styles.outline, styles.border, "focus keeps the shared neutral input border");
-    await modal.locator('[data-save]').click();
-    await modal.waitFor({state:"detached"});
-    assert.equal(skill.scope.node_id, "node-a");
-    assert.equal(skill.role, "quality");
-    assert.equal(skill.enabled, false);
-    assert.deepEqual(skill.parameters[0], {name:"channel", kind:"choice", required:true, default:"beta", choices:["stable","beta"], description:""});
-    assert.equal(writes[0].event_bindings.length, 2);
-    assert.equal(writes[0].event_bindings[0].binding.order, 3);
-    assert.equal(writes[0].event_bindings[0].binding.mode, "background");
-    assert.deepEqual(events[0].bindings[0], otherBinding);
-
+    const style = await modal.locator('#automation-name').evaluate(input => {const s=getComputedStyle(input); return {height:s.height,weight:s.fontWeight,border:s.borderColor,outline:s.outlineColor};});
+    assert.deepEqual(style,{height:'34px',weight:'400',border:style.border,outline:style.border});
+    await modal.locator('[data-save]').click(); await modal.waitFor({state:'detached'});
+    assert.equal(data.writes[0].trigger.source,'workflow.quality.enter');
+    assert.equal(data.writes[0].trigger.mode,'background');
+    assert.equal(data.writes[0].trigger.order,3);
+    assert.equal(data.writes[0].item.scope.node_id,'node-a');
+    assert.equal(data.writes[0].item.role,undefined);
+    assert.equal(data.records[0].item.parameters[0].default,'beta');
     await page.locator('[data-automation-row]').click();
-    await modal.locator('[data-kind]').waitFor();
-    assert.equal(await modal.locator('[data-kind]').inputValue(), "choice");
-    assert.equal(await modal.locator('[data-default]').inputValue(), "beta");
-    assert.equal(await modal.locator('[data-binding]').count(), 2);
-    await modal.locator('[data-kind]').selectOption("text");
-    assert.equal(await modal.locator('[data-choices]').isVisible(), false);
-    await page.keyboard.press("Escape");
-
-    await page.locator('[data-testid="settings-tab-events"]').click();
-    await page.locator('[data-testid="settings-events"]').waitFor();
-    const eventRows = page.locator('[data-testid="settings-events"] [data-automation-row]');
-    assert.equal(await page.locator('[data-testid="settings-events"] [data-automation-row]').count(), 1, "system Events are selected inside Skills, not listed on the Events tab");
-    assert.equal(await page.locator('[data-testid="automation-table"] button').count(), 0);
-    await eventRows.first().click();
+    await modal.locator('[data-clone-skill]').click();
     await modal.locator('#automation-name').waitFor();
-    assert.equal(await modal.locator('[data-bindings], [data-source]').count(), 0);
-    await modal.locator('#automation-name').fill("Review release");
-    await modal.locator('[data-save]').click();
-    await modal.waitFor({state:"detached"});
-    assert.equal(events[1].bindings.length, 1, "editing Event details preserves assigned Skills");
-
-    await page.locator('#nav-context-menu > summary').click();
-    const nav = page.locator('#nav-custom-events');
-    await nav.locator('[data-add-event]').waitFor();
-    assert.equal(await nav.locator('.nav-menu-label.nav-context-section-label').textContent(), "Events");
-    assert.equal(await nav.locator('button').last().textContent(), "Add event...");
-    await nav.locator('[data-add-event]').click();
-    await modal.locator('#automation-name').waitFor();
-    assert.equal(await modal.locator('[data-delete]').isVisible(), false);
-    await modal.locator('#automation-name').fill("Publish report");
-    await modal.locator('[data-add-parameter]').click();
-    await modal.locator('[data-parameter] [data-name]').fill("count");
-    await modal.locator('[data-kind]').selectOption("number");
-    await modal.locator('[data-default]').fill("3");
-    await modal.locator('[data-save]').click();
-    await modal.waitFor({state:"detached"});
-    assert.equal(events.at(-1).kind, "custom");
-    assert.equal(events.at(-1).parameters[0].default, 3);
-    assert.equal(await eventRows.count(), 2);
-    assert.deepEqual(app.pageErrors, []);
+    assert.equal(await modal.locator('#automation-name').inputValue(),'Inspect release copy');
+    assert.equal(await modal.locator('[data-delete]').isVisible(),false);
+    assert.equal(await modal.locator('[data-kind]').inputValue(),'choice');
+    await modal.locator('[data-trigger-source]').selectOption('custom');
+    await modal.locator('[data-save]').click(); await modal.waitFor({state:'detached'});
+    assert.equal(data.records.length,2);
+    assert.notEqual(data.records[0].item.id,data.records[1].item.id);
+    assert.equal(data.records[1].trigger.source,'custom');
+    assert.equal(data.records[0].trigger.source,'workflow.quality.enter');
+    assert.deepEqual(app.pageErrors,[]);
   } finally { await app.close(); }
+});
+
+test("Skill status toggles preserve the trigger, fence duplicate saves and refresh conflicts", {skip:SKIP}, async () => {
+  const data = skillFixture(); let releaseWrite;
+  const pending = new Promise(resolve=>{releaseWrite=resolve;});
+  let held = false;
+  const app = await openApp({fixture:async (pathname,request)=>{
+    if (request.method()==='PUT' && !held) {held=true;await pending;}
+    return data.fixture(pathname,request);
+  }});
+  try {
+    const page = app.page; await page.goto(`${app.origin}/#/settings/skills`);
+    const status = page.locator('[data-automation-status="inspect"]');
+    await status.locator('[data-choice="false"]').click();
+    assert.equal(await status.locator('[data-choice="true"]').isDisabled(),true);
+    await status.locator('[data-choice="false"]').evaluate(button=>button.click());
+    releaseWrite();
+    await status.locator('[data-choice="false"][aria-pressed="true"]').waitFor();
+    assert.equal(data.writes.length,1); assert.equal(data.writes[0].trigger,undefined);
+    assert.equal(data.records[0].trigger.source,'custom');
+    await page.waitForFunction(()=>!commandRegistry.has('skill.manual.inspect'));
+    assert.equal(await page.locator('[data-testid="automation-modal"]').count(),0);
+    await page.reload(); await status.locator('[data-choice="false"][aria-pressed="true"]').waitFor();
+    await status.locator('[data-choice="true"]').focus(); await page.keyboard.press('Enter');
+    await page.waitForFunction(()=>commandRegistry.has('skill.manual.inspect'));
+    await page.route('**/api/skills/inspect',route=>{
+      if(route.request().method()!=='PUT') return route.fallback();
+      data.records[0].item.name='Renamed concurrently';
+      return route.fulfill({status:409,contentType:'application/json',body:JSON.stringify({error:{code:'conflict',message:'Configuration changed. Refresh before saving.'}})});
+    });
+    await status.locator('[data-choice="false"]').click();
+    await page.locator('[data-automation-row]').filter({hasText:'Renamed concurrently'}).waitFor();
+    assert.equal(await status.locator('[data-choice="true"]').getAttribute('aria-pressed'),'true');
+    assert.equal(data.writes.length,2);
+    assert.deepEqual(app.pageErrors,[]);
+  } finally {releaseWrite();await app.close();}
 });

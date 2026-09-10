@@ -93,7 +93,7 @@ impl InProcessWebServer {
             .to_lowercase();
         if !matches!(
             profile.as_str(),
-            "terminal" | "agent" | "plan" | "goal" | "standalone"
+            "terminal" | "agent" | "plan" | "goal" | "standalone" | "skill"
         ) {
             return error_response(RefineError::InvalidInput(format!(
                 "unknown terminal profile {profile}"
@@ -109,6 +109,15 @@ impl InProcessWebServer {
             .map(str::trim)
             .filter(|value| !value.is_empty())
             .map(str::to_string);
+        if profile == "skill"
+            && (surface != TerminalSessionLaunchSurface::Toolbar
+                || goal_id.is_some()
+                || body.get("feature_id").is_some_and(|v| !v.is_null()))
+        {
+            return error_response(RefineError::InvalidInput(
+                "Skill tabs are standalone toolbar sessions without a Goal or Feature".into(),
+            ));
+        }
         if profile == "goal" {
             let Some(goal_id) = goal_id.as_deref() else {
                 return error_response(RefineError::InvalidInput(
@@ -200,6 +209,29 @@ impl InProcessWebServer {
             metadata.insert("feature_id".to_string(), json!(feature_id));
         }
 
+        let skill_prompt = if profile == "skill" {
+            let Some(skill_id) = body.get("skill_id").and_then(Value::as_str) else {
+                return error_response(RefineError::InvalidInput("skill_id is required".into()));
+            };
+            let service = crate::application::events::FileEventService::with_runtime_root(
+                &refine_dir,
+                &runtime_root,
+            );
+            match service.terminal_skill_prompt(
+                skill_id,
+                &target_root,
+                body.get("parameters").unwrap_or(&json!({})),
+            ) {
+                Ok((prompt, details)) => {
+                    metadata.extend(details.as_object().unwrap().clone());
+                    Some(prompt)
+                }
+                Err(error) => return error_response(error),
+            }
+        } else {
+            None
+        };
+
         let (worktree, worktree_created) = if profile == "standalone" {
             let requested_worktree = body.get("worktree").filter(|value| value.is_object());
             let result = match requested_worktree {
@@ -246,14 +278,16 @@ impl InProcessWebServer {
                         .map(str::to_string)
                 })
                 .unwrap_or_else(|| "claude".to_string());
-            let prompt = match terminal_profile_prompt(
-                self,
-                &profile,
-                surface,
-                goal_id.as_deref(),
-                feature_id.as_deref(),
-                supplemental_prompt,
-            ) {
+            let prompt = match skill_prompt.map(Ok).unwrap_or_else(|| {
+                terminal_profile_prompt(
+                    self,
+                    &profile,
+                    surface,
+                    goal_id.as_deref(),
+                    feature_id.as_deref(),
+                    supplemental_prompt,
+                )
+            }) {
                 Ok(prompt) => prompt,
                 Err(error) => {
                     if worktree_created && let Some(worktree) = worktree.as_ref() {

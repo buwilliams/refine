@@ -195,19 +195,9 @@
 .automation-parameters th:nth-child(2) { min-width: 135px; }
 .automation-parameters .segmented-control { flex-wrap: nowrap; }
 .automation-parameters [data-choices-row] .form-row { margin-bottom: 0; }
-.automation-binding {
-  min-width: 0;
-  margin: 0 0 12px;
-  padding: 12px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-}
-.automation-binding legend {
-  padding: 0 4px;
-  color: var(--color-text-muted);
-  font-size: 13px;
-}
-[data-testid="settings-events"] > .actions,
+.automation-optional > summary { cursor: pointer; margin-bottom: 12px; }
+.automation-modal [hidden] { display: none !important; }
+
 [data-testid="settings-skills"] > .actions { flex-wrap: wrap; }
 [data-automation-scope] { width: auto; }
 

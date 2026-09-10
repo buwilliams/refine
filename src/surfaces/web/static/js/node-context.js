@@ -191,7 +191,7 @@ async function applyAuthoritativeNodeContext(project, registry, {
   };
   if (changed) {
     nodeContextGeneration += 1;
-    if (typeof refreshCustomEvents === "function") refreshCustomEvents();
+    if (typeof refreshManualSkills === "function") refreshManualSkills();
     invalidateScreenDataCache();
     if (external) preserveExternalDirtySurfaces(preservedDirty);
     else if (!surfacesPrepared) await discardLocalNodeContextSurfaces();

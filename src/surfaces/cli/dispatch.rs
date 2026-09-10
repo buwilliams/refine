@@ -1,7 +1,7 @@
 mod agents;
 mod config;
 mod config_input;
-mod events;
+mod skills;
 #[cfg(test)]
 pub(crate) use config::dispatch_config;
 mod daemon_transport;
@@ -187,8 +187,7 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
     };
 
     match cli.command {
-        Commands::Events { action } => events::events(action),
-        Commands::Skills { action } => events::definitions("skills", action),
+        Commands::Skills { action } => skills::skills(action),
         command @ Commands::Config { .. } => config::dispatch_command(command),
         command @ Commands::Website { .. } => website::dispatch_command(command),
         command @ Commands::System { .. } => system::dispatch_command(command),
@@ -584,7 +583,7 @@ fn direct_work_item_service(target_root: &Path) -> RefineResult<FileWorkItemServ
 
 pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> {
     match command {
-        Commands::Events { .. } | Commands::Skills { .. } => None,
+        Commands::Skills { .. } => None,
         Commands::Config { action } => match action {
             ConfigAction::Show { target_root, .. } => target_root.as_ref(),
             ConfigAction::Settings { action } => match action {

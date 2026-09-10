@@ -54,7 +54,7 @@ pub fn run(
             config
                 .bindings(e, &ctx.node_id)
                 .iter()
-                .any(|(b, s)| b.mode == BindingMode::Blocking && s.role == status.as_str())
+                .any(|(b, _)| b.mode == BindingMode::Blocking)
         })
     {
         return Err(RefineError::InvalidInput(format!(

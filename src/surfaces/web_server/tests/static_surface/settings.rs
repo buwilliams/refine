@@ -81,12 +81,12 @@ fn static_main_nav_exposes_refine_source_update_affordance() {
 }
 
 #[test]
-fn static_settings_replace_retired_editors_with_events_and_skills() {
+fn static_settings_replace_retired_editors_with_skills() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
     let index = fs::read_to_string(root.join("index.html")).unwrap();
     let settings = fs::read_to_string(root.join("js/features/settings.js")).unwrap();
-    assert!(index.contains("settings_events.js"));
-    assert!(settings.contains("slug: \"events\""));
+    assert!(index.contains("settings_skills.js"));
+    assert!(!settings.contains("slug: \"events\""));
     assert!(settings.contains("slug: \"skills\""));
     for retired in [
         "settings_governance.js",

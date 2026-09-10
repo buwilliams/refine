@@ -40,7 +40,7 @@ function parseHash() {
   if (parts[0] === "logs") return { route: "logs" };
   if (parts[0] === "changes") return { route: "changes" };
   if (["system", "settings", "node", "governance", "project"].includes(parts[0])) {
-    const retired = ["governance", "quality", "guidance"];
+    const retired = ["governance", "quality", "guidance", "events"];
     let tab = parts[1] || (["governance", "project"].includes(parts[0]) ? "skills" : "processes");
     if (retired.includes(tab)) tab = "skills";
     if (parts[0] !== "settings" || tab !== parts[1]) history.replaceState(null, "", `#/settings/${tab}`);

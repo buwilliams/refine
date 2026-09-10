@@ -349,3 +349,90 @@ fn operation_sse_keeps_all_active_operations_beyond_recent_terminal_limit() {
 
     fs::remove_dir_all(runtime_root).unwrap();
 }
+
+#[cfg(unix)]
+#[test]
+fn custom_skill_terminal_uses_selected_instructions_and_managed_session_without_goal() {
+    use std::os::unix::fs::PermissionsExt;
+    let _env = crate::infrastructure::agents::invocation::smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    let temp_root = unique_temp_dir("http-skill-terminal");
+    let refine_dir = temp_root.join(".refine");
+    let runtime_root = temp_root.join("run/8080");
+    fs::create_dir_all(&refine_dir).unwrap();
+    let provider = temp_root.join("skill-provider");
+    fs::write(&provider, "#!/usr/bin/env python3\nimport pathlib,sys,time\npathlib.Path('skill-prompt.txt').write_text(sys.argv[-1])\nprint('Skill agent ready',flush=True)\ntime.sleep(30)\n").unwrap();
+    fs::set_permissions(&provider, fs::Permissions::from_mode(0o755)).unwrap();
+    struct Restore(Option<std::ffi::OsString>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            unsafe {
+                if let Some(value) = &self.0 {
+                    std::env::set_var("REFINE_SMOKE_AI_PATH", value);
+                } else {
+                    std::env::remove_var("REFINE_SMOKE_AI_PATH");
+                }
+            }
+        }
+    }
+    let _restore = Restore(std::env::var_os("REFINE_SMOKE_AI_PATH"));
+    unsafe {
+        std::env::set_var("REFINE_SMOKE_AI_PATH", &provider);
+    }
+    crate::infrastructure::process::supervisor::config::FileSettingsService::with_active_root(
+        &refine_dir,
+        &runtime_root,
+    )
+    .update(&json!({"agent_cli":"smoke-ai"}))
+    .unwrap();
+    let service =
+        crate::application::events::FileEventService::with_runtime_root(&refine_dir, &runtime_root);
+    let revision = service.config().unwrap().revision;
+    service.save("skills", "release", json!({"revision":revision,"item":{"name":"Release check","prompt":"Inspect only the release notes.","parameters":[{"name":"count","kind":"number","required":true}]},"trigger":{"source":"custom"}})).unwrap();
+    let mut server = server_with_projection();
+    server.target_root = Some(temp_root.clone());
+    server.runtime_root = Some(runtime_root.clone());
+    for extra in [
+        json!({"goal_id":"GOAL1"}),
+        json!({"surface":"cli"}),
+        json!({"parameters":{"count":"wrong"}}),
+    ] {
+        let mut body = json!({"profile":"skill","surface":"toolbar","skill_id":"release","parameters":{"count":4},"cols":80,"rows":20});
+        body.as_object_mut()
+            .unwrap()
+            .extend(extra.as_object().unwrap().clone());
+        let response = server.handle(ApiRequest {
+            method: "POST".into(),
+            path: "/api/terminal/session".into(),
+            body: Some(body),
+        });
+        assert_eq!(response.status, 400, "{}", response.body);
+    }
+    let start = server.handle(ApiRequest { method:"POST".into(),path:"/api/terminal/session".into(),body:Some(json!({"profile":"skill","surface":"toolbar","skill_id":"release","parameters":{"count":4},"cols":80,"rows":20})) });
+    assert_eq!(start.status, 200, "{}", start.body);
+    assert_eq!(start.body["profile"], "skill");
+    let process_id = start.body["process_id"].as_str().unwrap();
+    let records = FileProcessSupervisor::new(&runtime_root).list().unwrap();
+    let record = records.iter().find(|p| p.id == process_id).unwrap();
+    let metadata: serde_json::Value =
+        serde_json::from_str(record.details.as_deref().unwrap()).unwrap();
+    assert_eq!(metadata["skill_id"], "release");
+    assert!(metadata.get("goal_id").is_none());
+    for _ in 0..100 {
+        if temp_root.join("skill-prompt.txt").exists() {
+            break;
+        }
+        thread::sleep(Duration::from_millis(20));
+    }
+    let prompt = fs::read_to_string(temp_root.join("skill-prompt.txt")).unwrap();
+    assert!(prompt.contains("Inspect only the release notes."));
+    assert!(prompt.contains("\"count\":4"));
+    let stop = server.handle(ApiRequest {
+        method: "POST".into(),
+        path: format!("/api/terminal/{}/stop", start.body["id"].as_str().unwrap()),
+        body: None,
+    });
+    assert_eq!(stop.status, 200, "{}", stop.body);
+    remove_temp_dir(&temp_root);
+}

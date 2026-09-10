@@ -311,7 +311,7 @@ function drawGoalDetail(goal) {
   // lifecycle cannot requeue, cancel, or otherwise mutate the Goal.
   const canOpenAgent = !!goal.id;
   const eventAgents = !!goal.rounds?.at(-1)?.event_configuration && ["plan", "implement", "quality", "governance"].includes(goal.status);
-  const openAgentTitle = eventAgents ? "Inspect this Goal's Event agents, results, and process evidence" : ["plan", "implement", "quality"].includes(goal.status)
+  const openAgentTitle = eventAgents ? "Inspect this Goal's Skill runs, results, and process evidence" : ["plan", "implement", "quality"].includes(goal.status)
     ? "Attach to the running Goal Agent"
     : "Open a diagnostic Agent with this Goal's recorded context";
 
@@ -349,7 +349,7 @@ function drawGoalDetail(goal) {
         <div class="goal-action-group">
           <button class="goal-action-primary" id="btn-open-agent" data-testid="goal-open-agent"
                   ${canOpenAgent ? "" : "disabled"}
-                  title="${htmlEscape(openAgentTitle)}">${eventAgents ? "Event agents" : "Open Agent"}</button>
+                  title="${htmlEscape(openAgentTitle)}">${eventAgents ? "Skill runs" : "Open Agent"}</button>
           <details class="nav-menu goal-action-menu" id="goal-action-menu"${actionMenuOpen ? " open" : ""}>
             <summary class="btn goal-action-more" aria-label="More Goal actions" data-testid="goal-action-menu-toggle"></summary>
             <div class="nav-menu-panel goal-action-panel">

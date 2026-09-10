@@ -6,8 +6,9 @@ use serde_json::Value;
 
 use super::workflow::GoalStatus;
 
-pub const SCHEMA_VERSION: u32 = 1;
+pub const SCHEMA_VERSION: u32 = 2;
 pub const MAX_CONFIG_BYTES: usize = 16 * 1024 * 1024;
+pub const CUSTOM_EVENT_ID: &str = "custom";
 pub const WORKFLOW_STEPS: [&str; 10] = [
     "backlog",
     "todo",
@@ -162,6 +163,34 @@ pub struct EventDefinition {
     pub on_success: Option<String>,
 }
 
+impl EventDefinition {
+    /// The workflow owns its output contract; Skills supply reusable instructions.
+    pub fn result_role(&self) -> &str {
+        match self.source.as_deref() {
+            Some("workflow.plan.enter") => "plan",
+            Some("workflow.implement.enter") => "implement",
+            Some("workflow.quality.enter") => "quality",
+            Some("workflow.governance.enter") => "governance",
+            _ => "task",
+        }
+    }
+}
+
+/// A shared manual trigger. Selecting it never creates a user-named Event.
+pub fn custom_event() -> EventDefinition {
+    EventDefinition {
+        id: CUSTOM_EVENT_ID.into(),
+        name: "Custom".into(),
+        kind: EventKind::Custom,
+        source: None,
+        enabled: true,
+        scope: Scope::default(),
+        parameters: Vec::new(),
+        bindings: Vec::new(),
+        on_success: None,
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 pub struct AutomationConfig {
     pub schema_version: u32,
@@ -220,7 +249,7 @@ impl AutomationConfig {
         {
             return Err("Events/Skills configuration exceeds 16 MiB".into());
         }
-        if self.schema_version != SCHEMA_VERSION {
+        if ![1, SCHEMA_VERSION].contains(&self.schema_version) {
             return Err("unsupported Events/Skills schema".into());
         }
         if self.events.len() > 1024 || self.skills.len() > 1024 {
@@ -244,6 +273,7 @@ impl AutomationConfig {
             validate_parameters(&skill.parameters)?;
         }
         let catalog = system_catalog();
+        let mut assigned_skills = BTreeSet::new();
         for (id, event) in &self.events {
             if id != &event.id || !valid_id(id) || event.name.trim().is_empty() {
                 return Err(format!("invalid Event {id}"));
@@ -266,11 +296,17 @@ impl AutomationConfig {
             {
                 return Err("unsupported Event success action".into());
             }
-            if event.bindings.len() > 64 {
-                return Err("at most 64 bindings per Event are supported".into());
+            let max_bindings = if id == CUSTOM_EVENT_ID { 1024 * 64 } else { 64 };
+            if event.bindings.len() > max_bindings {
+                return Err(format!(
+                    "at most {max_bindings} bindings per Event are supported"
+                ));
             }
             let mut ids = BTreeSet::new();
             for binding in &event.bindings {
+                if self.schema_version >= 2 && !assigned_skills.insert(&binding.skill_id) {
+                    return Err("A Skill has one trigger. Clone the Skill to use it at another trigger point.".into());
+                }
                 if !valid_id(&binding.id) || !ids.insert(&binding.id) {
                     return Err("invalid or repeated binding ID".into());
                 }

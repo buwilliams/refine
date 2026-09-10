@@ -93,6 +93,31 @@ impl AutomationStore {
         })
     }
 
+    /// Upgrade under the same lock as edits; a concurrent first reader cannot
+    /// repeat the migration or overwrite a configuration saved after it.
+    pub fn upgrade(
+        &self,
+        upgrade: impl FnOnce(&mut AutomationConfig) -> RefineResult<()>,
+    ) -> RefineResult<Arc<AutomationConfig>> {
+        with_record_lock(&self.root, "automation-config", || {
+            let mut config = (*self.load()?).clone();
+            if config.schema_version == crate::model::automation::SCHEMA_VERSION {
+                return Ok(Arc::new(config));
+            }
+            let archive = self.root.join("automation/migration-v2.json");
+            if !archive.exists() {
+                write_json(&archive, &config)?;
+            }
+            upgrade(&mut config)?;
+            config.revision = config
+                .revision
+                .checked_add(1)
+                .ok_or_else(|| RefineError::Conflict("configuration revision exhausted".into()))?;
+            self.write(&config)?;
+            self.load()
+        })
+    }
+
     pub fn update(
         &self,
         revision: u64,
@@ -102,7 +127,7 @@ impl AutomationStore {
             let mut config = (*self.load()?).clone();
             if config.revision != revision {
                 return Err(RefineError::Conflict(format!(
-                    "Events/Skills changed: expected revision {revision}, current revision {}. Refresh before saving.",
+                    "Skill configuration changed: expected revision {revision}, current revision {}. Refresh before saving.",
                     config.revision
                 )));
             }

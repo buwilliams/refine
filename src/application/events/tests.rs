@@ -90,6 +90,7 @@ fn disabled_node_override_masks_only_its_project_binding() {
     override_binding.overrides = Some("default-plan".into());
     override_binding.enabled = false;
     event.bindings.push(override_binding);
+    super::migration::single_trigger_skills(&mut config).unwrap();
     config.validate().unwrap();
     let event = &config.events["workflow.plan.enter"];
     assert!(config.bindings(event, "node-a").is_empty());
@@ -689,7 +690,8 @@ print(json.dumps(result))
     }
     let mut config = (*service.config().unwrap()).clone();
     config.skills.get_mut("default-plan").unwrap().role = "task".into();
-    let event = config.events["workflow.plan.enter"].clone();
+    let mut event = config.events["workflow.plan.enter"].clone();
+    event.source = Some("workflow.plan.exit".into());
     let mut context = service.manual_context(&fixture.0, &json!({})).unwrap();
     context.provider = "smoke-ai".into();
     let invocation = service
@@ -794,9 +796,7 @@ fn skill_event_assignments_save_atomically_and_preserve_other_skills() {
     let original_quality = config.events["workflow.quality.enter"].bindings.clone();
     let skill = json!({"id":"release-review", "name":"Release review", "prompt":"Review release evidence", "role":"task"});
     let assignments = json!([
-        {"event_id":"workflow.quality.enter", "binding":{"id":"review", "skill_id":"release-review", "order":4}},
-        {"event_id":"workflow.quality.enter", "binding":{"id":"node-review", "skill_id":"release-review", "scope":{"node_id":"node-a"}, "overrides":"review", "mode":"background", "order":5}},
-        {"event_id":"node.startup.ready", "binding":{"id":"startup-review", "skill_id":"release-review"}}
+        {"event_id":"workflow.quality.enter", "binding":{"id":"review", "skill_id":"release-review", "order":4}}
     ]);
     let saved = service
         .save(
@@ -811,8 +811,8 @@ fn skill_event_assignments_save_atomically_and_preserve_other_skills() {
         current.events["workflow.quality.enter"].bindings[0],
         original_quality[0]
     );
-    assert_eq!(current.events["workflow.quality.enter"].bindings.len(), 3);
-    assert_eq!(current.events["node.startup.ready"].bindings.len(), 1);
+    assert_eq!(current.events["workflow.quality.enter"].bindings.len(), 2);
+    assert_eq!(current.events["node.startup.ready"].bindings.len(), 0);
 
     // An invalid cross-reference cannot partially rename the Skill or erase its bindings.
     let mut invalid_skill = skill.clone();
@@ -858,4 +858,172 @@ fn skill_event_assignments_save_atomically_and_preserve_other_skills() {
         original_quality
     );
     assert!(cleared.events["node.startup.ready"].bindings.is_empty());
+}
+
+#[test]
+fn v2_migration_splits_assignments_preserves_overrides_and_is_idempotent() {
+    let fixture = Fixture::new();
+    let service = fixture.service();
+    let mut old = (*service.config().unwrap()).clone();
+    old.schema_version = 1;
+    let quality = old.events.get_mut("workflow.quality.enter").unwrap();
+    let mut node = quality.bindings[0].clone();
+    node.id = "node-quality".into();
+    node.scope.node_id = Some("node-a".into());
+    node.overrides = Some("default-quality".into());
+    node.enabled = false;
+    quality.bindings.push(node);
+    let mut copy = old.events["workflow.quality.enter"].bindings[0].clone();
+    copy.id = "release-quality".into();
+    let mut custom = custom_event();
+    custom.bindings.push(copy);
+    old.events.insert(CUSTOM_EVENT_ID.into(), custom);
+    crate::infrastructure::storage::automation::write_json(
+        &service.refine_dir.join("automation/config.json"),
+        &old,
+    )
+    .unwrap();
+    let migrated = service.config().unwrap();
+    assert_eq!(migrated.schema_version, 2);
+    assert_eq!(migrated.revision, old.revision + 1);
+    assert_eq!(migrated.skills.len(), old.skills.len() + 2);
+    assert_eq!(
+        migrated.events["workflow.quality.enter"].bindings[0].skill_id,
+        "default-quality"
+    );
+    assert!(
+        migrated
+            .bindings(&migrated.events["workflow.quality.enter"], "node-a")
+            .is_empty()
+    );
+    assert_eq!(
+        migrated
+            .bindings(&migrated.events["workflow.quality.enter"], "node-b")
+            .len(),
+        1
+    );
+    for event in migrated.events.values() {
+        for binding in &event.bindings {
+            let prior = old.events[&event.id]
+                .bindings
+                .iter()
+                .find(|b| b.id == binding.id)
+                .unwrap();
+            assert_eq!(
+                migrated.skills[&binding.skill_id].prompt,
+                old.skills[&prior.skill_id].prompt
+            );
+            assert_eq!(binding.overrides, prior.overrides);
+            assert_eq!(binding.order, prior.order);
+        }
+    }
+    let archive: AutomationConfig = crate::infrastructure::storage::automation::read_json(
+        &service.refine_dir.join("automation/migration-v2.json"),
+    )
+    .unwrap();
+    assert_eq!(archive, old);
+    assert_eq!(*service.config().unwrap(), *migrated);
+}
+
+#[test]
+fn manual_skills_select_one_skill_validate_inputs_and_pin_replay_without_a_goal() {
+    let fixture = Fixture::new();
+    let service = fixture.service();
+    for id in ["one", "two"] {
+        let revision = service.config().unwrap().revision;
+        service.save("skills", id, json!({"revision":revision,"item":{"name":id,"prompt":format!("Run only {id}"),"role":"governance","parameters":[{"name":"count","kind":"number","required":true,"default":3}]},"trigger":{"source":"custom"}})).unwrap();
+    }
+    let inputs = service.skill_inputs("one", &fixture.0).unwrap();
+    assert_eq!(inputs["parameters"][0]["default"], 3);
+    let body = json!({"parameters":{"count":7},"request_id":"same-request"});
+    let run = service.trigger_skill("one", &fixture.0, &body).unwrap();
+    assert_eq!(run.bindings.len(), 1);
+    assert_eq!(run.bindings[0].skill.id, "one");
+    assert_eq!(run.bindings[0].skill.role, "task");
+    assert_eq!(run.bindings[0].parameters["count"], 7);
+    assert!(run.context.goal_id.is_none());
+    assert!(run.event.on_success.is_none());
+    let other = service.trigger_skill("two", &fixture.0, &body).unwrap();
+    assert_ne!(other.id, run.id);
+    assert!(
+        service
+            .trigger_skill(
+                "one",
+                &fixture.0,
+                &json!({"parameters":{"count":8},"request_id":"same-request"})
+            )
+            .is_err()
+    );
+    assert!(
+        service
+            .trigger_skill("one", &fixture.0, &json!({"goal_id":"GOAL1"}))
+            .is_err()
+    );
+    assert!(
+        service
+            .terminal_skill_prompt("one", &fixture.0, &json!({"count":"wrong"}))
+            .is_err()
+    );
+    let (prompt, metadata) = service
+        .terminal_skill_prompt("one", &fixture.0, &json!({"count":9}))
+        .unwrap();
+    assert!(prompt.contains("Run only one"));
+    assert!(!prompt.contains("Run only two"));
+    assert_eq!(metadata["skill_parameters"]["count"], 9);
+    let config = service.config().unwrap();
+    let mut skill = config.skills["one"].clone();
+    skill.enabled = false;
+    service
+        .save(
+            "skills",
+            "one",
+            json!({"revision":config.revision,"item":skill}),
+        )
+        .unwrap();
+    assert!(service.skill_inputs("one", &fixture.0).is_err());
+    assert_eq!(
+        service.trigger_skill("one", &fixture.0, &body).unwrap().id,
+        run.id
+    );
+    service.cancel_invocation(&run.id).unwrap();
+    assert_eq!(
+        service
+            .trigger_skill("one", &fixture.0, &body)
+            .unwrap()
+            .state,
+        InvocationState::Cancelled
+    );
+}
+
+#[test]
+fn single_trigger_save_rejects_multiple_and_derives_the_workflow_result_contract() {
+    let fixture = Fixture::new();
+    let service = fixture.service();
+    let revision = service.config().unwrap().revision;
+    let item = json!({"name":"Review", "prompt":"Review the work"});
+    service.save("skills", "review", json!({"revision":revision,"item":item,"trigger":{"source":"workflow.quality.enter","order":5}})).unwrap();
+    let shown = service.show_skill("review").unwrap();
+    assert_eq!(shown["trigger"]["source"], "workflow.quality.enter");
+    assert!(shown["item"].get("role").is_none());
+    let config = service.config().unwrap();
+    let context = service.manual_context(&fixture.0, &json!({})).unwrap();
+    let run = service
+        .prepare_pinned(
+            &config,
+            &config.events["workflow.quality.enter"],
+            context,
+            BTreeMap::new(),
+            "role-derived",
+        )
+        .unwrap();
+    assert!(run.bindings.iter().all(|b| b.skill.role == "quality"));
+    assert!(service.save("skills", "review", json!({"revision":config.revision,"item":item,"event_bindings":[{"event_id":"custom","binding":{"id":"one","skill_id":"review"}},{"event_id":"workflow.quality.enter","binding":{"id":"two","skill_id":"review"}}]})).is_err());
+    assert_eq!(*service.config().unwrap(), *config);
+    service.remove("skills", "review", config.revision).unwrap();
+    assert_eq!(
+        service.config().unwrap().events["workflow.quality.enter"]
+            .bindings
+            .len(),
+        1
+    );
 }

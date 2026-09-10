@@ -48,6 +48,22 @@ impl InProcessWebServer {
             };
             match (request.method.as_str(), parts.as_slice()) {
                 ("GET", ["event-definitions", "catalog"]) => Ok(service.catalog()),
+                ("GET", ["skills", "catalog"]) => Ok(service.skill_catalog()),
+                ("GET", ["skills", id]) => service.show_skill(id),
+                ("GET", ["skills", id, "inputs"]) => {
+                    let target = self
+                        .target_root()
+                        .ok_or_else(|| RefineError::InvalidInput("select a project".into()))?;
+                    service.skill_inputs(id, &target)
+                }
+                ("POST", ["skills", id, "trigger"]) => {
+                    let target = self
+                        .target_root()
+                        .ok_or_else(|| RefineError::InvalidInput("select a project".into()))?;
+                    let invocation = service.trigger_skill(id, &target, &body)?;
+                    let _ = service.dispatch_pending(&target);
+                    Ok(json!(invocation))
+                }
                 ("GET", ["event-definitions", id, "inputs"]) => {
                     let target = self
                         .target_root()
