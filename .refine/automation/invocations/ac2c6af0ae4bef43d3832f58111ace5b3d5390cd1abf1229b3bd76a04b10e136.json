@@ -2356,11 +2356,102 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-quality": {
+      "invocation_id": "ac2c6af0ae4bef43d3832f58111ace5b3d5390cd1abf1229b3bd76a04b10e136",
+      "binding_id": "default-quality",
+      "role": "quality",
+      "outcome": "success",
+      "summary": "Observational review found no new material defects. Read-only checks passed; focused test commands await Refine supervision against the pinned candidate.",
+      "evidence": [
+        "Verified clean candidate 05643ffb157c6404098f5437ffe8de40c721a5b7 on refine/DR54BF57DCE017ED8EC68A5EEB/round-3 before and after review. Recorded base b47569adb8d4c5d1d7335ba91729a3e486a38fe0 is an ancestor.",
+        "Reviewed the finalized Round 3 plan, implementation and Quality corrections against the affected worktree and workflow consistency intent contracts.",
+        "Engine preparation reconciles journals before both hydration paths. Recovery validates workspace membership, attempt authority, durable identities and checkout state. Persisted replacements are classified before rollback.",
+        "The committed Quality correction validates the retained source ref before restoring HEAD or moving the candidate branch. Its regression covers detached, attached and persisted replacements.",
+        "Engine-entry regressions cover all four phases, interruption windows, retained paths, dirty work, unexpected refs, authority loss, contention and exact-candidate gates. Publication retains its recorded remote SHA lease.",
+        "Read retained results and logs under /tmp/refine-quality-DR54BF57DCE017ED8EC68A5EEB-round3. These report earlier focused checks passing; they are not new supervised proof for this invocation.",
+        "No files or Git state were changed. No Goal mutation, merge, push, deployment or daemon restart occurred. Cargo commands below remain pending; full-suite execution, live daemon crashes and disk-failure injection were not performed."
+      ],
+      "artifacts": {
+        "tests": [
+          {
+            "command": "test \"$(git rev-parse HEAD)\" = 05643ffb157c6404098f5437ffe8de40c721a5b7 && test \"$(git branch --show-current)\" = refine/DR54BF57DCE017ED8EC68A5EEB/round-3 && test -z \"$(git --no-optional-locks status --porcelain=v1)\" && git merge-base --is-ancestor b47569adb8d4c5d1d7335ba91729a3e486a38fe0 05643ffb157c6404098f5437ffe8de40c721a5b7",
+            "evidence": "Executed in the pinned workspace; exit 0.",
+            "status": "passed",
+            "test": "Pinned candidate identity, clean checkout and base ancestry"
+          },
+          {
+            "command": "git diff --check b47569adb8d4c5d1d7335ba91729a3e486a38fe0 05643ffb157c6404098f5437ffe8de40c721a5b7",
+            "evidence": "Executed; exit 0 with no diagnostics.",
+            "status": "passed",
+            "test": "Pinned candidate whitespace"
+          },
+          {
+            "command": "git diff --name-only --diff-filter=ACMR -z b47569adb8d4c5d1d7335ba91729a3e486a38fe0 05643ffb157c6404098f5437ffe8de40c721a5b7 -- '*.rs' | xargs -0 rustfmt --check --edition 2024 --config skip_children=true",
+            "evidence": "Executed; exit 0 with no diagnostics.",
+            "status": "passed",
+            "test": "Formatting of changed Rust files"
+          },
+          {
+            "command": "cargo test --lib application::workflow::tests::worktree_resume -- --test-threads=1",
+            "evidence": "Proposed for supervision. Retained prior log reports 18 passed, 0 failed.",
+            "status": "pending",
+            "test": "Engine resumption, preservation and exact-candidate gates"
+          },
+          {
+            "command": "cargo test --lib application::workflow::tests::candidate_refresh -- --test-threads=1",
+            "evidence": "Proposed for supervision. Retained prior log reports 39 passed, 0 failed.",
+            "status": "pending",
+            "test": "Replay, conflicts, authority and publication recovery"
+          },
+          {
+            "command": "cargo test --lib application::workflow::tests::round_base -- --test-threads=1",
+            "evidence": "Proposed for supervision. Retained prior log reports 14 passed, 0 failed.",
+            "status": "pending",
+            "test": "Round creation, lineage and retained bases"
+          },
+          {
+            "command": "cargo test --lib replacement_skills -- --test-threads=1",
+            "evidence": "Proposed for supervision. Retained prior log reports 5 passed, 0 failed.",
+            "status": "pending",
+            "test": "Replacement Skills and candidate-bound evidence"
+          },
+          {
+            "command": "cargo test --lib infrastructure::git::worktrees -- --test-threads=1",
+            "evidence": "Proposed for supervision. Retained prior log reports 31 passed, 0 failed.",
+            "status": "pending",
+            "test": "Shared Git worktree behavior"
+          },
+          {
+            "command": "cargo test --lib architecture_tests",
+            "evidence": "Proposed for supervision. Retained prior log reports 5 passed, 0 failed.",
+            "status": "pending",
+            "test": "Architecture boundaries"
+          },
+          {
+            "command": "cargo check --all-targets",
+            "evidence": "Proposed for supervision. Retained prior results record exit 0.",
+            "status": "pending",
+            "test": "All-target compilation"
+          }
+        ]
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-quality",
+      "diagnostic": null,
+      "operation_id": "1a08bfa011b113c7657",
+      "process_id": "proc-1789054813331-1129590-807",
+      "raw_output": "{\n  \"binding_id\": \"default-quality\",\n  \"invocation_id\": \"ac2c6af0ae4bef43d3832f58111ace5b3d5390cd1abf1229b3bd76a04b10e136\",\n  \"role\": \"quality\",\n  \"outcome\": \"success\",\n  \"summary\": \"Observational review found no new material defects. Read-only checks passed; focused test commands await Refine supervision against the pinned candidate.\",\n  \"evidence\": [\n    \"Verified clean candidate 05643ffb157c6404098f5437ffe8de40c721a5b7 on refine/DR54BF57DCE017ED8EC68A5EEB/round-3 before and after review. Recorded base b47569adb8d4c5d1d7335ba91729a3e486a38fe0 is an ancestor.\",\n    \"Reviewed the finalized Round 3 plan, implementation and Quality corrections against the affected worktree and workflow consistency intent contracts.\",\n    \"Engine preparation reconciles journals before both hydration paths. Recovery validates workspace membership, attempt authority, durable identities and checkout state. Persisted replacements are classified before rollback.\",\n    \"The committed Quality correction validates the retained source ref before restoring HEAD or moving the candidate branch. Its regression covers detached, attached and persisted replacements.\",\n    \"Engine-entry regressions cover all four phases, interruption windows, retained paths, dirty work, unexpected refs, authority loss, contention and exact-candidate gates. Publication retains its recorded remote SHA lease.\",\n    \"Read retained results and logs under /tmp/refine-quality-DR54BF57DCE017ED8EC68A5EEB-round3. These report earlier focused checks passing; they are not new supervised proof for this invocation.\",\n    \"No files or Git state were changed. No Goal mutation, merge, push, deployment or daemon restart occurred. Cargo commands below remain pending; full-suite execution, live daemon crashes and disk-failure injection were not performed.\"\n  ],\n  \"artifacts\": {\n    \"tests\": [\n      {\n        \"test\": \"Pinned candidate identity, clean checkout and base ancestry\",\n        \"command\": \"test \\\"$(git rev-parse HEAD)\\\" = 05643ffb157c6404098f5437ffe8de40c721a5b7 && test \\\"$(git branch --show-current)\\\" = refine/DR54BF57DCE017ED8EC68A5EEB/round-3 && test -z \\\"$(git --no-optional-locks status --porcelain=v1)\\\" && git merge-base --is-ancestor b47569adb8d4c5d1d7335ba91729a3e486a38fe0 05643ffb157c6404098f5437ffe8de40c721a5b7\",\n        \"status\": \"passed\",\n        \"evidence\": \"Executed in the pinned workspace; exit 0.\"\n      },\n      {\n        \"test\": \"Pinned candidate whitespace\",\n        \"command\": \"git diff --check b47569adb8d4c5d1d7335ba91729a3e486a38fe0 05643ffb157c6404098f5437ffe8de40c721a5b7\",\n        \"status\": \"passed\",\n        \"evidence\": \"Executed; exit 0 with no diagnostics.\"\n      },\n      {\n        \"test\": \"Formatting of changed Rust files\",\n        \"command\": \"git diff --name-only --diff-filter=ACMR -z b47569adb8d4c5d1d7335ba91729a3e486a38fe0 05643ffb157c6404098f5437ffe8de40c721a5b7 -- '*.rs' | xargs -0 rustfmt --check --edition 2024 --config skip_children=true\",\n        \"status\": \"passed\",\n        \"evidence\": \"Executed; exit 0 with no diagnostics.\"\n      },\n      {\n        \"test\": \"Engine resumption, preservation and exact-candidate gates\",\n        \"command\": \"cargo test --lib application::workflow::tests::worktree_resume -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed for supervision. Retained prior log reports 18 passed, 0 failed.\"\n      },\n      {\n        \"test\": \"Replay, conflicts, authority and publication recovery\",\n        \"command\": \"cargo test --lib application::workflow::tests::candidate_refresh -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed for supervision. Retained prior log reports 39 passed, 0 failed.\"\n      },\n      {\n        \"test\": \"Round creation, lineage and retained bases\",\n        \"command\": \"cargo test --lib application::workflow::tests::round_base -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed for supervision. Retained prior log reports 14 passed, 0 failed.\"\n      },\n      {\n        \"test\": \"Replacement Skills and candidate-bound evidence\",\n        \"command\": \"cargo test --lib replacement_skills -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed for supervision. Retained prior log reports 5 passed, 0 failed.\"\n      },\n      {\n        \"test\": \"Shared Git worktree behavior\",\n        \"command\": \"cargo test --lib infrastructure::git::worktrees -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed for supervision. Retained prior log reports 31 passed, 0 failed.\"\n      },\n      {\n        \"test\": \"Architecture boundaries\",\n        \"command\": \"cargo test --lib architecture_tests\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed for supervision. Retained prior log reports 5 passed, 0 failed.\"\n      },\n      {\n        \"test\": \"All-target compilation\",\n        \"command\": \"cargo check --all-targets\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed for supervision. Retained prior results record exit 0.\"\n      }\n    ]\n  }\n}\n",
+      "workflow_revision": 54
+    }
+  ],
   "created_at": "2026-09-10T15:40:12.923655511+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-10T15:43:12.222525407+00:00",
   "error": null,
   "action_applied": false
 }
