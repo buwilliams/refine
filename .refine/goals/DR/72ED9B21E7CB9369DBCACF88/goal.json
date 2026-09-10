@@ -3,7 +3,7 @@
   "branch_name": "refine/DR72ED9B21E7CB9369DBCACF88/round-6",
   "candidate_commit": "b3c3b1f4b4c4420bf63b5a3362dc04355ad1046c",
   "created": "2026-09-10T08:26:05Z",
-  "event_generation": 18,
+  "event_generation": 19,
   "feature_id": "00000T130Z0R6J0GJMARY62005",
   "feature_order": 1,
   "id": "DR72ED9B21E7CB9369DBCACF88",
@@ -7019,9 +7019,119 @@
       "prompt": "Recover Goal DR72ED9B21E7CB9369DBCACF88: Keep automated Goal work in managed worktrees.\n\nThe user explicitly authorized restarting all six failed Goals after the Plan, Implement, Quality and Governance Skills were revised (configuration revision 26). This new Round supersedes the earlier user-directed hold; preserve its audit record and every previous attempt.\n\nOutcome: Keep automated Goal edits, staging, Skill evaluation and recovery in the correctly owned managed worktree while leaving the developer's primary checkout and index intact. Preserve legitimate pre-Plan lifecycle Skills, manual Custom Skills and toolbar contexts.\n\nRetained evidence: Round 4 captured candidate 39ae4cfa4d28739d41a6bc3c9465e064d9f92106. Its refresh then conflicted with newer main. Round 5 was automatically queued during the user-directed stop and never implemented. Earlier Quality findings concerned pre-Plan workspace materialization, cancelled blocking Entry Skills, missing completion results and stale workspace reuse. Inspect /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR72ED9B21E7CB9369DBCACF88-round-2 read-only as a reuse source: HEAD 39ae4cfa4d28739d41a6bc3c9465e064d9f92106, branch refine/DR72ED9B21E7CB9369DBCACF88/round-4, 0 tracked/untracked status entries at recovery preparation. Full prior Goal records, tracked patches and untracked-file manifests were captured at /tmp/refine-recovery-rounds-etc0wvs8/DR72ED9B21E7CB9369DBCACF88/. Prior plans, findings and test results are evidence, not instructions to reproduce their design or claims of a passed new candidate.\n\nApproach: Reconcile the retained isolation work with current main's existing GateAssessment and occurrence-pinned configuration. Keep execution outcome distinct from permission to advance: background failure must remain visible without vetoing satisfied blocking requirements. Establish workspace ownership and required-result validation once in their shared owners, then use them consistently for scheduler and manual transitions. Preserve canonical repository/worktree identity, branch or candidate binding, contained agent_subpath, and Git-environment isolation. Avoid resurrecting older aggregate-state semantics or parallel admission policies.\n\nVerification: Exercise actual workflow/Event entry paths with a dirty primary checkout and capture HEAD, index bytes and tracked/untracked content. Cover fresh Backlog/Todo lifecycle work, cancelled or partial blocking results, successful blocking results plus background failure, cached completion, replaced registrations, symlink escape, inherited Git overrides and resume. Reuse and extend current Events, workflow gate and worktree-ownership regressions, including main's execution_outcomes_and_gate_permission_are_independent test. Run the applicable project checks and report exact commands, selected test counts, failures, skips and candidate identity. Confirm any alleged baseline failure against this Round's pinned base.\n\nUse Refine's new managed Round workspace and the target tip selected at admission, which may include earlier Goals in this ordered recovery Feature. Reconcile the concept and existing owner before selectively carrying forward useful work. Preserve all earlier branches, worktrees, commits, uncommitted files, journals and failure evidence; do not reset or clean them. Keep changes within this Goal's behavior and update only affected intent documentation. The revised Skills govern this run. Refine owns candidate capture, workflow advancement and integration; human approval and serving-installation promotion/restart remain separate.",
       "quality_agent_report": "workflow.quality.enter:default-quality: Corrected pre-Plan Failed/Cancelled lifecycle hooks. Final checks pass; four Quality correction files await Refine candidate capture.",
       "quality_candidate_commit": "b3c3b1f4b4c4420bf63b5a3362dc04355ad1046c",
-      "quality_checked_at": null,
-      "quality_details": null,
-      "quality_message": null,
+      "quality_checked_at": "2026-09-10T18:01:34Z",
+      "quality_details": {
+        "candidate_commit": "b3c3b1f4b4c4420bf63b5a3362dc04355ad1046c",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR72ED9B21E7CB9369DBCACF88-round-6",
+        "diagnostics": [
+          "Event invocation 2a36e22ed73e86544d1ec5f46ddf1c427ae311868358cf8b94c23d47235568b8: automation/invocations/2a36e22ed73e86544d1ec5f46ddf1c427ae311868358cf8b94c23d47235568b8.json",
+          "Observed supervised process proc-1789062832610-1129590-1346 exited 0. stdout: _skills ... ok\ntest surfaces::web_server::tests::static_surface::settings::static_settings_retire_the_development_tab ... ok\ntest surfaces::web_server::tests::static_surface::terminal::static_goal_log_tail_uses_toolbar_and_shared_sse_activity ... ok\ntest surfaces::web_server::tests::static_surface::terminal::static_plan_mode_uses_managed_terminal_with_initial_context ... ok\ntest surfaces::web_server::tests::static_surface::terminal::static_toolbar_is_lazy_multi_agent_and_uses_shared_managed_terminal ... ok\ntest surfaces::web_server::tests::static_surface::work_items::static_goal_detail_exposes_event_agents_and_retains_interactive_diagnostics ... ok\ntest surfaces::web_server::tests::static_surface::work_items::static_goal_detail_logs_feature_blocking_notice_to_system ... ok\ntest surfaces::web_server::tests::static_surface::work_items::static_goal_detail_uses_shared_governance_review_state_helpers ... ok\ntest surfaces::web_server::tests::static_surface::work_items::static_goal_reports_and_bulk_jira_export_use_the_correct_surfaces ... ok\ntest surfaces::web_server::tests::static_surface::work_items::static_work_item_tables_use_shared_readable_name_layout ... ok\ntest surfaces::web_server::work_routes::tests::feature_spec_import_prompt_uses_architecture_lenses ... ok\ntest surfaces::web_server::work_routes::tests::plan_goal_extraction_requires_one_goal_and_discards_feature_destination ... ok\ntest surfaces::web_server::work_routes::tests::plan_import_prompt_excludes_refine_from_feature_metadata_contract ... ok\ntest surfaces::web_server::work_routes::tests::plan_import_result_merges_feature_behavior_and_implementation_goal_arrays ... ok\ntest surfaces::web_server::work_routes::tests::plan_import_result_reads_embedded_pretty_json_before_text_fallback ... ok\ntest surfaces::web_server::work_routes::tests::plan_import_result_sanitizes_feature_metadata_and_reads_feature_goals ... ok\n\ntest result: ok. 1215 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 434.39s stderr: Compiling refine v4.2.0 (/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR72ED9B21E7CB9369DBCACF88-round-6)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.37s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (detached HEAD 329de12)\nPreparing worktree (detached HEAD 0667991)\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')",
+          "Observed supervised process proc-1789063274529-1129590-1349 exited 0. stderr: Checking refine v4.2.0 (/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR72ED9B21E7CB9369DBCACF88-round-6)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.40s",
+          "Observed supervised process proc-1789063279068-1129590-1352 exited 0. stderr: lippy::module_inception)]` on by default\n\nwarning: consider using `sort_by_key`\n   --> src/surfaces/web_server/http/background_loops.rs:209:5\n    |\n209 |     files.sort_by(|a, b| b.0.cmp(&a.0));\n    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#unnecessary_sort_by\n    = note: `#[warn(clippy::unnecessary_sort_by)]` on by default\nhelp: try\n    |\n209 -     files.sort_by(|a, b| b.0.cmp(&a.0));\n209 +     files.sort_by_key(|b| std::cmp::Reverse(b.0));\n    |\n\nwarning: this call to `clone` can be replaced with `std::slice::from_ref`\n   --> src/application/work_items/service/round_helpers.rs:323:51\n    |\n323 |                 !last_round_is_unstarted_recovery(&[round.clone()], None),\n    |                                                   ^^^^^^^^^^^^^^^^ help: try: `std::slice::from_ref(&round)`\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#cloned_ref_to_slice_refs\n    = note: `#[warn(clippy::cloned_ref_to_slice_refs)]` on by default\n\nwarning: `refine` (lib) generated 4 warnings (run `cargo clippy --fix --lib -p refine -- ` to apply 2 suggestions)\nwarning: items after a test module\n   --> src/surfaces/cli/dispatch/config.rs:113:1\n    |\n113 | mod tests {\n    | ^^^^^^^^^\n...\n152 | pub(super) fn structured_config_error(error: RefineError) -> RefineError {\n    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#items_after_test_module\n    = note: `#[warn(clippy::items_after_test_module)]` on by default\n    = help: move the items to before the test module was defined\n\nwarning: `refine` (lib test) generated 6 warnings (4 duplicates) (run `cargo clippy --fix --lib -p refine --tests -- ` to apply 1 suggestion)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.75s",
+          "Observed supervised process proc-1789063291987-1129590-1355 exited 0.",
+          "Observed supervised process proc-1789063293812-1129590-1358 exited 0."
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "1a08c6fccdf113c767c",
+        "provider_attempts": [],
+        "quality_proof": {
+          "checked_at": "2026-09-10T18:01:34Z",
+          "checked_candidate_commit": "b3c3b1f4b4c4420bf63b5a3362dc04355ad1046c",
+          "evaluation_scope": "isolated_candidate",
+          "goal_id": "DR72ED9B21E7CB9369DBCACF88",
+          "operation_id": "1a08c6fccdf113c767c",
+          "results": [
+            {
+              "command": "cargo test --lib -- --test-threads=1",
+              "evidence": "Observed supervised process proc-1789062832610-1129590-1346 exited 0. stdout: _skills ... ok\ntest surfaces::web_server::tests::static_surface::settings::static_settings_retire_the_development_tab ... ok\ntest surfaces::web_server::tests::static_surface::terminal::static_goal_log_tail_uses_toolbar_and_shared_sse_activity ... ok\ntest surfaces::web_server::tests::static_surface::terminal::static_plan_mode_uses_managed_terminal_with_initial_context ... ok\ntest surfaces::web_server::tests::static_surface::terminal::static_toolbar_is_lazy_multi_agent_and_uses_shared_managed_terminal ... ok\ntest surfaces::web_server::tests::static_surface::work_items::static_goal_detail_exposes_event_agents_and_retains_interactive_diagnostics ... ok\ntest surfaces::web_server::tests::static_surface::work_items::static_goal_detail_logs_feature_blocking_notice_to_system ... ok\ntest surfaces::web_server::tests::static_surface::work_items::static_goal_detail_uses_shared_governance_review_state_helpers ... ok\ntest surfaces::web_server::tests::static_surface::work_items::static_goal_reports_and_bulk_jira_export_use_the_correct_surfaces ... ok\ntest surfaces::web_server::tests::static_surface::work_items::static_work_item_tables_use_shared_readable_name_layout ... ok\ntest surfaces::web_server::work_routes::tests::feature_spec_import_prompt_uses_architecture_lenses ... ok\ntest surfaces::web_server::work_routes::tests::plan_goal_extraction_requires_one_goal_and_discards_feature_destination ... ok\ntest surfaces::web_server::work_routes::tests::plan_import_prompt_excludes_refine_from_feature_metadata_contract ... ok\ntest surfaces::web_server::work_routes::tests::plan_import_result_merges_feature_behavior_and_implementation_goal_arrays ... ok\ntest surfaces::web_server::work_routes::tests::plan_import_result_reads_embedded_pretty_json_before_text_fallback ... ok\ntest surfaces::web_server::work_routes::tests::plan_import_result_sanitizes_feature_metadata_and_reads_feature_goals ... ok\n\ntest result: ok. 1215 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 434.39s stderr: Compiling refine v4.2.0 (/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR72ED9B21E7CB9369DBCACF88-round-6)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.37s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (detached HEAD 329de12)\nPreparing worktree (detached HEAD 0667991)\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')",
+              "exit_code": 0,
+              "process_id": "proc-1789062832610-1129590-1346",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Workspace isolation and lifecycle regressions across affected entry paths"
+            },
+            {
+              "command": "cargo check --all-targets",
+              "evidence": "Observed supervised process proc-1789063274529-1129590-1349 exited 0. stderr: Checking refine v4.2.0 (/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR72ED9B21E7CB9369DBCACF88-round-6)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.40s",
+              "exit_code": 0,
+              "process_id": "proc-1789063274529-1129590-1349",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: All-target compilation"
+            },
+            {
+              "command": "cargo clippy --all-targets",
+              "evidence": "Observed supervised process proc-1789063279068-1129590-1352 exited 0. stderr: lippy::module_inception)]` on by default\n\nwarning: consider using `sort_by_key`\n   --> src/surfaces/web_server/http/background_loops.rs:209:5\n    |\n209 |     files.sort_by(|a, b| b.0.cmp(&a.0));\n    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#unnecessary_sort_by\n    = note: `#[warn(clippy::unnecessary_sort_by)]` on by default\nhelp: try\n    |\n209 -     files.sort_by(|a, b| b.0.cmp(&a.0));\n209 +     files.sort_by_key(|b| std::cmp::Reverse(b.0));\n    |\n\nwarning: this call to `clone` can be replaced with `std::slice::from_ref`\n   --> src/application/work_items/service/round_helpers.rs:323:51\n    |\n323 |                 !last_round_is_unstarted_recovery(&[round.clone()], None),\n    |                                                   ^^^^^^^^^^^^^^^^ help: try: `std::slice::from_ref(&round)`\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#cloned_ref_to_slice_refs\n    = note: `#[warn(clippy::cloned_ref_to_slice_refs)]` on by default\n\nwarning: `refine` (lib) generated 4 warnings (run `cargo clippy --fix --lib -p refine -- ` to apply 2 suggestions)\nwarning: items after a test module\n   --> src/surfaces/cli/dispatch/config.rs:113:1\n    |\n113 | mod tests {\n    | ^^^^^^^^^\n...\n152 | pub(super) fn structured_config_error(error: RefineError) -> RefineError {\n    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#items_after_test_module\n    = note: `#[warn(clippy::items_after_test_module)]` on by default\n    = help: move the items to before the test module was defined\n\nwarning: `refine` (lib test) generated 6 warnings (4 duplicates) (run `cargo clippy --fix --lib -p refine --tests -- ` to apply 1 suggestion)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.75s",
+              "exit_code": 0,
+              "process_id": "proc-1789063279068-1129590-1352",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: All-target lint validation"
+            },
+            {
+              "command": "cargo fmt --all -- --check",
+              "evidence": "Observed supervised process proc-1789063291987-1129590-1355 exited 0.",
+              "exit_code": 0,
+              "process_id": "proc-1789063291987-1129590-1355",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Project formatting"
+            },
+            {
+              "command": "GIT_OPTIONAL_LOCKS=0 git diff --check b6527c2d1e847a37e450aea8ceb6dce040aaec63 HEAD",
+              "evidence": "Observed supervised process proc-1789063293812-1129590-1358 exited 0.",
+              "exit_code": 0,
+              "process_id": "proc-1789063293812-1129590-1358",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Candidate whitespace"
+            }
+          ],
+          "round_idx": 5,
+          "schema_version": 1,
+          "source_candidate_commit": "b3c3b1f4b4c4420bf63b5a3362dc04355ad1046c",
+          "state": "passed"
+        },
+        "results": [
+          {
+            "command": "cargo test --lib -- --test-threads=1",
+            "evidence": "Observed supervised process proc-1789062832610-1129590-1346 exited 0. stdout: _skills ... ok\ntest surfaces::web_server::tests::static_surface::settings::static_settings_retire_the_development_tab ... ok\ntest surfaces::web_server::tests::static_surface::terminal::static_goal_log_tail_uses_toolbar_and_shared_sse_activity ... ok\ntest surfaces::web_server::tests::static_surface::terminal::static_plan_mode_uses_managed_terminal_with_initial_context ... ok\ntest surfaces::web_server::tests::static_surface::terminal::static_toolbar_is_lazy_multi_agent_and_uses_shared_managed_terminal ... ok\ntest surfaces::web_server::tests::static_surface::work_items::static_goal_detail_exposes_event_agents_and_retains_interactive_diagnostics ... ok\ntest surfaces::web_server::tests::static_surface::work_items::static_goal_detail_logs_feature_blocking_notice_to_system ... ok\ntest surfaces::web_server::tests::static_surface::work_items::static_goal_detail_uses_shared_governance_review_state_helpers ... ok\ntest surfaces::web_server::tests::static_surface::work_items::static_goal_reports_and_bulk_jira_export_use_the_correct_surfaces ... ok\ntest surfaces::web_server::tests::static_surface::work_items::static_work_item_tables_use_shared_readable_name_layout ... ok\ntest surfaces::web_server::work_routes::tests::feature_spec_import_prompt_uses_architecture_lenses ... ok\ntest surfaces::web_server::work_routes::tests::plan_goal_extraction_requires_one_goal_and_discards_feature_destination ... ok\ntest surfaces::web_server::work_routes::tests::plan_import_prompt_excludes_refine_from_feature_metadata_contract ... ok\ntest surfaces::web_server::work_routes::tests::plan_import_result_merges_feature_behavior_and_implementation_goal_arrays ... ok\ntest surfaces::web_server::work_routes::tests::plan_import_result_reads_embedded_pretty_json_before_text_fallback ... ok\ntest surfaces::web_server::work_routes::tests::plan_import_result_sanitizes_feature_metadata_and_reads_feature_goals ... ok\n\ntest result: ok. 1215 passed; 0 failed; 6 ignored; 0 measured; 0 filtered out; finished in 434.39s stderr: Compiling refine v4.2.0 (/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR72ED9B21E7CB9369DBCACF88-round-6)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.37s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (detached HEAD 329de12)\nPreparing worktree (detached HEAD 0667991)\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')\nPreparing worktree (new branch 'refine/GOAL1/round-1')",
+            "exit_code": 0,
+            "process_id": "proc-1789062832610-1129590-1346",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Workspace isolation and lifecycle regressions across affected entry paths"
+          },
+          {
+            "command": "cargo check --all-targets",
+            "evidence": "Observed supervised process proc-1789063274529-1129590-1349 exited 0. stderr: Checking refine v4.2.0 (/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR72ED9B21E7CB9369DBCACF88-round-6)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.40s",
+            "exit_code": 0,
+            "process_id": "proc-1789063274529-1129590-1349",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: All-target compilation"
+          },
+          {
+            "command": "cargo clippy --all-targets",
+            "evidence": "Observed supervised process proc-1789063279068-1129590-1352 exited 0. stderr: lippy::module_inception)]` on by default\n\nwarning: consider using `sort_by_key`\n   --> src/surfaces/web_server/http/background_loops.rs:209:5\n    |\n209 |     files.sort_by(|a, b| b.0.cmp(&a.0));\n    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#unnecessary_sort_by\n    = note: `#[warn(clippy::unnecessary_sort_by)]` on by default\nhelp: try\n    |\n209 -     files.sort_by(|a, b| b.0.cmp(&a.0));\n209 +     files.sort_by_key(|b| std::cmp::Reverse(b.0));\n    |\n\nwarning: this call to `clone` can be replaced with `std::slice::from_ref`\n   --> src/application/work_items/service/round_helpers.rs:323:51\n    |\n323 |                 !last_round_is_unstarted_recovery(&[round.clone()], None),\n    |                                                   ^^^^^^^^^^^^^^^^ help: try: `std::slice::from_ref(&round)`\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#cloned_ref_to_slice_refs\n    = note: `#[warn(clippy::cloned_ref_to_slice_refs)]` on by default\n\nwarning: `refine` (lib) generated 4 warnings (run `cargo clippy --fix --lib -p refine -- ` to apply 2 suggestions)\nwarning: items after a test module\n   --> src/surfaces/cli/dispatch/config.rs:113:1\n    |\n113 | mod tests {\n    | ^^^^^^^^^\n...\n152 | pub(super) fn structured_config_error(error: RefineError) -> RefineError {\n    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n    |\n    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.96.0/index.html#items_after_test_module\n    = note: `#[warn(clippy::items_after_test_module)]` on by default\n    = help: move the items to before the test module was defined\n\nwarning: `refine` (lib test) generated 6 warnings (4 duplicates) (run `cargo clippy --fix --lib -p refine --tests -- ` to apply 1 suggestion)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.75s",
+            "exit_code": 0,
+            "process_id": "proc-1789063279068-1129590-1352",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: All-target lint validation"
+          },
+          {
+            "command": "cargo fmt --all -- --check",
+            "evidence": "Observed supervised process proc-1789063291987-1129590-1355 exited 0.",
+            "exit_code": 0,
+            "process_id": "proc-1789063291987-1129590-1355",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Project formatting"
+          },
+          {
+            "command": "GIT_OPTIONAL_LOCKS=0 git diff --check b6527c2d1e847a37e450aea8ceb6dce040aaec63 HEAD",
+            "evidence": "Observed supervised process proc-1789063293812-1129590-1358 exited 0.",
+            "exit_code": 0,
+            "process_id": "proc-1789063293812-1129590-1358",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Candidate whitespace"
+          }
+        ],
+        "source_candidate_commit": "b3c3b1f4b4c4420bf63b5a3362dc04355ad1046c"
+      },
+      "quality_message": "All Quality Skills passed with supervised evidence.",
       "quality_skill_results": [
         {
           "artifacts": {
@@ -7160,10 +7270,10 @@
           "summary": "Corrected pre-Plan Failed/Cancelled lifecycle hooks. Final checks pass; four Quality correction files await Refine candidate capture."
         }
       ],
-      "quality_state": null,
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
       "rule_state": null,
-      "updated": "2026-09-10T17:48:51Z",
+      "updated": "2026-09-10T18:01:34Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T16:22:57Z",
         "round_idx": 5,
@@ -7202,9 +7312,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "quality",
+  "status": "governance",
   "target_branch": "main",
-  "updated": "2026-09-10T17:48:51Z",
+  "updated": "2026-09-10T18:01:34Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:36.706264729+00:00",
@@ -7367,7 +7477,16 @@
       "node_id": "default",
       "round_idx": 5,
       "to": "quality"
+    },
+    {
+      "at": "2026-09-10T18:01:34.641704787+00:00",
+      "forced": false,
+      "from": "quality",
+      "generation": 19,
+      "node_id": "default",
+      "round_idx": 5,
+      "to": "governance"
     }
   ],
-  "workflow_revision": 132
+  "workflow_revision": 136
 }
