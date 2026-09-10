@@ -1,10 +1,10 @@
 {
-  "id": "5e2fa2729b06741dc0cc78a2af1b79563832549b72a4fd7998ad94e8f7a17cb4",
+  "id": "fc7c5d3925f4cd62eebd5f485a452d51905b6d9bdf632dd73dab2795b276b3ab",
   "event": {
-    "id": "workflow.implement.enter",
-    "name": "Workflow Implement Enter",
+    "id": "workflow.quality.enter",
+    "name": "Workflow Quality Enter",
     "kind": "system",
-    "source": "workflow.implement.enter",
+    "source": "workflow.quality.enter",
     "enabled": true,
     "scope": {
       "node_id": null
@@ -12,8 +12,8 @@
     "parameters": [],
     "bindings": [
       {
-        "id": "default-implement",
-        "skill_id": "default-implement",
+        "id": "default-quality",
+        "skill_id": "default-quality",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -35,7 +35,7 @@
     "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
     "round_idx": 1,
     "workflow_revision": 18,
-    "candidate_commit": null,
+    "candidate_commit": "ece644ced5ad4a161d0de1515b101b8dd8050e2a",
     "data": {
       "context": {
         "agent_context": {
@@ -210,6 +210,7 @@
           "version": 1,
           "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
         },
+        "implementation_report": "workflow.implement.enter:default-implement: Implemented guarded recovery of interrupted integration settlement from Review, with pinned Skill evidence, exact-candidate Git verification, originating-attempt history and atomic return to Review for human acceptance.",
         "plans": {
           "checklist": [
             {
@@ -259,11 +260,11 @@
       "event": {},
       "goal": {
         "assignee": "ethan.jacobson@insurity.com",
-        "base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+        "base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
         "branch_name": "refine/DRA87E5F985A1FFE2919BE7EC2/round-2",
-        "candidate_commit": null,
+        "candidate_commit": "ece644ced5ad4a161d0de1515b101b8dd8050e2a",
         "created": "2026-09-10T08:26:05Z",
-        "event_generation": 3,
+        "event_generation": 4,
         "feature_id": null,
         "feature_order": null,
         "id": "DRA87E5F985A1FFE2919BE7EC2",
@@ -524,17 +525,22 @@
           },
           {
             "assignee": "ethan.jacobson@insurity.com",
-            "constitution_state": "unclassified",
+            "constitution_state": null,
             "created": "2026-09-10T13:06:37Z",
             "failure_at": "",
             "failure_category": "",
             "failure_message": "",
-            "governance_candidate_commit": "",
-            "governance_checked_at": "",
-            "governance_details": "",
-            "governance_message": "",
+            "governance_candidate_commit": null,
+            "governance_checked_at": null,
+            "governance_details": null,
+            "governance_message": null,
             "governance_rule_actions": [],
-            "guidance_decision": null,
+            "guidance_decision": {
+              "applied": [],
+              "context_version": 1,
+              "recorded_at": "2026-09-10T14:35:30Z",
+              "skipped": []
+            },
             "implementation_plan": {
               "binding": {
                 "base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
@@ -545,6 +551,7 @@
                 "round_idx": 1,
                 "target_branch": "main"
               },
+              "completed_at": "2026-09-10T14:35:29Z",
               "final_plan": {
                 "completed_at": "2026-09-10T13:54:44Z",
                 "git_after": {
@@ -603,6 +610,78 @@
                   "summary": "workflow.plan.enter:default-plan: Extend Governance retry to recover interrupted exact-candidate integration settlement, using pinned Skill evidence and attempt-fenced writes before returning to Review for human acceptance."
                 },
                 "started_at": "2026-09-10T13:43:04Z"
+              },
+              "implementation": {
+                "completed_at": "2026-09-10T14:35:29Z",
+                "execution": {
+                  "checklist": [
+                    {
+                      "evidence": "Selectively adapted Round 1 recovery into focused evidence, settlement, publication and recovery modules. All 27 retained Round 1 file hashes remain unchanged.",
+                      "id": "workflow.plan.enter:default-plan:P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Centralized candidate-bound pinned Skill receipts and supervised Quality proof validation. Explicitly records no required Skills; rejects missing, failed, duplicate and mismatched results. Required and optional Skill regressions passed.",
+                      "id": "workflow.plan.enter:default-plan:P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added guarded Review recovery through shared Governance retry. Preserves diagnostics and attempt history; duplicate queued or completed recovery is idempotent.",
+                      "id": "workflow.plan.enter:default-plan:P3",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Checks exact candidate ancestry against fresh local and required published targets before workspace preparation. Regressions cover interrupted publication, already-integrated candidates and content equality with different commit identities.",
+                      "id": "workflow.plan.enter:default-plan:P4",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Routes contested Round publication, target publication and concurrent target movement through existing bounded recovery, retaining conflicting tips and diagnostics without force-pushing.",
+                      "id": "workflow.plan.enter:default-plan:P5",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Records prepared integration and completed Git effects against their originating attempt. Cancellation, supersession and crash-window regressions verify retained evidence without advancing replacement work.",
+                      "id": "workflow.plan.enter:default-plan:P6",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Atomically records verified settlement with Review under Goal authority checks. Guards automated Review entry and preserves lifecycle Skill gates. Regression confirms failed required Governance exit Skills prevent missing publication.",
+                      "id": "workflow.plan.enter:default-plan:P7",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "CLI and API use shared recovery eligibility; browser displays the same capability and missing-evidence diagnostics. Approval remains fenced to settled integration. CLI, API and JavaScript regressions passed.",
+                      "id": "workflow.plan.enter:default-plan:P8",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Updated seven affected intent pages covering Skills, integration, Governance, Review, CLI, API and browser recovery.",
+                      "id": "workflow.plan.enter:default-plan:P9",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Completed focused Rust and JavaScript verification, changed-file formatting, Clippy and diff checks. Verified all 56 changed/new candidate files match the final verification manifest.",
+                      "id": "workflow.plan.enter:default-plan:P10",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "cargo test --lib governance -- --test-threads=1: 83 passed, 0 failed, 0 ignored.",
+                    "cargo test --lib application::events:: -- --test-threads=1: 24 passed.",
+                    "cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1: 5 passed.",
+                    "cargo test --lib application::work_items::tests::workflow -- --test-threads=1: 12 passed.",
+                    "cargo test --lib surfaces::cli::tests::goals::lifecycle -- --test-threads=1: 5 passed.",
+                    "cargo test --lib candidate_refresh -- --test-threads=1: 16 passed.",
+                    "node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js: 6 passed, 0 failed, no skips.",
+                    "rustfmt --check --edition 2024 --config skip_children=true on changed Rust files: passed.",
+                    "cargo clippy --lib: completed successfully with six pre-existing warnings.",
+                    "git diff --check: passed.",
+                    "SHA-256 preservation checks: all 27 retained Round 1 files unchanged; all 56 candidate manifest entries matched."
+                  ]
+                },
+                "report": "workflow.implement.enter:default-implement: Implemented guarded recovery of interrupted integration settlement from Review, with pinned Skill evidence, exact-candidate Git verification, originating-attempt history and atomic return to Review for human acceptance.",
+                "started_at": "2026-09-10T13:54:44Z"
               },
               "phase": "implement",
               "phase_started_at": "2026-09-10T13:54:44Z",
@@ -667,44 +746,76 @@
               },
               "schema_version": 2,
               "started_at": "2026-09-10T13:43:04Z",
-              "state": "in_progress",
-              "updated_at": "2026-09-10T13:54:44Z"
+              "state": "completed",
+              "updated_at": "2026-09-10T14:35:29Z"
             },
-            "implementation_report": null,
-            "implementation_reported_at": null,
+            "implementation_report": "workflow.implement.enter:default-implement: Implemented guarded recovery of interrupted integration settlement from Review, with pinned Skill evidence, exact-candidate Git verification, originating-attempt history and atomic return to Review for human acceptance.",
+            "implementation_reported_at": "2026-09-10T14:35:29Z",
             "latest_log": {
               "actor": "refine",
-              "category": "state",
-              "datetime": "2026-09-10T13:54:44Z",
+              "category": "candidate_refresh",
+              "datetime": "2026-09-10T14:35:30Z",
               "details": {
-                "node_id": "default"
+                "node_id": "default",
+                "original_candidate_commit": "7bc2cae01b5e751fe1a088326f514d2f352f796f",
+                "refresh_evidence": {
+                  "authorizing_status": "quality",
+                  "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-2",
+                  "node_id": "default",
+                  "original_base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "original_candidate_commit": "7bc2cae01b5e751fe1a088326f514d2f352f796f",
+                  "previous_gate_evidence": {
+                    "constitution_state": "unclassified",
+                    "governance_candidate_commit": "",
+                    "governance_checked_at": "",
+                    "governance_details": "",
+                    "governance_message": "",
+                    "meta_rule_state": "unclassified",
+                    "product_state": "unclassified",
+                    "quality_candidate_commit": null,
+                    "quality_checked_at": "",
+                    "quality_details": "",
+                    "quality_message": "",
+                    "quality_state": "unclassified",
+                    "rule_state": "unclassified"
+                  },
+                  "refreshed_at": "2026-09-10T14:35:30Z",
+                  "replacement_base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+                  "replacement_candidate_commit": "ece644ced5ad4a161d0de1515b101b8dd8050e2a",
+                  "round_idx": 1,
+                  "state": "refreshed",
+                  "workflow_revision": 18,
+                  "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRA87E5F985A1FFE2919BE7EC2-round-2"
+                },
+                "replacement_base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+                "replacement_candidate_commit": "ece644ced5ad4a161d0de1515b101b8dd8050e2a"
               },
               "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
-              "message": "Workflow status changed: plan -> implement",
+              "message": "Refreshed the candidate onto the advanced target before Quality",
               "round_idx": 1,
               "severity": "info"
             },
             "latest_state_log": {
               "actor": "refine",
               "category": "state",
-              "datetime": "2026-09-10T13:54:44Z",
+              "datetime": "2026-09-10T14:35:30Z",
               "details": {
                 "node_id": "default"
               },
               "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
-              "message": "Workflow status changed: plan -> implement",
+              "message": "Workflow status changed: implement -> quality",
               "round_idx": 1,
               "severity": "info"
             },
             "latest_workflow_log": {
               "actor": "refine",
               "category": "state",
-              "datetime": "2026-09-10T13:54:44Z",
+              "datetime": "2026-09-10T14:35:30Z",
               "details": {
                 "node_id": "default"
               },
               "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
-              "message": "Workflow status changed: plan -> implement",
+              "message": "Workflow status changed: implement -> quality",
               "round_idx": 1,
               "severity": "info"
             },
@@ -763,43 +874,160 @@
                 "message": "Workflow status changed: plan -> implement",
                 "round_idx": 1,
                 "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "agent",
+                "datetime": "2026-09-10T14:35:29Z",
+                "details": {
+                  "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-2",
+                  "node_id": "default",
+                  "output": "workflow.implement.enter:default-implement: Implemented guarded recovery of interrupted integration settlement from Review, with pinned Skill evidence, exact-candidate Git verification, originating-attempt history and atomic return to Review for human acceptance.",
+                  "provider": "codex",
+                  "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRA87E5F985A1FFE2919BE7EC2-round-2"
+                },
+                "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+                "message": "Goal agent completed",
+                "round_idx": 1,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "git",
+                "datetime": "2026-09-10T14:35:30Z",
+                "details": {
+                  "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-2",
+                  "commit": "7bc2cae01b5e751fe1a088326f514d2f352f796f",
+                  "node_id": "default",
+                  "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRA87E5F985A1FFE2919BE7EC2-round-2"
+                },
+                "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+                "message": "Committed implementation branch refine/DRA87E5F985A1FFE2919BE7EC2/round-2",
+                "round_idx": 1,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "state",
+                "datetime": "2026-09-10T14:35:30Z",
+                "details": {
+                  "node_id": "default"
+                },
+                "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+                "message": "Workflow status changed: implement -> quality",
+                "round_idx": 1,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "candidate_refresh",
+                "datetime": "2026-09-10T14:35:30Z",
+                "details": {
+                  "node_id": "default",
+                  "original_candidate_commit": "7bc2cae01b5e751fe1a088326f514d2f352f796f",
+                  "refresh_evidence": {
+                    "authorizing_status": "quality",
+                    "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-2",
+                    "node_id": "default",
+                    "original_base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                    "original_candidate_commit": "7bc2cae01b5e751fe1a088326f514d2f352f796f",
+                    "previous_gate_evidence": {
+                      "constitution_state": "unclassified",
+                      "governance_candidate_commit": "",
+                      "governance_checked_at": "",
+                      "governance_details": "",
+                      "governance_message": "",
+                      "meta_rule_state": "unclassified",
+                      "product_state": "unclassified",
+                      "quality_candidate_commit": null,
+                      "quality_checked_at": "",
+                      "quality_details": "",
+                      "quality_message": "",
+                      "quality_state": "unclassified",
+                      "rule_state": "unclassified"
+                    },
+                    "refreshed_at": "2026-09-10T14:35:30Z",
+                    "replacement_base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+                    "replacement_candidate_commit": "ece644ced5ad4a161d0de1515b101b8dd8050e2a",
+                    "round_idx": 1,
+                    "state": "refreshed",
+                    "workflow_revision": 18,
+                    "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRA87E5F985A1FFE2919BE7EC2-round-2"
+                  },
+                  "replacement_base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+                  "replacement_candidate_commit": "ece644ced5ad4a161d0de1515b101b8dd8050e2a"
+                },
+                "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+                "message": "Refreshed the candidate onto the advanced target before Quality",
+                "round_idx": 1,
+                "severity": "info"
               }
             ],
-            "meta_rule_state": "unclassified",
-            "product_state": "unclassified",
+            "meta_rule_state": null,
+            "product_state": null,
             "prompt": "Provide a supported recovery path for a Goal stranded in Review when integration effects or publication occurred but successful settlement was interrupted.\n\nThis is still relevant after Skills: current approval requires settled integration, and RetryGovernance remains unavailable from Review. The four old Governance sub-states in the original report are historical evidence, not sufficient current authority. Round 1 retained unfinished retry and settlement changes without a candidate or verified completion; preserve them and its superseded-attempt failure.\n\nExtend the existing recovery capability so an eligible Review Goal can recheck or complete settlement through the normal workflow and return to Review for human acceptance. Keep approval strict. Resolve required Skill results and supervised candidate proof from the applicable pinned configuration, including an explicitly recorded case where no required Quality or Governance Skills apply. Never infer a pass from background/context Skills, obsolete configuration flags, a missing result or matching file content.\n\nUnder the existing target lease and Goal authority checks, compare the exact candidate with the current local and required published target. Recover settlement only from proof tied to that candidate and its actual integration. Content-equal commits with different identities need normal refresh or reconciliation and new checks when the candidate changes. Handle non-fast-forward publication and concurrent target movement through bounded existing recovery.\n\nRecord completed Git effects on the originating attempt even when it was cancelled or superseded, without advancing replacement work or reviving stale authority. Make settlement and entry to Review consistent and retries idempotent. CLI, API and browser guidance should expose the same allowed recovery and explain missing evidence clearly.\n\nVerify interrupted settlement before and after publication, an already-integrated exact candidate, content equality without identity, required Skills enabled or absent, failed and missing results, duplicate recovery, cancellation and supersession. Recovery must not approve the Goal, force-push a contested ref or rewrite historical results.\n\nThis is a recovery Round following the Skills review on 10 September 2026. Start from current main in a new managed Round worktree. Preserve Round 1, its plans, logs, branches, commits and uncommitted files; inspect and selectively reuse useful work instead of replaying the whole old attempt. Use the current Skills and docs/intent contracts, not archived Governance, Quality or Guidance configuration or the old fixed planning sequence. Refine owns workflow advancement and integration; human approval remains separate. Update only affected documentation and report focused verification with actual results.",
-            "quality_checked_at": "",
-            "quality_details": "",
-            "quality_message": "",
-            "quality_state": "unclassified",
+            "quality_candidate_commit": null,
+            "quality_checked_at": null,
+            "quality_details": null,
+            "quality_message": null,
+            "quality_state": null,
             "reporter": "Buddy Williams",
-            "rule_state": "unclassified",
-            "updated": "2026-09-10T13:54:44Z",
+            "rule_state": null,
+            "updated": "2026-09-10T14:35:30Z",
             "workflow_attempt_authority": {
               "claimed_at": "2026-09-10T13:43:03Z",
               "round_idx": 1,
               "workflow_revision": 18
             },
+            "workflow_candidate_refresh": {
+              "authorizing_status": "quality",
+              "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-2",
+              "node_id": "default",
+              "original_base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+              "original_candidate_commit": "7bc2cae01b5e751fe1a088326f514d2f352f796f",
+              "previous_gate_evidence": {
+                "constitution_state": "unclassified",
+                "governance_candidate_commit": "",
+                "governance_checked_at": "",
+                "governance_details": "",
+                "governance_message": "",
+                "meta_rule_state": "unclassified",
+                "product_state": "unclassified",
+                "quality_candidate_commit": null,
+                "quality_checked_at": "",
+                "quality_details": "",
+                "quality_message": "",
+                "quality_state": "unclassified",
+                "rule_state": "unclassified"
+              },
+              "refreshed_at": "2026-09-10T14:35:30Z",
+              "replacement_base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+              "replacement_candidate_commit": "ece644ced5ad4a161d0de1515b101b8dd8050e2a",
+              "round_idx": 1,
+              "state": "refreshed",
+              "workflow_revision": 18,
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRA87E5F985A1FFE2919BE7EC2-round-2"
+            },
             "workflow_reconciliation": null,
             "workflow_recovery": null
           }
         ],
-        "status": "implement",
+        "status": "quality",
         "target_branch": "main",
-        "updated": "2026-09-10T13:54:44Z",
-        "workflow_revision": 32
+        "updated": "2026-09-10T14:35:30Z",
+        "workflow_revision": 41
       },
       "system": {
-        "candidate_commit": null,
+        "candidate_commit": "ece644ced5ad4a161d0de1515b101b8dd8050e2a",
         "node_id": "default",
         "project_root": "/home/buddy/projects/refine-next",
-        "workflow_step": "implement",
+        "workflow_step": "quality",
         "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRA87E5F985A1FFE2919BE7EC2-round-2"
       }
     },
     "metadata": {
       "behavior": "EventSkill",
-      "event_operation_id": "1a08b997339113c7618",
+      "event_operation_id": "1a08bbec73f113c7626",
       "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
       "kind": "workflow",
       "node_id": "default",
@@ -807,14 +1035,14 @@
       "round_idx": 1,
       "target_app_id": "/home/buddy/projects/refine-next",
       "workflow_revision": 18,
-      "workflow_state": "implement"
+      "workflow_state": "quality"
     }
   },
   "bindings": [
     {
       "binding": {
-        "id": "default-implement",
-        "skill_id": "default-implement",
+        "id": "default-quality",
+        "skill_id": "default-quality",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -825,10 +1053,10 @@
         "inputs": {}
       },
       "skill": {
-        "id": "default-implement",
-        "name": "Implement",
-        "prompt": "## Implement\n\nImplement the current Goal Round using every accepted plan and attached Skill. Inspect existing code, make the complete change, run appropriate verification, and report evidence for each checklist item. Preserve unrelated changes and historical evidence. Refine owns candidate commits, workflow advancement, Quality, Governance and integration.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
-        "role": "implement",
+        "id": "default-quality",
+        "name": "Quality",
+        "prompt": "## Quality review\n\nIndependently review the finalized plans and candidate implementation. Select or add meaningful tests, correct defects when needed, and run the relevant checks. Report actual commands, results and findings. Refine verifies the exact candidate and supervises evaluation commands.\n\n## Required behavior\n\nPreserve the relevant Goal and docs/intent product behavior. Keep Model, Application, Infrastructure, and Surfaces coherent; shared capabilities authoritative; local state and evidence inspectable and recoverable; and affected surfaces semantically consistent.\n\n## Review and verification\n\nJudge the candidate against the Goal and only the relevant docs/intent pages. Use the smallest deterministic checks that cover the affected behavior, adding or adjusting behavior-focused tests only when evidence is missing. Scale integration and failure-path checks to actual risk. Report exact commands, results, and remaining uncertainty. Do not require unrelated tests, documentation, refactors, or cleanup; documentation is relevant only when product intent or an architectural contract changes.\n\n## Acceptance checks\n\n- The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
+        "role": "quality",
         "enabled": true,
         "scope": {
           "node_id": null
@@ -839,103 +1067,11 @@
       "parameters": {}
     }
   ],
-  "state": "succeeded",
-  "results": {
-    "default-implement": {
-      "invocation_id": "5e2fa2729b06741dc0cc78a2af1b79563832549b72a4fd7998ad94e8f7a17cb4",
-      "binding_id": "default-implement",
-      "role": "implement",
-      "outcome": "success",
-      "summary": "Implemented guarded recovery of interrupted integration settlement from Review, with pinned Skill evidence, exact-candidate Git verification, originating-attempt history and atomic return to Review for human acceptance.",
-      "evidence": [
-        "Implemented and verified in the pinned Round 2 worktree on refine/DRA87E5F985A1FFE2919BE7EC2/round-2.",
-        "HEAD remains f880b7767149e4de43d5bc4d4786247d1e536a8c. No candidate commit, merge, push, Goal-state change, deployment or daemon restart was performed.",
-        "Rust verification logs and candidate manifest are retained in /tmp/refine-round2-verification; final Clippy output is /tmp/refine-round2-clippy-final.log."
-      ],
-      "artifacts": {
-        "implementation_evidence": {
-          "checklist": [
-            {
-              "evidence": "Selectively adapted Round 1 recovery into focused evidence, settlement, publication and recovery modules. All 27 retained Round 1 file hashes remain unchanged.",
-              "id": "workflow.plan.enter:default-plan:P1",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Centralized candidate-bound pinned Skill receipts and supervised Quality proof validation. Explicitly records no required Skills; rejects missing, failed, duplicate and mismatched results. Required and optional Skill regressions passed.",
-              "id": "workflow.plan.enter:default-plan:P2",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Added guarded Review recovery through shared Governance retry. Preserves diagnostics and attempt history; duplicate queued or completed recovery is idempotent.",
-              "id": "workflow.plan.enter:default-plan:P3",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Checks exact candidate ancestry against fresh local and required published targets before workspace preparation. Regressions cover interrupted publication, already-integrated candidates and content equality with different commit identities.",
-              "id": "workflow.plan.enter:default-plan:P4",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Routes contested Round publication, target publication and concurrent target movement through existing bounded recovery, retaining conflicting tips and diagnostics without force-pushing.",
-              "id": "workflow.plan.enter:default-plan:P5",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Records prepared integration and completed Git effects against their originating attempt. Cancellation, supersession and crash-window regressions verify retained evidence without advancing replacement work.",
-              "id": "workflow.plan.enter:default-plan:P6",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Atomically records verified settlement with Review under Goal authority checks. Guards automated Review entry and preserves lifecycle Skill gates. Regression confirms failed required Governance exit Skills prevent missing publication.",
-              "id": "workflow.plan.enter:default-plan:P7",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "CLI and API use shared recovery eligibility; browser displays the same capability and missing-evidence diagnostics. Approval remains fenced to settled integration. CLI, API and JavaScript regressions passed.",
-              "id": "workflow.plan.enter:default-plan:P8",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Updated seven affected intent pages covering Skills, integration, Governance, Review, CLI, API and browser recovery.",
-              "id": "workflow.plan.enter:default-plan:P9",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Completed focused Rust and JavaScript verification, changed-file formatting, Clippy and diff checks. Verified all 56 changed/new candidate files match the final verification manifest.",
-              "id": "workflow.plan.enter:default-plan:P10",
-              "outcome": "completed"
-            }
-          ],
-          "verification": [
-            "cargo test --lib governance -- --test-threads=1: 83 passed, 0 failed, 0 ignored.",
-            "cargo test --lib application::events:: -- --test-threads=1: 24 passed.",
-            "cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1: 5 passed.",
-            "cargo test --lib application::work_items::tests::workflow -- --test-threads=1: 12 passed.",
-            "cargo test --lib surfaces::cli::tests::goals::lifecycle -- --test-threads=1: 5 passed.",
-            "cargo test --lib candidate_refresh -- --test-threads=1: 16 passed.",
-            "node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js: 6 passed, 0 failed, no skips.",
-            "rustfmt --check --edition 2024 --config skip_children=true on changed Rust files: passed.",
-            "cargo clippy --lib: completed successfully with six pre-existing warnings.",
-            "git diff --check: passed.",
-            "SHA-256 preservation checks: all 27 retained Round 1 files unchanged; all 56 candidate manifest entries matched."
-          ]
-        }
-      }
-    }
-  },
-  "attempts": [
-    {
-      "attempt": 0,
-      "binding_id": "default-implement",
-      "diagnostic": null,
-      "operation_id": null,
-      "process_id": "proc-1789048484709-1129590-156",
-      "raw_output": "{\n  \"artifacts\": {\n    \"implementation_evidence\": {\n      \"checklist\": [\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P1\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Selectively adapted Round 1 recovery into focused evidence, settlement, publication and recovery modules. All 27 retained Round 1 file hashes remain unchanged.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P2\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Centralized candidate-bound pinned Skill receipts and supervised Quality proof validation. Explicitly records no required Skills; rejects missing, failed, duplicate and mismatched results. Required and optional Skill regressions passed.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P3\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Added guarded Review recovery through shared Governance retry. Preserves diagnostics and attempt history; duplicate queued or completed recovery is idempotent.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P4\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Checks exact candidate ancestry against fresh local and required published targets before workspace preparation. Regressions cover interrupted publication, already-integrated candidates and content equality with different commit identities.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P5\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Routes contested Round publication, target publication and concurrent target movement through existing bounded recovery, retaining conflicting tips and diagnostics without force-pushing.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P6\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Records prepared integration and completed Git effects against their originating attempt. Cancellation, supersession and crash-window regressions verify retained evidence without advancing replacement work.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P7\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Atomically records verified settlement with Review under Goal authority checks. Guards automated Review entry and preserves lifecycle Skill gates. Regression confirms failed required Governance exit Skills prevent missing publication.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P8\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"CLI and API use shared recovery eligibility; browser displays the same capability and missing-evidence diagnostics. Approval remains fenced to settled integration. CLI, API and JavaScript regressions passed.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P9\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Updated seven affected intent pages covering Skills, integration, Governance, Review, CLI, API and browser recovery.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P10\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Completed focused Rust and JavaScript verification, changed-file formatting, Clippy and diff checks. Verified all 56 changed/new candidate files match the final verification manifest.\"\n        }\n      ],\n      \"verification\": [\n        \"cargo test --lib governance -- --test-threads=1: 83 passed, 0 failed, 0 ignored.\",\n        \"cargo test --lib application::events:: -- --test-threads=1: 24 passed.\",\n        \"cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1: 5 passed.\",\n        \"cargo test --lib application::work_items::tests::workflow -- --test-threads=1: 12 passed.\",\n        \"cargo test --lib surfaces::cli::tests::goals::lifecycle -- --test-threads=1: 5 passed.\",\n        \"cargo test --lib candidate_refresh -- --test-threads=1: 16 passed.\",\n        \"node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js: 6 passed, 0 failed, no skips.\",\n        \"rustfmt --check --edition 2024 --config skip_children=true on changed Rust files: passed.\",\n        \"cargo clippy --lib: completed successfully with six pre-existing warnings.\",\n        \"git diff --check: passed.\",\n        \"SHA-256 preservation checks: all 27 retained Round 1 files unchanged; all 56 candidate manifest entries matched.\"\n      ]\n    }\n  },\n  \"binding_id\": \"default-implement\",\n  \"evidence\": [\n    \"Implemented and verified in the pinned Round 2 worktree on refine/DRA87E5F985A1FFE2919BE7EC2/round-2.\",\n    \"HEAD remains f880b7767149e4de43d5bc4d4786247d1e536a8c. No candidate commit, merge, push, Goal-state change, deployment or daemon restart was performed.\",\n    \"Rust verification logs and candidate manifest are retained in /tmp/refine-round2-verification; final Clippy output is /tmp/refine-round2-clippy-final.log.\"\n  ],\n  \"invocation_id\": \"5e2fa2729b06741dc0cc78a2af1b79563832549b72a4fd7998ad94e8f7a17cb4\",\n  \"outcome\": \"success\",\n  \"role\": \"implement\",\n  \"summary\": \"Implemented guarded recovery of interrupted integration settlement from Review, with pinned Skill evidence, exact-candidate Git verification, originating-attempt history and atomic return to Review for human acceptance.\"\n}\n",
-      "workflow_revision": 18
-    }
-  ],
-  "created_at": "2026-09-10T13:54:44.650239709+00:00",
-  "completed_at": "2026-09-10T14:35:29.777414373+00:00",
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-10T14:35:30.936550242+00:00",
+  "completed_at": null,
   "error": null,
   "action_applied": false
 }
