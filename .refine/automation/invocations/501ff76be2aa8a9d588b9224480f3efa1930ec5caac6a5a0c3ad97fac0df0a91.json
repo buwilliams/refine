@@ -1,10 +1,10 @@
 {
-  "id": "5dacc101923b58b9e33d4100b12884d18130a8b0f737db738dc4c1c946e7d649",
+  "id": "501ff76be2aa8a9d588b9224480f3efa1930ec5caac6a5a0c3ad97fac0df0a91",
   "event": {
-    "id": "workflow.plan.enter",
-    "name": "Workflow Plan Enter",
+    "id": "workflow.implement.enter",
+    "name": "Workflow Implement Enter",
     "kind": "system",
-    "source": "workflow.plan.enter",
+    "source": "workflow.implement.enter",
     "enabled": true,
     "scope": {
       "node_id": null
@@ -12,8 +12,8 @@
     "parameters": [],
     "bindings": [
       {
-        "id": "default-plan",
-        "skill_id": "default-plan",
+        "id": "default-implement",
+        "skill_id": "default-implement",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -38,241 +38,276 @@
     "candidate_commit": null,
     "data": {
       "context": {
-        "assembled_at": "2026-09-10T13:43:05Z",
-        "current_round": {
-          "assignee": "ethan.jacobson@insurity.com",
-          "prompt": "Make text in the shared terminal reliably selectable and copyable, including Agent and Custom Skill tabs and retained output after a process exits.\n\nThe request remains valid. Current main has clipboard shortcuts and error messages but lacks the retained candidate's selection hints, Copy selection control and recovery field for blocked clipboard access. Round 1 produced 7f6988c7 with 71 recorded focused checks passing, then refreshed it to be1f6f0366dd855f93f505d470dd4e2ca5c6d1b5. The refreshed candidate failed its evaluation and is not integrated into main; the earlier pass does not approve that replacement. Its worktree is clean and retained.\n\nReview and selectively port that candidate's shared clipboard behavior. Explain Shift-drag on Windows/Linux and Option-drag on macOS when the application captures the mouse. Provide an accessible Copy selection control, native copy and focused platform shortcuts that use the originating terminal's selection even after exit or disconnection. Preserve Ctrl+C interruption without selection, paste framing, duplicate-event prevention and session replacement checks.\n\nWhen browser clipboard writes are unavailable or rejected, attempt supported fallbacks and offer the captured text in a normal selectable field. Report success only after a successful copy, retain the user's selection and keep asynchronous results attached to their originating tab. Do not disrupt input or focus in another tab. Custom Skills now use the shared agent-tab lifecycle, so test that surface explicitly as well as ordinary Agent tabs.\n\nReconcile tests with current main f880b776 and its browser-fixture and rendered-output fixes. The old candidate's tests/support/web_app.js and test-file restructuring are not authoritative; retain only changes needed for this behavior. Run focused browser checks with actual Chromium and report any skips as skips. Verify selection gestures, copy after exit, denied clipboard access, tab switching, keyboard focus, interruption, exactly-once paste and retained rendering against the final candidate using current Skill verification.\n\nThis is a recovery Round following the Skills review on 10 September 2026. Start from current main in a new managed Round worktree. Preserve Round 1, its plans, logs, branches, commits and uncommitted files; inspect and selectively reuse useful work instead of replaying the whole old attempt. Use the current Skills and docs/intent contracts, not archived Governance, Quality or Guidance configuration or the old fixed planning sequence. Refine owns workflow advancement and integration; human approval remains separate. Update only affected documentation and report focused verification with actual results.",
-          "reporter": "Buddy Williams",
-          "round": 2
-        },
-        "goal": {
-          "assignee": "ethan.jacobson@insurity.com",
-          "id": "DRBAC01843C2EBE03D1CD08034",
-          "name": "Make terminal text easy to select and copy",
-          "node_id": "default",
-          "priority": "low",
-          "reporter": "ethan.jacobson@insurity.com"
-        },
-        "governance": {
-          "configured": false,
-          "constitution": "",
-          "product": "",
-          "rules": []
-        },
-        "guidance_candidates": [],
-        "previous_rounds": [
-          {
+        "agent_context": {
+          "assembled_at": "2026-09-10T13:43:05Z",
+          "current_round": {
             "assignee": "ethan.jacobson@insurity.com",
-            "guidance_decision": {
-              "applied": [
-                {
-                  "enabled": true,
-                  "id": "guidance-1",
-                  "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
-                  "name": "Intent and architecture",
-                  "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
-                },
-                {
-                  "enabled": true,
-                  "id": "guidance-2",
-                  "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
-                  "name": "Cohesive code files",
-                  "rule": "Apply whenever an agent adds or changes code files in any language."
-                }
-              ],
-              "code_files_changed": true,
-              "context_version": 1,
-              "recorded_at": "2026-09-10T08:44:53Z",
-              "skipped": []
-            },
-            "implementation_plan": {
-              "binding": {
-                "base_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
-                "context_digest": "bb385dd353d4c0eebeba600c84ca27afa52614bcc2d61004bc76d077936c10d4",
+            "prompt": "Make text in the shared terminal reliably selectable and copyable, including Agent and Custom Skill tabs and retained output after a process exits.\n\nThe request remains valid. Current main has clipboard shortcuts and error messages but lacks the retained candidate's selection hints, Copy selection control and recovery field for blocked clipboard access. Round 1 produced 7f6988c7 with 71 recorded focused checks passing, then refreshed it to be1f6f0366dd855f93f505d470dd4e2ca5c6d1b5. The refreshed candidate failed its evaluation and is not integrated into main; the earlier pass does not approve that replacement. Its worktree is clean and retained.\n\nReview and selectively port that candidate's shared clipboard behavior. Explain Shift-drag on Windows/Linux and Option-drag on macOS when the application captures the mouse. Provide an accessible Copy selection control, native copy and focused platform shortcuts that use the originating terminal's selection even after exit or disconnection. Preserve Ctrl+C interruption without selection, paste framing, duplicate-event prevention and session replacement checks.\n\nWhen browser clipboard writes are unavailable or rejected, attempt supported fallbacks and offer the captured text in a normal selectable field. Report success only after a successful copy, retain the user's selection and keep asynchronous results attached to their originating tab. Do not disrupt input or focus in another tab. Custom Skills now use the shared agent-tab lifecycle, so test that surface explicitly as well as ordinary Agent tabs.\n\nReconcile tests with current main f880b776 and its browser-fixture and rendered-output fixes. The old candidate's tests/support/web_app.js and test-file restructuring are not authoritative; retain only changes needed for this behavior. Run focused browser checks with actual Chromium and report any skips as skips. Verify selection gestures, copy after exit, denied clipboard access, tab switching, keyboard focus, interruption, exactly-once paste and retained rendering against the final candidate using current Skill verification.\n\nThis is a recovery Round following the Skills review on 10 September 2026. Start from current main in a new managed Round worktree. Preserve Round 1, its plans, logs, branches, commits and uncommitted files; inspect and selectively reuse useful work instead of replaying the whole old attempt. Use the current Skills and docs/intent contracts, not archived Governance, Quality or Guidance configuration or the old fixed planning sequence. Refine owns workflow advancement and integration; human approval remains separate. Update only affected documentation and report focused verification with actual results.",
+            "reporter": "Buddy Williams",
+            "round": 2
+          },
+          "goal": {
+            "assignee": "ethan.jacobson@insurity.com",
+            "id": "DRBAC01843C2EBE03D1CD08034",
+            "name": "Make terminal text easy to select and copy",
+            "node_id": "default",
+            "priority": "low",
+            "reporter": "ethan.jacobson@insurity.com"
+          },
+          "governance": {
+            "configured": false,
+            "constitution": "",
+            "product": "",
+            "rules": []
+          },
+          "guidance_candidates": [],
+          "previous_rounds": [
+            {
+              "assignee": "ethan.jacobson@insurity.com",
+              "guidance_decision": {
+                "applied": [
+                  {
+                    "enabled": true,
+                    "id": "guidance-1",
+                    "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+                    "name": "Intent and architecture",
+                    "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+                  },
+                  {
+                    "enabled": true,
+                    "id": "guidance-2",
+                    "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+                    "name": "Cohesive code files",
+                    "rule": "Apply whenever an agent adds or changes code files in any language."
+                  }
+                ],
+                "code_files_changed": true,
                 "context_version": 1,
-                "goal_id": "DRBAC01843C2EBE03D1CD08034",
-                "implementation_branch": "refine/DRBAC01843C2EBE03D1CD08034/round-1",
-                "round_idx": 0,
-                "target_branch": "main"
+                "recorded_at": "2026-09-10T08:44:53Z",
+                "skipped": []
               },
-              "completed_at": "2026-09-10T08:44:53Z",
-              "criticism": {
-                "completed_at": "2026-09-10T08:29:29Z",
-                "git_after": {
-                  "branch": "refine/DRBAC01843C2EBE03D1CD08034/round-1",
-                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
-                  "status_porcelain": []
+              "implementation_plan": {
+                "binding": {
+                  "base_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "context_digest": "bb385dd353d4c0eebeba600c84ca27afa52614bcc2d61004bc76d077936c10d4",
+                  "context_version": 1,
+                  "goal_id": "DRBAC01843C2EBE03D1CD08034",
+                  "implementation_branch": "refine/DRBAC01843C2EBE03D1CD08034/round-1",
+                  "round_idx": 0,
+                  "target_branch": "main"
                 },
-                "git_before": {
-                  "branch": "refine/DRBAC01843C2EBE03D1CD08034/round-1",
-                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
-                  "status_porcelain": []
-                },
-                "result": {
-                  "summary": "The plan covers shared terminal selection, reliable copying, retained output, and clipboard failure recovery."
-                },
-                "started_at": "2026-09-10T08:27:57Z"
-              },
-              "final_plan": {
-                "completed_at": "2026-09-10T08:30:40Z",
-                "git_after": {
-                  "branch": "refine/DRBAC01843C2EBE03D1CD08034/round-1",
-                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
-                  "status_porcelain": []
-                },
-                "git_before": {
-                  "branch": "refine/DRBAC01843C2EBE03D1CD08034/round-1",
-                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
-                  "status_porcelain": []
-                },
-                "result": {
-                  "checklist": [
-                    {
-                      "description": "Make text selectable when terminal applications capture mouse input by retaining Shift-drag on Windows and Linux, enabling Option-drag on macOS, and displaying a concise selection hint while preserving ordinary application mouse handling.",
-                      "id": "P1"
-                    },
-                    {
-                      "description": "Move shared terminal clipboard behavior into a focused browser module that routes Ctrl+C, Ctrl+Shift+C, Cmd+C, native Copy events, and the Copy control through the originating terminal's selection without requiring a live process.",
-                      "id": "P2"
-                    },
-                    {
-                      "description": "Add a keyboard-accessible Copy selection control to the shared terminal header whose enabled state follows the current selection, works with retained output, and preserves the originating tab, selection, and renderer.",
-                      "id": "P3"
-                    },
-                    {
-                      "description": "Keep shortcuts scoped to the focused terminal, preserve Ctrl+C interruption without a selection, and retain existing terminal-native paste framing, duplicate-event prevention, and session replacement guards.",
-                      "id": "P4"
-                    },
-                    {
-                      "description": "Provide browser-supported fallbacks for unavailable or rejected clipboard writes, show success only when the copy operation reports success, and offer the captured selection in a standard selectable field with actionable feedback when automatic copying remains blocked, keeping recovery attached to the originating tab without disrupting another tab.",
-                      "id": "P5"
-                    },
-                    {
-                      "description": "Update the existing Terminal intent page in its established format to describe selection gestures, the Copy control, focused shortcut behavior, copying retained output, and clipboard failure recovery.",
-                      "id": "P6"
-                    }
-                  ],
-                  "summary": "Make selected text in Agent windows easy to copy through the shared terminal surface by exposing selection gestures and a Copy selection control, allowing copying after exit or disconnection, and providing recoverable clipboard failures while preserving terminal input behavior."
-                },
-                "started_at": "2026-09-10T08:29:30Z"
-              },
-              "governance_precheck": {
-                "attempt": 1,
-                "checked_at": "2026-09-10T08:31:19Z",
-                "message": "Executing the finalized plan as written does not require violating any supplied governance rule or enabled guidance.",
-                "status": "passed"
-              },
-              "implementation": {
                 "completed_at": "2026-09-10T08:44:53Z",
-                "execution": {
-                  "checklist": [
-                    {
-                      "evidence": "Enabled macOptionClickForcesSelection and displayed a platform-specific drag hint. Real xterm tests verified Shift-drag on Linux and Option-drag with a simulated Mac platform under mouse capture, while ordinary mouse input still reached the application.",
-                      "id": "P1",
-                      "outcome": "completed"
-                    },
-                    {
-                      "evidence": "Extracted shared copy/paste behavior into the focused 291-line terminal-clipboard.js module and loaded it in index.html. Ctrl+C, Ctrl+Shift+C, Cmd+C, native Copy, and the control capture the originating renderer's selection without requiring a live session.",
-                      "id": "P2",
-                      "outcome": "completed"
-                    },
-                    {
-                      "evidence": "Added a native keyboard-accessible Copy selection header button whose disabled state follows xterm selection changes. Browser tests verified keyboard activation, exited/sessionless copying, and renderer/selection retention across tab changes. Selected output and unfinished copy recovery defer automatic restart; the explicit Restart action remains available.",
-                      "id": "P3",
-                      "outcome": "completed"
-                    },
-                    {
-                      "evidence": "Clipboard shortcuts require focus inside the active terminal. Verified Ctrl+C interruption without selection, terminal-native multiline bracketed paste exactly once, unchanged Agent Ctrl+Enter/Ctrl+Z behavior, and existing asynchronous/buffered paste session replacement guards.",
-                      "id": "P4",
-                      "outcome": "completed"
-                    },
-                    {
-                      "evidence": "Clipboard API success, native Copy handling, or a true execCommand result is required before reporting success. Unavailable, throwing, and rejected writes use a selection fallback; failed fallbacks expose captured text in a labeled readonly textarea with Select text and Dismiss controls. Delayed results are fenced to the original attempt, renderer, and session. Tests verified recovery remains on an exited originating tab and preserves another tab's focus, plus manual-field selection across Toolbar redraws.",
-                      "id": "P5",
-                      "outcome": "completed"
-                    },
-                    {
-                      "evidence": "Updated only docs/intent/05-surfaces/03-browser/19-terminal.md, preserving its established sections and documenting selection gestures, Copy selection, focused shortcuts, retained output, and manual recovery.",
-                      "id": "P6",
-                      "outcome": "completed"
-                    }
-                  ],
-                  "verification": [
-                    "node --test tests/web_terminal_clipboard.test.js tests/web_supervisor_toolbar.test.js tests/web_goal_log_tail.test.js => 59 passed, 0 failed, 0 skipped; /tmp/refine-terminal-tests.log.",
-                    "NODE_PATH=/home/buddy/projects/refine/node_modules node --test tests/web_terminal_clipboard_browser.test.js => 7 passed, 0 failed, 0 skipped using real Chromium; /tmp/refine-terminal-browser-tests.log. The Mac platform is simulated.",
-                    "NODE_PATH=/home/buddy/projects/refine/node_modules node --test tests/web_*.test.js => 245 tests: 240 passed, 5 failed, 0 skipped; /tmp/refine-web-all-tests.log.",
-                    "NODE_PATH=/home/buddy/projects/refine/node_modules node --test tests/web_screen_render.test.js, cwd /tmp/refine-terminal-copy-baseline.3800t2 (git archive of unchanged starting commit 8f6de519c62a8a373b19482d5c7842068acfb35d) => 23 passed, the same 5 failures, 0 skipped; /tmp/refine-terminal-copy-baseline-tests.log. Matched failures: Controls Node selector switches by ID and refreshes the visible Node context; Agent terminal renders transported ANSI control sequences through xterm; every Node, Project, and legacy Settings tab renders and refreshes; Refine dev source refreshes morph identical and changed status without replacement; runtime banner distinguishes trusted source relationships from unknown evidence.",
-                    "git show --pretty= --name-only HEAD | rg '\\.js$' | xargs -r -n 1 node --check => all 9 changed/added JavaScript files passed.",
-                    "git diff --cached --check before commit and git show --format= --check HEAD after commit => passed. git rev-parse HEAD => 7f6988c7ea0b441ad71ec5fc0eb508451674caab. git status --porcelain => empty."
-                  ]
+                "criticism": {
+                  "completed_at": "2026-09-10T08:29:29Z",
+                  "git_after": {
+                    "branch": "refine/DRBAC01843C2EBE03D1CD08034/round-1",
+                    "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                    "status_porcelain": []
+                  },
+                  "git_before": {
+                    "branch": "refine/DRBAC01843C2EBE03D1CD08034/round-1",
+                    "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                    "status_porcelain": []
+                  },
+                  "result": {
+                    "summary": "The plan covers shared terminal selection, reliable copying, retained output, and clipboard failure recovery."
+                  },
+                  "started_at": "2026-09-10T08:27:57Z"
                 },
-                "report": "Implemented selection gestures, Copy selection, copying retained output, focused shortcuts, and clipboard recovery in local commit 7f6988c7ea0b441ad71ec5fc0eb508451674caab. Focused verification passed: 59 logic/lifecycle tests and 7 Chromium clipboard tests. Full web suite: 240 passed, 5 failures reproduced on the unchanged baseline. Working tree clean; no merge or push.",
-                "started_at": "2026-09-10T08:31:19Z"
+                "final_plan": {
+                  "completed_at": "2026-09-10T08:30:40Z",
+                  "git_after": {
+                    "branch": "refine/DRBAC01843C2EBE03D1CD08034/round-1",
+                    "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                    "status_porcelain": []
+                  },
+                  "git_before": {
+                    "branch": "refine/DRBAC01843C2EBE03D1CD08034/round-1",
+                    "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                    "status_porcelain": []
+                  },
+                  "result": {
+                    "checklist": [
+                      {
+                        "description": "Make text selectable when terminal applications capture mouse input by retaining Shift-drag on Windows and Linux, enabling Option-drag on macOS, and displaying a concise selection hint while preserving ordinary application mouse handling.",
+                        "id": "P1"
+                      },
+                      {
+                        "description": "Move shared terminal clipboard behavior into a focused browser module that routes Ctrl+C, Ctrl+Shift+C, Cmd+C, native Copy events, and the Copy control through the originating terminal's selection without requiring a live process.",
+                        "id": "P2"
+                      },
+                      {
+                        "description": "Add a keyboard-accessible Copy selection control to the shared terminal header whose enabled state follows the current selection, works with retained output, and preserves the originating tab, selection, and renderer.",
+                        "id": "P3"
+                      },
+                      {
+                        "description": "Keep shortcuts scoped to the focused terminal, preserve Ctrl+C interruption without a selection, and retain existing terminal-native paste framing, duplicate-event prevention, and session replacement guards.",
+                        "id": "P4"
+                      },
+                      {
+                        "description": "Provide browser-supported fallbacks for unavailable or rejected clipboard writes, show success only when the copy operation reports success, and offer the captured selection in a standard selectable field with actionable feedback when automatic copying remains blocked, keeping recovery attached to the originating tab without disrupting another tab.",
+                        "id": "P5"
+                      },
+                      {
+                        "description": "Update the existing Terminal intent page in its established format to describe selection gestures, the Copy control, focused shortcut behavior, copying retained output, and clipboard failure recovery.",
+                        "id": "P6"
+                      }
+                    ],
+                    "summary": "Make selected text in Agent windows easy to copy through the shared terminal surface by exposing selection gestures and a Copy selection control, allowing copying after exit or disconnection, and providing recoverable clipboard failures while preserving terminal input behavior."
+                  },
+                  "started_at": "2026-09-10T08:29:30Z"
+                },
+                "governance_precheck": {
+                  "attempt": 1,
+                  "checked_at": "2026-09-10T08:31:19Z",
+                  "message": "Executing the finalized plan as written does not require violating any supplied governance rule or enabled guidance.",
+                  "status": "passed"
+                },
+                "implementation": {
+                  "completed_at": "2026-09-10T08:44:53Z",
+                  "execution": {
+                    "checklist": [
+                      {
+                        "evidence": "Enabled macOptionClickForcesSelection and displayed a platform-specific drag hint. Real xterm tests verified Shift-drag on Linux and Option-drag with a simulated Mac platform under mouse capture, while ordinary mouse input still reached the application.",
+                        "id": "P1",
+                        "outcome": "completed"
+                      },
+                      {
+                        "evidence": "Extracted shared copy/paste behavior into the focused 291-line terminal-clipboard.js module and loaded it in index.html. Ctrl+C, Ctrl+Shift+C, Cmd+C, native Copy, and the control capture the originating renderer's selection without requiring a live session.",
+                        "id": "P2",
+                        "outcome": "completed"
+                      },
+                      {
+                        "evidence": "Added a native keyboard-accessible Copy selection header button whose disabled state follows xterm selection changes. Browser tests verified keyboard activation, exited/sessionless copying, and renderer/selection retention across tab changes. Selected output and unfinished copy recovery defer automatic restart; the explicit Restart action remains available.",
+                        "id": "P3",
+                        "outcome": "completed"
+                      },
+                      {
+                        "evidence": "Clipboard shortcuts require focus inside the active terminal. Verified Ctrl+C interruption without selection, terminal-native multiline bracketed paste exactly once, unchanged Agent Ctrl+Enter/Ctrl+Z behavior, and existing asynchronous/buffered paste session replacement guards.",
+                        "id": "P4",
+                        "outcome": "completed"
+                      },
+                      {
+                        "evidence": "Clipboard API success, native Copy handling, or a true execCommand result is required before reporting success. Unavailable, throwing, and rejected writes use a selection fallback; failed fallbacks expose captured text in a labeled readonly textarea with Select text and Dismiss controls. Delayed results are fenced to the original attempt, renderer, and session. Tests verified recovery remains on an exited originating tab and preserves another tab's focus, plus manual-field selection across Toolbar redraws.",
+                        "id": "P5",
+                        "outcome": "completed"
+                      },
+                      {
+                        "evidence": "Updated only docs/intent/05-surfaces/03-browser/19-terminal.md, preserving its established sections and documenting selection gestures, Copy selection, focused shortcuts, retained output, and manual recovery.",
+                        "id": "P6",
+                        "outcome": "completed"
+                      }
+                    ],
+                    "verification": [
+                      "node --test tests/web_terminal_clipboard.test.js tests/web_supervisor_toolbar.test.js tests/web_goal_log_tail.test.js => 59 passed, 0 failed, 0 skipped; /tmp/refine-terminal-tests.log.",
+                      "NODE_PATH=/home/buddy/projects/refine/node_modules node --test tests/web_terminal_clipboard_browser.test.js => 7 passed, 0 failed, 0 skipped using real Chromium; /tmp/refine-terminal-browser-tests.log. The Mac platform is simulated.",
+                      "NODE_PATH=/home/buddy/projects/refine/node_modules node --test tests/web_*.test.js => 245 tests: 240 passed, 5 failed, 0 skipped; /tmp/refine-web-all-tests.log.",
+                      "NODE_PATH=/home/buddy/projects/refine/node_modules node --test tests/web_screen_render.test.js, cwd /tmp/refine-terminal-copy-baseline.3800t2 (git archive of unchanged starting commit 8f6de519c62a8a373b19482d5c7842068acfb35d) => 23 passed, the same 5 failures, 0 skipped; /tmp/refine-terminal-copy-baseline-tests.log. Matched failures: Controls Node selector switches by ID and refreshes the visible Node context; Agent terminal renders transported ANSI control sequences through xterm; every Node, Project, and legacy Settings tab renders and refreshes; Refine dev source refreshes morph identical and changed status without replacement; runtime banner distinguishes trusted source relationships from unknown evidence.",
+                      "git show --pretty= --name-only HEAD | rg '\\.js$' | xargs -r -n 1 node --check => all 9 changed/added JavaScript files passed.",
+                      "git diff --cached --check before commit and git show --format= --check HEAD after commit => passed. git rev-parse HEAD => 7f6988c7ea0b441ad71ec5fc0eb508451674caab. git status --porcelain => empty."
+                    ]
+                  },
+                  "report": "Implemented selection gestures, Copy selection, copying retained output, focused shortcuts, and clipboard recovery in local commit 7f6988c7ea0b441ad71ec5fc0eb508451674caab. Focused verification passed: 59 logic/lifecycle tests and 7 Chromium clipboard tests. Full web suite: 240 passed, 5 failures reproduced on the unchanged baseline. Working tree clean; no merge or push.",
+                  "started_at": "2026-09-10T08:31:19Z"
+                },
+                "phase": "implement",
+                "phase_started_at": "2026-09-10T08:31:19Z",
+                "proposal": {
+                  "completed_at": "2026-09-10T08:27:57Z",
+                  "git_after": {
+                    "branch": "refine/DRBAC01843C2EBE03D1CD08034/round-1",
+                    "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                    "status_porcelain": []
+                  },
+                  "git_before": {
+                    "branch": "refine/DRBAC01843C2EBE03D1CD08034/round-1",
+                    "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                    "status_porcelain": []
+                  },
+                  "result": {
+                    "checklist": [
+                      {
+                        "description": "Make selection available when agent applications capture mouse input by retaining Shift-drag on Windows and Linux, enabling Option-drag on macOS, and showing a concise selection hint while preserving ordinary application mouse handling.",
+                        "id": "P1"
+                      },
+                      {
+                        "description": "Add a keyboard-accessible Copy selection control to the shared terminal header that is enabled only for selected text, works with retained output after disconnection or exit, and preserves the selection and originating tab.",
+                        "id": "P2"
+                      },
+                      {
+                        "description": "Consolidate clipboard interaction in a cohesive browser module that serves the Copy control, Ctrl+C, Ctrl+Shift+C, Cmd+C, and native Copy events independently of process liveness while preserving Ctrl+C interruption without a selection and existing paste framing and session guards.",
+                        "id": "P3"
+                      },
+                      {
+                        "description": "Add browser-supported copy fallbacks for unavailable or rejected clipboard writes, report success only after a confirmed copy, and offer the selected text in a standard selectable field with actionable feedback if automatic copying remains blocked.",
+                        "id": "P4"
+                      },
+                      {
+                        "description": "Update the existing Terminal intent page to describe selection gestures, the Copy control, shortcut behavior, copying retained output, and clipboard failure recovery.",
+                        "id": "P5"
+                      }
+                    ],
+                    "summary": "Make copying selected text from Agent windows reliable and discoverable through the shared terminal surface, including retained output after exit and clear recovery when browser clipboard access is blocked."
+                  },
+                  "started_at": "2026-09-10T08:26:09Z"
+                },
+                "schema_version": 2,
+                "started_at": "2026-09-10T08:26:09Z",
+                "state": "completed",
+                "updated_at": "2026-09-10T08:44:53Z"
               },
-              "phase": "implement",
-              "phase_started_at": "2026-09-10T08:31:19Z",
-              "proposal": {
-                "completed_at": "2026-09-10T08:27:57Z",
-                "git_after": {
-                  "branch": "refine/DRBAC01843C2EBE03D1CD08034/round-1",
-                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
-                  "status_porcelain": []
-                },
-                "git_before": {
-                  "branch": "refine/DRBAC01843C2EBE03D1CD08034/round-1",
-                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
-                  "status_porcelain": []
-                },
-                "result": {
-                  "checklist": [
-                    {
-                      "description": "Make selection available when agent applications capture mouse input by retaining Shift-drag on Windows and Linux, enabling Option-drag on macOS, and showing a concise selection hint while preserving ordinary application mouse handling.",
-                      "id": "P1"
-                    },
-                    {
-                      "description": "Add a keyboard-accessible Copy selection control to the shared terminal header that is enabled only for selected text, works with retained output after disconnection or exit, and preserves the selection and originating tab.",
-                      "id": "P2"
-                    },
-                    {
-                      "description": "Consolidate clipboard interaction in a cohesive browser module that serves the Copy control, Ctrl+C, Ctrl+Shift+C, Cmd+C, and native Copy events independently of process liveness while preserving Ctrl+C interruption without a selection and existing paste framing and session guards.",
-                      "id": "P3"
-                    },
-                    {
-                      "description": "Add browser-supported copy fallbacks for unavailable or rejected clipboard writes, report success only after a confirmed copy, and offer the selected text in a standard selectable field with actionable feedback if automatic copying remains blocked.",
-                      "id": "P4"
-                    },
-                    {
-                      "description": "Update the existing Terminal intent page to describe selection gestures, the Copy control, shortcut behavior, copying retained output, and clipboard failure recovery.",
-                      "id": "P5"
-                    }
-                  ],
-                  "summary": "Make copying selected text from Agent windows reliable and discoverable through the shared terminal surface, including retained output after exit and clear recovery when browser clipboard access is blocked."
-                },
-                "started_at": "2026-09-10T08:26:09Z"
+              "implementation_report": "Implemented selection gestures, Copy selection, copying retained output, focused shortcuts, and clipboard recovery in local commit 7f6988c7ea0b441ad71ec5fc0eb508451674caab. Focused verification passed: 59 logic/lifecycle tests and 7 Chromium clipboard tests. Full web suite: 240 passed, 5 failures reproduced on the unchanged baseline. Working tree clean; no merge or push.",
+              "implementation_reported_at": "2026-09-10T08:44:53Z",
+              "prompt": "From: Ethan Jacobson <ethan.jacobson@insurity.com>\nSubject: copy text from xterm window\n\nBody:\nNone of the standard methods worked for copying text from the Agent's  window.  That would be nice if it worked.\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nEthan Jacobson\r\nEthan.Jacobson@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
+              "quality_checked_at": "2026-09-10T08:54:43Z",
+              "quality_details": {
+                "candidate_commit": "be1f6f0366dd855f93f505d470dd4e2ca5c6d1b5",
+                "error": "{\"type\":\"item.completed\",\"item\":{\"id\":\"item_15\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"rg -n 'playwright|NODE_PATH|node --test|clipboard' scripts tests/test_all.rs .cargo Cargo.toml docs/runbooks/accelerate-goal-builds.md && git diff HEAD\\\"'^ HEAD -- tests/support/web_app.js tests/web_screen_render.test.js tests/support/terminal_clipboard_runtime.js | head -100 && command -v node && node -p '\\\"'JSON.stringify({version:process.version,nodePath:process.env.NODE_PATH})' && rg --files",
+                "error_kind": "evaluation_error",
+                "operation_id": "1a08a85c0721434c"
               },
-              "schema_version": 2,
-              "started_at": "2026-09-10T08:26:09Z",
-              "state": "completed",
-              "updated_at": "2026-09-10T08:44:53Z"
+              "quality_message": "Quality failed: {\"type\":\"item.completed\",\"item\":{\"id\":\"item_15\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"rg -n 'playwright|NODE_PATH|node --test|clipboard' scripts tests/test_all.rs .cargo Cargo.toml docs/runbooks/accelerate-goal-builds.md && git diff HEAD\\\"'^ HEAD -- tests/support/web_app.js tests/web_screen_render.test.js tests/support/terminal_clipboard_runtime.js | head -100 && c…",
+              "quality_state": "failed",
+              "reporter": "ethan.jacobson@insurity.com",
+              "round": 1
+            }
+          ],
+          "version": 1,
+          "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+        },
+        "plans": {
+          "checklist": [
+            {
+              "description": "Enable xterm's macOptionClickForcesSelection option and display platform-specific guidance: Shift-drag on Windows/Linux and Option-drag on macOS when applications capture the mouse. Preserve ordinary application mouse handling.",
+              "id": "workflow.plan.enter:default-plan:P1"
             },
-            "implementation_report": "Implemented selection gestures, Copy selection, copying retained output, focused shortcuts, and clipboard recovery in local commit 7f6988c7ea0b441ad71ec5fc0eb508451674caab. Focused verification passed: 59 logic/lifecycle tests and 7 Chromium clipboard tests. Full web suite: 240 passed, 5 failures reproduced on the unchanged baseline. Working tree clean; no merge or push.",
-            "implementation_reported_at": "2026-09-10T08:44:53Z",
-            "prompt": "From: Ethan Jacobson <ethan.jacobson@insurity.com>\nSubject: copy text from xterm window\n\nBody:\nNone of the standard methods worked for copying text from the Agent's  window.  That would be nice if it worked.\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nEthan Jacobson\r\nEthan.Jacobson@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
-            "quality_checked_at": "2026-09-10T08:54:43Z",
-            "quality_details": {
-              "candidate_commit": "be1f6f0366dd855f93f505d470dd4e2ca5c6d1b5",
-              "error": "{\"type\":\"item.completed\",\"item\":{\"id\":\"item_15\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"rg -n 'playwright|NODE_PATH|node --test|clipboard' scripts tests/test_all.rs .cargo Cargo.toml docs/runbooks/accelerate-goal-builds.md && git diff HEAD\\\"'^ HEAD -- tests/support/web_app.js tests/web_screen_render.test.js tests/support/terminal_clipboard_runtime.js | head -100 && command -v node && node -p '\\\"'JSON.stringify({version:process.version,nodePath:process.env.NODE_PATH})' && rg --files",
-              "error_kind": "evaluation_error",
-              "operation_id": "1a08a85c0721434c"
+            {
+              "description": "Review the retained be1f6f0366dd855f93f505d470dd4e2ca5c6d1b5 delta and selectively adapt its terminal-clipboard.js module. Route native Copy, Ctrl+C/Ctrl+Shift+C and Cmd+C through the originating renderer's captured selection independently of process liveness. Load the module through index.html and update affected test loaders. Keep clipboard responsibility cohesive and toolbar integration thin; preserve current main's fixtures and rendered-output fixes.",
+              "id": "workflow.plan.enter:default-plan:P2"
             },
-            "quality_message": "Quality failed: {\"type\":\"item.completed\",\"item\":{\"id\":\"item_15\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"rg -n 'playwright|NODE_PATH|node --test|clipboard' scripts tests/test_all.rs .cargo Cargo.toml docs/runbooks/accelerate-goal-builds.md && git diff HEAD\\\"'^ HEAD -- tests/support/web_app.js tests/web_screen_render.test.js tests/support/terminal_clipboard_runtime.js | head -100 && c…",
-            "quality_state": "failed",
-            "reporter": "ethan.jacobson@insurity.com",
-            "round": 1
-          }
-        ],
-        "version": 1,
-        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+            {
+              "description": "Add a native, keyboard-accessible Copy selection button to the shared terminal header, enabled only when text is selected. Bind actions to the originating terminal and update selection-dependent controls without replacing xterm, clearing selection, or stealing focus. Apply the same behavior to ordinary Agent, Custom Skill, and other shared terminal profiles.",
+              "id": "workflow.plan.enter:default-plan:P3"
+            },
+            {
+              "description": "Preserve Ctrl+C interruption without selection, Agent newline/suspend handling, terminal-native paste framing and line endings, duplicate-event prevention, and asynchronous/buffered paste session checks. Allow copying after exit or disconnection. Defer automatic restart and forced scrolling while retained selection, a pending copy, or recovery is present; recheck these conditions after asynchronous reattachment. Keep explicit Restart available and invalidate obsolete copy attempts when tabs close or sessions/renderers are replaced.",
+              "id": "workflow.plan.enter:default-plan:P4"
+            },
+            {
+              "description": "Capture copy text once per attempt. Use native event clipboard data when available, otherwise browser clipboard writes, followed by a supported selection-based fallback. Report success only after successful native handling, a fulfilled write, or a true fallback result. If copying remains blocked, expose the captured text in a labeled readonly selectable textarea with Select text and Dismiss controls and accessible feedback. Preserve terminal and DOM selections and focus during fallbacks. Fence delayed results by originating tab, terminal, renderer, session and attempt; defer focus-dependent fallback when the user has moved elsewhere, retain recovery on the originating tab, and preserve manual-field selection through redraws.",
+              "id": "workflow.plan.enter:default-plan:P5"
+            },
+            {
+              "description": "Update docs/intent/05-surfaces/03-browser/19-terminal.md for gestures, Copy selection, focused shortcuts, retained-output copying and recovery. Adjust only the affected retention/scrolling statements in 15-toolbar.md to document the copy-preservation exception. Keep browser clipboard state transient and surface-owned; retain Model, Application, Infrastructure and Surfaces boundaries and existing backend authority.",
+              "id": "workflow.plan.enter:default-plan:P6"
+            },
+            {
+              "description": "Adapt focused clipboard logic tests and add real Chromium coverage using current main's browser setup. Explicitly exercise an ordinary Agent and a Custom Skill launched through its existing UI, including live, disconnected and exited output; mouse capture and selection gestures; button and native/keyboard copy; actual successful clipboard content; unavailable, throwing and rejected writes; fallback success/failure; overlapping attempts; tab switching, unrelated input focus, recovery-field selection and redraws; close/restart races; Ctrl+C interruption; exactly-once bracketed paste and retained ANSI rendering. Preserve existing fixture behavior and test organization unless a narrowly scoped shared helper is necessary. Verify the final candidate through current Skill evidence requirements, recording commands, candidate identity, pass/fail/skip totals and platform limitations without inheriting Round 1's pass.",
+              "id": "workflow.plan.enter:default-plan:P7"
+            }
+          ],
+          "summary": "workflow.plan.enter:default-plan: Selectively adapt the retained terminal clipboard implementation onto Round 2 at f880b7767149e4de43d5bc4d4786247d1e536a8c, making selection and copying reliable across Agent and Custom Skill tabs while preserving current rendering, input, lifecycle, and workflow contracts."
+        }
       },
       "event": {},
       "goal": {
@@ -281,7 +316,7 @@
         "branch_name": "refine/DRBAC01843C2EBE03D1CD08034/round-2",
         "candidate_commit": null,
         "created": "2026-09-10T08:26:07Z",
-        "event_generation": 2,
+        "event_generation": 3,
         "feature_id": null,
         "feature_order": null,
         "id": "DRBAC01843C2EBE03D1CD08034",
@@ -937,52 +972,142 @@
                 "round_idx": 1,
                 "target_branch": "main"
               },
-              "phase": "plan",
-              "phase_started_at": "2026-09-10T13:43:05Z",
+              "final_plan": {
+                "completed_at": "2026-09-10T13:49:29Z",
+                "git_after": {
+                  "branch": "refine/DRBAC01843C2EBE03D1CD08034/round-2",
+                  "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DRBAC01843C2EBE03D1CD08034/round-2",
+                  "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Enable xterm's macOptionClickForcesSelection option and display platform-specific guidance: Shift-drag on Windows/Linux and Option-drag on macOS when applications capture the mouse. Preserve ordinary application mouse handling.",
+                      "id": "workflow.plan.enter:default-plan:P1"
+                    },
+                    {
+                      "description": "Review the retained be1f6f0366dd855f93f505d470dd4e2ca5c6d1b5 delta and selectively adapt its terminal-clipboard.js module. Route native Copy, Ctrl+C/Ctrl+Shift+C and Cmd+C through the originating renderer's captured selection independently of process liveness. Load the module through index.html and update affected test loaders. Keep clipboard responsibility cohesive and toolbar integration thin; preserve current main's fixtures and rendered-output fixes.",
+                      "id": "workflow.plan.enter:default-plan:P2"
+                    },
+                    {
+                      "description": "Add a native, keyboard-accessible Copy selection button to the shared terminal header, enabled only when text is selected. Bind actions to the originating terminal and update selection-dependent controls without replacing xterm, clearing selection, or stealing focus. Apply the same behavior to ordinary Agent, Custom Skill, and other shared terminal profiles.",
+                      "id": "workflow.plan.enter:default-plan:P3"
+                    },
+                    {
+                      "description": "Preserve Ctrl+C interruption without selection, Agent newline/suspend handling, terminal-native paste framing and line endings, duplicate-event prevention, and asynchronous/buffered paste session checks. Allow copying after exit or disconnection. Defer automatic restart and forced scrolling while retained selection, a pending copy, or recovery is present; recheck these conditions after asynchronous reattachment. Keep explicit Restart available and invalidate obsolete copy attempts when tabs close or sessions/renderers are replaced.",
+                      "id": "workflow.plan.enter:default-plan:P4"
+                    },
+                    {
+                      "description": "Capture copy text once per attempt. Use native event clipboard data when available, otherwise browser clipboard writes, followed by a supported selection-based fallback. Report success only after successful native handling, a fulfilled write, or a true fallback result. If copying remains blocked, expose the captured text in a labeled readonly selectable textarea with Select text and Dismiss controls and accessible feedback. Preserve terminal and DOM selections and focus during fallbacks. Fence delayed results by originating tab, terminal, renderer, session and attempt; defer focus-dependent fallback when the user has moved elsewhere, retain recovery on the originating tab, and preserve manual-field selection through redraws.",
+                      "id": "workflow.plan.enter:default-plan:P5"
+                    },
+                    {
+                      "description": "Update docs/intent/05-surfaces/03-browser/19-terminal.md for gestures, Copy selection, focused shortcuts, retained-output copying and recovery. Adjust only the affected retention/scrolling statements in 15-toolbar.md to document the copy-preservation exception. Keep browser clipboard state transient and surface-owned; retain Model, Application, Infrastructure and Surfaces boundaries and existing backend authority.",
+                      "id": "workflow.plan.enter:default-plan:P6"
+                    },
+                    {
+                      "description": "Adapt focused clipboard logic tests and add real Chromium coverage using current main's browser setup. Explicitly exercise an ordinary Agent and a Custom Skill launched through its existing UI, including live, disconnected and exited output; mouse capture and selection gestures; button and native/keyboard copy; actual successful clipboard content; unavailable, throwing and rejected writes; fallback success/failure; overlapping attempts; tab switching, unrelated input focus, recovery-field selection and redraws; close/restart races; Ctrl+C interruption; exactly-once bracketed paste and retained ANSI rendering. Preserve existing fixture behavior and test organization unless a narrowly scoped shared helper is necessary. Verify the final candidate through current Skill evidence requirements, recording commands, candidate identity, pass/fail/skip totals and platform limitations without inheriting Round 1's pass.",
+                      "id": "workflow.plan.enter:default-plan:P7"
+                    }
+                  ],
+                  "summary": "workflow.plan.enter:default-plan: Selectively adapt the retained terminal clipboard implementation onto Round 2 at f880b7767149e4de43d5bc4d4786247d1e536a8c, making selection and copying reliable across Agent and Custom Skill tabs while preserving current rendering, input, lifecycle, and workflow contracts."
+                },
+                "started_at": "2026-09-10T13:43:05Z"
+              },
+              "phase": "implement",
+              "phase_started_at": "2026-09-10T13:49:29Z",
+              "proposal": {
+                "completed_at": "2026-09-10T13:49:29Z",
+                "git_after": {
+                  "branch": "refine/DRBAC01843C2EBE03D1CD08034/round-2",
+                  "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DRBAC01843C2EBE03D1CD08034/round-2",
+                  "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Enable xterm's macOptionClickForcesSelection option and display platform-specific guidance: Shift-drag on Windows/Linux and Option-drag on macOS when applications capture the mouse. Preserve ordinary application mouse handling.",
+                      "id": "workflow.plan.enter:default-plan:P1"
+                    },
+                    {
+                      "description": "Review the retained be1f6f0366dd855f93f505d470dd4e2ca5c6d1b5 delta and selectively adapt its terminal-clipboard.js module. Route native Copy, Ctrl+C/Ctrl+Shift+C and Cmd+C through the originating renderer's captured selection independently of process liveness. Load the module through index.html and update affected test loaders. Keep clipboard responsibility cohesive and toolbar integration thin; preserve current main's fixtures and rendered-output fixes.",
+                      "id": "workflow.plan.enter:default-plan:P2"
+                    },
+                    {
+                      "description": "Add a native, keyboard-accessible Copy selection button to the shared terminal header, enabled only when text is selected. Bind actions to the originating terminal and update selection-dependent controls without replacing xterm, clearing selection, or stealing focus. Apply the same behavior to ordinary Agent, Custom Skill, and other shared terminal profiles.",
+                      "id": "workflow.plan.enter:default-plan:P3"
+                    },
+                    {
+                      "description": "Preserve Ctrl+C interruption without selection, Agent newline/suspend handling, terminal-native paste framing and line endings, duplicate-event prevention, and asynchronous/buffered paste session checks. Allow copying after exit or disconnection. Defer automatic restart and forced scrolling while retained selection, a pending copy, or recovery is present; recheck these conditions after asynchronous reattachment. Keep explicit Restart available and invalidate obsolete copy attempts when tabs close or sessions/renderers are replaced.",
+                      "id": "workflow.plan.enter:default-plan:P4"
+                    },
+                    {
+                      "description": "Capture copy text once per attempt. Use native event clipboard data when available, otherwise browser clipboard writes, followed by a supported selection-based fallback. Report success only after successful native handling, a fulfilled write, or a true fallback result. If copying remains blocked, expose the captured text in a labeled readonly selectable textarea with Select text and Dismiss controls and accessible feedback. Preserve terminal and DOM selections and focus during fallbacks. Fence delayed results by originating tab, terminal, renderer, session and attempt; defer focus-dependent fallback when the user has moved elsewhere, retain recovery on the originating tab, and preserve manual-field selection through redraws.",
+                      "id": "workflow.plan.enter:default-plan:P5"
+                    },
+                    {
+                      "description": "Update docs/intent/05-surfaces/03-browser/19-terminal.md for gestures, Copy selection, focused shortcuts, retained-output copying and recovery. Adjust only the affected retention/scrolling statements in 15-toolbar.md to document the copy-preservation exception. Keep browser clipboard state transient and surface-owned; retain Model, Application, Infrastructure and Surfaces boundaries and existing backend authority.",
+                      "id": "workflow.plan.enter:default-plan:P6"
+                    },
+                    {
+                      "description": "Adapt focused clipboard logic tests and add real Chromium coverage using current main's browser setup. Explicitly exercise an ordinary Agent and a Custom Skill launched through its existing UI, including live, disconnected and exited output; mouse capture and selection gestures; button and native/keyboard copy; actual successful clipboard content; unavailable, throwing and rejected writes; fallback success/failure; overlapping attempts; tab switching, unrelated input focus, recovery-field selection and redraws; close/restart races; Ctrl+C interruption; exactly-once bracketed paste and retained ANSI rendering. Preserve existing fixture behavior and test organization unless a narrowly scoped shared helper is necessary. Verify the final candidate through current Skill evidence requirements, recording commands, candidate identity, pass/fail/skip totals and platform limitations without inheriting Round 1's pass.",
+                      "id": "workflow.plan.enter:default-plan:P7"
+                    }
+                  ],
+                  "summary": "workflow.plan.enter:default-plan: Selectively adapt the retained terminal clipboard implementation onto Round 2 at f880b7767149e4de43d5bc4d4786247d1e536a8c, making selection and copying reliable across Agent and Custom Skill tabs while preserving current rendering, input, lifecycle, and workflow contracts."
+                },
+                "started_at": "2026-09-10T13:43:05Z"
+              },
               "schema_version": 2,
               "started_at": "2026-09-10T13:43:05Z",
               "state": "in_progress",
-              "updated_at": "2026-09-10T13:43:05Z"
+              "updated_at": "2026-09-10T13:49:29Z"
             },
             "implementation_report": null,
             "implementation_reported_at": null,
             "latest_log": {
               "actor": "refine",
-              "category": "git",
-              "datetime": "2026-09-10T13:43:05Z",
+              "category": "state",
+              "datetime": "2026-09-10T13:49:29Z",
               "details": {
-                "base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
-                "branch": "refine/DRBAC01843C2EBE03D1CD08034/round-2",
-                "branch_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
-                "node_id": "default",
-                "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRBAC01843C2EBE03D1CD08034-round-2"
+                "node_id": "default"
               },
               "goal_id": "DRBAC01843C2EBE03D1CD08034",
-              "message": "Created implementation worktree for refine/DRBAC01843C2EBE03D1CD08034/round-2",
+              "message": "Workflow status changed: plan -> implement",
               "round_idx": 1,
               "severity": "info"
             },
             "latest_state_log": {
               "actor": "refine",
               "category": "state",
-              "datetime": "2026-09-10T13:43:05Z",
+              "datetime": "2026-09-10T13:49:29Z",
               "details": {
                 "node_id": "default"
               },
               "goal_id": "DRBAC01843C2EBE03D1CD08034",
-              "message": "Workflow status changed: todo -> plan",
+              "message": "Workflow status changed: plan -> implement",
               "round_idx": 1,
               "severity": "info"
             },
             "latest_workflow_log": {
               "actor": "refine",
               "category": "state",
-              "datetime": "2026-09-10T13:43:05Z",
+              "datetime": "2026-09-10T13:49:29Z",
               "details": {
                 "node_id": "default"
               },
               "goal_id": "DRBAC01843C2EBE03D1CD08034",
-              "message": "Workflow status changed: todo -> plan",
+              "message": "Workflow status changed: plan -> implement",
               "round_idx": 1,
               "severity": "info"
             },
@@ -1029,6 +1154,18 @@
                 "message": "Created implementation worktree for refine/DRBAC01843C2EBE03D1CD08034/round-2",
                 "round_idx": 1,
                 "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "state",
+                "datetime": "2026-09-10T13:49:29Z",
+                "details": {
+                  "node_id": "default"
+                },
+                "goal_id": "DRBAC01843C2EBE03D1CD08034",
+                "message": "Workflow status changed: plan -> implement",
+                "round_idx": 1,
+                "severity": "info"
               }
             ],
             "meta_rule_state": "unclassified",
@@ -1040,7 +1177,7 @@
             "quality_state": "unclassified",
             "reporter": "Buddy Williams",
             "rule_state": "unclassified",
-            "updated": "2026-09-10T13:43:05Z",
+            "updated": "2026-09-10T13:49:29Z",
             "workflow_attempt_authority": {
               "claimed_at": "2026-09-10T13:43:04Z",
               "round_idx": 1,
@@ -1050,22 +1187,22 @@
             "workflow_recovery": null
           }
         ],
-        "status": "plan",
+        "status": "implement",
         "target_branch": "main",
-        "updated": "2026-09-10T13:43:05Z",
-        "workflow_revision": 37
+        "updated": "2026-09-10T13:49:29Z",
+        "workflow_revision": 43
       },
       "system": {
         "candidate_commit": null,
         "node_id": "default",
         "project_root": "/home/buddy/projects/refine-next",
-        "workflow_step": "plan",
+        "workflow_step": "implement",
         "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRBAC01843C2EBE03D1CD08034-round-2"
       }
     },
     "metadata": {
       "behavior": "EventSkill",
-      "event_operation_id": "1a08b8ec942113c76c",
+      "event_operation_id": "1a08b94a4f7113c7615",
       "goal_id": "DRBAC01843C2EBE03D1CD08034",
       "kind": "workflow",
       "node_id": "default",
@@ -1073,14 +1210,14 @@
       "round_idx": 1,
       "target_app_id": "/home/buddy/projects/refine-next",
       "workflow_revision": 29,
-      "workflow_state": "plan"
+      "workflow_state": "implement"
     }
   },
   "bindings": [
     {
       "binding": {
-        "id": "default-plan",
-        "skill_id": "default-plan",
+        "id": "default-implement",
+        "skill_id": "default-implement",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -1091,10 +1228,10 @@
         "inputs": {}
       },
       "skill": {
-        "id": "default-plan",
-        "name": "Plan",
-        "prompt": "## Plan\n\nProduce a complete, concise implementation plan for the current Goal Round. Inspect the repository and applicable context, resolve assumptions, consider alternatives and critique your proposed solution before finalizing it. Choose the planning method appropriate to the work. For a scoped finding recovery Round, focus the plan on the requested correction against the retained candidate. Do not change repository files. Return an actionable plan with stable checklist IDs and meaningful verification.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
-        "role": "plan",
+        "id": "default-implement",
+        "name": "Implement",
+        "prompt": "## Implement\n\nImplement the current Goal Round using every accepted plan and attached Skill. Inspect existing code, make the complete change, run appropriate verification, and report evidence for each checklist item. Preserve unrelated changes and historical evidence. Refine owns candidate commits, workflow advancement, Quality, Governance and integration.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
+        "role": "implement",
         "enabled": true,
         "scope": {
           "node_id": null
@@ -1105,98 +1242,11 @@
       "parameters": {}
     }
   ],
-  "state": "succeeded",
-  "results": {
-    "default-plan": {
-      "invocation_id": "5dacc101923b58b9e33d4100b12884d18130a8b0f737db738dc4c1c946e7d649",
-      "binding_id": "default-plan",
-      "role": "plan",
-      "outcome": "success",
-      "summary": "Corrected the structured plan to use CriticismResolution objects and finalized a scoped recovery checklist with proposed verification. Inspection was observational; no implementation, test pass, Goal-state change, merge, push, deployment or daemon restart occurred.",
-      "evidence": [
-        "Observed the invocation workspace on branch refine/DRBAC01843C2EBE03D1CD08034/round-2 at f880b7767149e4de43d5bc4d4786247d1e536a8c. Git status was empty before and after inspection. No files or Git state were changed.",
-        "Confirmed src/model/goal/implementation_plan.rs defines CriticismResolution with criticism_id and resolution string fields. The planning contract requires compact checklist id/description pairs; this response uses those shapes.",
-        "Read current Design, Surface Principles, Terminal, Toolbar and Skills intent. Skills specifies observational planning, supervised exact-candidate Quality evidence, and Custom Skills using the shared managed terminal lifecycle.",
-        "Inspected the retained commit and its toolbar/clipboard changes. The Round 1 branch still resolves to be1f6f0366dd855f93f505d470dd4e2ca5c6d1b5, but its recorded worktree directory is absent and is not listed among registered worktrees. Commit-based selective reuse remains available.",
-        "Current toolbar.js includes skill in both terminal mode sets, gates existing copy handling on process liveness, and automatically starts eligible exited terminals on activation. Current web_screen_render.test.js includes a Custom Skill launch test and its own browser setup. Its latest change is f880b776, Fix browser test setup and wait for rendered terminal output.",
-        "Observed Playwright under /home/buddy/projects/refine/node_modules and Chromium cache directories chromium-1208, chromium-1228 and chromium-1234. Browser launch and tests were not run during this observational correction; availability is not a passing test result.",
-        "Proposed final-candidate logic command: node --test --test-concurrency=1 tests/web_terminal_clipboard.test.js tests/web_supervisor_toolbar.test.js tests/web_goal_log_tail.test.js.",
-        "Proposed browser command after adding the focused suite: NODE_PATH=/home/buddy/projects/refine/node_modules node --test --test-concurrency=1 tests/web_terminal_clipboard_browser.test.js tests/web_screen_render.test.js. Require an actual Chromium launch and inspect reported skips. Label macOS/Windows platform simulation accurately.",
-        "Proposed final validation: run node --check on each changed JavaScript file and git diff --check f880b7767149e4de43d5bc4d4786247d1e536a8c HEAD, also checking any uncommitted diff. Record the final candidate SHA and worktree status with test results. Reproduce suspected unrelated failures against the unchanged pinned base only when necessary."
-      ],
-      "artifacts": {
-        "plan": {
-          "checklist": [
-            {
-              "description": "Enable xterm's macOptionClickForcesSelection option and display platform-specific guidance: Shift-drag on Windows/Linux and Option-drag on macOS when applications capture the mouse. Preserve ordinary application mouse handling.",
-              "id": "P1"
-            },
-            {
-              "description": "Review the retained be1f6f0366dd855f93f505d470dd4e2ca5c6d1b5 delta and selectively adapt its terminal-clipboard.js module. Route native Copy, Ctrl+C/Ctrl+Shift+C and Cmd+C through the originating renderer's captured selection independently of process liveness. Load the module through index.html and update affected test loaders. Keep clipboard responsibility cohesive and toolbar integration thin; preserve current main's fixtures and rendered-output fixes.",
-              "id": "P2"
-            },
-            {
-              "description": "Add a native, keyboard-accessible Copy selection button to the shared terminal header, enabled only when text is selected. Bind actions to the originating terminal and update selection-dependent controls without replacing xterm, clearing selection, or stealing focus. Apply the same behavior to ordinary Agent, Custom Skill, and other shared terminal profiles.",
-              "id": "P3"
-            },
-            {
-              "description": "Preserve Ctrl+C interruption without selection, Agent newline/suspend handling, terminal-native paste framing and line endings, duplicate-event prevention, and asynchronous/buffered paste session checks. Allow copying after exit or disconnection. Defer automatic restart and forced scrolling while retained selection, a pending copy, or recovery is present; recheck these conditions after asynchronous reattachment. Keep explicit Restart available and invalidate obsolete copy attempts when tabs close or sessions/renderers are replaced.",
-              "id": "P4"
-            },
-            {
-              "description": "Capture copy text once per attempt. Use native event clipboard data when available, otherwise browser clipboard writes, followed by a supported selection-based fallback. Report success only after successful native handling, a fulfilled write, or a true fallback result. If copying remains blocked, expose the captured text in a labeled readonly selectable textarea with Select text and Dismiss controls and accessible feedback. Preserve terminal and DOM selections and focus during fallbacks. Fence delayed results by originating tab, terminal, renderer, session and attempt; defer focus-dependent fallback when the user has moved elsewhere, retain recovery on the originating tab, and preserve manual-field selection through redraws.",
-              "id": "P5"
-            },
-            {
-              "description": "Update docs/intent/05-surfaces/03-browser/19-terminal.md for gestures, Copy selection, focused shortcuts, retained-output copying and recovery. Adjust only the affected retention/scrolling statements in 15-toolbar.md to document the copy-preservation exception. Keep browser clipboard state transient and surface-owned; retain Model, Application, Infrastructure and Surfaces boundaries and existing backend authority.",
-              "id": "P6"
-            },
-            {
-              "description": "Adapt focused clipboard logic tests and add real Chromium coverage using current main's browser setup. Explicitly exercise an ordinary Agent and a Custom Skill launched through its existing UI, including live, disconnected and exited output; mouse capture and selection gestures; button and native/keyboard copy; actual successful clipboard content; unavailable, throwing and rejected writes; fallback success/failure; overlapping attempts; tab switching, unrelated input focus, recovery-field selection and redraws; close/restart races; Ctrl+C interruption; exactly-once bracketed paste and retained ANSI rendering. Preserve existing fixture behavior and test organization unless a narrowly scoped shared helper is necessary. Verify the final candidate through current Skill evidence requirements, recording commands, candidate identity, pass/fail/skip totals and platform limitations without inheriting Round 1's pass.",
-              "id": "P7"
-            }
-          ],
-          "criticism_resolutions": [
-            {
-              "criticism_id": "C1",
-              "resolution": "A whole-candidate replay could overwrite newer Skills fixtures and rendering corrections. Use the retained commit as a source of reviewed clipboard behavior and adapt only necessary changes onto the pinned base. Preserve Round 1 references and evidence; its recorded worktree path is absent in this invocation, so its current filesystem cleanliness cannot be confirmed."
-            },
-            {
-              "criticism_id": "C2",
-              "resolution": "Successful clipboard handling can still lose text or disrupt another tab through restart, scrolling, redraw or delayed focus restoration. P3-P5 preserve selection and renderer identity, recheck retention after awaits, fence asynchronous attempts and restrict focus-dependent fallbacks to the originating context. Explicit restart remains available."
-            },
-            {
-              "criticism_id": "C3",
-              "resolution": "Historical test counts and mocked clipboard calls cannot establish the final candidate's browser behavior. P7 requires actual Chromium, explicit Custom Skill coverage, rendered-output synchronization and observable clipboard/input assertions. Report simulated platform checks, skips and baseline failures separately; Refine retains verification, workflow advancement and integration authority."
-            }
-          ],
-          "summary": "Selectively adapt the retained terminal clipboard implementation onto Round 2 at f880b7767149e4de43d5bc4d4786247d1e536a8c, making selection and copying reliable across Agent and Custom Skill tabs while preserving current rendering, input, lifecycle, and workflow contracts."
-        }
-      }
-    }
-  },
-  "attempts": [
-    {
-      "attempt": 0,
-      "binding_id": "default-plan",
-      "diagnostic": "agent returned invalid structured implementation plan JSON: does not match the required schema at field `criticism_resolutions[0]`: invalid type: string \"A whole-candidate replay could overwrite newer Skills fixtures and rendering corrections. Use the retained commit as a source of reviewed clipboard behavior and adapt only necessary changes onto the pinned base.\", expected struct CriticismResolution",
-      "operation_id": null,
-      "process_id": "proc-1789047785873-1129590-93",
-      "raw_output": "{\n  \"artifacts\": {\n    \"plan\": {\n      \"summary\": \"Selectively port the retained clipboard behavior onto Round 2 at f880b7767149e4de43d5bc4d4786247d1e536a8c. Keep clipboard interaction in one shared browser module used by Agent, Custom Skill and other terminal tabs. Preserve current lifecycle, input and rendering contracts, and verify the final candidate using the current Quality Skill.\",\n      \"checklist\": [\n        {\n          \"id\": \"P1\",\n          \"description\": \"Extract shared clipboard behavior from src/surfaces/web/static/js/features/toolbar.js into terminal-clipboard.js and load it through index.html. Selectively adapt be1f6f03's implementation, keeping clipboard state local to each terminal. Capture selection text, terminal/renderer identity, session identity and copy-attempt identity before asynchronous work. Copy must work after exit, disconnection or loss of a session ID; paste retains its live-session requirements. Preserve Model, Application and Infrastructure ownership.\"\n        },\n        {\n          \"id\": \"P2\",\n          \"description\": \"Enable xterm's macOptionClickForcesSelection and add visible hints explaining Shift-drag on Windows/Linux and Option-drag on macOS when applications capture mouse input. Add a native, keyboard-accessible Copy selection button whose enabled state follows the originating renderer's selection. Preserve selection during mouse and keyboard activation, ordinary application mouse handling, and usable header layout at narrow widths.\"\n        },\n        {\n          \"id\": \"P3\",\n          \"description\": \"Route the Copy button, native copy events, Ctrl+C/Ctrl+Shift+C and Cmd+C through the shared copy operation. Restrict shortcuts to the focused terminal; ordinary fields, including recovery fields, retain native editing and copying. Preserve Ctrl+C interruption without selection, Agent Ctrl+Enter/Ctrl+Z behavior, shell job control, xterm paste normalization and bracketed framing, duplicate-event prevention, and asynchronous/buffered paste session guards.\"\n        },\n        {\n          \"id\": \"P4\",\n          \"description\": \"Use native event clipboard data when available, otherwise Clipboard.writeText, then a supported selection-based browser fallback when it can preserve the user's current focus. If automatic copying fails, expose the captured text in a labeled readonly textarea with Select text and Dismiss controls and accessible status feedback. Report success only after successful clipboard handling. Update feedback without redrawing the Toolbar; ignore stale results after replacement, closure, dismissal or a newer attempt. Background results must remain with their originating tab and never focus a temporary field or disturb another tab's input.\"\n        },\n        {\n          \"id\": \"P5\",\n          \"description\": \"Integrate selection and pending/recovery state with activateToolbarTab, reattachment and focusTerminalSoon. Returning to selected output or unfinished recovery must preserve the renderer, viewport and text instead of automatically restarting or scrolling away. Recheck protection after awaited status requests. Preserve existing explicit Start/Restart/Stop authority and normal activation behavior when copy protection is absent. Scope delayed focus to the still-active originating tab and preserve keyboard focus in copy controls and recovery fields.\"\n        },\n        {\n          \"id\": \"P6\",\n          \"description\": \"Adapt behavior-focused VM tests and add a focused Chromium clipboard suite. Include skill explicitly in shared-profile tests and exercise a Custom Skill launched through the current typed-input UI, alongside ordinary Agent tabs. Derive any necessary shared browser bootstrap from current main's web_screen_render.test.js; preserve its current Skills fixtures, Controls setup and rendered-output waits. Extract only cohesive test-support responsibilities needed by these suites, without importing Round 1's broad restructuring. Update the Terminal intent page for selection, copying and recovery, and the Toolbar lifecycle passage for the narrow selection/recovery exception to activation scrolling and restart.\"\n        },\n        {\n          \"id\": \"P7\",\n          \"description\": \"Verify in the pinned Round 2 workspace. Proposed logic command: node --test --test-concurrency=1 tests/web_terminal_clipboard.test.js tests/web_supervisor_toolbar.test.js tests/web_goal_log_tail.test.js. Proposed browser command: NODE_PATH=/home/buddy/projects/refine/node_modules node --test --test-concurrency=1 tests/web_terminal_clipboard_browser.test.js. Run existing rendered regressions with NODE_PATH=/home/buddy/projects/refine/node_modules node --test --test-concurrency=1 --test-name-pattern='^(Toolbar add menu closes|a toolbar Agent|Agent terminal|Agent tab round trip|switching from Agent to Files|Custom Skills open)' tests/web_screen_render.test.js. Require real Chromium execution; report skips as skips. Cover mouse capture and selection gestures, keyboard activation, native copy, actual clipboard readback, unavailable/throwing/rejected writes, failed fallbacks, manual-field selection across redraws, exit/disconnection, tab switching, superseded attempts, closure/replacement, reattachment races, interruption, exactly-once paste and retained ANSI rendering. Run node --check on changed JavaScript, git diff --check, and cargo test --lib surfaces::web_server::tests::static_surface::terminal. Report exact commands, counts, browser/platform details and limitations against the final candidate; Refine owns candidate commits and supervised Quality evaluation.\"\n        }\n      ],\n      \"criticism_resolutions\": [\n        \"A whole-candidate replay could overwrite newer Skills fixtures and rendering corrections. Use the retained commit as a source of reviewed clipboard behavior and adapt only necessary changes onto the pinned base.\",\n        \"Adding more unrelated methods to the 3,087-line Toolbar file would worsen cohesion. Extract the clipboard responsibility behind small integration hooks; avoid a broader Toolbar refactor.\",\n        \"Clipboard fallback can steal focus, and a captured pre-await lifecycle decision can become stale. Fence asynchronous results and deferred focus, recheck copy protection after reattachment, and retain manual recovery on inactive tabs.\",\n        \"The retained browser suite primarily constructs Agent tabs directly and does not establish Custom Skill behavior. Add explicit coverage through the current Custom Skill launch surface and retain existing launch assertions.\",\n        \"Mock clipboard success and earlier test counts cannot approve this candidate. Combine deterministic failure/race tests with real Chromium clipboard readback and fresh supervised evidence; identify simulated macOS coverage separately.\",\n        \"The recorded Round 1 worktree is absent in live filesystem and worktree listings, but its branch and commit remain available. Inspect committed content without recreating, resetting or modifying historical state.\"\n      ]\n    }\n  },\n  \"binding_id\": \"default-plan\",\n  \"evidence\": [\n    \"Verified cwd is the supplied Round 2 managed worktree, branch is refine/DRBAC01843C2EBE03D1CD08034/round-2, and HEAD is f880b7767149e4de43d5bc4d4786247d1e536a8c. Final git status and untracked-file listings were empty; git diff --check succeeded.\",\n    \"Verified the Round 1 branch points to be1f6f0366dd855f93f505d470dd4e2ca5c6d1b5 and inspected its clipboard module, lifecycle changes and tests. Its recorded worktree path does not exist.\",\n    \"Inspected current Design, Surface Principles, Terminal, Toolbar and Skills intent, configure-skills.md, and automation configuration revision 22. Current Plan and Quality bindings are enabled and blocking; Quality requires focused observable checks supervised against the exact candidate.\",\n    \"Current toolbar.js includes skill in both terminal-mode sets, but copy handlers reject exited/sessionless terminals. The bundled xterm supports the requested platform selection gestures. Existing clipboard profile tests omit skill; current browser tests exercise Custom Skill launch and contain f880b776's rendered-output fixes.\",\n    \"Playwright resolves through /home/buddy/projects/refine/node_modules. Its pinned Chromium executable is absent, but cached Chromium executables 1208, 1228 and 1234 exist and the current browser loader supports cache discovery. Browser launch and test suites were not run during this observational planning invocation; P7 commands are proposed verification, not passing evidence.\"\n  ],\n  \"invocation_id\": \"5dacc101923b58b9e33d4100b12884d18130a8b0f737db738dc4c1c946e7d649\",\n  \"outcome\": \"success\",\n  \"role\": \"plan\",\n  \"summary\": \"Completed a read-only recovery plan with stable checklist IDs, resolved alternatives and focused verification. No repository files, Goal state, branches or runtime services were changed.\"\n}\n",
-      "workflow_revision": 29
-    },
-    {
-      "attempt": 1,
-      "binding_id": "default-plan",
-      "diagnostic": null,
-      "operation_id": null,
-      "process_id": "proc-1789048013001-1129590-123",
-      "raw_output": "{\n  \"artifacts\": {\n    \"plan\": {\n      \"summary\": \"Selectively adapt the retained terminal clipboard implementation onto Round 2 at f880b7767149e4de43d5bc4d4786247d1e536a8c, making selection and copying reliable across Agent and Custom Skill tabs while preserving current rendering, input, lifecycle, and workflow contracts.\",\n      \"checklist\": [\n        {\n          \"id\": \"P1\",\n          \"description\": \"Enable xterm's macOptionClickForcesSelection option and display platform-specific guidance: Shift-drag on Windows/Linux and Option-drag on macOS when applications capture the mouse. Preserve ordinary application mouse handling.\"\n        },\n        {\n          \"id\": \"P2\",\n          \"description\": \"Review the retained be1f6f0366dd855f93f505d470dd4e2ca5c6d1b5 delta and selectively adapt its terminal-clipboard.js module. Route native Copy, Ctrl+C/Ctrl+Shift+C and Cmd+C through the originating renderer's captured selection independently of process liveness. Load the module through index.html and update affected test loaders. Keep clipboard responsibility cohesive and toolbar integration thin; preserve current main's fixtures and rendered-output fixes.\"\n        },\n        {\n          \"id\": \"P3\",\n          \"description\": \"Add a native, keyboard-accessible Copy selection button to the shared terminal header, enabled only when text is selected. Bind actions to the originating terminal and update selection-dependent controls without replacing xterm, clearing selection, or stealing focus. Apply the same behavior to ordinary Agent, Custom Skill, and other shared terminal profiles.\"\n        },\n        {\n          \"id\": \"P4\",\n          \"description\": \"Preserve Ctrl+C interruption without selection, Agent newline/suspend handling, terminal-native paste framing and line endings, duplicate-event prevention, and asynchronous/buffered paste session checks. Allow copying after exit or disconnection. Defer automatic restart and forced scrolling while retained selection, a pending copy, or recovery is present; recheck these conditions after asynchronous reattachment. Keep explicit Restart available and invalidate obsolete copy attempts when tabs close or sessions/renderers are replaced.\"\n        },\n        {\n          \"id\": \"P5\",\n          \"description\": \"Capture copy text once per attempt. Use native event clipboard data when available, otherwise browser clipboard writes, followed by a supported selection-based fallback. Report success only after successful native handling, a fulfilled write, or a true fallback result. If copying remains blocked, expose the captured text in a labeled readonly selectable textarea with Select text and Dismiss controls and accessible feedback. Preserve terminal and DOM selections and focus during fallbacks. Fence delayed results by originating tab, terminal, renderer, session and attempt; defer focus-dependent fallback when the user has moved elsewhere, retain recovery on the originating tab, and preserve manual-field selection through redraws.\"\n        },\n        {\n          \"id\": \"P6\",\n          \"description\": \"Update docs/intent/05-surfaces/03-browser/19-terminal.md for gestures, Copy selection, focused shortcuts, retained-output copying and recovery. Adjust only the affected retention/scrolling statements in 15-toolbar.md to document the copy-preservation exception. Keep browser clipboard state transient and surface-owned; retain Model, Application, Infrastructure and Surfaces boundaries and existing backend authority.\"\n        },\n        {\n          \"id\": \"P7\",\n          \"description\": \"Adapt focused clipboard logic tests and add real Chromium coverage using current main's browser setup. Explicitly exercise an ordinary Agent and a Custom Skill launched through its existing UI, including live, disconnected and exited output; mouse capture and selection gestures; button and native/keyboard copy; actual successful clipboard content; unavailable, throwing and rejected writes; fallback success/failure; overlapping attempts; tab switching, unrelated input focus, recovery-field selection and redraws; close/restart races; Ctrl+C interruption; exactly-once bracketed paste and retained ANSI rendering. Preserve existing fixture behavior and test organization unless a narrowly scoped shared helper is necessary. Verify the final candidate through current Skill evidence requirements, recording commands, candidate identity, pass/fail/skip totals and platform limitations without inheriting Round 1's pass.\"\n        }\n      ],\n      \"criticism_resolutions\": [\n        {\n          \"criticism_id\": \"C1\",\n          \"resolution\": \"A whole-candidate replay could overwrite newer Skills fixtures and rendering corrections. Use the retained commit as a source of reviewed clipboard behavior and adapt only necessary changes onto the pinned base. Preserve Round 1 references and evidence; its recorded worktree path is absent in this invocation, so its current filesystem cleanliness cannot be confirmed.\"\n        },\n        {\n          \"criticism_id\": \"C2\",\n          \"resolution\": \"Successful clipboard handling can still lose text or disrupt another tab through restart, scrolling, redraw or delayed focus restoration. P3-P5 preserve selection and renderer identity, recheck retention after awaits, fence asynchronous attempts and restrict focus-dependent fallbacks to the originating context. Explicit restart remains available.\"\n        },\n        {\n          \"criticism_id\": \"C3\",\n          \"resolution\": \"Historical test counts and mocked clipboard calls cannot establish the final candidate's browser behavior. P7 requires actual Chromium, explicit Custom Skill coverage, rendered-output synchronization and observable clipboard/input assertions. Report simulated platform checks, skips and baseline failures separately; Refine retains verification, workflow advancement and integration authority.\"\n        }\n      ]\n    }\n  },\n  \"binding_id\": \"default-plan\",\n  \"evidence\": [\n    \"Observed the invocation workspace on branch refine/DRBAC01843C2EBE03D1CD08034/round-2 at f880b7767149e4de43d5bc4d4786247d1e536a8c. Git status was empty before and after inspection. No files or Git state were changed.\",\n    \"Confirmed src/model/goal/implementation_plan.rs defines CriticismResolution with criticism_id and resolution string fields. The planning contract requires compact checklist id/description pairs; this response uses those shapes.\",\n    \"Read current Design, Surface Principles, Terminal, Toolbar and Skills intent. Skills specifies observational planning, supervised exact-candidate Quality evidence, and Custom Skills using the shared managed terminal lifecycle.\",\n    \"Inspected the retained commit and its toolbar/clipboard changes. The Round 1 branch still resolves to be1f6f0366dd855f93f505d470dd4e2ca5c6d1b5, but its recorded worktree directory is absent and is not listed among registered worktrees. Commit-based selective reuse remains available.\",\n    \"Current toolbar.js includes skill in both terminal mode sets, gates existing copy handling on process liveness, and automatically starts eligible exited terminals on activation. Current web_screen_render.test.js includes a Custom Skill launch test and its own browser setup. Its latest change is f880b776, Fix browser test setup and wait for rendered terminal output.\",\n    \"Observed Playwright under /home/buddy/projects/refine/node_modules and Chromium cache directories chromium-1208, chromium-1228 and chromium-1234. Browser launch and tests were not run during this observational correction; availability is not a passing test result.\",\n    \"Proposed final-candidate logic command: node --test --test-concurrency=1 tests/web_terminal_clipboard.test.js tests/web_supervisor_toolbar.test.js tests/web_goal_log_tail.test.js.\",\n    \"Proposed browser command after adding the focused suite: NODE_PATH=/home/buddy/projects/refine/node_modules node --test --test-concurrency=1 tests/web_terminal_clipboard_browser.test.js tests/web_screen_render.test.js. Require an actual Chromium launch and inspect reported skips. Label macOS/Windows platform simulation accurately.\",\n    \"Proposed final validation: run node --check on each changed JavaScript file and git diff --check f880b7767149e4de43d5bc4d4786247d1e536a8c HEAD, also checking any uncommitted diff. Record the final candidate SHA and worktree status with test results. Reproduce suspected unrelated failures against the unchanged pinned base only when necessary.\"\n  ],\n  \"invocation_id\": \"5dacc101923b58b9e33d4100b12884d18130a8b0f737db738dc4c1c946e7d649\",\n  \"outcome\": \"success\",\n  \"role\": \"plan\",\n  \"summary\": \"Corrected the structured plan to use CriticismResolution objects and finalized a scoped recovery checklist with proposed verification. Inspection was observational; no implementation, test pass, Goal-state change, merge, push, deployment or daemon restart occurred.\"\n}",
-      "workflow_revision": 29
-    }
-  ],
-  "created_at": "2026-09-10T13:43:05.775796906+00:00",
-  "completed_at": "2026-09-10T13:49:29.334691643+00:00",
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-10T13:49:29.702561687+00:00",
+  "completed_at": null,
   "error": null,
   "action_applied": false
 }
