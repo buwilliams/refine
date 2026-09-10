@@ -1,9 +1,9 @@
 {
   "base_commit": "a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e",
   "branch_name": "refine/DR07C216F3E4EC22A57C60BE0B/round-6",
-  "candidate_commit": "3d221f8f5b5877d39da99aed12ded63df9cbd5d6",
+  "candidate_commit": "3fb8b4bf8377f07a4acc7d1e18b8f8e7ea8abbd9",
   "created": "2026-09-10T08:26:00Z",
-  "event_generation": 20,
+  "event_generation": 21,
   "feature_id": "00000T130Z0R6J0GJMARY62005",
   "feature_order": 2,
   "id": "DR07C216F3E4EC22A57C60BE0B",
@@ -8701,6 +8701,83 @@
         }
       },
       "event_results": {
+        "6d8b27036e1c4655273949fa327eedcfd5256444b69efe5d6fd56ad47a5a84ab": {
+          "candidate_commit": null,
+          "results": {
+            "default-implement": {
+              "artifacts": {
+                "implementation_evidence": {
+                  "checklist": [
+                    {
+                      "evidence": "Implemented in the pinned Round-6 workspace from retained HEAD 3d221f8f5b5877d39da99aed12ded63df9cbd5d6. Main remains a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e. Changes remain uncommitted for Refine capture.",
+                      "id": "workflow.plan.enter:default-plan:P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Extracted nonblocking capture with bounded batches, bounded buffering and explicit stream outcomes. Plan refinement: eliminated reader threads entirely, removing blocked-reader and join risks.",
+                      "id": "workflow.plan.enter:default-plan:P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Validated workload exit starts a fixed 200 ms drain deadline. Output cannot extend it. Workload status, callback ordering and deferred guardian reaping are preserved.",
+                      "id": "workflow.plan.enter:default-plan:P3",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Deadlines remain effective during capture. Faults use shared ownership and identity-checked termination. Receipts retain stream outcomes, workload status, paths and captured prefixes. Output-dependent callers reject incomplete capture through one shared check.",
+                      "id": "workflow.plan.enter:default-plan:P4",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Actual capacity and retirement tests preserve descendants, guardian identity and artifacts without primary registration. Missing or mismatched proof retains uncertainty; trustworthy scope-exit proof permits release.",
+                      "id": "workflow.plan.enter:default-plan:P5",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Seven new subprocess regressions cover the six inherited-pipe scenarios, exit statuses, trailing output, deadlines, capture faults, proof faults, replacement registration and buffering. Subprocess suite: 42 passed.",
+                      "id": "workflow.plan.enter:default-plan:P6",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "The same WorkflowEngine regression proves bounded caller return, retained descendant capacity, replacement refusal, unrelated progress and follow-up Plan admission within one second after proven release. Worker-liveness: 12 passed. Updated only the two affected intent pages.",
+                      "id": "workflow.plan.enter:default-plan:P7",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "All required final Linux checks passed on 960 unchanged source files. Corrected two observed fixture-cleanup races by awaiting actual worker/reaper completion without weakening assertions. Historical failures and intermediate runs remain retained.",
+                      "id": "workflow.plan.enter:default-plan:P8",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "cargo test --lib infrastructure::process::subprocess -- --test-threads=1: exit 0; 42 passed.",
+                    "cargo test --lib worker_liveness -- --test-threads=1: exit 0; 12 passed.",
+                    "cargo check --all-targets --locked: exit 0.",
+                    "cargo fmt --all -- --check: exit 0.",
+                    "cargo test --lib --bins -- --test-threads=1: exit 0; 1287 passed, zero failed, six ignored; binary target selected zero tests.",
+                    "cargo build --release --locked: exit 0.",
+                    "git diff --check: exit 0.",
+                    "Exact commands, results and logs: /tmp/refine-r6-implementation/final-settled/final-results.json.",
+                    "Additional verification: 39 worker tests passed; Quality restart-recovery passed ten consecutive runs. macOS was not tested. Ignored tests were not counted as passes."
+                  ]
+                }
+              },
+              "binding_id": "default-implement",
+              "evidence": [
+                "Detailed report: /tmp/refine-r6-implementation/completion.json.",
+                "Source manifest and unchanged readback: /tmp/refine-r6-implementation/final-settled/.",
+                "Patch and retained development history: /tmp/refine-r6-implementation/implementation.patch and /tmp/refine-r6-implementation/development-history.json.",
+                "No candidate commit, Goal-state advancement, merge, push, deployment or supervising-daemon restart was performed."
+              ],
+              "invocation_id": "6d8b27036e1c4655273949fa327eedcfd5256444b69efe5d6fd56ad47a5a84ab",
+              "outcome": "success",
+              "role": "implement",
+              "summary": "Implemented bounded standard capture, explicit incomplete-output evidence and ownership-safe settlement. All required final Linux checks passed."
+            }
+          },
+          "source": "workflow.implement.enter",
+          "state": "succeeded"
+        },
         "acb126ce63a61f19495ca9f027394ed611dae1bf39c74d069cf0b50e86e23f47": {
           "candidate_commit": null,
           "results": {
@@ -8785,7 +8862,12 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [],
+        "context_version": 1,
+        "recorded_at": "2026-09-10T21:42:39Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e",
@@ -8796,6 +8878,7 @@
           "round_idx": 5,
           "target_branch": "main"
         },
+        "completed_at": "2026-09-10T21:42:39Z",
         "final_plan": {
           "completed_at": "2026-09-10T20:45:10Z",
           "git_after": {
@@ -8846,6 +8929,66 @@
             "summary": "workflow.plan.enter:default-plan: Correct standard subprocess capture on retained candidate 3d221f8f5b5877d39da99aed12ded63df9cbd5d6. The existing workload-versus-scope distinction remains sound, but execution.rs still requires reader EOF after workload exit and disables deadline enforcement during that wait. Strengthen FileProcessSupervisor's capture lifecycle so workload results return within a bound while pending ownership retains capacity and artifacts."
           },
           "started_at": "2026-09-10T20:42:02Z"
+        },
+        "implementation": {
+          "completed_at": "2026-09-10T21:42:39Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Implemented in the pinned Round-6 workspace from retained HEAD 3d221f8f5b5877d39da99aed12ded63df9cbd5d6. Main remains a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e. Changes remain uncommitted for Refine capture.",
+                "id": "workflow.plan.enter:default-plan:P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Extracted nonblocking capture with bounded batches, bounded buffering and explicit stream outcomes. Plan refinement: eliminated reader threads entirely, removing blocked-reader and join risks.",
+                "id": "workflow.plan.enter:default-plan:P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Validated workload exit starts a fixed 200 ms drain deadline. Output cannot extend it. Workload status, callback ordering and deferred guardian reaping are preserved.",
+                "id": "workflow.plan.enter:default-plan:P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Deadlines remain effective during capture. Faults use shared ownership and identity-checked termination. Receipts retain stream outcomes, workload status, paths and captured prefixes. Output-dependent callers reject incomplete capture through one shared check.",
+                "id": "workflow.plan.enter:default-plan:P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Actual capacity and retirement tests preserve descendants, guardian identity and artifacts without primary registration. Missing or mismatched proof retains uncertainty; trustworthy scope-exit proof permits release.",
+                "id": "workflow.plan.enter:default-plan:P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Seven new subprocess regressions cover the six inherited-pipe scenarios, exit statuses, trailing output, deadlines, capture faults, proof faults, replacement registration and buffering. Subprocess suite: 42 passed.",
+                "id": "workflow.plan.enter:default-plan:P6",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "The same WorkflowEngine regression proves bounded caller return, retained descendant capacity, replacement refusal, unrelated progress and follow-up Plan admission within one second after proven release. Worker-liveness: 12 passed. Updated only the two affected intent pages.",
+                "id": "workflow.plan.enter:default-plan:P7",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "All required final Linux checks passed on 960 unchanged source files. Corrected two observed fixture-cleanup races by awaiting actual worker/reaper completion without weakening assertions. Historical failures and intermediate runs remain retained.",
+                "id": "workflow.plan.enter:default-plan:P8",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "cargo test --lib infrastructure::process::subprocess -- --test-threads=1: exit 0; 42 passed.",
+              "cargo test --lib worker_liveness -- --test-threads=1: exit 0; 12 passed.",
+              "cargo check --all-targets --locked: exit 0.",
+              "cargo fmt --all -- --check: exit 0.",
+              "cargo test --lib --bins -- --test-threads=1: exit 0; 1287 passed, zero failed, six ignored; binary target selected zero tests.",
+              "cargo build --release --locked: exit 0.",
+              "git diff --check: exit 0.",
+              "Exact commands, results and logs: /tmp/refine-r6-implementation/final-settled/final-results.json.",
+              "Additional verification: 39 worker tests passed; Quality restart-recovery passed ten consecutive runs. macOS was not tested. Ignored tests were not counted as passes."
+            ]
+          },
+          "report": "workflow.implement.enter:default-implement: Implemented bounded standard capture, explicit incomplete-output evidence and ownership-safe settlement. All required final Linux checks passed.",
+          "started_at": "2026-09-10T20:45:10Z"
         },
         "phase": "implement",
         "phase_started_at": "2026-09-10T20:45:10Z",
@@ -8902,11 +9045,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-09-10T20:42:02Z",
-        "state": "in_progress",
-        "updated_at": "2026-09-10T20:45:10Z"
+        "state": "completed",
+        "updated_at": "2026-09-10T21:42:39Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "workflow.implement.enter:default-implement: Implemented bounded standard capture, explicit incomplete-output evidence and ownership-safe settlement. All required final Linux checks passed.",
+      "implementation_reported_at": "2026-09-10T21:42:39Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -8917,7 +9060,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T20:45:10Z",
+      "updated": "2026-09-10T21:42:39Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T20:42:02Z",
         "round_idx": 5,
@@ -8927,9 +9070,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-10T20:45:10Z",
+  "updated": "2026-09-10T21:42:39Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:37.178169037+00:00",
@@ -9110,7 +9253,16 @@
       "node_id": "default",
       "round_idx": 5,
       "to": "implement"
+    },
+    {
+      "at": "2026-09-10T21:42:39.570210315+00:00",
+      "forced": false,
+      "from": "implement",
+      "generation": 21,
+      "node_id": "default",
+      "round_idx": 5,
+      "to": "quality"
     }
   ],
-  "workflow_revision": 144
+  "workflow_revision": 152
 }
