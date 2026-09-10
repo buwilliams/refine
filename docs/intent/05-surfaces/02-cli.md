@@ -38,6 +38,7 @@ Current implementation details that matter to intent:
   `--profile plan` and `--profile standalone` open those role sessions. Ctrl-]
   detaches without stopping the agent.
 - normal target-state mutations are routed to the daemon instead of directly writing files in normal operation.
+- `system fetch-email-goals --runtime-root <runtime> --target-root <target>` is a bounded one-shot exception for email intake Skills. Its required target identifies the host-local connection authorized by the shared Application capability before secret or request-ledger access. The CLI only adapts that capability: sender filtering, MIME extraction, deterministic Goal identities, durable retries, and ordinary Backlog authoring remain Application-owned. Fetching never approves Goals, changes Review decisions, or sends replies; unrelated direct-target restrictions remain in force.
 - `sync` is the single top-level state-convergence command; it replaced
   `project sync` and the `project state-recovery` subtree with no aliases.
   That replacement is per node, not per fleet: a node's CLI and daemon are one

@@ -1,5 +1,7 @@
 use super::*;
 
+mod intake;
+
 struct FakeMail {
     raw: Option<Vec<u8>>,
 }

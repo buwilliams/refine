@@ -48,6 +48,22 @@ fn explicit_target_root_path_detects_internal_cli_escape_hatch() {
     };
     assert_eq!(explicit_target_root_path(&command), Some(&target_root));
 
+    let fetch = Commands::System {
+        action: SystemAction::FetchEmailGoals {
+            runtime_root: PathBuf::from("/tmp/runtime"),
+            target_root: target_root.clone(),
+        },
+    };
+    assert_eq!(explicit_target_root_path(&fetch), None);
+    let config = Commands::Config {
+        action: ConfigAction::Settings {
+            action: ConfigSettingsAction::Show {
+                target_root: Some(target_root.clone()),
+            },
+        },
+    };
+    assert_eq!(explicit_target_root_path(&config), Some(&target_root));
+
     let default_daemon_command = Commands::Workflow {
         action: WorkflowAction::Pause {
             runtime_root: PathBuf::from("run"),
