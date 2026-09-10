@@ -3,7 +3,7 @@
   "branch_name": "refine/DRA87E5F985A1FFE2919BE7EC2/round-5",
   "candidate_commit": null,
   "created": "2026-09-10T08:26:05Z",
-  "event_generation": 16,
+  "event_generation": 17,
   "feature_id": null,
   "feature_order": null,
   "id": "DRA87E5F985A1FFE2919BE7EC2",
@@ -7397,6 +7397,90 @@
           }
         }
       },
+      "event_results": {
+        "d13d6c05b2ce85edf3df813bfcddcab76bd6efec2a7adbe7d41f0e1811b3ac94": {
+          "candidate_commit": null,
+          "results": {
+            "default-plan": {
+              "artifacts": {
+                "plan": {
+                  "checklist": [
+                    {
+                      "description": "Work only in the pinned Round 5 worktree at base 0b6cc819de716b1b118f40c4465d114290117699. Record starting status and retained refs. Selectively reapply the intended b47569ad..34660f8e delta, including all prior corrections; preserve prior branches, commits, worktrees, uncommitted files and evidence.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Restore the retained shared recovery, integration-effect and settlement modules and their CLI/API/browser adapters. Preserve guarded Review retry, strict approval, exact local/published ancestry, lifecycle gates, bounded publication recovery, atomic settlement with Review, and Q1’s distinct attribution of the originating local effect and replacement publication.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Resolve event integration against main’s current module boundaries. Keep completion, records, context and configuration responsibilities separated. Adapt useful receipt projection in context.rs without restoring recursive ledgers or configuration snapshots. Preserve completion repair, accepted-content observations, gate assessment and workflow admission. Combine both sides’ metadata invalidation keys and module declarations.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Adapt Quality and Governance receipt creation to main’s gate_configuration pin for each workflow occurrence. Retain pending/completed candidate-bound receipts and immutable history without introducing a competing configuration authority. Preserve Quality’s resolved requirements, accepted-review reuse, missing-review execution, failed findings, supervised commands and explicit empty coverage. Update replay fixtures to supported APIs instead of restoring the removed workflow::configuration helper.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Reconcile already_merged.rs with the extracted governance_evidence.rs, carrying QualityProof.skills and requirement-coverage validation into the shared normalization path. Keep pure receipt and coverage policy in Model. Validate agreement among the exact candidate, requirements snapshot, required bindings, invocation identities, receipts and supervised results. Apply equivalent checks to typed and normalized proofs; preserve compatible legacy evidence without inventing missing coverage. Update affected proof/result constructors.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Add focused regressions for the combined contracts: valid covered proof; missing or mismatched skills, requirements, candidate and invocation coverage; normalization bypass attempts; completed empty gates versus pending/missing receipts; replay after configuration edits; and accepted review reuse followed by fresh candidate-bound supervision. Adapt retained context/replay tests to current behavior without weakening assertions. Preserve Q1, malformed-intent, cancellation, supersession, deduplication and content-equality-without-identity coverage.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Run cargo test --lib <filter> -- --test-threads=1 for model::automation::gate_evidence, governance, application::events::, application::workflow::phases::quality::, application::workflow::engine::behaviors::tests::quality_resume, candidate_refresh, already_merged, application::work_items::tests::workflow, application::workflow::engine::admission, surfaces::cli::tests::goals::lifecycle and web_server_governance_retry_from_review. Confirm selection includes Q1 and main’s completion-repair, occurrence-pinning and final-content coverage regressions. Investigate failures against the pinned base where necessary.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Merge the retained additions to the seven affected Skills, merge/review, Governance, Review, CLI, API and browser intent pages while preserving main’s newer contracts. Clarify the Quality receipt/coverage relationship only if needed. Run node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js, rustfmt --check --edition 2024 --config skip_children=true on every changed/new Rust file, and git diff --check against the Round 5 base. Review overlapping files for semantic losses and keep modules cohesive.",
+                      "id": "P8"
+                    },
+                    {
+                      "description": "Report actual commands, exit codes, selected counts, failures, skips and unexecuted checks with the resulting candidate identity and preservation readback. Hand off to Refine for independent exact-candidate Quality and Governance before integration; replacement identities require replacement evidence. Leave Goal advancement, publication, integration and approval to the authorized workflow, and source promotion or serving-daemon restart to the operator.",
+                      "id": "P9"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "C1",
+                      "resolution": "Replaying all historical commits or taking either conflict side wholesale could discard main’s newer behavior. Reapply the net intended delta and deliberately reconcile all eight overlapping paths, including files that previously merged automatically."
+                    },
+                    {
+                      "criticism_id": "C2",
+                      "resolution": "The three-file restriction governed the failed in-place resolver. This fresh recovery Round requires dependent changes such as governance_evidence.rs and context.rs; the plan includes them without changing the general conflict-resolver scope policy."
+                    },
+                    {
+                      "criticism_id": "C3",
+                      "resolution": "Adding skills: None merely to compile would leave incompatible evidence paths. Preserve coverage validation, connect it to recovery receipts, and test both typed and normalized proof admission."
+                    },
+                    {
+                      "criticism_id": "C4",
+                      "resolution": "Main permits reuse of accepted review proposals whose requirements and observed content match. Preserve that optimization while requiring fresh supervised proof for the final exact candidate; content equality cannot transfer an earlier Quality or Governance verdict."
+                    }
+                  ],
+                  "summary": "Recover the retained Review-settlement implementation on Round 5’s pinned main, preserving the Q1 correction and Model policy extraction while integrating current Skill configuration, completion, and Quality coverage contracts."
+                }
+              },
+              "binding_id": "default-plan",
+              "evidence": [
+                "Verified the pinned Round 5 branch and clean worktree at 0b6cc819de716b1b118f40c4465d114290117699; main matched that commit. No unmerged paths or active merge, rebase or cherry-pick state were present.",
+                "Verified retained Round 4 ref at 34660f8e680c56c09ce52c89ddf552c78b3c7d75 and prior Round refs. Its net delta from b47569ad spans 62 files; eight paths overlap main’s Skill completion, admission and Quality-evidence changes.",
+                "Inspected relevant candidate intent, current and retained implementations, regression fixtures and completion-contract schemas. Confirmed the retained governance_evidence.rs lacks main’s QualityProof.skills field and coverage validation, and a retained replay test calls the removed workflow::configuration helper.",
+                "Read-only git diff --check passed for the retained candidate delta and the current Round 5 worktree. Final HEAD and retained Round 4 ref matched initial observations.",
+                "No files or Git state were changed. Implementation tests were not executed during this observational Plan invocation; the checklist supplies proposed verification commands."
+              ],
+              "invocation_id": "d13d6c05b2ce85edf3df813bfcddcab76bd6efec2a7adbe7d41f0e1811b3ac94",
+              "outcome": "success",
+              "role": "plan",
+              "summary": "Completed a read-only recovery plan with deliberate conflict resolutions, stable checklist IDs and verification of the combined contracts."
+            }
+          },
+          "source": "workflow.plan.enter",
+          "state": "succeeded"
+        }
+      },
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
@@ -7416,12 +7500,122 @@
           "round_idx": 4,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-09-10T15:50:03Z",
+        "final_plan": {
+          "completed_at": "2026-09-10T15:53:59Z",
+          "git_after": {
+            "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-5",
+            "head_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-5",
+            "head_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Work only in the pinned Round 5 worktree at base 0b6cc819de716b1b118f40c4465d114290117699. Record starting status and retained refs. Selectively reapply the intended b47569ad..34660f8e delta, including all prior corrections; preserve prior branches, commits, worktrees, uncommitted files and evidence.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Restore the retained shared recovery, integration-effect and settlement modules and their CLI/API/browser adapters. Preserve guarded Review retry, strict approval, exact local/published ancestry, lifecycle gates, bounded publication recovery, atomic settlement with Review, and Q1’s distinct attribution of the originating local effect and replacement publication.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Resolve event integration against main’s current module boundaries. Keep completion, records, context and configuration responsibilities separated. Adapt useful receipt projection in context.rs without restoring recursive ledgers or configuration snapshots. Preserve completion repair, accepted-content observations, gate assessment and workflow admission. Combine both sides’ metadata invalidation keys and module declarations.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Adapt Quality and Governance receipt creation to main’s gate_configuration pin for each workflow occurrence. Retain pending/completed candidate-bound receipts and immutable history without introducing a competing configuration authority. Preserve Quality’s resolved requirements, accepted-review reuse, missing-review execution, failed findings, supervised commands and explicit empty coverage. Update replay fixtures to supported APIs instead of restoring the removed workflow::configuration helper.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Reconcile already_merged.rs with the extracted governance_evidence.rs, carrying QualityProof.skills and requirement-coverage validation into the shared normalization path. Keep pure receipt and coverage policy in Model. Validate agreement among the exact candidate, requirements snapshot, required bindings, invocation identities, receipts and supervised results. Apply equivalent checks to typed and normalized proofs; preserve compatible legacy evidence without inventing missing coverage. Update affected proof/result constructors.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Add focused regressions for the combined contracts: valid covered proof; missing or mismatched skills, requirements, candidate and invocation coverage; normalization bypass attempts; completed empty gates versus pending/missing receipts; replay after configuration edits; and accepted review reuse followed by fresh candidate-bound supervision. Adapt retained context/replay tests to current behavior without weakening assertions. Preserve Q1, malformed-intent, cancellation, supersession, deduplication and content-equality-without-identity coverage.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Run cargo test --lib <filter> -- --test-threads=1 for model::automation::gate_evidence, governance, application::events::, application::workflow::phases::quality::, application::workflow::engine::behaviors::tests::quality_resume, candidate_refresh, already_merged, application::work_items::tests::workflow, application::workflow::engine::admission, surfaces::cli::tests::goals::lifecycle and web_server_governance_retry_from_review. Confirm selection includes Q1 and main’s completion-repair, occurrence-pinning and final-content coverage regressions. Investigate failures against the pinned base where necessary.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              },
+              {
+                "description": "Merge the retained additions to the seven affected Skills, merge/review, Governance, Review, CLI, API and browser intent pages while preserving main’s newer contracts. Clarify the Quality receipt/coverage relationship only if needed. Run node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js, rustfmt --check --edition 2024 --config skip_children=true on every changed/new Rust file, and git diff --check against the Round 5 base. Review overlapping files for semantic losses and keep modules cohesive.",
+                "id": "workflow.plan.enter:default-plan:P8"
+              },
+              {
+                "description": "Report actual commands, exit codes, selected counts, failures, skips and unexecuted checks with the resulting candidate identity and preservation readback. Hand off to Refine for independent exact-candidate Quality and Governance before integration; replacement identities require replacement evidence. Leave Goal advancement, publication, integration and approval to the authorized workflow, and source promotion or serving-daemon restart to the operator.",
+                "id": "workflow.plan.enter:default-plan:P9"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Recover the retained Review-settlement implementation on Round 5’s pinned main, preserving the Q1 correction and Model policy extraction while integrating current Skill configuration, completion, and Quality coverage contracts."
+          },
+          "started_at": "2026-09-10T15:50:03Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-09-10T15:53:59Z",
+        "proposal": {
+          "completed_at": "2026-09-10T15:53:59Z",
+          "git_after": {
+            "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-5",
+            "head_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-5",
+            "head_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Work only in the pinned Round 5 worktree at base 0b6cc819de716b1b118f40c4465d114290117699. Record starting status and retained refs. Selectively reapply the intended b47569ad..34660f8e delta, including all prior corrections; preserve prior branches, commits, worktrees, uncommitted files and evidence.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Restore the retained shared recovery, integration-effect and settlement modules and their CLI/API/browser adapters. Preserve guarded Review retry, strict approval, exact local/published ancestry, lifecycle gates, bounded publication recovery, atomic settlement with Review, and Q1’s distinct attribution of the originating local effect and replacement publication.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Resolve event integration against main’s current module boundaries. Keep completion, records, context and configuration responsibilities separated. Adapt useful receipt projection in context.rs without restoring recursive ledgers or configuration snapshots. Preserve completion repair, accepted-content observations, gate assessment and workflow admission. Combine both sides’ metadata invalidation keys and module declarations.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Adapt Quality and Governance receipt creation to main’s gate_configuration pin for each workflow occurrence. Retain pending/completed candidate-bound receipts and immutable history without introducing a competing configuration authority. Preserve Quality’s resolved requirements, accepted-review reuse, missing-review execution, failed findings, supervised commands and explicit empty coverage. Update replay fixtures to supported APIs instead of restoring the removed workflow::configuration helper.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Reconcile already_merged.rs with the extracted governance_evidence.rs, carrying QualityProof.skills and requirement-coverage validation into the shared normalization path. Keep pure receipt and coverage policy in Model. Validate agreement among the exact candidate, requirements snapshot, required bindings, invocation identities, receipts and supervised results. Apply equivalent checks to typed and normalized proofs; preserve compatible legacy evidence without inventing missing coverage. Update affected proof/result constructors.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Add focused regressions for the combined contracts: valid covered proof; missing or mismatched skills, requirements, candidate and invocation coverage; normalization bypass attempts; completed empty gates versus pending/missing receipts; replay after configuration edits; and accepted review reuse followed by fresh candidate-bound supervision. Adapt retained context/replay tests to current behavior without weakening assertions. Preserve Q1, malformed-intent, cancellation, supersession, deduplication and content-equality-without-identity coverage.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Run cargo test --lib <filter> -- --test-threads=1 for model::automation::gate_evidence, governance, application::events::, application::workflow::phases::quality::, application::workflow::engine::behaviors::tests::quality_resume, candidate_refresh, already_merged, application::work_items::tests::workflow, application::workflow::engine::admission, surfaces::cli::tests::goals::lifecycle and web_server_governance_retry_from_review. Confirm selection includes Q1 and main’s completion-repair, occurrence-pinning and final-content coverage regressions. Investigate failures against the pinned base where necessary.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              },
+              {
+                "description": "Merge the retained additions to the seven affected Skills, merge/review, Governance, Review, CLI, API and browser intent pages while preserving main’s newer contracts. Clarify the Quality receipt/coverage relationship only if needed. Run node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js, rustfmt --check --edition 2024 --config skip_children=true on every changed/new Rust file, and git diff --check against the Round 5 base. Review overlapping files for semantic losses and keep modules cohesive.",
+                "id": "workflow.plan.enter:default-plan:P8"
+              },
+              {
+                "description": "Report actual commands, exit codes, selected counts, failures, skips and unexecuted checks with the resulting candidate identity and preservation readback. Hand off to Refine for independent exact-candidate Quality and Governance before integration; replacement identities require replacement evidence. Leave Goal advancement, publication, integration and approval to the authorized workflow, and source promotion or serving-daemon restart to the operator.",
+                "id": "workflow.plan.enter:default-plan:P9"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Recover the retained Review-settlement implementation on Round 5’s pinned main, preserving the Q1 correction and Model policy extraction while integrating current Skill configuration, completion, and Quality coverage contracts."
+          },
+          "started_at": "2026-09-10T15:50:03Z"
+        },
         "schema_version": 2,
         "started_at": "2026-09-10T15:50:03Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T15:50:03Z"
+        "updated_at": "2026-09-10T15:53:59Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -7435,7 +7629,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T15:50:03Z",
+      "updated": "2026-09-10T15:53:59Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T15:50:02Z",
         "round_idx": 4,
@@ -7498,9 +7692,9 @@
       }
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-09-10T15:50:03Z",
+  "updated": "2026-09-10T15:53:59Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:37.079960889+00:00",
@@ -7645,7 +7839,16 @@
       "node_id": "default",
       "round_idx": 4,
       "to": "plan"
+    },
+    {
+      "at": "2026-09-10T15:53:59.182418274+00:00",
+      "forced": false,
+      "from": "plan",
+      "generation": 17,
+      "node_id": "default",
+      "round_idx": 4,
+      "to": "implement"
     }
   ],
-  "workflow_revision": 120
+  "workflow_revision": 126
 }
