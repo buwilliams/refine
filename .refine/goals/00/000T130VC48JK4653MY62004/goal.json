@@ -1,9 +1,9 @@
 {
   "base_commit": "0b6cc819de716b1b118f40c4465d114290117699",
   "branch_name": "refine/00000T130VC48JK4653MY62004/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "8cb7f307a671f134a8288a76ffb81362e344545a",
   "created": "2026-09-10T16:16:39Z",
-  "event_generation": 4,
+  "event_generation": 5,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T130VC48JK4653MY62004",
@@ -582,6 +582,65 @@
           },
           "source": "workflow.plan.enter",
           "state": "succeeded"
+        },
+        "76bdee316505e24fa944bbb2f5132422c0955b8e9333efdab5a7c51bc2056c47": {
+          "candidate_commit": null,
+          "results": {
+            "default-implement": {
+              "artifacts": {
+                "implementation_evidence": {
+                  "checklist": [
+                    {
+                      "evidence": "Extracted keyboard policy into the 97-line terminal-keyboard.js. All four existing helpers match the baseline byte-for-byte. Updated index.html and all three explicit test loaders. Renderer lifecycle, transport, and clipboard operations retain their existing owners.",
+                      "id": "workflow.plan.enter:default-plan:P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "The shared custom-key hook consumes focused, non-composing Alt+Up/Down keydowns and queues ESC[1;3A/B once per event, including repeat. Exited or missing sessions consume the gesture without sending. Browser tests verify renderer and session fencing.",
+                      "id": "workflow.plan.enter:default-plan:P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added five policy tests and 13 real Chromium/xterm tests covering platform settings, cursor modes, repeats, keyup, composition, modifiers, focus, retained output, lifecycle changes, profiles/providers, neighboring shortcuts, and palette precedence. The regression fails on the pinned Linux and Windows baseline because Alt+Up emits ESC[1;5A.",
+                      "id": "workflow.plan.enter:default-plan:P3",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Updated only docs/intent/05-surfaces/03-browser/19-terminal.md to document modifier preservation and attached-application shortcut ownership.",
+                      "id": "workflow.plan.enter:default-plan:P4",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Focused and full web suites pass without skips. Rust tests, formatting, locked release build, and whitespace checks pass. Baseline full web suite also passes; no broader failure comparison was needed.",
+                      "id": "workflow.plan.enter:default-plan:P5",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal*.test.js tests/web_supervisor_toolbar.test.js tests/web_goal_log_tail.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js: 135 passed, 0 failed, 0 skipped.",
+                    "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/*.test.js: 317 passed, 0 failed, 0 skipped; pinned baseline 0b6cc819de716b1b118f40c4465d114290117699: 299 passed, 0 failed, 0 skipped.",
+                    "cargo fmt --all -- --check: exit 0.",
+                    "cargo test --lib --bins -- --test-threads=1: 1159 passed, 0 failed, 6 existing helper/systemd integration tests ignored; binary target had 0 tests.",
+                    "cargo build --release --locked: exit 0.",
+                    "git diff --check: exit 0."
+                  ]
+                }
+              },
+              "binding_id": "default-implement",
+              "evidence": [
+                "Logs, complete patch, and verified file hashes: /tmp/refine-alt-arrows-round1-CwJYsB/evidence.json.",
+                "No implementation-plan deviations. Nine changed paths; HEAD remains the pinned baseline.",
+                "Verification covers exact browser input-route bytes and provider fixtures. No native Codex smoke test was performed.",
+                "No Goal-state changes, candidate commits, merge, push, deployment, or supervising-daemon restart."
+              ],
+              "invocation_id": "76bdee316505e24fa944bbb2f5132422c0955b8e9333efdab5a7c51bc2056c47",
+              "outcome": "success",
+              "role": "implement",
+              "summary": "Implemented shared Alt+Up/Down modifier preservation and completed verification. Changes remain uncommitted for Refine’s candidate and Quality workflow."
+            }
+          },
+          "source": "workflow.implement.enter",
+          "state": "succeeded"
         }
       },
       "failure_at": "",
@@ -592,7 +651,12 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [],
+        "context_version": 1,
+        "recorded_at": "2026-09-10T16:42:57Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "0b6cc819de716b1b118f40c4465d114290117699",
@@ -603,6 +667,7 @@
           "round_idx": 0,
           "target_branch": "main"
         },
+        "completed_at": "2026-09-10T16:42:56Z",
         "final_plan": {
           "completed_at": "2026-09-10T16:27:51Z",
           "git_after": {
@@ -641,6 +706,48 @@
             "summary": "workflow.plan.enter:default-plan: Restore native Alt+Up delivery through the shared terminal keyboard adapter. The bundled xterm rewrites Alt+Up to Ctrl+Up on non-macOS platforms; the backend forwards those incorrect bytes unchanged. The governing invariant is that focused terminal navigation preserves the user's modifiers and reaches only its originating session. Ownership remains in the browser terminal adapter, with shortcut meaning owned by the attached CLI. Use a focused reproduction-and-regression approach. Correct Alt+Down alongside Alt+Up because both share the demonstrated vertical-arrow remapping. Prefer the existing custom-key hook over modifying vendored xterm, changing platform detection, rewriting backend input, or adding Codex-specific behavior. Changing terminalKeyData alone would miss the production xterm path. Keep Model, Application, Infrastructure, and workflow contracts unchanged."
           },
           "started_at": "2026-09-10T16:22:59Z"
+        },
+        "implementation": {
+          "completed_at": "2026-09-10T16:42:56Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Extracted keyboard policy into the 97-line terminal-keyboard.js. All four existing helpers match the baseline byte-for-byte. Updated index.html and all three explicit test loaders. Renderer lifecycle, transport, and clipboard operations retain their existing owners.",
+                "id": "workflow.plan.enter:default-plan:P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "The shared custom-key hook consumes focused, non-composing Alt+Up/Down keydowns and queues ESC[1;3A/B once per event, including repeat. Exited or missing sessions consume the gesture without sending. Browser tests verify renderer and session fencing.",
+                "id": "workflow.plan.enter:default-plan:P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added five policy tests and 13 real Chromium/xterm tests covering platform settings, cursor modes, repeats, keyup, composition, modifiers, focus, retained output, lifecycle changes, profiles/providers, neighboring shortcuts, and palette precedence. The regression fails on the pinned Linux and Windows baseline because Alt+Up emits ESC[1;5A.",
+                "id": "workflow.plan.enter:default-plan:P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated only docs/intent/05-surfaces/03-browser/19-terminal.md to document modifier preservation and attached-application shortcut ownership.",
+                "id": "workflow.plan.enter:default-plan:P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Focused and full web suites pass without skips. Rust tests, formatting, locked release build, and whitespace checks pass. Baseline full web suite also passes; no broader failure comparison was needed.",
+                "id": "workflow.plan.enter:default-plan:P5",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal*.test.js tests/web_supervisor_toolbar.test.js tests/web_goal_log_tail.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js: 135 passed, 0 failed, 0 skipped.",
+              "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/*.test.js: 317 passed, 0 failed, 0 skipped; pinned baseline 0b6cc819de716b1b118f40c4465d114290117699: 299 passed, 0 failed, 0 skipped.",
+              "cargo fmt --all -- --check: exit 0.",
+              "cargo test --lib --bins -- --test-threads=1: 1159 passed, 0 failed, 6 existing helper/systemd integration tests ignored; binary target had 0 tests.",
+              "cargo build --release --locked: exit 0.",
+              "git diff --check: exit 0."
+            ]
+          },
+          "report": "workflow.implement.enter:default-implement: Implemented shared Alt+Up/Down modifier preservation and completed verification. Changes remain uncommitted for Refine’s candidate and Quality workflow.",
+          "started_at": "2026-09-10T16:27:51Z"
         },
         "phase": "implement",
         "phase_started_at": "2026-09-10T16:27:51Z",
@@ -685,11 +792,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-09-10T16:22:59Z",
-        "state": "in_progress",
-        "updated_at": "2026-09-10T16:27:51Z"
+        "state": "completed",
+        "updated_at": "2026-09-10T16:42:56Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "workflow.implement.enter:default-implement: Implemented shared Alt+Up/Down modifier preservation and completed verification. Changes remain uncommitted for Refine’s candidate and Quality workflow.",
+      "implementation_reported_at": "2026-09-10T16:42:56Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -700,7 +807,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T16:27:51Z",
+      "updated": "2026-09-10T16:42:57Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T16:22:58Z",
         "round_idx": 0,
@@ -710,9 +817,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-10T16:27:51Z",
+  "updated": "2026-09-10T16:42:57Z",
   "workflow_events": [
     {
       "at": "2026-09-10T16:16:39.697881485+00:00",
@@ -749,7 +856,16 @@
       "node_id": "default",
       "round_idx": 0,
       "to": "implement"
+    },
+    {
+      "at": "2026-09-10T16:42:57.301160539+00:00",
+      "forced": false,
+      "from": "implement",
+      "generation": 5,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "quality"
     }
   ],
-  "workflow_revision": 16
+  "workflow_revision": 24
 }
