@@ -8701,6 +8701,73 @@
         }
       },
       "event_results": {
+        "31ab35e4efba92eee7ea3ba351d5d137973f1d7491c31a28c2598db8054310f6": {
+          "candidate_commit": "3fb8b4bf8377f07a4acc7d1e18b8f8e7ea8abbd9",
+          "results": {
+            "default-quality": {
+              "artifacts": {
+                "tests": [
+                  {
+                    "command": "cargo test --lib infrastructure::process::subprocess -- --test-threads=1",
+                    "evidence": "Exit 0; 42 passed.",
+                    "status": "passed",
+                    "test": "Bounded capture and ownership retention"
+                  },
+                  {
+                    "command": "cargo test --lib worker_liveness -- --test-threads=1",
+                    "evidence": "Exit 0; 12 passed.",
+                    "status": "passed",
+                    "test": "Failure containment and follow-up admission"
+                  },
+                  {
+                    "command": "cargo check --all-targets --locked",
+                    "evidence": "Exit 0.",
+                    "status": "passed",
+                    "test": "All-target compilation"
+                  },
+                  {
+                    "command": "cargo fmt --all -- --check",
+                    "evidence": "Exit 0.",
+                    "status": "passed",
+                    "test": "Formatting"
+                  },
+                  {
+                    "command": "cargo test --lib --bins -- --test-threads=1",
+                    "evidence": "Exit 0; 1287 passed, zero failed, six ignored. Binary target selected zero tests.",
+                    "status": "passed",
+                    "test": "Full regression suite"
+                  },
+                  {
+                    "command": "cargo build --release --locked",
+                    "evidence": "Exit 0.",
+                    "status": "passed",
+                    "test": "Release compilation"
+                  },
+                  {
+                    "command": "git diff --check a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e HEAD",
+                    "evidence": "Exit 0. Working-tree git diff --check also exited 0.",
+                    "status": "passed",
+                    "test": "Candidate patch whitespace"
+                  }
+                ]
+              },
+              "binding_id": "default-quality",
+              "evidence": [
+                "Verified clean candidate 3fb8b4bf8377f07a4acc7d1e18b8f8e7ea8abbd9; all 960 source hashes remained unchanged.",
+                "Reviewed bounded capture, output-dependent callers, deadline settlement, descendant ownership, artifact retention and follow-up admission. Existing regressions provide sufficient coverage; no corrections were needed.",
+                "Commands ran sequentially through FileProcessSupervisor with ProcessOwner::Quality. Exact results and logs: /tmp/refine-r6-quality/final-results.json. Review: /tmp/refine-r6-quality/quality-review.json.",
+                "Six existing tests were ignored and not counted as passes. macOS remains unverified.",
+                "No Goal state changes, commits, merges, pushes, deployment or daemon restart occurred."
+              ],
+              "invocation_id": "31ab35e4efba92eee7ea3ba351d5d137973f1d7491c31a28c2598db8054310f6",
+              "outcome": "success",
+              "role": "quality",
+              "summary": "Reviewed the candidate independently. No additional defects found; all required Linux checks passed."
+            }
+          },
+          "source": "workflow.quality.enter",
+          "state": "succeeded"
+        },
         "6d8b27036e1c4655273949fa327eedcfd5256444b69efe5d6fd56ad47a5a84ab": {
           "candidate_commit": null,
           "results": {
@@ -9054,13 +9121,77 @@
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
       "prompt": "Preserve the candidate and prior evidence. Correct standard run_to_completion capture in src/infrastructure/process/subprocess/execution.rs so a validated workload-exit receipt starts bounded output finalization rather than an indefinite wait for descendant-held pipes. Keep the guardian alive, retain capacity and artifacts while ownership remains pending, preserve workload status and captured output, and report incomplete capture explicitly. Avoid unbounded reader joins and preserve timeout enforcement through settlement. Add deterministic regressions with a setsid descendant retaining stdout, stderr, and both after leader exit, including quiet and continuously writing descendants. Assert bounded return, actual descendant state, retained capacity and artifacts, and eventual release only after trustworthy scope-exit proof. Through supported supervision, run cargo test --lib infrastructure::process::subprocess -- --test-threads=1 and cargo test --lib worker_liveness -- --test-threads=1, followed by the required candidate checks. Retain existing PTY, identity, settlement and retention regressions. Refine owns candidate capture and advancement.",
+      "quality_agent_report": "workflow.quality.enter:default-quality: Reviewed the candidate independently. No additional defects found; all required Linux checks passed.",
+      "quality_candidate_commit": "3fb8b4bf8377f07a4acc7d1e18b8f8e7ea8abbd9",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
+      "quality_skill_results": [
+        {
+          "artifacts": {
+            "tests": [
+              {
+                "command": "cargo test --lib infrastructure::process::subprocess -- --test-threads=1",
+                "evidence": "Exit 0; 42 passed.",
+                "status": "passed",
+                "test": "Bounded capture and ownership retention"
+              },
+              {
+                "command": "cargo test --lib worker_liveness -- --test-threads=1",
+                "evidence": "Exit 0; 12 passed.",
+                "status": "passed",
+                "test": "Failure containment and follow-up admission"
+              },
+              {
+                "command": "cargo check --all-targets --locked",
+                "evidence": "Exit 0.",
+                "status": "passed",
+                "test": "All-target compilation"
+              },
+              {
+                "command": "cargo fmt --all -- --check",
+                "evidence": "Exit 0.",
+                "status": "passed",
+                "test": "Formatting"
+              },
+              {
+                "command": "cargo test --lib --bins -- --test-threads=1",
+                "evidence": "Exit 0; 1287 passed, zero failed, six ignored. Binary target selected zero tests.",
+                "status": "passed",
+                "test": "Full regression suite"
+              },
+              {
+                "command": "cargo build --release --locked",
+                "evidence": "Exit 0.",
+                "status": "passed",
+                "test": "Release compilation"
+              },
+              {
+                "command": "git diff --check a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e HEAD",
+                "evidence": "Exit 0. Working-tree git diff --check also exited 0.",
+                "status": "passed",
+                "test": "Candidate patch whitespace"
+              }
+            ]
+          },
+          "binding_id": "workflow.quality.enter:default-quality",
+          "evidence": [
+            "Verified clean candidate 3fb8b4bf8377f07a4acc7d1e18b8f8e7ea8abbd9; all 960 source hashes remained unchanged.",
+            "Reviewed bounded capture, output-dependent callers, deadline settlement, descendant ownership, artifact retention and follow-up admission. Existing regressions provide sufficient coverage; no corrections were needed.",
+            "Commands ran sequentially through FileProcessSupervisor with ProcessOwner::Quality. Exact results and logs: /tmp/refine-r6-quality/final-results.json. Review: /tmp/refine-r6-quality/quality-review.json.",
+            "Six existing tests were ignored and not counted as passes. macOS remains unverified.",
+            "No Goal state changes, commits, merges, pushes, deployment or daemon restart occurred."
+          ],
+          "invocation_id": "31ab35e4efba92eee7ea3ba351d5d137973f1d7491c31a28c2598db8054310f6",
+          "outcome": "success",
+          "role": "quality",
+          "summary": "Reviewed the candidate independently. No additional defects found; all required Linux checks passed."
+        }
+      ],
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T21:42:39Z",
+      "updated": "2026-09-10T21:54:12Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T20:42:02Z",
         "round_idx": 5,
@@ -9072,7 +9203,7 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-10T21:42:39Z",
+  "updated": "2026-09-10T21:54:12Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:37.178169037+00:00",
@@ -9264,5 +9395,5 @@
       "to": "quality"
     }
   ],
-  "workflow_revision": 152
+  "workflow_revision": 156
 }
