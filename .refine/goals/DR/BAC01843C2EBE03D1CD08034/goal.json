@@ -106,8 +106,25 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-09-10T08:27:57Z",
+        "criticism": {
+          "completed_at": "2026-09-10T08:29:29Z",
+          "git_after": {
+            "branch": "refine/DRBAC01843C2EBE03D1CD08034/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRBAC01843C2EBE03D1CD08034/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "result": {
+            "summary": "The plan covers shared terminal selection, reliable copying, retained output, and clipboard failure recovery."
+          },
+          "started_at": "2026-09-10T08:27:57Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-09-10T08:29:30Z",
         "proposal": {
           "completed_at": "2026-09-10T08:27:57Z",
           "git_after": {
@@ -150,7 +167,7 @@
         "schema_version": 2,
         "started_at": "2026-09-10T08:26:09Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T08:27:57Z"
+        "updated_at": "2026-09-10T08:29:30Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -164,7 +181,7 @@
       "quality_state": "unclassified",
       "reporter": "ethan.jacobson@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T08:27:57Z",
+      "updated": "2026-09-10T08:29:30Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T08:26:09Z",
         "round_idx": 0,
@@ -176,6 +193,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-09-10T08:27:57Z",
-  "workflow_revision": 9
+  "updated": "2026-09-10T08:29:30Z",
+  "workflow_revision": 11
 }
