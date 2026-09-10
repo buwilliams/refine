@@ -3,7 +3,7 @@
   "branch_name": "refine/DR72ED9B21E7CB9369DBCACF88/round-4",
   "candidate_commit": "be1356af9c29c6467f03f0d38341acb2d676ceba",
   "created": "2026-09-10T08:26:05Z",
-  "event_generation": 10,
+  "event_generation": 11,
   "feature_id": null,
   "feature_order": null,
   "id": "DR72ED9B21E7CB9369DBCACF88",
@@ -4492,6 +4492,91 @@
           }
         }
       },
+      "event_results": {
+        "ca9bf4b652053c2bf4938fe4decd63667b33c3cd597a66262f8d7f0708ca132e": {
+          "candidate_commit": null,
+          "results": {
+            "default-plan": {
+              "artifacts": {
+                "plan": {
+                  "checklist": [
+                    {
+                      "description": "Continue through the supplied retained-candidate handoff and capture preservation snapshots.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Add and reproduce the cancelled Todo Entry scheduler-admission regression.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Add shared validation requiring successful invocation state and complete, valid blocking results.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Carry required invocation, binding and original workspace commitments independently of returned results.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Apply shared completion and settlement validation to scheduler and manual transitions.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Extend cancellation, restart, partial-result and stale-settlement regression coverage.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Clarify blocking completion requirements in the affected Skills, Events and Todo intent passages.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Run the required serial verification and compare preservation snapshots.",
+                      "id": "P8"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "C1",
+                      "resolution": "Reject a state-only correction: Succeeded records can still lack required results. Validate each pinned blocking result's presence, identity, role, outcome and artifact contract."
+                    },
+                    {
+                      "criticism_id": "C2",
+                      "resolution": "Reject result-derived settlement membership: missing results erase required invocations. Capture requirements before execution and reread every required invocation after later Skills finish."
+                    },
+                    {
+                      "criticism_id": "C3",
+                      "resolution": "Keep gate acceptance separate from terminal-record retention. Reject cancelled or incomplete gates without rewriting evidence, relaunching providers, requiring background success or extending locks across agent execution."
+                    }
+                  ],
+                  "summary": "Close the cancelled blocking lifecycle Skill admission bypass while preserving retained evidence, workspace isolation and atomic Todo-to-Plan admission."
+                }
+              },
+              "binding_id": "default-plan",
+              "evidence": [
+                "Observational inspection completed without file or Git mutations. The supplied round-2 directory is registered to refine/DR72ED9B21E7CB9369DBCACF88/round-4. HEAD remains be1356af9c29c6467f03f0d38341acb2d676ceba with clean status. git merge-base main HEAD returned current main b47569adb8d4c5d1d7335ba91729a3e486a38fe0; the retained candidate already contains main.",
+                "Read automation/invocations/a76f8af449310af3063d1325d55154287e455209e0dfd8f56a970fe8dd642266.json from .git/refine-live-state and inspected /tmp/dr72-round3-quality-evidence/. All ten retained Quality correction hashes match candidate files. All 36 retained Round 1 modified/untracked file hashes match its earlier preservation snapshot.",
+                "Source confirms the reported bypass: preparation.rs retains Cancelled records; runner.rs returns them without execution; workflow.rs rejects only Error and filter_map drops missing blocking results. require_success accepts the empty list, and exit derives settlement invocation IDs from those results. WorkflowTodo materializes the implementation checkout after this transition approval. The cancellation bypass was not dynamically reproduced during this observational invocation.",
+                "P1: Use the invocation's registered checkout, without deriving a path from the Round number. Before implementation, refresh the main/candidate comparison and snapshot primary and Round 1 contents, staged data, status, HEAD and raw index bytes, plus retained refs and worktree registrations. Preserve declared-base creation, existing isolation, lifecycle admission and Quality corrections.",
+                "P2: In src/application/events/execution/lifecycle_tests/workflow.rs, add cancelled_todo_entry_invocation_blocks_scheduler_admission using Fixture, SmokeSkill and claimed_context. Configure blocking workflow.todo.enter, promote the fresh authored Goal to Todo without implementation refs, dispatch Entry, cancel through cancel_invocation, claim scheduler authority and call WorkflowTodo.advance. Run cargo test --lib cancelled_todo_entry_invocation_blocks_scheduler_admission -- --test-threads=1 before correction and retain the expected failure demonstrating advancement. After correction, require rejection before exit approval, retained Todo status, no implementation refs or checkout, unchanged Cancelled record and lifecycle registration, no new launches or attempts, and identical dirty-primary snapshots.",
+                "P3-P5: Place shared completion validation beside execution/contracts.rs and reuse aggregate_state, SkillResult::validate and validate_artifacts where appropriate. For every applicable pinned blocking binding, require a matching valid successful result and Succeeded invocation state before gate acceptance or a success action. Missing results must identify invocation and binding and explain that fresh authorized recovery is required. Preserve failed-finding versus execution-error reporting for Quality and Governance consumers.",
+                "P4-P5: Capture required invocation IDs, pinned blocking binding identities and original workspace commitments before consuming results. Carry these through Entry and Exit execution independently of the result vector. At settlement, reread each required record, verify complete successful results, current Goal/Round/request/node and transition or occurrence authority, and the original physical registration. Use this shared validation in workflow.rs and transitions/dispatch.rs. Validate stored identities before adding presentation namespaces to binding IDs.",
+                "P5: Preserve preparation and runner behavior that retains terminal Failed, Error and Cancelled records without rewriting or relaunching them. Keep existing Goal-to-invocation lock ordering, short record locks, immediate cancellation and idempotent transitions. Agents run outside Goal locks. Disabled/context-only bindings remain checkout-free; background verdicts remain nonblocking; an actually empty applicable blocking set remains valid where existing phase policy allows it.",
+                "P6: Cover repeated dispatch and reconstructed FileEventService after invocation cancellation; multiple blocking bindings with only partial results; Succeeded records missing a required result; malformed or mismatched retained result identities; and completion or registration becoming invalid while a later Exit Skill runs. Exercise scheduler and manual settlement. Retain pending/completed Entry reuse, superseded Goal/Round/node authority, stale Entry-workspace settlement, cached-success and replaced-registration regressions.",
+                "P6-P7: Preserve state-only ordinary queueing and implementation materialization only after capacity selection and atomic authored-Round admission into Plan. Keep lifecycle output separate from implementation output, with explicit cwd/context, canonical subpath containment and inherited Git-environment sanitization. Application owns acceptance and settlement policy; existing Model contracts and Infrastructure Git/process capabilities remain shared. Keep additions cohesive and review files approaching 500 lines. Update only affected passages in docs/intent/03-application/01-agents/02-skills.md, docs/intent/03-application/05-events.md and docs/intent/03-application/02-workflow/02-todo.md.",
+                "P8 proposed verification: rerun the new regression after correction. Then execute cargo test --lib <filter> -- --test-threads=1 separately and sequentially for these filters: fresh_goal_backlog_exit_skill_remains_runnable_before_round_materialization; application::events::; application::workflow::tests::execution_ownership; authored_todo_start; infrastructure::git::worktrees::tests; worktree_resume; quality::tests::; application::workflow::tests::candidate_refresh; application::workflow::tests::quality_recovery; application::workflow::tests::quality_base_refresh; round_base; workflow::engine::behaviors::tests::; launch_environment; infrastructure::agents::invocation::tests; infrastructure::process::subprocess::. Require nonzero selections and explicitly confirm backlog_promotion_changes_only_goal_state_and_does_not_create_worktrees executes.",
+                "P8 proposed checks: cargo check --all-targets; cargo clippy --all-targets; rustfmt --check --edition 2024 --config skip_children=true for every changed Rust file, including added modules; git diff --check; and git diff --check be1356af9c29c6467f03f0d38341acb2d676ceba. Retain actual commands, exit codes, test counts, failures, ignored tests and skips. Compare warnings with the retained baseline and compare preservation snapshots before handoff.",
+                "Retained final/verification.json records 232 passing test executions across 15 commands, with zero failures or ignored tests; check and Clippy recorded exit 0, with eight unchanged warnings. These are historical results inspected now, not fresh verification or evidence that the new cancellation regression passes.",
+                "The completion validator explicitly requires checklist entries to contain only compact id/description pairs; this response places supporting detail and proposed verification in evidence. Refine retains ownership of workflow advancement and candidate integration. This phase performs no approval, merge, push, deployment or serving-installation restart."
+              ],
+              "invocation_id": "ca9bf4b652053c2bf4938fe4decd63667b33c3cd597a66262f8d7f0708ca132e",
+              "outcome": "success",
+              "role": "plan",
+              "summary": "Completed the observational recovery plan and corrected the checklist format; implementation and runtime verification remain proposed."
+            }
+          },
+          "source": "workflow.plan.enter",
+          "state": "succeeded"
+        }
+      },
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
@@ -4511,12 +4596,114 @@
           "round_idx": 3,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-09-10T15:40:59Z",
+        "final_plan": {
+          "completed_at": "2026-09-10T15:48:18Z",
+          "git_after": {
+            "branch": "refine/DR72ED9B21E7CB9369DBCACF88/round-4",
+            "head_commit": "be1356af9c29c6467f03f0d38341acb2d676ceba",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR72ED9B21E7CB9369DBCACF88/round-4",
+            "head_commit": "be1356af9c29c6467f03f0d38341acb2d676ceba",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Continue through the supplied retained-candidate handoff and capture preservation snapshots.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Add and reproduce the cancelled Todo Entry scheduler-admission regression.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Add shared validation requiring successful invocation state and complete, valid blocking results.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Carry required invocation, binding and original workspace commitments independently of returned results.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Apply shared completion and settlement validation to scheduler and manual transitions.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Extend cancellation, restart, partial-result and stale-settlement regression coverage.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Clarify blocking completion requirements in the affected Skills, Events and Todo intent passages.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              },
+              {
+                "description": "Run the required serial verification and compare preservation snapshots.",
+                "id": "workflow.plan.enter:default-plan:P8"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Close the cancelled blocking lifecycle Skill admission bypass while preserving retained evidence, workspace isolation and atomic Todo-to-Plan admission."
+          },
+          "started_at": "2026-09-10T15:40:59Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-09-10T15:48:18Z",
+        "proposal": {
+          "completed_at": "2026-09-10T15:48:18Z",
+          "git_after": {
+            "branch": "refine/DR72ED9B21E7CB9369DBCACF88/round-4",
+            "head_commit": "be1356af9c29c6467f03f0d38341acb2d676ceba",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR72ED9B21E7CB9369DBCACF88/round-4",
+            "head_commit": "be1356af9c29c6467f03f0d38341acb2d676ceba",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Continue through the supplied retained-candidate handoff and capture preservation snapshots.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Add and reproduce the cancelled Todo Entry scheduler-admission regression.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Add shared validation requiring successful invocation state and complete, valid blocking results.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Carry required invocation, binding and original workspace commitments independently of returned results.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Apply shared completion and settlement validation to scheduler and manual transitions.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Extend cancellation, restart, partial-result and stale-settlement regression coverage.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Clarify blocking completion requirements in the affected Skills, Events and Todo intent passages.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              },
+              {
+                "description": "Run the required serial verification and compare preservation snapshots.",
+                "id": "workflow.plan.enter:default-plan:P8"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Close the cancelled blocking lifecycle Skill admission bypass while preserving retained evidence, workspace isolation and atomic Todo-to-Plan admission."
+          },
+          "started_at": "2026-09-10T15:40:59Z"
+        },
         "schema_version": 2,
         "started_at": "2026-09-10T15:40:59Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T15:40:59Z"
+        "updated_at": "2026-09-10T15:48:18Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -4530,7 +4717,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T15:41:00Z",
+      "updated": "2026-09-10T15:48:18Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T15:40:59Z",
         "round_idx": 3,
@@ -4540,9 +4727,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-09-10T15:41:00Z",
+  "updated": "2026-09-10T15:48:18Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:36.706264729+00:00",
@@ -4633,7 +4820,16 @@
       "node_id": "default",
       "round_idx": 3,
       "to": "plan"
+    },
+    {
+      "at": "2026-09-10T15:48:18.534395006+00:00",
+      "forced": false,
+      "from": "plan",
+      "generation": 11,
+      "node_id": "default",
+      "round_idx": 3,
+      "to": "implement"
     }
   ],
-  "workflow_revision": 86
+  "workflow_revision": 92
 }
