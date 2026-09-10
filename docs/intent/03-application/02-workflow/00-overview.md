@@ -38,7 +38,7 @@ These gates are currently evaluated per node, not across the fleet. Users who ne
 
 Linear Feature order plus priority is Refine's canonical dependency model. User-authored “after X” placement and imported `depends_on` relationships compile to the Feature's integer order; Refine deliberately has no separate DAG or blocked-by graph.
 
-An in-memory active set avoids duplicate launches in one runner, while synchronized Goal status, node assignment, and Round remain authoritative across nodes.
+The existing admission cycle remains active while child Goal executions run. It materializes pending occurrences and alternates admission opportunities between eligible Goals and standalone Skills. Both use shared transient reservations and observed supervised processes for global, node, provider, and app capacity; one execution is counted once. Busy checkouts and malformed pending records do not prevent unrelated eligible work from being considered. Pending-record reads are bounded and rotate through the queue. An in-memory active set avoids duplicate launches in one runner, while synchronized Goal status, node assignment, and Round remain authoritative across nodes.
 
 Workers persist semantic artifacts and reread Goal authority at transitions and consequential boundaries. A restart may schedule the same nonterminal Goal again. Preserved planning, Git, quality, governance, integration, logs, branches, and worktrees make that repetition idempotent and explainable. A valid Quality or Governance finding may draft a fresh recovery Round and atomically return the Goal to todo; both stages share one bounded retry counter. Provider, parsing, Git, harness, and infrastructure failures do not consume that automatic recovery budget.
 

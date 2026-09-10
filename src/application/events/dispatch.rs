@@ -14,28 +14,13 @@ use crate::model::workflow::GoalStatus;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::path::Path;
-use std::sync::{Mutex, OnceLock};
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
+static SCAN_CURSOR: AtomicUsize = AtomicUsize::new(0);
 
-#[derive(Clone)]
-pub(crate) struct EventReservation {
-    pub runtime: std::path::PathBuf,
-    pub invocation_id: String,
-    pub node: String,
-    pub provider: String,
-    pub target: String,
-}
-static ACTIVE: OnceLock<Mutex<BTreeMap<String, EventReservation>>> = OnceLock::new();
+use super::waiting::WaitReason;
+use crate::application::workflow::engine::admission::{ExecutionReservation, reserve};
 static DISPATCH: Mutex<()> = Mutex::new(());
-pub(crate) fn reservations(runtime: &Path) -> Vec<EventReservation> {
-    ACTIVE
-        .get_or_init(Default::default)
-        .lock()
-        .unwrap_or_else(|e| e.into_inner())
-        .values()
-        .filter(|v| v.runtime == runtime)
-        .cloned()
-        .collect()
-}
 
 impl FileEventService {
     pub(crate) fn manual_skill_event(
@@ -379,7 +364,22 @@ impl FileEventService {
 
     /// Called by the existing workflow worker; only pending records are inspected.
     pub fn dispatch_pending(&self, target_root: &Path) -> RefineResult<usize> {
-        let _dispatch = DISPATCH.lock().unwrap_or_else(|e| e.into_inner());
+        self.dispatch_pending_limit(target_root, 32)
+    }
+
+    pub(crate) fn dispatch_pending_limit(
+        &self,
+        target_root: &Path,
+        limit: usize,
+    ) -> RefineResult<usize> {
+        if limit == 0 {
+            return Ok(0);
+        }
+        let _dispatch = match DISPATCH.try_lock() {
+            Ok(guard) => guard,
+            Err(std::sync::TryLockError::WouldBlock) => return Ok(0),
+            Err(std::sync::TryLockError::Poisoned(error)) => error.into_inner(),
+        };
         let runtime = self.runtime()?;
         let node = FileNodeRegistryService::with_active_root(&self.refine_dir, runtime)
             .active_node_id()?;
@@ -389,21 +389,29 @@ impl FileEventService {
             return Ok(0);
         }
         let engine = WorkflowEngine::with_target_root(runtime, target_root);
-        engine.ensure_automation_running()?;
+        let paused = engine.workflow_paused()?;
         let policy = engine.policy_for_refine_dir_and_node(&self.refine_dir, &node)?;
         let mut launched = 0;
-        for entry in std::fs::read_dir(directory)
+        let mut paths = std::fs::read_dir(directory)
             .map_err(|e| RefineError::Io(e.to_string()))?
-            .take(256)
-        {
-            let path = entry.map_err(|e| RefineError::Io(e.to_string()))?.path();
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .collect::<Vec<_>>();
+        paths.sort();
+        if paths.is_empty() {
+            return Ok(0);
+        }
+        let offset = SCAN_CURSOR.load(Ordering::Relaxed) % paths.len();
+        paths.rotate_left(offset);
+        for path in paths.into_iter().take(256) {
+            SCAN_CURSOR.fetch_add(1, Ordering::Relaxed);
             if path.extension().and_then(|p| p.to_str()) != Some("json") {
                 continue;
             }
             let record: Value = match read_json(&path) {
                 Ok(record) => record,
                 Err(_) if !path.exists() => continue,
-                Err(e) => return Err(e),
+                Err(_) => continue,
             };
             if record.get("node_id").and_then(Value::as_str) != Some(&node) {
                 continue;
@@ -411,50 +419,71 @@ impl FileEventService {
             let Some(id) = record.get("id").and_then(Value::as_str) else {
                 continue;
             };
-            let invocation = self.invocation(id)?;
+            let invocation = match self.invocation(id) {
+                Ok(value) => value,
+                Err(_) => continue,
+            };
             // Active workflow phases own these invocations and their capacity themselves.
             if (invocation.context.workflow_revision.is_some() && !invocation.state.terminal())
-                || (invocation.state.terminal()
-                    && !(invocation.state == InvocationState::Succeeded
-                        && invocation.event.on_success.is_some()
-                        && !invocation.action_applied))
+                || (invocation.state.terminal() && !invocation.success_action_ready())
             {
                 continue;
             }
-            if !engine.soft_capacity_available(
-                &policy,
-                &node,
-                &invocation.context.provider,
-                &target_root.display().to_string(),
-            )? {
-                break;
-            }
-            let key = format!("{}:{id}", self.refine_dir.display());
-            let mut active = ACTIVE.get_or_init(Default::default).lock().unwrap();
-            if active.len() >= 32 {
-                break;
-            }
-            if active.contains_key(&key) {
+            if crate::application::workflow::engine::admission::reservations(runtime)
+                .iter()
+                .any(|r| r.invocation_id.as_deref() == Some(id))
+            {
                 continue;
             }
-            active.insert(
-                key.clone(),
-                EventReservation {
+            if paused {
+                self.record_wait(id, Some(WaitReason::Paused))?;
+                continue;
+            }
+            match crate::infrastructure::storage::workspace::WorkspaceLease::acquire(
+                &invocation.context.cwd,
+            ) {
+                Ok(lease) => drop(lease),
+                Err(RefineError::Degraded(message))
+                    if message.starts_with("workspace is in use") =>
+                {
+                    self.record_wait(id, Some(WaitReason::WorkspaceBusy))?;
+                    continue;
+                }
+                Err(error) => {
+                    eprintln!("refine Skill admission: {error}");
+                    continue;
+                }
+            }
+            let key = format!("{}:{}:{id}", runtime.display(), self.refine_dir.display());
+            let Some(lease) = reserve(
+                &engine,
+                &policy,
+                key,
+                ExecutionReservation {
                     runtime: runtime.into(),
-                    invocation_id: id.into(),
+                    invocation_id: Some(id.into()),
+                    goal_id: None,
                     node: node.clone(),
                     provider: invocation.context.provider.clone(),
                     target: target_root.display().to_string(),
                 },
-            );
-            drop(active);
+            )?
+            else {
+                self.record_wait(id, Some(WaitReason::Capacity))?;
+                continue;
+            };
+            self.record_wait(id, None)?;
             let service = self.clone();
             std::thread::spawn(move || {
-                let result = service.execute(&invocation.id, || {
-                    service.validate_manual_authority(&invocation)
-                });
+                let _lease = lease;
+                let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    service.execute(&invocation.id, || {
+                        service.validate_manual_authority(&invocation)
+                    })
+                }))
+                .unwrap_or_else(|_| Err(RefineError::Degraded("Skill worker panicked".into())));
                 match result {
-                    Ok(mut result) if result.state == InvocationState::Succeeded => {
+                    Ok(mut result) if result.success_action_ready() => {
                         if let Err(error) = service.apply_success_action(&mut result) {
                             result.state = InvocationState::Error;
                             result.error = Some(error.to_string());
@@ -463,7 +492,11 @@ impl FileEventService {
                     }
                     Ok(_) => {}
                     Err(RefineError::Degraded(message))
-                        if message.starts_with("workspace is in use") => {}
+                        if message.starts_with("workspace is in use") =>
+                    {
+                        let _ =
+                            service.record_wait(&invocation.id, Some(WaitReason::WorkspaceBusy));
+                    }
                     Err(error) => {
                         if let Ok(mut result) = service.invocation(&invocation.id)
                             && !result.state.terminal()
@@ -474,13 +507,11 @@ impl FileEventService {
                         }
                     }
                 }
-                ACTIVE
-                    .get_or_init(Default::default)
-                    .lock()
-                    .unwrap()
-                    .remove(&key);
             });
             launched += 1;
+            if launched >= limit {
+                break;
+            }
         }
         Ok(launched)
     }

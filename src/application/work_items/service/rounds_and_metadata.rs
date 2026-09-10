@@ -495,6 +495,8 @@ impl FileWorkItemService {
         for key in [
             "agent_context",
             "event_configuration",
+            "gate_configurations",
+            "quality_requirements",
             "event_results",
             "quality_skill_results",
             "guidance_decision",

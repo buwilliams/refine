@@ -346,7 +346,8 @@ impl WorkflowEngine {
 
     pub(crate) fn observed_execution_load(&self) -> RefineResult<ExecutionLoad> {
         let mut load = ExecutionLoad::default();
-        let reservations = crate::application::events::dispatch::reservations(&self.runtime_root);
+        let reservations =
+            crate::application::workflow::engine::admission::reservations(&self.runtime_root);
         for reserved in &reservations {
             load.record(&reserved.node, &reserved.provider, &reserved.target);
         }
@@ -363,10 +364,9 @@ impl WorkflowEngine {
                     .as_deref()
                     .and_then(|details| serde_json::from_str::<Value>(details).ok())
                     .unwrap_or_else(|| json!({}));
-                if details
-                    .get("event_invocation_id")
-                    .and_then(Value::as_str)
-                    .is_some_and(|id| reservations.iter().any(|r| r.invocation_id == id))
+                if reservations
+                    .iter()
+                    .any(|reservation| reservation.covers_process(&details))
                 {
                     continue;
                 }

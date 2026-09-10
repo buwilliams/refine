@@ -10,7 +10,8 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 
 const UNRESOLVABLE_CANDIDATE: &str = "0123456789abcdef0123456789abcdef01234567";
-const SMOKE_AI_CORRECTION_FIXTURE_REPORT: &str = "workflow.quality.enter:default-quality: Smoke AI Quality fixture reviewed the candidate and retained existing tests.";
+const SMOKE_AI_CORRECTION_FIXTURE_REPORT: &str =
+    "workflow.quality.enter:default-quality: The candidate passes.";
 
 #[test]
 fn resume_with_a_durable_quality_proof_transitions_without_any_provider_invocation() {
@@ -58,7 +59,7 @@ fn resume_with_a_proof_for_another_candidate_reruns_the_whole_quality_phase() {
     };
     assert_eq!(to, GoalStatus::Governance);
     assert_eq!(reason, "Quality checks passed");
-    // The gate ran against the real candidate; the correction agent re-ran too.
+    // One fresh review covers the real candidate and supplies the supervised check.
     assert_eq!(fixture.invocation_count(), 1);
     let detail = fixture.work_items.show_goal_detail("GOAL1").unwrap();
     assert_eq!(

@@ -43,6 +43,7 @@ mod runner;
 mod settings;
 mod settlement;
 mod skill_checks;
+mod skill_evidence;
 mod summary;
 mod wire;
 
@@ -118,6 +119,8 @@ pub struct QualityCheckResult {
     pub checked_at: Option<Timestamp>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub provider_attempts: Vec<QualityProviderAttempt>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skill_evidence: Option<crate::model::goal::QualitySkillEvidence>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]

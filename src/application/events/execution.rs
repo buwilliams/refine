@@ -1,103 +1,17 @@
-use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
-use std::collections::{BTreeMap, BTreeSet};
-use std::path::PathBuf;
+use std::collections::BTreeMap;
 
 use super::FileEventService;
 use crate::error::{RefineError, RefineResult};
-use crate::infrastructure::agents::invocation::{HostAgentProviderService, ProviderInvocation};
 use crate::infrastructure::process::supervisor::coordination::with_record_lock;
-use crate::infrastructure::storage::automation::{read_json, write_json};
 use crate::model::automation::*;
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct InvocationContext {
-    pub node_id: String,
-    pub target_root: PathBuf,
-    pub cwd: PathBuf,
-    pub provider: String,
-    #[serde(default)]
-    pub goal_id: Option<String>,
-    #[serde(default)]
-    pub round_idx: Option<usize>,
-    #[serde(default)]
-    pub workflow_revision: Option<u64>,
-    #[serde(default)]
-    pub candidate_commit: Option<String>,
-    #[serde(default)]
-    pub data: Value,
-    #[serde(default)]
-    pub metadata: serde_json::Map<String, Value>,
-}
+pub use super::records::{EventInvocation, InvocationContext, InvocationState, PinnedBinding};
 
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum InvocationState {
-    Pending,
-    Running,
-    Succeeded,
-    Failed,
-    Error,
-    Cancelled,
-}
-
-impl InvocationState {
-    pub fn terminal(&self) -> bool {
-        !matches!(self, Self::Pending | Self::Running)
-    }
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct PinnedBinding {
-    pub binding: Binding,
-    pub skill: Skill,
-    pub parameters: BTreeMap<String, Value>,
-}
-
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct EventInvocation {
-    pub id: String,
-    pub event: EventDefinition,
-    pub config_revision: u64,
-    pub context: InvocationContext,
-    pub bindings: Vec<PinnedBinding>,
-    pub state: InvocationState,
-    pub results: BTreeMap<String, SkillResult>,
-    pub attempts: Vec<Value>,
-    pub created_at: String,
-    pub completed_at: Option<String>,
-    pub error: Option<String>,
-    #[serde(default)]
-    pub action_applied: bool,
-}
-
-/// Keep authored Goal context and accepted artifacts without recursively embedding
-/// configuration snapshots, prior invocation ledgers, and their copies of the Goal.
-pub fn goal_context(goal: &Value) -> Value {
-    let mut goal = goal.clone();
-    let strip = |value: &mut Value| {
-        if let Some(object) = value.as_object_mut() {
-            for key in [
-                "agent_context",
-                "event_configuration",
-                "pending_event_transition",
-                "event_results",
-                "workflow_events",
-                "event_actions",
-            ] {
-                object.remove(key);
-            }
-        }
-    };
-    strip(&mut goal);
-    if let Some(rounds) = goal.get_mut("rounds").and_then(Value::as_array_mut) {
-        for round in rounds {
-            strip(round);
-        }
-    }
-    goal
-}
+pub use super::context::goal_context;
+use super::parameters::field;
+pub use super::parameters::resolve_parameters;
 
 pub fn stable_id(key: &str) -> String {
     format!("{:x}", Sha256::digest(key.as_bytes()))
@@ -107,202 +21,6 @@ fn now() -> String {
 }
 
 impl FileEventService {
-    pub fn invocation_path(&self, id: &str) -> RefineResult<PathBuf> {
-        if !valid_id(id) {
-            return Err(RefineError::InvalidInput("invalid invocation ID".into()));
-        }
-        Ok(self
-            .refine_dir
-            .join("automation/invocations")
-            .join(format!("{id}.json")))
-    }
-    pub fn invocation(&self, id: &str) -> RefineResult<EventInvocation> {
-        read_json(&self.invocation_path(id)?)
-    }
-    pub fn save_invocation(&self, invocation: &EventInvocation) -> RefineResult<()> {
-        with_record_lock(
-            &self.refine_dir,
-            &format!("event-{}", invocation.id),
-            || {
-                let path = self.invocation_path(&invocation.id)?;
-                if path.exists() {
-                    let current = self.invocation(&invocation.id)?;
-                    if current.state == InvocationState::Cancelled
-                        && invocation.state != InvocationState::Cancelled
-                    {
-                        return Err(RefineError::Conflict(
-                            "Event invocation was cancelled".into(),
-                        ));
-                    }
-                    if current.state.terminal() && !invocation.state.terminal() {
-                        return Err(RefineError::Conflict(
-                            "Event invocation is already settled".into(),
-                        ));
-                    }
-                }
-                let journal = self
-                    .refine_dir
-                    .join("automation/index-updates")
-                    .join(&invocation.context.node_id)
-                    .join(format!("{}.json", invocation.id));
-                write_json(&journal, &json!({"id": invocation.id}))?;
-                write_json(&path, invocation)?;
-                self.write_invocation_indexes(invocation)?;
-                remove_if_present(&journal)
-            },
-        )
-    }
-
-    fn write_invocation_indexes(&self, invocation: &EventInvocation) -> RefineResult<()> {
-        let history = self.refine_dir.join("automation/history").join(format!(
-            "{}-{}.json",
-            invocation.created_at.replace(':', "-"),
-            invocation.id
-        ));
-        write_json(
-            &history,
-            &json!({"id":invocation.id, "event":{"id":invocation.event.id,"name":invocation.event.name,"kind":invocation.event.kind,"source":invocation.event.source},"config_revision":invocation.config_revision,"state":invocation.state,"created_at":invocation.created_at,"completed_at":invocation.completed_at,"goal_id":invocation.context.goal_id,"node_id":invocation.context.node_id,"error":invocation.error,"result_count":invocation.results.len()}),
-        )?;
-        if let Some(goal_id) = &invocation.context.goal_id {
-            if !valid_id(goal_id) {
-                return Err(RefineError::InvalidInput("invalid Event Goal ID".into()));
-            }
-            let goal_history = self
-                .refine_dir
-                .join("automation/goal-history")
-                .join(goal_id)
-                .join(history.file_name().expect("history name"));
-            let summary: Value = read_json(&history)?;
-            write_json(&goal_history, &summary)?;
-        }
-        let pending = self
-            .refine_dir
-            .join("automation/pending")
-            .join(&invocation.context.node_id)
-            .join(format!("{}.json", invocation.id));
-        if invocation.state.terminal()
-            && !(invocation.state == InvocationState::Succeeded
-                && invocation.event.on_success.is_some()
-                && !invocation.action_applied)
-        {
-            remove_if_present(&pending)?;
-        } else {
-            write_json(
-                &pending,
-                &json!({"id": invocation.id, "node_id": invocation.context.node_id}),
-            )?;
-        }
-        Ok(())
-    }
-
-    /// Recover only interrupted index updates, never scan historical invocation blobs.
-    pub(crate) fn repair_invocation_indexes(&self, node: Option<&str>) -> RefineResult<()> {
-        let root = self.refine_dir.join("automation/index-updates");
-        if !root.exists() {
-            return Ok(());
-        }
-        let directories = if let Some(node) = node {
-            vec![root.join(node)]
-        } else {
-            std::fs::read_dir(&root)
-                .map_err(|e| RefineError::Io(e.to_string()))?
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(|e| RefineError::Io(e.to_string()))?
-                .into_iter()
-                .map(|e| e.path())
-                .filter(|p| p.is_dir())
-                .collect()
-        };
-        let mut remaining = 128;
-        for directory in directories {
-            if !directory.exists() {
-                continue;
-            }
-            for entry in std::fs::read_dir(directory)
-                .map_err(|e| RefineError::Io(e.to_string()))?
-                .take(remaining)
-            {
-                let journal = entry.map_err(|e| RefineError::Io(e.to_string()))?.path();
-                if journal.extension().and_then(|v| v.to_str()) != Some("json") {
-                    continue;
-                }
-                let id = journal
-                    .file_stem()
-                    .and_then(|v| v.to_str())
-                    .ok_or_else(|| {
-                        RefineError::Serialization("missing invocation index ID".into())
-                    })?;
-                self.invocation_path(id)?;
-                with_record_lock(&self.refine_dir, &format!("event-{id}"), || {
-                    if !journal.exists() {
-                        return Ok(());
-                    }
-                    if self.invocation_path(id)?.exists() {
-                        self.write_invocation_indexes(&self.invocation(id)?)?;
-                    }
-                    remove_if_present(&journal)
-                })?;
-                remaining -= 1;
-            }
-            if remaining == 0 {
-                break;
-            }
-        }
-        Ok(())
-    }
-
-    pub fn invocations(&self, offset: usize, limit: usize) -> RefineResult<Value> {
-        self.repair_invocation_indexes(None)?;
-        self.read_invocation_history(self.refine_dir.join("automation/history"), offset, limit)
-    }
-
-    pub fn goal_invocations(
-        &self,
-        goal_id: &str,
-        offset: usize,
-        limit: usize,
-    ) -> RefineResult<Value> {
-        if !valid_id(goal_id) {
-            return Err(RefineError::InvalidInput("invalid Goal ID".into()));
-        }
-        self.repair_invocation_indexes(None)?;
-        self.read_invocation_history(
-            self.refine_dir
-                .join("automation/goal-history")
-                .join(goal_id),
-            offset,
-            limit,
-        )
-    }
-
-    fn read_invocation_history(
-        &self,
-        directory: PathBuf,
-        offset: usize,
-        limit: usize,
-    ) -> RefineResult<Value> {
-        if !directory.exists() {
-            return Ok(json!({"items": [], "offset": offset, "total": 0}));
-        }
-        let mut paths: Vec<_> = std::fs::read_dir(directory)
-            .map_err(|e| RefineError::Io(e.to_string()))?
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| RefineError::Io(e.to_string()))?
-            .into_iter()
-            .map(|e| e.path())
-            .filter(|p| p.extension().is_some_and(|e| e == "json"))
-            .collect();
-        paths.sort_by(|a, b| b.cmp(a));
-        let total = paths.len();
-        let items = paths
-            .iter()
-            .skip(offset)
-            .take(limit.clamp(1, 100))
-            .map(|p| read_json::<Value>(p))
-            .collect::<RefineResult<Vec<_>>>()?;
-        Ok(json!({"items": items, "offset": offset, "total": total}))
-    }
-
     pub fn prepare(
         &self,
         event_id: &str,
@@ -651,7 +369,12 @@ impl FileEventService {
                     "completion_timeout_seconds".into(),
                     json!(seconds("agent_hard_cap_seconds", 7200)),
                 );
-                let contract = result_contract(&invocation, &pinned);
+                let contract =
+                    crate::application::agent_io::contracts::skill_result::result_contract(
+                        id,
+                        &pinned.binding.id,
+                        &pinned.skill.role,
+                    );
                 let observational = pinned.skill.role == "plan"
                     || pinned.skill.role == "governance"
                     || invocation
@@ -660,10 +383,6 @@ impl FileEventService {
                         .get("verification_only")
                         .and_then(Value::as_bool)
                         == Some(true);
-                let git = crate::infrastructure::git::worktrees::FileGitWorktreeService::with_runtime_root(&invocation.context.cwd, runtime);
-                let before = observational
-                    .then(|| git.implementation_planning_observation())
-                    .transpose()?;
                 let role_instructions = if pinned.skill.role == "governance" {
                     "For failure, artifacts.violations must contain objects with stable rule_id and message fields; also fill recovery_analysis and recovery_round_prompt."
                 } else {
@@ -687,34 +406,17 @@ impl FileEventService {
                         ""
                     }
                 );
-                let provider = HostAgentProviderService::with_runtime_root(runtime);
-                let mut last_error = String::new();
-                for attempt in 0..=2 {
-                    validate_authority()?;
-                    let output = provider.invoke_detailed(ProviderInvocation { provider: invocation.context.provider.clone(), prompt: if attempt == 0 { prompt.clone() } else { format!("{prompt}\n\nThe previous response did not satisfy the result contract: {last_error}. Correct the response using retained evidence; do not repeat side effects.") }, session_id: None, cwd: Some(invocation.context.cwd.display().to_string()), stall_timeout_seconds: Some(seconds("agent_idle_timeout_seconds", 900)).filter(|v| *v > 0), process_metadata: metadata.clone() })?;
-                    invocation.attempts.push(json!({"binding_id": pinned.binding.id, "attempt": attempt, "process_id": output.process_id, "raw_output": output.output, "workflow_revision":metadata.get("workflow_revision"), "operation_id":metadata.get("operation_id"), "diagnostic": null}));
-                    self.save_invocation(&invocation)?;
-                    validate_authority()?;
-                    if let Some(before) = &before
-                        && &git.implementation_planning_observation()? != before
-                    {
-                        return Err(RefineError::Conflict("observational Skill changed the checkout; changes and process evidence were retained".into()));
-                    }
-                    let parsed = <SkillResult as crate::application::agent_io::structured_output::Contract>::decode(&output.output)
-                        .map_err(|e| RefineError::InvalidInput(e.to_string()))
-                        .and_then(|result| { result.validate(id, &pinned.binding.id, &pinned.skill.role).map_err(RefineError::InvalidInput)?; validate_artifacts(&result)?; Ok(result) });
-                    if let Some(last) = invocation.attempts.last_mut() {
-                        last["diagnostic"] = json!(parsed.as_ref().err().map(ToString::to_string));
-                    }
-                    self.save_invocation(&invocation)?;
-                    match parsed {
-                        Ok(result) => return Ok(result),
-                        Err(e) => last_error = e.to_string(),
-                    }
-                }
-                Err(RefineError::Serialization(format!(
-                    "Skill output contract failed after two repairs: {last_error}"
-                )))
+                super::completion::run(
+                    self,
+                    &mut invocation,
+                    &pinned,
+                    &prompt,
+                    &contract,
+                    &metadata,
+                    Some(seconds("agent_idle_timeout_seconds", 900)).filter(|v| *v > 0),
+                    observational,
+                    &validate_authority,
+                )
             })();
             match run {
                 Ok(result) => {
@@ -758,7 +460,7 @@ pub fn aggregate_state(invocation: &EventInvocation) -> InvocationState {
     for binding in invocation
         .bindings
         .iter()
-        .filter(|b| b.binding.mode == BindingMode::Blocking)
+        .filter(|b| b.binding.mode != BindingMode::Context)
     {
         match invocation
             .results
@@ -777,133 +479,19 @@ pub fn aggregate_state(invocation: &EventInvocation) -> InvocationState {
     }
 }
 
-pub fn resolve_parameters(
-    parameters: &[Parameter],
-    explicit: &BTreeMap<String, Value>,
-    mapped: &BTreeMap<String, Value>,
-) -> RefineResult<BTreeMap<String, Value>> {
-    let names: BTreeSet<_> = parameters.iter().map(|p| p.name.as_str()).collect();
-    if let Some(name) = explicit.keys().find(|k| !names.contains(k.as_str())) {
-        return Err(RefineError::InvalidInput(format!(
-            "unknown parameter: {name}"
-        )));
-    }
-    let mut values = BTreeMap::new();
-    let mut missing = Vec::new();
-    for p in parameters {
-        match explicit
-            .get(&p.name)
-            .or_else(|| mapped.get(&p.name))
-            .or(p.default.as_ref())
-        {
-            Some(value)
-                if p.accepts(value)
-                    && !(p.required && value.as_str().is_some_and(|v| v.trim().is_empty())) =>
-            {
-                values.insert(p.name.clone(), value.clone());
-            }
-            Some(_) => {
-                return Err(RefineError::InvalidInput(format!(
-                    "invalid parameter: {}",
-                    p.name
-                )));
-            }
-            None if p.required => missing.push(p.name.clone()),
-            None => {}
-        }
-    }
-    if !missing.is_empty() {
-        return Err(RefineError::InvalidInput(format!(
-            "missing required parameters: {}",
-            missing.join(", ")
-        )));
-    }
-    Ok(values)
-}
-
-fn field<'a>(value: &'a Value, path: &str) -> Option<&'a Value> {
-    path.split('.').try_fold(value, |v, key| {
-        if v.is_array() {
-            v.get(key.parse::<usize>().ok()?)
-        } else {
-            v.get(key)
-        }
-    })
-}
-
-fn result_contract(invocation: &EventInvocation, pinned: &PinnedBinding) -> Value {
-    let artifacts = match pinned.skill.role.as_str() {
-        "plan" => {
-            json!({"plan": {"summary": "What changes and why", "checklist": [{"id": "P1", "description": "Implement and verify the requested behavior"}], "criticism_resolutions": []}})
-        }
-        "implement" => {
-            json!({"implementation_evidence": {"checklist": [{"id": "copy the complete checklist ID", "outcome": "completed", "evidence": "Actual change and verification"}], "verification": ["command and observed result"]}})
-        }
-        "quality" => {
-            json!({"tests": [{"test": "Observable requirement", "command": "non-interactive command whose exit 0 means pass", "status": "passed", "evidence": "Observed result"}]})
-        }
-        "governance" => {
-            json!({"violations": [], "recovery_analysis": null, "recovery_round_prompt": null})
-        }
-        _ => json!({}),
-    };
-    json!({"invocation_id": invocation.id, "binding_id": pinned.binding.id, "role": pinned.skill.role, "outcome": "success", "summary": "What happened", "evidence": ["Observed supporting evidence"], "artifacts": artifacts})
-}
-
-impl crate::application::agent_io::structured_output::Contract for SkillResult {
-    const LABEL: &'static str = "Skill completion result";
-    const ENVELOPE_FIELDS: &'static [&'static str] = &["skill_result", "result"];
-    fn example() -> Self {
-        Self {
-            invocation_id: "invocation".into(),
-            binding_id: "binding".into(),
-            role: "task".into(),
-            outcome: "success".into(),
-            summary: "Task completed".into(),
-            evidence: vec!["Observed evidence".into()],
-            artifacts: json!({}),
-        }
-    }
-}
-
-fn validate_artifacts(result: &SkillResult) -> RefineResult<()> {
-    use crate::application::agent_io::structured_output::Contract;
-    use crate::model::goal::{ImplementationExecutionEvidence, ProposedImplementationPlan};
-    if result.outcome != "success" {
-        return Ok(());
-    }
-    match result.role.as_str() {
-        "plan" => {
-            ProposedImplementationPlan::decode(&result.artifacts["plan"].to_string())
-                .map_err(|e| RefineError::Serialization(e.to_string()))?;
-        }
-        "implement" => {
-            ImplementationExecutionEvidence::decode(
-                &result.artifacts["implementation_evidence"].to_string(),
-            )
-            .map_err(|e| RefineError::Serialization(e.to_string()))?;
-        }
-        "quality" => {
-            for test in result.artifacts["tests"].as_array().into_iter().flatten() {
-                for key in ["test", "command"] {
-                    if test
-                        .get(key)
-                        .and_then(Value::as_str)
-                        .is_none_or(|v| v.trim().is_empty())
-                    {
-                        return Err(RefineError::Serialization(format!(
-                            "artifacts.tests requires a nonempty {key}"
-                        )));
-                    }
-                }
-            }
-        }
-        _ => {}
-    }
-    Ok(())
-}
-
 impl EventInvocation {
+    /// Keep historical recorded state intact while exposing the outcome of all actual executions.
+    pub fn execution_state(&self) -> InvocationState {
+        if !self.state.terminal()
+            || self.state == InvocationState::Cancelled
+            || (self.state == InvocationState::Error
+                && self.results.values().all(|r| r.outcome != "error"))
+        {
+            return self.state.clone();
+        }
+        aggregate_state(self)
+    }
+
     pub(crate) fn execution_error(&self) -> RefineError {
         let message = self
             .error
@@ -918,13 +506,5 @@ impl EventInvocation {
         } else {
             RefineError::Degraded(message)
         }
-    }
-}
-
-fn remove_if_present(path: &std::path::Path) -> RefineResult<()> {
-    match std::fs::remove_file(path) {
-        Ok(()) => Ok(()),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
-        Err(e) => Err(RefineError::Io(e.to_string())),
     }
 }

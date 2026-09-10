@@ -165,6 +165,19 @@ function skillTriggerLabel(source) {
   return match ? `${match[1][0].toUpperCase() + match[1].slice(1)} ${match[2] === "enter" ? "starts" : "ends"}` : "Unconfigured";
 }
 
+let skillIdSequence = 0;
+function newSkillId() {
+  const browserCrypto = globalThis.crypto;
+  if (typeof browserCrypto?.randomUUID === "function") return `skill-${browserCrypto.randomUUID()}`;
+  // getRandomValues also works on remote HTTP pages without the secure-context UUID API.
+  if (typeof browserCrypto?.getRandomValues === "function") {
+    const bytes = browserCrypto.getRandomValues(new Uint8Array(16));
+    return `skill-${Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("")}`;
+  }
+  // These are record identifiers, not credentials. Keep older browsers usable too.
+  return `skill-${Date.now().toString(36)}-${(++skillIdSequence).toString(36)}-${Math.random().toString(36).slice(2)}`;
+}
+
 async function openSkillEditor(original = null, clone = false) {
   if (automationEditor || automationEditorOpening) return;
   automationEditorOpening = true;
@@ -178,9 +191,9 @@ async function openSkillEditor(original = null, clone = false) {
     ]);
     if (!isNodeContextGenerationCurrent(generation)) return;
     sources = catalog.sources; revision = current.revision;
-    item = original ? structuredClone(current.item) : {id: `skill-${crypto.randomUUID()}`, name: "", prompt: "", enabled: true, scope: {node_id: null}, parameters: []};
+    item = original ? structuredClone(current.item) : {id: newSkillId(), name: "", prompt: "", enabled: true, scope: {node_id: null}, parameters: []};
     trigger = current.trigger || {source: "custom", mode: "blocking", order: 0, inputs: {}};
-    if (clone) { item.id = `skill-${crypto.randomUUID()}`; item.name += " copy"; trigger = {...trigger, id: undefined}; }
+    if (clone) { item.id = newSkillId(); item.name += " copy"; trigger = {...trigger, id: undefined}; }
   } catch (error) { showActionError(error); return; }
   finally { automationEditorOpening = false; }
   const root = automationModal(editing ? `${item.name} — Edit Skill` : "New Skill", `<form data-automation-form novalidate>
@@ -338,6 +351,11 @@ async function triggerManualSkill(id) {
   finally { manualSkillOpening = false; }
 }
 
+function skillRunStatus(run) {
+  const waiting = { capacity: "Waiting for agent capacity", workspace_busy: "Waiting for checkout", paused: "Automation paused" };
+  return waiting[run.waiting?.reason] || run.execution_state || run.state;
+}
+
 async function openEventHistory(id = null, offset = 0, goalId = null) {
   if (automationHistoryOpening) return;
   if (automationHistory?.isConnected) { automationHistory.querySelector(".modal-title").focus(); return; }
@@ -346,7 +364,7 @@ async function openEventHistory(id = null, offset = 0, goalId = null) {
     const generation = captureNodeContextGeneration();
     const data = await api("GET", id ? `/api/event-invocations/${encodeURIComponent(id)}` : `/api/event-invocations?offset=${offset}&limit=30${goalId ? `&goal_id=${encodeURIComponent(goalId)}` : ""}`);
     if (!isNodeContextGenerationCurrent(generation)) return;
-    const root = automationModal(id ? data.event.name : goalId ? `Skill runs · ${goalId}` : "Skill history", id ? `<p><strong>${htmlEscape(data.state)}</strong></p>${data.error ? `<p role="alert">${htmlEscape(data.error)}</p>` : ""}${Object.values(data.results).map(r => `<section><h3>${htmlEscape(r.binding_id)} · ${htmlEscape(r.outcome)}</h3><p>${htmlEscape(r.summary)}</p><pre style="white-space:pre-wrap">${htmlEscape((r.evidence || []).join("\n"))}</pre><details><summary>Result artifacts</summary><pre style="white-space:pre-wrap">${htmlEscape(JSON.stringify(r.artifacts, null, 2))}</pre></details></section>`).join("")}${(data.attempts || []).length ? `<details><summary>Execution attempts and process evidence</summary>${data.attempts.map(a => `<p>${htmlEscape(a.binding_id)} · Process ${htmlEscape(a.process_id || "unavailable")}</p><pre style="white-space:pre-wrap">${htmlEscape(a.diagnostic || "")}${htmlEscape(a.raw_output || "")}</pre>`).join("")}<a href="#/settings/processes">Open Processes</a></details>` : ""}` : `<table class="table"><thead><tr><th>Run</th><th>State</th><th>Created</th></tr></thead><tbody>${data.items.map(run => `<tr><td><button class="secondary" data-open-run="${run.id}">${htmlEscape(run.event.name)}</button></td><td>${htmlEscape(run.state)}</td><td>${htmlEscape(run.created_at)}</td></tr>`).join("")}</tbody></table><div class="automation-pagination"><button class="secondary" data-previous ${offset ? "" : "disabled"}>Previous</button><button class="secondary" data-next ${offset + data.items.length < data.total ? "" : "disabled"}>Next</button></div>`);
+    const root = automationModal(id ? data.event.name : goalId ? `Skill runs · ${goalId}` : "Skill history", id ? `<p><strong>${htmlEscape(skillRunStatus(data))}</strong></p>${data.context?.goal_id && data.gate ? `<p>Workflow gate: ${htmlEscape(data.gate)}</p>` : ""}${data.execution_state && data.execution_state !== data.state ? `<p>Originally recorded as ${htmlEscape(data.state)}; status above includes every executed Skill.</p>` : ""}${data.error ? `<p role="alert">${htmlEscape(data.error)}</p>` : ""}${Object.values(data.results).map(r => `<section><h3>${htmlEscape(r.binding_id)} · ${htmlEscape(r.outcome)}</h3><p>${htmlEscape(r.summary)}</p><pre style="white-space:pre-wrap">${htmlEscape((r.evidence || []).join("\n"))}</pre><details><summary>Result artifacts</summary><pre style="white-space:pre-wrap">${htmlEscape(JSON.stringify(r.artifacts, null, 2))}</pre></details></section>`).join("")}${(data.attempts || []).length ? `<details><summary>Execution attempts and process evidence</summary>${data.attempts.map(a => `<p>${htmlEscape(a.binding_id)} · ${a.purpose === "completion_repair" ? "Report repair" : "Work"}${a.started_at && a.received_at ? ` · ${Math.max(0, Math.round((Date.parse(a.received_at) - Date.parse(a.started_at)) / 1000))}s` : ""} · Process ${htmlEscape(a.process_id || "unavailable")}</p><pre style="white-space:pre-wrap">${htmlEscape(a.diagnostic || "")}${htmlEscape(a.raw_output || "")}</pre>`).join("")}<a href="#/settings/processes">Open Processes</a></details>` : ""}` : `<table class="table"><thead><tr><th>Run</th><th>State</th><th>Created</th></tr></thead><tbody>${data.items.map(run => `<tr><td><button class="secondary" data-open-run="${run.id}">${htmlEscape(run.event.name)}</button></td><td>${htmlEscape(skillRunStatus(run))}</td><td>${htmlEscape(run.created_at)}</td></tr>`).join("")}</tbody></table><div class="automation-pagination"><button class="secondary" data-previous ${offset ? "" : "disabled"}>Previous</button><button class="secondary" data-next ${offset + data.items.length < data.total ? "" : "disabled"}>Next</button></div>`);
     automationHistory = root;
     root.querySelector("[data-close]").textContent = "Close";
     root.querySelector("[data-save]").textContent = "Refresh";

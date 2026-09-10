@@ -1683,3 +1683,54 @@ test("Skill History opens once after refreshes and repeated clicks with spaced p
     assert.deepEqual(app.pageErrors,[]);
   } finally { await app.close(); }
 });
+
+test("Skill history explains waiting, background outcomes, and report repair", {skip:SKIP}, async () => {
+  const app = await openApp({fixture(pathname) {
+    if (pathname === "/api/event-invocations") return {total:1,items:[{id:"RUN",event:{name:"Background task"},state:"pending",waiting:{reason:"workspace_busy"},created_at:"2026-09-10T12:00:00Z"}]};
+    if (pathname === "/api/event-invocations/RUN") return {id:"RUN",event:{name:"Background task"},state:"succeeded",execution_state:"error",context:{goal_id:"GOAL"},gate:"satisfied",results:{background:{binding_id:"background",outcome:"error",summary:"Provider failed",evidence:[],artifacts:{}}},attempts:[{binding_id:"background",process_id:"P1",purpose:"completion_repair",started_at:"2026-09-10T12:00:00Z",received_at:"2026-09-10T12:00:07Z",diagnostic:"Invalid report",raw_output:"retained"}]};
+    return apiFixture(pathname);
+  }});
+  try {
+    await app.page.goto(`${app.origin}/#/settings/skills`);
+    await app.page.locator('[data-event-history]').click();
+    await app.page.getByText("Waiting for checkout", {exact:true}).waitFor();
+    await app.page.locator('[data-open-run="RUN"]').click();
+    await app.page.getByText("Workflow gate: satisfied", {exact:true}).waitFor();
+    assert.equal(await app.page.locator('[aria-modal="true"]').count(), 1);
+    await app.page.getByText("Execution attempts and process evidence", {exact:true}).click();
+    assert.match(await app.page.locator('[aria-modal="true"]').innerText(), /Report repair · 7s/);
+    assert.match(await app.page.locator('[aria-modal="true"]').innerText(), /Originally recorded as succeeded/);
+    assert.deepEqual(app.pageErrors, []);
+  } finally { await app.close(); }
+});
+
+for (const cryptoMode of ["without-randomUUID", "without-crypto"]) {
+  test(`Skill creation and cloning work ${cryptoMode}`, {skip:SKIP}, async () => {
+    const data = skillFixture();
+    const app = await openApp({fixture:data.fixture});
+    try {
+      await app.page.addInitScript(mode => {
+        if (mode === "without-crypto") Object.defineProperty(globalThis, "crypto", {value:undefined,configurable:true});
+        else Object.defineProperty(globalThis.crypto, "randomUUID", {value:undefined,configurable:true});
+      }, cryptoMode);
+      await app.page.goto(`${app.origin}/#/settings/skills`);
+      await app.page.locator('[data-automation-new]').click();
+      const modal = app.page.locator('[data-testid="automation-modal"]');
+      await modal.locator('[data-prompt]').fill('Inspect the current release.');
+      await modal.locator('[data-save]').click();
+      await modal.locator('#automation-name').fill('HTTP release check');
+      await modal.locator('[data-save]').click();
+      await modal.waitFor({state:'detached'});
+      assert.match(data.writes[0].item.id, /^skill-[A-Za-z0-9-]+$/);
+      await app.page.locator('[data-automation-edit="inspect"]').click();
+      await modal.locator('[data-clone-skill]').click();
+      await modal.locator('[data-save]').click();
+      await modal.waitFor({state:'detached'});
+      assert.equal(data.writes.length, 2);
+      assert.notEqual(data.writes[1].item.id, data.writes[0].item.id);
+      assert.notEqual(data.writes[1].item.id, 'inspect');
+      assert.equal(data.writes[1].item.prompt, 'Inspect the release.');
+      assert.deepEqual(app.pageErrors, []);
+    } finally { await app.close(); }
+  });
+}

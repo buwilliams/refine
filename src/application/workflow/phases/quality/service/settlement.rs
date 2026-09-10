@@ -37,6 +37,7 @@ impl QualityOperationRunner {
             state: if result.ok { "passed" } else { "failed" }.to_string(),
             checked_at: checked_at.clone(),
             results: recorded_results,
+            skills: result.skill_evidence.clone().map(Box::new),
         };
         let details = json!({
             "operation_id": operation_id,

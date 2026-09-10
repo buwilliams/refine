@@ -1,7 +1,7 @@
 //! Goal mutations publish lifecycle occurrences atomically with semantic state.
 //! Blocking user transitions retain intent on the Goal; workers never hold a Goal lock
 //! while an agent runs, so Cancel and reassignment remain immediately available.
-use super::{FileEventService, InvocationState};
+use super::FileEventService;
 use crate::error::{RefineError, RefineResult};
 use crate::infrastructure::storage::automation::{AutomationStore, read_json, write_json};
 use crate::model::automation::{AutomationConfig, BindingMode};
@@ -389,12 +389,13 @@ impl FileEventService {
                                 continue;
                             }
                         };
-                        complete &= invocation.state.terminal();
+                        let assessment = invocation.gate_assessment();
+                        complete &= assessment
+                            != crate::application::workflow::gates::GateAssessment::Missing;
                         failed |= matches!(
-                            invocation.state,
-                            InvocationState::Failed
-                                | InvocationState::Error
-                                | InvocationState::Cancelled
+                            assessment,
+                            crate::application::workflow::gates::GateAssessment::Finding
+                                | crate::application::workflow::gates::GateAssessment::Fault
                         );
                     }
                     if complete || failed {

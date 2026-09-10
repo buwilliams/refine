@@ -14,6 +14,7 @@ fn failed_quality_result(
         candidate_commit: "candidate".to_string(),
         checked_at: None,
         provider_attempts: Vec::new(),
+        skill_evidence: None,
     }
 }
 

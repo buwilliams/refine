@@ -36,7 +36,7 @@ impl InProcessWebServer {
                             service.invocations(offset, limit)
                         }
                     }
-                    ("GET", [_, id]) => Ok(json!(service.invocation(id)?)),
+                    ("GET", [_, id]) => service.invocation_view(id),
                     ("POST", [_, id, "cancel"]) => Ok(json!(service.cancel_invocation(id)?)),
                     _ => Err(RefineError::NotFound("Event invocation route".into())),
                 };

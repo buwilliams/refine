@@ -257,6 +257,17 @@ print(json.dumps(contract))
 #[cfg(unix)]
 #[test]
 fn default_skills_complete_a_real_workflow_with_observed_quality_and_candidate_evidence() {
+    exercise_workflow(false);
+}
+
+#[cfg(unix)]
+#[test]
+fn queued_custom_skill_is_admitted_before_an_active_goal_finishes() {
+    exercise_workflow(true);
+}
+
+#[cfg(unix)]
+fn exercise_workflow(concurrent_skill: bool) {
     use crate::application::work_items::FileWorkItemService;
     use crate::application::workflow::WorkflowEngine;
     use crate::infrastructure::process::supervisor::config::FileSettingsService;
@@ -285,21 +296,29 @@ fn default_skills_complete_a_real_workflow_with_observed_quality_and_candidate_e
     git(&["commit", "-qm", "initial"]);
     let provider = fixture.0.join("provider");
     std::fs::write(&provider, r##"#!/usr/bin/env python3
-import sys,json,pathlib
+import sys,json,pathlib,time
+fixture=pathlib.Path(@FIXTURE@)
 prompt=' '.join(sys.argv[1:])
 decode=json.JSONDecoder().raw_decode
 result=decode(prompt.split('Refine completion contract (supplied by the system):\n',1)[1])[0]
 context=decode(prompt.split('Pinned context:\n',1)[1])[0]
 role=result['role']
 result['evidence']=['Inspected the candidate and observed the requested behavior.']
+if role=='task':
+ (fixture/'skill-finished').write_text('done')
 if role=='implement':
+ if (fixture/'concurrent').exists():
+  (fixture/'goal-started').write_text('started')
+  deadline=time.monotonic()+20
+  while not (fixture/'skill-finished').exists() and time.monotonic()<deadline: time.sleep(.02)
+  assert (fixture/'skill-finished').exists(), 'Queued Skill was starved behind the active Goal'
  pathlib.Path('app.txt').write_text('after\n')
  checklist=context['goal']['rounds'][-1]['implementation_plan']['final_plan']['result']['checklist']
  result['artifacts']={'implementation_evidence':{'checklist':[{'id':i['id'],'outcome':'completed','evidence':'Changed app.txt and verified contents'} for i in checklist], 'verification':['app.txt contains after']}}
 if role=='quality':
  result['artifacts']={'tests':[{'test':'Requested output','command':"test \"$(cat app.txt)\" = after",'status':'passed','evidence':'The supervised command checks the actual file'}]}
 print(json.dumps(result))
-"##).unwrap();
+"##.replace("@FIXTURE@", &json!(fixture.0).to_string())).unwrap();
     std::fs::set_permissions(&provider, std::fs::Permissions::from_mode(0o755)).unwrap();
     let _environment = crate::infrastructure::agents::invocation::smoke_ai_env_lock()
         .lock()
@@ -323,10 +342,28 @@ print(json.dumps(result))
     let root = crate::infrastructure::storage::project_layout::refine_dir_for_target_root(&target)
         .unwrap();
     FileSettingsService::new(&root)
-        .update(&json!({"agent_cli":"smoke-ai"}))
+        .update(&json!({"agent_cli":"smoke-ai","parallel_run_cap":2}))
         .unwrap();
     let service = FileEventService::with_runtime_root(&root, fixture.0.join("runtime"));
     service.config().unwrap();
+    let quality = service.show_skill("default-quality").unwrap();
+    let mut quality_item = quality["item"].clone();
+    quality_item["parameters"] = json!([{"name":"project","kind":"text","required":true}]);
+    let mut quality_trigger = quality["trigger"].clone();
+    quality_trigger["inputs"] = json!({"project":"system.project_root"});
+    service
+        .save(
+            "skills",
+            "default-quality",
+            json!({"revision":quality["revision"],"item":quality_item,"trigger":quality_trigger}),
+        )
+        .unwrap();
+    if concurrent_skill {
+        std::fs::write(fixture.0.join("concurrent"), "yes").unwrap();
+        let revision = service.config().unwrap().revision;
+        service.save("skills", "side-task", json!({"revision":revision,
+            "item":{"name":"Side task","prompt":"Run the independent fixture action"},"trigger":{"source":"custom"}})).unwrap();
+    }
     let work = FileWorkItemService::new(&root);
     work.create_goal_summary("Change the output", Some("EVENTGOAL"))
         .unwrap();
@@ -338,8 +375,42 @@ print(json.dumps(result))
     .unwrap();
     work.transition_goal_status("EVENTGOAL", GoalStatus::Todo)
         .unwrap();
-    let result =
-        WorkflowEngine::with_target_root(fixture.0.join("runtime"), &target).evaluate_workflow();
+    let engine = WorkflowEngine::with_target_root(fixture.0.join("runtime"), &target);
+    let result = if concurrent_skill {
+        std::thread::scope(|scope| {
+            let worker = scope.spawn(|| engine.evaluate_workflow());
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(15);
+            while !fixture.0.join("goal-started").exists() && std::time::Instant::now() < deadline {
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+            assert!(
+                fixture.0.join("goal-started").exists(),
+                "Goal never started"
+            );
+            let run = service
+                .trigger_skill(
+                    "side-task",
+                    &target,
+                    &json!({"request_id":"while-goal-active"}),
+                )
+                .unwrap();
+            assert!(!fixture.0.join("skill-finished").exists());
+            let result = worker.join().unwrap();
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            while !service.invocation(&run.id).unwrap().state.terminal()
+                && std::time::Instant::now() < deadline
+            {
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+            assert_eq!(
+                service.invocation(&run.id).unwrap().state,
+                InvocationState::Succeeded
+            );
+            result
+        })
+    } else {
+        engine.evaluate_workflow()
+    };
     assert!(
         result.is_ok(),
         "{result:?}\n{}",
@@ -367,6 +438,26 @@ print(json.dumps(result))
             .any(|run| run["event"]["source"] == "workflow.quality.enter"
                 && run["state"] == "succeeded")
     );
+    let quality_runs = runs["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|run| run["event"]["source"] == "workflow.quality.enter")
+        .collect::<Vec<_>>();
+    assert_eq!(
+        quality_runs.len(),
+        1,
+        "An unchanged candidate needs one Quality review: {runs}"
+    );
+    let proof = &goal["rounds"][0]["quality_details"]["quality_proof"];
+    assert_eq!(
+        proof["skills"]["required_bindings"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    assert_eq!(proof["skills"]["invocations"].as_object().unwrap().len(), 1);
 }
 
 fn add_gate(service: &FileEventService, source: &str, missing_input: bool) {
@@ -428,6 +519,20 @@ fn manual_transition_waits_for_exit_evidence_and_cancellation_can_supersede_it()
     for run in runs["items"].as_array().unwrap() {
         let id = run["id"].as_str().unwrap();
         let mut invocation = service.invocation(id).unwrap();
+        for binding in &invocation.bindings {
+            invocation.results.insert(
+                binding.binding.id.clone(),
+                SkillResult {
+                    invocation_id: invocation.id.clone(),
+                    binding_id: binding.binding.id.clone(),
+                    role: binding.skill.role.clone(),
+                    outcome: "success".into(),
+                    summary: "Observed exit checks passed".into(),
+                    evidence: vec!["Fixture observed the exit check".into()],
+                    artifacts: json!({}),
+                },
+            );
+        }
         invocation.state = InvocationState::Succeeded;
         service.save_invocation(&invocation).unwrap();
     }
@@ -1027,3 +1132,5 @@ fn single_trigger_save_rejects_multiple_and_derives_the_workflow_result_contract
         1
     );
 }
+
+mod repairs;

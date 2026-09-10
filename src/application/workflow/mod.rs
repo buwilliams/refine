@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 mod agents;
 pub mod engine;
+pub(crate) mod gates;
 pub mod governance;
 pub mod phases;
 pub mod recovery;

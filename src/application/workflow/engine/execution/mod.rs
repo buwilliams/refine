@@ -50,7 +50,11 @@ struct PreparedGoalError {
 
 impl WorkflowEngine {
     pub fn evaluate_workflow(&self) -> RefineResult<WorkflowPassResult> {
-        let promoted = self.promote()?;
+        let promoted = if self.workflow_paused()? {
+            0
+        } else {
+            self.promote()?
+        };
         let steps = self.execute_work()?;
         Ok(WorkflowPassResult { promoted, steps })
     }
@@ -63,7 +67,6 @@ impl WorkflowEngine {
     }
 
     pub fn execute_work(&self) -> RefineResult<Vec<WorkflowStepResult>> {
-        self.ensure_automation_running()?;
         let mut results = Vec::new();
         let mut errors = Vec::new();
         let mut scheduler_error = None;
@@ -72,6 +75,7 @@ impl WorkflowEngine {
             let mut active = BTreeSet::new();
             let mut launch_order = 0usize;
             let mut next_replenish = Instant::now();
+            let mut skills_first = super::admission::skills_first(&self.runtime_root);
 
             loop {
                 let paused = match self.workflow_paused() {
@@ -81,7 +85,11 @@ impl WorkflowEngine {
                         false
                     }
                 };
-                if !paused && scheduler_error.is_none() && Instant::now() >= next_replenish {
+                let admission_tick = Instant::now() >= next_replenish;
+                if admission_tick {
+                    self.service_pending_skills(usize::from(skills_first));
+                }
+                if !paused && scheduler_error.is_none() && admission_tick {
                     if let Err(error) = self.promote_backlog_to_todo() {
                         scheduler_error = Some(error);
                     }
@@ -89,67 +97,82 @@ impl WorkflowEngine {
                 }
 
                 let mut launched = false;
-                if !paused && scheduler_error.is_none() {
+                if !paused && scheduler_error.is_none() && admission_tick {
                     match self.launchable_goals(&active) {
                         Ok(goal_ids) => {
                             for goal_id in goal_ids {
                                 if active.contains(&goal_id) {
                                     continue;
                                 }
+                                let lease = match self.reserve_goal(&goal_id) {
+                                    Ok(Some(lease)) => lease,
+                                    Ok(None) => continue,
+                                    Err(error) => {
+                                        scheduler_error = Some(error);
+                                        break;
+                                    }
+                                };
                                 let order = launch_order;
                                 launch_order += 1;
-                                match self.prepare_goal(&goal_id) {
-                                    Ok(PreparedGoal::Execute(ctx)) => {
-                                        active.insert(goal_id.clone());
-                                        launched = true;
-                                        let outcome_tx = outcome_tx.clone();
-                                        let authority = ctx.attempt_authority;
-                                        scope.spawn(move || {
-                                            let outcome = std::panic::catch_unwind(
-                                                std::panic::AssertUnwindSafe(|| {
+                                active.insert(goal_id.clone());
+                                launched = true;
+                                let outcome_tx = outcome_tx.clone();
+                                scope.spawn(move || {
+                                    let _admission = lease;
+                                    let authority = std::cell::Cell::new(None);
+                                    let outcome = std::panic::catch_unwind(
+                                        std::panic::AssertUnwindSafe(|| {
+                                            match self.prepare_goal(&goal_id) {
+                                                Ok(PreparedGoal::Execute(ctx)) => {
+                                                    authority.set(Some(ctx.attempt_authority));
                                                     self.execute_prepared_goal(*ctx)
-                                                }),
-                                            )
-                                            .unwrap_or_else(|_| {
-                                                let error = RefineError::Conflict(format!(
-                                                    "workflow worker panicked for Goal {goal_id}"
-                                                ));
-                                                let _ = self.settle_goal_failure(
-                                                    &goal_id,
-                                                    authority,
-                                                    "workflow_panic",
-                                                    &error,
-                                                );
-                                                Err(error)
-                                            });
-                                            let _ = outcome_tx.send((order, goal_id, outcome));
-                                        });
-                                    }
-                                    Ok(PreparedGoal::Completed(result)) => {
-                                        self.clear_retry(&goal_id);
-                                        results.push((order, *result));
-                                        launched = true;
-                                    }
-                                    Err(failure) if is_stale_authority(&failure.error) => {}
-                                    Err(failure) => {
-                                        if let Some(authority) = failure.authority {
+                                                }
+                                                Ok(PreparedGoal::Completed(result)) => Ok(*result),
+                                                Err(failure) => {
+                                                    if !is_stale_authority(&failure.error)
+                                                        && let Some(authority) = failure.authority
+                                                    {
+                                                        let _ = self.settle_goal_failure(
+                                                            &goal_id,
+                                                            authority,
+                                                            "preparation",
+                                                            &failure.error,
+                                                        );
+                                                    }
+                                                    Err(failure.error)
+                                                }
+                                            }
+                                        }),
+                                    )
+                                    .unwrap_or_else(|_| {
+                                        let error = RefineError::Conflict(format!(
+                                            "workflow worker panicked for Goal {goal_id}"
+                                        ));
+                                        if let Some(authority) = authority.get() {
                                             let _ = self.settle_goal_failure(
                                                 &goal_id,
                                                 authority,
-                                                "preparation",
-                                                &failure.error,
+                                                "workflow_panic",
+                                                &error,
                                             );
                                         }
-                                        self.record_retry(&goal_id);
-                                        errors.push((order, failure.error));
-                                    }
-                                }
+                                        Err(error)
+                                    });
+                                    let _ = outcome_tx.send((order, goal_id, outcome));
+                                });
                             }
                         }
                         Err(error) => scheduler_error = Some(error),
                     }
                 }
 
+                if admission_tick {
+                    // Goals have had their admission opportunity; standalone work may
+                    // now fill remaining capacity, including passes with no active Goals.
+                    self.service_pending_skills(32);
+                    skills_first = !skills_first;
+                    next_replenish = Instant::now() + ACTIVE_WORK_REPLENISH_INTERVAL;
+                }
                 if active.is_empty() {
                     if !launched {
                         break;
@@ -165,6 +188,7 @@ impl WorkflowEngine {
                                 self.clear_retry(&goal_id);
                                 results.push((order, result));
                             }
+                            Err(error) if is_stale_authority(&error) => {}
                             Err(error) => {
                                 self.record_retry(&goal_id);
                                 errors.push((order, error));
@@ -189,6 +213,53 @@ impl WorkflowEngine {
         }
         results.sort_by_key(|(order, _)| *order);
         Ok(results.into_iter().map(|(_, result)| result).collect())
+    }
+
+    /// Admission remains responsive while child Goal executions are running.
+    fn service_pending_skills(&self, limit: usize) {
+        let Some(target) = self.target_root.as_ref() else {
+            return;
+        };
+        let result = (|| -> RefineResult<()> {
+            let events = crate::application::events::FileEventService::with_runtime_root(
+                prepare_refine_dir(target)?,
+                &self.runtime_root,
+            );
+            if let Err(error) = events.dispatch_goal_events(target) {
+                eprintln!("refine Goal event materialization: {error}");
+            }
+            if limit > 0 {
+                events.dispatch_pending_limit(target, limit)?;
+            }
+            Ok(())
+        })();
+        if let Err(error) = result {
+            eprintln!("refine Skill admission: {error}");
+        }
+    }
+
+    fn reserve_goal(
+        &self,
+        goal_id: &str,
+    ) -> RefineResult<Option<super::admission::AdmissionLease>> {
+        let policy = self.policy()?;
+        super::admission::reserve(
+            self,
+            &policy,
+            format!(
+                "{}:{}:goal:{goal_id}",
+                self.runtime_root.display(),
+                policy.target_app_id
+            ),
+            super::admission::ExecutionReservation {
+                runtime: self.runtime_root.clone(),
+                invocation_id: None,
+                goal_id: Some(goal_id.into()),
+                node: policy.active_node_id.clone(),
+                provider: policy.provider.clone(),
+                target: policy.target_app_id.clone(),
+            },
+        )
     }
 
     fn launchable_goals(&self, active: &BTreeSet<String>) -> RefineResult<Vec<String>> {

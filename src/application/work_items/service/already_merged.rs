@@ -517,6 +517,7 @@ fn normalize_quality_proof(
         state: "passed".to_string(),
         checked_at: checked_at.unwrap_or_default().to_string(),
         results,
+        skills: None,
     };
     (Some(proof), Some("normalized".to_string()), None)
 }
@@ -529,7 +530,15 @@ fn valid_quality_proof(
     round: &Value,
     details: &Value,
 ) -> bool {
-    proof.schema_version == QUALITY_PROOF_SCHEMA_VERSION
+    let skills_match = match (&proof.skills, round.get("quality_requirements")) {
+        (Some(skills), Some(snapshot)) => {
+            skills.covers(snapshot) && snapshot["candidate_commit"] == candidate
+        }
+        (None, None) => true, // Legacy proof is checked by the existing exact-candidate rules below.
+        _ => false,
+    };
+    skills_match
+        && proof.schema_version == QUALITY_PROOF_SCHEMA_VERSION
         && proof.goal_id == goal_id
         && proof.round_idx == round_idx
         && proof.evaluation_scope == "isolated_candidate"

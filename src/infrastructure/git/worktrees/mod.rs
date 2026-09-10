@@ -435,3 +435,5 @@ use integration::BASE_IN_CONFLICT_MARKERS;
 #[cfg(test)]
 mod tests;
 mod worktrees;
+
+mod observation;

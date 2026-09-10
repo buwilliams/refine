@@ -212,6 +212,7 @@ pub(crate) fn parse_quality_provider_output(
         candidate_commit: String::new(),
         checked_at: None,
         provider_attempts: Vec::new(),
+        skill_evidence: None,
     })
 }
 

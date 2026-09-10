@@ -1,32 +1,13 @@
 //! Workflow adapters bind generic Skill results to the existing semantic gates.
-use super::{FileEventService, InvocationContext, InvocationState};
+use super::{FileEventService, InvocationContext};
 use crate::application::workflow::engine::context::WorkflowContext;
 use crate::error::{RefineError, RefineResult};
 use crate::infrastructure::process::supervisor::coordination::with_record_lock;
-use crate::model::automation::{AutomationConfig, BindingMode, SkillResult};
+use crate::model::automation::{BindingMode, SkillResult};
 use crate::model::workflow::GoalStatus;
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
 use std::path::Path;
-
-pub fn configuration(ctx: &WorkflowContext<'_>) -> RefineResult<AutomationConfig> {
-    with_record_lock(&ctx.refine_dir(), &ctx.goal_id, || {
-        let goal = ctx.work_items.show_goal_detail(&ctx.goal_id)?;
-        let status = goal
-            .get("status")
-            .and_then(Value::as_str)
-            .and_then(GoalStatus::parse_wire)
-            .ok_or_else(|| RefineError::InvalidInput("missing Goal status".into()))?;
-        ctx.revalidate_authority(status)?;
-        let config = (*FileEventService::new(ctx.refine_dir()).config()?).clone();
-        ctx.work_items.update_goal_round_evaluation_summary(
-            &ctx.goal_id,
-            ctx.round_idx,
-            &json!({"event_configuration": config}),
-        )?;
-        Ok(config)
-    })
-}
 
 pub fn run(
     ctx: &WorkflowContext<'_>,
@@ -37,8 +18,14 @@ pub fn run(
     variant: &str,
 ) -> RefineResult<Vec<SkillResult>> {
     ctx.revalidate_authority(status.clone())?;
-    let config = configuration(ctx)?;
     let source = format!("workflow.{}.{}", status.as_str(), edge);
+    let config = FileEventService::new(ctx.refine_dir()).gate_configuration(
+        &ctx.goal_id,
+        ctx.round_idx,
+        &ctx.node_id,
+        &source,
+        || ctx.revalidate_authority(status.clone()),
+    )?;
     let service = FileEventService::with_runtime_root(ctx.refine_dir(), ctx.runtime_root);
     let events = config
         .events
@@ -98,7 +85,7 @@ pub fn run(
             service.execute_with_metadata(&invocation.id, Some(&context.metadata), || {
                 ctx.revalidate_authority(status.clone())
             })?;
-        if invocation.state == InvocationState::Succeeded && invocation.event.on_success.is_some() {
+        if invocation.success_action_ready() {
             service.apply_success_action(&mut invocation)?;
             ctx.revalidate_authority(status.clone())?;
         }
@@ -121,7 +108,9 @@ pub fn run(
             )?;
             Ok(())
         })?;
-        if invocation.state == InvocationState::Error {
+        if invocation.gate_assessment()
+            == crate::application::workflow::gates::GateAssessment::Fault
+        {
             return Err(invocation.execution_error());
         }
         results.extend(

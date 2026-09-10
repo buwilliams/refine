@@ -23,6 +23,7 @@ impl QualityService for FileQualityService {
                 candidate_commit: request.candidate_commit,
                 checked_at: None,
                 provider_attempts: Vec::new(),
+                skill_evidence: None,
             });
         }
         let test_names = definitions
@@ -170,6 +171,7 @@ impl QualityService for FileQualityService {
             candidate_commit: request.candidate_commit,
             checked_at: None,
             provider_attempts,
+            skill_evidence: None,
         };
         if !result.ok {
             result.summary = quality_failure_summary(&result);
@@ -204,6 +206,7 @@ impl QualityService for FileQualityService {
             candidate_commit: String::new(),
             checked_at: None,
             provider_attempts: Vec::new(),
+            skill_evidence: None,
         })
     }
 
@@ -222,6 +225,7 @@ impl QualityService for FileQualityService {
             candidate_commit: String::new(),
             checked_at: None,
             provider_attempts: Vec::new(),
+            skill_evidence: None,
         })
     }
 }

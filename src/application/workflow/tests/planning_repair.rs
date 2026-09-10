@@ -103,16 +103,15 @@ fn run_planning(
         crate::application::events::FileEventService::with_runtime_root(&refine_dir, &runtime_root);
     if multiple {
         let config = events.config().unwrap();
-        let mut event = config.events["workflow.plan.enter"].clone();
-        let mut binding = event.bindings[0].clone();
-        binding.id = "independent-plan".into();
-        binding.order = 1;
-        event.bindings.push(binding);
+        let mut skill = config.skills["default-plan"].clone();
+        skill.id = "independent-plan".into();
+        skill.name = "Independent plan".into();
         events
             .save(
-                "events",
-                &event.id,
-                json!({"revision":config.revision, "item":event}),
+                "skills",
+                &skill.id,
+                json!({"revision":config.revision,"item":skill,
+            "trigger":{"source":"workflow.plan.enter","order":1}}),
             )
             .unwrap();
     }
@@ -189,7 +188,7 @@ fn run_planning(
 fn plan_skill_repairs_invalid_artifact_and_retains_diagnostics() {
     let (result, detail) = run_planning(
         "event-plan-repair",
-        "if 'previous response' not in prompt: result['artifacts']['plan']={'summary':'Missing checklist'}",
+        "if not prompt.startswith('Repair only'): result['artifacts']['plan']={'summary':'Missing checklist'}",
         false,
         false,
     );
@@ -227,7 +226,7 @@ fn plan_skill_exhausts_bounded_repairs_without_accepting_an_invalid_plan() {
         result
             .unwrap_err()
             .to_string()
-            .contains("after two repairs")
+            .contains("missing field `checklist`")
     );
     assert_eq!(
         detail["invocations"][0]["attempts"]

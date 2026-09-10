@@ -260,6 +260,7 @@ fn failed_quality_from_operation(
         state: "failed".to_string(),
         checked_at,
         results,
+        skills: result.skill_evidence.clone().map(Box::new),
     };
     let details = json!({
         "operation_id": operation.id,
