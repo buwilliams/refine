@@ -106,8 +106,25 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-09-10T08:28:48Z",
+        "criticism": {
+          "completed_at": "2026-09-10T08:30:27Z",
+          "git_after": {
+            "branch": "refine/DR40B8829DD3748E280BBEE7EE/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR40B8829DD3748E280BBEE7EE/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "result": {
+            "summary": "The plan restores manual acceptance by default while preserving governed approval and existing node settings contracts."
+          },
+          "started_at": "2026-09-10T08:28:48Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-09-10T08:30:27Z",
         "proposal": {
           "completed_at": "2026-09-10T08:28:48Z",
           "git_after": {
@@ -154,7 +171,7 @@
         "schema_version": 2,
         "started_at": "2026-09-10T08:26:03Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T08:28:48Z"
+        "updated_at": "2026-09-10T08:30:27Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -168,7 +185,7 @@
       "quality_state": "unclassified",
       "reporter": "ethan.jacobson@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T08:28:48Z",
+      "updated": "2026-09-10T08:30:27Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T08:26:03Z",
         "round_idx": 0,
@@ -180,6 +197,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-09-10T08:28:48Z",
-  "workflow_revision": 9
+  "updated": "2026-09-10T08:30:27Z",
+  "workflow_revision": 11
 }
