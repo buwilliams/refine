@@ -2475,11 +2475,114 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-quality": {
+      "invocation_id": "042c2558d6e30c65acecd3097ad12993c7b496dd99b33ce0cd53c92f06458c37",
+      "binding_id": "default-quality",
+      "role": "quality",
+      "outcome": "success",
+      "summary": "Observational review found no defects in the pinned candidate. Read-only checks passed; focused regression commands are ready for Refine supervision.",
+      "evidence": [
+        "Verified clean HEAD 34660f8e680c56c09ce52c89ddf552c78b3c7d75 on the Round 4 branch in the pinned workspace.",
+        "Reviewed the finalized plans, six-file policy extraction, relevant intent contracts, recovery implementation and regression coverage. No actionable defects found.",
+        "Read-only source comparison exited 0: required selection, receipt construction, validation decisions and diagnostic text are preserved. Model owns the extracted policy; Application retains orchestration, configuration persistence and timestamp acquisition.",
+        "Reviewed Q1 recovery and its regression: originating local effects remain distinct from replacement publication, repeated recovery preserves evidence, and stale attempts cannot settle replacement work.",
+        "Read retained execution logs under /tmp/refine-quality-4478edd5/. Read-only assertions confirmed all 62 candidate file hashes and retained Round refs match that evidence manifest.",
+        "Runtime tests above are proposals for Refine supervision, not executions from this invocation. Existing coverage is sufficient; no additional tests are proposed. Full-suite, Clippy and live-environment recovery were not exercised.",
+        "No files, Goal state, branches or commits were changed. No merge, push, deployment or daemon restart occurred."
+      ],
+      "artifacts": {
+        "tests": [
+          {
+            "command": "cargo test --lib model::automation::gate_evidence -- --test-threads=1",
+            "evidence": "Proposed for supervision. Retained candidate log reports 4 passed; not rerun during this observational invocation.",
+            "status": "pending",
+            "test": "Model selection, receipt validation and compatibility"
+          },
+          {
+            "command": "cargo test --lib governance -- --test-threads=1",
+            "evidence": "Proposed for supervision. Retained log reports 86 passed, including Q1 publication attribution and malformed integration intents.",
+            "status": "pending",
+            "test": "Recovery, settlement, lifecycle gates and stale-attempt rejection"
+          },
+          {
+            "command": "cargo test --lib application::events:: -- --test-threads=1",
+            "evidence": "Proposed for supervision. Retained log reports 21 passed; three policy tests moved to Model.",
+            "status": "pending",
+            "test": "Application event execution and Skill evidence"
+          },
+          {
+            "command": "cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1",
+            "evidence": "Proposed for supervision. Retained log reports 6 passed.",
+            "status": "pending",
+            "test": "Pinned configuration replay and supervised Quality proof"
+          },
+          {
+            "command": "cargo test --lib candidate_refresh -- --test-threads=1",
+            "evidence": "Proposed for supervision. Retained log reports 16 passed.",
+            "status": "pending",
+            "test": "Candidate refresh and bounded recovery"
+          },
+          {
+            "command": "cargo test --lib application::work_items::tests::workflow -- --test-threads=1",
+            "evidence": "Proposed for supervision. Retained log reports 12 passed.",
+            "status": "pending",
+            "test": "Shared workflow transitions"
+          },
+          {
+            "command": "cargo test --lib surfaces::cli::tests::goals::lifecycle -- --test-threads=1",
+            "evidence": "Proposed for supervision. Retained log reports 5 passed.",
+            "status": "pending",
+            "test": "CLI recovery and strict approval"
+          },
+          {
+            "command": "cargo test --lib web_server_governance_retry_from_review -- --test-threads=1",
+            "evidence": "Proposed for supervision. Retained log reports 1 passed.",
+            "status": "pending",
+            "test": "API shared recovery eligibility"
+          },
+          {
+            "command": "node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js",
+            "evidence": "Proposed for supervision. Retained log reports 6 passed with no skips.",
+            "status": "pending",
+            "test": "Browser recovery diagnostics and JavaScript syntax"
+          },
+          {
+            "command": "set -o pipefail\nGIT_OPTIONAL_LOCKS=0 git diff --name-only b47569adb8d4c5d1d7335ba91729a3e486a38fe0 HEAD -- '*.rs' | xargs -r rustfmt --check --edition 2024 --config skip_children=true",
+            "evidence": "Executed during this invocation: exit 0, no formatting diagnostics.",
+            "status": "passed",
+            "test": "Changed Rust formatting"
+          },
+          {
+            "command": "GIT_OPTIONAL_LOCKS=0 git diff --check 59af87d23c3c14881f3969ef316146e7aa2e3273 HEAD",
+            "evidence": "Executed during this invocation: exit 0, no whitespace errors.",
+            "status": "passed",
+            "test": "Recovery Round patch integrity"
+          },
+          {
+            "command": "GIT_OPTIONAL_LOCKS=0 git diff --check b47569adb8d4c5d1d7335ba91729a3e486a38fe0 HEAD",
+            "evidence": "Executed during this invocation: exit 0, no whitespace errors.",
+            "status": "passed",
+            "test": "Complete candidate patch integrity"
+          }
+        ]
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-quality",
+      "diagnostic": null,
+      "operation_id": "1a08bfa2e74113c7659",
+      "process_id": "proc-1789054824949-1129590-810",
+      "raw_output": "{\n  \"artifacts\": {\n    \"tests\": [\n      {\n        \"command\": \"cargo test --lib model::automation::gate_evidence -- --test-threads=1\",\n        \"evidence\": \"Proposed for supervision. Retained candidate log reports 4 passed; not rerun during this observational invocation.\",\n        \"status\": \"pending\",\n        \"test\": \"Model selection, receipt validation and compatibility\"\n      },\n      {\n        \"command\": \"cargo test --lib governance -- --test-threads=1\",\n        \"evidence\": \"Proposed for supervision. Retained log reports 86 passed, including Q1 publication attribution and malformed integration intents.\",\n        \"status\": \"pending\",\n        \"test\": \"Recovery, settlement, lifecycle gates and stale-attempt rejection\"\n      },\n      {\n        \"command\": \"cargo test --lib application::events:: -- --test-threads=1\",\n        \"evidence\": \"Proposed for supervision. Retained log reports 21 passed; three policy tests moved to Model.\",\n        \"status\": \"pending\",\n        \"test\": \"Application event execution and Skill evidence\"\n      },\n      {\n        \"command\": \"cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1\",\n        \"evidence\": \"Proposed for supervision. Retained log reports 6 passed.\",\n        \"status\": \"pending\",\n        \"test\": \"Pinned configuration replay and supervised Quality proof\"\n      },\n      {\n        \"command\": \"cargo test --lib candidate_refresh -- --test-threads=1\",\n        \"evidence\": \"Proposed for supervision. Retained log reports 16 passed.\",\n        \"status\": \"pending\",\n        \"test\": \"Candidate refresh and bounded recovery\"\n      },\n      {\n        \"command\": \"cargo test --lib application::work_items::tests::workflow -- --test-threads=1\",\n        \"evidence\": \"Proposed for supervision. Retained log reports 12 passed.\",\n        \"status\": \"pending\",\n        \"test\": \"Shared workflow transitions\"\n      },\n      {\n        \"command\": \"cargo test --lib surfaces::cli::tests::goals::lifecycle -- --test-threads=1\",\n        \"evidence\": \"Proposed for supervision. Retained log reports 5 passed.\",\n        \"status\": \"pending\",\n        \"test\": \"CLI recovery and strict approval\"\n      },\n      {\n        \"command\": \"cargo test --lib web_server_governance_retry_from_review -- --test-threads=1\",\n        \"evidence\": \"Proposed for supervision. Retained log reports 1 passed.\",\n        \"status\": \"pending\",\n        \"test\": \"API shared recovery eligibility\"\n      },\n      {\n        \"command\": \"node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js\",\n        \"evidence\": \"Proposed for supervision. Retained log reports 6 passed with no skips.\",\n        \"status\": \"pending\",\n        \"test\": \"Browser recovery diagnostics and JavaScript syntax\"\n      },\n      {\n        \"command\": \"set -o pipefail\\nGIT_OPTIONAL_LOCKS=0 git diff --name-only b47569adb8d4c5d1d7335ba91729a3e486a38fe0 HEAD -- '*.rs' | xargs -r rustfmt --check --edition 2024 --config skip_children=true\",\n        \"evidence\": \"Executed during this invocation: exit 0, no formatting diagnostics.\",\n        \"status\": \"passed\",\n        \"test\": \"Changed Rust formatting\"\n      },\n      {\n        \"command\": \"GIT_OPTIONAL_LOCKS=0 git diff --check 59af87d23c3c14881f3969ef316146e7aa2e3273 HEAD\",\n        \"evidence\": \"Executed during this invocation: exit 0, no whitespace errors.\",\n        \"status\": \"passed\",\n        \"test\": \"Recovery Round patch integrity\"\n      },\n      {\n        \"command\": \"GIT_OPTIONAL_LOCKS=0 git diff --check b47569adb8d4c5d1d7335ba91729a3e486a38fe0 HEAD\",\n        \"evidence\": \"Executed during this invocation: exit 0, no whitespace errors.\",\n        \"status\": \"passed\",\n        \"test\": \"Complete candidate patch integrity\"\n      }\n    ]\n  },\n  \"binding_id\": \"default-quality\",\n  \"evidence\": [\n    \"Verified clean HEAD 34660f8e680c56c09ce52c89ddf552c78b3c7d75 on the Round 4 branch in the pinned workspace.\",\n    \"Reviewed the finalized plans, six-file policy extraction, relevant intent contracts, recovery implementation and regression coverage. No actionable defects found.\",\n    \"Read-only source comparison exited 0: required selection, receipt construction, validation decisions and diagnostic text are preserved. Model owns the extracted policy; Application retains orchestration, configuration persistence and timestamp acquisition.\",\n    \"Reviewed Q1 recovery and its regression: originating local effects remain distinct from replacement publication, repeated recovery preserves evidence, and stale attempts cannot settle replacement work.\",\n    \"Read retained execution logs under /tmp/refine-quality-4478edd5/. Read-only assertions confirmed all 62 candidate file hashes and retained Round refs match that evidence manifest.\",\n    \"Runtime tests above are proposals for Refine supervision, not executions from this invocation. Existing coverage is sufficient; no additional tests are proposed. Full-suite, Clippy and live-environment recovery were not exercised.\",\n    \"No files, Goal state, branches or commits were changed. No merge, push, deployment or daemon restart occurred.\"\n  ],\n  \"invocation_id\": \"042c2558d6e30c65acecd3097ad12993c7b496dd99b33ce0cd53c92f06458c37\",\n  \"outcome\": \"success\",\n  \"role\": \"quality\",\n  \"summary\": \"Observational review found no defects in the pinned candidate. Read-only checks passed; focused regression commands are ready for Refine supervision.\"\n}\n",
+      "workflow_revision": 82
+    }
+  ],
   "created_at": "2026-09-10T15:40:24.528554398+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-10T15:43:44.202931903+00:00",
   "error": null,
   "action_applied": false
 }
