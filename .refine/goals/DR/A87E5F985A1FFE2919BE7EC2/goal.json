@@ -1,9 +1,9 @@
 {
   "base_commit": "b47569adb8d4c5d1d7335ba91729a3e486a38fe0",
   "branch_name": "refine/DRA87E5F985A1FFE2919BE7EC2/round-4",
-  "candidate_commit": "59af87d23c3c14881f3969ef316146e7aa2e3273",
+  "candidate_commit": "34660f8e680c56c09ce52c89ddf552c78b3c7d75",
   "created": "2026-09-10T08:26:05Z",
-  "event_generation": 12,
+  "event_generation": 13,
   "feature_id": null,
   "feature_order": null,
   "id": "DRA87E5F985A1FFE2919BE7EC2",
@@ -4767,6 +4767,81 @@
         }
       },
       "event_results": {
+        "18910d4dc1da713a31248c054ada5c8355c962d0eb719282e0822bf5ef51d7bb": {
+          "candidate_commit": null,
+          "results": {
+            "default-implement": {
+              "artifacts": {
+                "implementation_evidence": {
+                  "checklist": [
+                    {
+                      "evidence": "Started clean on refine/DRA87E5F985A1FFE2919BE7EC2/round-4 at 59af87d23c3c14881f3969ef316146e7aa2e3273. Final audit confirms unchanged prior Round refs, all 27 retained Round 1 file hashes, and 892 unrelated tracked files.",
+                      "id": "workflow.plan.enter:default-plan:P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added model/automation/gate_evidence.rs containing required_bindings and complete receipt validation. Uses existing Model types and Result<Vec<String>, String>, without Application, Infrastructure, filesystem, process or clock dependencies.",
+                      "id": "workflow.plan.enter:default-plan:P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Receipt construction and Quality checks use Model selection. Application validation now delegates to Model and maps errors to RefineError::Conflict. Receipt construction, invocation configuration matching, timestamps, orchestration and persistence retain their existing ownership.",
+                      "id": "workflow.plan.enter:default-plan:P3",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Relocated three policy tests into Model with fixed receipts; retained the Application projection test. Added compatibility coverage for version 1 receipts, absent legacy state and additional metadata. Expanded identity, result and selection rejection coverage. All four Model tests pass.",
+                      "id": "workflow.plan.enter:default-plan:P4",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "All six requested Rust selections pass. Governance includes the Q1 pending-publication attribution regression and malformed/unproved-intent coverage. Application events selects 21 tests because three policy tests moved to Model.",
+                      "id": "workflow.plan.enter:default-plan:P5",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "CLI, API and browser checks pass. Formatting passes for all six changed/new Rust files. Retained-candidate patch and new-file whitespace checks are clean.",
+                      "id": "workflow.plan.enter:default-plan:P6",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Source comparison confirms unchanged selection, validation decisions, diagnostic text and receipt construction. One Model policy implementation remains. No intent contract changed, so documentation required no edits. All six file hashes remained stable through verification. Changes remain uncommitted for Refine; no Goal advancement, approval, merge, push, deployment or daemon restart occurred.",
+                      "id": "workflow.plan.enter:default-plan:P7",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "cargo test --lib model::automation::gate_evidence -- --test-threads=1: exit 0; 4 passed.",
+                    "cargo test --lib governance -- --test-threads=1: exit 0; 86 passed.",
+                    "cargo test --lib application::events:: -- --test-threads=1: exit 0; 21 passed.",
+                    "cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1: exit 0; 6 passed.",
+                    "cargo test --lib candidate_refresh -- --test-threads=1: exit 0; 16 passed.",
+                    "cargo test --lib application::work_items::tests::workflow -- --test-threads=1: exit 0; 12 passed.",
+                    "cargo test --lib surfaces::cli::tests::goals::lifecycle -- --test-threads=1: exit 0; 5 passed.",
+                    "cargo test --lib web_server_governance_retry_from_review -- --test-threads=1: exit 0; 1 passed.",
+                    "node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js: exit 0; 6 passed, 0 failed, 0 skipped.",
+                    "rustfmt --check --edition 2024 --config skip_children=true src/application/events/evidence.rs src/application/events/evidence/tests.rs src/application/workflow/phases/quality/service/skill_checks.rs src/model/automation.rs src/model/automation/gate_evidence.rs src/model/automation/gate_evidence/tests.rs: exit 0.",
+                    "git diff --check 59af87d23c3c14881f3969ef316146e7aa2e3273: exit 0.",
+                    "git diff --no-index --check /dev/null src/model/automation/gate_evidence.rs and the equivalent command for gate_evidence/tests.rs: each returned 1 for file differences, with no whitespace diagnostics. Explicit Python whitespace inspection passed, exit 0.",
+                    "Source-equivalence and final SHA-256 preservation audits: exit 0.",
+                    "Every Rust selection had zero failures and zero ignored tests. No baseline failures observed. All requested checks ran; full-suite, Clippy and live-environment recovery were not exercised."
+                  ]
+                }
+              },
+              "binding_id": "default-implement",
+              "evidence": [
+                "Implemented and verified six scoped Rust file changes in the invocation-pinned worktree.",
+                "Logs, starting-state snapshot, verification manifest and final preservation audit are retained at /tmp/refine-implement-18910d4d-8yu1uu3u/."
+              ],
+              "invocation_id": "18910d4dc1da713a31248c054ada5c8355c962d0eb719282e0822bf5ef51d7bb",
+              "outcome": "success",
+              "role": "implement",
+              "summary": "Moved required Skill selection and receipt-validity policy into Model automation, preserving recovery behavior and passing all requested verification."
+            }
+          },
+          "source": "workflow.implement.enter",
+          "state": "succeeded"
+        },
         "a89b53d559e1fed6aa0292a860e192bcd93333bf90aa2473904c31ab6b09cefe": {
           "candidate_commit": null,
           "results": {
@@ -4846,7 +4921,12 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [],
+        "context_version": 1,
+        "recorded_at": "2026-09-10T15:36:03Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "b47569adb8d4c5d1d7335ba91729a3e486a38fe0",
@@ -4857,6 +4937,7 @@
           "round_idx": 3,
           "target_branch": "main"
         },
+        "completed_at": "2026-09-10T15:36:03Z",
         "final_plan": {
           "completed_at": "2026-09-10T15:29:27Z",
           "git_after": {
@@ -4903,6 +4984,66 @@
             "summary": "workflow.plan.enter:default-plan: Resolve ARCH-MODEL-PURE-POLICY on retained candidate 59af87d23c3c14881f3969ef316146e7aa2e3273 by moving required Skill selection and receipt validation into Model automation while preserving existing recovery behavior."
           },
           "started_at": "2026-09-10T15:24:12Z"
+        },
+        "implementation": {
+          "completed_at": "2026-09-10T15:36:03Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Started clean on refine/DRA87E5F985A1FFE2919BE7EC2/round-4 at 59af87d23c3c14881f3969ef316146e7aa2e3273. Final audit confirms unchanged prior Round refs, all 27 retained Round 1 file hashes, and 892 unrelated tracked files.",
+                "id": "workflow.plan.enter:default-plan:P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added model/automation/gate_evidence.rs containing required_bindings and complete receipt validation. Uses existing Model types and Result<Vec<String>, String>, without Application, Infrastructure, filesystem, process or clock dependencies.",
+                "id": "workflow.plan.enter:default-plan:P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Receipt construction and Quality checks use Model selection. Application validation now delegates to Model and maps errors to RefineError::Conflict. Receipt construction, invocation configuration matching, timestamps, orchestration and persistence retain their existing ownership.",
+                "id": "workflow.plan.enter:default-plan:P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Relocated three policy tests into Model with fixed receipts; retained the Application projection test. Added compatibility coverage for version 1 receipts, absent legacy state and additional metadata. Expanded identity, result and selection rejection coverage. All four Model tests pass.",
+                "id": "workflow.plan.enter:default-plan:P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "All six requested Rust selections pass. Governance includes the Q1 pending-publication attribution regression and malformed/unproved-intent coverage. Application events selects 21 tests because three policy tests moved to Model.",
+                "id": "workflow.plan.enter:default-plan:P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "CLI, API and browser checks pass. Formatting passes for all six changed/new Rust files. Retained-candidate patch and new-file whitespace checks are clean.",
+                "id": "workflow.plan.enter:default-plan:P6",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Source comparison confirms unchanged selection, validation decisions, diagnostic text and receipt construction. One Model policy implementation remains. No intent contract changed, so documentation required no edits. All six file hashes remained stable through verification. Changes remain uncommitted for Refine; no Goal advancement, approval, merge, push, deployment or daemon restart occurred.",
+                "id": "workflow.plan.enter:default-plan:P7",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "cargo test --lib model::automation::gate_evidence -- --test-threads=1: exit 0; 4 passed.",
+              "cargo test --lib governance -- --test-threads=1: exit 0; 86 passed.",
+              "cargo test --lib application::events:: -- --test-threads=1: exit 0; 21 passed.",
+              "cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1: exit 0; 6 passed.",
+              "cargo test --lib candidate_refresh -- --test-threads=1: exit 0; 16 passed.",
+              "cargo test --lib application::work_items::tests::workflow -- --test-threads=1: exit 0; 12 passed.",
+              "cargo test --lib surfaces::cli::tests::goals::lifecycle -- --test-threads=1: exit 0; 5 passed.",
+              "cargo test --lib web_server_governance_retry_from_review -- --test-threads=1: exit 0; 1 passed.",
+              "node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js: exit 0; 6 passed, 0 failed, 0 skipped.",
+              "rustfmt --check --edition 2024 --config skip_children=true src/application/events/evidence.rs src/application/events/evidence/tests.rs src/application/workflow/phases/quality/service/skill_checks.rs src/model/automation.rs src/model/automation/gate_evidence.rs src/model/automation/gate_evidence/tests.rs: exit 0.",
+              "git diff --check 59af87d23c3c14881f3969ef316146e7aa2e3273: exit 0.",
+              "git diff --no-index --check /dev/null src/model/automation/gate_evidence.rs and the equivalent command for gate_evidence/tests.rs: each returned 1 for file differences, with no whitespace diagnostics. Explicit Python whitespace inspection passed, exit 0.",
+              "Source-equivalence and final SHA-256 preservation audits: exit 0.",
+              "Every Rust selection had zero failures and zero ignored tests. No baseline failures observed. All requested checks ran; full-suite, Clippy and live-environment recovery were not exercised."
+            ]
+          },
+          "report": "workflow.implement.enter:default-implement: Moved required Skill selection and receipt-validity policy into Model automation, preserving recovery behavior and passing all requested verification.",
+          "started_at": "2026-09-10T15:29:28Z"
         },
         "phase": "implement",
         "phase_started_at": "2026-09-10T15:29:28Z",
@@ -4955,11 +5096,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-09-10T15:24:12Z",
-        "state": "in_progress",
-        "updated_at": "2026-09-10T15:29:28Z"
+        "state": "completed",
+        "updated_at": "2026-09-10T15:36:03Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "workflow.implement.enter:default-implement: Moved required Skill selection and receipt-validity policy into Model automation, preserving recovery behavior and passing all requested verification.",
+      "implementation_reported_at": "2026-09-10T15:36:03Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -4970,7 +5111,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T15:29:28Z",
+      "updated": "2026-09-10T15:36:04Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T15:24:12Z",
         "round_idx": 3,
@@ -4980,9 +5121,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-10T15:29:28Z",
+  "updated": "2026-09-10T15:36:04Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:37.079960889+00:00",
@@ -5091,7 +5232,16 @@
       "node_id": "default",
       "round_idx": 3,
       "to": "implement"
+    },
+    {
+      "at": "2026-09-10T15:36:04.176836821+00:00",
+      "forced": false,
+      "from": "implement",
+      "generation": 13,
+      "node_id": "default",
+      "round_idx": 3,
+      "to": "quality"
     }
   ],
-  "workflow_revision": 96
+  "workflow_revision": 104
 }
