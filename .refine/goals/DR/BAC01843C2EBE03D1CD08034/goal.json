@@ -106,12 +106,51 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-09-10T08:26:09Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-09-10T08:27:57Z",
+        "proposal": {
+          "completed_at": "2026-09-10T08:27:57Z",
+          "git_after": {
+            "branch": "refine/DRBAC01843C2EBE03D1CD08034/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRBAC01843C2EBE03D1CD08034/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Make selection available when agent applications capture mouse input by retaining Shift-drag on Windows and Linux, enabling Option-drag on macOS, and showing a concise selection hint while preserving ordinary application mouse handling.",
+                "id": "P1"
+              },
+              {
+                "description": "Add a keyboard-accessible Copy selection control to the shared terminal header that is enabled only for selected text, works with retained output after disconnection or exit, and preserves the selection and originating tab.",
+                "id": "P2"
+              },
+              {
+                "description": "Consolidate clipboard interaction in a cohesive browser module that serves the Copy control, Ctrl+C, Ctrl+Shift+C, Cmd+C, and native Copy events independently of process liveness while preserving Ctrl+C interruption without a selection and existing paste framing and session guards.",
+                "id": "P3"
+              },
+              {
+                "description": "Add browser-supported copy fallbacks for unavailable or rejected clipboard writes, report success only after a confirmed copy, and offer the selected text in a standard selectable field with actionable feedback if automatic copying remains blocked.",
+                "id": "P4"
+              },
+              {
+                "description": "Update the existing Terminal intent page to describe selection gestures, the Copy control, shortcut behavior, copying retained output, and clipboard failure recovery.",
+                "id": "P5"
+              }
+            ],
+            "summary": "Make copying selected text from Agent windows reliable and discoverable through the shared terminal surface, including retained output after exit and clear recovery when browser clipboard access is blocked."
+          },
+          "started_at": "2026-09-10T08:26:09Z"
+        },
         "schema_version": 2,
         "started_at": "2026-09-10T08:26:09Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T08:26:09Z"
+        "updated_at": "2026-09-10T08:27:57Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -125,7 +164,7 @@
       "quality_state": "unclassified",
       "reporter": "ethan.jacobson@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T08:26:09Z",
+      "updated": "2026-09-10T08:27:57Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T08:26:09Z",
         "round_idx": 0,
@@ -137,6 +176,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-09-10T08:26:09Z",
-  "workflow_revision": 7
+  "updated": "2026-09-10T08:27:57Z",
+  "workflow_revision": 9
 }
