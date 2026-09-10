@@ -41,7 +41,9 @@ test(`${profile}: blocked copying offers a standard field scoped to the originat
       document.execCommand = () => { execCalls += 1; return false; };
       navigator.clipboard.writeText = () => new Promise((_, reject) => { window.rejectCopy = reject; });
     });
-    await app.page.keyboard.press("Control+c");
+    await app.page.keyboard.press("Control+Shift+c");
+    assert.equal(await app.page.evaluate(() => terminalStateFor().clipboard?.pending
+      && typeof window.rejectCopy === "function"), true, "fallback copy must be pending before changing tabs");
     await app.page.evaluate(async () => {
       finishTerminalExit(currentToolbarTab(), terminalStateFor());
       terminalStateFor().term.clearSelection();
@@ -107,7 +109,7 @@ test(`${profile}: failed browser fallbacks expose captured text and never claim 
           }));
         }
       }, failure);
-      if (!failure.startsWith("native")) await app.page.keyboard.press("Control+c");
+      if (!failure.startsWith("native")) await app.page.keyboard.press("Control+Shift+c");
       await app.page.waitForFunction(() => terminalStateFor().clipboard.recovery);
       const field = app.page.getByRole("textbox", { name: "Selected terminal text", exact: true });
       assert.equal(await field.inputValue(), "OUTPUT-agent-a");
@@ -135,7 +137,9 @@ test('delayed rejection preserves unrelated input and manual recovery selection 
       window.fallbackCalls = 0;
       document.execCommand = () => { fallbackCalls++; return false; };
     });
-    await page.keyboard.press('Control+c');
+    await page.keyboard.press('Control+Shift+c');
+    assert.equal(await page.evaluate(() => terminalStateFor().clipboard?.pending
+      && typeof window.rejectCopy === 'function'), true, 'fallback copy must be pending before moving focus');
     await page.evaluate(() => {
       const field = document.createElement('textarea');
       field.id = 'unrelated-input';
