@@ -3,7 +3,7 @@
   "branch_name": "refine/DR07C216F3E4EC22A57C60BE0B/round-5",
   "candidate_commit": "3d221f8f5b5877d39da99aed12ded63df9cbd5d6",
   "created": "2026-09-10T08:26:00Z",
-  "event_generation": 16,
+  "event_generation": 17,
   "feature_id": "00000T130Z0R6J0GJMARY62005",
   "feature_order": 2,
   "id": "DR07C216F3E4EC22A57C60BE0B",
@@ -6697,9 +6697,68 @@
       "prompt": "Recover Goal DR07C216F3E4EC22A57C60BE0B in a fresh Refine-managed implementation Round using the target tip selected at admission. Preserve all previous attempts, branches, worktrees, commits, uncommitted files and evidence. Inspect and selectively retain candidate 8087e73c50825c99eb780c504b913e0c34c3c596, including its operation/deadline corrections and bounded scope-receipt test. Round 4 was based on a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e. Read its finalized plan, failed invocation /home/buddy/projects/refine-next/.git/refine-live-state/automation/invocations/3ec0b553d86c4fe2ece68ffc7d36eabbd571b6897308b4b0251f9eff6af7f376.json, preceding Quality invocation e279bd1c5559f8462990cb4e888bd06f8e5d5975cca5a187c8591e5b86afe627.json, and /tmp/refine-r4-quality/{reproductions.json,final-results.json,quality.patch}. Follow current Skills and affected execution-ownership/process intent.\n\nComplete adoption of FileProcessSupervisor ownership across PTY settlement and artifact retirement. In src/application/agents/sessions/session_runtime.rs, distinguish workload PID/status from guardian identity/status. Route completion, timeout and error termination through the shared bounded ownership mechanism, preserving the guardian while it adopts and reaps descendants and produces trustworthy scope-exit proof. Audit related launch-failure and reader-settlement paths. Consume workload-status evidence separately from whole-scope completion; preserve output, exit semantics and structured completion results without waiting indefinitely for detached descendants. Bound settlement and reader shutdown. If termination or proof is unavailable, retain capacity and artifacts and surface actionable uncertainty without claiming exit. Preserve identity fences, overlapping-stop coordination, survivor resume, original deadlines, Toolbar protection, human-input exceptions and settlement authority. Continue using maintain_daemon; do not introduce another scheduler or reaper.\n\nCorrect sweep_orphan_process_logs in src/surfaces/web_server/http/background_loops.rs to use shared ownership and artifact-retirement rules. Missing primary registration alone must not authorize deletion. Preserve stdout, stderr and stdin evidence for Live, Unverified, corrupt or unreadable ownership and while artifact handoff remains active. Recheck retirement eligibility under appropriate coordination. Proven-exited artifacts should remain removable after the existing retention interval. Keep the HTTP surface thin and avoid duplicating ownership policy.\n\nAdd deterministic regressions through run_goal_agent and the actual retention consumer. Exercise valid completion, hard-cap/idle failure, natural workload exit and relevant setup/capture failures with controlled guardian timing and a setsid descendant surviving leader exit before descendant observation. Verify real descendant state, identity-bound exit proof, group_pending, capacity accounting and replacement eligibility; an empty list() is insufficient. Cover missing primary registration and unavailable ownership evidence. Assert safe eventual release when proof becomes available and explicit retained uncertainty otherwise. Through the same workflow runner, prove another eligible Goal enters Plan within one poll interval after a PTY failure safely releases capacity. Test all three aged log types with Live, Unverified, corrupt/unreadable and proven-exited ownership, including active handoff and unexpired retention. Preserve existing operation-revision, cancellation, deadline, settlement-panic and worktree-protection regressions.\n\nRun focused checks through supported Refine supervision: cargo test --lib <filter> -- --test-threads=1 for application::agents::sessions, surfaces::web_server::http::background_loops, worker_liveness, failure_settlement, infrastructure::process::subprocess, infrastructure::process::supervisor, application::workers, application::maintenance::worktrees, application::workflow::health and surfaces::web_server::tests::http_transport::runtime. Ensure new tests are selected. Run cargo check --all-targets --locked, cargo fmt --all -- --check, cargo test --lib --bins -- --test-threads=1, cargo build --release --locked and git diff --check. Report exact commands, nonzero selected counts, failures, ignored/skipped checks, logs and candidate identity. Establish any baseline failure against this new Round's pinned base. Prior Linux passes do not cover these missing behaviors; macOS remains unverified because the earlier cross-check failed compiling aws-lc-sys with unsupported Darwin compiler flags. Update only affected intent documentation. Refine owns candidate capture and workflow advancement; do not directly edit Goal state, approve, push, merge, deploy or restart the supervising daemon.",
       "quality_agent_report": "workflow.quality.enter:default-quality: Corrected stale process identity handling, added three regressions, and passed final Linux verification.",
       "quality_candidate_commit": "3d221f8f5b5877d39da99aed12ded63df9cbd5d6",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
+      "quality_checked_at": "2026-09-10T20:39:26Z",
+      "quality_details": {
+        "candidate_commit": "3d221f8f5b5877d39da99aed12ded63df9cbd5d6",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR07C216F3E4EC22A57C60BE0B-round-4",
+        "diagnostics": [
+          "Event invocation ac2f74f7c8c0a6a07dafc6d1d2f3a8016551af2e7184d1bb3c11b99036d911c8: automation/invocations/ac2f74f7c8c0a6a07dafc6d1d2f3a8016551af2e7184d1bb3c11b99036d911c8.json",
+          "Observed supervised process proc-1789072764024-1129590-1526 exited 0.",
+          "Observed supervised process proc-1789072765742-1129590-1529 exited 0."
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "1a08d0a8fa5113c768a",
+        "provider_attempts": [],
+        "quality_proof": {
+          "checked_at": "2026-09-10T20:39:26Z",
+          "checked_candidate_commit": "3d221f8f5b5877d39da99aed12ded63df9cbd5d6",
+          "evaluation_scope": "isolated_candidate",
+          "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+          "operation_id": "1a08d0a8fa5113c768a",
+          "results": [
+            {
+              "command": "cargo fmt --all -- --check",
+              "evidence": "Observed supervised process proc-1789072764024-1129590-1526 exited 0.",
+              "exit_code": 0,
+              "process_id": "proc-1789072764024-1129590-1526",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Candidate formatting"
+            },
+            {
+              "command": "git diff --check a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e HEAD",
+              "evidence": "Observed supervised process proc-1789072765742-1129590-1529 exited 0.",
+              "exit_code": 0,
+              "process_id": "proc-1789072765742-1129590-1529",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Candidate patch whitespace"
+            }
+          ],
+          "round_idx": 4,
+          "schema_version": 1,
+          "source_candidate_commit": "3d221f8f5b5877d39da99aed12ded63df9cbd5d6",
+          "state": "passed"
+        },
+        "results": [
+          {
+            "command": "cargo fmt --all -- --check",
+            "evidence": "Observed supervised process proc-1789072764024-1129590-1526 exited 0.",
+            "exit_code": 0,
+            "process_id": "proc-1789072764024-1129590-1526",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Candidate formatting"
+          },
+          {
+            "command": "git diff --check a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e HEAD",
+            "evidence": "Observed supervised process proc-1789072765742-1129590-1529 exited 0.",
+            "exit_code": 0,
+            "process_id": "proc-1789072765742-1129590-1529",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Candidate patch whitespace"
+          }
+        ],
+        "source_candidate_commit": "3d221f8f5b5877d39da99aed12ded63df9cbd5d6"
+      },
+      "quality_message": "All Quality Skills passed with supervised evidence.",
       "quality_skill_results": [
         {
           "artifacts": {
@@ -6810,10 +6869,10 @@
           "summary": "Corrected stale process identity handling, added three regressions, and passed final Linux verification."
         }
       ],
-      "quality_state": "unclassified",
+      "quality_state": "passed",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T20:37:54Z",
+      "updated": "2026-09-10T20:39:26Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T19:36:49Z",
         "round_idx": 4,
@@ -6823,9 +6882,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "quality",
+  "status": "governance",
   "target_branch": "main",
-  "updated": "2026-09-10T20:37:54Z",
+  "updated": "2026-09-10T20:39:26Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:37.178169037+00:00",
@@ -6970,7 +7029,16 @@
       "node_id": "default",
       "round_idx": 4,
       "to": "quality"
+    },
+    {
+      "at": "2026-09-10T20:39:26.494428546+00:00",
+      "forced": false,
+      "from": "quality",
+      "generation": 17,
+      "node_id": "default",
+      "round_idx": 4,
+      "to": "governance"
     }
   ],
-  "workflow_revision": 123
+  "workflow_revision": 127
 }
