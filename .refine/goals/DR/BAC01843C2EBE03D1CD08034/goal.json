@@ -1256,6 +1256,44 @@
           },
           "source": "workflow.plan.enter",
           "state": "succeeded"
+        },
+        "b1f0edde83bb47798c82d9140255b7cf558ce71095d1b13de0ce0dccc364df6e": {
+          "candidate_commit": "b4a637091dbbecb06b183f29b65e86c4e5e390f4",
+          "results": {
+            "default-quality": {
+              "artifacts": {
+                "tests": [
+                  {
+                    "command": "NODE_PATH=/home/buddy/projects/refine/node_modules node --test --test-concurrency=1 tests/web_terminal_clipboard.test.js tests/web_supervisor_toolbar.test.js tests/web_goal_log_tail.test.js tests/web_terminal_clipboard_browser.test.js tests/web_terminal_copy_lifecycle_browser.test.js tests/web_terminal_copy_recovery_browser.test.js",
+                    "evidence": "Exit 0: 89 passed, 0 failed, 0 cancelled, 0 skipped. Covered Agent and UI-launched Custom Skill tabs, selection gestures, retained-output copying, actual clipboard contents, denied writes, fallback and recovery, focus preservation, obsolete asynchronous results, interruption input, and exactly-once bracketed paste.",
+                    "status": "passed",
+                    "test": "Shared terminal selection, clipboard recovery, input semantics, and lifecycle isolation satisfy the Goal."
+                  },
+                  {
+                    "command": "NODE_PATH=/home/buddy/projects/refine/node_modules node --test --test-reporter=tap --test-concurrency=1 --test-name-pattern=\"^(Toolbar add menu closes|a toolbar Agent|Agent terminal|Agent tab round trip|switching from Agent to Files|Custom Skills open)\" tests/web_screen_render.test.js",
+                    "evidence": "Exit 0: 7 passed, 0 failed, 0 cancelled, 0 skipped. Verified transported ANSI rendering, resize/fullscreen behavior, retained renderer and scrollback, tab switching, morphed controls, and Custom Skill launch context.",
+                    "status": "passed",
+                    "test": "Affected browser surfaces preserve existing rendering and managed terminal behavior."
+                  }
+                ]
+              },
+              "binding_id": "default-quality",
+              "evidence": [
+                "Independently reviewed finalized checklist P1–P7 against candidate b4a637091dbbecb06b183f29b65e86c4e5e390f4 and base f880b7767149e4de43d5bc4d4786247d1e536a8c. No defects or missing required coverage found; no corrective edits needed.",
+                "Reviewed candidate Design, Surface Principles, Toolbar, and Terminal intent. Clipboard state remains transient and shared within the browser; backend process authority and Model, Application, and Infrastructure boundaries remain intact.",
+                "96 focused checks passed, including 37 browser checks using actual Chromium 145.0.7632.6. All 12 changed JavaScript files passed node --check; git diff --check passed. Programmatic comparison confirmed current-base browser fixtures and existing rendered test bodies were preserved exactly.",
+                "Final HEAD and parent matched the pinned candidate and base; the worktree remained clean. No Goal state changes, commits, merges, pushes, deployment, or daemon restart.",
+                "Limitations: Windows and macOS platform behavior was simulated in Linux Chromium. Browser tests intercepted daemon traffic; native operating-system clipboard integration and live PTY processes were not exercised.",
+                ""
+              ],
+              "invocation_id": "b1f0edde83bb47798c82d9140255b7cf558ce71095d1b13de0ce0dccc364df6e",
+              "outcome": "success",
+              "role": "quality",
+              "summary": "Quality review passed for b4a637091dbbecb06b183f29b65e86c4e5e390f4. No corrections required; 96 focused checks passed with zero failures or skips."
+            }
+          },
+          "source": "workflow.quality.enter",
+          "state": "succeeded"
         }
       },
       "failure_at": "",
@@ -1438,13 +1476,48 @@
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
       "prompt": "Make text in the shared terminal reliably selectable and copyable, including Agent and Custom Skill tabs and retained output after a process exits.\n\nThe request remains valid. Current main has clipboard shortcuts and error messages but lacks the retained candidate's selection hints, Copy selection control and recovery field for blocked clipboard access. Round 1 produced 7f6988c7 with 71 recorded focused checks passing, then refreshed it to be1f6f0366dd855f93f505d470dd4e2ca5c6d1b5. The refreshed candidate failed its evaluation and is not integrated into main; the earlier pass does not approve that replacement. Its worktree is clean and retained.\n\nReview and selectively port that candidate's shared clipboard behavior. Explain Shift-drag on Windows/Linux and Option-drag on macOS when the application captures the mouse. Provide an accessible Copy selection control, native copy and focused platform shortcuts that use the originating terminal's selection even after exit or disconnection. Preserve Ctrl+C interruption without selection, paste framing, duplicate-event prevention and session replacement checks.\n\nWhen browser clipboard writes are unavailable or rejected, attempt supported fallbacks and offer the captured text in a normal selectable field. Report success only after a successful copy, retain the user's selection and keep asynchronous results attached to their originating tab. Do not disrupt input or focus in another tab. Custom Skills now use the shared agent-tab lifecycle, so test that surface explicitly as well as ordinary Agent tabs.\n\nReconcile tests with current main f880b776 and its browser-fixture and rendered-output fixes. The old candidate's tests/support/web_app.js and test-file restructuring are not authoritative; retain only changes needed for this behavior. Run focused browser checks with actual Chromium and report any skips as skips. Verify selection gestures, copy after exit, denied clipboard access, tab switching, keyboard focus, interruption, exactly-once paste and retained rendering against the final candidate using current Skill verification.\n\nThis is a recovery Round following the Skills review on 10 September 2026. Start from current main in a new managed Round worktree. Preserve Round 1, its plans, logs, branches, commits and uncommitted files; inspect and selectively reuse useful work instead of replaying the whole old attempt. Use the current Skills and docs/intent contracts, not archived Governance, Quality or Guidance configuration or the old fixed planning sequence. Refine owns workflow advancement and integration; human approval remains separate. Update only affected documentation and report focused verification with actual results.",
+      "quality_agent_report": "workflow.quality.enter:default-quality: Quality review passed for b4a637091dbbecb06b183f29b65e86c4e5e390f4. No corrections required; 96 focused checks passed with zero failures or skips.",
+      "quality_candidate_commit": "b4a637091dbbecb06b183f29b65e86c4e5e390f4",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
+      "quality_skill_results": [
+        {
+          "artifacts": {
+            "tests": [
+              {
+                "command": "NODE_PATH=/home/buddy/projects/refine/node_modules node --test --test-concurrency=1 tests/web_terminal_clipboard.test.js tests/web_supervisor_toolbar.test.js tests/web_goal_log_tail.test.js tests/web_terminal_clipboard_browser.test.js tests/web_terminal_copy_lifecycle_browser.test.js tests/web_terminal_copy_recovery_browser.test.js",
+                "evidence": "Exit 0: 89 passed, 0 failed, 0 cancelled, 0 skipped. Covered Agent and UI-launched Custom Skill tabs, selection gestures, retained-output copying, actual clipboard contents, denied writes, fallback and recovery, focus preservation, obsolete asynchronous results, interruption input, and exactly-once bracketed paste.",
+                "status": "passed",
+                "test": "Shared terminal selection, clipboard recovery, input semantics, and lifecycle isolation satisfy the Goal."
+              },
+              {
+                "command": "NODE_PATH=/home/buddy/projects/refine/node_modules node --test --test-reporter=tap --test-concurrency=1 --test-name-pattern=\"^(Toolbar add menu closes|a toolbar Agent|Agent terminal|Agent tab round trip|switching from Agent to Files|Custom Skills open)\" tests/web_screen_render.test.js",
+                "evidence": "Exit 0: 7 passed, 0 failed, 0 cancelled, 0 skipped. Verified transported ANSI rendering, resize/fullscreen behavior, retained renderer and scrollback, tab switching, morphed controls, and Custom Skill launch context.",
+                "status": "passed",
+                "test": "Affected browser surfaces preserve existing rendering and managed terminal behavior."
+              }
+            ]
+          },
+          "binding_id": "workflow.quality.enter:default-quality",
+          "evidence": [
+            "Independently reviewed finalized checklist P1–P7 against candidate b4a637091dbbecb06b183f29b65e86c4e5e390f4 and base f880b7767149e4de43d5bc4d4786247d1e536a8c. No defects or missing required coverage found; no corrective edits needed.",
+            "Reviewed candidate Design, Surface Principles, Toolbar, and Terminal intent. Clipboard state remains transient and shared within the browser; backend process authority and Model, Application, and Infrastructure boundaries remain intact.",
+            "96 focused checks passed, including 37 browser checks using actual Chromium 145.0.7632.6. All 12 changed JavaScript files passed node --check; git diff --check passed. Programmatic comparison confirmed current-base browser fixtures and existing rendered test bodies were preserved exactly.",
+            "Final HEAD and parent matched the pinned candidate and base; the worktree remained clean. No Goal state changes, commits, merges, pushes, deployment, or daemon restart.",
+            "Limitations: Windows and macOS platform behavior was simulated in Linux Chromium. Browser tests intercepted daemon traffic; native operating-system clipboard integration and live PTY processes were not exercised.",
+            ""
+          ],
+          "invocation_id": "b1f0edde83bb47798c82d9140255b7cf558ce71095d1b13de0ce0dccc364df6e",
+          "outcome": "success",
+          "role": "quality",
+          "summary": "Quality review passed for b4a637091dbbecb06b183f29b65e86c4e5e390f4. No corrections required; 96 focused checks passed with zero failures or skips."
+        }
+      ],
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T14:07:50Z",
+      "updated": "2026-09-10T14:11:17Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T13:43:04Z",
         "round_idx": 1,
@@ -1456,7 +1529,7 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-10T14:07:50Z",
+  "updated": "2026-09-10T14:11:17Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:37.282390759+00:00",
@@ -1495,5 +1568,5 @@
       "to": "quality"
     }
   ],
-  "workflow_revision": 51
+  "workflow_revision": 55
 }
