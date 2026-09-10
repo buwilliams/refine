@@ -537,6 +537,7 @@ test("Controls Node selector switches by ID and refreshes the visible Node conte
   const app = await openApp({ fixture });
   try {
     await assertScreenRenders(app, { route: "#/", marker: "#dash" });
+    await app.page.locator('[data-testid="context-menu-toggle"]').click();
     const selector = app.page.locator('[data-testid="global-node"]');
     assert.deepEqual(await selector.locator("option").allTextContents(), ["Alpha", "Beta"]);
     assert.equal(await selector.inputValue(), "node-a");
@@ -798,7 +799,7 @@ test("Agent terminal renders transported ANSI control sequences through xterm", 
   const app = await openApp();
   try {
     await assertScreenRenders(app, { route: "#/", marker: "#dash" });
-    const rendered = await app.page.evaluate(async () => {
+    await app.page.evaluate(async () => {
       chatState.tabs = {
         agent: normalizeInteractiveTerminalTab({
           goalId: null,
@@ -814,16 +815,23 @@ test("Agent terminal renders transported ANSI control sequences through xterm", 
       const terminal = terminalStateFor("agent");
       terminalReceiveOutput("\\u001b[31mANSI-RED\\u001b[0m plain", terminal);
       await new Promise((resolve) => terminal.term.write("", resolve));
-      const rows = document.querySelector(".terminal-output .xterm-rows");
-      return {
-        text: rows?.textContent || "",
-        html: rows?.innerHTML || "",
-      };
     });
+    // The write callback confirms parsing; xterm paints the DOM on a later frame.
+    await app.page.waitForFunction(() =>
+      document.querySelector(".terminal-output .xterm-rows")?.textContent.includes("ANSI-RED plain"),
+    );
+    const rendered = await app.page.locator(".terminal-output .xterm-rows").evaluate((rows) => ({
+      text: rows.textContent,
+      colors: [...rows.querySelectorAll("span")].map((span) => ({
+        text: span.textContent,
+        color: getComputedStyle(span).color,
+      })),
+    }));
 
     assert.match(rendered.text, /ANSI-RED plain/);
     assert.doesNotMatch(rendered.text, /(?:\\u001b|\[31m|\[0m)/);
-    assert.match(rendered.html, /color:\s*#b91c1c|color:\s*rgb\(185,\s*28,\s*28\)/i);
+    assert.equal(rendered.colors.find((span) => span.text === "ANSI-RED")?.color, "rgb(185, 28, 28)");
+    assert.equal(rendered.colors.find((span) => span.text === " plain")?.color, "rgb(17, 24, 39)");
     assert.deepEqual(app.pageErrors, []);
   } finally {
     await app.close();
@@ -1512,6 +1520,10 @@ test("settings refresh never clears the Upgrade banner while its read is pending
 test("runtime banner distinguishes trusted source relationships from unknown evidence", { skip: SKIP }, async () => {
   const app = await openApp();
   try {
+    await assertScreenRenders(app, {
+      route: "#/settings/runtime",
+      marker: '[data-testid="runtime-recheck-auth"]',
+    });
     const messages = await app.page.evaluate(() => {
       const text = (upgrade) => {
         const root = document.createElement("div");
