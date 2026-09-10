@@ -1,9 +1,9 @@
 {
   "base_commit": "a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e",
   "branch_name": "refine/DR07C216F3E4EC22A57C60BE0B/round-5",
-  "candidate_commit": "8087e73c50825c99eb780c504b913e0c34c3c596",
+  "candidate_commit": "462118664ddf8754de2b4c3f60b4febe19a051c1",
   "created": "2026-09-10T08:26:00Z",
-  "event_generation": 15,
+  "event_generation": 16,
   "feature_id": "00000T130Z0R6J0GJMARY62005",
   "feature_order": 2,
   "id": "DR07C216F3E4EC22A57C60BE0B",
@@ -6162,6 +6162,102 @@
         }
       },
       "event_results": {
+        "4e91ac0f8007b70d8b35b61a1df05edc974a94bf430941c7de40a0b554addccb": {
+          "candidate_commit": null,
+          "results": {
+            "default-implement": {
+              "artifacts": {
+                "implementation_evidence": {
+                  "checklist": [
+                    {
+                      "evidence": "Implemented on Round 5 in the supplied managed workspace, retaining HEAD 8087e73c50825c99eb780c504b913e0c34c3c596 and base a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e. Prior operation/deadline corrections remain intact. Changes are uncommitted for Refine capture.",
+                      "id": "workflow.plan.enter:default-plan:P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Extracted pty_lifecycle.rs with separate guardian handle, workload identity and launch scope. Registration precedes release. Gated failures abort through guardian reaping; possibly released failures use shared termination. Prompt leases survive through supervised handle reaping.",
+                      "id": "workflow.plan.enter:default-plan:P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "PTY polling consumes identity-bound workload-status receipts. Completion, natural exit, deadlines and capture/transport failures use shared scope termination. Structured completion is preserved in process evidence when settlement remains uncertain; original errors and workload exit semantics are retained.",
+                      "id": "workflow.plan.enter:default-plan:P3",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added one monotonic two-second stop deadline, interruptible reads, bounded final drain and deferred guardian-handle reaping. Shared capacity and Application health now retain and identify uncertain terminal registrations with missing group evidence. Existing maintenance and timeout exceptions remain covered.",
+                      "id": "workflow.plan.enter:default-plan:P4",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Extracted shared artifact retirement and delegated HTTP retention to it. Ownership, registration, handoff and age are rechecked under bounded coordination. Stable lock inodes prevent replacement races. Seven-day retention remains unchanged.",
+                      "id": "workflow.plan.enter:default-plan:P5",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Four new PTY regressions cover structured completion, successful/nonzero exit, hard-cap/idle failure, setup/release boundaries, capture, transport and settlement faults, missing/mismatched/delayed proof and failed termination. They verify actual setsid descendants, guardian survival, capacity, retained artifacts, actionable health and eventual proven release. Session suite: 41 passed.",
+                      "id": "workflow.plan.enter:default-plan:P6",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "The same WorkflowEngine regression exhausts capacity alongside another active Goal, verifies worker replacement refusal and retained Todo state during uncertainty, then admits follow-up Plan within one second after proven release. Worker-liveness suite: 11 passed. Existing authority, deadline, operation and worktree regressions passed.",
+                      "id": "workflow.plan.enter:default-plan:P7",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Actual retention-consumer tests cover all three aged log types with absent registration and live, unverified, missing, corrupt, unreadable or proven-exited ownership; handoff/registration changes after discovery; unexpired files; unrelated eligible artifacts; and eventual deletion. Background-loop suite: 4 passed.",
+                      "id": "workflow.plan.enter:default-plan:P8",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Updated only execution-ownership and process intent pages. Split launch, capture, retirement and registration-identity responsibilities into cohesive modules. Tests required additional shared capacity/health corrections and a runtime-local ignore marker for persistent supervisor locks; existing ignore policy is preserved.",
+                      "id": "workflow.plan.enter:default-plan:P9",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "All required Linux checks passed through Refine supervision on unchanged final files. Full suite: 1276 passed, zero failed, six existing tests ignored; binary target selected zero tests. macOS remains unverified, with the prior aws-lc-sys Darwin-toolchain limitation retained.",
+                      "id": "workflow.plan.enter:default-plan:P10",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "Logs below are under /tmp/refine-r5-implementation/. Every final command exited 0.",
+                    "cargo test --lib application::agents::sessions -- --test-threads=1: 41 passed; complete-1.log.",
+                    "cargo test --lib surfaces::web_server::http::background_loops -- --test-threads=1: 4 passed; complete-2.log.",
+                    "cargo test --lib worker_liveness -- --test-threads=1: 11 passed; complete-3.log.",
+                    "cargo test --lib failure_settlement -- --test-threads=1: 4 passed; complete-4.log.",
+                    "cargo test --lib infrastructure::process::subprocess -- --test-threads=1: 33 passed; complete-5.log.",
+                    "cargo test --lib infrastructure::process::supervisor -- --test-threads=1: 54 passed; complete-6.log.",
+                    "cargo test --lib application::workers -- --test-threads=1: 39 passed; complete-7.log.",
+                    "cargo test --lib application::maintenance::worktrees -- --test-threads=1: 20 passed; complete-8.log.",
+                    "cargo test --lib application::workflow::health -- --test-threads=1: 4 passed; complete-9.log.",
+                    "cargo test --lib surfaces::web_server::tests::http_transport::runtime -- --test-threads=1: 8 passed; complete-10.log.",
+                    "cargo check --all-targets --locked: passed; complete-11.log.",
+                    "cargo fmt --all -- --check: passed; complete-12.log.",
+                    "cargo test --lib --bins -- --test-threads=1: 1276 passed, zero failed, six ignored; binary target selected zero tests; complete-13.log.",
+                    "cargo build --release --locked: passed; complete-14.log.",
+                    "git diff --check: passed; complete-15.log.",
+                    "Pinned-base legacy-sync comparison passed 1 test. The candidate lock-file regression was corrected and passed both its focused rerun and final full suite. Exact comparison commands and logs are retained in completion.json and development-history.json."
+                  ]
+                }
+              },
+              "binding_id": "default-implement",
+              "evidence": [
+                "Final evidence directory: /tmp/refine-r5-implementation/. Source identity, command results and unchanged readback of 956 files are recorded in source-identity.json, final-results.json and file-readback.json.",
+                "Complete implementation patch: implementation.patch; SHA256 8dc129e02a24c2fce92d580b9ca536b874a68e778a77d643e5fa22d1706980f4.",
+                "Development failures are preserved in development-history.json. A superseded full run had one corrected lock-file Git-inventory regression and eight executable-path failures caused by concurrent baseline compilation. Final verification was sequential and used no exclusions.",
+                "The six ignored systemd/platform/helper tests and their reasons are recorded in ignored-tests.json; none were counted as passes. macOS was not run.",
+                "No Goal-state edits, candidate commits, approval, merge, push, deployment or serving-daemon restart were performed. Refine retains candidate capture and workflow advancement."
+              ],
+              "invocation_id": "4e91ac0f8007b70d8b35b61a1df05edc974a94bf430941c7de40a0b554addccb",
+              "outcome": "success",
+              "role": "implement",
+              "summary": "Completed shared ownership adoption for bounded PTY settlement and coordinated artifact retirement. Final Linux verification passed."
+            }
+          },
+          "source": "workflow.implement.enter",
+          "state": "succeeded"
+        },
         "ce761fc8ceda747f31465e9b9e75c0bdc69c2efe9ea33cc74f4e1c61bcf411d4": {
           "candidate_commit": null,
           "results": {
@@ -6258,7 +6354,12 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [],
+        "context_version": 1,
+        "recorded_at": "2026-09-10T20:22:32Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e",
@@ -6269,6 +6370,7 @@
           "round_idx": 4,
           "target_branch": "main"
         },
+        "completed_at": "2026-09-10T20:22:31Z",
         "final_plan": {
           "completed_at": "2026-09-10T19:41:36Z",
           "git_after": {
@@ -6327,6 +6429,84 @@
             "summary": "workflow.plan.enter:default-plan: Complete shared execution-ownership adoption on retained candidate 8087e73c50825c99eb780c504b913e0c34c3c596. PTY handling conflates workload completion with guardian completion and can destroy the guardian before scope-exit proof; log retention treats missing registration as permission to delete evidence. FileProcessSupervisor already owns observation, bounded termination and artifact coordination. Application owns session results, maintenance and Goal settlement; HTTP should delegate retention. Preserve the invariant that workload results, complete execution exit and semantic Goal authority are separate: only trustworthy scope-exit proof releases owned capacity and permits artifact retirement."
           },
           "started_at": "2026-09-10T19:36:50Z"
+        },
+        "implementation": {
+          "completed_at": "2026-09-10T20:22:31Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Implemented on Round 5 in the supplied managed workspace, retaining HEAD 8087e73c50825c99eb780c504b913e0c34c3c596 and base a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e. Prior operation/deadline corrections remain intact. Changes are uncommitted for Refine capture.",
+                "id": "workflow.plan.enter:default-plan:P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Extracted pty_lifecycle.rs with separate guardian handle, workload identity and launch scope. Registration precedes release. Gated failures abort through guardian reaping; possibly released failures use shared termination. Prompt leases survive through supervised handle reaping.",
+                "id": "workflow.plan.enter:default-plan:P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "PTY polling consumes identity-bound workload-status receipts. Completion, natural exit, deadlines and capture/transport failures use shared scope termination. Structured completion is preserved in process evidence when settlement remains uncertain; original errors and workload exit semantics are retained.",
+                "id": "workflow.plan.enter:default-plan:P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added one monotonic two-second stop deadline, interruptible reads, bounded final drain and deferred guardian-handle reaping. Shared capacity and Application health now retain and identify uncertain terminal registrations with missing group evidence. Existing maintenance and timeout exceptions remain covered.",
+                "id": "workflow.plan.enter:default-plan:P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Extracted shared artifact retirement and delegated HTTP retention to it. Ownership, registration, handoff and age are rechecked under bounded coordination. Stable lock inodes prevent replacement races. Seven-day retention remains unchanged.",
+                "id": "workflow.plan.enter:default-plan:P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Four new PTY regressions cover structured completion, successful/nonzero exit, hard-cap/idle failure, setup/release boundaries, capture, transport and settlement faults, missing/mismatched/delayed proof and failed termination. They verify actual setsid descendants, guardian survival, capacity, retained artifacts, actionable health and eventual proven release. Session suite: 41 passed.",
+                "id": "workflow.plan.enter:default-plan:P6",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "The same WorkflowEngine regression exhausts capacity alongside another active Goal, verifies worker replacement refusal and retained Todo state during uncertainty, then admits follow-up Plan within one second after proven release. Worker-liveness suite: 11 passed. Existing authority, deadline, operation and worktree regressions passed.",
+                "id": "workflow.plan.enter:default-plan:P7",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Actual retention-consumer tests cover all three aged log types with absent registration and live, unverified, missing, corrupt, unreadable or proven-exited ownership; handoff/registration changes after discovery; unexpired files; unrelated eligible artifacts; and eventual deletion. Background-loop suite: 4 passed.",
+                "id": "workflow.plan.enter:default-plan:P8",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated only execution-ownership and process intent pages. Split launch, capture, retirement and registration-identity responsibilities into cohesive modules. Tests required additional shared capacity/health corrections and a runtime-local ignore marker for persistent supervisor locks; existing ignore policy is preserved.",
+                "id": "workflow.plan.enter:default-plan:P9",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "All required Linux checks passed through Refine supervision on unchanged final files. Full suite: 1276 passed, zero failed, six existing tests ignored; binary target selected zero tests. macOS remains unverified, with the prior aws-lc-sys Darwin-toolchain limitation retained.",
+                "id": "workflow.plan.enter:default-plan:P10",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "Logs below are under /tmp/refine-r5-implementation/. Every final command exited 0.",
+              "cargo test --lib application::agents::sessions -- --test-threads=1: 41 passed; complete-1.log.",
+              "cargo test --lib surfaces::web_server::http::background_loops -- --test-threads=1: 4 passed; complete-2.log.",
+              "cargo test --lib worker_liveness -- --test-threads=1: 11 passed; complete-3.log.",
+              "cargo test --lib failure_settlement -- --test-threads=1: 4 passed; complete-4.log.",
+              "cargo test --lib infrastructure::process::subprocess -- --test-threads=1: 33 passed; complete-5.log.",
+              "cargo test --lib infrastructure::process::supervisor -- --test-threads=1: 54 passed; complete-6.log.",
+              "cargo test --lib application::workers -- --test-threads=1: 39 passed; complete-7.log.",
+              "cargo test --lib application::maintenance::worktrees -- --test-threads=1: 20 passed; complete-8.log.",
+              "cargo test --lib application::workflow::health -- --test-threads=1: 4 passed; complete-9.log.",
+              "cargo test --lib surfaces::web_server::tests::http_transport::runtime -- --test-threads=1: 8 passed; complete-10.log.",
+              "cargo check --all-targets --locked: passed; complete-11.log.",
+              "cargo fmt --all -- --check: passed; complete-12.log.",
+              "cargo test --lib --bins -- --test-threads=1: 1276 passed, zero failed, six ignored; binary target selected zero tests; complete-13.log.",
+              "cargo build --release --locked: passed; complete-14.log.",
+              "git diff --check: passed; complete-15.log.",
+              "Pinned-base legacy-sync comparison passed 1 test. The candidate lock-file regression was corrected and passed both its focused rerun and final full suite. Exact comparison commands and logs are retained in completion.json and development-history.json."
+            ]
+          },
+          "report": "workflow.implement.enter:default-implement: Completed shared ownership adoption for bounded PTY settlement and coordinated artifact retirement. Final Linux verification passed.",
+          "started_at": "2026-09-10T19:41:36Z"
         },
         "phase": "implement",
         "phase_started_at": "2026-09-10T19:41:36Z",
@@ -6391,11 +6571,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-09-10T19:36:50Z",
-        "state": "in_progress",
-        "updated_at": "2026-09-10T19:41:36Z"
+        "state": "completed",
+        "updated_at": "2026-09-10T20:22:31Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "workflow.implement.enter:default-implement: Completed shared ownership adoption for bounded PTY settlement and coordinated artifact retirement. Final Linux verification passed.",
+      "implementation_reported_at": "2026-09-10T20:22:31Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -6406,7 +6586,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T19:41:36Z",
+      "updated": "2026-09-10T20:22:32Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T19:36:49Z",
         "round_idx": 4,
@@ -6416,9 +6596,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-10T19:41:36Z",
+  "updated": "2026-09-10T20:22:32Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:37.178169037+00:00",
@@ -6554,7 +6734,16 @@
       "node_id": "default",
       "round_idx": 4,
       "to": "implement"
+    },
+    {
+      "at": "2026-09-10T20:22:32.395740278+00:00",
+      "forced": false,
+      "from": "implement",
+      "generation": 16,
+      "node_id": "default",
+      "round_idx": 4,
+      "to": "quality"
     }
   ],
-  "workflow_revision": 111
+  "workflow_revision": 119
 }
