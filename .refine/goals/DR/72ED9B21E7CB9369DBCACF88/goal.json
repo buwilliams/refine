@@ -3,7 +3,7 @@
   "branch_name": "refine/DR72ED9B21E7CB9369DBCACF88/round-6",
   "candidate_commit": "b3c3b1f4b4c4420bf63b5a3362dc04355ad1046c",
   "created": "2026-09-10T08:26:05Z",
-  "event_generation": 19,
+  "event_generation": 20,
   "feature_id": "00000T130Z0R6J0GJMARY62005",
   "feature_order": 1,
   "id": "DR72ED9B21E7CB9369DBCACF88",
@@ -5955,7 +5955,7 @@
         "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
       },
       "assignee": "Refine",
-      "constitution_state": null,
+      "constitution_state": "passed",
       "created": "2026-09-10T16:20:39Z",
       "event_configuration": {
         "events": {
@@ -6444,6 +6444,33 @@
         }
       },
       "event_results": {
+        "47c7f46a8415c061d95f92c8a044221fb270e683dcc2428135288db2083652eb": {
+          "candidate_commit": "b3c3b1f4b4c4420bf63b5a3362dc04355ad1046c",
+          "results": {
+            "default-governance": {
+              "artifacts": {
+                "recovery_analysis": null,
+                "recovery_round_prompt": null,
+                "violations": []
+              },
+              "binding_id": "default-governance",
+              "evidence": [
+                "Verified clean HEAD b3c3b1f4b4c4420bf63b5a3362dc04355ad1046c and reviewed the candidate delta against refreshed base b6527c2d1e847a37e450aea8ceb6dce040aaec63, accepted Round 6 plan, implementation report and Quality evidence.",
+                "Reviewed shared workspace admission, lifecycle ownership, launch validation, candidate writes, recovery and Quality reconciliation. Required-result validation preserves blocking requirements independently of background execution outcomes.",
+                "Reviewed regressions covering cancellation, partial results, cached completion, replaced registrations, Git overrides, contained cwd, provider resume and dirty-primary preservation. The seven affected intent pages retain their established format.",
+                "All four recorded Quality correction hashes match the committed candidate. Supplied supervised Quality proof names this exact commit and records 1215 passed tests, zero failures and six ignored, plus successful compilation, Clippy and formatting checks. Six Clippy warnings are documented as existing.",
+                "Read-only candidate whitespace validation passed. Final HEAD and clean status remain unchanged. No files, Goal state or Git state were changed.",
+                "Tests were not rerun during this observational review. Proposed focused recheck: cargo test --lib application::events:: -- --test-threads=1."
+              ],
+              "invocation_id": "47c7f46a8415c061d95f92c8a044221fb270e683dcc2428135288db2083652eb",
+              "outcome": "success",
+              "role": "governance",
+              "summary": "No concrete violations of the supplied intent or project rules were identified in the exact candidate."
+            }
+          },
+          "source": "workflow.governance.enter",
+          "state": "succeeded"
+        },
         "73f671abd2c32ff7c9b541e1321a29f402a7e2c8454855b4fa5a343f59dbfc3d": {
           "candidate_commit": null,
           "results": {
@@ -6778,10 +6805,40 @@
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
-      "governance_candidate_commit": null,
-      "governance_checked_at": null,
-      "governance_details": null,
-      "governance_message": null,
+      "governance_candidate_commit": "b3c3b1f4b4c4420bf63b5a3362dc04355ad1046c",
+      "governance_checked_at": "2026-09-10T18:06:00Z",
+      "governance_details": {
+        "candidate_commit": "b3c3b1f4b4c4420bf63b5a3362dc04355ad1046c",
+        "configured": true,
+        "failed_actions": [],
+        "phase": "post_implementation",
+        "skill_results": [
+          {
+            "artifacts": {
+              "recovery_analysis": null,
+              "recovery_round_prompt": null,
+              "violations": []
+            },
+            "binding_id": "workflow.governance.enter:default-governance",
+            "evidence": [
+              "Verified clean HEAD b3c3b1f4b4c4420bf63b5a3362dc04355ad1046c and reviewed the candidate delta against refreshed base b6527c2d1e847a37e450aea8ceb6dce040aaec63, accepted Round 6 plan, implementation report and Quality evidence.",
+              "Reviewed shared workspace admission, lifecycle ownership, launch validation, candidate writes, recovery and Quality reconciliation. Required-result validation preserves blocking requirements independently of background execution outcomes.",
+              "Reviewed regressions covering cancellation, partial results, cached completion, replaced registrations, Git overrides, contained cwd, provider resume and dirty-primary preservation. The seven affected intent pages retain their established format.",
+              "All four recorded Quality correction hashes match the committed candidate. Supplied supervised Quality proof names this exact commit and records 1215 passed tests, zero failures and six ignored, plus successful compilation, Clippy and formatting checks. Six Clippy warnings are documented as existing.",
+              "Read-only candidate whitespace validation passed. Final HEAD and clean status remain unchanged. No files, Goal state or Git state were changed.",
+              "Tests were not rerun during this observational review. Proposed focused recheck: cargo test --lib application::events:: -- --test-threads=1."
+            ],
+            "invocation_id": "47c7f46a8415c061d95f92c8a044221fb270e683dcc2428135288db2083652eb",
+            "outcome": "success",
+            "role": "governance",
+            "summary": "No concrete violations of the supplied intent or project rules were identified in the exact candidate."
+          }
+        ],
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR72ED9B21E7CB9369DBCACF88-round-6"
+      },
+      "governance_message": "Governance checks passed.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
       "governance_rule_actions": [],
       "guidance_decision": {
         "applied": [],
@@ -7014,8 +7071,8 @@
       "implementation_report": "workflow.implement.enter:default-implement: Implemented managed-workspace isolation and shared blocking-result validation across Goal execution, lifecycle Skills, recovery and Quality. Final verification passed: 249 focused test executions and 1208 library tests; six tests were ignored.",
       "implementation_reported_at": "2026-09-10T17:26:41Z",
       "logs": [],
-      "meta_rule_state": null,
-      "product_state": null,
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Recover Goal DR72ED9B21E7CB9369DBCACF88: Keep automated Goal work in managed worktrees.\n\nThe user explicitly authorized restarting all six failed Goals after the Plan, Implement, Quality and Governance Skills were revised (configuration revision 26). This new Round supersedes the earlier user-directed hold; preserve its audit record and every previous attempt.\n\nOutcome: Keep automated Goal edits, staging, Skill evaluation and recovery in the correctly owned managed worktree while leaving the developer's primary checkout and index intact. Preserve legitimate pre-Plan lifecycle Skills, manual Custom Skills and toolbar contexts.\n\nRetained evidence: Round 4 captured candidate 39ae4cfa4d28739d41a6bc3c9465e064d9f92106. Its refresh then conflicted with newer main. Round 5 was automatically queued during the user-directed stop and never implemented. Earlier Quality findings concerned pre-Plan workspace materialization, cancelled blocking Entry Skills, missing completion results and stale workspace reuse. Inspect /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR72ED9B21E7CB9369DBCACF88-round-2 read-only as a reuse source: HEAD 39ae4cfa4d28739d41a6bc3c9465e064d9f92106, branch refine/DR72ED9B21E7CB9369DBCACF88/round-4, 0 tracked/untracked status entries at recovery preparation. Full prior Goal records, tracked patches and untracked-file manifests were captured at /tmp/refine-recovery-rounds-etc0wvs8/DR72ED9B21E7CB9369DBCACF88/. Prior plans, findings and test results are evidence, not instructions to reproduce their design or claims of a passed new candidate.\n\nApproach: Reconcile the retained isolation work with current main's existing GateAssessment and occurrence-pinned configuration. Keep execution outcome distinct from permission to advance: background failure must remain visible without vetoing satisfied blocking requirements. Establish workspace ownership and required-result validation once in their shared owners, then use them consistently for scheduler and manual transitions. Preserve canonical repository/worktree identity, branch or candidate binding, contained agent_subpath, and Git-environment isolation. Avoid resurrecting older aggregate-state semantics or parallel admission policies.\n\nVerification: Exercise actual workflow/Event entry paths with a dirty primary checkout and capture HEAD, index bytes and tracked/untracked content. Cover fresh Backlog/Todo lifecycle work, cancelled or partial blocking results, successful blocking results plus background failure, cached completion, replaced registrations, symlink escape, inherited Git overrides and resume. Reuse and extend current Events, workflow gate and worktree-ownership regressions, including main's execution_outcomes_and_gate_permission_are_independent test. Run the applicable project checks and report exact commands, selected test counts, failures, skips and candidate identity. Confirm any alleged baseline failure against this Round's pinned base.\n\nUse Refine's new managed Round workspace and the target tip selected at admission, which may include earlier Goals in this ordered recovery Feature. Reconcile the concept and existing owner before selectively carrying forward useful work. Preserve all earlier branches, worktrees, commits, uncommitted files, journals and failure evidence; do not reset or clean them. Keep changes within this Goal's behavior and update only affected intent documentation. The revised Skills govern this run. Refine owns candidate capture, workflow advancement and integration; human approval and serving-installation promotion/restart remain separate.",
       "quality_agent_report": "workflow.quality.enter:default-quality: Corrected pre-Plan Failed/Cancelled lifecycle hooks. Final checks pass; four Quality correction files await Refine candidate capture.",
       "quality_candidate_commit": "b3c3b1f4b4c4420bf63b5a3362dc04355ad1046c",
@@ -7272,13 +7329,9 @@
       ],
       "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": null,
-      "updated": "2026-09-10T18:01:34Z",
-      "workflow_attempt_authority": {
-        "claimed_at": "2026-09-10T16:22:57Z",
-        "round_idx": 5,
-        "workflow_revision": 105
-      },
+      "rule_state": "passed",
+      "updated": "2026-09-10T18:06:05Z",
+      "workflow_attempt_authority": null,
       "workflow_candidate_refresh": {
         "authorizing_status": "quality",
         "branch": "refine/DR72ED9B21E7CB9369DBCACF88/round-6",
@@ -7308,13 +7361,27 @@
         "workflow_revision": 105,
         "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR72ED9B21E7CB9369DBCACF88-round-6"
       },
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "b3c3b1f4b4c4420bf63b5a3362dc04355ad1046c",
+        "integrated_at": "2026-09-10T18:06:05.165457877+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n docs/intent/03-application/01-agents/02-skills.md  |   4 +\n .../01-agents/05-merge-review-git-worktrees.md     |  10 +-\n .../03-application/01-agents/10-goal-agents.md     |   2 +\n docs/intent/03-application/02-workflow/02-todo.md  |  23 +-\n .../03-application/02-workflow/05-quality.md       |   4 +-\n docs/intent/03-application/05-events.md            |  10 +-\n docs/intent/04-infrastructure/01-process.md        |   2 +\n src/application/agents/sessions/session_runtime.rs |   5 +\n src/application/events/completion.rs               |  10 +\n src/application/events/context.rs                  |   2 +\n src/application/events/dispatch.rs                 | 284 +------------\n src/application/events/dispatch/actions.rs         | 172 ++++++++\n src/application/events/dispatch/context.rs         | 137 +++++++\n src/application/events/execution.rs                | 445 +-------------------\n src/application/events/execution/blocking.rs       | 101 +++++\n src/application/events/execution/lifecycle.rs      | 318 +++++++++++++++\n .../events/execution/lifecycle/admission.rs        | 164 ++++++++\n .../events/execution/lifecycle_tests.rs            | 274 +++++++++++++\n .../events/execution/lifecycle_tests/authority.rs  | 145 +++++++\n .../events/execution/lifecycle_tests/completion.rs | 296 ++++++++++++++\n .../events/execution/lifecycle_tests/recovery.rs   | 312 ++++++++++++++\n .../events/execution/lifecycle_tests/semantics.rs  | 214 ++++++++++\n .../events/execution/lifecycle_tests/support.rs    | 180 ++++++++\n .../events/execution/lifecycle_tests/terminal.rs   |  90 ++++\n .../events/execution/lifecycle_tests/workflow.rs   | 253 ++++++++++++\n src/application/events/execution/preparation.rs    | 236 +++++++++++\n src/application/events/execution/runner.rs         | 283 +++++++++++++\n src/application/events/execution/workspace.rs      | 146 +++++++\n .../events/execution/workspace_tests.rs            | 324 +++++++++++++++\n src/application/events/gate_configuration.rs       | 119 ++++--\n src/application/events/records.rs                  |   4 +\n src/application/events/test_support.rs             |  65 +++\n src/application/events/tests.rs                    |  48 ++-\n src/application/events/tests/repairs.rs            |  49 ++-\n src/application/events/transitions.rs              | 274 ++-----------\n src/application/events/transitions/dispatch.rs     | 291 +++++++++++++\n src/application/events/workflow.rs                 | 112 ++++-\n .../persistence_sync/resolution/installed_agent.rs | 104 +++++\n src/application/persistence_sync/resolution/mod.rs |  93 +----\n .../workflow/engine/behaviors/authoring.rs         | 243 +++++++++++\n src/application/workflow/engine/behaviors/mod.rs   | 406 +-----------------\n .../workflow/engine/behaviors/scoped_recovery.rs   | 160 ++++++++\n .../engine/behaviors/tests/quality_resume.rs       |   3 +-\n .../workflow/engine/context/execution.rs           | 110 +++--\n src/application/workflow/engine/context/mod.rs     |  12 +\n .../workflow/engine/context/workspace.rs           | 121 ++++++\n src/application/workflow/gates.rs                  |  70 +++-\n .../workflow/phases/quality/identity.rs            |  37 ++\n src/application/workflow/phases/quality/service.rs |   1 +\n .../workflow/phases/quality/service/execution.rs   |   1 +\n .../phases/quality/service/registration.rs         | 329 +++++++++++++++\n .../workflow/phases/quality/service/runner.rs      | 358 ----------------\n .../workflow/phases/quality/service/settings.rs    |  29 ++\n .../phases/quality/service/skill_checks.rs         |  22 +-\n .../phases/quality/service/skill_evidence.rs       |  47 ++-\n .../workflow/phases/quality/tests/execution.rs     |  34 +-\n .../workflow/phases/quality/tests/mod.rs           |  52 ++-\n .../workflow/phases/quality/tests/results.rs       | 138 ++++++-\n .../workflow/recovery/candidate_handoff/mod.rs     |  17 +\n .../workflow/recovery/candidate_refresh/mod.rs     |  24 +-\n src/application/workflow/tests/already_merged.rs   |  22 +\n .../workflow/tests/candidate_refresh.rs            |  34 +-\n src/application/workflow/tests/disruption.rs       |   4 +-\n src/application/workflow/tests/planning_repair.rs  |  38 +-\n src/application/workflow/tests/quality_recovery.rs |  30 ++\n src/infrastructure/agents/invocation/service.rs    |  72 +---\n .../agents/invocation/service/resume.rs            |  91 +++++\n src/infrastructure/git/repository/mod.rs           |   3 +\n src/infrastructure/git/worktrees/admission.rs      | 277 +++++++++++++\n src/infrastructure/git/worktrees/changes.rs        |  23 ++\n src/infrastructure/git/worktrees/commands.rs       |  32 +-\n src/infrastructure/git/worktrees/integration.rs    |   1 +\n src/infrastructure/git/worktrees/mod.rs            |   3 +\n .../git/worktrees/service_adapter.rs               |   4 +\n .../git/worktrees/tests/admission.rs               | 454 +++++++++++++++++++++\n src/infrastructure/git/worktrees/tests/mod.rs      |   2 +\n src/infrastructure/git/worktrees/worktrees.rs      |   1 +\n .../process/launch_environment/mod.rs              |  68 +++\n .../process/subprocess/command_spec.rs             |   8 +\n src/infrastructure/storage/project_layout/mod.rs   |  12 +-\n src/surfaces/web_server/tests/goals/lifecycle.rs   |  26 +-\n .../web_server/tests/quality_guidance/quality.rs   |   8 +-\n 82 files changed, 6984 insertions(+), 2048 deletions(-)\n create mode 100644 src/application/events/dispatch/actions.rs\n create mode 100644 src/application/events/dispatch/context.rs\n create mode 100644 src/application/events/execution/blocking.rs\n create mode 100644 src/application/events/execution/lifecycle.rs\n create mode 100644 src/application/events/execution/lifecycle/admission.rs\n create mode 100644 src/application/events/execution/lifecycle_tests.rs\n create mode 100644 src/application/events/execution/lifecycle_tests/authority.rs\n create mode 100644 src/application/events/execution/lifecycle_tests/completion.rs\n create mode 100644 src/application/events/execution/lifecycle_tests/recovery.rs\n create mode 100644 src/application/events/execution/lifecycle_tests/semantics.rs\n create mode 100644 src/application/events/execution/lifecycle_tests/support.rs\n create mode 100644 src/application/events/execution/lifecycle_tests/terminal.rs\n create mode 100644 src/application/events/execution/lifecycle_tests/workflow.rs\n create mode 100644 src/application/events/execution/preparation.rs\n create mode 100644 src/application/events/execution/runner.rs\n create mode 100644 src/application/events/execution/workspace.rs\n create mode 100644 src/application/events/execution/workspace_tests.rs\n create mode 100644 src/application/events/transitions/dispatch.rs\n create mode 100644 src/application/persistence_sync/resolution/installed_agent.rs\n create mode 100644 src/application/workflow/engine/behaviors/authoring.rs\n create mode 100644 src/application/workflow/engine/behaviors/scoped_recovery.rs\n create mode 100644 src/application/workflow/engine/context/workspace.rs\n create mode 100644 src/application/workflow/phases/quality/service/registration.rs\n create mode 100644 src/infrastructure/agents/invocation/service/resume.rs\n create mode 100644 src/infrastructure/git/worktrees/admission.rs\n create mode 100644 src/infrastructure/git/worktrees/tests/admission.rs",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e"
+      },
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "governance",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-09-10T18:01:34Z",
+  "updated": "2026-09-10T18:06:05Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:36.706264729+00:00",
@@ -7486,7 +7553,16 @@
       "node_id": "default",
       "round_idx": 5,
       "to": "governance"
+    },
+    {
+      "at": "2026-09-10T18:06:05.583841742+00:00",
+      "forced": false,
+      "from": "governance",
+      "generation": 20,
+      "node_id": "default",
+      "round_idx": 5,
+      "to": "review"
     }
   ],
-  "workflow_revision": 136
+  "workflow_revision": 143
 }

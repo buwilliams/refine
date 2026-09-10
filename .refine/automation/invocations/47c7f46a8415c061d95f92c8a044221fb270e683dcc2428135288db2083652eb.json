@@ -3985,11 +3985,42 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-governance": {
+      "invocation_id": "47c7f46a8415c061d95f92c8a044221fb270e683dcc2428135288db2083652eb",
+      "binding_id": "default-governance",
+      "role": "governance",
+      "outcome": "success",
+      "summary": "No concrete violations of the supplied intent or project rules were identified in the exact candidate.",
+      "evidence": [
+        "Verified clean HEAD b3c3b1f4b4c4420bf63b5a3362dc04355ad1046c and reviewed the candidate delta against refreshed base b6527c2d1e847a37e450aea8ceb6dce040aaec63, accepted Round 6 plan, implementation report and Quality evidence.",
+        "Reviewed shared workspace admission, lifecycle ownership, launch validation, candidate writes, recovery and Quality reconciliation. Required-result validation preserves blocking requirements independently of background execution outcomes.",
+        "Reviewed regressions covering cancellation, partial results, cached completion, replaced registrations, Git overrides, contained cwd, provider resume and dirty-primary preservation. The seven affected intent pages retain their established format.",
+        "All four recorded Quality correction hashes match the committed candidate. Supplied supervised Quality proof names this exact commit and records 1215 passed tests, zero failures and six ignored, plus successful compilation, Clippy and formatting checks. Six Clippy warnings are documented as existing.",
+        "Read-only candidate whitespace validation passed. Final HEAD and clean status remain unchanged. No files, Goal state or Git state were changed.",
+        "Tests were not rerun during this observational review. Proposed focused recheck: cargo test --lib application::events:: -- --test-threads=1."
+      ],
+      "artifacts": {
+        "recovery_analysis": null,
+        "recovery_round_prompt": null,
+        "violations": []
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-governance",
+      "diagnostic": null,
+      "operation_id": null,
+      "process_id": "proc-1789063294971-1129590-1362",
+      "raw_output": "{\n  \"artifacts\": {\n    \"recovery_analysis\": null,\n    \"recovery_round_prompt\": null,\n    \"violations\": []\n  },\n  \"binding_id\": \"default-governance\",\n  \"evidence\": [\n    \"Verified clean HEAD b3c3b1f4b4c4420bf63b5a3362dc04355ad1046c and reviewed the candidate delta against refreshed base b6527c2d1e847a37e450aea8ceb6dce040aaec63, accepted Round 6 plan, implementation report and Quality evidence.\",\n    \"Reviewed shared workspace admission, lifecycle ownership, launch validation, candidate writes, recovery and Quality reconciliation. Required-result validation preserves blocking requirements independently of background execution outcomes.\",\n    \"Reviewed regressions covering cancellation, partial results, cached completion, replaced registrations, Git overrides, contained cwd, provider resume and dirty-primary preservation. The seven affected intent pages retain their established format.\",\n    \"All four recorded Quality correction hashes match the committed candidate. Supplied supervised Quality proof names this exact commit and records 1215 passed tests, zero failures and six ignored, plus successful compilation, Clippy and formatting checks. Six Clippy warnings are documented as existing.\",\n    \"Read-only candidate whitespace validation passed. Final HEAD and clean status remain unchanged. No files, Goal state or Git state were changed.\",\n    \"Tests were not rerun during this observational review. Proposed focused recheck: cargo test --lib application::events:: -- --test-threads=1.\"\n  ],\n  \"invocation_id\": \"47c7f46a8415c061d95f92c8a044221fb270e683dcc2428135288db2083652eb\",\n  \"outcome\": \"success\",\n  \"role\": \"governance\",\n  \"summary\": \"No concrete violations of the supplied intent or project rules were identified in the exact candidate.\"\n}\n",
+      "workflow_revision": 105
+    }
+  ],
   "created_at": "2026-09-10T18:01:34.900525294+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-10T18:05:59.980546910+00:00",
   "error": null,
   "action_applied": false
 }
