@@ -471,10 +471,20 @@ fn completion_preserves_workload_output_status_and_fast_exit_lifetime_proof() {
             .into_iter()
             .find(|g| g.process.id == output.process.id)
             .unwrap();
-        assert_eq!(
-            supervisor.assess_owned_group(&group).unwrap(),
-            OwnershipAssessment::Exited
-        );
+        // Workload status precedes the guardian's ECHILD receipt. Require complete
+        // scope proof within a bound without assuming both writes are simultaneous.
+        let deadline = Instant::now() + Duration::from_secs(1);
+        loop {
+            match supervisor.assess_owned_group(&group).unwrap() {
+                OwnershipAssessment::Exited => break,
+                OwnershipAssessment::Live if Instant::now() < deadline => {
+                    std::thread::sleep(Duration::from_millis(5));
+                }
+                assessment => {
+                    panic!("fast workload did not produce scope exit proof: {assessment:?}")
+                }
+            }
+        }
         assert!(!supervisor.group_pending(&output.process).unwrap());
     }
     fs::remove_dir_all(root).unwrap();

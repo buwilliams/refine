@@ -7,7 +7,6 @@ impl FileOperationRegistry {
         &self,
         operation_id: &str,
         expected_revision: u64,
-        verify_exit: impl FnOnce() -> RefineResult<bool>,
     ) -> RefineResult<()> {
         let lock = self.mutation_lock()?;
         let mut operation = self.status(operation_id)?;
@@ -20,7 +19,7 @@ impl FileOperationRegistry {
             return Ok(());
         }
         // The same mutation lock fences all supervised launches for this operation.
-        if !verify_exit()? {
+        if !self.live_owned_processes(operation_id)?.is_empty() {
             return Err(RefineError::Degraded(
                 "operation still owns a live process group; deadline reconciliation deferred"
                     .into(),

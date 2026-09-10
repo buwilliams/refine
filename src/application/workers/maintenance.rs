@@ -173,17 +173,29 @@ fn maintain_group(
         }
         return Ok(false);
     }
-    let operation = if let Some(pending) = &pending {
-        serde_json::from_value::<Option<OperationHandle>>(pending["operation"].clone())
-            .map_err(|e| RefineError::Serialization(e.to_string()))?
+    let operations = if let Some(pending) = &pending {
+        if let Some(operations) = pending.get("operations") {
+            serde_json::from_value::<Vec<OperationHandle>>(operations.clone())
+                .map_err(|e| RefineError::Serialization(e.to_string()))?
+        } else {
+            // Retain the exact snapshot in earlier receipts; never acquire newer
+            // operation authority while retrying an already recorded deadline.
+            serde_json::from_value::<Option<OperationHandle>>(pending["operation"].clone())
+                .map_err(|e| RefineError::Serialization(e.to_string()))?
+                .into_iter()
+                .collect()
+        }
     } else {
-        metadata["operation_id"]
-            .as_str()
+        ["operation_id", "event_operation_id"]
+            .into_iter()
+            .filter_map(|key| metadata[key].as_str())
+            .collect::<std::collections::BTreeSet<_>>()
+            .into_iter()
             .map(|id| FileOperationRegistry::new(runtime).status(id))
-            .transpose()?
+            .collect::<RefineResult<Vec<_>>>()?
     };
     let evidence = json!({"process_id": current.id, "original_started_at": group.process.started_at,
-        "hard_cap_expired": expired_hard, "idle_expired": expired_idle, "operation": operation, "settled": false});
+        "hard_cap_expired": expired_hard, "idle_expired": expired_idle, "operations": operations, "settled": false});
     write_deadline_evidence(&pending_path, &evidence)?;
     let stopped = supervisor.stop_owned_group(&observed, Duration::from_millis(200))?;
     if !stopped.confirmed_exit {
@@ -193,30 +205,9 @@ fn maintain_group(
     }
     // Process settlement is deliberately evidence-only here. The owning Goal attempt retains
     // its Round authority; operation reconciliation below only settles the exact live operation.
-    if let Some(operation) = operation {
-        FileOperationRegistry::new(runtime).interrupt_after_process_exit(
-            &operation.id,
-            operation.revision,
-            || {
-                for root in [runtime.to_path_buf(), runtime.join("agents")] {
-                    let supervisor = FileProcessSupervisor::new(root);
-                    for group in supervisor.owned_groups()? {
-                        let details: Value = group
-                            .process
-                            .details
-                            .as_deref()
-                            .and_then(|s| serde_json::from_str(s).ok())
-                            .unwrap_or(Value::Null);
-                        if details["operation_id"].as_str() == Some(&operation.id)
-                            && !supervisor.observe_owned_group(&group)?.confirmed_exit
-                        {
-                            return Ok(false);
-                        }
-                    }
-                }
-                Ok(true)
-            },
-        )?;
+    for operation in operations {
+        FileOperationRegistry::new(runtime)
+            .interrupt_after_process_exit(&operation.id, operation.revision)?;
     }
     let mut settled = evidence;
     settled["settled"] = json!(true);

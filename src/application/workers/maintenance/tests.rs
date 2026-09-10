@@ -224,6 +224,15 @@ fn deadline_reconciliation_defers_live_siblings_and_preserves_newer_operation_re
         OperationState::Running
     );
     assert!(supervisor.group_pending(&sibling).unwrap());
+    // An older receipt must retain its claim revision across the schema extension.
+    let pending_path = root
+        .join("deadline-reconciliation")
+        .join(format!("{}.json", process.id));
+    let mut pending: Value =
+        serde_json::from_slice(&std::fs::read(&pending_path).unwrap()).unwrap();
+    pending["operation"] = pending["operations"][0].clone();
+    pending.as_object_mut().unwrap().remove("operations");
+    std::fs::write(&pending_path, serde_json::to_vec(&pending).unwrap()).unwrap();
     let newer = operations
         .compare_and_set(&operation.id, operation.revision, |current| {
             current.progress = json!({"newer_owner": true});
@@ -240,11 +249,123 @@ fn deadline_reconciliation_defers_live_siblings_and_preserves_newer_operation_re
     assert_eq!(retained.progress, newer.progress);
     // The same API settles an authoritative operation only after the shared exit proof.
     operations
-        .interrupt_after_process_exit(&operation.id, newer.revision, || Ok(true))
+        .interrupt_after_process_exit(&operation.id, newer.revision)
         .unwrap();
     assert_eq!(
         operations.status(&operation.id).unwrap().state,
         OperationState::Interrupted
     );
     std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn deadline_reconciliation_requires_exit_of_every_correlated_sibling() {
+    let mut results = Vec::new();
+    for key in ["operation_id", "event_operation_id"] {
+        for missing_group in [false, true] {
+            let (root, supervisor, mut process) = fixture(json!({}));
+            let operations = FileOperationRegistry::new(&root);
+            let operation = operations.register("deadline:sibling-evidence").unwrap();
+            let mut details: Value =
+                serde_json::from_str(process.details.as_deref().unwrap()).unwrap();
+            details["operation_id"] = json!(operation.id);
+            process.details = Some(details.to_string());
+            supervisor.register(process.clone()).unwrap();
+            let sibling_owner = FileProcessSupervisor::new(root.join("agents"));
+            let mut metadata = json!({"agent_hard_cap_millis":600_000});
+            metadata[key] = json!(operation.id);
+            let sibling = sibling_owner
+                .launch(ManagedProcessSpec {
+                    owner: ProcessOwner::Agent,
+                    command: "/bin/sleep".into(),
+                    args: vec!["60".into()],
+                    cwd: None,
+                    env: Vec::new(),
+                    stdin: None,
+                    limits: None,
+                    authorization_command: None,
+                    sensitive: false,
+                    metadata: serde_json::from_value(metadata).unwrap(),
+                })
+                .unwrap();
+            let path = sibling_owner
+                .runtime_root
+                .join("owned-groups")
+                .join(format!("{}.json", sibling.id));
+            let retained = std::fs::read(&path).unwrap();
+            if missing_group {
+                std::fs::remove_file(&path).unwrap();
+            }
+            let group = supervisor.owned_groups().unwrap().remove(0);
+            let now = process.started_at.parse::<i64>().unwrap() + 1001;
+            let deferred = maintain_group(&root, &supervisor, &group, now).is_err();
+            let state = operations.status(&operation.id).unwrap().state;
+            let alive = FileProcessSupervisor::process_is_alive(&sibling).unwrap();
+            if missing_group {
+                std::fs::write(&path, retained).unwrap();
+            }
+            stop(&sibling_owner);
+            let reconciled_after_exit = maintain_group(&root, &supervisor, &group, now).unwrap();
+            let final_state = operations.status(&operation.id).unwrap().state;
+            stop(&supervisor);
+            std::fs::remove_dir_all(root).unwrap();
+            results.push((
+                key,
+                missing_group,
+                deferred,
+                state,
+                alive,
+                reconciled_after_exit,
+                final_state,
+            ));
+        }
+    }
+    for (key, missing, deferred, state, alive, reconciled, final_state) in results {
+        assert!(
+            deferred && alive && state == OperationState::Running,
+            "{key}, missing group={missing}: deferred={deferred}, alive={alive}, state={state:?}"
+        );
+        assert_eq!(final_state, OperationState::Interrupted);
+        assert!(reconciled);
+    }
+}
+
+#[test]
+fn deadline_reconciliation_settles_event_and_parent_operations() {
+    for include_parent in [false, true] {
+        let (root, supervisor, mut process) = fixture(json!({}));
+        let operations = FileOperationRegistry::new(&root);
+        let event = operations.register("event:deadline").unwrap();
+        let parent = operations.register("capability:deadline").unwrap();
+        let mut details: Value = serde_json::from_str(process.details.as_deref().unwrap()).unwrap();
+        details["event_operation_id"] = json!(event.id);
+        if include_parent {
+            details["operation_id"] = json!(parent.id);
+        }
+        process.details = Some(details.to_string());
+        supervisor.register(process.clone()).unwrap();
+        let group = supervisor.owned_groups().unwrap().remove(0);
+        assert!(
+            maintain_group(
+                &root,
+                &supervisor,
+                &group,
+                process.started_at.parse::<i64>().unwrap() + 1001
+            )
+            .unwrap()
+        );
+        let result = operations.status(&event.id).unwrap();
+        let parent_result = operations.status(&parent.id).unwrap();
+        stop(&supervisor);
+        std::fs::remove_dir_all(root).unwrap();
+        assert_eq!(result.state, OperationState::Interrupted);
+        assert_eq!(
+            parent_result.state,
+            if include_parent {
+                OperationState::Interrupted
+            } else {
+                OperationState::Running
+            }
+        );
+    }
 }
