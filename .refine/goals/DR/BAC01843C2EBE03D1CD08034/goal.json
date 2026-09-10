@@ -3,7 +3,7 @@
   "branch_name": "refine/DRBAC01843C2EBE03D1CD08034/round-2",
   "candidate_commit": "b4a637091dbbecb06b183f29b65e86c4e5e390f4",
   "created": "2026-09-10T08:26:07Z",
-  "event_generation": 5,
+  "event_generation": 6,
   "feature_id": null,
   "feature_order": null,
   "id": "DRBAC01843C2EBE03D1CD08034",
@@ -629,7 +629,7 @@
         "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
       },
       "assignee": "ethan.jacobson@insurity.com",
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-09-10T13:06:37Z",
       "event_configuration": {
         "events": {
@@ -1118,6 +1118,35 @@
         }
       },
       "event_results": {
+        "3e6eef6fa55aee404a530bb9a38c75634f7f594a720d2a6b0ded4d7a522db8fe": {
+          "candidate_commit": "b4a637091dbbecb06b183f29b65e86c4e5e390f4",
+          "results": {
+            "default-governance": {
+              "artifacts": {
+                "recovery_analysis": null,
+                "recovery_round_prompt": null,
+                "violations": []
+              },
+              "binding_id": "default-governance",
+              "evidence": [
+                "Verified clean HEAD b4a637091dbbecb06b183f29b65e86c4e5e390f4 with parent f880b7767149e4de43d5bc4d4786247d1e536a8c in the pinned Round 2 workspace. All 16 changed files match the recorded implementation verification hashes.",
+                "Reviewed accepted Round 2 checklist P1–P7, implementation and Quality evidence, the complete candidate diff, and candidate Design, Surface Principles, Toolbar and Terminal intent. No additional Skills were listed in the attachment.",
+                "The 318-line terminal-clipboard.js owns shared browser clipboard behavior. Focus checks, originating-attempt guards, confirmed-success handling and selectable recovery appear at lines 19, 122, 160, 175 and 190. Toolbar integration preserves selected output through activation, asynchronous reattachment and history replay. Changes introduce no Model dependency, backend authority, persistence or coding-agent replacement.",
+                "Programmatic comparison confirmed tests/support/web_app.js preserves the base browser harness and fixtures exactly apart from extraction imports, exports and relative path adjustment. Existing web_screen_render.test.js test bodies are unchanged. Documentation changes are confined to affected Toolbar and Terminal statements and preserve their format.",
+                "Recorded Quality proof is bound to this exact candidate: 96 passing checks, including 37 Chromium browser checks, with zero failures, cancellations or skips. Implementation tests.tap records 122 passes with zero failures, cancellations or skips; its verified file hashes match the committed candidate. Coverage includes Agent and UI-launched Custom Skill tabs, selection gestures, retained output, clipboard contents, denial recovery, focus isolation, replacement races, interruption and exactly-once paste.",
+                "This review independently passed 12 JavaScript syntax checks and git diff --check. Browser tests were not rerun. Recorded platform coverage used Linux Chromium with simulated Windows/macOS platforms and intercepted daemon traffic; native Windows/macOS and live PTY integration were not exercised.",
+                "Proposed regression command, not executed here, from the pinned workspace: test \"$(git rev-parse HEAD)\" = b4a637091dbbecb06b183f29b65e86c4e5e390f4 && NODE_PATH=/home/buddy/projects/refine/node_modules node --test --test-reporter=tap --test-concurrency=1 tests/web_terminal_clipboard.test.js tests/web_supervisor_toolbar.test.js tests/web_goal_log_tail.test.js tests/web_screen_render.test.js tests/web_terminal_clipboard_browser.test.js tests/web_terminal_copy_lifecycle_browser.test.js tests/web_terminal_copy_recovery_browser.test.js",
+                "Final worktree remained clean. No files, Goal state or Git references were changed. Round 1 remains referenced at be1f6f0366dd855f93f505d470dd4e2ca5c6d1b5."
+              ],
+              "invocation_id": "3e6eef6fa55aee404a530bb9a38c75634f7f594a720d2a6b0ded4d7a522db8fe",
+              "outcome": "success",
+              "role": "governance",
+              "summary": "Governance review passed for b4a637091dbbecb06b183f29b65e86c4e5e390f4. No demonstrated violations of the supplied rules or accepted intent were found."
+            }
+          },
+          "source": "workflow.governance.enter",
+          "state": "succeeded"
+        },
         "501ff76be2aa8a9d588b9224480f3efa1930ec5caac6a5a0c3ad97fac0df0a91": {
           "candidate_commit": null,
           "results": {
@@ -1299,10 +1328,42 @@
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
-      "governance_candidate_commit": "",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_candidate_commit": "b4a637091dbbecb06b183f29b65e86c4e5e390f4",
+      "governance_checked_at": "2026-09-10T14:18:27Z",
+      "governance_details": {
+        "candidate_commit": "b4a637091dbbecb06b183f29b65e86c4e5e390f4",
+        "configured": true,
+        "failed_actions": [],
+        "phase": "post_implementation",
+        "skill_results": [
+          {
+            "artifacts": {
+              "recovery_analysis": null,
+              "recovery_round_prompt": null,
+              "violations": []
+            },
+            "binding_id": "workflow.governance.enter:default-governance",
+            "evidence": [
+              "Verified clean HEAD b4a637091dbbecb06b183f29b65e86c4e5e390f4 with parent f880b7767149e4de43d5bc4d4786247d1e536a8c in the pinned Round 2 workspace. All 16 changed files match the recorded implementation verification hashes.",
+              "Reviewed accepted Round 2 checklist P1–P7, implementation and Quality evidence, the complete candidate diff, and candidate Design, Surface Principles, Toolbar and Terminal intent. No additional Skills were listed in the attachment.",
+              "The 318-line terminal-clipboard.js owns shared browser clipboard behavior. Focus checks, originating-attempt guards, confirmed-success handling and selectable recovery appear at lines 19, 122, 160, 175 and 190. Toolbar integration preserves selected output through activation, asynchronous reattachment and history replay. Changes introduce no Model dependency, backend authority, persistence or coding-agent replacement.",
+              "Programmatic comparison confirmed tests/support/web_app.js preserves the base browser harness and fixtures exactly apart from extraction imports, exports and relative path adjustment. Existing web_screen_render.test.js test bodies are unchanged. Documentation changes are confined to affected Toolbar and Terminal statements and preserve their format.",
+              "Recorded Quality proof is bound to this exact candidate: 96 passing checks, including 37 Chromium browser checks, with zero failures, cancellations or skips. Implementation tests.tap records 122 passes with zero failures, cancellations or skips; its verified file hashes match the committed candidate. Coverage includes Agent and UI-launched Custom Skill tabs, selection gestures, retained output, clipboard contents, denial recovery, focus isolation, replacement races, interruption and exactly-once paste.",
+              "This review independently passed 12 JavaScript syntax checks and git diff --check. Browser tests were not rerun. Recorded platform coverage used Linux Chromium with simulated Windows/macOS platforms and intercepted daemon traffic; native Windows/macOS and live PTY integration were not exercised.",
+              "Proposed regression command, not executed here, from the pinned workspace: test \"$(git rev-parse HEAD)\" = b4a637091dbbecb06b183f29b65e86c4e5e390f4 && NODE_PATH=/home/buddy/projects/refine/node_modules node --test --test-reporter=tap --test-concurrency=1 tests/web_terminal_clipboard.test.js tests/web_supervisor_toolbar.test.js tests/web_goal_log_tail.test.js tests/web_screen_render.test.js tests/web_terminal_clipboard_browser.test.js tests/web_terminal_copy_lifecycle_browser.test.js tests/web_terminal_copy_recovery_browser.test.js",
+              "Final worktree remained clean. No files, Goal state or Git references were changed. Round 1 remains referenced at be1f6f0366dd855f93f505d470dd4e2ca5c6d1b5."
+            ],
+            "invocation_id": "3e6eef6fa55aee404a530bb9a38c75634f7f594a720d2a6b0ded4d7a522db8fe",
+            "outcome": "success",
+            "role": "governance",
+            "summary": "Governance review passed for b4a637091dbbecb06b183f29b65e86c4e5e390f4. No demonstrated violations of the supplied rules or accepted intent were found."
+          }
+        ],
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRBAC01843C2EBE03D1CD08034-round-2"
+      },
+      "governance_message": "Governance checks passed.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
       "governance_rule_actions": [],
       "guidance_decision": {
         "applied": [],
@@ -1473,8 +1534,8 @@
       "implementation_report": "workflow.implement.enter:default-implement: Implemented all seven checklist items. Changes remain uncommitted in the pinned Round 2 worktree for Refine’s candidate handoff.",
       "implementation_reported_at": "2026-09-10T14:07:50Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Make text in the shared terminal reliably selectable and copyable, including Agent and Custom Skill tabs and retained output after a process exits.\n\nThe request remains valid. Current main has clipboard shortcuts and error messages but lacks the retained candidate's selection hints, Copy selection control and recovery field for blocked clipboard access. Round 1 produced 7f6988c7 with 71 recorded focused checks passing, then refreshed it to be1f6f0366dd855f93f505d470dd4e2ca5c6d1b5. The refreshed candidate failed its evaluation and is not integrated into main; the earlier pass does not approve that replacement. Its worktree is clean and retained.\n\nReview and selectively port that candidate's shared clipboard behavior. Explain Shift-drag on Windows/Linux and Option-drag on macOS when the application captures the mouse. Provide an accessible Copy selection control, native copy and focused platform shortcuts that use the originating terminal's selection even after exit or disconnection. Preserve Ctrl+C interruption without selection, paste framing, duplicate-event prevention and session replacement checks.\n\nWhen browser clipboard writes are unavailable or rejected, attempt supported fallbacks and offer the captured text in a normal selectable field. Report success only after a successful copy, retain the user's selection and keep asynchronous results attached to their originating tab. Do not disrupt input or focus in another tab. Custom Skills now use the shared agent-tab lifecycle, so test that surface explicitly as well as ordinary Agent tabs.\n\nReconcile tests with current main f880b776 and its browser-fixture and rendered-output fixes. The old candidate's tests/support/web_app.js and test-file restructuring are not authoritative; retain only changes needed for this behavior. Run focused browser checks with actual Chromium and report any skips as skips. Verify selection gestures, copy after exit, denied clipboard access, tab switching, keyboard focus, interruption, exactly-once paste and retained rendering against the final candidate using current Skill verification.\n\nThis is a recovery Round following the Skills review on 10 September 2026. Start from current main in a new managed Round worktree. Preserve Round 1, its plans, logs, branches, commits and uncommitted files; inspect and selectively reuse useful work instead of replaying the whole old attempt. Use the current Skills and docs/intent contracts, not archived Governance, Quality or Guidance configuration or the old fixed planning sequence. Refine owns workflow advancement and integration; human approval remains separate. Update only affected documentation and report focused verification with actual results.",
       "quality_agent_report": "workflow.quality.enter:default-quality: Quality review passed for b4a637091dbbecb06b183f29b65e86c4e5e390f4. No corrections required; 96 focused checks passed with zero failures or skips.",
       "quality_candidate_commit": "b4a637091dbbecb06b183f29b65e86c4e5e390f4",
@@ -1575,20 +1636,30 @@
       ],
       "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-09-10T14:15:03Z",
-      "workflow_attempt_authority": {
-        "claimed_at": "2026-09-10T13:43:04Z",
-        "round_idx": 1,
-        "workflow_revision": 29
+      "rule_state": "passed",
+      "updated": "2026-09-10T14:18:32Z",
+      "workflow_attempt_authority": null,
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "b4a637091dbbecb06b183f29b65e86c4e5e390f4",
+        "integrated_at": "2026-09-10T14:18:31.963157946+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n docs/intent/05-surfaces/03-browser/15-toolbar.md   |   5 +-\n docs/intent/05-surfaces/03-browser/19-terminal.md  |  23 +-\n src/surfaces/web/static/css/toolbar.css            |  16 +\n src/surfaces/web/static/index.html                 |   1 +\n .../web/static/js/features/terminal-clipboard.js   | 318 ++++++++++++++++++\n src/surfaces/web/static/js/features/toolbar.js     | 212 +++---------\n tests/support/terminal_browser.js                  |  98 ++++++\n tests/support/terminal_clipboard_runtime.js        | 319 ++++++++++++++++++\n tests/support/web_app.js                           | 233 +++++++++++++\n tests/web_goal_log_tail.test.js                    |   1 +\n tests/web_screen_render.test.js                    | 232 +------------\n tests/web_supervisor_toolbar.test.js               |   1 +\n tests/web_terminal_clipboard.test.js               | 364 ++++-----------------\n tests/web_terminal_clipboard_browser.test.js       | 135 ++++++++\n tests/web_terminal_copy_lifecycle_browser.test.js  | 231 +++++++++++++\n tests/web_terminal_copy_recovery_browser.test.js   | 224 +++++++++++++\n 16 files changed, 1702 insertions(+), 711 deletions(-)\n create mode 100644 src/surfaces/web/static/js/features/terminal-clipboard.js\n create mode 100644 tests/support/terminal_browser.js\n create mode 100644 tests/support/terminal_clipboard_runtime.js\n create mode 100644 tests/support/web_app.js\n create mode 100644 tests/web_terminal_clipboard_browser.test.js\n create mode 100644 tests/web_terminal_copy_lifecycle_browser.test.js\n create mode 100644 tests/web_terminal_copy_recovery_browser.test.js",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead"
       },
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "governance",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-09-10T14:15:03Z",
+  "updated": "2026-09-10T14:18:32Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:37.282390759+00:00",
@@ -1634,7 +1705,16 @@
       "node_id": "default",
       "round_idx": 1,
       "to": "governance"
+    },
+    {
+      "at": "2026-09-10T14:18:32.399763549+00:00",
+      "forced": false,
+      "from": "governance",
+      "generation": 6,
+      "node_id": "default",
+      "round_idx": 1,
+      "to": "review"
     }
   ],
-  "workflow_revision": 59
+  "workflow_revision": 66
 }
