@@ -1,0 +1,17 @@
+{
+  "completed_at": null,
+  "config_revision": 22,
+  "created_at": "2026-09-10T14:15:03.185100671+00:00",
+  "error": null,
+  "event": {
+    "id": "workflow.governance.enter",
+    "kind": "system",
+    "name": "Workflow Governance Enter",
+    "source": "workflow.governance.enter"
+  },
+  "goal_id": "DRBAC01843C2EBE03D1CD08034",
+  "id": "3e6eef6fa55aee404a530bb9a38c75634f7f594a720d2a6b0ded4d7a522db8fe",
+  "node_id": "default",
+  "result_count": 0,
+  "state": "running"
+}

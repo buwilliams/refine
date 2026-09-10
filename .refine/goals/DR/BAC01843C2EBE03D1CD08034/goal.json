@@ -3,7 +3,7 @@
   "branch_name": "refine/DRBAC01843C2EBE03D1CD08034/round-2",
   "candidate_commit": "b4a637091dbbecb06b183f29b65e86c4e5e390f4",
   "created": "2026-09-10T08:26:07Z",
-  "event_generation": 4,
+  "event_generation": 5,
   "feature_id": null,
   "feature_order": null,
   "id": "DRBAC01843C2EBE03D1CD08034",
@@ -1478,9 +1478,68 @@
       "prompt": "Make text in the shared terminal reliably selectable and copyable, including Agent and Custom Skill tabs and retained output after a process exits.\n\nThe request remains valid. Current main has clipboard shortcuts and error messages but lacks the retained candidate's selection hints, Copy selection control and recovery field for blocked clipboard access. Round 1 produced 7f6988c7 with 71 recorded focused checks passing, then refreshed it to be1f6f0366dd855f93f505d470dd4e2ca5c6d1b5. The refreshed candidate failed its evaluation and is not integrated into main; the earlier pass does not approve that replacement. Its worktree is clean and retained.\n\nReview and selectively port that candidate's shared clipboard behavior. Explain Shift-drag on Windows/Linux and Option-drag on macOS when the application captures the mouse. Provide an accessible Copy selection control, native copy and focused platform shortcuts that use the originating terminal's selection even after exit or disconnection. Preserve Ctrl+C interruption without selection, paste framing, duplicate-event prevention and session replacement checks.\n\nWhen browser clipboard writes are unavailable or rejected, attempt supported fallbacks and offer the captured text in a normal selectable field. Report success only after a successful copy, retain the user's selection and keep asynchronous results attached to their originating tab. Do not disrupt input or focus in another tab. Custom Skills now use the shared agent-tab lifecycle, so test that surface explicitly as well as ordinary Agent tabs.\n\nReconcile tests with current main f880b776 and its browser-fixture and rendered-output fixes. The old candidate's tests/support/web_app.js and test-file restructuring are not authoritative; retain only changes needed for this behavior. Run focused browser checks with actual Chromium and report any skips as skips. Verify selection gestures, copy after exit, denied clipboard access, tab switching, keyboard focus, interruption, exactly-once paste and retained rendering against the final candidate using current Skill verification.\n\nThis is a recovery Round following the Skills review on 10 September 2026. Start from current main in a new managed Round worktree. Preserve Round 1, its plans, logs, branches, commits and uncommitted files; inspect and selectively reuse useful work instead of replaying the whole old attempt. Use the current Skills and docs/intent contracts, not archived Governance, Quality or Guidance configuration or the old fixed planning sequence. Refine owns workflow advancement and integration; human approval remains separate. Update only affected documentation and report focused verification with actual results.",
       "quality_agent_report": "workflow.quality.enter:default-quality: Quality review passed for b4a637091dbbecb06b183f29b65e86c4e5e390f4. No corrections required; 96 focused checks passed with zero failures or skips.",
       "quality_candidate_commit": "b4a637091dbbecb06b183f29b65e86c4e5e390f4",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
+      "quality_checked_at": "2026-09-10T14:15:01Z",
+      "quality_details": {
+        "candidate_commit": "b4a637091dbbecb06b183f29b65e86c4e5e390f4",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRBAC01843C2EBE03D1CD08034-round-2",
+        "diagnostics": [
+          "Event invocation 62e0082806025f8c1d672b64768647f481a7172ef2e4b93083dc685949c022f5: automation/invocations/62e0082806025f8c1d672b64768647f481a7172ef2e4b93083dc685949c022f5.json",
+          "Observed supervised process proc-1789049646153-1129590-180 exited 0. stdout: 054.004682\n  type: 'test'\n  ...\n# Subtest: agent: failed browser fallbacks expose captured text and never claim success\nok 82 - agent: failed browser fallbacks expose captured text and never claim success\n  ---\n  duration_ms: 1025.055124\n  type: 'test'\n  ...\n# Subtest: skill: unavailable and rejected writes use the browser copy fallback and restore focus\nok 83 - skill: unavailable and rejected writes use the browser copy fallback and restore focus\n  ---\n  duration_ms: 1155.638225\n  type: 'test'\n  ...\n# Subtest: skill: blocked copying offers a standard field scoped to the originating tab\nok 84 - skill: blocked copying offers a standard field scoped to the originating tab\n  ---\n  duration_ms: 1245.420548\n  type: 'test'\n  ...\n# Subtest: skill: failed browser fallbacks expose captured text and never claim success\nok 85 - skill: failed browser fallbacks expose captured text and never claim success\n  ---\n  duration_ms: 1466.815148\n  type: 'test'\n  ...\n# Subtest: delayed rejection preserves unrelated input and manual recovery selection through redraws\nok 86 - delayed rejection preserves unrelated input and manual recovery selection through redraws\n  ---\n  duration_ms: 1521.155956\n  type: 'test'\n  ...\n# Subtest: selection fallback restores both ordinary field carets and DOM ranges\nok 87 - selection fallback restores both ordinary field carets and DOM ranges\n  ---\n  duration_ms: 1229.923113\n  type: 'test'\n  ...\n# Subtest: agent: browser-enforced write denial falls back and then offers manual recovery\nok 88 - agent: browser-enforced write denial falls back and then offers manual recovery\n  ---\n  duration_ms: 1381.565261\n  type: 'test'\n  ...\n# Subtest: skill: browser-enforced write denial falls back and then offers manual recovery\nok 89 - skill: browser-enforced write denial falls back and then offers manual recovery\n  ---\n  duration_ms: 1430.957971\n  type: 'test'\n  ...\n1..89\n# tests 89\n# suites 0\n# pass 89\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 45916.874081",
+          "Observed supervised process proc-1789049692374-1129590-183 exited 0. stdout: TAP version 13\n# Subtest: Toolbar add menu closes when the user clicks outside it\nok 1 - Toolbar add menu closes when the user clicks outside it\n  ---\n  duration_ms: 1052.454683\n  type: 'test'\n  ...\n# Subtest: a toolbar Agent's morphed Start button dispatches Stop\nok 2 - a toolbar Agent's morphed Start button dispatches Stop\n  ---\n  duration_ms: 1094.340608\n  type: 'test'\n  ...\n# Subtest: Agent terminal renders transported ANSI control sequences through xterm\nok 3 - Agent terminal renders transported ANSI control sequences through xterm\n  ---\n  duration_ms: 808.988392\n  type: 'test'\n  ...\n# Subtest: Agent terminal refits from visible geometry after minimize and fullscreen\nok 4 - Agent terminal refits from visible geometry after minimize and fullscreen\n  ---\n  duration_ms: 1678.247186\n  type: 'test'\n  ...\n# Subtest: Agent tab round trip retains xterm and scrollback while returning to latest output\nok 5 - Agent tab round trip retains xterm and scrollback while returning to latest output\n  ---\n  duration_ms: 949.660806\n  type: 'test'\n  ...\n# Subtest: switching from Agent to Files and back restores the terminal renderer\nok 6 - switching from Agent to Files and back restores the terminal renderer\n  ---\n  duration_ms: 1110.375023\n  type: 'test'\n  ...\n# Subtest: Custom Skills open a selected agent tab with typed inputs and no Goal context\nok 7 - Custom Skills open a selected agent tab with typed inputs and no Goal context\n  ---\n  duration_ms: 1229.662197\n  type: 'test'\n  ...\n1..7\n# tests 7\n# suites 0\n# pass 7\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 8614.37711"
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "1a08ba89d7d113c761b",
+        "provider_attempts": [],
+        "quality_proof": {
+          "checked_at": "2026-09-10T14:15:01Z",
+          "checked_candidate_commit": "b4a637091dbbecb06b183f29b65e86c4e5e390f4",
+          "evaluation_scope": "isolated_candidate",
+          "goal_id": "DRBAC01843C2EBE03D1CD08034",
+          "operation_id": "1a08ba89d7d113c761b",
+          "results": [
+            {
+              "command": "NODE_PATH=/home/buddy/projects/refine/node_modules node --test --test-reporter=tap --test-concurrency=1 tests/web_terminal_clipboard.test.js tests/web_supervisor_toolbar.test.js tests/web_goal_log_tail.test.js tests/web_terminal_clipboard_browser.test.js tests/web_terminal_copy_lifecycle_browser.test.js tests/web_terminal_copy_recovery_browser.test.js",
+              "evidence": "Observed supervised process proc-1789049646153-1129590-180 exited 0. stdout: 054.004682\n  type: 'test'\n  ...\n# Subtest: agent: failed browser fallbacks expose captured text and never claim success\nok 82 - agent: failed browser fallbacks expose captured text and never claim success\n  ---\n  duration_ms: 1025.055124\n  type: 'test'\n  ...\n# Subtest: skill: unavailable and rejected writes use the browser copy fallback and restore focus\nok 83 - skill: unavailable and rejected writes use the browser copy fallback and restore focus\n  ---\n  duration_ms: 1155.638225\n  type: 'test'\n  ...\n# Subtest: skill: blocked copying offers a standard field scoped to the originating tab\nok 84 - skill: blocked copying offers a standard field scoped to the originating tab\n  ---\n  duration_ms: 1245.420548\n  type: 'test'\n  ...\n# Subtest: skill: failed browser fallbacks expose captured text and never claim success\nok 85 - skill: failed browser fallbacks expose captured text and never claim success\n  ---\n  duration_ms: 1466.815148\n  type: 'test'\n  ...\n# Subtest: delayed rejection preserves unrelated input and manual recovery selection through redraws\nok 86 - delayed rejection preserves unrelated input and manual recovery selection through redraws\n  ---\n  duration_ms: 1521.155956\n  type: 'test'\n  ...\n# Subtest: selection fallback restores both ordinary field carets and DOM ranges\nok 87 - selection fallback restores both ordinary field carets and DOM ranges\n  ---\n  duration_ms: 1229.923113\n  type: 'test'\n  ...\n# Subtest: agent: browser-enforced write denial falls back and then offers manual recovery\nok 88 - agent: browser-enforced write denial falls back and then offers manual recovery\n  ---\n  duration_ms: 1381.565261\n  type: 'test'\n  ...\n# Subtest: skill: browser-enforced write denial falls back and then offers manual recovery\nok 89 - skill: browser-enforced write denial falls back and then offers manual recovery\n  ---\n  duration_ms: 1430.957971\n  type: 'test'\n  ...\n1..89\n# tests 89\n# suites 0\n# pass 89\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 45916.874081",
+              "exit_code": 0,
+              "process_id": "proc-1789049646153-1129590-180",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Shared terminal selection, copying, recovery, and input behavior satisfy the Goal."
+            },
+            {
+              "command": "NODE_PATH=/home/buddy/projects/refine/node_modules node --test --test-reporter=tap --test-concurrency=1 --test-name-pattern='^(Toolbar add menu closes|a toolbar Agent|Agent terminal|Agent tab round trip|switching from Agent to Files|Custom Skills open)' tests/web_screen_render.test.js",
+              "evidence": "Observed supervised process proc-1789049692374-1129590-183 exited 0. stdout: TAP version 13\n# Subtest: Toolbar add menu closes when the user clicks outside it\nok 1 - Toolbar add menu closes when the user clicks outside it\n  ---\n  duration_ms: 1052.454683\n  type: 'test'\n  ...\n# Subtest: a toolbar Agent's morphed Start button dispatches Stop\nok 2 - a toolbar Agent's morphed Start button dispatches Stop\n  ---\n  duration_ms: 1094.340608\n  type: 'test'\n  ...\n# Subtest: Agent terminal renders transported ANSI control sequences through xterm\nok 3 - Agent terminal renders transported ANSI control sequences through xterm\n  ---\n  duration_ms: 808.988392\n  type: 'test'\n  ...\n# Subtest: Agent terminal refits from visible geometry after minimize and fullscreen\nok 4 - Agent terminal refits from visible geometry after minimize and fullscreen\n  ---\n  duration_ms: 1678.247186\n  type: 'test'\n  ...\n# Subtest: Agent tab round trip retains xterm and scrollback while returning to latest output\nok 5 - Agent tab round trip retains xterm and scrollback while returning to latest output\n  ---\n  duration_ms: 949.660806\n  type: 'test'\n  ...\n# Subtest: switching from Agent to Files and back restores the terminal renderer\nok 6 - switching from Agent to Files and back restores the terminal renderer\n  ---\n  duration_ms: 1110.375023\n  type: 'test'\n  ...\n# Subtest: Custom Skills open a selected agent tab with typed inputs and no Goal context\nok 7 - Custom Skills open a selected agent tab with typed inputs and no Goal context\n  ---\n  duration_ms: 1229.662197\n  type: 'test'\n  ...\n1..7\n# tests 7\n# suites 0\n# pass 7\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 8614.37711",
+              "exit_code": 0,
+              "process_id": "proc-1789049692374-1129590-183",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Affected browser surfaces preserve rendering and managed terminal behavior."
+            }
+          ],
+          "round_idx": 1,
+          "schema_version": 1,
+          "source_candidate_commit": "b4a637091dbbecb06b183f29b65e86c4e5e390f4",
+          "state": "passed"
+        },
+        "results": [
+          {
+            "command": "NODE_PATH=/home/buddy/projects/refine/node_modules node --test --test-reporter=tap --test-concurrency=1 tests/web_terminal_clipboard.test.js tests/web_supervisor_toolbar.test.js tests/web_goal_log_tail.test.js tests/web_terminal_clipboard_browser.test.js tests/web_terminal_copy_lifecycle_browser.test.js tests/web_terminal_copy_recovery_browser.test.js",
+            "evidence": "Observed supervised process proc-1789049646153-1129590-180 exited 0. stdout: 054.004682\n  type: 'test'\n  ...\n# Subtest: agent: failed browser fallbacks expose captured text and never claim success\nok 82 - agent: failed browser fallbacks expose captured text and never claim success\n  ---\n  duration_ms: 1025.055124\n  type: 'test'\n  ...\n# Subtest: skill: unavailable and rejected writes use the browser copy fallback and restore focus\nok 83 - skill: unavailable and rejected writes use the browser copy fallback and restore focus\n  ---\n  duration_ms: 1155.638225\n  type: 'test'\n  ...\n# Subtest: skill: blocked copying offers a standard field scoped to the originating tab\nok 84 - skill: blocked copying offers a standard field scoped to the originating tab\n  ---\n  duration_ms: 1245.420548\n  type: 'test'\n  ...\n# Subtest: skill: failed browser fallbacks expose captured text and never claim success\nok 85 - skill: failed browser fallbacks expose captured text and never claim success\n  ---\n  duration_ms: 1466.815148\n  type: 'test'\n  ...\n# Subtest: delayed rejection preserves unrelated input and manual recovery selection through redraws\nok 86 - delayed rejection preserves unrelated input and manual recovery selection through redraws\n  ---\n  duration_ms: 1521.155956\n  type: 'test'\n  ...\n# Subtest: selection fallback restores both ordinary field carets and DOM ranges\nok 87 - selection fallback restores both ordinary field carets and DOM ranges\n  ---\n  duration_ms: 1229.923113\n  type: 'test'\n  ...\n# Subtest: agent: browser-enforced write denial falls back and then offers manual recovery\nok 88 - agent: browser-enforced write denial falls back and then offers manual recovery\n  ---\n  duration_ms: 1381.565261\n  type: 'test'\n  ...\n# Subtest: skill: browser-enforced write denial falls back and then offers manual recovery\nok 89 - skill: browser-enforced write denial falls back and then offers manual recovery\n  ---\n  duration_ms: 1430.957971\n  type: 'test'\n  ...\n1..89\n# tests 89\n# suites 0\n# pass 89\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 45916.874081",
+            "exit_code": 0,
+            "process_id": "proc-1789049646153-1129590-180",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Shared terminal selection, copying, recovery, and input behavior satisfy the Goal."
+          },
+          {
+            "command": "NODE_PATH=/home/buddy/projects/refine/node_modules node --test --test-reporter=tap --test-concurrency=1 --test-name-pattern='^(Toolbar add menu closes|a toolbar Agent|Agent terminal|Agent tab round trip|switching from Agent to Files|Custom Skills open)' tests/web_screen_render.test.js",
+            "evidence": "Observed supervised process proc-1789049692374-1129590-183 exited 0. stdout: TAP version 13\n# Subtest: Toolbar add menu closes when the user clicks outside it\nok 1 - Toolbar add menu closes when the user clicks outside it\n  ---\n  duration_ms: 1052.454683\n  type: 'test'\n  ...\n# Subtest: a toolbar Agent's morphed Start button dispatches Stop\nok 2 - a toolbar Agent's morphed Start button dispatches Stop\n  ---\n  duration_ms: 1094.340608\n  type: 'test'\n  ...\n# Subtest: Agent terminal renders transported ANSI control sequences through xterm\nok 3 - Agent terminal renders transported ANSI control sequences through xterm\n  ---\n  duration_ms: 808.988392\n  type: 'test'\n  ...\n# Subtest: Agent terminal refits from visible geometry after minimize and fullscreen\nok 4 - Agent terminal refits from visible geometry after minimize and fullscreen\n  ---\n  duration_ms: 1678.247186\n  type: 'test'\n  ...\n# Subtest: Agent tab round trip retains xterm and scrollback while returning to latest output\nok 5 - Agent tab round trip retains xterm and scrollback while returning to latest output\n  ---\n  duration_ms: 949.660806\n  type: 'test'\n  ...\n# Subtest: switching from Agent to Files and back restores the terminal renderer\nok 6 - switching from Agent to Files and back restores the terminal renderer\n  ---\n  duration_ms: 1110.375023\n  type: 'test'\n  ...\n# Subtest: Custom Skills open a selected agent tab with typed inputs and no Goal context\nok 7 - Custom Skills open a selected agent tab with typed inputs and no Goal context\n  ---\n  duration_ms: 1229.662197\n  type: 'test'\n  ...\n1..7\n# tests 7\n# suites 0\n# pass 7\n# fail 0\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 8614.37711",
+            "exit_code": 0,
+            "process_id": "proc-1789049692374-1129590-183",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Affected browser surfaces preserve rendering and managed terminal behavior."
+          }
+        ],
+        "source_candidate_commit": "b4a637091dbbecb06b183f29b65e86c4e5e390f4"
+      },
+      "quality_message": "All Quality Skills passed with supervised evidence.",
       "quality_skill_results": [
         {
           "artifacts": {
@@ -1514,10 +1573,10 @@
           "summary": "Quality review passed for b4a637091dbbecb06b183f29b65e86c4e5e390f4. No corrections required; 96 focused checks passed with zero failures or skips."
         }
       ],
-      "quality_state": "unclassified",
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T14:11:17Z",
+      "updated": "2026-09-10T14:15:03Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T13:43:04Z",
         "round_idx": 1,
@@ -1527,9 +1586,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "quality",
+  "status": "governance",
   "target_branch": "main",
-  "updated": "2026-09-10T14:11:17Z",
+  "updated": "2026-09-10T14:15:03Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:37.282390759+00:00",
@@ -1566,7 +1625,16 @@
       "node_id": "default",
       "round_idx": 1,
       "to": "quality"
+    },
+    {
+      "at": "2026-09-10T14:15:02.777721720+00:00",
+      "forced": false,
+      "from": "quality",
+      "generation": 5,
+      "node_id": "default",
+      "round_idx": 1,
+      "to": "governance"
     }
   ],
-  "workflow_revision": 55
+  "workflow_revision": 59
 }
