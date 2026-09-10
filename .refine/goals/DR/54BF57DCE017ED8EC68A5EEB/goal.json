@@ -1,7 +1,7 @@
 {
   "base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
   "branch_name": "refine/DR54BF57DCE017ED8EC68A5EEB/round-2",
-  "candidate_commit": "6b9e73d02dfe7f3fb472cbe816686ac32fa98ba6",
+  "candidate_commit": "9baf06e5524dcc10c1a12dfa9db765d86f42ff6e",
   "created": "2026-09-10T08:26:04Z",
   "event_generation": 4,
   "feature_id": null,
@@ -1070,6 +1070,81 @@
           "source": "workflow.plan.enter",
           "state": "succeeded"
         },
+        "9c8602be1e2bbaa1a07e51352127ee8d91f0a862dcaca7425fdf8eb4814d3ba2": {
+          "candidate_commit": "6b9e73d02dfe7f3fb472cbe816686ac32fa98ba6",
+          "results": {
+            "default-quality": {
+              "artifacts": {
+                "tests": [
+                  {
+                    "command": "cargo test --lib application::workflow -- --test-threads=1 --skip multiple_plan_skills_contribute_separate_namespaced_checklists",
+                    "evidence": "206 passed, 0 failed; exit 0.",
+                    "status": "passed",
+                    "test": "Lineage, replay, retries, replacement checks, conflict scope, publication races and interruption"
+                  },
+                  {
+                    "command": "cargo test --lib application::events::tests -- --test-threads=1",
+                    "evidence": "20 passed, 0 failed; exit 0.",
+                    "status": "passed",
+                    "test": "Current Skill invocation and evidence contracts"
+                  },
+                  {
+                    "command": "cargo test --lib infrastructure::git::worktrees -- --test-threads=1",
+                    "evidence": "31 passed, 0 failed; exit 0.",
+                    "status": "passed",
+                    "test": "Shared Git worktree and recovery behavior"
+                  },
+                  {
+                    "command": "cargo test --lib infrastructure::process::supervisor::operations -- --test-threads=1",
+                    "evidence": "10 passed, 0 failed; exit 0.",
+                    "status": "passed",
+                    "test": "Durable operation coordination and recovery"
+                  },
+                  {
+                    "command": "cargo test --lib architecture_tests -- --test-threads=1",
+                    "evidence": "5 passed, 0 failed; exit 0.",
+                    "status": "passed",
+                    "test": "Semantic architecture boundaries"
+                  },
+                  {
+                    "command": "cargo check --all-targets",
+                    "evidence": "Exit 0.",
+                    "status": "passed",
+                    "test": "All-target compilation"
+                  },
+                  {
+                    "command": "cargo clippy --lib --tests -- -D warnings -A clippy::needless_pub_self -A clippy::collapsible_if -A clippy::module_inception -A clippy::unnecessary_sort_by",
+                    "evidence": "Exit 0; strict baseline diagnostics reported separately.",
+                    "status": "passed",
+                    "test": "Clippy with verified baseline allowances"
+                  },
+                  {
+                    "command": "git diff --check 7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+                    "evidence": "Exit 0.",
+                    "status": "passed",
+                    "test": "Candidate diff whitespace"
+                  }
+                ]
+              },
+              "binding_id": "default-quality",
+              "evidence": [
+                "Reviewed candidate 6b9e73d02dfe7f3fb472cbe816686ac32fa98ba6 against the finalized plan and affected intent contracts. Corrections remain in the pinned Round worktree for Refine to commit and verify.",
+                "Reproduced and fixed an interruption gap that allowed Governance to integrate a persisted replacement without Quality proof. Regression tests now verify missing checks run, exact passing proof is reused, and failed evidence survives restart and Skill removal.",
+                "Reproduced and fixed conflict-resolution scope bypass through nonconflicting files already staged by replay. Index and working-file content comparisons now reject those edits and preserve the source candidate.",
+                "Initial command cargo test --lib application::workflow -- --test-threads=1 returned 201 passed and 2 failed. Corrected the candidate's stale optional-Skills assertion. The remaining multiple_plan_skills_contribute_separate_namespaced_checklists fixture violates the existing one-trigger validator; both files match the base exactly. Excluded only that fixture from final verification.",
+                "Strict cargo clippy --lib --tests -- -D warnings reported five existing diagnostics: two needless_pub_self, one collapsible_if, one module_inception and one unnecessary_sort_by. Verified their source locations predate this candidate.",
+                "Scoped rustfmt --check --edition 2024 --config skip_children=true passed for all 40 changed Rust files.",
+                "Race and interruption checks used deterministic local Git and provider fixtures. No deployment, daemon restart, Goal-state mutation, merge or push was performed on this project."
+              ],
+              "invocation_id": "9c8602be1e2bbaa1a07e51352127ee8d91f0a862dcaca7425fdf8eb4814d3ba2",
+              "outcome": "success",
+              "role": "quality",
+              "summary": "Corrected two defects and one stale assertion. Focused verification passed; baseline test and lint limitations are recorded."
+            }
+          },
+          "source": "workflow.quality.enter",
+          "state": "succeeded"
+        },
         "a7381646927a35850b75b4bb751c36908cca54e7515c33530520976a41f6dcee": {
           "candidate_commit": null,
           "results": {
@@ -1386,14 +1461,85 @@
       "meta_rule_state": null,
       "product_state": null,
       "prompt": "Recover safely from an old candidate whose recorded base is wrong or whose target has advanced, using the candidate's proven Goal changes.\n\nThe original worktree-creation defect was fixed by 8f6de519: fresh and recreated Round branches use the recorded merge-target base. Current code also refreshes candidates before Quality and integration. Keep those behaviors and focus this Round on remaining lineage and retry gaps. settle_stale_candidate still fails immediately when the target equals the recorded base but the candidate does not descend from it. Round 1 retained extensive unfinished replay and publication work without a candidate or final verification.\n\nValidate actual worktree HEAD, recorded base, target and planning or Skill context before automated edits. Preserve the original base when resuming existing work. Extend the current refresh and recovery path to repair bookkeeping only when retained Round and Git evidence identify the Goal's own change range. A merge base or a conflict-free rebase alone does not prove that every commit on a divergent developer branch belongs to the Goal. Ambiguous or unavailable history must remain recoverable with clear evidence, not import unrelated work.\n\nReplay an unambiguous candidate onto one observed target tip in a managed workspace. Record original and replacement identities, retain the source attempt, and rerun the applicable current Skills and exact-candidate checks for every changed candidate. Respect required, background and context-only behavior and record when no required check Skills apply. Bound retries for target movement, preserve conflict evidence and existing supported conflict recovery, and never treat dirty work, lost authority or a Git error as a successful replay.\n\nPreserve target leases and atomic publication checks against the previously recorded remote candidate SHA. Handle an already-published identical replacement idempotently; preserve unexpected remote changes and interrupted publication evidence.\n\nVerify advanced targets, a wrong recorded base with an unchanged target, divergent branches containing unrelated commits, retries, content conflicts, remote publication races and interruption. Prove fresh Round creation still starts at the declared target and that replacement commits cannot reuse stale check evidence.\n\nThis is a recovery Round following the Skills review on 10 September 2026. Start from current main in a new managed Round worktree. Preserve Round 1, its plans, logs, branches, commits and uncommitted files; inspect and selectively reuse useful work instead of replaying the whole old attempt. Use the current Skills and docs/intent contracts, not archived Governance, Quality or Guidance configuration or the old fixed planning sequence. Refine owns workflow advancement and integration; human approval remains separate. Update only affected documentation and report focused verification with actual results.",
-      "quality_candidate_commit": null,
+      "quality_agent_report": "workflow.quality.enter:default-quality: Corrected two defects and one stale assertion. Focused verification passed; baseline test and lint limitations are recorded.",
+      "quality_candidate_commit": "9baf06e5524dcc10c1a12dfa9db765d86f42ff6e",
       "quality_checked_at": null,
       "quality_details": null,
       "quality_message": null,
+      "quality_skill_results": [
+        {
+          "artifacts": {
+            "tests": [
+              {
+                "command": "cargo test --lib application::workflow -- --test-threads=1 --skip multiple_plan_skills_contribute_separate_namespaced_checklists",
+                "evidence": "206 passed, 0 failed; exit 0.",
+                "status": "passed",
+                "test": "Lineage, replay, retries, replacement checks, conflict scope, publication races and interruption"
+              },
+              {
+                "command": "cargo test --lib application::events::tests -- --test-threads=1",
+                "evidence": "20 passed, 0 failed; exit 0.",
+                "status": "passed",
+                "test": "Current Skill invocation and evidence contracts"
+              },
+              {
+                "command": "cargo test --lib infrastructure::git::worktrees -- --test-threads=1",
+                "evidence": "31 passed, 0 failed; exit 0.",
+                "status": "passed",
+                "test": "Shared Git worktree and recovery behavior"
+              },
+              {
+                "command": "cargo test --lib infrastructure::process::supervisor::operations -- --test-threads=1",
+                "evidence": "10 passed, 0 failed; exit 0.",
+                "status": "passed",
+                "test": "Durable operation coordination and recovery"
+              },
+              {
+                "command": "cargo test --lib architecture_tests -- --test-threads=1",
+                "evidence": "5 passed, 0 failed; exit 0.",
+                "status": "passed",
+                "test": "Semantic architecture boundaries"
+              },
+              {
+                "command": "cargo check --all-targets",
+                "evidence": "Exit 0.",
+                "status": "passed",
+                "test": "All-target compilation"
+              },
+              {
+                "command": "cargo clippy --lib --tests -- -D warnings -A clippy::needless_pub_self -A clippy::collapsible_if -A clippy::module_inception -A clippy::unnecessary_sort_by",
+                "evidence": "Exit 0; strict baseline diagnostics reported separately.",
+                "status": "passed",
+                "test": "Clippy with verified baseline allowances"
+              },
+              {
+                "command": "git diff --check 7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+                "evidence": "Exit 0.",
+                "status": "passed",
+                "test": "Candidate diff whitespace"
+              }
+            ]
+          },
+          "binding_id": "workflow.quality.enter:default-quality",
+          "evidence": [
+            "Reviewed candidate 6b9e73d02dfe7f3fb472cbe816686ac32fa98ba6 against the finalized plan and affected intent contracts. Corrections remain in the pinned Round worktree for Refine to commit and verify.",
+            "Reproduced and fixed an interruption gap that allowed Governance to integrate a persisted replacement without Quality proof. Regression tests now verify missing checks run, exact passing proof is reused, and failed evidence survives restart and Skill removal.",
+            "Reproduced and fixed conflict-resolution scope bypass through nonconflicting files already staged by replay. Index and working-file content comparisons now reject those edits and preserve the source candidate.",
+            "Initial command cargo test --lib application::workflow -- --test-threads=1 returned 201 passed and 2 failed. Corrected the candidate's stale optional-Skills assertion. The remaining multiple_plan_skills_contribute_separate_namespaced_checklists fixture violates the existing one-trigger validator; both files match the base exactly. Excluded only that fixture from final verification.",
+            "Strict cargo clippy --lib --tests -- -D warnings reported five existing diagnostics: two needless_pub_self, one collapsible_if, one module_inception and one unnecessary_sort_by. Verified their source locations predate this candidate.",
+            "Scoped rustfmt --check --edition 2024 --config skip_children=true passed for all 40 changed Rust files.",
+            "Race and interruption checks used deterministic local Git and provider fixtures. No deployment, daemon restart, Goal-state mutation, merge or push was performed on this project."
+          ],
+          "invocation_id": "9c8602be1e2bbaa1a07e51352127ee8d91f0a862dcaca7425fdf8eb4814d3ba2",
+          "outcome": "success",
+          "role": "quality",
+          "summary": "Corrected two defects and one stale assertion. Focused verification passed; baseline test and lint limitations are recorded."
+        }
+      ],
       "quality_state": null,
       "reporter": "Buddy Williams",
       "rule_state": null,
-      "updated": "2026-09-10T14:40:12Z",
+      "updated": "2026-09-10T14:51:21Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T13:43:00Z",
         "round_idx": 1,
@@ -1434,7 +1580,7 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-10T14:40:12Z",
+  "updated": "2026-09-10T14:51:21Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:36.990956802+00:00",
@@ -1473,5 +1619,5 @@
       "to": "quality"
     }
   ],
-  "workflow_revision": 41
+  "workflow_revision": 45
 }
