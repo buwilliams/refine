@@ -7,6 +7,7 @@ impl GitWorktreeService for FileGitWorktreeService {
             runtime_root: self.runtime_root.clone(),
             operation_id: self.operation_id.clone(),
             process_metadata: self.process_metadata.clone(),
+            managed_worktree: self.managed_worktree.clone(),
         };
         let root = stdout(service.git_output(&["rev-parse", "--show-toplevel"])?)?
             .trim()
@@ -108,7 +109,9 @@ impl GitWorktreeService for FileGitWorktreeService {
     fn ensure_worktree(&self, branch: &str, target: &Path) -> RefineResult<String> {
         validate_branch_name(branch)?;
         if let Some(existing) = self.worktree_for_branch(branch)? {
+            self.check_worktree_reuse_target(&existing, target)?;
             if existing.exists() {
+                self.admit_linked_worktree(&existing, Some(branch), None, false)?;
                 // Re-lock on reuse so worktrees created before locking existed
                 // self-migrate to prune protection on first touch.
                 self.lock_worktree(&existing, CANDIDATE_WORKTREE_LOCK_REASON)?;
@@ -144,6 +147,7 @@ impl GitWorktreeService for FileGitWorktreeService {
         } else {
             self.git_output(&["worktree", "add", target.to_str().unwrap_or(""), branch])?;
         }
+        self.admit_linked_worktree(&target, Some(branch), None, false)?;
         // Candidate worktrees must survive the repo-wide `git worktree prune` sweeps
         // run by state sync and source promotion; locked worktrees are exempt.
         self.lock_worktree(&target, CANDIDATE_WORKTREE_LOCK_REASON)?;

@@ -32,7 +32,8 @@ impl RefreshFixture {
         let temp_root = unique_temp_dir("workflow-candidate-refresh");
         let target_root = temp_root.join("repo");
         let runtime_root = temp_root.join("run/8080");
-        let worktree = temp_root.join("candidate");
+        let worktree = target_root.join(".git/refine-worktrees/refine-GOAL1-round-1");
+        fs::create_dir_all(worktree.parent().unwrap()).unwrap();
         fs::create_dir_all(&target_root).unwrap();
         git(&target_root, &["init", "-b", "main"]).unwrap();
         git(
@@ -113,17 +114,27 @@ impl RefreshFixture {
                 )
                 .unwrap();
         }
+        let branch = if automatic_retry_attempt.is_some() {
+            "refine/GOAL1/round-2"
+        } else {
+            "refine/GOAL1/round-1"
+        };
+        let worktree = if automatic_retry_attempt.is_some() {
+            let service = FileGitWorktreeService::new(&target_root);
+            let target = service.managed_worktree_path(branch).unwrap();
+            PathBuf::from(
+                service
+                    .ensure_worktree_at_commit(branch, &target, &candidate)
+                    .unwrap(),
+            )
+        } else {
+            worktree
+        };
         work_items
             .advance_automated_goal_status("GOAL1", GoalStatus::Plan)
             .unwrap();
         work_items
-            .update_goal_git_refs(
-                "GOAL1",
-                "refine/GOAL1/round-1",
-                "main",
-                &base,
-                Some(&candidate),
-            )
+            .update_goal_git_refs("GOAL1", branch, "main", &base, Some(&candidate))
             .unwrap();
         work_items
             .advance_automated_goal_status("GOAL1", GoalStatus::Implement)
@@ -169,7 +180,12 @@ impl RefreshFixture {
             Default::default(),
             self.work_items.clone(),
         );
-        context.branch = Some("refine/GOAL1/round-1".to_string());
+        context.branch = self
+            .work_items
+            .show_goal_summary("GOAL1")
+            .unwrap()
+            .goal
+            .branch_name;
         context.worktree_path = Some(self.worktree.display().to_string());
         context.commit = Some(self.candidate.clone());
         context

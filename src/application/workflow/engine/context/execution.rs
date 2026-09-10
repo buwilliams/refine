@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use serde_json::{Value, json};
 
@@ -151,6 +151,17 @@ pub(crate) fn hydrate_retry_context(
         }
     }
     if ctx.reconciliation_state.is_none() || current == GoalStatus::Governance {
+        super::validate_round_workspace_branch(
+            &detail,
+            &ctx.goal_id,
+            ctx.round_idx,
+            &branch,
+            &crate::application::workflow::setting_string(
+                &ctx.settings,
+                "branch_name_pattern",
+                "refine/{goal_id}",
+            ),
+        )?;
         ensure_resumed_candidate_worktree(ctx, &branch, &candidate, &base)?;
     } else {
         // The Quality-reconciliation lane materializes its own exact-candidate checkout
@@ -159,8 +170,31 @@ pub(crate) fn hydrate_retry_context(
         let worktree = FileGitWorktreeService::with_runtime_root(ctx.target_root, ctx.runtime_root)
             .existing_worktree_for_branch(&branch)?
             .filter(|path| path.exists());
+        let worktree = worktree.filter(|path| {
+            crate::infrastructure::git::worktrees::ManagedWorktree {
+                repository: ctx.target_root.to_path_buf(),
+                path: path.clone(),
+                branch: branch.clone(),
+                commit: None,
+                allow_rebase: false,
+                registration: None,
+            }
+            .validate()
+            .is_ok()
+        });
         ctx.worktree_path = worktree.as_ref().map(|path| path.display().to_string());
-        ctx.agent_cwd = worktree;
+        ctx.agent_cwd = worktree
+            .map(|path| {
+                agent_worktree_cwd(
+                    &path.to_string_lossy(),
+                    &crate::application::workflow::setting_string(
+                        &ctx.settings,
+                        "agent_subpath",
+                        "",
+                    ),
+                )
+            })
+            .transpose()?;
     }
     ctx.start_status = current.clone();
     ctx.log(
@@ -204,10 +238,14 @@ fn ensure_resumed_candidate_worktree(
             .and_then(Value::as_str)
     }) {
         Some(path) => PathBuf::from(path),
-        None => git
-            .git_path("refine-worktrees")?
-            .join(branch.replace('/', "-")),
+        None => git.managed_worktree_path(branch)?,
     };
+    if target != git.managed_worktree_path(branch)? {
+        return Err(RefineError::Degraded(
+            "retained candidate handoff names an unrelated workspace; existing work was preserved"
+                .to_string(),
+        ));
+    }
     let base = prior_handoff
         .as_ref()
         .and_then(|operation| operation.request.get("base_commit").and_then(Value::as_str))
@@ -222,7 +260,24 @@ fn ensure_resumed_candidate_worktree(
                         ctx.goal_id
                     )));
                 }
-                git.ensure_worktree(branch, &target)?
+                if target.is_dir()
+                    && FileGitWorktreeService::new(&target).operation_in_progress()?
+                {
+                    // A retained rebase has detached HEAD. Prove its recorded branch
+                    // before allowing the existing refresh recovery to inspect it.
+                    crate::infrastructure::git::worktrees::ManagedWorktree {
+                        repository: ctx.target_root.into(),
+                        path: target.clone(),
+                        branch: branch.into(),
+                        commit: None,
+                        allow_rebase: true,
+                        registration: None,
+                    }
+                    .pin()?;
+                    target.display().to_string()
+                } else {
+                    git.ensure_worktree(branch, &target)?
+                }
             }
             // The branch ref is gone (external cleanup): pin the exact recorded candidate
             // without moving any other ref.
@@ -242,7 +297,10 @@ fn ensure_resumed_candidate_worktree(
     })?;
     ctx.worktree_path = Some(worktree.clone());
     ctx.candidate_handoff_operation_id = Some(handoff.id);
-    ctx.agent_cwd = Some(PathBuf::from(&worktree));
+    ctx.agent_cwd = Some(agent_worktree_cwd(
+        &worktree,
+        &crate::application::workflow::setting_string(&ctx.settings, "agent_subpath", ""),
+    )?);
     ctx.log(
         "workflow",
         "Ensured candidate worktree while resuming",
@@ -273,6 +331,13 @@ pub(crate) fn hydrate_plan_or_implement_context(
         .filter(|value| !value.is_empty())
         .map(ToString::to_string)
         .unwrap_or_else(|| implementation_branch_name(branch_pattern, &ctx.goal_id, ctx.round_idx));
+    super::validate_round_workspace_branch(
+        &detail,
+        &ctx.goal_id,
+        ctx.round_idx,
+        &branch,
+        branch_pattern,
+    )?;
     let git = FileGitWorktreeService::with_runtime_root(ctx.target_root, ctx.runtime_root);
     let base = detail
         .get("base_commit")
@@ -281,9 +346,7 @@ pub(crate) fn hydrate_plan_or_implement_context(
         .filter(|value| !value.is_empty())
         .map(ToString::to_string)
         .unwrap_or(git.resolve_commit(target_branch)?);
-    let worktree_target = git
-        .git_path("refine-worktrees")?
-        .join(branch.replace('/', "-"));
+    let worktree_target = git.managed_worktree_path(&branch)?;
     let (worktree, handoff) = with_repository_git_lock(ctx.target_root, || {
         // Resumption recreates the branch only when it is gone, and then at the
         // Goal's recorded base rather than at the shared checkout's HEAD — the same
@@ -316,7 +379,10 @@ pub(crate) fn hydrate_plan_or_implement_context(
     ctx.branch = Some(branch.clone());
     ctx.worktree_path = Some(worktree.clone());
     ctx.candidate_handoff_operation_id = Some(handoff.id);
-    ctx.agent_cwd = Some(PathBuf::from(&worktree));
+    ctx.agent_cwd = Some(agent_worktree_cwd(
+        &worktree,
+        &crate::application::workflow::setting_string(&ctx.settings, "agent_subpath", ""),
+    )?);
     ctx.start_status = GoalStatus::Implement;
     ctx.log(
         "workflow",
@@ -363,24 +429,4 @@ pub(crate) fn implementation_branch_name(pattern: &str, goal_id: &str, round_idx
     }
 }
 
-pub(crate) fn agent_worktree_cwd(
-    worktree_path: &str,
-    agent_subpath: &str,
-) -> RefineResult<PathBuf> {
-    let root = PathBuf::from(worktree_path);
-    let subpath = agent_subpath.trim();
-    if subpath.is_empty() {
-        return Ok(root);
-    }
-    let relative = Path::new(subpath);
-    if relative.is_absolute()
-        || relative
-            .components()
-            .any(|component| matches!(component, std::path::Component::ParentDir))
-    {
-        return Err(RefineError::InvalidInput(
-            "agent_subpath must be a relative path inside the worktree".to_string(),
-        ));
-    }
-    Ok(root.join(relative))
-}
+pub(crate) use crate::infrastructure::git::worktrees::agent_worktree_cwd;

@@ -112,6 +112,12 @@ fn workflow_admits_current_round_integration_from_todo_and_stops_resuming() {
     // Reconciliation observes the target ref under repository coordination; the user's current
     // checkout may be on another branch without invalidating exact target ancestry.
     git(&target_root, &["checkout", "refine/GOAL1/round-1"]).unwrap();
+    fs::write(target_root.join("candidate.txt"), "human staged\n").unwrap();
+    git(&target_root, &["add", "candidate.txt"]).unwrap();
+    fs::write(target_root.join("candidate.txt"), "human unstaged\n").unwrap();
+    fs::write(target_root.join("human-untracked.txt"), "human untracked\n").unwrap();
+    let primary_index = fs::read(target_root.join(".git/index")).unwrap();
+    let primary_head = git_output(&target_root, &["rev-parse", "HEAD"]);
 
     let provider = temp_root.join("proof-provider");
     fs::write(&provider, "#!/bin/sh\nprintf '%s' fixture\n").unwrap();
@@ -156,5 +162,21 @@ fn workflow_admits_current_round_integration_from_todo_and_stops_resuming() {
         candidate
     );
     assert!(workflow.execute_work().unwrap().is_empty());
+    assert_eq!(
+        primary_index,
+        fs::read(target_root.join(".git/index")).unwrap()
+    );
+    assert_eq!(
+        primary_head,
+        git_output(&target_root, &["rev-parse", "HEAD"])
+    );
+    assert_eq!(
+        fs::read_to_string(target_root.join("candidate.txt")).unwrap(),
+        "human unstaged\n"
+    );
+    assert_eq!(
+        fs::read_to_string(target_root.join("human-untracked.txt")).unwrap(),
+        "human untracked\n"
+    );
     fs::remove_dir_all(temp_root).unwrap();
 }

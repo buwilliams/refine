@@ -40,6 +40,14 @@ pub(super) fn process_command_with_environment(
     spec: &ManagedProcessSpec,
     environment: &crate::infrastructure::process::launch_environment::EffectiveLaunchEnvironment,
 ) -> RefineResult<Command> {
+    if matches!(spec.owner, ProcessOwner::Agent | ProcessOwner::Quality)
+        || spec.metadata.contains_key("managed_worktree")
+    {
+        crate::infrastructure::git::worktrees::validate_workspace_launch(
+            &spec.metadata,
+            spec.cwd.as_deref().map(Path::new),
+        )?;
+    }
     environment.validate_launch(&spec.command, &spec.args)?;
     let mut command = Command::new(&spec.command);
     command.args(&spec.args);

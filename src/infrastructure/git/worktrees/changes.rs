@@ -1,6 +1,26 @@
 use super::*;
 
 impl FileGitWorktreeService {
+    /// Create a newly owned checkout. Interrupted callers must retain their original
+    /// registration or report ambiguity; an existing ref/path is never adopted here.
+    pub fn create_worktree_from_base(
+        &self,
+        branch: &str,
+        target: &Path,
+        base: &str,
+    ) -> RefineResult<String> {
+        if target.symlink_metadata().is_ok()
+            || self.branch_exists(branch)?
+            || self.worktree_for_branch(branch)?.is_some()
+        {
+            return Err(RefineError::Degraded(format!(
+                "workspace admission interrupted or owned location occupied: {}; retain the branch and checkout and retry with a new invocation",
+                target.display()
+            )));
+        }
+        self.ensure_worktree_from_base(branch, target, base)
+    }
+
     /// Materialize a managed branch/worktree at one exact commit without moving an existing ref.
     /// This is used to regenerate candidate-bound evidence after the shared target has advanced.
     pub fn ensure_worktree_at_commit(
@@ -13,12 +33,15 @@ impl FileGitWorktreeService {
         validate_commitish(commit)?;
         let resolved_commit = self.resolve_commit(commit)?;
         if let Some(existing) = self.worktree_for_branch(branch)? {
+            self.check_worktree_reuse_target(&existing, target)?;
             if existing.exists() {
+                self.admit_linked_worktree(&existing, Some(branch), None, false)?;
                 let existing_git = FileGitWorktreeService {
                     root: existing.clone(),
                     runtime_root: self.runtime_root.clone(),
                     operation_id: self.operation_id.clone(),
                     process_metadata: self.process_metadata.clone(),
+                    managed_worktree: self.managed_worktree.clone(),
                 };
                 let head = existing_git.head_ref()?;
                 let status = existing_git.inspect("")?;

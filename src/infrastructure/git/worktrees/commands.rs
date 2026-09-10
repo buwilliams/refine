@@ -7,6 +7,7 @@ impl FileGitWorktreeService {
             runtime_root: None,
             operation_id: None,
             process_metadata: Map::new(),
+            managed_worktree: None,
         }
     }
 
@@ -16,6 +17,7 @@ impl FileGitWorktreeService {
             runtime_root: Some(runtime_root.into()),
             operation_id: None,
             process_metadata: Map::new(),
+            managed_worktree: None,
         }
     }
 
@@ -82,12 +84,21 @@ impl FileGitWorktreeService {
         env: &[(&str, &str)],
         stdin: Option<&str>,
     ) -> RefineResult<HostCommandOutput> {
+        if !is_read_only_git_command(args)
+            && let Some(workspace) = &self.managed_worktree
+        {
+            workspace.validate_cwd(&self.root)?;
+        }
         if self.operation_id.is_none() && is_read_only_git_command(args) {
             return self.git_raw_untracked(args, env, stdin);
         }
         let mut process_args = vec!["-C".to_string(), self.root.display().to_string()];
         process_args.extend(args.iter().map(|arg| arg.to_string()));
         let mut metadata = self.process_metadata.clone();
+        metadata.remove("managed_worktree");
+        if let Some(workspace) = &self.managed_worktree {
+            metadata.insert("managed_worktree".into(), json!(workspace));
+        }
         metadata.insert("kind".to_string(), json!("git"));
         metadata.insert("isolated_process_group".to_string(), json!(true));
         metadata.insert(
@@ -97,16 +108,24 @@ impl FileGitWorktreeService {
         if let Some(operation_id) = self.operation_id.as_deref() {
             metadata.insert("operation_id".to_string(), json!(operation_id));
         }
+        let mut environment = Vec::new();
+        if is_read_only_git_command(args) {
+            environment.push(("GIT_OPTIONAL_LOCKS".to_string(), "0".to_string()));
+        }
+        environment.extend(
+            env.iter()
+                .map(|(key, value)| ((*key).to_string(), (*value).to_string())),
+        );
         let output = FileProcessSupervisor::new(self.process_runtime_root()).run_to_completion(
             ManagedProcessSpec {
                 owner: ProcessOwner::Maintenance,
                 command: "git".to_string(),
                 args: process_args,
-                cwd: None,
-                env: env
-                    .iter()
-                    .map(|(key, value)| ((*key).to_string(), (*value).to_string()))
-                    .collect(),
+                cwd: self
+                    .managed_worktree
+                    .as_ref()
+                    .map(|_| self.root.display().to_string()),
+                env: environment,
                 stdin: stdin.map(str::to_string),
                 // Git runs while holding the repository lock, so a command that
                 // hangs — an unreachable remote, a wedged index — stalls every
@@ -138,6 +157,9 @@ impl FileGitWorktreeService {
         stdin: Option<&str>,
     ) -> RefineResult<HostCommandOutput> {
         let mut command = Command::new("git");
+        crate::infrastructure::process::launch_environment::remove_inherited_git_environment(
+            &mut command,
+        );
         command
             .arg("-C")
             .arg(&self.root)

@@ -31,11 +31,42 @@ fn unique_temp_dir(prefix: &str) -> PathBuf {
     std::env::temp_dir().join(format!("refine-{prefix}-{}-{nanos}", std::process::id()))
 }
 
-fn quality_operation_metadata(runtime_root: &PathBuf) -> serde_json::Map<String, Value> {
+fn quality_operation_metadata(
+    runtime_root: &PathBuf,
+    candidate_root: &Path,
+    refine_dir: &Path,
+) -> serde_json::Map<String, Value> {
     let operation = FileOperationRegistry::new(runtime_root)
-        .register("quality:test")
+        .register_with_request("quality:test", json!({"target_root": candidate_root}))
         .unwrap();
-    serde_json::Map::from_iter([("operation_id".to_string(), json!(operation.id))])
+    let git = FileGitWorktreeService::new(candidate_root);
+    let work = FileWorkItemService::new(refine_dir);
+    work.create_goal_summary("Quality", Some("GOAL1")).unwrap();
+    work.append_goal_round_summary("GOAL1", "test", "Check candidate")
+        .unwrap();
+    let commit = git.resolve_commit("HEAD").unwrap();
+    work.update_goal_git_refs(
+        "GOAL1",
+        "refine/GOAL1/round-1",
+        "main",
+        &commit,
+        Some(&commit),
+    )
+    .unwrap();
+    let workspace = crate::infrastructure::git::worktrees::ManagedWorktree {
+        repository: candidate_root.into(),
+        path: candidate_root.into(),
+        branch: git.head_ref().unwrap().branch.unwrap(),
+        commit: Some(git.resolve_commit("HEAD").unwrap()),
+        allow_rebase: false,
+        registration: None,
+    }
+    .pin()
+    .unwrap();
+    serde_json::Map::from_iter([
+        ("operation_id".to_string(), json!(operation.id)),
+        ("managed_worktree".into(), json!(workspace)),
+    ])
 }
 
 fn legacy_quality_node(id: &str, timing: &str, commands: &str) -> Value {
@@ -159,19 +190,26 @@ impl GoalQualityFixture {
 
 fn goal_quality_fixture(prefix: &str, provider_body: &str) -> GoalQualityFixture {
     let temp_root = unique_temp_dir(prefix);
-    let candidate_root = temp_root.join("candidate");
+    let target_root = temp_root.join("candidate");
     let refine_dir = temp_root.join("state");
     let runtime_root = temp_root.join("run/8080");
     let smoke_ai = temp_root.join("smoke-ai");
     fs::create_dir_all(&temp_root).unwrap();
     fs::write(&smoke_ai, format!("#!/bin/sh\n{provider_body}\n")).unwrap();
     make_executable(&smoke_ai);
-    let candidate_commit = init_git_candidate(&candidate_root);
+    let candidate_commit = init_git_candidate(&target_root);
+    let candidate_root = target_root.join(".git/refine-worktrees/refine-GOAL1-round-1");
     assert!(
         Command::new("git")
             .arg("-C")
-            .arg(&candidate_root)
-            .args(["branch", "-m", "refine/GOAL1/round-1"])
+            .arg(&target_root)
+            .args([
+                "worktree",
+                "add",
+                "-b",
+                "refine/GOAL1/round-1",
+                candidate_root.to_str().unwrap()
+            ])
             .status()
             .unwrap()
             .success()

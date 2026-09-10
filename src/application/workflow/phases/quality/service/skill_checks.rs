@@ -41,6 +41,21 @@ impl FileQualityService {
             node_id: request.node_id.clone(),
             target_root: target_root.clone(),
             cwd: root.clone(),
+            workspace: Some(
+                serde_json::from_value(
+                    request
+                        .process_metadata
+                        .get("managed_worktree")
+                        .cloned()
+                        .ok_or_else(|| {
+                            RefineError::Degraded("Quality has no admitted workspace".into())
+                        })?,
+                )
+                .map_err(|e| {
+                    RefineError::Serialization(format!("invalid Quality workspace: {e}"))
+                })?,
+            ),
+            lifecycle: None,
             provider: request.provider.clone(),
             goal_id: Some(request.owner_id.clone()),
             round_idx: Some(request.round_idx),
@@ -147,11 +162,8 @@ impl FileQualityService {
                 Some(&request.process_metadata),
                 || self.ensure_operation_active(&request, "Quality Skill result"),
             )?;
-            if invocation.gate_assessment()
-                == crate::application::workflow::gates::GateAssessment::Fault
-            {
-                return Err(invocation.execution_error());
-            }
+            invocation.blocking_results()?;
+            invocation.context.validate_workspace(&self.refine_dir)?;
             for id in missing {
                 let mut result = invocation.results.get(&id).cloned().ok_or_else(|| {
                     RefineError::Conflict("Required Quality review is missing".into())

@@ -171,6 +171,7 @@ pub struct FileGitWorktreeService {
     pub runtime_root: Option<PathBuf>,
     operation_id: Option<String>,
     process_metadata: Map<String, Value>,
+    managed_worktree: Option<ManagedWorktree>,
 }
 
 impl FileGitWorktreeService {}
@@ -436,4 +437,6 @@ use integration::BASE_IN_CONFLICT_MARKERS;
 mod tests;
 mod worktrees;
 
+mod admission;
 mod observation;
+pub use admission::{ManagedWorktree, agent_worktree_cwd, validate_workspace_launch};

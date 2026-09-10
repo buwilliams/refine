@@ -14,7 +14,9 @@ use crate::model::log::LogEntry;
 use crate::model::workflow::GoalStatus;
 
 pub(crate) mod execution;
+mod workspace;
 use crate::application::workflow::{json_object, now_timestamp};
+pub(crate) use workspace::validate_round_workspace_branch;
 
 pub struct WorkflowContext<'a> {
     pub runtime_root: &'a Path,
@@ -32,6 +34,8 @@ pub struct WorkflowContext<'a> {
     pub quality_operation_id: Option<String>,
     pub quality_request: Option<QualityCheckRequest>,
     pub agent_cwd: Option<PathBuf>,
+    admitted_worktree:
+        std::cell::RefCell<Option<crate::infrastructure::git::worktrees::ManagedWorktree>>,
     pub provider_output: Option<String>,
     pub commit: Option<String>,
     pub implementation_changed: bool,
@@ -85,6 +89,7 @@ impl<'a> WorkflowContext<'a> {
             quality_operation_id: None,
             quality_request: None,
             agent_cwd: None,
+            admitted_worktree: Default::default(),
             provider_output: None,
             commit: None,
             implementation_changed: false,
@@ -198,6 +203,9 @@ impl<'a> WorkflowContext<'a> {
             "target_app_id".to_string(),
             json!(self.target_root.display().to_string()),
         );
+        if let Ok(workspace) = self.managed_worktree() {
+            metadata.insert("managed_worktree".to_string(), json!(workspace));
+        }
         metadata
     }
 
@@ -208,12 +216,16 @@ impl<'a> WorkflowContext<'a> {
     }
 
     pub fn require_worktree_path(&self) -> RefineResult<&str> {
+        self.managed_worktree()?.validate()?;
         self.worktree_path
             .as_deref()
             .ok_or_else(|| missing_artifact("worktree", &self.goal_id))
     }
 
     pub fn require_agent_cwd(&self) -> RefineResult<&Path> {
+        if let Some(cwd) = &self.agent_cwd {
+            self.managed_worktree()?.validate_cwd(cwd)?;
+        }
         self.agent_cwd
             .as_deref()
             .ok_or_else(|| missing_artifact("agent cwd", &self.goal_id))

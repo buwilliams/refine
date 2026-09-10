@@ -82,6 +82,14 @@ impl EffectiveLaunchEnvironment {
                 insert_checked(&mut entries, key.clone().into(), value.clone().into())?;
             }
         }
+        // Repository selection belongs to the command, never the daemon shell. Explicit
+        // per-command overrides below still support temporary indexes and merge operations.
+        if matches!(
+            owner,
+            ProcessOwner::Agent | ProcessOwner::Quality | ProcessOwner::Maintenance
+        ) {
+            entries.retain(|_, (key, _)| !is_git_redirection(key));
+        }
         for (key, value) in overrides {
             insert_checked(&mut entries, key.into(), value.into())?;
         }
@@ -288,9 +296,69 @@ fn os_len(value: &OsStr) -> usize {
     value.to_string_lossy().len()
 }
 
+fn is_git_redirection(key: &OsStr) -> bool {
+    let key = key.to_string_lossy().to_ascii_uppercase();
+    matches!(
+        key.as_str(),
+        "GIT_DIR"
+            | "GIT_COMMON_DIR"
+            | "GIT_WORK_TREE"
+            | "GIT_INDEX_FILE"
+            | "GIT_OBJECT_DIRECTORY"
+            | "GIT_ALTERNATE_OBJECT_DIRECTORIES"
+            | "GIT_CEILING_DIRECTORIES"
+            | "GIT_DISCOVERY_ACROSS_FILESYSTEM"
+            | "GIT_NAMESPACE"
+            | "GIT_PREFIX"
+            | "GIT_SHALLOW_FILE"
+            | "GIT_CONFIG"
+            | "GIT_CONFIG_GLOBAL"
+            | "GIT_CONFIG_SYSTEM"
+            | "GIT_CONFIG_COUNT"
+            | "GIT_CONFIG_PARAMETERS"
+    ) || key.starts_with("GIT_CONFIG_KEY_")
+        || key.starts_with("GIT_CONFIG_VALUE_")
+}
+
+pub(crate) fn remove_inherited_git_environment(command: &mut Command) {
+    for (key, _) in env::vars_os().filter(|(key, _)| is_git_redirection(key)) {
+        command.env_remove(key);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn managed_launches_remove_inherited_git_redirection_but_keep_explicit_indexes() {
+        let inherited = [
+            ("GIT_DIR".to_string(), "/manual/.git".to_string()),
+            ("GIT_WORK_TREE".to_string(), "/manual".to_string()),
+            ("GIT_INDEX_FILE".to_string(), "/manual/index".to_string()),
+            ("GIT_CONFIG_COUNT".to_string(), "1".to_string()),
+            ("GIT_CONFIG_KEY_0".to_string(), "core.worktree".to_string()),
+            ("GIT_CONFIG_VALUE_0".to_string(), "/manual".to_string()),
+        ];
+        let shell = BTreeMap::from(inherited.clone());
+        for owner in [
+            ProcessOwner::Agent,
+            ProcessOwner::Quality,
+            ProcessOwner::Maintenance,
+        ] {
+            let environment = EffectiveLaunchEnvironment::assemble_for_test(
+                &owner,
+                &inherited,
+                &shell,
+                &[("GIT_INDEX_FILE".to_string(), "/isolated/index".to_string())],
+            )
+            .unwrap();
+            let mut command = Command::new("sh");
+            command.args(["-c", "test -z \"${GIT_DIR+x}${GIT_WORK_TREE+x}${GIT_CONFIG_COUNT+x}${GIT_CONFIG_KEY_0+x}${GIT_CONFIG_VALUE_0+x}\" && test \"$GIT_INDEX_FILE\" = /isolated/index"]);
+            environment.apply_to_command(&mut command);
+            assert!(command.status().unwrap().success(), "{owner:?}");
+        }
+    }
 
     #[test]
     fn quality_shell_projection_is_allowlisted_and_overrides_remain_final() {

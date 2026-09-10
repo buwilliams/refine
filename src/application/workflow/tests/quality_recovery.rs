@@ -79,6 +79,13 @@ fn file_automation_fails_after_the_shared_quality_recovery_budget_is_exhausted()
         })
         .unwrap();
 
+    fs::write(target_root.join("app.py"), "manual staged\n").unwrap();
+    git(&target_root, &["add", "app.py"]).unwrap();
+    fs::write(target_root.join("app.py"), "manual unstaged\n").unwrap();
+    let primary_before = (
+        fs::read(target_root.join("app.py")).unwrap(),
+        fs::read(target_root.join(".git/index")).unwrap(),
+    );
     let automation = WorkflowEngine::with_target_root(&runtime_root, &target_root);
     let error = automation.evaluate_workflow().unwrap_err();
     assert!(
@@ -90,6 +97,29 @@ fn file_automation_fails_after_the_shared_quality_recovery_budget_is_exhausted()
     let goal = work_items.show_goal_detail("GOAL1").unwrap();
     assert_eq!(goal["status"], "failed");
     assert_eq!(goal["rounds"].as_array().unwrap().len(), 6);
+    assert_eq!(
+        primary_before,
+        (
+            fs::read(target_root.join("app.py")).unwrap(),
+            fs::read(target_root.join(".git/index")).unwrap()
+        )
+    );
+    for round in 1..=6 {
+        let branch = format!("refine/GOAL1/round-{round}");
+        let path = target_root
+            .join(".git/refine-worktrees")
+            .join(branch.replace('/', "-"));
+        assert_eq!(
+            git_output(&path, &["branch", "--show-current"]).trim(),
+            branch
+        );
+        assert_eq!(
+            git_output(&path, &["rev-parse", "HEAD"]).trim(),
+            goal["rounds"][round - 1]["quality_candidate_commit"]
+                .as_str()
+                .unwrap()
+        );
+    }
     let latest = &goal["rounds"][5];
     assert_eq!(latest["quality_state"], "failed");
     assert_eq!(latest["automatic_retry"]["attempt"], 5);

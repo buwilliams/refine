@@ -589,6 +589,7 @@ impl FileGitWorktreeService {
             runtime_root: self.runtime_root.clone(),
             operation_id: self.operation_id.clone(),
             process_metadata: self.process_metadata.clone(),
+            managed_worktree: self.managed_worktree.clone(),
         }
     }
 

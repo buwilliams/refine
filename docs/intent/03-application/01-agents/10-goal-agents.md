@@ -24,6 +24,8 @@ Invocation history retains results, attempts, and process references. Restart ca
 
 Interactive Toolbar, Plan Mode, and standalone sessions retain their own attachment and terminal contracts. Event execution is inspected and cancelled through invocation history and Processes. Opening an interactive session does not create another workflow occurrence or change an Event result.
 
+Every automated Goal agent, including Skill bindings, diagnostic repairs, corrections, and conflict recovery, receives the admitted Round workspace explicitly. The configured `agent_subpath` must resolve to an existing directory inside that workspace and the same Git checkout; absolute paths, parent traversal, symlink escapes, and nested repositories are rejected. Recovered invocations retain their pinned workspace and revalidate its repository, Goal, Round, branch or candidate, and registration before launching or accepting results. A process resume or fresh-launch fallback cannot choose a different cwd. Workspace faults retain edits and process evidence for recovery.
+
 ## Future Direction
 
 Improve continuity, process visibility, and fleet-aware inspection while preserving synchronized Goal authority and the evidence of the agents that actually performed the work.

@@ -31,6 +31,10 @@ Release and email intake can be ordinary project-authored Custom Skills. A Node 
 
 Configurations from the earlier multiple-trigger model are archived and converted deterministically: each assignment receives its own Skill while preserving instructions, parameters, execution order, effective scope, enabled state, and existing override relationships. Historical runs retain their pinned snapshots.
 
+Backlog and Todo lifecycle Skills can execute before Plan without an implementation branch. Applicable executable bindings receive an invocation-owned managed checkout from an explicit target-derived source commit; their output remains lifecycle evidence and cannot become the implementation candidate. Scheduler-owned Todo-to-Plan execution uses the current workflow claim and reuses retained Todo Entry evidence before creating the implementation checkout. Queueing and disabled or context-only bindings do not materialize a checkout.
+
+Goal-bound Skills carry a pinned workspace admission through ordered bindings, diagnostic repairs, and recovered invocations. Refine verifies the current Goal and Round and the linked checkout before every launch, result acceptance and cached-success settlement. Lifecycle invocations also retain and recheck their authored request, node and transition or durable-occurrence authority. Quality Skills and each supervised check run against the admitted exact candidate; a primary checkout or stale registration is an infrastructure error. Independently launched Custom Skills receive only their explicit execution context: opening a Goal never attaches that Skill to the Goal or changes its workspace.
+
 ## Future Direction
 
 Improve reuse, discovery, and context selection while keeping authored instructions readable. Additional result contracts should remain Refine-owned so richer execution does not turn Skill editing into schema programming.

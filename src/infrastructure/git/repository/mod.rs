@@ -189,6 +189,9 @@ fn git_at_untracked(
     args: &[&str],
 ) -> RefineResult<GitCommandOutput> {
     let mut command = std::process::Command::new("git");
+    crate::infrastructure::process::launch_environment::remove_inherited_git_environment(
+        &mut command,
+    );
     command.arg("-C").arg(target_root);
     if root != target_root {
         command.arg("-C").arg(root);

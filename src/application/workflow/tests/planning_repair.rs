@@ -42,7 +42,13 @@ fn run_planning(
         .trim()
         .to_string();
     let branch = "refine/GOAL1/round-1";
-    git(&target_root, &["checkout", "-b", branch]).unwrap();
+    let workspace = target_root.join(".git/refine-worktrees/refine-GOAL1-round-1");
+    crate::infrastructure::git::worktrees::FileGitWorktreeService::new(&target_root)
+        .ensure_worktree_from_base(branch, &workspace, &base)
+        .unwrap();
+    fs::write(target_root.join("manual.txt"), "untracked human work").unwrap();
+    let primary_index = fs::read(target_root.join(".git/index")).unwrap();
+    let primary_head = git_output(&target_root, &["rev-parse", "HEAD"]);
 
     fs::write(&smoke_ai, native_script(script_body)).unwrap();
     let mut permissions = fs::metadata(&smoke_ai).unwrap().permissions();
@@ -88,7 +94,7 @@ fn run_planning(
     let authority = work_items
         .claim_workflow_attempt("GOAL1", GoalStatus::Plan, round_idx, revision, &request)
         .unwrap();
-    let context = WorkflowContext::new(
+    let mut context = WorkflowContext::new(
         &runtime_root,
         &target_root,
         "GOAL1".to_string(),
@@ -99,6 +105,8 @@ fn run_planning(
         Default::default(),
         work_items.clone(),
     );
+    context.branch = Some(branch.into());
+    context.worktree_path = Some(workspace.display().to_string());
     let events =
         crate::application::events::FileEventService::with_runtime_root(&refine_dir, &runtime_root);
     if multiple {
@@ -117,7 +125,7 @@ fn run_planning(
     }
     let goal = work_items.show_goal_detail("GOAL1").unwrap();
     let mut result =
-        run_governed_implementation_planning(&context, &goal, &agent_context, &target_root, branch);
+        run_governed_implementation_planning(&context, &goal, &agent_context, &workspace, branch);
 
     if retry {
         let error = result.unwrap_err();
@@ -141,7 +149,7 @@ fn run_planning(
         let authority = work_items
             .claim_workflow_attempt("GOAL1", GoalStatus::Plan, round_idx, revision, &request)
             .unwrap();
-        let context = WorkflowContext::new(
+        let mut context = WorkflowContext::new(
             &runtime_root,
             &target_root,
             "GOAL1".into(),
@@ -152,12 +160,14 @@ fn run_planning(
             Default::default(),
             work_items.clone(),
         );
+        context.branch = Some(branch.into());
+        context.worktree_path = Some(workspace.display().to_string());
         let goal = work_items.show_goal_detail("GOAL1").unwrap();
         result = run_governed_implementation_planning(
             &context,
             &goal,
             &agent_context,
-            &target_root,
+            &workspace,
             branch,
         );
     }
@@ -171,7 +181,7 @@ fn run_planning(
             .map(|i| events.invocation(i["id"].as_str().unwrap()).unwrap())
             .collect::<Vec<_>>()
     );
-    detail["file"] = json!(fs::read_to_string(target_root.join("app.txt")).unwrap());
+    detail["file"] = json!(fs::read_to_string(workspace.join("app.txt")).unwrap());
     unsafe {
         if let Some(previous) = previous_provider {
             std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
@@ -179,6 +189,22 @@ fn run_planning(
             std::env::remove_var("REFINE_SMOKE_AI_PATH");
         }
     }
+    assert_eq!(
+        primary_index,
+        fs::read(target_root.join(".git/index")).unwrap()
+    );
+    assert_eq!(
+        primary_head,
+        git_output(&target_root, &["rev-parse", "HEAD"])
+    );
+    assert_eq!(
+        fs::read_to_string(target_root.join("manual.txt")).unwrap(),
+        "untracked human work"
+    );
+    assert_eq!(
+        fs::read_to_string(target_root.join("app.txt")).unwrap(),
+        "base\n"
+    );
     fs::remove_dir_all(temp_root).unwrap();
     (result, detail)
 }

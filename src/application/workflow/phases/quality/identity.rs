@@ -149,6 +149,30 @@ pub fn validate_quality_identity(
                 &observed,
             ));
         }
+        if !reconciliation_checkout_matches {
+            use crate::infrastructure::process::supervisor::config::{
+                ConfigService, FileSettingsService,
+            };
+            let settings = FileSettingsService::for_node(
+                refine_dir,
+                summary.goal.node_id.as_deref().unwrap_or("default"),
+            )
+            .load()?;
+            crate::application::workflow::engine::context::validate_round_workspace_branch(
+                &detail,
+                &commitment.goal_id,
+                commitment.round_idx,
+                &commitment.branch,
+                &crate::application::workflow::setting_string(
+                    &settings,
+                    "branch_name_pattern",
+                    "refine/{goal_id}",
+                ),
+            )
+            .map_err(|error| {
+                infrastructure_error(commitment, phase, &error.to_string(), &observed)
+            })?;
+        }
         let registered = git.existing_worktree_for_branch(&commitment.branch)?;
         observed.registered = registered.is_some();
         observed.path = registered.as_ref().map(|path| path.display().to_string());
@@ -191,6 +215,19 @@ pub fn validate_quality_identity(
         observed.registered = observed.branch.as_deref() == Some(commitment.branch.as_str());
     }
 
+    if commitment.evaluation_scope == ISOLATED_CANDIDATE {
+        let workspace = crate::infrastructure::git::worktrees::ManagedWorktree {
+            repository: target_root.to_path_buf(),
+            path: PathBuf::from(&commitment.path),
+            branch: commitment.branch.clone(),
+            commit: Some(commitment.candidate_commit.clone()),
+            allow_rebase: false,
+            registration: None,
+        };
+        workspace.validate().map_err(|error| {
+            infrastructure_error(commitment, phase, &error.to_string(), &observed)
+        })?;
+    }
     let committed_path = PathBuf::from(&commitment.path);
     if !committed_path.is_dir() {
         return Err(infrastructure_error(

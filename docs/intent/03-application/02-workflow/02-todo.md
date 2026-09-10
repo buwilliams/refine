@@ -18,10 +18,12 @@ The scheduler reads todo Goals assigned to its active node. When policy permits,
 If a Goal cannot proceed, it remains visible as actionable work. Live-process counts and runner-local reservations are soft efficiency controls and may be rebuilt after restart.
 
 Todo execution is admitted only for an existing non-empty latest Round. Before
-any branch, worktree, or process is created, Refine locks the Goal record and
+any implementation branch, worktree, or process is created, Refine locks the Goal record and
 atomically rechecks Todo status, active-node ownership, exact Round count,
 request, and authored workflow revision while moving to plan. A changed
 authoring commitment remains Todo and produces no execution side effects.
+
+Configured executable Backlog and Todo Enter/Exit Skills may need to run before that admission. Each such invocation owns a separate managed linked checkout pinned from the configured target, with Goal, current Round/request, node and transition authority (a pending user transition or the scheduler's current Todo-to-Plan claim) or a durable occurrence. Its workspace and output never set the implementation branch, base or candidate. Ordinary queueing and Backlog promotion remain state-only; disabled and context-only bindings create no checkout. Lifecycle process launch still obeys capacity and pause controls, and cancellation supersedes pending transition authority immediately. A cancelled, incomplete or invalid blocking Todo Entry invocation prevents transition approval and implementation materialization, including after dispatch retries or restart. Before settlement, Refine rereads every required Entry and Exit invocation and binding, requiring successful completion under the current authority and the original workspace registration even after later Skills have finished.
 
 Before the base is pinned, Refine brings the local merge target up to its
 remote, so a Round starts from what the fleet has actually published rather than
@@ -44,14 +46,17 @@ the work. Resumption follows the same rule — a Round branch that has gone
 missing is recreated at the Goal's recorded base, while one still carrying an
 interrupted Round's commits is reused exactly as it stands.
 
-A Quality- or Governance-finding recovery Round continues on the source
-Round's retained candidate instead of a fresh repository copy. After the same
-atomic Todo admission, Refine verifies the retained worktree still names the
-exact recorded candidate and is clean, then creates the new Round branch at
-that commit in the same worktree — preserving its warm build state. Any failed
-precondition falls back to the ordinary fresh materialization, and
-integration-race recoveries always take the fresh path because their candidate
-itself is stale.
+A Quality- or Governance-finding recovery Round starts from the source
+Round's retained candidate in its own managed worktree. After the same atomic
+Todo admission, Refine verifies that the source checkout is registered at its
+owned location and still clean at the exact recorded candidate, then creates
+the new Round branch and checkout at that commit. The source Round's branch,
+checkout, and evidence are preserved. Missing or changed candidate contents
+can fall back to ordinary fresh materialization; ambiguous checkout ownership
+fails visibly without moving or cleaning retained work. Integration-race
+recoveries take the fresh path because their candidate itself is stale.
+
+Lifecycle dispatch and scheduler admission consume the same occurrence-pinned Entry configuration, even when Skill definitions change before either worker runs. A completed blocking requirement can permit advancement while a background failure remains visible; cancellation or missing/invalid blocking evidence cannot.
 
 ## Future Direction
 
