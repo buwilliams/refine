@@ -3,7 +3,7 @@
   "branch_name": "refine/DRCBAA3A2FC4ABDDCEC2B87473/round-4",
   "candidate_commit": null,
   "created": "2026-09-10T08:26:07Z",
-  "event_generation": 10,
+  "event_generation": 11,
   "feature_id": null,
   "feature_order": null,
   "id": "DRCBAA3A2FC4ABDDCEC2B87473",
@@ -5001,6 +5001,97 @@
           }
         }
       },
+      "event_results": {
+        "9ef861f6dc1472d36685a69169d7d90a6188f50fc148a641d67e430dac8d67d8": {
+          "candidate_commit": null,
+          "results": {
+            "default-plan": {
+              "artifacts": {
+                "plan": {
+                  "checklist": [
+                    {
+                      "description": "Implement only in the pinned Round 4 worktree at 0b6cc819de716b1b118f40c4465d114290117699. Preserve retained candidate ddf7ce84c7806cf0f81e4e430101753658008403, its branch, earlier worktrees and artifacts. Compare the complete 7b430a6a..ddf7ce84 delta with the pinned base; selectively reapply its implementation, Quality corrections and Round 3 fixes, omitting equivalent changes already present.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Restore the candidate's durable decisions, Rejected status, settlement/recovery history, causal validation, synchronization/archive retention, indexes and shared CLI/API/browser metrics. Preserve exact-candidate review proof, atomic decisions, stale-request fencing, idempotent receipts, historical attribution and unknown legacy coverage. Treat records.rs and outcome_evidence.rs as necessary recovery scope; the earlier resolver's three-file restriction applied to that stopped resolution attempt.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Adapt evidence persistence to current events/records.rs. On save, retain the ordering journal → canonical invocation → permanent Goal/archive evidence → indexes → journal removal. Run the same evidence retention during interrupted-index recovery before clearing its journal. Preserve cancellation and terminal-state fences, existing lock ordering, idempotent replay and late evidence archival without recreating deleted Goals.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Adapt outcome_evidence.rs to completion receipts: prefer received_at, support legacy at, and identify invocation-created fallback timestamps as fallback provenance when neither exists. Never use restart time or rewrite previously retained immutable evidence. Preserve completion.rs report-only repairs, original verdicts, checkout observations and durable provider receipts; retain failed repair attempts without manufacturing terminal Goal failure.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Adapt action_authority.rs and success_actions.rs to current success_action_ready/gate_assessment policy instead of requiring aggregate InvocationState::Succeeded. Required success may authorize an explicitly configured action despite a background failure; required failure, cancellation or unsuccessful execution without required bindings cannot. Retain actual errors, pinned action/configuration authority, matching submissions and completed receipts, proof validation and automatic-versus-human provenance.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Reconcile all eight overlapping paths deliberately. Union cohesive Event modules and tests; preserve main's admission, waiting, completion-repair and context-projection behavior. Combine gate assessment with deferred review settlement, retain gate_configurations/quality_requirements clearing for new Rounds, and preserve main's independent-Skill fixture and newer planning-repair assertions. Carry forward affected intent changes while retaining current workflow contracts. Keep Model validation, Application policy, Infrastructure storage and thin surfaces separate.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Add focused integration regressions for modern and legacy receipt timestamps; evidence failure after canonical invocation persistence; restart recovery, duplicate replay, late archival and pruning; and required success with background failure through actual automatic action paths. Retain tests for blocked actions, stale authority, immediate/deferred decisions, automatic same-Round retry, operator retry within an automatic successor, distinct recovery-Round counts and immutable earlier settlements. Preserve main's tests proving repaired reports do not repeat work or modify the checkout.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Run cargo test --lib application::work_items::tests::metrics -- --test-threads=1 --nocapture. Require the six-Goal fixture to retain decisions 3 accepted/1 rejected, acceptance 3/4, automatic/failure rates 1/6, first-Round success 2/6 and average Rounds 8/6. Verify settlement history, date/group boundaries, unknown coverage and archive deduplication. Measure the 10,000-Goal cold, warm and incremental queries separately, requiring zero routine history reads and warm latency below 50 ms.",
+                      "id": "P8"
+                    },
+                    {
+                      "description": "Run cargo check --all-targets --locked; separate cargo test --lib FILTER -- --test-threads=1 commands for model::goal, model::workflow, model::feature, application::work_items, application::events, application::workflow, application::persistence_sync, application::projects::projection and surfaces::web_server; then cargo test --test sync_regressions --test sync_simulation -- --test-threads=1. Diagnose failures against the pinned base where needed and report actual counts rather than inheriting earlier Round results.",
+                      "id": "P9"
+                    },
+                    {
+                      "description": "Run node --test tests/web_dashboard_review_results.test.js tests/web_goal_review.test.js and the xtask test-cli, test-browser and check-static-assets commands. Use the verified existing Playwright module directory through NODE_PATH and verify a matching Chromium launch so rendering executes. Report all failures and skips separately. Check changed Rust files with rustfmt --check --edition 2024 --config skip_children=true and run git diff --check against the Round 4 base.",
+                      "id": "P10"
+                    },
+                    {
+                      "description": "Review the final delta for lost target changes, duplicated implementation and unresolved markers; read back the worktree, base, branch and retained candidate identities. Report implemented checklist IDs, commands, results and benchmark measurements for Refine candidate capture. Require fresh Quality and independent Governance on the exact resulting commit, including replacement gates after any refresh. Leave workflow advancement, integration, push, human approval, deployment and serving-daemon restart to Refine or the operator.",
+                      "id": "P11"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "C1",
+                      "resolution": "Replaying only Round 3 would omit the underlying implementation and Quality corrections; replacing files wholesale would erase newer main behavior. P1–P2 selectively recover the complete retained delta, and P6 explicitly reconciles overlapping changes."
+                    },
+                    {
+                      "criticism_id": "C2",
+                      "resolution": "Resolving textual conflicts alone would miss relocated persistence hooks and misdate modern completion receipts. P3–P4 include the supporting modules and define persistence ordering, timestamp compatibility and immutable replay; P7 verifies crash and retention boundaries."
+                    },
+                    {
+                      "criticism_id": "C3",
+                      "resolution": "The retained authority capture rejects actions that current main permits after required success with a background error. P5 preserves shared gate semantics while retaining durable authority and error evidence; P7 verifies both permitted and prohibited actions."
+                    }
+                  ],
+                  "summary": "Recover the retained durable-outcomes implementation on the pinned Round 4 base, adapting persistence, completion timestamps and action authority to current main while preserving prior evidence and requiring fresh exact-candidate checks."
+                }
+              },
+              "binding_id": "default-plan",
+              "evidence": [
+                "Read-only Git inspection confirmed the clean Round 4 branch at 0b6cc819de716b1b118f40c4465d114290117699; main resolved to the same commit. The retained Round 3 branch and its clean worktree remained at ddf7ce84c7806cf0f81e4e430101753658008403.",
+                "The retained candidate contains three commits after 7b430a6a3bc0d692f03e71da68d06f3e9534dead: implementation 99172365, Quality corrections b3465d05 and Round 3 corrections ddf7ce84. Its complete delta changes 115 files; eight paths overlap target changes.",
+                "Current events/records.rs owns save_invocation and repair_invocation_indexes. The retained candidate adds retain_skill_evidence at both corresponding boundaries in the former execution.rs implementation.",
+                "Current completion.rs records started_at and received_at. Retained outcome_evidence.rs reads attempt.at and otherwise uses invocation.created_at.",
+                "Current workflow/gates.rs and events/tests/repairs.rs permit configured actions after required success despite a background error. Retained action_authority.rs instead requires InvocationState::Succeeded.",
+                "Inspected current architecture, Skills, Events, workflow, Quality and worktree intent, plus retained resolution-metrics intent and fixtures. The historical memory note supplied orientation; current source and pinned context determined the plan.",
+                "The prior Playwright module directory exists at /tmp/refine-clipboard-round1-fqes06ao/node_modules/playwright. Chromium execution remains a proposed implementation check.",
+                "Final Git status remained clean and git diff --check reported no findings. No files, refs or Goal state were changed. Compilation, behavioral tests and benchmarks were not run during this observational planning invocation."
+              ],
+              "invocation_id": "9ef861f6dc1472d36685a69169d7d90a6188f50fc148a641d67e430dac8d67d8",
+              "outcome": "success",
+              "role": "plan",
+              "summary": "Completed a read-only recovery plan with stable checklist IDs, deliberate conflict resolutions and proposed exact-candidate verification."
+            }
+          },
+          "source": "workflow.plan.enter",
+          "state": "succeeded"
+        }
+      },
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
@@ -5020,12 +5111,138 @@
           "round_idx": 3,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-09-10T15:56:40Z",
+        "final_plan": {
+          "completed_at": "2026-09-10T16:00:49Z",
+          "git_after": {
+            "branch": "refine/DRCBAA3A2FC4ABDDCEC2B87473/round-4",
+            "head_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRCBAA3A2FC4ABDDCEC2B87473/round-4",
+            "head_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Implement only in the pinned Round 4 worktree at 0b6cc819de716b1b118f40c4465d114290117699. Preserve retained candidate ddf7ce84c7806cf0f81e4e430101753658008403, its branch, earlier worktrees and artifacts. Compare the complete 7b430a6a..ddf7ce84 delta with the pinned base; selectively reapply its implementation, Quality corrections and Round 3 fixes, omitting equivalent changes already present.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Restore the candidate's durable decisions, Rejected status, settlement/recovery history, causal validation, synchronization/archive retention, indexes and shared CLI/API/browser metrics. Preserve exact-candidate review proof, atomic decisions, stale-request fencing, idempotent receipts, historical attribution and unknown legacy coverage. Treat records.rs and outcome_evidence.rs as necessary recovery scope; the earlier resolver's three-file restriction applied to that stopped resolution attempt.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Adapt evidence persistence to current events/records.rs. On save, retain the ordering journal → canonical invocation → permanent Goal/archive evidence → indexes → journal removal. Run the same evidence retention during interrupted-index recovery before clearing its journal. Preserve cancellation and terminal-state fences, existing lock ordering, idempotent replay and late evidence archival without recreating deleted Goals.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Adapt outcome_evidence.rs to completion receipts: prefer received_at, support legacy at, and identify invocation-created fallback timestamps as fallback provenance when neither exists. Never use restart time or rewrite previously retained immutable evidence. Preserve completion.rs report-only repairs, original verdicts, checkout observations and durable provider receipts; retain failed repair attempts without manufacturing terminal Goal failure.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Adapt action_authority.rs and success_actions.rs to current success_action_ready/gate_assessment policy instead of requiring aggregate InvocationState::Succeeded. Required success may authorize an explicitly configured action despite a background failure; required failure, cancellation or unsuccessful execution without required bindings cannot. Retain actual errors, pinned action/configuration authority, matching submissions and completed receipts, proof validation and automatic-versus-human provenance.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Reconcile all eight overlapping paths deliberately. Union cohesive Event modules and tests; preserve main's admission, waiting, completion-repair and context-projection behavior. Combine gate assessment with deferred review settlement, retain gate_configurations/quality_requirements clearing for new Rounds, and preserve main's independent-Skill fixture and newer planning-repair assertions. Carry forward affected intent changes while retaining current workflow contracts. Keep Model validation, Application policy, Infrastructure storage and thin surfaces separate.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Add focused integration regressions for modern and legacy receipt timestamps; evidence failure after canonical invocation persistence; restart recovery, duplicate replay, late archival and pruning; and required success with background failure through actual automatic action paths. Retain tests for blocked actions, stale authority, immediate/deferred decisions, automatic same-Round retry, operator retry within an automatic successor, distinct recovery-Round counts and immutable earlier settlements. Preserve main's tests proving repaired reports do not repeat work or modify the checkout.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              },
+              {
+                "description": "Run cargo test --lib application::work_items::tests::metrics -- --test-threads=1 --nocapture. Require the six-Goal fixture to retain decisions 3 accepted/1 rejected, acceptance 3/4, automatic/failure rates 1/6, first-Round success 2/6 and average Rounds 8/6. Verify settlement history, date/group boundaries, unknown coverage and archive deduplication. Measure the 10,000-Goal cold, warm and incremental queries separately, requiring zero routine history reads and warm latency below 50 ms.",
+                "id": "workflow.plan.enter:default-plan:P8"
+              },
+              {
+                "description": "Run cargo check --all-targets --locked; separate cargo test --lib FILTER -- --test-threads=1 commands for model::goal, model::workflow, model::feature, application::work_items, application::events, application::workflow, application::persistence_sync, application::projects::projection and surfaces::web_server; then cargo test --test sync_regressions --test sync_simulation -- --test-threads=1. Diagnose failures against the pinned base where needed and report actual counts rather than inheriting earlier Round results.",
+                "id": "workflow.plan.enter:default-plan:P9"
+              },
+              {
+                "description": "Run node --test tests/web_dashboard_review_results.test.js tests/web_goal_review.test.js and the xtask test-cli, test-browser and check-static-assets commands. Use the verified existing Playwright module directory through NODE_PATH and verify a matching Chromium launch so rendering executes. Report all failures and skips separately. Check changed Rust files with rustfmt --check --edition 2024 --config skip_children=true and run git diff --check against the Round 4 base.",
+                "id": "workflow.plan.enter:default-plan:P10"
+              },
+              {
+                "description": "Review the final delta for lost target changes, duplicated implementation and unresolved markers; read back the worktree, base, branch and retained candidate identities. Report implemented checklist IDs, commands, results and benchmark measurements for Refine candidate capture. Require fresh Quality and independent Governance on the exact resulting commit, including replacement gates after any refresh. Leave workflow advancement, integration, push, human approval, deployment and serving-daemon restart to Refine or the operator.",
+                "id": "workflow.plan.enter:default-plan:P11"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Recover the retained durable-outcomes implementation on the pinned Round 4 base, adapting persistence, completion timestamps and action authority to current main while preserving prior evidence and requiring fresh exact-candidate checks."
+          },
+          "started_at": "2026-09-10T15:56:40Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-09-10T16:00:50Z",
+        "proposal": {
+          "completed_at": "2026-09-10T16:00:49Z",
+          "git_after": {
+            "branch": "refine/DRCBAA3A2FC4ABDDCEC2B87473/round-4",
+            "head_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRCBAA3A2FC4ABDDCEC2B87473/round-4",
+            "head_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Implement only in the pinned Round 4 worktree at 0b6cc819de716b1b118f40c4465d114290117699. Preserve retained candidate ddf7ce84c7806cf0f81e4e430101753658008403, its branch, earlier worktrees and artifacts. Compare the complete 7b430a6a..ddf7ce84 delta with the pinned base; selectively reapply its implementation, Quality corrections and Round 3 fixes, omitting equivalent changes already present.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Restore the candidate's durable decisions, Rejected status, settlement/recovery history, causal validation, synchronization/archive retention, indexes and shared CLI/API/browser metrics. Preserve exact-candidate review proof, atomic decisions, stale-request fencing, idempotent receipts, historical attribution and unknown legacy coverage. Treat records.rs and outcome_evidence.rs as necessary recovery scope; the earlier resolver's three-file restriction applied to that stopped resolution attempt.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Adapt evidence persistence to current events/records.rs. On save, retain the ordering journal → canonical invocation → permanent Goal/archive evidence → indexes → journal removal. Run the same evidence retention during interrupted-index recovery before clearing its journal. Preserve cancellation and terminal-state fences, existing lock ordering, idempotent replay and late evidence archival without recreating deleted Goals.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Adapt outcome_evidence.rs to completion receipts: prefer received_at, support legacy at, and identify invocation-created fallback timestamps as fallback provenance when neither exists. Never use restart time or rewrite previously retained immutable evidence. Preserve completion.rs report-only repairs, original verdicts, checkout observations and durable provider receipts; retain failed repair attempts without manufacturing terminal Goal failure.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Adapt action_authority.rs and success_actions.rs to current success_action_ready/gate_assessment policy instead of requiring aggregate InvocationState::Succeeded. Required success may authorize an explicitly configured action despite a background failure; required failure, cancellation or unsuccessful execution without required bindings cannot. Retain actual errors, pinned action/configuration authority, matching submissions and completed receipts, proof validation and automatic-versus-human provenance.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Reconcile all eight overlapping paths deliberately. Union cohesive Event modules and tests; preserve main's admission, waiting, completion-repair and context-projection behavior. Combine gate assessment with deferred review settlement, retain gate_configurations/quality_requirements clearing for new Rounds, and preserve main's independent-Skill fixture and newer planning-repair assertions. Carry forward affected intent changes while retaining current workflow contracts. Keep Model validation, Application policy, Infrastructure storage and thin surfaces separate.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Add focused integration regressions for modern and legacy receipt timestamps; evidence failure after canonical invocation persistence; restart recovery, duplicate replay, late archival and pruning; and required success with background failure through actual automatic action paths. Retain tests for blocked actions, stale authority, immediate/deferred decisions, automatic same-Round retry, operator retry within an automatic successor, distinct recovery-Round counts and immutable earlier settlements. Preserve main's tests proving repaired reports do not repeat work or modify the checkout.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              },
+              {
+                "description": "Run cargo test --lib application::work_items::tests::metrics -- --test-threads=1 --nocapture. Require the six-Goal fixture to retain decisions 3 accepted/1 rejected, acceptance 3/4, automatic/failure rates 1/6, first-Round success 2/6 and average Rounds 8/6. Verify settlement history, date/group boundaries, unknown coverage and archive deduplication. Measure the 10,000-Goal cold, warm and incremental queries separately, requiring zero routine history reads and warm latency below 50 ms.",
+                "id": "workflow.plan.enter:default-plan:P8"
+              },
+              {
+                "description": "Run cargo check --all-targets --locked; separate cargo test --lib FILTER -- --test-threads=1 commands for model::goal, model::workflow, model::feature, application::work_items, application::events, application::workflow, application::persistence_sync, application::projects::projection and surfaces::web_server; then cargo test --test sync_regressions --test sync_simulation -- --test-threads=1. Diagnose failures against the pinned base where needed and report actual counts rather than inheriting earlier Round results.",
+                "id": "workflow.plan.enter:default-plan:P9"
+              },
+              {
+                "description": "Run node --test tests/web_dashboard_review_results.test.js tests/web_goal_review.test.js and the xtask test-cli, test-browser and check-static-assets commands. Use the verified existing Playwright module directory through NODE_PATH and verify a matching Chromium launch so rendering executes. Report all failures and skips separately. Check changed Rust files with rustfmt --check --edition 2024 --config skip_children=true and run git diff --check against the Round 4 base.",
+                "id": "workflow.plan.enter:default-plan:P10"
+              },
+              {
+                "description": "Review the final delta for lost target changes, duplicated implementation and unresolved markers; read back the worktree, base, branch and retained candidate identities. Report implemented checklist IDs, commands, results and benchmark measurements for Refine candidate capture. Require fresh Quality and independent Governance on the exact resulting commit, including replacement gates after any refresh. Leave workflow advancement, integration, push, human approval, deployment and serving-daemon restart to Refine or the operator.",
+                "id": "workflow.plan.enter:default-plan:P11"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Recover the retained durable-outcomes implementation on the pinned Round 4 base, adapting persistence, completion timestamps and action authority to current main while preserving prior evidence and requiring fresh exact-candidate checks."
+          },
+          "started_at": "2026-09-10T15:56:40Z"
+        },
         "schema_version": 2,
         "started_at": "2026-09-10T15:56:40Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T15:56:40Z"
+        "updated_at": "2026-09-10T16:00:50Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -5039,7 +5256,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T15:56:40Z",
+      "updated": "2026-09-10T16:00:50Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T15:56:39Z",
         "round_idx": 3,
@@ -5102,9 +5319,9 @@
       }
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-09-10T15:56:40Z",
+  "updated": "2026-09-10T16:00:50Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:36.799534192+00:00",
@@ -5195,7 +5412,16 @@
       "node_id": "default",
       "round_idx": 3,
       "to": "plan"
+    },
+    {
+      "at": "2026-09-10T16:00:50.109037570+00:00",
+      "forced": false,
+      "from": "plan",
+      "generation": 11,
+      "node_id": "default",
+      "round_idx": 3,
+      "to": "implement"
     }
   ],
-  "workflow_revision": 78
+  "workflow_revision": 84
 }
