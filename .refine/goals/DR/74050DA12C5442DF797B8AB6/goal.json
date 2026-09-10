@@ -3,7 +3,7 @@
   "branch_name": "refine/DR74050DA12C5442DF797B8AB6/round-2",
   "candidate_commit": null,
   "created": "2026-09-10T08:26:05Z",
-  "event_generation": 2,
+  "event_generation": 3,
   "feature_id": null,
   "feature_order": null,
   "id": "DR74050DA12C5442DF797B8AB6",
@@ -1012,6 +1012,106 @@
           }
         }
       },
+      "event_results": {
+        "4357e47d8ff8a0552b076144b8d02e247b5521348c6f0379a3ce7844059f5f28": {
+          "candidate_commit": null,
+          "results": {
+            "default-plan": {
+              "artifacts": {
+                "plan": {
+                  "checklist": [
+                    {
+                      "description": "Implement against pinned base f880b7767149e4de43d5bc4d4786247d1e536a8c in the current Round 2 worktree. Preserve Round 1 unchanged and selectively adapt its deadline, termination and recovery modules. Use one Application supervision entry point and health assessment shared with DR07C216F3E4EC22A57C60BE0B; that Goal owns scheduler heartbeat failure detection and worker replacement. Infrastructure owns process observation and signalling; Application owns admission and settlement; surfaces consume shared results.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Extend registration-time process identity with the owning runtime, original start, effective recorded cap and absolute deadline, OS incarnation, verified process-group identity, and available Goal/Round/attempt, invocation, binding and operation correlations. Cover synchronous Skill subprocesses, managed launches and sessions. Preserve evidence independently of the primary process record through confirmed exit and settlement. Recover legacy deadlines only from sufficient original evidence; never substitute a fresh deadline or an assumed two-hour cap.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Extend the identity-fenced termination mechanism to recover orphan registrations and confirm exit of the owned group, including descendants after leader exit. Revalidate identity before each signal; missing ownership, PID/PGID reuse, unavailable identity or contradictory registration must retain evidence and produce an actionable problem without signalling. Use TERM, a five-second grace, then KILL and a ten-second confirmation budget. Bound subprocess reaping and PTY/output draining, preserving transcripts and artifact-handoff obligations.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Invoke incremental deadline reconciliation at least every five seconds from existing daemon supervision, independently of admission, pause and target lookup failures. Inspect both runtime process locations and retained identities. Keep per-record failures and lock contention from preventing other deadline checks. With responsive host observation, require confirmed group exit or an explicit termination failure within 25 seconds after the recorded deadline. Preserve current idle/needs-input rules and authenticated Toolbar timeout exemptions without changing the original recorded deadline.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Add daemon-lifetime operation recovery with durable first-detection time and per-operation execution ownership evidence. Supplement owner PID identity with a task execution lease or equivalent lifetime proof so an abandoned task is detectable while its worker remains alive. Fence the registration-to-launch window and retain Skill process receipts before waiting for completion. Reconcile operation_id, event_operation_id and invocation correlations across both process roots. Distinguish healthy execution, queued work, proven interruption and unknown ownership; age alone must not terminate healthy work.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Within 60 seconds of detected interruption, reconcile supported recovery or mark unrecoverable executable operations failed with original errors, process evidence and explicit cleanup obligations. Preserve cancellation and capability-owned restart/handoff contracts, including already-terminal Interrupted records that remain valid retry evidence. Settle affected Skill invocations as execution errors and mutate only the still-authorized Goal attempt. Fence late success and superseded results. Continue tracking unresolved cleanup after terminal settlement; if persistence itself fails, publish that failure within the bound and retain retry obligations.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Replace the pass-long scheduler_error latch with retries whose delay is capped at 30 seconds and whose error clears after successful reevaluation. Compose with the companion Goal's isolation of blocking preparation and settlement. Count starting tasks, Event reservations and still-live owned groups without double counting; releasing an operation or task entry must not release live process capacity. Isolate damaged records to affected work. Preserve authored-Round, ownership, required Skill, Feature order, priority, pause and resource gates. Require an eligible Todo to enter Plan and launch its Plan Skill within 60 seconds after safe capacity and transient blockers clear.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Publish recovery observations into the shared runtime-local workflow health assessment, bound to runtime, target and actual worker incarnation. Include overdue processes, pending cleanup, interrupted operations, admission retry cause, observation age and supported remedies. Consume scheduler-produced ticks from the companion contract; supervision must not manufacture scheduler progress. Expose the same assessment through node show/health, system status and refine next. Keep provisioning and state-sync health intact, report unavailable evidence explicitly, and emit bounded onset/change/recovery activity rather than one entry per tick.",
+                      "id": "P8"
+                    },
+                    {
+                      "description": "Add an isolated daemon-lifetime recovery integration fixture using production supervision and worker execution paths. Launch a real owned group with descendants, deliberately lose its session/poller and primary registration, and retain its original deadline identity. Verify TERM/KILL escalation, confirmed whole-group exit, correlated operation and Skill settlement, retained evidence, released safe capacity and another Todo starting its Plan Skill within the documented bound. Capture actual daemon and worker PID plus OS incarnation before and after; reconstructed engines or synthetic heartbeat records cannot satisfy the proof.",
+                      "id": "P9"
+                    },
+                    {
+                      "description": "Add a same-worker admission regression with a two-slot limit, an unrelated equal-priority task held active, an interrupted operation and a transient admission error. Assert recovery and fresh Plan admission while the original task remains active, then assert causal health output and recovery activity. Exercise both a released task lease under a live owner PID and an exited owner, plus workflow Skills and non-workflow Custom/Node-start Skills.",
+                      "id": "P10"
+                    },
+                    {
+                      "description": "Add focused failure tests for PID/PGID reuse, missing or corrupt identity, leader-only exit, TERM refusal, KILL/observation failure, blocked output drain, launch-versus-recovery races, cancellation, superseded Round/node authority, late completion, persistence failure and retained cleanup capacity. Verify pause prevents admission while deadline enforcement continues; legitimate ordering, missing required Skills and unavailable capacity do not produce false admission-stall claims. Verify recovery never extends deadlines and interactive attachment behavior remains unchanged.",
+                      "id": "P11"
+                    },
+                    {
+                      "description": "Keep changes cohesive by separating identity/deadline/group mechanisms, operation recovery, admission and health responsibilities, moving related helpers and tests with them. Update only affected process, execution-ownership, workflow, Skill/agent timeout, activity and CLI/API intent contracts. Run focused serial unit checks using cargo test --lib with filters for infrastructure::process, application::events, application::workers, application::workflow and application::agents::sessions; register and run the new daemon_lifetime_recovery integration target explicitly. Run relevant surface tests, formatting checks and git diff --check. Report exact commands, selected test counts, results and skips against the resulting candidate; do not promote source or restart the serving installation.",
+                      "id": "P12"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "C1",
+                      "resolution": "P9 and P10 make uninterrupted daemon/worker identity and actual Plan Skill launch mandatory evidence. They replace archived classification assertions and avoid treating direct reconciler calls or engine reconstruction as proof of daemon-lifetime recovery."
+                    },
+                    {
+                      "criticism_id": "C2",
+                      "resolution": "Self-review rejected wholesale reuse of Round 1: its deadline fallback assumes two hours, and its operation recovery skips Interrupted records and detects only owner-process death. P2, P5 and P6 use recorded limits, task lifetime evidence and current Skill settlement contracts."
+                    },
+                    {
+                      "criticism_id": "C3",
+                      "resolution": "A successful signal or dead leader does not establish safe capacity. P3, P6 and P7 require group-exit evidence, retain cleanup obligations and reject stale settlement; unknown ownership remains visible without authorizing a kill."
+                    },
+                    {
+                      "criticism_id": "C4",
+                      "resolution": "Self-review rejected a second watchdog and synchronous bulk recovery inside admission. P1, P4 and P8 use one existing supervision path and shared health assessment, with bounded incremental recovery so one failure cannot prevent other checks."
+                    }
+                  ],
+                  "summary": "Recover overdue managed agents and interrupted Skill operations through existing daemon supervision, preserve identity and workflow authority, and resume unrelated eligible admission within explicit bounds. Selectively reuse Round 1 mechanisms against the clean Round 2 base; share supervision and health with DR07C216F3E4EC22A57C60BE0B."
+                }
+              },
+              "binding_id": "default-plan",
+              "evidence": [
+                "Verified the current branch is refine/DR74050DA12C5442DF797B8AB6/round-2 at f880b7767149e4de43d5bc4d4786247d1e536a8c. Initial and final git status were clean; git diff --check reported no errors. No files, Goal state, branches or commits were changed.",
+                "Read current docs/intent contracts for architecture, processes, execution ownership, Skills, Todo, Plan, workflow, agents, activity and CLI. The current Plan contract explicitly permits one Skill-selected planning method and requires observational execution.",
+                "src/application/workflow/engine/execution/mod.rs:69-149 retains scheduler_error and gates subsequent admission on its absence while active tasks remain. prepare_goal runs synchronously in that admission path.",
+                "src/application/events/execution.rs records completion_timeout_seconds from agent_hard_cap_seconds. src/infrastructure/process/subprocess/execution.rs:175-206 enforces it inside the synchronous polling loop; session_runtime.rs separately enforces completion and idle timeouts. ManagedProcessIdentity currently lacks a recoverable deadline and process-group snapshot.",
+                "src/infrastructure/process/supervisor/operations/storage.rs:176 implements restart-oriented active-operation recovery. Existing recovery termination calls terminate_and_confirm_exit, which checks leader PID exit; the stronger identity-fenced primitive also requires extension for orphan group confirmation.",
+                "Inspected retained Round 1 at 8f6de519c62a8a373b19482d5c7842068acfb35d: 26 tracked files have unfinished edits, with additional untracked recovery modules and tests. Its deadline code contains a 7,200,000-ms fallback; lifetime recovery skips Interrupted operations; its orphan test publishes a constructed AdmissionHeartbeat.",
+                "Read DR07C216F3E4EC22A57C60BE0B's current Round 2 prompt. It owns scheduler-loop fault containment, actual scheduler ticks, stale-worker detection and safe replacement, and explicitly requests shared deadline/operation supervision.",
+                "src/application/guidance/mod.rs:174 counts only processes whose kind is workflow and suppresses observation errors. Current capacity accounting already includes Event reservations and Agent/Quality processes, so recovery must extend that accounting rather than introduce another capacity store.",
+                "Runtime tests were not executed during this observational planning invocation. Timing bounds and new test targets above are proposed acceptance criteria, not measured passes."
+              ],
+              "invocation_id": "4357e47d8ff8a0552b076144b8d02e247b5521348c6f0379a3ce7844059f5f28",
+              "outcome": "success",
+              "role": "plan",
+              "summary": "Completed repository inspection and self-critique, preserved both Rounds, and produced a scoped implementation plan with stable IDs, bounded recovery, shared supervision and explicit no-restart verification."
+            }
+          },
+          "source": "workflow.plan.enter",
+          "state": "succeeded"
+        }
+      },
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
@@ -1031,12 +1131,146 @@
           "round_idx": 1,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-09-10T13:43:03Z",
+        "final_plan": {
+          "completed_at": "2026-09-10T13:49:00Z",
+          "git_after": {
+            "branch": "refine/DR74050DA12C5442DF797B8AB6/round-2",
+            "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR74050DA12C5442DF797B8AB6/round-2",
+            "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Implement against pinned base f880b7767149e4de43d5bc4d4786247d1e536a8c in the current Round 2 worktree. Preserve Round 1 unchanged and selectively adapt its deadline, termination and recovery modules. Use one Application supervision entry point and health assessment shared with DR07C216F3E4EC22A57C60BE0B; that Goal owns scheduler heartbeat failure detection and worker replacement. Infrastructure owns process observation and signalling; Application owns admission and settlement; surfaces consume shared results.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Extend registration-time process identity with the owning runtime, original start, effective recorded cap and absolute deadline, OS incarnation, verified process-group identity, and available Goal/Round/attempt, invocation, binding and operation correlations. Cover synchronous Skill subprocesses, managed launches and sessions. Preserve evidence independently of the primary process record through confirmed exit and settlement. Recover legacy deadlines only from sufficient original evidence; never substitute a fresh deadline or an assumed two-hour cap.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Extend the identity-fenced termination mechanism to recover orphan registrations and confirm exit of the owned group, including descendants after leader exit. Revalidate identity before each signal; missing ownership, PID/PGID reuse, unavailable identity or contradictory registration must retain evidence and produce an actionable problem without signalling. Use TERM, a five-second grace, then KILL and a ten-second confirmation budget. Bound subprocess reaping and PTY/output draining, preserving transcripts and artifact-handoff obligations.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Invoke incremental deadline reconciliation at least every five seconds from existing daemon supervision, independently of admission, pause and target lookup failures. Inspect both runtime process locations and retained identities. Keep per-record failures and lock contention from preventing other deadline checks. With responsive host observation, require confirmed group exit or an explicit termination failure within 25 seconds after the recorded deadline. Preserve current idle/needs-input rules and authenticated Toolbar timeout exemptions without changing the original recorded deadline.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Add daemon-lifetime operation recovery with durable first-detection time and per-operation execution ownership evidence. Supplement owner PID identity with a task execution lease or equivalent lifetime proof so an abandoned task is detectable while its worker remains alive. Fence the registration-to-launch window and retain Skill process receipts before waiting for completion. Reconcile operation_id, event_operation_id and invocation correlations across both process roots. Distinguish healthy execution, queued work, proven interruption and unknown ownership; age alone must not terminate healthy work.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Within 60 seconds of detected interruption, reconcile supported recovery or mark unrecoverable executable operations failed with original errors, process evidence and explicit cleanup obligations. Preserve cancellation and capability-owned restart/handoff contracts, including already-terminal Interrupted records that remain valid retry evidence. Settle affected Skill invocations as execution errors and mutate only the still-authorized Goal attempt. Fence late success and superseded results. Continue tracking unresolved cleanup after terminal settlement; if persistence itself fails, publish that failure within the bound and retain retry obligations.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Replace the pass-long scheduler_error latch with retries whose delay is capped at 30 seconds and whose error clears after successful reevaluation. Compose with the companion Goal's isolation of blocking preparation and settlement. Count starting tasks, Event reservations and still-live owned groups without double counting; releasing an operation or task entry must not release live process capacity. Isolate damaged records to affected work. Preserve authored-Round, ownership, required Skill, Feature order, priority, pause and resource gates. Require an eligible Todo to enter Plan and launch its Plan Skill within 60 seconds after safe capacity and transient blockers clear.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              },
+              {
+                "description": "Publish recovery observations into the shared runtime-local workflow health assessment, bound to runtime, target and actual worker incarnation. Include overdue processes, pending cleanup, interrupted operations, admission retry cause, observation age and supported remedies. Consume scheduler-produced ticks from the companion contract; supervision must not manufacture scheduler progress. Expose the same assessment through node show/health, system status and refine next. Keep provisioning and state-sync health intact, report unavailable evidence explicitly, and emit bounded onset/change/recovery activity rather than one entry per tick.",
+                "id": "workflow.plan.enter:default-plan:P8"
+              },
+              {
+                "description": "Add an isolated daemon-lifetime recovery integration fixture using production supervision and worker execution paths. Launch a real owned group with descendants, deliberately lose its session/poller and primary registration, and retain its original deadline identity. Verify TERM/KILL escalation, confirmed whole-group exit, correlated operation and Skill settlement, retained evidence, released safe capacity and another Todo starting its Plan Skill within the documented bound. Capture actual daemon and worker PID plus OS incarnation before and after; reconstructed engines or synthetic heartbeat records cannot satisfy the proof.",
+                "id": "workflow.plan.enter:default-plan:P9"
+              },
+              {
+                "description": "Add a same-worker admission regression with a two-slot limit, an unrelated equal-priority task held active, an interrupted operation and a transient admission error. Assert recovery and fresh Plan admission while the original task remains active, then assert causal health output and recovery activity. Exercise both a released task lease under a live owner PID and an exited owner, plus workflow Skills and non-workflow Custom/Node-start Skills.",
+                "id": "workflow.plan.enter:default-plan:P10"
+              },
+              {
+                "description": "Add focused failure tests for PID/PGID reuse, missing or corrupt identity, leader-only exit, TERM refusal, KILL/observation failure, blocked output drain, launch-versus-recovery races, cancellation, superseded Round/node authority, late completion, persistence failure and retained cleanup capacity. Verify pause prevents admission while deadline enforcement continues; legitimate ordering, missing required Skills and unavailable capacity do not produce false admission-stall claims. Verify recovery never extends deadlines and interactive attachment behavior remains unchanged.",
+                "id": "workflow.plan.enter:default-plan:P11"
+              },
+              {
+                "description": "Keep changes cohesive by separating identity/deadline/group mechanisms, operation recovery, admission and health responsibilities, moving related helpers and tests with them. Update only affected process, execution-ownership, workflow, Skill/agent timeout, activity and CLI/API intent contracts. Run focused serial unit checks using cargo test --lib with filters for infrastructure::process, application::events, application::workers, application::workflow and application::agents::sessions; register and run the new daemon_lifetime_recovery integration target explicitly. Run relevant surface tests, formatting checks and git diff --check. Report exact commands, selected test counts, results and skips against the resulting candidate; do not promote source or restart the serving installation.",
+                "id": "workflow.plan.enter:default-plan:P12"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Recover overdue managed agents and interrupted Skill operations through existing daemon supervision, preserve identity and workflow authority, and resume unrelated eligible admission within explicit bounds. Selectively reuse Round 1 mechanisms against the clean Round 2 base; share supervision and health with DR07C216F3E4EC22A57C60BE0B."
+          },
+          "started_at": "2026-09-10T13:43:03Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-09-10T13:49:01Z",
+        "proposal": {
+          "completed_at": "2026-09-10T13:49:00Z",
+          "git_after": {
+            "branch": "refine/DR74050DA12C5442DF797B8AB6/round-2",
+            "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR74050DA12C5442DF797B8AB6/round-2",
+            "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Implement against pinned base f880b7767149e4de43d5bc4d4786247d1e536a8c in the current Round 2 worktree. Preserve Round 1 unchanged and selectively adapt its deadline, termination and recovery modules. Use one Application supervision entry point and health assessment shared with DR07C216F3E4EC22A57C60BE0B; that Goal owns scheduler heartbeat failure detection and worker replacement. Infrastructure owns process observation and signalling; Application owns admission and settlement; surfaces consume shared results.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Extend registration-time process identity with the owning runtime, original start, effective recorded cap and absolute deadline, OS incarnation, verified process-group identity, and available Goal/Round/attempt, invocation, binding and operation correlations. Cover synchronous Skill subprocesses, managed launches and sessions. Preserve evidence independently of the primary process record through confirmed exit and settlement. Recover legacy deadlines only from sufficient original evidence; never substitute a fresh deadline or an assumed two-hour cap.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Extend the identity-fenced termination mechanism to recover orphan registrations and confirm exit of the owned group, including descendants after leader exit. Revalidate identity before each signal; missing ownership, PID/PGID reuse, unavailable identity or contradictory registration must retain evidence and produce an actionable problem without signalling. Use TERM, a five-second grace, then KILL and a ten-second confirmation budget. Bound subprocess reaping and PTY/output draining, preserving transcripts and artifact-handoff obligations.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Invoke incremental deadline reconciliation at least every five seconds from existing daemon supervision, independently of admission, pause and target lookup failures. Inspect both runtime process locations and retained identities. Keep per-record failures and lock contention from preventing other deadline checks. With responsive host observation, require confirmed group exit or an explicit termination failure within 25 seconds after the recorded deadline. Preserve current idle/needs-input rules and authenticated Toolbar timeout exemptions without changing the original recorded deadline.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Add daemon-lifetime operation recovery with durable first-detection time and per-operation execution ownership evidence. Supplement owner PID identity with a task execution lease or equivalent lifetime proof so an abandoned task is detectable while its worker remains alive. Fence the registration-to-launch window and retain Skill process receipts before waiting for completion. Reconcile operation_id, event_operation_id and invocation correlations across both process roots. Distinguish healthy execution, queued work, proven interruption and unknown ownership; age alone must not terminate healthy work.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Within 60 seconds of detected interruption, reconcile supported recovery or mark unrecoverable executable operations failed with original errors, process evidence and explicit cleanup obligations. Preserve cancellation and capability-owned restart/handoff contracts, including already-terminal Interrupted records that remain valid retry evidence. Settle affected Skill invocations as execution errors and mutate only the still-authorized Goal attempt. Fence late success and superseded results. Continue tracking unresolved cleanup after terminal settlement; if persistence itself fails, publish that failure within the bound and retain retry obligations.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Replace the pass-long scheduler_error latch with retries whose delay is capped at 30 seconds and whose error clears after successful reevaluation. Compose with the companion Goal's isolation of blocking preparation and settlement. Count starting tasks, Event reservations and still-live owned groups without double counting; releasing an operation or task entry must not release live process capacity. Isolate damaged records to affected work. Preserve authored-Round, ownership, required Skill, Feature order, priority, pause and resource gates. Require an eligible Todo to enter Plan and launch its Plan Skill within 60 seconds after safe capacity and transient blockers clear.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              },
+              {
+                "description": "Publish recovery observations into the shared runtime-local workflow health assessment, bound to runtime, target and actual worker incarnation. Include overdue processes, pending cleanup, interrupted operations, admission retry cause, observation age and supported remedies. Consume scheduler-produced ticks from the companion contract; supervision must not manufacture scheduler progress. Expose the same assessment through node show/health, system status and refine next. Keep provisioning and state-sync health intact, report unavailable evidence explicitly, and emit bounded onset/change/recovery activity rather than one entry per tick.",
+                "id": "workflow.plan.enter:default-plan:P8"
+              },
+              {
+                "description": "Add an isolated daemon-lifetime recovery integration fixture using production supervision and worker execution paths. Launch a real owned group with descendants, deliberately lose its session/poller and primary registration, and retain its original deadline identity. Verify TERM/KILL escalation, confirmed whole-group exit, correlated operation and Skill settlement, retained evidence, released safe capacity and another Todo starting its Plan Skill within the documented bound. Capture actual daemon and worker PID plus OS incarnation before and after; reconstructed engines or synthetic heartbeat records cannot satisfy the proof.",
+                "id": "workflow.plan.enter:default-plan:P9"
+              },
+              {
+                "description": "Add a same-worker admission regression with a two-slot limit, an unrelated equal-priority task held active, an interrupted operation and a transient admission error. Assert recovery and fresh Plan admission while the original task remains active, then assert causal health output and recovery activity. Exercise both a released task lease under a live owner PID and an exited owner, plus workflow Skills and non-workflow Custom/Node-start Skills.",
+                "id": "workflow.plan.enter:default-plan:P10"
+              },
+              {
+                "description": "Add focused failure tests for PID/PGID reuse, missing or corrupt identity, leader-only exit, TERM refusal, KILL/observation failure, blocked output drain, launch-versus-recovery races, cancellation, superseded Round/node authority, late completion, persistence failure and retained cleanup capacity. Verify pause prevents admission while deadline enforcement continues; legitimate ordering, missing required Skills and unavailable capacity do not produce false admission-stall claims. Verify recovery never extends deadlines and interactive attachment behavior remains unchanged.",
+                "id": "workflow.plan.enter:default-plan:P11"
+              },
+              {
+                "description": "Keep changes cohesive by separating identity/deadline/group mechanisms, operation recovery, admission and health responsibilities, moving related helpers and tests with them. Update only affected process, execution-ownership, workflow, Skill/agent timeout, activity and CLI/API intent contracts. Run focused serial unit checks using cargo test --lib with filters for infrastructure::process, application::events, application::workers, application::workflow and application::agents::sessions; register and run the new daemon_lifetime_recovery integration target explicitly. Run relevant surface tests, formatting checks and git diff --check. Report exact commands, selected test counts, results and skips against the resulting candidate; do not promote source or restart the serving installation.",
+                "id": "workflow.plan.enter:default-plan:P12"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Recover overdue managed agents and interrupted Skill operations through existing daemon supervision, preserve identity and workflow authority, and resume unrelated eligible admission within explicit bounds. Selectively reuse Round 1 mechanisms against the clean Round 2 base; share supervision and health with DR07C216F3E4EC22A57C60BE0B."
+          },
+          "started_at": "2026-09-10T13:43:03Z"
+        },
         "schema_version": 2,
         "started_at": "2026-09-10T13:43:03Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T13:43:03Z"
+        "updated_at": "2026-09-10T13:49:01Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -1050,7 +1284,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T13:43:03Z",
+      "updated": "2026-09-10T13:49:01Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T13:43:02Z",
         "round_idx": 1,
@@ -1060,9 +1294,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-09-10T13:43:03Z",
+  "updated": "2026-09-10T13:49:01Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:36.894817765+00:00",
@@ -1081,7 +1315,16 @@
       "node_id": "default",
       "round_idx": 1,
       "to": "plan"
+    },
+    {
+      "at": "2026-09-10T13:49:00.971965254+00:00",
+      "forced": false,
+      "from": "plan",
+      "generation": 3,
+      "node_id": "default",
+      "round_idx": 1,
+      "to": "implement"
     }
   ],
-  "workflow_revision": 26
+  "workflow_revision": 32
 }
