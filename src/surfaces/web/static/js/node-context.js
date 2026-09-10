@@ -112,6 +112,7 @@ async function confirmLocalNodeContextDiscard() {
 
 async function discardLocalNodeContextSurfaces() {
   if (typeof automationEditor !== "undefined") automationEditor?._close();
+  if (typeof automationHistory !== "undefined") automationHistory?._close();
   if (typeof _discardNewGoalForNodeSwitch === "function") _discardNewGoalForNodeSwitch();
   if (typeof _discardImportForNodeSwitch === "function") await _discardImportForNodeSwitch();
   if (typeof _targetAppDraftDirty !== "undefined") _targetAppDraftDirty = false;
@@ -138,6 +139,7 @@ function preserveExternalDirtySurfaces(dirty) {
 function closeCleanNodeContextModals() {
   const dirtyRoots = new Set(nodeContextDirtySurfaces().map((item) => item.root).filter(Boolean));
   if (typeof automationEditor !== "undefined" && automationEditor && !dirtyRoots.has(automationEditor)) automationEditor._close();
+  if (typeof automationHistory !== "undefined") automationHistory?._close();
   if (typeof _newGoalModalOpen !== "undefined" && _newGoalModalOpen
       && !dirtyRoots.has(document.querySelector("[data-testid='new-goal-modal']")?.closest(".modal-backdrop"))) {
     if (typeof _discardNewGoalForNodeSwitch === "function") _discardNewGoalForNodeSwitch();

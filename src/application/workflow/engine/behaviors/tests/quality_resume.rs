@@ -142,6 +142,80 @@ fn resume_with_persisted_correction_evidence_skips_the_agent_and_reruns_only_the
     );
 }
 
+#[test]
+fn empty_quality_and_governance_skills_pass_without_agents_and_retain_candidate_proof() {
+    use crate::application::events::FileEventService;
+    for mode in ["deleted", "disabled", "other-node"] {
+        let fixture = QualityResumeFixture::new(mode, None);
+        let service = FileEventService::with_runtime_root(
+            fixture.context().refine_dir(),
+            &fixture.runtime_root,
+        );
+        for id in ["default-quality", "default-governance"] {
+            let current = service.show_skill(id).unwrap();
+            if mode == "deleted" {
+                service
+                    .remove("skills", id, current["revision"].as_u64().unwrap())
+                    .unwrap();
+            } else {
+                let mut item = current["item"].clone();
+                if mode == "disabled" {
+                    item["enabled"] = json!(false);
+                } else {
+                    item["scope"] = json!({"node_id":"other-node"});
+                }
+                service
+                    .save(
+                        "skills",
+                        id,
+                        json!({"revision":current["revision"], "item":item, "trigger":current["trigger"]}),
+                    )
+                    .unwrap();
+            }
+        }
+        let mut context = fixture.context();
+        let outcome = WorkflowQuality.advance(&mut context).unwrap();
+        assert!(matches!(
+            outcome,
+            WorkflowAdvanceOutcome::Transition {
+                to: GoalStatus::Governance,
+                ..
+            }
+        ));
+        let detail = fixture.work_items.show_goal_detail("GOAL1").unwrap();
+        assert_eq!(detail["rounds"][0]["quality_state"], "passed");
+        assert_eq!(
+            detail["rounds"][0]["quality_details"]["quality_proof"]["checked_candidate_commit"],
+            fixture.candidate
+        );
+        assert!(
+            detail["rounds"][0]["quality_details"]["results"]
+                .as_array()
+                .unwrap()
+                .is_empty()
+        );
+        let evaluation = evaluate_workflow_governance(
+            &context,
+            fixture.worktree.to_str().unwrap(),
+            &fixture.worktree,
+            &json!({}),
+        )
+        .unwrap();
+        assert!(!evaluation.failed);
+        record_governance(&context, &evaluation).unwrap();
+        let detail = fixture.work_items.show_goal_detail("GOAL1").unwrap();
+        assert_eq!(detail["rounds"][0]["rule_state"], "passed");
+        assert!(
+            detail["rounds"][0]["governance_message"]
+                .as_str()
+                .unwrap()
+                .contains("without agent checks")
+        );
+        assert_eq!(service.invocations(0, 100).unwrap()["total"], 0);
+        assert_eq!(fixture.invocation_count(), 0);
+    }
+}
+
 struct QualityResumeFixture {
     temp_root: PathBuf,
     target_root: PathBuf,

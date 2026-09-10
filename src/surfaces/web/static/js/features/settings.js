@@ -100,7 +100,7 @@ async function loadSettingsSurfaceData() {
   }
   const needs = settingsSurfaceDataNeeds(surface, activeSlug);
   const [
-    s, diag, reps, dash, nodes, processes, releases, source,
+    s, diag, reps, dash, nodes, processes, source,
   ] = await Promise.all([
     needs.settings ? api("GET", "/api/settings") : Promise.resolve({}),
     needs.diagnostics ? api("GET", "/api/diagnostics") : Promise.resolve({}),
@@ -108,7 +108,6 @@ async function loadSettingsSurfaceData() {
     needs.dashboard ? api("GET", "/api/dashboard") : Promise.resolve({}),
     needs.nodes ? api("GET", "/api/nodes") : Promise.resolve({}),
     needs.processes ? api("GET", "/api/processes") : Promise.resolve({}),
-    needs.releases ? api("GET", "/api/system/releases") : Promise.resolve({}),
     needs.source
       ? api("GET", "/api/system/source", undefined, { recordError: false }).catch((error) => ({
           source_update: {
@@ -147,7 +146,6 @@ async function loadSettingsSurfaceData() {
     activeNodeId,
     activeNodeLabel,
     processes: processes || {},
-    releases: releases.releases || { operations: [] },
     source: source || {},
     cli: (settings.agent_cli || "claude").toLowerCase(),
     projectApps,
@@ -166,11 +164,9 @@ function settingsSurfaceDataNeeds(surface, slug) {
     dashboard: false,
     nodes: false,
     processes: false,
-    releases: false,
     source: false,
   };
-  if (slug === "releases") needs.releases = true;
-  else if (slug === "application") needs.nodes = true;
+  if (slug === "application") needs.nodes = true;
   else if (slug === "reporters") { needs.reporters = true; needs.nodes = true; }
   else if (slug === "target-app" || slug === "runtime") { needs.settings = true; needs.nodes = true; }
   else if (slug === "processes") { needs.processes = true; needs.source = true; }
@@ -210,7 +206,6 @@ function detachedSettingsSurfaceData(project = {}) {
       processes: [],
       target_app: { state: "unknown" },
     },
-    releases: { operations: [] },
     cli: "",
     projectApps,
     currentProject,
@@ -693,7 +688,6 @@ const SETTINGS_SURFACES = {
       { slug: "skills", label: "Skills" },
       { slug: "target-app", label: "Target App" },
       { slug: "runtime", label: "Runtime" },
-      { slug: "releases", label: "Refine (dev)" },
     ],
   },
 };
@@ -710,7 +704,7 @@ function isSettingsRoute(route = state.currentRoute) {
 }
 
 function normalizeSettingsTab(slug, surface = settingsSurfaceForRoute()) {
-  if (slug === "events") return "skills";
+  if (["events", "releases"].includes(slug)) return "skills";
   if (slug === "system") return "processes";
   if (slug === "agents") return "processes";
   if (surface === SETTINGS_SURFACES.settings && (slug === "application-config" || slug === "target-app-config")) {
@@ -888,9 +882,6 @@ function renderSettingsTabBody(surface, slug, data) {
     return renderSettingsNoProjectTab(surface.title);
   }
   if (surface === SETTINGS_SURFACES.settings) {
-    if (slug === "releases") {
-      return renderSettingsReleasesTab(data.releases);
-    }
     if (slug === "processes") {
       return renderProcessesTab(data.processes, data.source);
     }
@@ -976,8 +967,7 @@ function bindSettingsTabBody(surface, slug, data) {
     return;
   }
   if (surface === SETTINGS_SURFACES.settings) {
-    if (slug === "releases") bindSettingsReleasesTab(data.releases);
-    else if (slug === "processes") bindSettingsProcessesTab(data.source);
+    if (slug === "processes") bindSettingsProcessesTab(data.source);
     else if (slug === "reporters") bindSettingsReportersTab();
     else if (slug === "application") {
       bindSettingsApplicationTab(data.currentProject);

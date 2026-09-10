@@ -92,7 +92,7 @@ test("identical UI errors are persisted at most once per cooldown", () => {
 test("passive source-status reads opt out of Activity error recording", () => {
   const settings = fs.readFileSync(path.join(staticRoot, "features/settings.js"), "utf8");
   const releases = fs.readFileSync(
-    path.join(staticRoot, "features/settings_releases.js"),
+    path.join(staticRoot, "features/source_update.js"),
     "utf8",
   );
   assert.match(
@@ -101,6 +101,6 @@ test("passive source-status reads opt out of Activity error recording", () => {
   );
   assert.equal(
     (releases.match(/\{ cache: false, recordError: fetchRemote \}/g) || []).length,
-    2,
+    1,
   );
 });

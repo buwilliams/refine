@@ -3,6 +3,29 @@ use super::*;
 pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
     match command {
         Commands::System {
+            action:
+                SystemAction::FetchEmailGoals {
+                    runtime_root,
+                    target_root,
+                },
+        } => {
+            let result = crate::application::development_requests::fetch_email_goals(
+                &absolute_cli_path(runtime_root)?,
+                &absolute_cli_path(target_root)?,
+            )?;
+            print_json(&result);
+            if result["errors"]
+                .as_array()
+                .is_some_and(|errors| !errors.is_empty())
+            {
+                return Err(RefineError::Conflict(
+                    "Some email requests could not be imported; see errors in the fetch result"
+                        .into(),
+                ));
+            }
+            Ok(())
+        }
+        Commands::System {
             action: SystemAction::ApiGroups,
         } => {
             let groups: Vec<_> = API_GROUPS

@@ -66,7 +66,7 @@ use crate::surfaces::web_server::support::{
 fn releases_request_body_accepts_candidate_objects() -> bool {
     let source = fs::read_to_string(
         Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("src/surfaces/web/static/js/features/settings_releases.js"),
+            .join("src/surfaces/web/static/js/features/source_update.js"),
     )
     .unwrap();
     source.contains("{ candidate, confirmed: true }")

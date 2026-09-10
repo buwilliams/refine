@@ -1,0 +1,19 @@
+{
+  "id": "release",
+  "name": "Release",
+  "enabled": true,
+  "scope": {
+    "node_id": null
+  },
+  "prompt": "Carry out the release request in the request parameter for the selected project. Use system.project_root as the release repository, system.runtime_root for durable operation state, and system.refine_executable for Refine commands. Read docs/runbooks/semantic-release.md in the project before acting. Use the existing system release-plan, release-prepare, and release-publish capabilities; do not reimplement version selection, candidate integration, tagging, or publication. Always pass the explicit --repo-root and --runtime-root values. Preview the requested semantic increment and report the proposed version and relevant changes. Preparation creates a normal reviewable Goal; retain its operation ID and inspect real Goal and operation evidence. Use the daemon API for asynchronous preparation when useful. Publishing requires the user's explicit publication authorization and an approved preparation; pass --confirm only when that authorization is present. Preserve review and exact-candidate checks. Reuse existing operation IDs for retries and report actual remote tag, release URL, and deployment evidence. Never infer publication success merely from a successful command or local tag.",
+  "parameters": [
+    {
+      "name": "request",
+      "kind": "text",
+      "required": true
+    }
+  ],
+  "trigger": {
+    "source": "custom"
+  }
+}

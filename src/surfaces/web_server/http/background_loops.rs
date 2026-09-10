@@ -20,15 +20,7 @@ impl LocalHttpDaemon {
                     // even if workflow execution itself cannot be launched.
                     let workflow_error = ensure_worker_failure(&workers, WORKFLOW_RUNNER);
                     let cleanup_error = ensure_worker_failure(&workers, WORKTREE_CLEANUP_RUNNER);
-                    let development_request_error =
-                        match load_self_development_email_config(runtime_root) {
-                            Ok(Some(_)) => {
-                                ensure_worker_failure(&workers, DEVELOPMENT_REQUEST_RUNNER)
-                            }
-                            Ok(None) => None,
-                            Err(error) => Some(format!("self-development email contract: {error}")),
-                        };
-                    let failures = [workflow_error, cleanup_error, development_request_error]
+                    let failures = [workflow_error, cleanup_error]
                         .into_iter()
                         .flatten()
                         .collect::<Vec<_>>();

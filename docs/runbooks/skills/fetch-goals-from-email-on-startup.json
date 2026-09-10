@@ -1,0 +1,21 @@
+{
+  "id": "fetch-goals-from-email-on-startup",
+  "name": "Fetch Goals from Email on startup",
+  "enabled": true,
+  "scope": {
+    "node_id": "default"
+  },
+  "prompt": "Queue the Custom Skill `fetch-goals-from-email` once for this startup occurrence. Run system.refine_executable with arguments `skills trigger fetch-goals-from-email --request-id startup-email-<invocation_id>`, copying invocation_id exactly from this invocation's completion contract. Set REFINE_DAEMON_PORT to the daemon_port parameter for that command. Use safely quoted arguments. Report the queued invocation ID, then complete this startup Skill immediately. Do not wait for the child Skill: releasing this agent slot lets it run even when concurrency is limited to one. Reuse the same request ID if the command needs a retry; do not create a polling loop or fetch email directly. If the target Skill is missing or disabled, report that error without changing its configuration.",
+  "parameters": [
+    {
+      "name": "daemon_port",
+      "kind": "number",
+      "required": true,
+      "default": 8082
+    }
+  ],
+  "trigger": {
+    "source": "node.startup.ready",
+    "mode": "background"
+  }
+}

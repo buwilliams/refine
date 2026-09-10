@@ -8,7 +8,7 @@ fn file_settings_service_lists_defaults_and_persists_updates() {
     let service = FileSettingsService::new(&refine_dir);
 
     assert_eq!(service.load().unwrap()["agent_cli"], "claude");
-    assert_eq!(service.load().unwrap()["auto_approve"], "false");
+    assert!(!service.load().unwrap().contains_key("auto_approve"));
     assert_eq!(
         service.load().unwrap()["automatic_agent_resource_budget_percent"],
         "70"
@@ -603,7 +603,6 @@ fn runtime_settings_copy_is_real_validated_and_serialized_with_other_writers() {
         .update(&json!({
             "automatic_agent_resource_budget_percent": 45,
             "parallel_run_cap": 3,
-            "auto_approve": true,
             "target_app_url": "https://source.invalid"
         }))
         .unwrap();
@@ -646,7 +645,6 @@ fn runtime_settings_copy_is_real_validated_and_serialized_with_other_writers() {
     let destination = FileSettingsService::new(&refine_dir).load().unwrap();
     assert_eq!(destination["automatic_agent_resource_budget_percent"], "45");
     assert_eq!(destination["parallel_run_cap"], "3");
-    assert_eq!(destination["auto_approve"], "true");
     assert_eq!(destination["target_app_url"], "https://concurrent.invalid");
     assert_eq!(
         FileNodeRegistryService::new(&refine_dir)

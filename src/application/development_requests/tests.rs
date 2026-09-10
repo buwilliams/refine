@@ -1,9 +1,7 @@
 use super::*;
-use std::cell::Cell;
 
 struct FakeMail {
     raw: Option<Vec<u8>>,
-    notifications: Cell<usize>,
 }
 
 impl MailSource for FakeMail {
@@ -20,22 +18,12 @@ impl MailSource for FakeMail {
     fn mark_processed(&self, _email_id: &str) -> RefineResult<()> {
         Ok(())
     }
-
-    fn send_resolution(
-        &self,
-        _settings: &DevelopmentRequestSettings,
-        _record: &DevelopmentRequestRecord,
-    ) -> RefineResult<()> {
-        self.notifications.set(self.notifications.get() + 1);
-        Ok(())
-    }
 }
 
 fn settings() -> DevelopmentRequestSettings {
     DevelopmentRequestSettings {
         address: "goal@getrefine.dev".to_string(),
         allowed_senders: BTreeSet::from(["buddy@example.com".to_string()]),
-        auto_approve_after: Duration::ZERO,
     }
 }
 
@@ -90,7 +78,6 @@ fn local_contract_is_normalized_reread_and_bound_to_one_target() {
         .unwrap();
     assert_eq!(config.target_root, target_root.canonicalize().unwrap());
     assert_eq!(config.address, "goal@getrefine.dev");
-    assert_eq!(config.poll_seconds, 1);
     assert_eq!(
         config.allowed_senders,
         BTreeSet::from(["buddy@example.com".to_string()])
@@ -114,7 +101,7 @@ fn local_contract_is_normalized_reread_and_bound_to_one_target() {
         ])
     );
     let settings = DevelopmentRequestSettings::from_local_config(&updated);
-    assert_eq!(settings.auto_approve_after, Duration::from_secs(5));
+    assert_eq!(settings.allowed_senders, updated.allowed_senders);
     fs::remove_dir_all(root).unwrap();
 }
 
@@ -319,7 +306,6 @@ fn schema_one_received_is_upgraded_from_raw_mail_before_goal_authoring() {
             "--x\r\nContent-Type: text/plain\r\nContent-Disposition: attachment; filename=two.txt\r\n\r\nTwo.\r\n",
             "--x--\r\n"
         ).as_bytes().to_vec()),
-        notifications: Cell::new(0),
     };
     service
         .migrate_received_record(&mut record, &mail, &settings())
@@ -379,10 +365,7 @@ fn unavailable_schema_one_raw_mail_is_retryable_and_creates_no_goal() {
     );
     record.schema_version = 1;
     service.write_record(&record).unwrap();
-    let mail = FakeMail {
-        raw: None,
-        notifications: Cell::new(0),
-    };
+    let mail = FakeMail { raw: None };
     service.process_local_records(&mail, &settings()).unwrap();
     let retried = service
         .read_record(&service.record_path(&record.id))
@@ -432,7 +415,6 @@ fn interrupted_schema_one_migration_write_retains_retryable_legacy_record() {
             .as_bytes()
             .to_vec(),
         ),
-        notifications: Cell::new(0),
     };
     service.fail_next_record_write.set(true);
     service.process_local_records(&mail, &settings()).unwrap();
@@ -494,10 +476,7 @@ fn schema_one_received_links_an_existing_legacy_goal_without_raw_mail_or_rewrite
         .json_path;
     let goal_path = refine_dir.join(goal_path);
     let before = fs::read(&goal_path).unwrap();
-    let mail = FakeMail {
-        raw: None,
-        notifications: Cell::new(0),
-    };
+    let mail = FakeMail { raw: None };
     service
         .recover_or_create_goal(&mut record, &mail, &settings())
         .unwrap();
@@ -536,10 +515,7 @@ fn unsupported_record_is_unchanged_and_does_not_starve_later_valid_record() {
         "goal@getrefine.dev",
     );
     service.write_record(&valid).unwrap();
-    let mail = FakeMail {
-        raw: None,
-        notifications: Cell::new(0),
-    };
+    let mail = FakeMail { raw: None };
     service.process_local_records(&mail, &settings()).unwrap();
     assert_eq!(fs::read(&bad_path).unwrap(), bad_bytes);
     assert_eq!(
@@ -615,16 +591,31 @@ fn linked_and_terminal_schema_one_records_retry_without_duplication() {
     service.write_record(&terminal).unwrap();
     let terminal_path = service.record_path(&terminal.id);
     let terminal_before = fs::read(&terminal_path).unwrap();
-    let mail = FakeMail {
-        raw: None,
-        notifications: Cell::new(0),
-    };
+    let mail = FakeMail { raw: None };
     service.process_local_records(&mail, &settings()).unwrap();
     service.process_local_records(&mail, &settings()).unwrap();
     assert_eq!(work_items.list_goal_summaries().unwrap().len(), 1);
     assert_eq!(fs::read(terminal_path).unwrap(), terminal_before);
-    assert_eq!(mail.notifications.get(), 0);
     fs::remove_dir_all(root).unwrap();
 }
 
-mod review;
+#[test]
+fn one_shot_fetch_checks_target_before_secrets_or_records() {
+    let root = std::env::temp_dir().join(format!("refine-email-target-{}", uuid::Uuid::new_v4()));
+    let runtime = root.join("runtime");
+    let target = root.join("target");
+    let other = root.join("other");
+    fs::create_dir_all(&target).unwrap();
+    fs::create_dir_all(&other).unwrap();
+    write_config(&runtime, &target, &["buddy@example.com"]);
+    let error = fetch_email_goals(&runtime, &other).unwrap_err();
+    assert!(error.to_string().contains("different target app"));
+    assert!(!runtime.join("self-development-email").exists());
+    let config = load_self_development_email_config(&runtime)
+        .unwrap()
+        .unwrap();
+    let value = serde_json::to_value(config).unwrap();
+    assert!(value.get("poll_seconds").is_none());
+    assert!(value.get("auto_approve_after_seconds").is_none());
+    fs::remove_dir_all(root).unwrap();
+}

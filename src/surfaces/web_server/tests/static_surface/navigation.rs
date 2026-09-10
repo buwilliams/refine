@@ -91,8 +91,7 @@ fn static_main_nav_consolidates_context_and_controls() {
     let theme_css = fs::read_to_string(static_root.join("css/theme.css")).unwrap();
     let target_app = fs::read_to_string(static_root.join("js/target-app.js")).unwrap();
     let node_context = fs::read_to_string(static_root.join("js/node-context.js")).unwrap();
-    let releases =
-        fs::read_to_string(static_root.join("js/features/settings_releases.js")).unwrap();
+    let releases = fs::read_to_string(static_root.join("js/features/source_update.js")).unwrap();
 
     let menu_start = index
         .find(r#"<details class="nav-menu nav-context-menu" id="nav-context-menu">"#)

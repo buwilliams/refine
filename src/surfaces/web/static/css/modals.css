@@ -178,9 +178,9 @@
   flex-wrap: wrap;
 }
 .automation-modal .segmented-control button { font-weight: 550; }
-.automation-field-pair {
+.automation-fields {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(0, 1fr));
   gap: 16px;
 }
 .automation-section { margin: 20px 0; }
@@ -202,7 +202,7 @@
 [data-automation-scope] { width: auto; }
 
 @media (max-width: 600px) {
-  .automation-field-pair { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  .automation-fields { grid-template-columns: minmax(0, 1fr); gap: 0; }
 }
 
 .reporter-onboarding-modal {
@@ -580,3 +580,13 @@
     flex: 1 1 auto;
   }
 }
+
+.automation-trigger-help { margin: 0 0 12px; }
+
+.automation-instructions .settings-section { margin-top: 0; }
+.automation-instructions :is(.settings-markdown-preview, textarea) {
+  min-height: min(46dvh, 420px);
+}
+.automation-skill-settings > summary { cursor: pointer; margin-bottom: 16px; }
+
+.automation-pagination { display: flex; gap: 8px; margin-top: 16px; }

@@ -1,183 +1,92 @@
-# Operate the development-request email intake
+# Fetch Goals from Email with a Skill
 
-Use this runbook only for a local Refine installation that develops Refine
-itself. The example connects `~/projects/refine/run/8082` to the Fastmail
-address `goal@getrefine.dev` and pins intake to `~/projects/refine-next`.
-Fastmail is the durable queue: mail continues to arrive while Refine is stopped,
-and the daemon processes it after restart.
+Use the **Fetch Goals from Email** Custom Skill to import requests addressed to
+`goal@getrefine.dev` into the selected project's Backlog. Fastmail keeps mail
+queued while Refine is stopped. The Skill performs bounded fetches when invoked;
+there is no dedicated polling worker, automatic acceptance, or resolution reply.
 
-This is deliberately not a project setting. A production Refine installation
-without the port-local capability file does not launch an email worker, access
-Fastmail, or create an email-request ledger.
+## Configure the local connection
 
-## Preconditions
+Keep the existing Fastmail domain and address configuration. The mail token
+needs read/write access; fetching does not require submission access. Store it
+through the native secret API at
+`PUT /api/agents/secrets/email/fastmail_jmap_token` with a JSON `value` field.
+Never include the token in a Skill, command output, or synchronized state.
 
-- `getrefine.dev` is active as a Fastmail custom domain while Cloudflare remains
-  its authoritative DNS provider.
-- A test message reaches `goal@getrefine.dev` in Fastmail.
-- Refine is attached to the intended target repository.
-
-Do not enable Cloudflare Email Routing for this domain after its MX records
-point to Fastmail. Keep the existing website records in Cloudflare unchanged.
-
-## Finish the Fastmail address setup
-
-1. Confirm `goal@getrefine.dev` is an address or alias on the account and is
-   available as a sending identity.
-2. Under **Settings -> Privacy & Security -> Manage API tokens**, create a token
-   for Refine with mail read/write and submission access. Copy it once.
-
-No dedicated mailbox or Fastmail filing rule is required. Refine queries mail
-addressed to `goal@getrefine.dev` wherever Fastmail filed it, then accepts only
-senders present in the host-local allowlist.
-
-## Store the token locally
-
-With Refine running on port 8082, store the Fastmail token in the native Refine
-secret store. Substitute the token without putting it in shell history when
-that matters on the host:
-
-```bash
-curl --fail-with-body \
-  -X PUT http://127.0.0.1:8082/api/agents/secrets/email/fastmail_jmap_token \
-  -H 'content-type: application/json' \
-  --data '{"value":"PASTE_FASTMAIL_TOKEN"}'
-```
-
-The token must not be copied into project settings or committed files.
-
-## Install the local capability contract
-
-Create `~/projects/refine/run/8082/self-development-email.json` on the Refine
-host. The file belongs to the running Refine installation, not to its target
-repository, and must not be committed or synchronized:
+The host-local file `run/8082/self-development-email.json` remains the connection
+and authorization boundary. Existing files work unchanged; polling and approval
+fields are ignored. A minimal connection is:
 
 ```json
 {
   "schema_version": 1,
   "target_root": "/home/buddy/projects/refine-next",
   "address": "goal@getrefine.dev",
-  "allowed_senders": [
-    "person@example.com"
-  ],
-  "poll_seconds": 60,
-  "auto_approve_after_seconds": 0
+  "allowed_senders": ["person@example.com"]
 }
 ```
 
-The configured `target_root` must be absolute and resolvable. Refine compares
-its canonical path with the currently active target before it reads the token
-or contacts Fastmail. Switching this installation to any other target therefore
-leaves incoming mail queued at Fastmail.
+The canonical target must match before Refine accesses the token or the request
+ledger. Sender matching is case-insensitive. This local connection and its
+secret are not synchronized through refine-state.
 
-Sender matching is case-insensitive. `auto_approve_after_seconds` sets the delay
-for automatic approval, which also requires the worker node's
-saved `auto_approve` setting to be `true`. It defaults to `false` on new and
-existing installations, so email-linked Goals wait in Review for QA acceptance.
-Approval still uses Refine's candidate-integration and publication checks before
-moving the Goal to Done. Older capability files may still contain `agent_cli`;
-unknown fields are tolerated for compatibility, but that field is inactive and
-omitted when the configuration is serialized.
+## Install and run the Skills
 
-Edit `allowed_senders` in this file to change the list. The runner rereads and
-validates the complete file each polling cycle.
+Save [Fetch Goals from Email](skills/fetch-goals-from-email.json) through
+**Settings → Skills** or `refine skills save`, using the latest configuration
+revision. Choose the node that owns the mailbox connection. Open
+**Controls → Skills → Fetch Goals from Email** to run it in an agent tab.
 
-## Control Review acceptance
+The Skill uses the supported one-shot command:
 
-In the email worker's node, open **Node -> Runtime Config**, edit
-**Auto-approve**, and select **On** or **Off (manual acceptance)** using the
-normal autosave flow. This setting applies to email-request Goals processed by
-that node. It is also included when copying runtime settings from another node.
-The shared settings API accepts `PATCH /api/settings` with
-`{"auto_approve": true}` or `{"auto_approve": false}`. The CLI against the running
-daemon supports the same control:
-
-```bash
-refine config settings set --set auto_approve=false
-refine config settings show
+```sh
+refine system fetch-email-goals \
+  --runtime-root /home/buddy/projects/refine/run/8082 \
+  --target-root /home/buddy/projects/refine-next
 ```
 
-The worker rereads the saved setting at every automatic approval decision; no
-restart is needed. Missing values mean `false`. Invalid or unreadable settings
-keep Goals in Review and record a retry error in the local request ledger.
+Each call fetches at most 25 remote messages. Its JSON result includes
+`fetched_count`, `batch_limit`, `goal_ids`, and per-record `errors`. Errors cause
+a nonzero exit while retaining successful imports and retry evidence. The Skill
+may fetch further batches, up to ten per invocation, and reports remaining work.
 
-The first observed Review time is recorded even while Auto-approve is off.
-Turning it on also affects requests already waiting in Review: the worker
-approves only after `auto_approve_after_seconds` has elapsed from that recorded
-time. A zero delay permits approval at the next attempt. Turning it off prevents
-subsequent automatic approvals and leaves already completed Goals unchanged.
+For startup fetching, also install
+[Fetch Goals from Email on startup](skills/fetch-goals-from-email-on-startup.json)
+on that node. Set its daemon port parameter to the installation's port. Its
+**Node starts** trigger queues the Custom fetch Skill with an occurrence-specific
+request ID, then exits. It never waits for the child agent while holding an
+execution slot. Each Skill retains one trigger, and the fetch instructions remain
+in one place. Mail arriving later waits until the next manual run or startup.
 
-With Auto-approve off, use the Goal's **Approve →** action after QA testing, or
-create a follow-up Round describing the additional work. Manual acceptance uses
-the same verified Review approval path and remains available when Auto-approve
-is on. The resolution reply is sent after Done following either approval path,
-even if Auto-approve is off or its setting is unreadable.
+## Reliability and evidence
 
-## Processing contract
+Concurrent fetch calls serialize before remote acknowledgement and Goal
+creation. Each accepted message is durably recorded before it receives the
+processed keyword in Fastmail. At most one deterministic low-priority Goal is
+created, containing the sender, subject, decoded body, and named text attachments
+in MIME order. Images, binary bodies, and unnamed attachments are excluded.
+The sender remains the Reporter and normal default assignee behavior applies.
 
-For each accepted Fastmail message, Refine:
+Existing request records remain under
+`run/8082/self-development-email/requests/<request-id>/request.json`. Received
+schema-1 records still require their original raw message before source
+migration and authoring. Invalid records remain unchanged and are reported
+without blocking later valid records. Linked and terminal records are retained
+without modifying historical Goals or sending messages.
 
-1. queries mail addressed to the configured recipient and checks the local
-   sender allowlist;
-2. persists a retry record before marking the Fastmail message processed;
-3. deterministically assembles the authoritative source as `From`, `Subject`,
-   decoded body, and each named text attachment in MIME order, preserving each
-   attachment filename and ignoring unnamed, image, binary, and non-text bodies;
-4. atomically creates at most one deterministic, low-priority Goal with that
-   source as its sole initial Round, the sender as Reporter, and the normal
-   default assignee semantics; no reviewer rewrites accepted trusted source;
-5. lets the normal backlog and workflow automation run;
-6. retains the Goal in Review for manual acceptance by default, or automatically
-   approves it when the worker node's Auto-approve is on, the delay has elapsed,
-   and Governance integration evidence is verified; and
-7. sends a threaded resolution reply from `goal@getrefine.dev` after Done.
+Normal workflow behavior determines when imported Goals run. Review acceptance
+uses the ordinary manual approval and follow-up Round controls. The retired
+email-specific Auto-approve setting is ignored and cannot be configured.
 
-Request records live only below the installation runtime at
-`run/8082/self-development-email/requests/<request-id>/request.json`. A
-deterministic outbound Message-ID plus a Sent-mail lookup prevents a restart
-between send and local settlement from sending the same resolution twice.
+## Verify and disable
 
-Records use schema 2. On restart, a schema-1 `received` record is upgraded only
-by re-fetching its original `provider_email_id` and durably reconstructing the
-complete source before Goal authoring. If raw mail is unavailable, the schema-1
-record remains retryable and no body-only Goal is created. Schema-1 records
-already linked or terminal continue without rewriting historical Goal Rounds or
-evidence. Unsupported, malformed, and invalid records are left byte-for-byte
-unchanged and isolated so later valid records can continue.
+Run the Skill and confirm its agent output identifies the imported Goals or
+reports no new mail. Repeating a fetch must not duplicate a Goal. Restart Refine
+and inspect Skill execution history for one startup invocation and its queued
+Custom fetch invocation. Check real completion evidence, not just the queued
+receipt.
 
-The runner is owned by the local daemon. Stopping Refine stops polling, agent
-review, Goal creation, approval, and replies; Fastmail continues queuing mail.
-
-## Verify end to end
-
-1. Send a small request from one allowlisted address.
-2. Confirm a new `DR...` Goal appears in Backlog within the polling interval.
-3. Confirm the sole Round contains `From`, `Subject`, decoded body, and named
-   text-attachment filenames and contents; image, binary, non-text, and unnamed
-   attachment bodies must not appear.
-4. With Auto-approve off (the default), let the Goal reach Review and confirm it
-   stays there across polls. Use Approve after QA testing, or create a follow-up
-   Round when more work is needed. Confirm acceptance advances it to Done.
-5. Confirm the sender receives one threaded resolution reply.
-6. Stop Refine, send another request, wait longer than one polling interval,
-   and confirm no Goal appears until Refine is started again.
-7. For a request waiting in Review, turn Auto-approve on without restarting the
-   worker. Confirm it advances to Done only when the configured delay from its
-   first observed Review time has elapsed, then sends one resolution reply.
-   Restore Auto-approve to off when manual QA acceptance is required.
-
-If intake fails, inspect the request record's `last_error` and the daemon's
-`refine development requests:` log line. Common causes are a missing token, a
-sender absent from the allowlist, an unavailable raw message needed for schema-1
-migration, an unsupported/invalid record schema, or an API token without
-mail/submission access.
-
-## Disable or rotate
-
-Disable processing without changing Fastmail by removing or renaming
-`run/8082/self-development-email.json`. The worker exits after its next polling
-cycle and the daemon does not relaunch it while the file is absent.
-
-Queued Fastmail messages remain available. To rotate the token, create the new
-Fastmail token, overwrite `email/fastmail_jmap_token` through the same PUT
-route, verify one poll, then revoke the old token in Fastmail.
+Disable the startup Skill to stop automatic fetching. Disable the Custom Skill
+to remove manual availability. Removing the local connection prevents the fetch
+capability from accessing mail; queued messages and historical records remain.
+Rotate the token through the same secret API without copying it into Skills.

@@ -37,6 +37,8 @@ Current implementation details that matter to intent:
 - every blocking Governance Skill must pass for the collective gate to pass; invalid provider output remains an execution fault rather than a fabricated violation;
 - post-Quality integration takes the repository workflow lease before final target revalidation and retains it through any provable candidate refresh, replacement Quality and Governance, publication, integration, and evidence settlement. Governance always judges the exact candidate that the lease will integrate; a replacement commit invalidates and reruns the prior gates. The verdict itself runs between repository-lock holds under a no-output stall budget, and integration re-proves the exact target tip it will merge onto.
 
+When no enabled required Governance Skills apply to the current node, the step passes without agent checks. Durable evidence records that configuration, while candidate identity, Quality proof, integration, and publication checks retain their normal authority.
+
 ## Future Direction
 
 Future governance should become more active and contextual. Agents may classify risk, map changes to governance concerns, ask for approvals, propose safer plans, or explain why a change is outside project norms.

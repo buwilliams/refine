@@ -696,6 +696,7 @@ pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> 
         Commands::Commands => None,
         Commands::System { action } => match action {
             SystemAction::Doctor { target_root, .. } => target_root.as_ref(),
+            SystemAction::FetchEmailGoals { target_root, .. } => Some(target_root),
             SystemAction::ServiceInstall { .. }
             | SystemAction::Performance { .. }
             | SystemAction::Repair { .. }

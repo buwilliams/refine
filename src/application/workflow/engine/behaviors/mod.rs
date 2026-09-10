@@ -1954,11 +1954,15 @@ fn run_quality_correction_agent(ctx: &mut WorkflowContext<'_>) -> RefineResult<(
         json!({"agent_context": agent_context, "plans": plan, "implementation_report": implementation_report}),
         &format!("correct-{}", ctx.commit.as_deref().unwrap_or("")),
     )?;
-    let report = results
-        .iter()
-        .map(|r| format!("{}: {}", r.binding_id, r.summary))
-        .collect::<Vec<_>>()
-        .join("\n");
+    let report = if results.is_empty() {
+        "No required Quality Skills apply; passed without agent checks.".to_string()
+    } else {
+        results
+            .iter()
+            .map(|r| format!("{}: {}", r.binding_id, r.summary))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
     ctx.work_items.update_goal_round_evaluation_summary(
         &ctx.goal_id,
         ctx.round_idx,
@@ -1977,7 +1981,11 @@ fn run_quality_correction_agent(ctx: &mut WorkflowContext<'_>) -> RefineResult<(
     })?;
     ctx.log(
         "quality",
-        "Quality Agent completed candidate review and corrections",
+        if results.is_empty() {
+            "Quality passed without agent checks"
+        } else {
+            "Quality Agent completed candidate review and corrections"
+        },
         Some(json_object(json!({
             "candidate_commit": commit.commit,
             "report": report
@@ -2325,7 +2333,7 @@ fn evaluate_workflow_governance(
         recovery_analysis: (!failures.is_empty()).then_some(analysis),
         recovery_round_prompt: (!failures.is_empty()).then_some(recovery),
         details: json_object(
-            json!({"phase": "post_implementation", "configured": true, "skill_results": results, "failed_actions": actions, "worktree": worktree_path, "candidate_commit": ctx.commit}),
+            json!({"phase": "post_implementation", "configured": !results.is_empty(), "skill_results": results, "failed_actions": actions, "worktree": worktree_path, "candidate_commit": ctx.commit}),
         ),
     })
 }
@@ -2338,7 +2346,7 @@ fn record_governance(
         if evaluation.details["configured"].as_bool() == Some(true) {
             "Governance checks passed.".to_string()
         } else {
-            "No governance rules configured.".to_string()
+            "No required Governance Skills apply; passed without agent checks.".to_string()
         }
     });
     ctx.work_items.update_latest_goal_round_evaluation_summary(

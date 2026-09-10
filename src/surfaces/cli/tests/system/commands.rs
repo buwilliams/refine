@@ -238,3 +238,34 @@ fn system_ps_lists_and_stops_nested_agent_processes() {
 
     fs::remove_dir_all(temp_root).unwrap();
 }
+
+#[test]
+fn email_fetch_cli_requires_the_pinned_target_before_accessing_mail() {
+    let root = unique_temp_dir("cli-email-fetch");
+    let runtime = root.join("run/8082");
+    let target = root.join("target");
+    let other = root.join("other");
+    for path in [&runtime, &target, &other] {
+        fs::create_dir_all(path).unwrap();
+    }
+    fs::write(runtime.join("self-development-email.json"), serde_json::to_vec(&json!({
+        "schema_version":1,"target_root":target,"address":"goal@example.com","allowed_senders":["sender@example.com"]
+    })).unwrap()).unwrap();
+    let cli = Cli::try_parse_from([
+        "refine",
+        "system",
+        "fetch-email-goals",
+        "--runtime-root",
+        runtime.to_str().unwrap(),
+        "--target-root",
+        other.to_str().unwrap(),
+    ])
+    .unwrap();
+    let error = dispatch(cli).unwrap_err();
+    assert!(
+        error.to_string().contains("different target app"),
+        "{error}"
+    );
+    assert!(!runtime.join("self-development-email").exists());
+    fs::remove_dir_all(root).unwrap();
+}

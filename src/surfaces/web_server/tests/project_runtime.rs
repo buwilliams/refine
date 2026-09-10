@@ -493,7 +493,7 @@ fn web_server_reports_project_registry_and_updates_settings() {
     });
     assert_eq!(settings.status, 200);
     assert_eq!(settings.body["settings"]["agent_cli"], "claude");
-    assert_eq!(settings.body["settings"]["auto_approve"], "false");
+    assert!(settings.body["settings"].get("auto_approve").is_none());
     assert_eq!(settings.body["runtime"]["paused"], false);
 
     let updated = server.handle(ApiRequest {
@@ -502,14 +502,13 @@ fn web_server_reports_project_registry_and_updates_settings() {
         body: Some(json!({
             "agent_cli": "smoke-ai",
             "parallel_run_cap": 3,
-            "auto_approve": true,
             "paused": true
         })),
     });
     assert_eq!(updated.status, 200);
     assert_eq!(updated.body["settings"]["agent_cli"], "smoke-ai");
     assert_eq!(updated.body["settings"]["parallel_run_cap"], "3");
-    assert_eq!(updated.body["settings"]["auto_approve"], "true");
+    assert!(updated.body["settings"].get("auto_approve").is_none());
     let invalid = server.handle(ApiRequest {
         method: "PATCH".to_string(),
         path: "/api/settings".to_string(),
@@ -521,7 +520,7 @@ fn web_server_reports_project_registry_and_updates_settings() {
         path: "/api/settings".to_string(),
         body: None,
     });
-    assert_eq!(reloaded.body["settings"]["auto_approve"], "true");
+    assert!(reloaded.body["settings"].get("auto_approve").is_none());
     assert!(updated.body["settings"].get("paused").is_none());
     assert_eq!(updated.body["runtime"]["paused"], true);
     assert_eq!(updated.body["runtime"]["workflow_paused"], true);

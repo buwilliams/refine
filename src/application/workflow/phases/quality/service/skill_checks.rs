@@ -29,6 +29,41 @@ impl FileQualityService {
                 .map_err(|e| RefineError::Serialization(e.to_string()))?,
             None => (*events.config()?).clone(),
         };
+        let required = config
+            .events
+            .values()
+            .filter(|event| {
+                event.enabled
+                    && event.source.as_deref() == Some("workflow.quality.enter")
+                    && event.scope.applies(&request.node_id)
+            })
+            .any(|event| {
+                config
+                    .bindings(event, &request.node_id)
+                    .iter()
+                    .any(|(binding, _)| binding.mode == BindingMode::Blocking)
+            });
+        if !required {
+            verify_candidate(
+                &root,
+                &request.candidate_commit,
+                "after optional Quality gate",
+            )?;
+            self.ensure_operation_active(&request, "optional Quality settlement")?;
+            return Ok(QualityCheckResult {
+                owner_id: request.owner_id,
+                ok: true,
+                summary: "No required Quality Skills apply; passed without agent checks.".into(),
+                results: Vec::new(),
+                diagnostics: vec![format!(
+                    "Skill configuration revision {} has no enabled required Quality Skills for node {}.",
+                    config.revision, request.node_id
+                )],
+                candidate_commit: request.candidate_commit,
+                checked_at: None,
+                provider_attempts: Vec::new(),
+            });
+        }
         let mut skills = Vec::<SkillResult>::new();
         let mut invocation_evidence = Vec::new();
         // A valid failed corrective verdict is evidence, not an invitation to ask again

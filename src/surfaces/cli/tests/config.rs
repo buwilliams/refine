@@ -2,8 +2,6 @@ use super::*;
 use crate::error::RefineError;
 use std::sync::{Mutex, OnceLock};
 
-mod auto_approve;
-
 static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
 #[test]

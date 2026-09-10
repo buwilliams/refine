@@ -1404,7 +1404,7 @@ test("every Node, Project, and legacy Settings tab renders and refreshes", { ski
       ["#/node/processes", '[data-testid="settings-pane-processes"].active'],
       ["#/node/target-app", '[data-testid="target-app-copy-node"]'],
       ["#/node/runtime", '[data-testid="runtime-recheck-auth"]'],
-      ["#/node/releases", '[data-testid="release-bump"]'],
+      ["#/node/releases", '[data-testid="settings-skills"]'],
       ["#/project/governance", '[data-testid="settings-skills"]'],
       ["#/settings/events", '[data-testid="settings-skills"]'],
       ["#/settings/skills", '[data-testid="settings-skills"]'],
@@ -1424,84 +1424,6 @@ test("every Node, Project, and legacy Settings tab renders and refreshes", { ski
   }
 });
 
-test("Refine dev source refreshes morph identical and changed status without replacement", { skip: SKIP }, async () => {
-  const app = await openApp();
-  try {
-    await assertScreenRenders(app, {
-      route: "#/node/releases",
-      marker: '[data-testid="source-promotion-readiness"]',
-    });
-    const result = await app.page.evaluate(async () => {
-      const source = {
-        clean: true,
-        fast_forward: true,
-        update_available: false,
-        active_work: [],
-        checkout_path: "/tmp/refine",
-        current_commit: "1111111111111111111111111111111111111111",
-        available_commit: "1111111111111111111111111111111111111111",
-        remote: "origin",
-        branch: "main",
-      };
-      applySourcePromotionStatus(source);
-      const root = document.getElementById("source-promotion-status");
-      const facts = root.querySelector(".source-promotion-facts");
-      const readiness = root.querySelector('[data-testid="source-promotion-readiness"]');
-      let identicalMutations = 0;
-      const observer = new MutationObserver((records) => {
-        identicalMutations += records.length;
-      });
-      observer.observe(root, {
-        childList: true,
-        characterData: true,
-        subtree: true,
-      });
-      applySourcePromotionStatus(source);
-      await Promise.resolve();
-      observer.disconnect();
-      const identicalFacts = facts === root.querySelector(".source-promotion-facts");
-      const identicalReadiness =
-        readiness === root.querySelector('[data-testid="source-promotion-readiness"]');
-
-      applySourcePromotionStatus({
-        ...source,
-        update_available: true,
-        available_commit: "2222222222222222222222222222222222222222",
-      });
-      return {
-        identicalFacts,
-        identicalReadiness,
-        identicalMutations,
-        changedFacts: facts === root.querySelector(".source-promotion-facts"),
-        changedReadiness:
-          readiness === root.querySelector('[data-testid="source-promotion-readiness"]'),
-        changedText: root.textContent,
-      };
-    });
-
-    assert.deepEqual(
-      {
-        identicalFacts: result.identicalFacts,
-        identicalReadiness: result.identicalReadiness,
-        identicalMutations: result.identicalMutations,
-        changedFacts: result.changedFacts,
-        changedReadiness: result.changedReadiness,
-      },
-      {
-        identicalFacts: true,
-        identicalReadiness: true,
-        identicalMutations: 0,
-        changedFacts: true,
-        changedReadiness: true,
-      },
-    );
-    assert.match(result.changedText, /222222222222/);
-    assert.match(result.changedText, /Ready to build, promote, and restart/);
-    assert.deepEqual(app.pageErrors, []);
-  } finally {
-    await app.close();
-  }
-});
 
 test("settings refresh never clears the Upgrade banner while its read is pending", { skip: SKIP }, async () => {
   const fixture = (pathname, request) => {
@@ -1825,18 +1747,28 @@ test("Skills use one trigger, shared modal controls and clickable rows with clon
     await page.goto(`${app.origin}/#/settings/events`);
     await page.locator('[data-testid="settings-skills"]').waitFor();
     assert.equal(new URL(page.url()).hash,"#/settings/skills");
-    assert.deepEqual(await page.locator('.settings-tab').allTextContents().then(labels=>labels.map(s=>s.trim())),["Processes","Application","Reporters","Skills","Target App","Runtime","Refine (dev)"]);
+    assert.deepEqual(await page.locator('.settings-tab').allTextContents().then(labels=>labels.map(s=>s.trim())),["Processes","Application","Reporters","Skills","Target App","Runtime"]);
     assert.equal(await page.locator('[data-testid="automation-table"] td:first-child button').count(),0);
     await page.locator('[data-automation-row]').focus(); await page.keyboard.press('Enter');
     const modal = page.locator('[data-testid="automation-modal"]');
+    await modal.waitFor();
+    assert.equal(await modal.locator('.modal-title').textContent(), 'Inspect release — Edit Skill');
+    assert.equal(await modal.locator('#automation-name').isVisible(), false);
+    assert.equal(await modal.locator('[data-prompt]').isVisible(), false);
+    assert.equal(await modal.locator('[data-settings-markdown-preview]').textContent().then(s => s.trim()), 'Inspect the release.');
+    await modal.locator('[data-settings-markdown-edit]').click();
+    await modal.locator('[data-prompt]').fill('## Release instructions\n\nVerify **all changes**.');
+    await modal.locator('[data-settings-markdown-edit]').click();
+    assert.equal(await modal.locator('[data-settings-markdown-preview] h2').textContent(), 'Release instructions');
+    assert.equal(await modal.locator('[data-settings-markdown-preview] strong').textContent(), 'all changes');
+    await modal.locator('[data-skill-settings] > summary').click();
     await modal.locator('#automation-name').waitFor();
     assert.equal(await modal.locator('[data-trigger-source]').count(),1);
     assert.equal(await modal.locator('[data-role], [data-add-binding], [data-overrides]').count(),0);
     assert.doesNotMatch(await modal.textContent(),/Result role|Override project assignment/);
     assert.equal(await modal.locator('[data-automatic-options]').isVisible(),false);
     await modal.locator('[data-trigger-source]').selectOption('workflow.quality.enter');
-    assert.equal(await modal.locator('[data-automatic-options]').getAttribute('open'),null);
-    await modal.locator('[data-automatic-options] > summary').click();
+    assert.equal(await modal.locator('[data-automatic-options]').isVisible(),true);
     await modal.locator('[data-mode] [data-choice="background"]').click();
     await modal.locator('[data-order]').fill('3');
     await modal.locator('[data-scope] [data-choice="node"]').click();
@@ -1846,12 +1778,12 @@ test("Skills use one trigger, shared modal controls and clickable rows with clon
     await parameter.locator('[data-kind]').selectOption('choice');
     await parameter.locator('[data-choices]').fill('stable, beta'); await parameter.locator('[data-choices]').press('Tab');
     await parameter.locator('[data-default]').selectOption('beta');
-    await modal.locator('[data-context-options] > summary').click();
     await modal.locator('[data-input-name="channel"]').fill('system.node_id');
     await modal.locator('#automation-name').focus();
     const style = await modal.locator('#automation-name').evaluate(input => {const s=getComputedStyle(input); return {height:s.height,weight:s.fontWeight,border:s.borderColor,outline:s.outlineColor};});
     assert.deepEqual(style,{height:'34px',weight:'400',border:style.border,outline:style.border});
     await modal.locator('[data-save]').click(); await modal.waitFor({state:'detached'});
+    assert.match(data.writes[0].item.prompt, /## Release instructions/);
     assert.equal(data.writes[0].trigger.source,'workflow.quality.enter');
     assert.equal(data.writes[0].trigger.mode,'background');
     assert.equal(data.writes[0].trigger.order,3);
@@ -1860,6 +1792,7 @@ test("Skills use one trigger, shared modal controls and clickable rows with clon
     assert.equal(data.records[0].item.parameters[0].default,'beta');
     await page.locator('[data-automation-row]').click();
     await modal.locator('[data-clone-skill]').click();
+    await modal.locator('[data-skill-settings] > summary').click();
     await modal.locator('#automation-name').waitFor();
     assert.equal(await modal.locator('#automation-name').inputValue(),'Inspect release copy');
     assert.equal(await modal.locator('[data-delete]').isVisible(),false);
@@ -1908,4 +1841,63 @@ test("Skill status toggles preserve the trigger, fence duplicate saves and refre
     assert.equal(data.writes.length,2);
     assert.deepEqual(app.pageErrors,[]);
   } finally {releaseWrite();await app.close();}
+});
+
+
+test("New Skill starts with instructions and reveals required settings before saving", {skip:SKIP}, async () => {
+  const data = skillFixture();
+  const app = await openApp({fixture:data.fixture});
+  try {
+    await app.page.goto(`${app.origin}/#/settings/skills`);
+    await app.page.locator('[data-automation-new]').click();
+    const modal = app.page.locator('[data-testid="automation-modal"]');
+    await modal.locator('[data-prompt]').waitFor();
+    assert.equal(await modal.locator('[data-prompt]').isVisible(), true);
+    assert.equal(await modal.locator('#automation-name').isVisible(), false);
+    await modal.locator('[data-prompt]').fill('## Check the release\n\nSummarize changes.');
+    await modal.locator('[data-save]').click();
+    assert.equal(data.writes.length, 0);
+    assert.equal(await modal.locator('#automation-name').isVisible(), true);
+    await modal.locator('#automation-name').fill('New release check');
+    await modal.locator('[data-save]').click();
+    await modal.waitFor({state:'detached'});
+    assert.equal(data.writes[0].item.name, 'New release check');
+    assert.match(data.writes[0].item.prompt, /## Check the release/);
+    assert.deepEqual(app.pageErrors, []);
+  } finally { await app.close(); }
+});
+
+
+test("Skill History opens once after refreshes and repeated clicks with spaced pagination", {skip:SKIP}, async () => {
+  const data = skillFixture(); let historyReads = 0;
+  const app = await openApp({fixture:async (pathname,request) => {
+    if (pathname === '/api/event-invocations') {
+      historyReads++;
+      await new Promise(resolve=>setTimeout(resolve,100));
+      return {items:[],offset:0,total:0};
+    }
+    return data.fixture(pathname,request);
+  }});
+  try {
+    const page = app.page;
+    await page.goto(`${app.origin}/#/settings/skills`);
+    await page.locator('[data-event-history]').waitFor();
+    assert.deepEqual(await page.locator('[data-testid="settings-skills"] > .actions > button').allTextContents(), ['History','New Skill']);
+    await page.evaluate(async () => {
+      await refreshSettings({force:true}); await refreshSettings({force:true});
+      const button=document.querySelector('[data-event-history]'); button.click(); button.click(); button.click();
+    });
+    const modal=page.locator('[data-testid="automation-modal"]');
+    await modal.waitFor();
+    assert.equal(historyReads,1); assert.equal(await modal.count(),1);
+    const bounds=await modal.evaluate(el=>({table:el.querySelector('table').getBoundingClientRect().bottom,previous:el.querySelector('[data-previous]').getBoundingClientRect().toJSON(),next:el.querySelector('[data-next]').getBoundingClientRect().toJSON()}));
+    assert.ok(bounds.previous.top-bounds.table>=12);
+    assert.ok(bounds.next.left-bounds.previous.right>=8);
+    await modal.locator('[data-save]').click();
+    await page.waitForFunction(()=>document.querySelectorAll('[data-testid="automation-modal"]').length===1);
+    assert.equal(historyReads,2);
+    await modal.locator('[data-close]').click();
+    assert.equal(await modal.count(),0);
+    assert.deepEqual(app.pageErrors,[]);
+  } finally { await app.close(); }
 });

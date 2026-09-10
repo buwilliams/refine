@@ -290,9 +290,9 @@ const GUIDE_CATEGORIES = [
     description: "Process management for this node.",
     items: [
       guideItem("release-workflow", "Semantic releases", "Educate and operate",
-        "Releases separates reviewable semantic preparation from explicitly confirmed external publication. Preview the version and gates, prepare and merge the candidate, then publish from synchronized main.",
+        "Use a Release Skill from Controls → Skills to preview a semantic version, prepare a reviewable Goal, and publish after approval through the existing release commands.",
         "Default: prepare first; publish only after review and merge.",
-        { hash: "#/settings/releases", selector: "[data-testid='release-planner']" },
+        { hash: "#/settings/skills", selector: "[data-automation-new]" },
         { canUseDefault: false }),
       guideItem("process-management", "Process management", "Educate",
         "Process management is the node's centralized list of Refine processes. It shows the target app, daemon, background workers, and current agents with live resource use and direct controls.",

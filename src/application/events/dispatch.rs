@@ -105,7 +105,7 @@ impl FileEventService {
             RefineError::InvalidInput("This Skill has no enabled Custom trigger".into())
         })?;
         let prompt = format!(
-            "Run this standalone Skill in the selected project. Follow its instructions and report what you did. This run is independent of Goal workflows; do not create or change a Goal unless the user explicitly asks.\n\nSkill: {}\n{}\n\nParameters:\n{}\n\nSystem context:\n{}",
+            "Run this standalone Skill in the selected project. Follow its instructions and report what you did. This run is independent of Goal workflows; create or change Goals only when the Skill instructions or the user request authorize it.\n\nSkill: {}\n{}\n\nParameters:\n{}\n\nSystem context:\n{}",
             pinned.skill.name,
             pinned.skill.prompt,
             json!(pinned.parameters),
@@ -322,7 +322,7 @@ impl FileEventService {
             round_idx,
             workflow_revision: None,
             candidate_commit,
-            data: json!({"goal": super::execution::goal_context(&goal), "system": {"node_id": node, "project_root": target_root, "workspace": cwd}}),
+            data: json!({"goal": super::execution::goal_context(&goal), "system": {"node_id": node, "project_root": target_root, "workspace": cwd, "runtime_root": runtime, "refine_executable": std::env::current_exe().ok(), "refine_checkout": crate::infrastructure::runtime::checkout::active_refine_paths().ok().map(|(_, checkout)| checkout)}}),
             metadata: Default::default(),
         })
     }

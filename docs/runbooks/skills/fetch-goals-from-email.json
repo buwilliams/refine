@@ -1,0 +1,13 @@
+{
+  "id": "fetch-goals-from-email",
+  "name": "Fetch Goals from Email",
+  "enabled": true,
+  "scope": {
+    "node_id": "default"
+  },
+  "prompt": "Fetch new email requests into the selected project's Backlog. This Skill authorizes creation of ordinary Goals from the configured mailbox. Use system.refine_executable to run `system fetch-email-goals --runtime-root <system.runtime_root> --target-root <system.project_root>`, passing each value as a separate, safely quoted argument. This one-shot capability owns secret access, the target-bound sender allowlist, MIME extraction, remote acknowledgement, deterministic Goal IDs, and durable retry records. Do not read or print the mail token, author duplicate Goals yourself, rewrite email source, or modify the request ledger. Inspect the JSON result and report the imported or recovered Goal IDs and any errors. A batch is limited to 25 remote messages; if fetched_count equals batch_limit, fetch another batch, up to ten batches per invocation, then report whether more mail may remain. Stop on a failed command and report the retained retry evidence. Fetching does not approve Goals, change Review decisions, or send email replies. Follow docs/runbooks/development-request-email.md for connection errors.",
+  "parameters": [],
+  "trigger": {
+    "source": "custom"
+  }
+}

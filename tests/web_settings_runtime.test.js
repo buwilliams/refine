@@ -43,42 +43,8 @@ function runtimeSettings() {
   return { context, control, requests, alerts };
 }
 
-test("Runtime Config renders Auto-approve off by default and reflects saved booleans", () => {
+test("Runtime omits the retired email approval setting", () => {
   const { context } = runtimeSettings();
-  for (const [settings, enabled] of [
-    [{}, false], [{ auto_approve: "false" }, false], [{ auto_approve: false }, false],
-    [{ auto_approve: "true" }, true], [{ auto_approve: true }, true],
-  ]) {
-    const html = context.renderNodeRuntimeConfigSections(settings, "Email worker", "claude");
-    assert.match(html, /Node: Email worker/);
-    assert.match(html, /data-testid="s-auto-approve-edit"/);
-    assert.match(html, /email-request Goals processed by this node/);
-    assert.match(html, /including requests already waiting in Review/);
-    assert.match(html, /first observed Review time/);
-    const select = html.match(/<select id="s-auto-approve"[^>]*>([\s\S]*?)<\/select>/)[1];
-    assert.match(select, new RegExp(`value="${enabled}" selected`));
-    assert.doesNotMatch(select, new RegExp(`value="${!enabled}" selected`));
-  }
-});
-
-test("Auto-approve uses the shared edit commit autosave and restores a rejected change", async () => {
-  const { context, control, requests, alerts } = runtimeSettings();
-  const flag = control("#s-auto-approve");
-  flag.value = "false";
-  context.bindNodeRuntimeConfigControls();
-  assert.equal(flag.dataset.settingsSavedValue, "false");
-  assert.equal(typeof flag.listeners["settings-editable-commit"], "function");
-  flag.value = "true";
-  await flag.listeners["settings-editable-commit"]();
-  assert.equal(requests[0].method, "PATCH");
-  assert.equal(requests[0].url, "/api/settings");
-  assert.equal(requests[0].body.auto_approve, "true");
-  assert.equal(flag.dataset.settingsSavedValue, "true");
-
-  context.failSave = true;
-  flag.value = "false";
-  await flag.listeners["settings-editable-commit"]();
-  assert.equal(requests[1].body.auto_approve, "false");
-  assert.equal(flag.value, "true");
-  assert.equal(alerts.length, 1);
+  const html = context.renderNodeRuntimeConfigSections({ auto_approve: "true" }, "Default", "claude");
+  assert.doesNotMatch(html, /s-auto-approve|email-request Goals/);
 });

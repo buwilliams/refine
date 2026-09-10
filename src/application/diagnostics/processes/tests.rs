@@ -139,7 +139,7 @@ fn process_summary_exposes_stable_background_workers_and_live_resources() {
         })
         .unwrap();
     supervisor
-        .set_background_worker_enabled("development-requests", false)
+        .set_background_worker_enabled("worktree-cleanup", false)
         .unwrap();
 
     let summary = FileProcessStatusService::new(&runtime_root)
@@ -163,15 +163,15 @@ fn process_summary_exposes_stable_background_workers_and_live_resources() {
         workflow["management_actions"],
         json!(["start_background_worker", "pause_workflow"])
     );
-    let development_requests = workers
+    let cleanup = workers
         .iter()
-        .find(|worker| worker["worker_kind"] == "development-requests")
+        .find(|worker| worker["worker_kind"] == "worktree-cleanup")
         .unwrap();
-    assert_eq!(development_requests["status"], "stopped");
-    assert_eq!(development_requests["disabled"], true);
+    assert_eq!(cleanup["status"], "stopped");
+    assert_eq!(cleanup["disabled"], true);
     assert_eq!(
         summary["disabled_background_workers"],
-        json!(["development-requests"])
+        json!(["worktree-cleanup"])
     );
 
     std::fs::remove_dir_all(runtime_root).unwrap();

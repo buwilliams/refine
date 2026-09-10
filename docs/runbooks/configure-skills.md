@@ -2,7 +2,7 @@
 
 Use **Controls → Settings → Skills** to configure repeatable agent work. Each Skill has one trigger, plain-text instructions, an enabled state, project or node scope, and optional typed inputs. Choose **Custom** for a manually runnable action, or a workflow or lifecycle point for automatic work. Events remain internal; there is no separate Events editor or CLI group.
 
-Refine supplies Plan, Implement, Quality, and Governance Skills at their respective Enter triggers. Refine determines the expected result from the trigger. Each of those automated workflow phases requires an enabled required Skill. The default Plan Skill chooses its own planning method.
+Refine supplies Plan, Implement, Quality, and Governance Skills at their respective Enter triggers. Refine determines the expected result from the trigger. Plan and Implement require an enabled required Skill. Quality and Governance pass when no enabled required Skills apply, recording that no agent checks ran while retaining candidate and integration checks. The default Plan Skill chooses its own planning method.
 
 ## Discover and edit
 
@@ -12,7 +12,7 @@ refine skills list
 refine skills show default-quality
 ```
 
-In the browser, click a Skill row to edit it or use its Status toggle to enable or disable it directly. The editor has a single Trigger selector. Optional workflow settings and parameter context stay collapsed until needed. **Clone Skill** copies instructions and inputs into an independent new Skill; choose a different trigger for the copy.
+In the browser, click a Skill row to edit it or use its Status toggle to enable or disable it directly. The modal shows rendered instructions first; use the edit icon to change their Markdown. Open **Skill settings** below to change the name, trigger, scope, status, inputs, and workflow options. **Clone Skill** copies instructions and inputs into an independent new Skill; choose a different trigger for the copy.
 
 For CLI configuration, create a JSON file such as:
 
@@ -58,6 +58,12 @@ refine skills cancel INVOCATION_ID
 Reuse a request ID only to retry the same Skill request. Different parameters or node return a conflict. Interactive terminals prompt for missing required values; unattended calls return an error. Automatic missing inputs record an execution error.
 
 Headless invocation history retains selected configuration, inputs, results, process references, and invalid-response diagnostics. Web agent tabs retain managed session and process evidence. Quality retains supervised checks and exact candidate proof. Cancellation prevents later launches and rejects late completion of cancelled work.
+
+## Operational Skills
+
+The example files in [skills](skills/) provide **Release**, **Fetch Goals from Email**, and **Fetch Goals from Email on startup**. They are editable project configuration, not global defaults. Save each through `refine skills save ID --revision REVISION --file FILE`, reading the current revision before each save. The startup Skill queues the Custom fetch Skill with an occurrence-specific request ID and exits immediately; it must not wait for the child agent while holding an execution slot.
+
+System context supplies `project_root`, `workspace`, `node_id`, `runtime_root`, `refine_executable`, and, when discoverable, `refine_checkout`. Use these values to keep maintenance commands tied to the intended app and running installation.
 
 ## Migration and recovery
 

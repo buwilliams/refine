@@ -41,7 +41,7 @@ Current implementation details that matter to intent:
 - a valid failed verdict should trigger a separate read-only investigation that records an evidence-based cause, drafts a complete next-Round request, and returns the Goal to Todo; Quality and Governance share the configured five-Round automatic recovery budget, after which a remaining finding moves the Goal to Failed;
 - provider, parsing, harness, candidate-identity, authority, and infrastructure failures should fail visibly without creating or consuming an automatic recovery Round;
 - quality settings should be shared project context, not hidden UI state;
-- Quality success requires nonempty supervised evidence; missing blocking Quality Skills or check commands are configuration or contract errors.
+- With enabled required Quality Skills, success requires nonempty supervised evidence and missing check commands are contract errors. When none apply to the current node, Quality passes without agent checks and records that reason together with the exact candidate proof.
 
 `automation/config.json` holds the authoritative Event and Skill definitions. Goal Quality evaluates the isolated candidate before Governance. Migration archives existing Quality instructions and test policy, including deduplicated enabled legacy commands from every node. Previously enforced commands remain supervised until the imported default Quality Skill is deliberately edited or replaced. Legacy files remain migration evidence and do not regain configuration authority.
 

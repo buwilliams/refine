@@ -4,8 +4,7 @@ use super::*;
 fn static_runtime_settings_expose_state_sync_controls() {
     let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
     let runtime = fs::read_to_string(static_root.join("js/features/settings_runtime.js")).unwrap();
-    let releases =
-        fs::read_to_string(static_root.join("js/features/settings_releases.js")).unwrap();
+    let releases = fs::read_to_string(static_root.join("js/features/source_update.js")).unwrap();
 
     assert!(runtime.contains(r#"data-testid="runtime-state-sync-now""#));
     assert!(runtime.contains(r#"placeholder="Automatic""#));
@@ -43,24 +42,16 @@ fn static_runtime_settings_expose_state_sync_controls() {
             .contains(r##"worktree_cleanup_after_seconds: $("#s-worktree-cleanup-delay").value"##)
     );
     assert!(!runtime.contains(r#"data-testid="source-upgrade-section""#));
-    assert!(releases.contains(r#"data-testid="source-upgrade-section""#));
-    assert!(releases.contains("<h3>Update</h3>"));
-    assert!(!releases.contains("checkout has uncommitted changes"));
-    assert!(releases.contains(r#"data-testid="source-promotion-stash""#));
-    assert!(!releases.contains("Dogfood source"));
-    assert!(releases.contains(r#"data-testid="source-promotion-check""#));
-    assert!(releases.contains(r#"data-testid="source-promotion-promote""#));
+    assert!(!releases.contains("source-promotion-status"));
     assert!(releases.contains("/api/system/source/check"));
     assert!(releases.contains("/api/system/source/promote"));
-    assert!(releases.contains("Refine is restarting; reconnecting"));
 }
 
 #[test]
 fn static_main_nav_exposes_refine_source_update_affordance() {
     let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
     let index = fs::read_to_string(static_root.join("index.html")).unwrap();
-    let releases =
-        fs::read_to_string(static_root.join("js/features/settings_releases.js")).unwrap();
+    let releases = fs::read_to_string(static_root.join("js/features/source_update.js")).unwrap();
     let init = fs::read_to_string(static_root.join("js/init.js")).unwrap();
 
     assert!(index.contains(r#"data-testid="nav-source-update""#));
@@ -98,25 +89,11 @@ fn static_settings_replace_retired_editors_with_skills() {
 }
 
 #[test]
-fn static_releases_surface_separates_prepare_from_confirmed_publish() {
-    let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
-    let index = fs::read_to_string(static_root.join("index.html")).unwrap();
-    let settings = fs::read_to_string(static_root.join("js/features/settings.js")).unwrap();
-    let releases =
-        fs::read_to_string(static_root.join("js/features/settings_releases.js")).unwrap();
-
-    assert!(index.contains("settings_releases.js"));
-    let node_tabs = settings.split("const SETTINGS_SURFACES =").nth(1).unwrap();
-    assert!(
-        node_tabs.find("slug: \"runtime\"").unwrap()
-            < node_tabs.find("slug: \"releases\"").unwrap()
-    );
-    assert!(releases.contains(r#"data-testid="release-bump""#));
-    assert!(releases.contains(r#"data-testid="release-preview""#));
-    assert!(releases.contains(r#"data-testid="release-prepare""#));
-    assert!(releases.contains(r#"data-testid="release-publish""#));
-    assert!(releases.contains("explicit confirmation"));
-    assert!(releases.contains("/api/system/releases/prepare"));
-    assert!(releases.contains("/api/system/releases/publish"));
-    assert!(releases.contains("/retry"));
+fn static_settings_retire_the_development_tab() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
+    let settings = fs::read_to_string(root.join("js/features/settings.js")).unwrap();
+    let router = fs::read_to_string(root.join("js/router.js")).unwrap();
+    assert!(!settings.contains("Refine (dev)"));
+    assert!(!settings.contains("/api/system/releases"));
+    assert!(router.contains("\"events\", \"releases\""));
 }

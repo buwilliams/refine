@@ -33,18 +33,11 @@ target app. Cached reads never run Git fetch. Automatic refresh runs at most
 once per hour by default; duplicate manual clicks and clients share one
 supervised fetch.
 
-1. Use the enabled main-navigation refresh icon, or open **Node → Refine (dev)**
-   and find **Update** for the detailed status.
-2. In the detailed view, select **Check for source updates**. Confirm the checkout, current commit,
-   upstream remote/branch, and available commit.
-3. If the panel reports a blocker, resolve it without overwriting work and
-   check again.
-4. Select **Update Refine** once. This authorizes the installed maintenance
-   Agent; there is no confirmation dialog. A failed or interrupted operation
-   re-enables the control for a manual retry.
-5. Keep the page open or return to it later. The panel reconnects and polls the
-   durable operation state through the daemon restart.
-6. Require the final message `Latest source promoted and Refine is healthy`.
+1. Open **Controls** and use the source-update action to check the configured upstream.
+2. Resolve any reported blocker without overwriting work, then check again.
+3. Select **Update Refine** once to queue the installed maintenance Agent. A failed or interrupted operation permits a manual retry.
+4. Keep the page open or return later; the source control reconnects through restart. Detailed source and operation evidence remains available through `refine system source-status` and the shared source API.
+5. Require the final message `Latest source promoted and Refine is healthy`.
 
 ## CLI Parity
 

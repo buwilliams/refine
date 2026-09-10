@@ -669,8 +669,13 @@ impl FileEventService {
                 } else {
                     ""
                 };
+                let authority = if invocation.context.goal_id.is_some() {
+                    "Do not change Goal state, merge or push."
+                } else {
+                    "Perform only the actions authorized by the Skill instructions and inputs. Use supported Refine commands for Goal changes."
+                };
                 let prompt = format!(
-                    "{}\n{role_instructions}\n\nAttached Skills:\n{}\n\nParameters:\n{}\n\nPinned context:\n{}\n\nRefine completion contract (supplied by the system):\n{}\nReturn one JSON object matching this contract. Do not change Goal state, merge or push. Identity fields must be copied exactly. Use outcome failure for findings and error for execution faults. Supply actual evidence; do not fabricate a pass. {}",
+                    "{}\n{role_instructions}\n\nAttached Skills:\n{}\n\nParameters:\n{}\n\nPinned context:\n{}\n\nRefine completion contract (supplied by the system):\n{}\nReturn one JSON object matching this contract. {authority} Identity fields must be copied exactly. Use outcome failure for findings and error for execution faults. Supply actual evidence; do not fabricate a pass. {}",
                     pinned.skill.prompt,
                     contexts,
                     json!(pinned.parameters),

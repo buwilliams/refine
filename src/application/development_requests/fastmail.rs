@@ -4,10 +4,7 @@ use reqwest::blocking::Client;
 use serde::Deserialize;
 use serde_json::{Map, Value, json};
 
-use super::{
-    DevelopmentRequestRecord, DevelopmentRequestSettings, JMAP_SESSION_URL, MailSource,
-    PROCESSED_KEYWORD,
-};
+use super::{JMAP_SESSION_URL, MailSource, PROCESSED_KEYWORD};
 use crate::error::{RefineError, RefineResult};
 
 #[derive(Clone, Debug, Deserialize)]
@@ -102,25 +99,6 @@ impl FastmailClient {
             .ok_or_else(|| RefineError::Serialization(format!("Fastmail response omitted {name}")))
     }
 
-    fn mailbox_id_by_role(&self, role: &str) -> RefineResult<String> {
-        let response = self.call(
-            &["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
-            vec![json!(["Mailbox/get", {"accountId": self.account_id}, "mailboxes"])],
-        )?;
-        Self::method_result(&response, "Mailbox/get")?
-            .get("list")
-            .and_then(Value::as_array)
-            .and_then(|mailboxes| {
-                mailboxes
-                    .iter()
-                    .find(|mailbox| mailbox.get("role").and_then(Value::as_str) == Some(role))
-            })
-            .and_then(|mailbox| mailbox.get("id"))
-            .and_then(Value::as_str)
-            .map(str::to_string)
-            .ok_or_else(|| RefineError::NotFound(format!("Fastmail {role} mailbox was not found")))
-    }
-
     fn pending_email_ids(&self, address: &str) -> RefineResult<Vec<String>> {
         let response = self.call(
             &["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
@@ -190,118 +168,6 @@ impl FastmailClient {
             "mark email processed",
         )
     }
-
-    fn identity_id(&self, address: &str) -> RefineResult<String> {
-        let response = self.call(
-            &[
-                "urn:ietf:params:jmap:core",
-                "urn:ietf:params:jmap:mail",
-                "urn:ietf:params:jmap:submission",
-            ],
-            vec![json!(["Identity/get", {"accountId": self.account_id}, "identities"])],
-        )?;
-        Self::method_result(&response, "Identity/get")?
-            .get("list")
-            .and_then(Value::as_array)
-            .and_then(|identities| {
-                identities.iter().find(|identity| {
-                    identity
-                        .get("email")
-                        .and_then(Value::as_str)
-                        .is_some_and(|email| email.eq_ignore_ascii_case(address))
-                })
-            })
-            .and_then(|identity| identity.get("id"))
-            .and_then(Value::as_str)
-            .map(str::to_string)
-            .ok_or_else(|| {
-                RefineError::NotFound(format!("Fastmail identity {address} was not found"))
-            })
-    }
-
-    fn sent_contains_message_id(&self, sent_id: &str, message_id: &str) -> RefineResult<bool> {
-        let response = self.call(
-            &["urn:ietf:params:jmap:core", "urn:ietf:params:jmap:mail"],
-            vec![json!(["Email/query", {
-                "accountId": self.account_id,
-                "filter": {"inMailbox": sent_id, "header": ["Message-ID", message_id]},
-                "limit": 1
-            }, "sent-query"])],
-        )?;
-        Ok(Self::method_result(&response, "Email/query")?
-            .get("ids")
-            .and_then(Value::as_array)
-            .is_some_and(|ids| !ids.is_empty()))
-    }
-
-    fn send_resolution(
-        &self,
-        settings: &DevelopmentRequestSettings,
-        record: &DevelopmentRequestRecord,
-    ) -> RefineResult<()> {
-        let drafts_id = self.mailbox_id_by_role("drafts")?;
-        let sent_id = self.mailbox_id_by_role("sent")?;
-        if self
-            .sent_contains_message_id(&sent_id, &format!("<{}>", record.notification_message_id))?
-        {
-            return Ok(());
-        }
-        let identity_id = self.identity_id(&settings.address)?;
-        let subject = if record.subject.to_ascii_lowercase().starts_with("re:") {
-            record.subject.clone()
-        } else {
-            format!("Re: {}", record.subject)
-        };
-        let goal_id = record.goal_id.as_deref().unwrap_or("unknown");
-        let goal_name = record.goal_name.as_deref().unwrap_or("Development request");
-        let body = format!(
-            "Your development request has been resolved.\n\nGoal: {goal_name} ({goal_id})\n\nThis confirms the Refine Goal is done; it does not make a separate deployment claim.\n"
-        );
-        let mut draft = json!({
-            "mailboxIds": {drafts_id.clone(): true},
-            "keywords": {"$draft": true, "$seen": true},
-            "from": [{"email": settings.address}],
-            "to": [{"email": record.sender}],
-            "subject": subject,
-            "textBody": [{"partId": "body", "type": "text/plain"}],
-            "bodyValues": {"body": {"value": body, "isTruncated": false}},
-            "header:Message-ID:asMessageIds": [record.notification_message_id]
-        });
-        if let Some(message_id) = record.message_id.as_ref().filter(|value| !value.is_empty()) {
-            draft["header:In-Reply-To:asMessageIds"] = json!([message_id]);
-            draft["header:References:asMessageIds"] = json!([message_id]);
-        }
-        let response = self.call(
-            &[
-                "urn:ietf:params:jmap:core",
-                "urn:ietf:params:jmap:mail",
-                "urn:ietf:params:jmap:submission",
-            ],
-            vec![
-                json!(["Email/set", {
-                    "accountId": self.account_id,
-                    "create": {"draft": draft}
-                }, "draft"]),
-                json!(["EmailSubmission/set", {
-                    "accountId": self.account_id,
-                    "create": {"submission": {"emailId": "#draft", "identityId": identity_id}},
-                    "onSuccessUpdateEmail": {"#submission": {
-                        format!("mailboxIds/{drafts_id}"): null,
-                        format!("mailboxIds/{sent_id}"): true,
-                        "keywords/$draft": null
-                    }}
-                }, "submit"]),
-            ],
-        )?;
-        ensure_set_succeeded(
-            Self::method_result(&response, "Email/set")?,
-            "create resolution email",
-        )?;
-        ensure_set_succeeded(
-            Self::method_result(&response, "EmailSubmission/set")?,
-            "submit resolution email",
-        )
-    }
 }
 
 impl MailSource for FastmailClient {
@@ -315,14 +181,6 @@ impl MailSource for FastmailClient {
 
     fn mark_processed(&self, email_id: &str) -> RefineResult<()> {
         Self::mark_processed(self, email_id)
-    }
-
-    fn send_resolution(
-        &self,
-        settings: &DevelopmentRequestSettings,
-        record: &DevelopmentRequestRecord,
-    ) -> RefineResult<()> {
-        Self::send_resolution(self, settings, record)
     }
 }
 

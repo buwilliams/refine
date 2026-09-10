@@ -15,17 +15,11 @@ confirmation.
 
 ## Prepare
 
-1. Open **Node > Refine (dev)**.
-2. Select major, minor, or patch and choose **Preview**.
-3. Review the current/proposed versions, previous tag, commits, breaking-change
-   findings, affected files, and deterministic gates.
-4. Choose **Prepare release**. Refine creates and queues a normal visible Goal
-   whose prompt contains the trusted release plan.
-5. Follow the linked Goal's real workflow state and agent logs. Its worktree is
-   managed by the normal Goal workflow under `.git/refine-worktrees`.
-6. Review and approve the Goal normally. Governance integrates the exact
-   preparation candidate before Review; approval accepts that integration and
-   does not perform another merge. Preparation never tags or publishes.
+1. Configure the [Release Skill](skills/release.json) in **Settings → Skills**.
+2. Open **Controls → Skills → Release** and enter the requested version change or operation.
+3. The Skill uses the shared release commands to preview the version, commits, affected files, and gates. Ask it to prepare the release when ready.
+4. Preparation creates a normal Goal with a managed worktree, visible workflow state, and agent logs.
+5. Review and approve that Goal normally. Governance integrates the exact candidate before Review; preparation never tags or publishes.
 
 The supported CLI acceptance command, after the Goal reaches Review, is:
 
@@ -49,9 +43,7 @@ cargo run --manifest-path xtask/Cargo.toml -- release-check
 
 ## Publish
 
-Return to **Refine (dev)** after the candidate is integrated, reviewed, and
-approved. Choose
-**Publish release…** and explicitly confirm. Refine rejects publication unless:
+After the candidate is integrated, reviewed, and approved, explicitly ask the Release Skill to publish the retained preparation ID. Refine rejects publication unless:
 
 - the current branch is the clean target branch recorded by the trusted
   preparation (normally `main`);
@@ -78,6 +70,4 @@ refine system release-publish --preparation-id <operation-id> --confirm --repo-r
 ```
 
 If preparation fails, retry its linked Goal without discarding review edits. If
-publication fails or is interrupted, use **Retry / resume**; Refine validates
-completed external stages and continues from the first missing stage. Every
-publish attempt asks for confirmation again.
+publication fails or is interrupted, ask the Skill to inspect the persisted operation and use `POST /api/system/releases/{operation_id}/retry` with `{"confirmed":true}` only after publication is authorized. Refine validates completed external stages and continues from the first missing stage.

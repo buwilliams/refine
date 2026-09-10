@@ -47,8 +47,7 @@ pub fn run(
             e.source.as_deref() == Some(&source) && e.enabled && e.scope.applies(&ctx.node_id)
         })
         .collect::<Vec<_>>();
-    let requires_role = edge == "enter"
-        && ["plan", "implement", "quality", "governance"].contains(&status.as_str());
+    let requires_role = edge == "enter" && ["plan", "implement"].contains(&status.as_str());
     if requires_role
         && !events.iter().any(|e| {
             config

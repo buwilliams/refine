@@ -37,15 +37,13 @@ use tokio::sync::{Notify, broadcast, oneshot};
 use tokio_stream::wrappers::ReceiverStream;
 
 use crate::application::agents::sessions::find_agent_session;
-#[cfg(not(test))]
-use crate::application::development_requests::load_self_development_email_config;
 use crate::application::persistence_sync::health::StateSyncHealth;
 use crate::application::projects::projection::ProjectionQuery;
+#[cfg(not(test))]
+use crate::application::workers::WORKFLOW_RUNNER;
 use crate::application::workers::{
     BackgroundWorkerEnsure, FileRunnerWorkerService, GIT_SYNC_RUNNER, WORKTREE_CLEANUP_RUNNER,
 };
-#[cfg(not(test))]
-use crate::application::workers::{DEVELOPMENT_REQUEST_RUNNER, WORKFLOW_RUNNER};
 #[cfg(test)]
 use crate::application::workflow::WorkflowEngine;
 use crate::application::workflow::phases::quality::QualityOperationRunner;

@@ -25,7 +25,6 @@ pub(super) fn default_settings() -> JsonObject {
         ("resource_isolation_mode", "process_group"),
         ("chat_idle_timeout_seconds", "300"),
         ("backlog_promote_after_seconds", "3600"),
-        ("auto_approve", "false"),
         ("worktree_cleanup_after_seconds", "0"),
         ("state_sync_debounce_seconds", "5"),
         ("state_sync_stale_threshold_seconds", "900"),
@@ -87,7 +86,6 @@ pub(super) fn allowed_settings() -> BTreeSet<&'static str> {
         "resource_isolation_mode",
         "chat_idle_timeout_seconds",
         "backlog_promote_after_seconds",
-        "auto_approve",
         "worktree_cleanup_after_seconds",
         "state_sync_debounce_seconds",
         "state_sync_stale_threshold_seconds",
@@ -163,7 +161,8 @@ pub(super) fn legacy_setting_key(key: &str) -> Option<&'static str> {
 pub(super) fn is_retired_development_request_setting(key: &str) -> bool {
     matches!(
         key,
-        "development_request_email_enabled"
+        "auto_approve"
+            | "development_request_email_enabled"
             | "development_request_address"
             | "development_request_mailbox"
             | "development_request_allowed_senders"
@@ -179,15 +178,6 @@ pub(super) fn is_retired_development_request_setting(key: &str) -> bool {
 
 pub(super) fn normalize_setting(key: &str, value: &Value) -> RefineResult<String> {
     match key {
-        "auto_approve" => match value {
-            Value::Bool(enabled) => Ok(enabled.to_string()),
-            Value::String(raw) if matches!(raw.trim(), "true" | "false") => {
-                Ok(raw.trim().to_string())
-            }
-            _ => Err(RefineError::InvalidInput(
-                "auto_approve must be true or false".to_string(),
-            )),
-        },
         "agent_cli" => {
             let raw = as_string(value);
             let choice = raw.trim();

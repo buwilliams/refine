@@ -2,6 +2,15 @@ use super::*;
 
 #[derive(Debug, Subcommand)]
 pub enum SystemAction {
+    /// Fetch one batch of email requests as Goals using the local email connection.
+    FetchEmailGoals {
+        /// Absolute port-scoped runtime directory containing the email connection and secret.
+        #[arg(long)]
+        runtime_root: PathBuf,
+        /// Target app pinned by the local email connection.
+        #[arg(long)]
+        target_root: PathBuf,
+    },
     /// Register and start Refine's port-scoped systemd or launchd service.
     ServiceInstall {
         /// Daemon port to configure for the service.
