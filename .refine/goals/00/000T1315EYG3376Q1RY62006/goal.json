@@ -598,6 +598,94 @@
           "source": "workflow.plan.enter",
           "state": "succeeded"
         },
+        "a84874e207a5022c3e58a83b4a4b2f3f0aad80ce4d2caa26c60683b491efdaf0": {
+          "candidate_commit": "036c0802c771a6cc5865a8bc4d669480e1a76c57",
+          "results": {
+            "default-quality": {
+              "artifacts": {
+                "tests": [
+                  {
+                    "command": "cargo test --locked --lib surfaces::cli::tests -- --test-threads=1",
+                    "evidence": "72 passed; 0 failed.",
+                    "status": "passed",
+                    "test": "CLI behavior and unrelated restrictions"
+                  },
+                  {
+                    "command": "cargo test --locked --lib application::development_requests::tests -- --test-threads=1",
+                    "evidence": "22 passed; 0 failed. Covers authorization, sender filtering, durable retries, deduplication and Backlog creation.",
+                    "status": "passed",
+                    "test": "Email intake and recovery"
+                  },
+                  {
+                    "command": "cargo test --locked --test cli_target_root -- --test-threads=1",
+                    "evidence": "4 passed; 0 failed. Configured target reaches secret lookup; mismatched target preserves fixture state. Paths contain spaces and apostrophes.",
+                    "status": "passed",
+                    "test": "Compiled production dispatch and authorization boundary"
+                  },
+                  {
+                    "command": "cargo build --release --locked --bin refine",
+                    "evidence": "Exit 0.",
+                    "status": "passed",
+                    "test": "Production release build"
+                  },
+                  {
+                    "command": "cargo test --release --locked --test cli_target_root -- --test-threads=1",
+                    "evidence": "4 passed; 0 failed.",
+                    "status": "passed",
+                    "test": "Release-binary dispatch regressions"
+                  },
+                  {
+                    "command": "target/debug/deps/refine-8328488576a1416d application::development_requests::email_source::tests --test-threads=1",
+                    "evidence": "2 passed; 0 failed.",
+                    "status": "passed",
+                    "test": "MIME body and attachment extraction"
+                  },
+                  {
+                    "command": "target/debug/deps/refine-8328488576a1416d application::development_requests::records::tests --test-threads=1",
+                    "evidence": "1 passed; 0 failed.",
+                    "status": "passed",
+                    "test": "Unsupported records retain original bytes"
+                  },
+                  {
+                    "command": "cargo fmt --all -- --check",
+                    "evidence": "Exit 0.",
+                    "status": "passed",
+                    "test": "Rust formatting"
+                  },
+                  {
+                    "command": "git diff --check 0b6cc819de716b1b118f40c4465d114290117699 036c0802c771a6cc5865a8bc4d669480e1a76c57",
+                    "evidence": "Exit 0; working-tree git diff --check also passed.",
+                    "status": "passed",
+                    "test": "Candidate whitespace"
+                  },
+                  {
+                    "command": "python3 -m json.tool docs/runbooks/skills/fetch-goals-from-email.json > /dev/null",
+                    "evidence": "Exit 0. Additional Python assertions verified argument structure, batch limits and immediate stop on failure.",
+                    "status": "passed",
+                    "test": "Skill configuration"
+                  }
+                ]
+              },
+              "binding_id": "default-quality",
+              "evidence": [
+                "Reviewed candidate 036c0802c771a6cc5865a8bc4d669480e1a76c57 against the finalized plan and relevant CLI/Skills intent. No findings or corrections; HEAD matches and the worktree remains clean.",
+                "Only FetchEmailGoals is exempted from the generic guard. Application-owned authorization runs before secret or ledger processing; unrelated restrictions remain effective.",
+                "Intake tests verify successful imports survive per-record failures, retry evidence persists, deterministic recovery prevents duplicates, and imported Goals remain ordinary Backlog items.",
+                "Source review confirms fetched_count is added and the CLI prints JSON before returning nonzero for per-record errors. Authenticated CLI success and partial-error output were not exercised.",
+                "Runbook and Skill preserve separate safely quoted arguments, 25-message batches, ten-batch maximum, immediate stop on failure, and no approval, Review changes or replies.",
+                "Retained implementation logs show both new routing tests failing against the original guard. Candidate debug and release regressions were independently rerun and passed.",
+                "Verification used isolated fixtures. No live mailbox, credentials, email source, request ledger or existing Goals were used. No deployment, daemon restart, Goal-state change, merge or push occurred.",
+                "Logs, review evidence and the completion report are retained in /tmp/refine-email-quality-a84874e2/."
+              ],
+              "invocation_id": "a84874e207a5022c3e58a83b4a4b2f3f0aad80ce4d2caa26c60683b491efdaf0",
+              "outcome": "success",
+              "role": "quality",
+              "summary": "Independent Quality review passed with no findings or changes. Focused tests, compiled CLI regressions, release build and required checks passed on the pinned candidate."
+            }
+          },
+          "source": "workflow.quality.enter",
+          "state": "succeeded"
+        },
         "e68b746327243dd2166ae8711a8c51c3025bd70741adc29ebef00ddcf4169c2b": {
           "candidate_commit": null,
           "results": {
@@ -841,13 +929,98 @@
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
       "prompt": "Fix the production CLI dispatch conflict that prevents the standalone Fetch Goals from Email Skill from importing requests into the selected project's Backlog.\n\nObserved failure:\nThe Skill prescribed this command, which was run from /home/buddy/projects/refine-next:\n'/home/buddy/projects/refine/bin/refine' system fetch-email-goals --runtime-root '/home/buddy/projects/refine/run/8082' --target-root '/home/buddy/projects/refine-next'\n\nIt exited with code 1:\ndirect --target-root CLI dispatch is not supported in normal operation; use the daemon API for target state mutations instead (/home/buddy/projects/refine-next)\n\nThe failure occurs before email fetching and before a JSON result is produced. No Goals were imported or recovered by that invocation. A read-only check found 34 existing request.json records retained under /home/buddy/projects/refine/run/8082/self-development-email/requests.\n\nDiagnosis:\nsrc/surfaces/cli/dispatch.rs applies a generic #[cfg(not(test))] explicit_target_root_path rejection before dispatch. That helper includes SystemAction::FetchEmailGoals, whose target_root is required. The existing handler in src/surfaces/cli/dispatch/system.rs is therefore unreachable in normal operation. The unit test email_fetch_cli_requires_the_pinned_target_before_accessing_mail in src/surfaces/cli/tests/system/commands.rs bypasses the production guard through cfg(test), allowing this regression to escape detection.\n\nRequested change:\nImplement a narrowly scoped dispatch correction that restores the documented one-shot capability while preserving the restrictions on other commands and the email capability's existing authorization and retry behavior. Keep docs/runbooks/development-request-email.md and docs/runbooks/skills/fetch-goals-from-email.json consistent with the supported command.\n\nAcceptance criteria:\n1. The documented system fetch-email-goals command, with separately and safely quoted runtime-root and target-root arguments, reaches the email-fetch capability in a production build.\n2. A mismatched configured target is rejected before secret or request-ledger access.\n3. Sender filtering, MIME extraction, deterministic Goal IDs, duplicate prevention, remote acknowledgement, and durable retries remain intact.\n4. Successful fetches return the documented JSON fields, including fetched_count, batch_limit, goal_ids, and errors. Per-record failures retain successful imports and retry evidence while returning a nonzero exit.\n5. Regression coverage executes the compiled CLI with production dispatch checks enabled and would fail on the current bug. Cover both reaching the fetch capability for the intended target and rejecting a mismatched target without secret or ledger access. Existing restrictions on unrelated commands remain effective.\n6. Fetching retains ordinary Backlog creation behavior without approving Goals, changing Review decisions, or sending replies. Preserve the Skill's 25-message batch limit, maximum ten batches, and stop-on-command-failure behavior.\n7. Run the focused CLI and development-request checks plus appropriate compiled-binary regression validation. Use isolated fixtures; preserve the live mailbox, token, raw email source, request ledger, and existing Goals.\n\nDeliver the scoped fix and validation evidence through the ordinary Goal/Round workflow.",
+      "quality_agent_report": "workflow.quality.enter:default-quality: Independent Quality review passed with no findings or changes. Focused tests, compiled CLI regressions, release build and required checks passed on the pinned candidate.",
+      "quality_candidate_commit": "036c0802c771a6cc5865a8bc4d669480e1a76c57",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
+      "quality_skill_results": [
+        {
+          "artifacts": {
+            "tests": [
+              {
+                "command": "cargo test --locked --lib surfaces::cli::tests -- --test-threads=1",
+                "evidence": "72 passed; 0 failed.",
+                "status": "passed",
+                "test": "CLI behavior and unrelated restrictions"
+              },
+              {
+                "command": "cargo test --locked --lib application::development_requests::tests -- --test-threads=1",
+                "evidence": "22 passed; 0 failed. Covers authorization, sender filtering, durable retries, deduplication and Backlog creation.",
+                "status": "passed",
+                "test": "Email intake and recovery"
+              },
+              {
+                "command": "cargo test --locked --test cli_target_root -- --test-threads=1",
+                "evidence": "4 passed; 0 failed. Configured target reaches secret lookup; mismatched target preserves fixture state. Paths contain spaces and apostrophes.",
+                "status": "passed",
+                "test": "Compiled production dispatch and authorization boundary"
+              },
+              {
+                "command": "cargo build --release --locked --bin refine",
+                "evidence": "Exit 0.",
+                "status": "passed",
+                "test": "Production release build"
+              },
+              {
+                "command": "cargo test --release --locked --test cli_target_root -- --test-threads=1",
+                "evidence": "4 passed; 0 failed.",
+                "status": "passed",
+                "test": "Release-binary dispatch regressions"
+              },
+              {
+                "command": "target/debug/deps/refine-8328488576a1416d application::development_requests::email_source::tests --test-threads=1",
+                "evidence": "2 passed; 0 failed.",
+                "status": "passed",
+                "test": "MIME body and attachment extraction"
+              },
+              {
+                "command": "target/debug/deps/refine-8328488576a1416d application::development_requests::records::tests --test-threads=1",
+                "evidence": "1 passed; 0 failed.",
+                "status": "passed",
+                "test": "Unsupported records retain original bytes"
+              },
+              {
+                "command": "cargo fmt --all -- --check",
+                "evidence": "Exit 0.",
+                "status": "passed",
+                "test": "Rust formatting"
+              },
+              {
+                "command": "git diff --check 0b6cc819de716b1b118f40c4465d114290117699 036c0802c771a6cc5865a8bc4d669480e1a76c57",
+                "evidence": "Exit 0; working-tree git diff --check also passed.",
+                "status": "passed",
+                "test": "Candidate whitespace"
+              },
+              {
+                "command": "python3 -m json.tool docs/runbooks/skills/fetch-goals-from-email.json > /dev/null",
+                "evidence": "Exit 0. Additional Python assertions verified argument structure, batch limits and immediate stop on failure.",
+                "status": "passed",
+                "test": "Skill configuration"
+              }
+            ]
+          },
+          "binding_id": "workflow.quality.enter:default-quality",
+          "evidence": [
+            "Reviewed candidate 036c0802c771a6cc5865a8bc4d669480e1a76c57 against the finalized plan and relevant CLI/Skills intent. No findings or corrections; HEAD matches and the worktree remains clean.",
+            "Only FetchEmailGoals is exempted from the generic guard. Application-owned authorization runs before secret or ledger processing; unrelated restrictions remain effective.",
+            "Intake tests verify successful imports survive per-record failures, retry evidence persists, deterministic recovery prevents duplicates, and imported Goals remain ordinary Backlog items.",
+            "Source review confirms fetched_count is added and the CLI prints JSON before returning nonzero for per-record errors. Authenticated CLI success and partial-error output were not exercised.",
+            "Runbook and Skill preserve separate safely quoted arguments, 25-message batches, ten-batch maximum, immediate stop on failure, and no approval, Review changes or replies.",
+            "Retained implementation logs show both new routing tests failing against the original guard. Candidate debug and release regressions were independently rerun and passed.",
+            "Verification used isolated fixtures. No live mailbox, credentials, email source, request ledger or existing Goals were used. No deployment, daemon restart, Goal-state change, merge or push occurred.",
+            "Logs, review evidence and the completion report are retained in /tmp/refine-email-quality-a84874e2/."
+          ],
+          "invocation_id": "a84874e207a5022c3e58a83b4a4b2f3f0aad80ce4d2caa26c60683b491efdaf0",
+          "outcome": "success",
+          "role": "quality",
+          "summary": "Independent Quality review passed with no findings or changes. Focused tests, compiled CLI regressions, release build and required checks passed on the pinned candidate."
+        }
+      ],
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T16:42:05Z",
+      "updated": "2026-09-10T16:46:49Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T16:28:06Z",
         "round_idx": 0,
@@ -859,7 +1032,7 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-10T16:42:05Z",
+  "updated": "2026-09-10T16:46:49Z",
   "workflow_events": [
     {
       "at": "2026-09-10T16:27:40.832459218+00:00",
@@ -907,5 +1080,5 @@
       "to": "quality"
     }
   ],
-  "workflow_revision": 25
+  "workflow_revision": 29
 }
