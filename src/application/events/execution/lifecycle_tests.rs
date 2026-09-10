@@ -6,6 +6,7 @@ use crate::infrastructure::storage::automation::{read_json, write_json};
 use std::fs;
 use std::path::PathBuf;
 mod support;
+mod terminal;
 use support::*;
 
 #[test]

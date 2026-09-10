@@ -47,17 +47,36 @@ pub enum LifecycleAuthority {
 }
 
 pub(super) fn applicable(event: &EventDefinition, context: &InvocationContext) -> bool {
-    event.kind == EventKind::System
-        && context.goal_id.is_some()
-        && matches!(
-            event.source.as_deref(),
-            Some(
-                "workflow.backlog.enter"
-                    | "workflow.backlog.exit"
-                    | "workflow.todo.enter"
-                    | "workflow.todo.exit"
-            )
-        )
+    if event.kind != EventKind::System || context.goal_id.is_none() {
+        return false;
+    }
+    match event.source.as_deref() {
+        Some(
+            "workflow.backlog.enter"
+            | "workflow.backlog.exit"
+            | "workflow.todo.enter"
+            | "workflow.todo.exit",
+        ) => true,
+        Some(
+            "workflow.failed.enter"
+            | "workflow.failed.exit"
+            | "workflow.cancelled.enter"
+            | "workflow.cancelled.exit",
+        ) => {
+            // Stopping before Plan does not create an implementation workspace.
+            // Its hooks have the same occurrence ownership as Backlog/Todo work.
+            // Existing implementation evidence must still use normal admission.
+            let goal = &context.data["goal"];
+            ["branch_name", "base_commit", "candidate_commit"]
+                .iter()
+                .all(|key| goal[key].is_null())
+                && goal["rounds"]
+                    .as_array()
+                    .and_then(|rounds| rounds.last())
+                    .is_none_or(|round| round["implementation_plan"]["state"].is_null())
+        }
+        _ => false,
+    }
 }
 
 fn unavailable(reason: &str) -> RefineError {
