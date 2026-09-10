@@ -1,0 +1,17 @@
+{
+  "completed_at": null,
+  "config_revision": 22,
+  "created_at": "2026-09-10T15:23:37.164059972+00:00",
+  "error": null,
+  "event": {
+    "id": "workflow.plan.enter",
+    "kind": "system",
+    "name": "Workflow Plan Enter",
+    "source": "workflow.plan.enter"
+  },
+  "goal_id": "DRCBAA3A2FC4ABDDCEC2B87473",
+  "id": "3fbb79ed186e5be223dccaf58a2145b5dfccc8a3a13cfaf3f9363390a24af896",
+  "node_id": "default",
+  "result_count": 0,
+  "state": "running"
+}
