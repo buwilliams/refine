@@ -1139,11 +1139,82 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "failed",
+  "results": {
+    "default-quality": {
+      "invocation_id": "2929b7e8ae050a027f664ec99a1106eacb10aa05e88563126424482ccc17adc4",
+      "binding_id": "default-quality",
+      "role": "quality",
+      "outcome": "failure",
+      "summary": "Reviewed the pinned candidate without changes. Found automatic-authority validation and recovery-provenance defects. Four browser logic tests, formatting and whitespace checks passed; proposed focused Rust regressions and supervised commands.",
+      "evidence": [
+        "Verified HEAD b3465d05ac29dd4c597d2971b84d82ed07377b77 in the supplied Round 2 worktree. Git status was clean before and after review. No files, Goal state or Git state were changed.",
+        "P1 — src/model/goal/audit_validation.rs:193-201 checks only that an automatic outcome's authority has the Skill variant. It does not validate invocation_id, binding_id, action or configuration, or require a matching submission. Consequently, an otherwise valid integrated outcome with empty authority identifiers, an empty action, null configuration and no submissions can pass validation and count as auto_integrated. The stronger checks at lines 92-105 apply only to submissions. Hydration invokes this validator at src/application/persistence_sync/state/audit_retention.rs:243-249. Validate automatic outcome authority and its causal submission before admitting synchronized or archived evidence.",
+        "P2 — src/application/work_items/service/outcome_history.rs:61-91 infers recovery authority from the current Round's existing source_round marker. A configured Skill retry in Round 1 follows src/application/events/success_actions.rs:74-83 without adding that marker, so its reopening is recorded as OperatorRecovery with manual intervention. Conversely, a human same-Round retry of a previously automatic successor inherits its old marker and is recorded as AutomaticRecovery with the earlier source Round. Lines 216-225 also mark every Failed settlement as requiring manual intervention and propagate that classification permanently. These paths conflict with the finalized plan and resolution-metrics intent, which distinguish automatic retries from required operator intervention.",
+        "Add behavioral regressions for a configured Skill retry of Failed Round 1 and an operator retry within an automatically created Round 2. Assert the actual reopening authority, source Round and intervention evidence. Add synchronization regressions rejecting automatic outcomes with empty, mismatched or missing authority/submission evidence while preserving valid automatic settlement round trips.",
+        "The two Rust findings are based on source inspection, not newly executed Rust reproductions. Rust suites, benchmarks and Chromium rendering were not run in this observational invocation. Earlier supplied results do not establish new verification here; their Chromium skips remain coverage gaps."
+      ],
+      "artifacts": {
+        "tests": [
+          {
+            "command": "node --test tests/web_dashboard_review_results.test.js tests/web_goal_review.test.js",
+            "evidence": "Exit 0: 4 passed, 0 failed, 0 skipped.",
+            "status": "passed",
+            "test": "Browser review receipts, transport retries and bulk result reporting"
+          },
+          {
+            "command": "git diff --check 7b430a6a3bc0d692f03e71da68d06f3e9534dead b3465d05ac29dd4c597d2971b84d82ed07377b77",
+            "evidence": "Exit 0; no whitespace findings.",
+            "status": "passed",
+            "test": "Pinned candidate whitespace"
+          },
+          {
+            "command": "set -o pipefail; git diff --name-only 7b430a6a3bc0d692f03e71da68d06f3e9534dead b3465d05ac29dd4c597d2971b84d82ed07377b77 -- '*.rs' | xargs -r rustfmt --check --edition 2024 --config skip_children=true",
+            "evidence": "Exit 0.",
+            "status": "passed",
+            "test": "Changed Rust file formatting"
+          },
+          {
+            "command": "cargo check --all-targets --locked",
+            "evidence": "Proposed for supervised evaluation; not executed during this observational invocation.",
+            "status": "not_run",
+            "test": "Candidate compilation"
+          },
+          {
+            "command": "cargo test --lib application::work_items -- --test-threads=1",
+            "evidence": "Proposed after adding recovery-authority regressions described below.",
+            "status": "not_run",
+            "test": "Durable decisions, recovery classification, retention and metrics"
+          },
+          {
+            "command": "cargo test --lib application::events -- --test-threads=1",
+            "evidence": "Proposed after adding a configured Skill retry regression.",
+            "status": "not_run",
+            "test": "Automatic retry provenance"
+          },
+          {
+            "command": "cargo test --lib application::persistence_sync -- --test-threads=1",
+            "evidence": "Proposed after adding malformed automatic-authority cases for merge, hydration and archives.",
+            "status": "not_run",
+            "test": "Reject automatic settlements lacking valid authority"
+          }
+        ]
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-quality",
+      "diagnostic": null,
+      "operation_id": "1a08be1aa02113c7642",
+      "process_id": "proc-1789053218040-1129590-668",
+      "raw_output": "{\n  \"artifacts\": {\n    \"tests\": [\n      {\n        \"command\": \"node --test tests/web_dashboard_review_results.test.js tests/web_goal_review.test.js\",\n        \"evidence\": \"Exit 0: 4 passed, 0 failed, 0 skipped.\",\n        \"status\": \"passed\",\n        \"test\": \"Browser review receipts, transport retries and bulk result reporting\"\n      },\n      {\n        \"command\": \"git diff --check 7b430a6a3bc0d692f03e71da68d06f3e9534dead b3465d05ac29dd4c597d2971b84d82ed07377b77\",\n        \"evidence\": \"Exit 0; no whitespace findings.\",\n        \"status\": \"passed\",\n        \"test\": \"Pinned candidate whitespace\"\n      },\n      {\n        \"command\": \"set -o pipefail; git diff --name-only 7b430a6a3bc0d692f03e71da68d06f3e9534dead b3465d05ac29dd4c597d2971b84d82ed07377b77 -- '*.rs' | xargs -r rustfmt --check --edition 2024 --config skip_children=true\",\n        \"evidence\": \"Exit 0.\",\n        \"status\": \"passed\",\n        \"test\": \"Changed Rust file formatting\"\n      },\n      {\n        \"command\": \"cargo check --all-targets --locked\",\n        \"evidence\": \"Proposed for supervised evaluation; not executed during this observational invocation.\",\n        \"status\": \"not_run\",\n        \"test\": \"Candidate compilation\"\n      },\n      {\n        \"command\": \"cargo test --lib application::work_items -- --test-threads=1\",\n        \"evidence\": \"Proposed after adding recovery-authority regressions described below.\",\n        \"status\": \"not_run\",\n        \"test\": \"Durable decisions, recovery classification, retention and metrics\"\n      },\n      {\n        \"command\": \"cargo test --lib application::events -- --test-threads=1\",\n        \"evidence\": \"Proposed after adding a configured Skill retry regression.\",\n        \"status\": \"not_run\",\n        \"test\": \"Automatic retry provenance\"\n      },\n      {\n        \"command\": \"cargo test --lib application::persistence_sync -- --test-threads=1\",\n        \"evidence\": \"Proposed after adding malformed automatic-authority cases for merge, hydration and archives.\",\n        \"status\": \"not_run\",\n        \"test\": \"Reject automatic settlements lacking valid authority\"\n      }\n    ]\n  },\n  \"binding_id\": \"default-quality\",\n  \"evidence\": [\n    \"Verified HEAD b3465d05ac29dd4c597d2971b84d82ed07377b77 in the supplied Round 2 worktree. Git status was clean before and after review. No files, Goal state or Git state were changed.\",\n    \"P1 — src/model/goal/audit_validation.rs:193-201 checks only that an automatic outcome's authority has the Skill variant. It does not validate invocation_id, binding_id, action or configuration, or require a matching submission. Consequently, an otherwise valid integrated outcome with empty authority identifiers, an empty action, null configuration and no submissions can pass validation and count as auto_integrated. The stronger checks at lines 92-105 apply only to submissions. Hydration invokes this validator at src/application/persistence_sync/state/audit_retention.rs:243-249. Validate automatic outcome authority and its causal submission before admitting synchronized or archived evidence.\",\n    \"P2 — src/application/work_items/service/outcome_history.rs:61-91 infers recovery authority from the current Round's existing source_round marker. A configured Skill retry in Round 1 follows src/application/events/success_actions.rs:74-83 without adding that marker, so its reopening is recorded as OperatorRecovery with manual intervention. Conversely, a human same-Round retry of a previously automatic successor inherits its old marker and is recorded as AutomaticRecovery with the earlier source Round. Lines 216-225 also mark every Failed settlement as requiring manual intervention and propagate that classification permanently. These paths conflict with the finalized plan and resolution-metrics intent, which distinguish automatic retries from required operator intervention.\",\n    \"Add behavioral regressions for a configured Skill retry of Failed Round 1 and an operator retry within an automatically created Round 2. Assert the actual reopening authority, source Round and intervention evidence. Add synchronization regressions rejecting automatic outcomes with empty, mismatched or missing authority/submission evidence while preserving valid automatic settlement round trips.\",\n    \"The two Rust findings are based on source inspection, not newly executed Rust reproductions. Rust suites, benchmarks and Chromium rendering were not run in this observational invocation. Earlier supplied results do not establish new verification here; their Chromium skips remain coverage gaps.\"\n  ],\n  \"invocation_id\": \"2929b7e8ae050a027f664ec99a1106eacb10aa05e88563126424482ccc17adc4\",\n  \"outcome\": \"failure\",\n  \"role\": \"quality\",\n  \"summary\": \"Reviewed the pinned candidate without changes. Found automatic-authority validation and recovery-provenance defects. Four browser logic tests, formatting and whitespace checks passed; proposed focused Rust regressions and supervised commands.\"\n}\n",
+      "workflow_revision": 18
+    }
+  ],
   "created_at": "2026-09-10T15:13:37.694289498+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-10T15:19:42.953149119+00:00",
   "error": null,
   "action_applied": false
 }

@@ -1797,9 +1797,46 @@
       "prompt": "Make human acceptance, rejection, cancellation, failure and recovery measurable from durable Goal history.\n\nThe request remains valid, but its description of every passed Quality/Governance gate reaching Done is outdated. Current Skills run checks, integration leads to Review, and approval is a separate decision. Passing a Skill, or having no required check Skills, must never be counted as human acceptance. Round 1 has substantial uncommitted work but no candidate or completed verification; reassess it against current lifecycle and Skill execution code.\n\nRecord immutable human decision events with a stable identity, Goal, Round, node, reviewer, decision time, accepted or rejected result, optional reason and exact candidate. Make rejection a supported outcome distinct from cancellation, with an explicit path to a new Round that retains the rejection. Record terminal outcomes with completion time, resolution type, failure category where applicable, manual intervention, total and recovery Rounds, and first-Round success. Keep integration facts separate from acceptance, and classify automatic completion only when its actual authority is recorded. Capture Skill failures and execution errors without mistaking every failed Skill attempt or automatic retry for final Goal failure.\n\nUse shared work-item operations for CLI, API, browser and bulk decisions. Persist decisions and status atomically, fence stale or duplicate requests, preserve exact-candidate approval requirements, and retain earlier outcomes when work reopens. Keep this history through synchronization, log pruning and supported deletion or archival. Preserve original decision and completion timestamps and attribution; report unknown legacy data instead of inventing it.\n\nProvide a shared query and CLI/API report over a date range, grouped by node, reporter or Feature, with time buckets, outcome counts, human accept rate, automatic resolution rate, first-Round success, average Rounds and failure rate. Define deduplication and denominators, expose missing-data coverage and use null for an empty denominator. Extend existing indexes and caches so routine queries do not scan every Round or run history.\n\nVerify acceptance, rejection, Skill failure followed by recovery, cancellation, reopen, duplicate and stale submissions, sync conflicts, retention and legacy records. Check known fixture totals, rates, date boundaries and query performance.\n\nThis is a recovery Round following the Skills review on 10 September 2026. Start from current main in a new managed Round worktree. Preserve Round 1, its plans, logs, branches, commits and uncommitted files; inspect and selectively reuse useful work instead of replaying the whole old attempt. Use the current Skills and docs/intent contracts, not archived Governance, Quality or Guidance configuration or the old fixed planning sequence. Refine owns workflow advancement and integration; human approval remains separate. Update only affected documentation and report focused verification with actual results.",
       "quality_agent_report": "workflow.quality.enter:default-quality: Reviewed the finalized plan and candidate, corrected decision-fencing, synchronization, archival-retention and browser-reporting defects, and passed focused verification. Chromium-dependent browser coverage remains skipped.",
       "quality_candidate_commit": "b3465d05ac29dd4c597d2971b84d82ed07377b77",
-      "quality_checked_at": null,
-      "quality_details": null,
-      "quality_message": null,
+      "quality_checked_at": "2026-09-10T15:19:43Z",
+      "quality_details": {
+        "candidate_commit": "b3465d05ac29dd4c597d2971b84d82ed07377b77",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRCBAA3A2FC4ABDDCEC2B87473-round-2",
+        "diagnostics": [
+          "Event invocation 2929b7e8ae050a027f664ec99a1106eacb10aa05e88563126424482ccc17adc4: automation/invocations/2929b7e8ae050a027f664ec99a1106eacb10aa05e88563126424482ccc17adc4.json"
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "1a08be1aa02113c7642",
+        "provider_attempts": [],
+        "quality_proof": {
+          "checked_at": "2026-09-10T15:19:43Z",
+          "checked_candidate_commit": "b3465d05ac29dd4c597d2971b84d82ed07377b77",
+          "evaluation_scope": "isolated_candidate",
+          "goal_id": "DRCBAA3A2FC4ABDDCEC2B87473",
+          "operation_id": "1a08be1aa02113c7642",
+          "results": [
+            {
+              "command": "",
+              "evidence": "Reviewed the pinned candidate without changes. Found automatic-authority validation and recovery-provenance defects. Four browser logic tests, formatting and whitespace checks passed; proposed focused Rust regressions and supervised commands.",
+              "status": "failed",
+              "test": "workflow.quality.enter:default-quality"
+            }
+          ],
+          "round_idx": 1,
+          "schema_version": 1,
+          "source_candidate_commit": "b3465d05ac29dd4c597d2971b84d82ed07377b77",
+          "state": "failed"
+        },
+        "results": [
+          {
+            "command": "",
+            "evidence": "Reviewed the pinned candidate without changes. Found automatic-authority validation and recovery-provenance defects. Four browser logic tests, formatting and whitespace checks passed; proposed focused Rust regressions and supervised commands.",
+            "status": "failed",
+            "test": "workflow.quality.enter:default-quality"
+          }
+        ],
+        "source_candidate_commit": "b3465d05ac29dd4c597d2971b84d82ed07377b77"
+      },
+      "quality_message": "Quality failed: “workflow.quality.enter:default-quality” — Reviewed the pinned candidate without changes. Found automatic-authority validation and recovery-provenance defects. Four browser logic tests, formatting and whitespace checks passed; propo….",
       "quality_skill_results": [
         {
           "artifacts": {
@@ -1921,10 +1958,10 @@
           "summary": "Reviewed the finalized plan and candidate, corrected decision-fencing, synchronization, archival-retention and browser-reporting defects, and passed focused verification. Chromium-dependent browser coverage remains skipped."
         }
       ],
-      "quality_state": null,
+      "quality_state": "failed",
       "reporter": "Buddy Williams",
       "rule_state": null,
-      "updated": "2026-09-10T15:13:36Z",
+      "updated": "2026-09-10T15:19:43Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T13:43:05Z",
         "round_idx": 1,
@@ -1965,7 +2002,7 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-10T15:13:36Z",
+  "updated": "2026-09-10T15:19:43Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:36.799534192+00:00",
@@ -2004,5 +2041,5 @@
       "to": "quality"
     }
   ],
-  "workflow_revision": 45
+  "workflow_revision": 46
 }
