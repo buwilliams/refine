@@ -93,7 +93,9 @@ for (const profile of ['agent', 'skill']) {
         navigator.clipboard.writeText = () => new Promise((_, reject) => { window.rejectCopy = reject; });
         document.execCommand = () => false;
       });
-      await page.keyboard.press('Control+c');
+      await page.keyboard.press('Control+Shift+c');
+      assert.equal(await page.evaluate(() => terminalStateFor().clipboard?.pending
+        && typeof window.rejectCopy === 'function'), true, 'fallback copy must be pending before history and exit');
       await page.evaluate(async () => {
         terminalPrependOutput('earlier context\r\n', terminalStateFor());
         terminalStateFor().eventSource.emit('terminal_exit', {});
@@ -131,7 +133,9 @@ test('overlapping attempts and late close, session and renderer results cannot o
           window.resolveCopy = resolve; window.rejectCopy = reject;
         });
       });
-      await page.keyboard.press('Control+c');
+      await page.keyboard.press('Control+Shift+c');
+      assert.equal(await page.evaluate(() => terminalStateFor().clipboard?.pending
+        && typeof window.rejectCopy === 'function'), true, `fallback copy must be pending before ${replacement}`);
       await page.evaluate(async replacement => {
         if (replacement === 'attempt') {
           navigator.clipboard.writeText = async () => {};
@@ -203,7 +207,9 @@ test('successful delayed copies stay with their originating tab and superseded s
     await page.evaluate(() => {
       navigator.clipboard.writeText = () => new Promise(resolve => { window.resolveCopy = resolve; });
     });
-    await page.keyboard.press('Control+c');
+    await page.keyboard.press('Control+Shift+c');
+    assert.equal(await page.evaluate(() => terminalStateFor().clipboard?.pending
+      && typeof window.resolveCopy === 'function'), true, 'fallback copy must be pending before switching tabs');
     await page.evaluate(async () => {
       await activateToolbarTab(clipboardTabs.b);
       terminalStateFor().term.focus();
@@ -214,7 +220,9 @@ test('successful delayed copies stay with their originating tab and superseded s
     assert.equal(await page.evaluate(() => document.activeElement === terminalStateFor().term.textarea), true);
     await page.evaluate(() => activateToolbarTab(clipboardTabs.a));
     await selectOutput(page);
-    await page.keyboard.press('Control+c');
+    await page.keyboard.press('Control+Shift+c');
+    assert.equal(await page.evaluate(() => terminalStateFor().clipboard?.pending
+      && typeof window.resolveCopy === 'function'), true, 'fallback copy must be pending before supersession');
     await page.evaluate(() => {
       navigator.clipboard.writeText = async () => { throw new Error('new attempt denied'); };
       document.execCommand = () => false;

@@ -9,28 +9,23 @@ test("every terminal profile installs the shared copy and paste behavior", async
     ["agent-one", "agent", "Agent"],
     ["worktree-one", "standalone", "Agent in Worktree"],
     ["goal-one", "goal", "Goal Agent"],
-    ["plan-one", "plan", "Planing Agent"],
-    ["skill-one", "skill", "Custom Skill"],
+    ["plan-one", "plan", "Planning Agent"],
+    ["skill-one", "skill", "Skill"],
   ];
 
   for (const [tabId, mode, label] of profiles) {
     assert.equal(browser.runtime.add(tabId, mode, label), true);
     browser.runtime.select(tabId, `selected-${mode}`);
     const copy = browser.runtime.key(tabId, { key: "c", ctrlKey: true });
-    assert.deepEqual({ ...copy }, {
-      acceptedByTerminal: false,
-      defaultPrevented: true,
-    });
-    browser.setRead(async () => `pasted-${mode}`);
+    assert.deepEqual({ ...copy }, { acceptedByTerminal: false, defaultPrevented: false });
+    assert.equal(browser.runtime.copyEvent(tabId).copied["text/plain"], `selected-${mode}`);
     const paste = browser.runtime.key(tabId, { key: "v", ctrlKey: true });
-    assert.deepEqual({ ...paste }, {
-      acceptedByTerminal: false,
-      defaultPrevented: true,
-    });
+    assert.deepEqual({ ...paste }, { acceptedByTerminal: false, defaultPrevented: false });
+    browser.runtime.pasteEvent(tabId, `pasted-${mode}`);
     await settleInput();
   }
 
-  assert.deepEqual(browser.writes, profiles.map(([, mode]) => `selected-${mode}`));
+  assert.deepEqual(browser.writes, []);
   assert.deepEqual(
     inputRequests(browser).map(({ path: requestPath, body }) => [requestPath, body.data]),
     profiles.map(([tabId, mode]) => [
@@ -67,8 +62,8 @@ test("Ctrl+Z cannot suspend Agent terminals and subsequent input remains usable"
     ["agent", "agent", "Agent"],
     ["worktree", "standalone", "Agent in Worktree"],
     ["goal", "goal", "Goal Agent"],
-    ["plan", "plan", "Planing Agent"],
-    ["skill", "skill", "Custom Skill"],
+    ["plan", "plan", "Planning Agent"],
+    ["skill", "skill", "Skill"],
   ];
 
   for (const [tabId, mode, label] of profiles) {
@@ -137,10 +132,10 @@ test("Ctrl+V uses terminal-native framing for single-line and multiline text", a
   const values = ["single line", "first\r\nsecond\nthird\tend"];
 
   for (const value of values) {
-    browser.setRead(async () => value);
     const result = browser.runtime.key("agent-a", { key: "v", ctrlKey: true });
     assert.equal(result.acceptedByTerminal, false);
-    assert.equal(result.defaultPrevented, true);
+    assert.equal(result.defaultPrevented, false);
+    browser.runtime.pasteEvent("agent-a", value);
     await settleInput();
   }
 
@@ -178,7 +173,7 @@ test("copy failures retain text for recovery while paste failures stay visible",
   unavailable.runtime.add("shell", "terminal", "Terminal");
   unavailable.runtime.select("shell", "selection");
   unavailable.unavailable("copy");
-  const copy = unavailable.runtime.key("shell", { key: "c", ctrlKey: true });
+  const copy = unavailable.runtime.key("shell", { key: "c", ctrlKey: true, shiftKey: true });
   assert.equal(copy.acceptedByTerminal, false);
   assert.equal(copy.defaultPrevented, true);
   assert.equal(unavailable.runtime.copied("shell").recovery, true);
@@ -186,9 +181,9 @@ test("copy failures retain text for recovery while paste failures stay visible",
   assert.match(unavailable.runtime.copied("shell").message, /Automatic copy was blocked/);
 
   unavailable.unavailable("paste");
-  const paste = unavailable.runtime.key("shell", { key: "v", ctrlKey: true });
+  const paste = unavailable.runtime.key("shell", { key: "v", ctrlKey: true, shiftKey: true });
   assert.equal(paste.acceptedByTerminal, false);
-  assert.equal(paste.defaultPrevented, false);
+  assert.equal(paste.defaultPrevented, true);
   assert.match(unavailable.runtime.error("shell"), /clipboard read access is unavailable/i);
   await settleInput();
   assert.deepEqual(inputRequests(unavailable), []);
@@ -197,13 +192,13 @@ test("copy failures retain text for recovery while paste failures stay visible",
   denied.runtime.add("terminal", "terminal", "Terminal");
   denied.runtime.select("terminal", "selection");
   denied.setWrite(async () => { throw new Error("clipboard write permission denied"); });
-  denied.runtime.key("terminal", { key: "c", metaKey: true });
+  denied.runtime.key("terminal", { key: "c", ctrlKey: true, shiftKey: true });
   await settleInput();
   assert.equal(denied.runtime.copied("terminal").recovery, true);
   assert.equal(denied.runtime.copied("terminal").text, "selection");
 
   denied.setRead(async () => { throw new Error("clipboard read permission denied"); });
-  denied.runtime.key("terminal", { key: "v", metaKey: true });
+  denied.runtime.key("terminal", { key: "v", ctrlKey: true, shiftKey: true });
   await settleInput();
   assert.match(denied.runtime.error("terminal"), /read permission denied/i);
   assert.match(denied.html(), /read permission denied/i);
@@ -215,7 +210,7 @@ test("an asynchronous paste cannot cross into a replacement managed session", as
   let resolveClipboard;
   browser.setRead(() => new Promise((resolve) => { resolveClipboard = resolve; }));
 
-  browser.runtime.key("agent", { key: "v", ctrlKey: true });
+  browser.runtime.key("agent", { key: "v", ctrlKey: true, shiftKey: true });
   browser.runtime.rotateSession("agent", "replacement-session");
   resolveClipboard("must not cross sessions");
   await settleInput();
@@ -229,7 +224,7 @@ test("clipboard text buffered before replacement cannot cross managed sessions",
   let resolveClipboard;
   browser.setRead(() => new Promise((resolve) => { resolveClipboard = resolve; }));
 
-  browser.runtime.key("agent", { key: "v", ctrlKey: true });
+  browser.runtime.key("agent", { key: "v", ctrlKey: true, shiftKey: true });
   resolveClipboard("buffered for the original session");
   await Promise.resolve();
   browser.runtime.rotateSession("agent", "replacement-session");
@@ -257,13 +252,16 @@ test("copy shortcuts and native Copy work after exit and macOS forces selection"
   for (const modifiers of [{ ctrlKey: true }, { ctrlKey: true, shiftKey: true }, { metaKey: true }]) {
     const result = browser.runtime.key("agent", { key: "c", ...modifiers });
     assert.equal(result.acceptedByTerminal, false);
-    assert.equal(result.defaultPrevented, true);
+    assert.equal(result.defaultPrevented, !!modifiers.shiftKey);
+    if (!modifiers.shiftKey) {
+      assert.equal(browser.runtime.copyEvent("agent").copied["text/plain"], "retained output");
+    }
     await settleInput();
     assert.equal(browser.runtime.copied("agent").message, "Selection copied.");
   }
   const native = browser.runtime.copyEvent("agent");
   assert.equal(native.copied["text/plain"], "retained output");
-  assert.deepEqual(browser.writes, Array(3).fill("retained output"));
+  assert.deepEqual(browser.writes, ["retained output"]);
   assert.deepEqual(inputRequests(browser), []);
 });
 
@@ -284,14 +282,65 @@ test("late and superseded clipboard results cannot replace current copy feedback
   let rejectFirst;
   browser.setWrite(() => new Promise((_, reject) => { rejectFirst = reject; }));
   browser.runtime.select("agent", "first selection");
-  browser.runtime.key("agent", { key: "c", ctrlKey: true });
+  browser.runtime.key("agent", { key: "c", ctrlKey: true, shiftKey: true });
   assert.equal(browser.runtime.copied("agent").message, "Copying selection…");
   browser.setWrite(async () => {});
   browser.runtime.select("agent", "second selection");
-  browser.runtime.key("agent", { key: "c", ctrlKey: true });
+  browser.runtime.key("agent", { key: "c", ctrlKey: true, shiftKey: true });
   await settleInput();
   rejectFirst(new Error("denied"));
   await settleInput();
   assert.equal(browser.runtime.copied("agent").text, "second selection");
   assert.equal(browser.runtime.copied("agent").message, "Selection copied.");
+});
+
+test("Cmd clipboard shortcuts yield to native browser events", async () => {
+  const browser = clipboardRuntime();
+  browser.runtime.add("mac", "skill", "Skill");
+  browser.runtime.select("mac", "selected λ🙂");
+  for (const key of ["c", "v"]) {
+    const result = browser.runtime.key("mac", { key, metaKey: true });
+    assert.deepEqual({ ...result }, { acceptedByTerminal: false, defaultPrevented: false });
+  }
+  assert.equal(browser.runtime.copyEvent("mac").copied["text/plain"], "selected λ🙂");
+  browser.runtime.pasteEvent("mac", "selected λ🙂");
+  await settleInput();
+  assert.deepEqual(browser.writes, []);
+  assert.equal(inputRequests(browser).length, 1);
+});
+
+test("terminal-specific fallback performs one operation and ignores key repeat", async () => {
+  const browser = clipboardRuntime();
+  browser.runtime.add("fallback", "agent", "Agent");
+  browser.runtime.select("fallback", "fallback text");
+  browser.setRead(async () => "fallback λ🙂\nsecond");
+  for (const key of ["c", "v"]) {
+    for (const repeat of [false, true]) {
+      const result = browser.runtime.key("fallback", { key, ctrlKey: true, shiftKey: true, repeat });
+      assert.deepEqual({ ...result }, { acceptedByTerminal: false, defaultPrevented: true });
+    }
+  }
+  await settleInput();
+  assert.deepEqual(browser.writes, ["fallback text"]);
+  assert.deepEqual(inputRequests(browser).map((input) => input.body.data), ["\x1b[200~fallback λ🙂\rsecond\x1b[201~"]);
+});
+
+test("pending read results and errors cannot affect an inactive terminal", async () => {
+  for (const change of ["tab", "focus", "exit", "session"]) {
+    for (const rejected of [false, true]) {
+      const browser = clipboardRuntime();
+      browser.runtime.add("pending", "agent", "Agent");
+      let finish;
+      browser.setRead(() => new Promise((resolve, reject) => { finish = rejected ? reject : resolve; }));
+      browser.runtime.key("pending", { key: "v", ctrlKey: true, shiftKey: true });
+      if (change === "tab") browser.runtime.add("different", "agent", "Other Agent");
+      if (change === "focus") browser.runtime.outsideKey("pending", { key: "ArrowLeft" });
+      if (change === "exit") browser.runtime.exited("pending");
+      if (change === "session") browser.runtime.rotateSession("pending", "different");
+      finish(rejected ? new Error("stale denial") : "stale text");
+      await settleInput();
+      assert.deepEqual(inputRequests(browser), []);
+      assert.equal(browser.runtime.error("pending"), "");
+    }
+  }
 });

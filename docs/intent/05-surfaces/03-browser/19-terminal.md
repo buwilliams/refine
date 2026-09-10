@@ -21,6 +21,11 @@ Current implementation details that matter to intent:
 
 - terminal is a toolbar tab;
 - backend routes create terminal sessions, send input, resize, stop, and stream events;
+- text copy and paste have the same browser contract across Terminal, Agent,
+  Planning Agent, Goal, Agent in Worktree, and Skill profiles, regardless of
+  provider. Native browser Copy/Paste menu actions and control-C/V (command-C/V
+  on macOS), plus Ctrl+Insert/Shift+Insert where supported by the browser, are
+  authoritative and do not require asynchronous clipboard access;
 - all Agent, Custom Skill, and shell terminal tabs expose a selection hint: Shift-drag on
   Windows/Linux and Option-drag on macOS select text even when the application
   captures mouse input; ordinary mouse gestures still reach the application;
@@ -43,8 +48,15 @@ Current implementation details that matter to intent:
   attached agent TUI, while ordinary shell terminals retain job control;
 - clipboard text, including multiline text, uses xterm's terminal-native paste
   semantics before reaching the managed input route, preserving bracketed-paste
-  framing and line endings as the attached PTY application expects; clipboard
-  access failures remain visible;
+  framing and line endings as the attached PTY application expects. One accepted
+  paste produces one input operation and cannot cross into a replacement session;
+- terminal-specific control-Shift-C/V shortcuts use asynchronous clipboard access
+  as a separate fallback. Browsers may restrict that API by permission or secure
+  context; blocked copies retain the existing manual recovery field, and paste
+  failures are visible and point to native browser clipboard gestures.
+  Pending reads are discarded if their session, renderer, active tab, or focus
+  no longer matches. Browser and operating-system clipboard restrictions still
+  apply, and clipboard text is never read without a user clipboard gesture;
 - output is retained up to a bounded size in the UI;
 - terminal sessions run through the local daemon rather than raw browser execution;
 - worktree-aware terminal behavior supports merge and standalone workflows.

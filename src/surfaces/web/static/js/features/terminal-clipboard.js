@@ -24,17 +24,24 @@ function terminalClipboardHasFocus(terminal) {
 function handleTerminalClipboardKeydown(e, terminal = terminalStateFor()) {
   if (!terminalClipboardHasFocus(terminal) || e.altKey) return false;
   if (e.type && e.type !== "keydown") return false;
-  if (!e.ctrlKey && !e.metaKey) return false;
   const key = String(e.key || "").toLowerCase();
-  if (key === "c") {
-    // Prevent the native shortcut as well as xterm input, even if all copy
-    // methods fail. The captured text remains available for manual recovery.
-    if (!copyTerminalSelection(terminal)) return false;
+  const copy = ((e.ctrlKey || e.metaKey) && key === "c")
+    || (e.ctrlKey && !e.shiftKey && key === "insert");
+  const paste = ((e.ctrlKey || e.metaKey) && key === "v")
+    || (e.shiftKey && !e.ctrlKey && key === "insert");
+  if ((!copy && !paste) || (copy && !terminalSelection(terminal))) return false;
+  if (paste && (!terminal.sessionId || terminal.exited)) return false;
+  if (e.ctrlKey && e.shiftKey && !e.metaKey && (key === "c" || key === "v")) {
+    // Terminal-specific shortcuts have no portable browser default. Cancel
+    // them even on failure; failed copies retain their text for manual recovery.
     e.preventDefault();
-    return true;
+    if (!e.repeat) {
+      if (copy) copyTerminalSelection(terminal);
+      else readTerminalClipboard(terminal);
+    }
   }
-  if (key !== "v" || !terminal.sessionId || terminal.exited) return false;
-  if (readTerminalClipboard(terminal)) e.preventDefault();
+  // Skip xterm interpretation while preserving the browser's native shortcut.
+  // Its copy/paste event owns the operation without requiring async API access.
   return true;
 }
 
@@ -59,7 +66,7 @@ function bindTerminalClipboardEvents(terminal) {
 function renderTerminalCopyControl(terminal) {
   const gesture = typeof navigator !== "undefined" && /Mac/.test(navigator.platform || "")
     ? "Option-drag" : "Shift-drag";
-  return `<span class="muted small" data-testid="terminal-selection-hint"
+  return `<span class="muted small" id="terminal-selection-hint" data-testid="terminal-selection-hint"
                title="Select text even when the application captures mouse input">${gesture} to select text</span>
     <button type="button" class="secondary" data-terminal-copy data-testid="terminal-copy" data-copy-tab="${htmlEscape(terminal.tabId)}"
             ${terminalSelection(terminal) ? "" : "disabled"}>Copy selection</button>`;
@@ -227,28 +234,17 @@ function copyTerminalTextWithSelection(text) {
 function handleTerminalPaste(e, terminal = terminalStateFor()) {
   if (!terminalClipboardHasFocus(terminal)) return false;
   if (!terminal?.sessionId || terminal.exited) return false;
-  let text;
+  // Own empty and rejected events too, so xterm cannot duplicate the operation
+  // or bypass a failed clipboard read through its own paste listener.
+  e.preventDefault();
+  e.stopPropagation();
   try {
-    text = e.clipboardData?.getData("text/plain");
+    const text = e.clipboardData?.getData("text/plain");
+    if (typeof text !== "string") throw new Error("Browser paste data is unavailable.");
+    pasteTerminalText(text, terminal);
   } catch (error) {
     showTerminalClipboardError("paste", error, terminal);
-    return false;
   }
-  if (typeof text !== "string") {
-    showTerminalClipboardError(
-      "paste",
-      new Error("Browser paste data is unavailable."),
-      terminal,
-    );
-    return false;
-  }
-  if (!text) return false;
-  if (!pasteTerminalText(text, terminal)) return false;
-  e.preventDefault();
-  // This listener runs during capture above xterm's textarea. Once the shared
-  // terminal path accepts the paste, keep xterm from processing the same event
-  // a second time after Terminal.paste has emitted its terminal-native input.
-  e.stopPropagation();
   return true;
 }
 
@@ -275,23 +271,18 @@ function pasteTerminalText(
 }
 
 function readTerminalClipboard(terminal) {
-  const readText = typeof navigator !== "undefined"
-    ? navigator.clipboard?.readText
-    : null;
-  if (typeof readText !== "function") {
-    showTerminalClipboardError(
-      "paste",
-      new Error("Browser clipboard read access is unavailable."),
-      terminal,
-    );
-    return false;
-  }
   const sessionId = terminal.sessionId;
   const term = terminal.term;
-  const isCurrent = () => terminalStates.get(terminal.tabId) === terminal
+  const tab = chatState.tabs[terminal.tabId];
+  const isCurrent = () => terminalClipboardHasFocus(terminal)
+    && chatState.tabs[terminal.tabId] === tab
     && terminal.sessionId === sessionId && terminal.term === term && !terminal.exited;
   try {
-    Promise.resolve(readText.call(navigator.clipboard))
+    const clipboard = typeof navigator !== "undefined" ? navigator.clipboard : null;
+    if (typeof clipboard?.readText !== "function") {
+      throw new Error("Browser clipboard read access is unavailable.");
+    }
+    Promise.resolve(clipboard.readText())
       .then((text) => {
         if (
           typeof text === "string"
@@ -305,7 +296,7 @@ function readTerminalClipboard(terminal) {
         if (isCurrent()) showTerminalClipboardError("paste", error, terminal);
       });
   } catch (error) {
-    showTerminalClipboardError("paste", error, terminal);
+    if (isCurrent()) showTerminalClipboardError("paste", error, terminal);
     return false;
   }
   return true;
@@ -313,6 +304,6 @@ function readTerminalClipboard(terminal) {
 
 function showTerminalClipboardError(action, error, terminal) {
   const detail = error?.message || String(error || "Clipboard access failed.");
-  terminal.error = `Unable to ${action} terminal text: ${detail}`;
+  terminal.error = `Unable to ${action} terminal text: ${detail} Use the browser Copy/Paste menu or Ctrl/Cmd+C/V.`;
   if (chatState.activeTabId === terminal.tabId) drawToolbar();
 }

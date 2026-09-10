@@ -1219,6 +1219,7 @@ function renderTerminalPanel(tab) {
            tabindex="0"
            role="textbox"
            aria-label="Terminal"
+           aria-describedby="terminal-selection-hint"
            spellcheck="false"
            data-morph-preserve="1"></div>
     </div>`;
