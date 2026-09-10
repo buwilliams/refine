@@ -1,7 +1,7 @@
 {
   "base_commit": "b47569adb8d4c5d1d7335ba91729a3e486a38fe0",
   "branch_name": "refine/DR72ED9B21E7CB9369DBCACF88/round-3",
-  "candidate_commit": "a7f5b37adaa674cf0c6ffad7f67252f9a8dca25c",
+  "candidate_commit": "be1356af9c29c6467f03f0d38341acb2d676ceba",
   "created": "2026-09-10T08:26:05Z",
   "event_generation": 8,
   "feature_id": null,
@@ -2735,6 +2735,148 @@
           },
           "source": "workflow.plan.enter",
           "state": "succeeded"
+        },
+        "9155c57835d167e7287bcc05b7c3163eaa879f32d75bec634b1c9b1362cdbedb": {
+          "candidate_commit": "a7f5b37adaa674cf0c6ffad7f67252f9a8dca25c",
+          "results": {
+            "default-quality": {
+              "artifacts": {
+                "tests": [
+                  {
+                    "command": "cargo test --lib fresh_goal_backlog_exit_skill_remains_runnable_before_round_materialization -- --test-threads=1",
+                    "evidence": "Exit 0: 1 passed.",
+                    "status": "passed",
+                    "test": "Fresh Backlog Exit execution and settlement"
+                  },
+                  {
+                    "command": "cargo test --lib application::events:: -- --test-threads=1",
+                    "evidence": "Exit 0: 44 passed, including all three added regressions.",
+                    "status": "passed",
+                    "test": "Skills, lifecycle authority and recovery"
+                  },
+                  {
+                    "command": "cargo test --lib application::workflow::tests::execution_ownership -- --test-threads=1",
+                    "evidence": "Exit 0: 7 passed, including backlog_promotion_changes_only_goal_state_and_does_not_create_worktrees.",
+                    "status": "passed",
+                    "test": "Workflow ownership and state-only promotion"
+                  },
+                  {
+                    "command": "cargo test --lib authored_todo_start -- --test-threads=1",
+                    "evidence": "Exit 0: 3 passed.",
+                    "status": "passed",
+                    "test": "Authored Todo admission"
+                  },
+                  {
+                    "command": "cargo test --lib infrastructure::git::worktrees::tests -- --test-threads=1",
+                    "evidence": "Exit 0: 45 passed.",
+                    "status": "passed",
+                    "test": "Managed worktree admission and isolation"
+                  },
+                  {
+                    "command": "cargo test --lib worktree_resume -- --test-threads=1",
+                    "evidence": "Exit 0: 3 passed.",
+                    "status": "passed",
+                    "test": "Worktree resume"
+                  },
+                  {
+                    "command": "cargo test --lib quality::tests:: -- --test-threads=1",
+                    "evidence": "Exit 0: 38 passed.",
+                    "status": "passed",
+                    "test": "Exact-candidate Quality"
+                  },
+                  {
+                    "command": "cargo test --lib application::workflow::tests::candidate_refresh -- --test-threads=1",
+                    "evidence": "Exit 0: 16 passed.",
+                    "status": "passed",
+                    "test": "Candidate refresh"
+                  },
+                  {
+                    "command": "cargo test --lib application::workflow::tests::quality_recovery -- --test-threads=1",
+                    "evidence": "Exit 0: 1 passed.",
+                    "status": "passed",
+                    "test": "Quality recovery"
+                  },
+                  {
+                    "command": "cargo test --lib application::workflow::tests::quality_base_refresh -- --test-threads=1",
+                    "evidence": "Exit 0: 9 passed.",
+                    "status": "passed",
+                    "test": "Quality base refresh"
+                  },
+                  {
+                    "command": "cargo test --lib round_base -- --test-threads=1",
+                    "evidence": "Exit 0: 9 passed.",
+                    "status": "passed",
+                    "test": "Declared Round base"
+                  },
+                  {
+                    "command": "cargo test --lib workflow::engine::behaviors::tests:: -- --test-threads=1",
+                    "evidence": "Exit 0: 15 passed.",
+                    "status": "passed",
+                    "test": "Workflow behavior and recovery"
+                  },
+                  {
+                    "command": "cargo test --lib launch_environment -- --test-threads=1",
+                    "evidence": "Exit 0: 5 passed.",
+                    "status": "passed",
+                    "test": "Launch environment sanitization"
+                  },
+                  {
+                    "command": "cargo test --lib infrastructure::agents::invocation::tests -- --test-threads=1",
+                    "evidence": "Exit 0: 16 passed.",
+                    "status": "passed",
+                    "test": "Provider invocation"
+                  },
+                  {
+                    "command": "cargo test --lib infrastructure::process::subprocess:: -- --test-threads=1",
+                    "evidence": "Exit 0: 20 passed.",
+                    "status": "passed",
+                    "test": "Process launch and supervision"
+                  },
+                  {
+                    "command": "cargo check --all-targets",
+                    "evidence": "Exit 0.",
+                    "status": "passed",
+                    "test": "All-target compilation"
+                  },
+                  {
+                    "command": "cargo clippy --all-targets",
+                    "evidence": "Exit 0; eight unchanged warnings.",
+                    "status": "passed",
+                    "test": "Clippy"
+                  },
+                  {
+                    "command": "xargs -d '\\n' rustfmt --check --edition 2024 --config skip_children=true < /tmp/dr72-round3-quality-evidence/changed-rust-files.txt",
+                    "evidence": "Exit 0: 60 Rust files checked, including the new regression module.",
+                    "status": "passed",
+                    "test": "Changed Rust formatting"
+                  },
+                  {
+                    "command": "git diff --check 256f7fa161d12f9a82fdd99c6933f551c5173677",
+                    "evidence": "Exit 0.",
+                    "status": "passed",
+                    "test": "Whitespace"
+                  }
+                ]
+              },
+              "binding_id": "default-quality",
+              "evidence": [
+                "Reviewed candidate a7f5b37adaa674cf0c6ffad7f67252f9a8dca25c against the finalized plans and relevant intent.",
+                "The added scheduler-admission regression initially failed with 'workflow artifact branch is missing for Goal FRESH'. Corrected scheduler-owned Todo Skills to use invocation-owned lifecycle workspaces and reuse retained Todo Entry evidence.",
+                "The added settlement regression initially failed because Todo entered Plan after its successful Entry workspace disappeared. Settlement now revalidates blocking invocation verdicts and original workspace registrations.",
+                "Three added regressions pass, covering scheduler admission, pending/completed Entry reuse, superseded claims, cancellation, stale settlement and separation of lifecycle output from implementation output. Existing cached-success and replaced-registration regressions pass.",
+                "Final verification: 232 passing test executions across 15 serial commands, zero failures and zero ignored tests. Clippy reports eight warnings unchanged from the initial candidate check.",
+                "Primary-checkout HEAD, status and raw index bytes remain unchanged. Round 1 HEAD, status, index and all 36 retained modified/untracked files remain unchanged. Goal refs and original worktree paths are preserved; unrelated live-worktree changes are recorded separately.",
+                "Ten files contain uncommitted Quality corrections, including three relevant intent passages. Refine owns committing corrections and verifying the resulting exact candidate. No Goal mutation, merge, push, deployment or daemon restart was performed.",
+                "Logs, initial regression failures, correction hashes, preservation comparisons and the parse-checked report are retained in /tmp/dr72-round3-quality-evidence/. Live external provider continuation and Windows were not exercised."
+              ],
+              "invocation_id": "9155c57835d167e7287bcc05b7c3163eaa879f32d75bec634b1c9b1362cdbedb",
+              "outcome": "success",
+              "role": "quality",
+              "summary": "Corrected Todo-to-Plan lifecycle admission and stale Entry-workspace settlement. All required checks pass; corrections await Refine candidate finalization."
+            }
+          },
+          "source": "workflow.quality.enter",
+          "state": "succeeded"
         }
       },
       "failure_at": "",
@@ -2949,14 +3091,152 @@
       "meta_rule_state": null,
       "product_state": null,
       "prompt": "Correct the pre-Plan lifecycle Skill workspace regression for Goal DR72ED9B21E7CB9369DBCACF88 in a fresh Refine-managed recovery Round. Preserve Round 1's unfinished files and all retained branches, worktrees, commits, plans, logs and failed Quality evidence. Use retained candidate 256f7fa161d12f9a82fdd99c6933f551c5173677 through the supported recovery handoff, comparing it with current main before carrying changes forward. Preserve the existing ensure_worktree_from_base fix and Round 2's workspace isolation work, including Quality's cached-success revalidation in src/application/events/execution/runner.rs.\n\nReproduce the retained failure with `cargo test --lib fresh_goal_backlog_exit_skill_remains_runnable_before_round_materialization -- --test-threads=1`. Trace src/application/events/transitions.rs, dispatch.rs, execution.rs and execution/workspace.rs. Fresh Goals with an authored Round have no branch_name before Plan, yet a configured Backlog Exit Skill must run before the transition can complete. Provide lifecycle-aware workspace admission that supports these executable Skills in an explicitly owned managed linked checkout without requiring an already-materialized implementation branch. Reuse the shared Git worktree and execution capabilities. Bind the lifecycle workspace to its repository, Goal, current Round and invocation or occurrence, and pin an explicit target-derived source commit and physical registration. Ensure the process cwd and supplied workspace context both identify that admitted checkout, with agent_subpath canonically contained inside it.\n\nPreserve the docs/intent Todo admission contract: queueing or ordinary Backlog promotion remains state-only, and the implementation branch/worktree is materialized only after capacity and atomic authored-Round admission into Plan. Any workspace needed for a pre-Plan Skill must have explicit invocation ownership and must not silently become the implementation candidate or rewrite its base. Do not fix this by falling back to the primary checkout, treating Goal-bound Skills as standalone, disabling supported bindings, or precreating every queued Goal's implementation workspace.\n\nCarry the admitted lifecycle workspace through ordered bindings, diagnostic repairs, process resumes, replay and result acceptance. Recheck Goal/Round/node/transition authority before execution side effects and settlement; preserve cancellation and idempotent transition behavior. Retain registration validation and Git-environment sanitization before launches and writes. Missing or replaced registrations, wrong branches, unrelated repositories and symlink escapes must fail with actionable errors while preserving retained work. Independently launched Custom Skills and toolbar sessions must retain their explicit context.\n\nKeep the failing regression and extend it through actual deterministic Skill execution and successful transition settlement, starting with no Goal branch or worktree. Correct the existing manual-transition fixture that currently calls goal_workspace before testing Backlog Exit. Cover other applicable pre-Plan lifecycle bindings, repeated dispatch/restart, cancellation or changed Round authority, and disabled/context-only bindings that need no checkout. Verify staged, unstaged and untracked primary-checkout contents, HEAD and raw index bytes remain unchanged. Keep cached-success and replaced-registration regressions passing.\n\nRun the events suite, relevant workflow admission tests including backlog_promotion_changes_only_goal_state_and_does_not_create_worktrees, worktree admission/resume tests, and affected Quality, candidate-refresh, recovery and declared-base suites using `cargo test --lib` with one filter per command and serial execution. Run appropriate compilation, changed-file formatting and whitespace checks. Report actual commands, counts, failures and skips; distinguish existing Clippy warnings. Update only affected Skills/workspace/Todo intent documentation. Use current Skills contracts. Refine owns workflow advancement and integration; do not directly change Goal state, approve, merge or push.",
-      "quality_candidate_commit": null,
+      "quality_agent_report": "workflow.quality.enter:default-quality: Corrected Todo-to-Plan lifecycle admission and stale Entry-workspace settlement. All required checks pass; corrections await Refine candidate finalization.",
+      "quality_candidate_commit": "be1356af9c29c6467f03f0d38341acb2d676ceba",
       "quality_checked_at": null,
       "quality_details": null,
       "quality_message": null,
+      "quality_skill_results": [
+        {
+          "artifacts": {
+            "tests": [
+              {
+                "command": "cargo test --lib fresh_goal_backlog_exit_skill_remains_runnable_before_round_materialization -- --test-threads=1",
+                "evidence": "Exit 0: 1 passed.",
+                "status": "passed",
+                "test": "Fresh Backlog Exit execution and settlement"
+              },
+              {
+                "command": "cargo test --lib application::events:: -- --test-threads=1",
+                "evidence": "Exit 0: 44 passed, including all three added regressions.",
+                "status": "passed",
+                "test": "Skills, lifecycle authority and recovery"
+              },
+              {
+                "command": "cargo test --lib application::workflow::tests::execution_ownership -- --test-threads=1",
+                "evidence": "Exit 0: 7 passed, including backlog_promotion_changes_only_goal_state_and_does_not_create_worktrees.",
+                "status": "passed",
+                "test": "Workflow ownership and state-only promotion"
+              },
+              {
+                "command": "cargo test --lib authored_todo_start -- --test-threads=1",
+                "evidence": "Exit 0: 3 passed.",
+                "status": "passed",
+                "test": "Authored Todo admission"
+              },
+              {
+                "command": "cargo test --lib infrastructure::git::worktrees::tests -- --test-threads=1",
+                "evidence": "Exit 0: 45 passed.",
+                "status": "passed",
+                "test": "Managed worktree admission and isolation"
+              },
+              {
+                "command": "cargo test --lib worktree_resume -- --test-threads=1",
+                "evidence": "Exit 0: 3 passed.",
+                "status": "passed",
+                "test": "Worktree resume"
+              },
+              {
+                "command": "cargo test --lib quality::tests:: -- --test-threads=1",
+                "evidence": "Exit 0: 38 passed.",
+                "status": "passed",
+                "test": "Exact-candidate Quality"
+              },
+              {
+                "command": "cargo test --lib application::workflow::tests::candidate_refresh -- --test-threads=1",
+                "evidence": "Exit 0: 16 passed.",
+                "status": "passed",
+                "test": "Candidate refresh"
+              },
+              {
+                "command": "cargo test --lib application::workflow::tests::quality_recovery -- --test-threads=1",
+                "evidence": "Exit 0: 1 passed.",
+                "status": "passed",
+                "test": "Quality recovery"
+              },
+              {
+                "command": "cargo test --lib application::workflow::tests::quality_base_refresh -- --test-threads=1",
+                "evidence": "Exit 0: 9 passed.",
+                "status": "passed",
+                "test": "Quality base refresh"
+              },
+              {
+                "command": "cargo test --lib round_base -- --test-threads=1",
+                "evidence": "Exit 0: 9 passed.",
+                "status": "passed",
+                "test": "Declared Round base"
+              },
+              {
+                "command": "cargo test --lib workflow::engine::behaviors::tests:: -- --test-threads=1",
+                "evidence": "Exit 0: 15 passed.",
+                "status": "passed",
+                "test": "Workflow behavior and recovery"
+              },
+              {
+                "command": "cargo test --lib launch_environment -- --test-threads=1",
+                "evidence": "Exit 0: 5 passed.",
+                "status": "passed",
+                "test": "Launch environment sanitization"
+              },
+              {
+                "command": "cargo test --lib infrastructure::agents::invocation::tests -- --test-threads=1",
+                "evidence": "Exit 0: 16 passed.",
+                "status": "passed",
+                "test": "Provider invocation"
+              },
+              {
+                "command": "cargo test --lib infrastructure::process::subprocess:: -- --test-threads=1",
+                "evidence": "Exit 0: 20 passed.",
+                "status": "passed",
+                "test": "Process launch and supervision"
+              },
+              {
+                "command": "cargo check --all-targets",
+                "evidence": "Exit 0.",
+                "status": "passed",
+                "test": "All-target compilation"
+              },
+              {
+                "command": "cargo clippy --all-targets",
+                "evidence": "Exit 0; eight unchanged warnings.",
+                "status": "passed",
+                "test": "Clippy"
+              },
+              {
+                "command": "xargs -d '\\n' rustfmt --check --edition 2024 --config skip_children=true < /tmp/dr72-round3-quality-evidence/changed-rust-files.txt",
+                "evidence": "Exit 0: 60 Rust files checked, including the new regression module.",
+                "status": "passed",
+                "test": "Changed Rust formatting"
+              },
+              {
+                "command": "git diff --check 256f7fa161d12f9a82fdd99c6933f551c5173677",
+                "evidence": "Exit 0.",
+                "status": "passed",
+                "test": "Whitespace"
+              }
+            ]
+          },
+          "binding_id": "workflow.quality.enter:default-quality",
+          "evidence": [
+            "Reviewed candidate a7f5b37adaa674cf0c6ffad7f67252f9a8dca25c against the finalized plans and relevant intent.",
+            "The added scheduler-admission regression initially failed with 'workflow artifact branch is missing for Goal FRESH'. Corrected scheduler-owned Todo Skills to use invocation-owned lifecycle workspaces and reuse retained Todo Entry evidence.",
+            "The added settlement regression initially failed because Todo entered Plan after its successful Entry workspace disappeared. Settlement now revalidates blocking invocation verdicts and original workspace registrations.",
+            "Three added regressions pass, covering scheduler admission, pending/completed Entry reuse, superseded claims, cancellation, stale settlement and separation of lifecycle output from implementation output. Existing cached-success and replaced-registration regressions pass.",
+            "Final verification: 232 passing test executions across 15 serial commands, zero failures and zero ignored tests. Clippy reports eight warnings unchanged from the initial candidate check.",
+            "Primary-checkout HEAD, status and raw index bytes remain unchanged. Round 1 HEAD, status, index and all 36 retained modified/untracked files remain unchanged. Goal refs and original worktree paths are preserved; unrelated live-worktree changes are recorded separately.",
+            "Ten files contain uncommitted Quality corrections, including three relevant intent passages. Refine owns committing corrections and verifying the resulting exact candidate. No Goal mutation, merge, push, deployment or daemon restart was performed.",
+            "Logs, initial regression failures, correction hashes, preservation comparisons and the parse-checked report are retained in /tmp/dr72-round3-quality-evidence/. Live external provider continuation and Windows were not exercised."
+          ],
+          "invocation_id": "9155c57835d167e7287bcc05b7c3163eaa879f32d75bec634b1c9b1362cdbedb",
+          "outcome": "success",
+          "role": "quality",
+          "summary": "Corrected Todo-to-Plan lifecycle admission and stale Entry-workspace settlement. All required checks pass; corrections await Refine candidate finalization."
+        }
+      ],
       "quality_state": null,
       "reporter": "Refine",
       "rule_state": null,
-      "updated": "2026-09-10T15:18:54Z",
+      "updated": "2026-09-10T15:33:32Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T14:52:32Z",
         "round_idx": 2,
@@ -2997,7 +3277,7 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-10T15:18:54Z",
+  "updated": "2026-09-10T15:33:32Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:36.706264729+00:00",
@@ -3072,5 +3352,5 @@
       "to": "quality"
     }
   ],
-  "workflow_revision": 71
+  "workflow_revision": 75
 }
