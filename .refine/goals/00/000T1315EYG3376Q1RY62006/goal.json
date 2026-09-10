@@ -3,7 +3,7 @@
   "branch_name": "refine/00000T1315EYG3376Q1RY62006/round-1",
   "candidate_commit": "036c0802c771a6cc5865a8bc4d669480e1a76c57",
   "created": "2026-09-10T16:27:40Z",
-  "event_generation": 5,
+  "event_generation": 6,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T1315EYG3376Q1RY62006",
@@ -931,9 +931,170 @@
       "prompt": "Fix the production CLI dispatch conflict that prevents the standalone Fetch Goals from Email Skill from importing requests into the selected project's Backlog.\n\nObserved failure:\nThe Skill prescribed this command, which was run from /home/buddy/projects/refine-next:\n'/home/buddy/projects/refine/bin/refine' system fetch-email-goals --runtime-root '/home/buddy/projects/refine/run/8082' --target-root '/home/buddy/projects/refine-next'\n\nIt exited with code 1:\ndirect --target-root CLI dispatch is not supported in normal operation; use the daemon API for target state mutations instead (/home/buddy/projects/refine-next)\n\nThe failure occurs before email fetching and before a JSON result is produced. No Goals were imported or recovered by that invocation. A read-only check found 34 existing request.json records retained under /home/buddy/projects/refine/run/8082/self-development-email/requests.\n\nDiagnosis:\nsrc/surfaces/cli/dispatch.rs applies a generic #[cfg(not(test))] explicit_target_root_path rejection before dispatch. That helper includes SystemAction::FetchEmailGoals, whose target_root is required. The existing handler in src/surfaces/cli/dispatch/system.rs is therefore unreachable in normal operation. The unit test email_fetch_cli_requires_the_pinned_target_before_accessing_mail in src/surfaces/cli/tests/system/commands.rs bypasses the production guard through cfg(test), allowing this regression to escape detection.\n\nRequested change:\nImplement a narrowly scoped dispatch correction that restores the documented one-shot capability while preserving the restrictions on other commands and the email capability's existing authorization and retry behavior. Keep docs/runbooks/development-request-email.md and docs/runbooks/skills/fetch-goals-from-email.json consistent with the supported command.\n\nAcceptance criteria:\n1. The documented system fetch-email-goals command, with separately and safely quoted runtime-root and target-root arguments, reaches the email-fetch capability in a production build.\n2. A mismatched configured target is rejected before secret or request-ledger access.\n3. Sender filtering, MIME extraction, deterministic Goal IDs, duplicate prevention, remote acknowledgement, and durable retries remain intact.\n4. Successful fetches return the documented JSON fields, including fetched_count, batch_limit, goal_ids, and errors. Per-record failures retain successful imports and retry evidence while returning a nonzero exit.\n5. Regression coverage executes the compiled CLI with production dispatch checks enabled and would fail on the current bug. Cover both reaching the fetch capability for the intended target and rejecting a mismatched target without secret or ledger access. Existing restrictions on unrelated commands remain effective.\n6. Fetching retains ordinary Backlog creation behavior without approving Goals, changing Review decisions, or sending replies. Preserve the Skill's 25-message batch limit, maximum ten batches, and stop-on-command-failure behavior.\n7. Run the focused CLI and development-request checks plus appropriate compiled-binary regression validation. Use isolated fixtures; preserve the live mailbox, token, raw email source, request ledger, and existing Goals.\n\nDeliver the scoped fix and validation evidence through the ordinary Goal/Round workflow.",
       "quality_agent_report": "workflow.quality.enter:default-quality: Independent Quality review passed with no findings or changes. Focused tests, compiled CLI regressions, release build and required checks passed on the pinned candidate.",
       "quality_candidate_commit": "036c0802c771a6cc5865a8bc4d669480e1a76c57",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
+      "quality_checked_at": "2026-09-10T16:50:24Z",
+      "quality_details": {
+        "candidate_commit": "036c0802c771a6cc5865a8bc4d669480e1a76c57",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T1315EYG3376Q1RY62006-round-1",
+        "diagnostics": [
+          "Event invocation 227d4c60eaa92ef8ce7cccc2cacbeb1c3a11a7cd825e45be4483ce9da052a4b8: automation/invocations/227d4c60eaa92ef8ce7cccc2cacbeb1c3a11a7cd825e45be4483ce9da052a4b8.json",
+          "Observed supervised process proc-1789059016109-1129590-1070 exited 0. stdout: vice_start_command_failure_preserves_health_and_exact_evidence ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_start_clears_stale_failure_but_observes_a_new_failure ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_start_times_out_without_hiding_the_manager_context ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_stop_command_failure_keeps_active_status_and_recovery_evidence ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_stop_timeout_never_persists_stopped ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_stop_waits_for_confirmed_shutdown ... ok\ntest surfaces::cli::tests::system::daemon::system_lifecycle_commands_default_to_8082 ... ok\ntest surfaces::cli::tests::system::daemon::system_start_migrates_and_detaches_an_unavailable_port_scoped_project ... ok\ntest surfaces::cli::tests::system::daemon::system_start_owns_foreground_web_options ... ok\ntest surfaces::cli::tests::system::daemon::system_start_resolves_relative_runtime_root_before_spawning_daemon ... ok\ntest surfaces::cli::tests::system::daemon::system_status_reports_current_version_and_running_ports ... ok\ntest surfaces::cli::tests::system::installation::retired_system_install_and_uninstall_commands_are_not_parseable ... ok\ntest surfaces::cli::tests::system::installation::system_service_install_repair_and_service_uninstall_use_installation_service ... ok\ntest surfaces::cli::tests::system::installation::system_update_is_owned_by_the_launcher_not_the_deployed_binary ... ok\ntest surfaces::cli::tests::system::release_workers::system_start_recovers_jira_export_and_public_retry_launches_supervised_worker ... ok\ntest surfaces::cli::tests::system::release_workers::system_start_refuses_jira_retry_when_orphan_exit_cannot_be_confirmed ... ok\ntest surfaces::cli::tests::todos::todo_commands_dispatch_through_the_shared_file_todo_service ... ok\n\ntest result: ok. 72 passed; 0 failed; 0 ignored; 0 measured; 1098 filtered out; finished in 4.13s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+          "Observed supervised process proc-1789059020489-1129590-1073 exited 0. stdout: d_by_deterministic_identity ... ok\ntest application::development_requests::tests::intake::per_record_failure_retains_successful_imports_and_durable_retry_evidence ... ok\ntest application::development_requests::tests::interrupted_schema_one_migration_write_retains_retryable_legacy_record ... ok\ntest application::development_requests::tests::jmap_patch_uses_the_provider_email_id_as_the_dynamic_object_key ... ok\ntest application::development_requests::tests::legacy_agent_cli_config_is_tolerated_but_inactive_and_omitted ... ok\ntest application::development_requests::tests::linked_and_terminal_schema_one_records_retry_without_duplication ... ok\ntest application::development_requests::tests::local_contract_is_normalized_reread_and_bound_to_one_target ... ok\ntest application::development_requests::tests::local_contract_rejects_a_relative_target ... ok\ntest application::development_requests::tests::local_request_record_round_trips_as_the_durable_retry_queue ... ok\ntest application::development_requests::tests::mime_extraction_keeps_body_and_text_attachments_only ... ok\ntest application::development_requests::tests::one_shot_fetch_checks_target_before_secrets_or_records ... ok\ntest application::development_requests::tests::pending_query_selects_the_recipient_address_without_a_mailbox ... ok\ntest application::development_requests::tests::request_identity_is_stable_and_goal_compatible ... ok\ntest application::development_requests::tests::schema_one_received_is_upgraded_from_raw_mail_before_goal_authoring ... ok\ntest application::development_requests::tests::schema_one_received_links_an_existing_legacy_goal_without_raw_mail_or_rewrite ... ok\ntest application::development_requests::tests::unavailable_schema_one_raw_mail_is_retryable_and_creates_no_goal ... ok\ntest application::development_requests::tests::unsupported_record_is_unchanged_and_does_not_starve_later_valid_record ... ok\n\ntest result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 1145 filtered out; finished in 0.14s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+          "Observed supervised process proc-1789059020873-1129590-1076 exited 0. stdout: running 4 tests\ntest production_cli_product_commands_require_daemon ... ok\ntest production_cli_rejects_target_root_argument ... ok\ntest production_email_fetch_reaches_capability_with_the_configured_target ... ok\ntest production_email_fetch_rejects_mismatched_target_before_secrets_or_ledger ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running tests/cli_target_root.rs (target/debug/deps/cli_target_root-104a832b35e27d28)",
+          "Observed supervised process proc-1789059021142-1129590-1079 exited 0. stderr: Finished `release` profile [optimized] target(s) in 0.09s",
+          "Observed supervised process proc-1789059021374-1129590-1082 exited 0. stdout: running 4 tests\ntest production_cli_product_commands_require_daemon ... ok\ntest production_cli_rejects_target_root_argument ... ok\ntest production_email_fetch_reaches_capability_with_the_configured_target ... ok\ntest production_email_fetch_rejects_mismatched_target_before_secrets_or_ledger ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s stderr: Finished `release` profile [optimized] target(s) in 0.09s\n     Running tests/cli_target_root.rs (target/release/deps/cli_target_root-7e5c92834630595f)",
+          "Observed supervised process proc-1789059021642-1129590-1085 exited 0.",
+          "Observed supervised process proc-1789059023522-1129590-1088 exited 0.",
+          "Observed supervised process proc-1789059023648-1129590-1091 exited 0."
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "1a08c370376113c7671",
+        "provider_attempts": [],
+        "quality_proof": {
+          "checked_at": "2026-09-10T16:50:24Z",
+          "checked_candidate_commit": "036c0802c771a6cc5865a8bc4d669480e1a76c57",
+          "evaluation_scope": "isolated_candidate",
+          "goal_id": "00000T1315EYG3376Q1RY62006",
+          "operation_id": "1a08c370376113c7671",
+          "results": [
+            {
+              "command": "cargo test --locked --lib surfaces::cli::tests -- --test-threads=1",
+              "evidence": "Observed supervised process proc-1789059016109-1129590-1070 exited 0. stdout: vice_start_command_failure_preserves_health_and_exact_evidence ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_start_clears_stale_failure_but_observes_a_new_failure ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_start_times_out_without_hiding_the_manager_context ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_stop_command_failure_keeps_active_status_and_recovery_evidence ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_stop_timeout_never_persists_stopped ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_stop_waits_for_confirmed_shutdown ... ok\ntest surfaces::cli::tests::system::daemon::system_lifecycle_commands_default_to_8082 ... ok\ntest surfaces::cli::tests::system::daemon::system_start_migrates_and_detaches_an_unavailable_port_scoped_project ... ok\ntest surfaces::cli::tests::system::daemon::system_start_owns_foreground_web_options ... ok\ntest surfaces::cli::tests::system::daemon::system_start_resolves_relative_runtime_root_before_spawning_daemon ... ok\ntest surfaces::cli::tests::system::daemon::system_status_reports_current_version_and_running_ports ... ok\ntest surfaces::cli::tests::system::installation::retired_system_install_and_uninstall_commands_are_not_parseable ... ok\ntest surfaces::cli::tests::system::installation::system_service_install_repair_and_service_uninstall_use_installation_service ... ok\ntest surfaces::cli::tests::system::installation::system_update_is_owned_by_the_launcher_not_the_deployed_binary ... ok\ntest surfaces::cli::tests::system::release_workers::system_start_recovers_jira_export_and_public_retry_launches_supervised_worker ... ok\ntest surfaces::cli::tests::system::release_workers::system_start_refuses_jira_retry_when_orphan_exit_cannot_be_confirmed ... ok\ntest surfaces::cli::tests::todos::todo_commands_dispatch_through_the_shared_file_todo_service ... ok\n\ntest result: ok. 72 passed; 0 failed; 0 ignored; 0 measured; 1098 filtered out; finished in 4.13s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+              "exit_code": 0,
+              "process_id": "proc-1789059016109-1129590-1070",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: CLI routing and unrelated command restrictions"
+            },
+            {
+              "command": "cargo test --locked --lib application::development_requests:: -- --test-threads=1",
+              "evidence": "Observed supervised process proc-1789059020489-1129590-1073 exited 0. stdout: d_by_deterministic_identity ... ok\ntest application::development_requests::tests::intake::per_record_failure_retains_successful_imports_and_durable_retry_evidence ... ok\ntest application::development_requests::tests::interrupted_schema_one_migration_write_retains_retryable_legacy_record ... ok\ntest application::development_requests::tests::jmap_patch_uses_the_provider_email_id_as_the_dynamic_object_key ... ok\ntest application::development_requests::tests::legacy_agent_cli_config_is_tolerated_but_inactive_and_omitted ... ok\ntest application::development_requests::tests::linked_and_terminal_schema_one_records_retry_without_duplication ... ok\ntest application::development_requests::tests::local_contract_is_normalized_reread_and_bound_to_one_target ... ok\ntest application::development_requests::tests::local_contract_rejects_a_relative_target ... ok\ntest application::development_requests::tests::local_request_record_round_trips_as_the_durable_retry_queue ... ok\ntest application::development_requests::tests::mime_extraction_keeps_body_and_text_attachments_only ... ok\ntest application::development_requests::tests::one_shot_fetch_checks_target_before_secrets_or_records ... ok\ntest application::development_requests::tests::pending_query_selects_the_recipient_address_without_a_mailbox ... ok\ntest application::development_requests::tests::request_identity_is_stable_and_goal_compatible ... ok\ntest application::development_requests::tests::schema_one_received_is_upgraded_from_raw_mail_before_goal_authoring ... ok\ntest application::development_requests::tests::schema_one_received_links_an_existing_legacy_goal_without_raw_mail_or_rewrite ... ok\ntest application::development_requests::tests::unavailable_schema_one_raw_mail_is_retryable_and_creates_no_goal ... ok\ntest application::development_requests::tests::unsupported_record_is_unchanged_and_does_not_starve_later_valid_record ... ok\n\ntest result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 1145 filtered out; finished in 0.14s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+              "exit_code": 0,
+              "process_id": "proc-1789059020489-1129590-1073",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Email capability and durable recovery"
+            },
+            {
+              "command": "cargo test --locked --test cli_target_root -- --test-threads=1",
+              "evidence": "Observed supervised process proc-1789059020873-1129590-1076 exited 0. stdout: running 4 tests\ntest production_cli_product_commands_require_daemon ... ok\ntest production_cli_rejects_target_root_argument ... ok\ntest production_email_fetch_reaches_capability_with_the_configured_target ... ok\ntest production_email_fetch_rejects_mismatched_target_before_secrets_or_ledger ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running tests/cli_target_root.rs (target/debug/deps/cli_target_root-104a832b35e27d28)",
+              "exit_code": 0,
+              "process_id": "proc-1789059020873-1129590-1076",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Compiled production dispatch and target authorization"
+            },
+            {
+              "command": "cargo build --release --locked --bin refine",
+              "evidence": "Observed supervised process proc-1789059021142-1129590-1079 exited 0. stderr: Finished `release` profile [optimized] target(s) in 0.09s",
+              "exit_code": 0,
+              "process_id": "proc-1789059021142-1129590-1079",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Production release build"
+            },
+            {
+              "command": "cargo test --release --locked --test cli_target_root -- --test-threads=1",
+              "evidence": "Observed supervised process proc-1789059021374-1129590-1082 exited 0. stdout: running 4 tests\ntest production_cli_product_commands_require_daemon ... ok\ntest production_cli_rejects_target_root_argument ... ok\ntest production_email_fetch_reaches_capability_with_the_configured_target ... ok\ntest production_email_fetch_rejects_mismatched_target_before_secrets_or_ledger ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s stderr: Finished `release` profile [optimized] target(s) in 0.09s\n     Running tests/cli_target_root.rs (target/release/deps/cli_target_root-7e5c92834630595f)",
+              "exit_code": 0,
+              "process_id": "proc-1789059021374-1129590-1082",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Release-binary dispatch regressions"
+            },
+            {
+              "command": "cargo fmt --all -- --check",
+              "evidence": "Observed supervised process proc-1789059021642-1129590-1085 exited 0.",
+              "exit_code": 0,
+              "process_id": "proc-1789059021642-1129590-1085",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Rust formatting"
+            },
+            {
+              "command": "git diff --check 0b6cc819de716b1b118f40c4465d114290117699 036c0802c771a6cc5865a8bc4d669480e1a76c57",
+              "evidence": "Observed supervised process proc-1789059023522-1129590-1088 exited 0.",
+              "exit_code": 0,
+              "process_id": "proc-1789059023522-1129590-1088",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Candidate whitespace"
+            },
+            {
+              "command": "python3 -m json.tool docs/runbooks/skills/fetch-goals-from-email.json > /dev/null",
+              "evidence": "Observed supervised process proc-1789059023648-1129590-1091 exited 0.",
+              "exit_code": 0,
+              "process_id": "proc-1789059023648-1129590-1091",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Skill JSON validity"
+            }
+          ],
+          "round_idx": 0,
+          "schema_version": 1,
+          "source_candidate_commit": "036c0802c771a6cc5865a8bc4d669480e1a76c57",
+          "state": "passed"
+        },
+        "results": [
+          {
+            "command": "cargo test --locked --lib surfaces::cli::tests -- --test-threads=1",
+            "evidence": "Observed supervised process proc-1789059016109-1129590-1070 exited 0. stdout: vice_start_command_failure_preserves_health_and_exact_evidence ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_start_clears_stale_failure_but_observes_a_new_failure ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_start_times_out_without_hiding_the_manager_context ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_stop_command_failure_keeps_active_status_and_recovery_evidence ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_stop_timeout_never_persists_stopped ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_stop_waits_for_confirmed_shutdown ... ok\ntest surfaces::cli::tests::system::daemon::system_lifecycle_commands_default_to_8082 ... ok\ntest surfaces::cli::tests::system::daemon::system_start_migrates_and_detaches_an_unavailable_port_scoped_project ... ok\ntest surfaces::cli::tests::system::daemon::system_start_owns_foreground_web_options ... ok\ntest surfaces::cli::tests::system::daemon::system_start_resolves_relative_runtime_root_before_spawning_daemon ... ok\ntest surfaces::cli::tests::system::daemon::system_status_reports_current_version_and_running_ports ... ok\ntest surfaces::cli::tests::system::installation::retired_system_install_and_uninstall_commands_are_not_parseable ... ok\ntest surfaces::cli::tests::system::installation::system_service_install_repair_and_service_uninstall_use_installation_service ... ok\ntest surfaces::cli::tests::system::installation::system_update_is_owned_by_the_launcher_not_the_deployed_binary ... ok\ntest surfaces::cli::tests::system::release_workers::system_start_recovers_jira_export_and_public_retry_launches_supervised_worker ... ok\ntest surfaces::cli::tests::system::release_workers::system_start_refuses_jira_retry_when_orphan_exit_cannot_be_confirmed ... ok\ntest surfaces::cli::tests::todos::todo_commands_dispatch_through_the_shared_file_todo_service ... ok\n\ntest result: ok. 72 passed; 0 failed; 0 ignored; 0 measured; 1098 filtered out; finished in 4.13s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+            "exit_code": 0,
+            "process_id": "proc-1789059016109-1129590-1070",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: CLI routing and unrelated command restrictions"
+          },
+          {
+            "command": "cargo test --locked --lib application::development_requests:: -- --test-threads=1",
+            "evidence": "Observed supervised process proc-1789059020489-1129590-1073 exited 0. stdout: d_by_deterministic_identity ... ok\ntest application::development_requests::tests::intake::per_record_failure_retains_successful_imports_and_durable_retry_evidence ... ok\ntest application::development_requests::tests::interrupted_schema_one_migration_write_retains_retryable_legacy_record ... ok\ntest application::development_requests::tests::jmap_patch_uses_the_provider_email_id_as_the_dynamic_object_key ... ok\ntest application::development_requests::tests::legacy_agent_cli_config_is_tolerated_but_inactive_and_omitted ... ok\ntest application::development_requests::tests::linked_and_terminal_schema_one_records_retry_without_duplication ... ok\ntest application::development_requests::tests::local_contract_is_normalized_reread_and_bound_to_one_target ... ok\ntest application::development_requests::tests::local_contract_rejects_a_relative_target ... ok\ntest application::development_requests::tests::local_request_record_round_trips_as_the_durable_retry_queue ... ok\ntest application::development_requests::tests::mime_extraction_keeps_body_and_text_attachments_only ... ok\ntest application::development_requests::tests::one_shot_fetch_checks_target_before_secrets_or_records ... ok\ntest application::development_requests::tests::pending_query_selects_the_recipient_address_without_a_mailbox ... ok\ntest application::development_requests::tests::request_identity_is_stable_and_goal_compatible ... ok\ntest application::development_requests::tests::schema_one_received_is_upgraded_from_raw_mail_before_goal_authoring ... ok\ntest application::development_requests::tests::schema_one_received_links_an_existing_legacy_goal_without_raw_mail_or_rewrite ... ok\ntest application::development_requests::tests::unavailable_schema_one_raw_mail_is_retryable_and_creates_no_goal ... ok\ntest application::development_requests::tests::unsupported_record_is_unchanged_and_does_not_starve_later_valid_record ... ok\n\ntest result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 1145 filtered out; finished in 0.14s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+            "exit_code": 0,
+            "process_id": "proc-1789059020489-1129590-1073",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Email capability and durable recovery"
+          },
+          {
+            "command": "cargo test --locked --test cli_target_root -- --test-threads=1",
+            "evidence": "Observed supervised process proc-1789059020873-1129590-1076 exited 0. stdout: running 4 tests\ntest production_cli_product_commands_require_daemon ... ok\ntest production_cli_rejects_target_root_argument ... ok\ntest production_email_fetch_reaches_capability_with_the_configured_target ... ok\ntest production_email_fetch_rejects_mismatched_target_before_secrets_or_ledger ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running tests/cli_target_root.rs (target/debug/deps/cli_target_root-104a832b35e27d28)",
+            "exit_code": 0,
+            "process_id": "proc-1789059020873-1129590-1076",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Compiled production dispatch and target authorization"
+          },
+          {
+            "command": "cargo build --release --locked --bin refine",
+            "evidence": "Observed supervised process proc-1789059021142-1129590-1079 exited 0. stderr: Finished `release` profile [optimized] target(s) in 0.09s",
+            "exit_code": 0,
+            "process_id": "proc-1789059021142-1129590-1079",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Production release build"
+          },
+          {
+            "command": "cargo test --release --locked --test cli_target_root -- --test-threads=1",
+            "evidence": "Observed supervised process proc-1789059021374-1129590-1082 exited 0. stdout: running 4 tests\ntest production_cli_product_commands_require_daemon ... ok\ntest production_cli_rejects_target_root_argument ... ok\ntest production_email_fetch_reaches_capability_with_the_configured_target ... ok\ntest production_email_fetch_rejects_mismatched_target_before_secrets_or_ledger ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s stderr: Finished `release` profile [optimized] target(s) in 0.09s\n     Running tests/cli_target_root.rs (target/release/deps/cli_target_root-7e5c92834630595f)",
+            "exit_code": 0,
+            "process_id": "proc-1789059021374-1129590-1082",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Release-binary dispatch regressions"
+          },
+          {
+            "command": "cargo fmt --all -- --check",
+            "evidence": "Observed supervised process proc-1789059021642-1129590-1085 exited 0.",
+            "exit_code": 0,
+            "process_id": "proc-1789059021642-1129590-1085",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Rust formatting"
+          },
+          {
+            "command": "git diff --check 0b6cc819de716b1b118f40c4465d114290117699 036c0802c771a6cc5865a8bc4d669480e1a76c57",
+            "evidence": "Observed supervised process proc-1789059023522-1129590-1088 exited 0.",
+            "exit_code": 0,
+            "process_id": "proc-1789059023522-1129590-1088",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Candidate whitespace"
+          },
+          {
+            "command": "python3 -m json.tool docs/runbooks/skills/fetch-goals-from-email.json > /dev/null",
+            "evidence": "Observed supervised process proc-1789059023648-1129590-1091 exited 0.",
+            "exit_code": 0,
+            "process_id": "proc-1789059023648-1129590-1091",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Skill JSON validity"
+          }
+        ],
+        "source_candidate_commit": "036c0802c771a6cc5865a8bc4d669480e1a76c57"
+      },
+      "quality_message": "All Quality Skills passed with supervised evidence.",
       "quality_skill_results": [
         {
           "artifacts": {
@@ -1017,10 +1178,10 @@
           "summary": "Independent Quality review passed with no findings or changes. Focused tests, compiled CLI regressions, release build and required checks passed on the pinned candidate."
         }
       ],
-      "quality_state": "unclassified",
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T16:46:49Z",
+      "updated": "2026-09-10T16:50:24Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T16:28:06Z",
         "round_idx": 0,
@@ -1030,9 +1191,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "quality",
+  "status": "governance",
   "target_branch": "main",
-  "updated": "2026-09-10T16:46:49Z",
+  "updated": "2026-09-10T16:50:24Z",
   "workflow_events": [
     {
       "at": "2026-09-10T16:27:40.832459218+00:00",
@@ -1078,7 +1239,16 @@
       "node_id": "default",
       "round_idx": 0,
       "to": "quality"
+    },
+    {
+      "at": "2026-09-10T16:50:24.522466732+00:00",
+      "forced": false,
+      "from": "quality",
+      "generation": 6,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "governance"
     }
   ],
-  "workflow_revision": 29
+  "workflow_revision": 33
 }

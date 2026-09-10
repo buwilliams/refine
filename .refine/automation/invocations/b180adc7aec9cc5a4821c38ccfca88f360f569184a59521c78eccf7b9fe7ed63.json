@@ -1,0 +1,921 @@
+{
+  "id": "b180adc7aec9cc5a4821c38ccfca88f360f569184a59521c78eccf7b9fe7ed63",
+  "event": {
+    "id": "workflow.governance.enter",
+    "name": "Workflow Governance Enter",
+    "kind": "system",
+    "source": "workflow.governance.enter",
+    "enabled": true,
+    "scope": {
+      "node_id": null
+    },
+    "parameters": [],
+    "bindings": [
+      {
+        "id": "default-governance",
+        "skill_id": "default-governance",
+        "enabled": true,
+        "mode": "blocking",
+        "order": 0,
+        "scope": {
+          "node_id": null
+        },
+        "overrides": null,
+        "inputs": {}
+      }
+    ],
+    "on_success": null
+  },
+  "config_revision": 26,
+  "context": {
+    "node_id": "default",
+    "target_root": "/home/buddy/projects/refine-next",
+    "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T1315EYG3376Q1RY62006-round-1",
+    "provider": "codex",
+    "goal_id": "00000T1315EYG3376Q1RY62006",
+    "round_idx": 0,
+    "workflow_revision": 3,
+    "candidate_commit": "036c0802c771a6cc5865a8bc4d669480e1a76c57",
+    "data": {
+      "context": {
+        "assembled_at": "2026-09-10T16:28:07Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Fix the production CLI dispatch conflict that prevents the standalone Fetch Goals from Email Skill from importing requests into the selected project's Backlog.\n\nObserved failure:\nThe Skill prescribed this command, which was run from /home/buddy/projects/refine-next:\n'/home/buddy/projects/refine/bin/refine' system fetch-email-goals --runtime-root '/home/buddy/projects/refine/run/8082' --target-root '/home/buddy/projects/refine-next'\n\nIt exited with code 1:\ndirect --target-root CLI dispatch is not supported in normal operation; use the daemon API for target state mutations instead (/home/buddy/projects/refine-next)\n\nThe failure occurs before email fetching and before a JSON result is produced. No Goals were imported or recovered by that invocation. A read-only check found 34 existing request.json records retained under /home/buddy/projects/refine/run/8082/self-development-email/requests.\n\nDiagnosis:\nsrc/surfaces/cli/dispatch.rs applies a generic #[cfg(not(test))] explicit_target_root_path rejection before dispatch. That helper includes SystemAction::FetchEmailGoals, whose target_root is required. The existing handler in src/surfaces/cli/dispatch/system.rs is therefore unreachable in normal operation. The unit test email_fetch_cli_requires_the_pinned_target_before_accessing_mail in src/surfaces/cli/tests/system/commands.rs bypasses the production guard through cfg(test), allowing this regression to escape detection.\n\nRequested change:\nImplement a narrowly scoped dispatch correction that restores the documented one-shot capability while preserving the restrictions on other commands and the email capability's existing authorization and retry behavior. Keep docs/runbooks/development-request-email.md and docs/runbooks/skills/fetch-goals-from-email.json consistent with the supported command.\n\nAcceptance criteria:\n1. The documented system fetch-email-goals command, with separately and safely quoted runtime-root and target-root arguments, reaches the email-fetch capability in a production build.\n2. A mismatched configured target is rejected before secret or request-ledger access.\n3. Sender filtering, MIME extraction, deterministic Goal IDs, duplicate prevention, remote acknowledgement, and durable retries remain intact.\n4. Successful fetches return the documented JSON fields, including fetched_count, batch_limit, goal_ids, and errors. Per-record failures retain successful imports and retry evidence while returning a nonzero exit.\n5. Regression coverage executes the compiled CLI with production dispatch checks enabled and would fail on the current bug. Cover both reaching the fetch capability for the intended target and rejecting a mismatched target without secret or ledger access. Existing restrictions on unrelated commands remain effective.\n6. Fetching retains ordinary Backlog creation behavior without approving Goals, changing Review decisions, or sending replies. Preserve the Skill's 25-message batch limit, maximum ten batches, and stop-on-command-failure behavior.\n7. Run the focused CLI and development-request checks plus appropriate compiled-binary regression validation. Use isolated fixtures; preserve the live mailbox, token, raw email source, request ledger, and existing Goals.\n\nDeliver the scoped fix and validation evidence through the ordinary Goal/Round workflow.",
+          "reporter": "Buddy Williams",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000T1315EYG3376Q1RY62006",
+          "name": "Fix Fetch Goals from Email being blocked by CLI dispatch",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": false,
+          "constitution": "",
+          "product": "",
+          "rules": []
+        },
+        "guidance_candidates": [],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "event": {},
+      "goal": {
+        "assignee": "Buddy Williams",
+        "base_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+        "branch_name": "refine/00000T1315EYG3376Q1RY62006/round-1",
+        "candidate_commit": "036c0802c771a6cc5865a8bc4d669480e1a76c57",
+        "created": "2026-09-10T16:27:40Z",
+        "event_generation": 6,
+        "feature_id": null,
+        "feature_order": null,
+        "id": "00000T1315EYG3376Q1RY62006",
+        "name": "Fix Fetch Goals from Email being blocked by CLI dispatch",
+        "node_display_name": "Default",
+        "node_id": "default",
+        "notes": [],
+        "priority": "low",
+        "reporter": "Buddy Williams",
+        "round_count": 1,
+        "rounds": [
+          {
+            "assignee": "Buddy Williams",
+            "constitution_state": "unclassified",
+            "created": "2026-09-10T16:28:05Z",
+            "failure_at": "",
+            "failure_category": "",
+            "failure_message": "",
+            "governance_candidate_commit": "",
+            "governance_checked_at": "",
+            "governance_details": "",
+            "governance_message": "",
+            "governance_rule_actions": [],
+            "guidance_decision": {
+              "applied": [],
+              "context_version": 1,
+              "recorded_at": "2026-09-10T16:42:04Z",
+              "skipped": []
+            },
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+                "context_digest": "ddf4edcf4ee1b89a00b1d4a1534e292739d9671d3321e5a5b2505cb56e81fe5e",
+                "context_version": 1,
+                "goal_id": "00000T1315EYG3376Q1RY62006",
+                "implementation_branch": "refine/00000T1315EYG3376Q1RY62006/round-1",
+                "round_idx": 0,
+                "target_branch": "main"
+              },
+              "completed_at": "2026-09-10T16:42:04Z",
+              "final_plan": {
+                "completed_at": "2026-09-10T16:32:00Z",
+                "git_after": {
+                  "branch": "refine/00000T1315EYG3376Q1RY62006/round-1",
+                  "head_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/00000T1315EYG3376Q1RY62006/round-1",
+                  "head_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "In src/surfaces/cli/dispatch.rs, classify only SystemAction::FetchEmailGoals as exempt from the direct-target rejection. Document that its required target identifies the connection authorized by development_requests::fetch_email_goals. Preserve the production guard and every unrelated command classification.",
+                      "id": "workflow.plan.enter:default-plan:P1"
+                    },
+                    {
+                      "description": "Extend tests/cli_target_root.rs to execute CARGO_BIN_EXE_refine with separate arguments and temporary paths containing spaces and apostrophes. Initialize a real temporary Git target and valid local connection without credentials; require the specific missing email/fastmail_jmap_token error, proving production dispatch reached the capability without contacting mail. Both new routing tests must fail against the current guard.",
+                      "id": "workflow.plan.enter:default-plan:P2"
+                    },
+                    {
+                      "description": "Add the compiled mismatched-target case using distinct temporary targets, a malformed secret index, and retained ledger sentinels. Require the application’s different-target error before secret parsing, fetch-lock creation, or ledger processing; assert unchanged fixture state. Retain compiled tests for rejected goal --target-root arguments and daemon-required product commands, plus unit coverage that unrelated targets remain classified as restricted.",
+                      "id": "workflow.plan.enter:default-plan:P3"
+                    },
+                    {
+                      "description": "Preserve the existing handler and email-processing implementation. Extend existing application tests through MailSource where coverage is missing: sender filtering, durable recording before remote acknowledgement, successful imports surviving per-record failures, returned goal_ids/errors/batch_limit, retry evidence, deterministic deduplication, and ordinary Backlog creation. Retain MIME, legacy migration, and historical-record tests. Verify the unchanged handler prints JSON including fetched_count before returning nonzero for per-record errors. Put substantial new intake tests in a cohesive child module.",
+                      "id": "workflow.plan.enter:default-plan:P4"
+                    },
+                    {
+                      "description": "Update docs/runbooks/development-request-email.md with separately quoted executable, runtime-root, and target-root values. Keep fetch-goals-from-email.json consistent with the same command, 25-message batches, ten-batch maximum, and immediate stop on command failure. Clarify the bounded one-shot exception in docs/intent/05-surfaces/02-cli.md; preserve the existing Skills intent and prohibition on fetching approving Goals, changing Review decisions, or sending replies.",
+                      "id": "workflow.plan.enter:default-plan:P5"
+                    },
+                    {
+                      "description": "From the pinned worktree, run cargo test --locked --lib surfaces::cli::tests -- --test-threads=1; cargo test --locked --lib application::development_requests::tests -- --test-threads=1; cargo test --locked --test cli_target_root -- --test-threads=1; cargo build --release --locked --bin refine; cargo fmt --all -- --check; and git diff --check. Parse-check the Skill JSON and review its batch/stop instructions. Report actual test counts, baseline failures, and candidate evidence through the ordinary workflow, using isolated fixtures and preserving all live mail, credentials, records, and Goals.",
+                      "id": "workflow.plan.enter:default-plan:P6"
+                    }
+                  ],
+                  "summary": "workflow.plan.enter:default-plan: Restore the documented email-fetch command by correcting its dispatch classification while preserving application-owned target authorization, durable intake behavior, and restrictions on unrelated commands."
+                },
+                "started_at": "2026-09-10T16:28:07Z"
+              },
+              "implementation": {
+                "completed_at": "2026-09-10T16:42:04Z",
+                "execution": {
+                  "checklist": [
+                    {
+                      "evidence": "Exempted only FetchEmailGoals from direct-target rejection. Preserved the production guard and application-owned authorization.",
+                      "id": "workflow.plan.enter:default-plan:P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added compiled-CLI tests using temporary Git targets and separate arguments containing spaces and apostrophes. Both new tests failed against the original guard. The corrected matching-target invocation reaches the specific missing email/fastmail_jmap_token error without contacting mail.",
+                      "id": "workflow.plan.enter:default-plan:P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Mismatched-target regression returns the application authorization error before malformed secret parsing or ledger processing. Complete fixture snapshots remain unchanged, including absence of fetch-lock creation. Existing command restrictions and classification tests pass.",
+                      "id": "workflow.plan.enter:default-plan:P3",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added five passing MailSource tests in tests/intake.rs covering sender filtering, durable recording before acknowledgement, failure retries, partial-success results, deterministic deduplication, and Backlog creation. Existing MIME, migration, and historical-record tests pass. Unchanged source confirms fetched_count inclusion and JSON printing before nonzero failure; no credentialed end-to-end fetch was attempted.",
+                      "id": "workflow.plan.enter:default-plan:P4",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Updated the runbook, Skill JSON, and CLI intent. Validated separate quoted arguments, 25-message batches, ten-batch maximum, immediate stop on failure, and unchanged approval/Review/reply restrictions.",
+                      "id": "workflow.plan.enter:default-plan:P5",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "All required checks and supplemental release-binary regressions passed. Original-guard failures and final verification logs are retained in /tmp/refine-email-dispatch-e68b7463-evidence/.",
+                      "id": "workflow.plan.enter:default-plan:P6",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "Original guard: compiled CLI suite — 2 existing tests passed; both new routing tests failed as expected.",
+                    "cargo test --locked --lib surfaces::cli::tests -- --test-threads=1 — 72 passed.",
+                    "cargo test --locked --lib application::development_requests::tests -- --test-threads=1 — 22 passed.",
+                    "cargo test --locked --test cli_target_root -- --test-threads=1 — 4 passed.",
+                    "Supplemental compiled unit-harness checks — 2 MIME tests and 1 record-schema test passed.",
+                    "cargo build --release --locked --bin refine — passed.",
+                    "cargo test --release --locked --test cli_target_root -- --test-threads=1 — 4 passed.",
+                    "cargo fmt --all -- --check — passed.",
+                    "git diff --check — passed.",
+                    "Skill JSON parsing and command/batch/stop assertions — passed."
+                  ]
+                },
+                "report": "workflow.implement.enter:default-implement: Restored production email-fetch dispatch while preserving application authorization. Verification passed; changes are ready for Refine's candidate and Quality handoff.",
+                "started_at": "2026-09-10T16:32:00Z"
+              },
+              "phase": "implement",
+              "phase_started_at": "2026-09-10T16:32:00Z",
+              "proposal": {
+                "completed_at": "2026-09-10T16:32:00Z",
+                "git_after": {
+                  "branch": "refine/00000T1315EYG3376Q1RY62006/round-1",
+                  "head_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/00000T1315EYG3376Q1RY62006/round-1",
+                  "head_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "In src/surfaces/cli/dispatch.rs, classify only SystemAction::FetchEmailGoals as exempt from the direct-target rejection. Document that its required target identifies the connection authorized by development_requests::fetch_email_goals. Preserve the production guard and every unrelated command classification.",
+                      "id": "workflow.plan.enter:default-plan:P1"
+                    },
+                    {
+                      "description": "Extend tests/cli_target_root.rs to execute CARGO_BIN_EXE_refine with separate arguments and temporary paths containing spaces and apostrophes. Initialize a real temporary Git target and valid local connection without credentials; require the specific missing email/fastmail_jmap_token error, proving production dispatch reached the capability without contacting mail. Both new routing tests must fail against the current guard.",
+                      "id": "workflow.plan.enter:default-plan:P2"
+                    },
+                    {
+                      "description": "Add the compiled mismatched-target case using distinct temporary targets, a malformed secret index, and retained ledger sentinels. Require the application’s different-target error before secret parsing, fetch-lock creation, or ledger processing; assert unchanged fixture state. Retain compiled tests for rejected goal --target-root arguments and daemon-required product commands, plus unit coverage that unrelated targets remain classified as restricted.",
+                      "id": "workflow.plan.enter:default-plan:P3"
+                    },
+                    {
+                      "description": "Preserve the existing handler and email-processing implementation. Extend existing application tests through MailSource where coverage is missing: sender filtering, durable recording before remote acknowledgement, successful imports surviving per-record failures, returned goal_ids/errors/batch_limit, retry evidence, deterministic deduplication, and ordinary Backlog creation. Retain MIME, legacy migration, and historical-record tests. Verify the unchanged handler prints JSON including fetched_count before returning nonzero for per-record errors. Put substantial new intake tests in a cohesive child module.",
+                      "id": "workflow.plan.enter:default-plan:P4"
+                    },
+                    {
+                      "description": "Update docs/runbooks/development-request-email.md with separately quoted executable, runtime-root, and target-root values. Keep fetch-goals-from-email.json consistent with the same command, 25-message batches, ten-batch maximum, and immediate stop on command failure. Clarify the bounded one-shot exception in docs/intent/05-surfaces/02-cli.md; preserve the existing Skills intent and prohibition on fetching approving Goals, changing Review decisions, or sending replies.",
+                      "id": "workflow.plan.enter:default-plan:P5"
+                    },
+                    {
+                      "description": "From the pinned worktree, run cargo test --locked --lib surfaces::cli::tests -- --test-threads=1; cargo test --locked --lib application::development_requests::tests -- --test-threads=1; cargo test --locked --test cli_target_root -- --test-threads=1; cargo build --release --locked --bin refine; cargo fmt --all -- --check; and git diff --check. Parse-check the Skill JSON and review its batch/stop instructions. Report actual test counts, baseline failures, and candidate evidence through the ordinary workflow, using isolated fixtures and preserving all live mail, credentials, records, and Goals.",
+                      "id": "workflow.plan.enter:default-plan:P6"
+                    }
+                  ],
+                  "summary": "workflow.plan.enter:default-plan: Restore the documented email-fetch command by correcting its dispatch classification while preserving application-owned target authorization, durable intake behavior, and restrictions on unrelated commands."
+                },
+                "started_at": "2026-09-10T16:28:07Z"
+              },
+              "schema_version": 2,
+              "started_at": "2026-09-10T16:28:07Z",
+              "state": "completed",
+              "updated_at": "2026-09-10T16:42:04Z"
+            },
+            "implementation_report": "workflow.implement.enter:default-implement: Restored production email-fetch dispatch while preserving application authorization. Verification passed; changes are ready for Refine's candidate and Quality handoff.",
+            "implementation_reported_at": "2026-09-10T16:42:04Z",
+            "latest_log": {
+              "actor": "refine",
+              "category": "state",
+              "datetime": "2026-09-10T16:50:24Z",
+              "details": {
+                "node_id": "default"
+              },
+              "goal_id": "00000T1315EYG3376Q1RY62006",
+              "message": "Workflow status changed: quality -> governance",
+              "round_idx": 0,
+              "severity": "info"
+            },
+            "latest_state_log": {
+              "actor": "refine",
+              "category": "state",
+              "datetime": "2026-09-10T16:50:24Z",
+              "details": {
+                "node_id": "default"
+              },
+              "goal_id": "00000T1315EYG3376Q1RY62006",
+              "message": "Workflow status changed: quality -> governance",
+              "round_idx": 0,
+              "severity": "info"
+            },
+            "latest_workflow_log": {
+              "actor": "refine",
+              "category": "state",
+              "datetime": "2026-09-10T16:50:24Z",
+              "details": {
+                "node_id": "default"
+              },
+              "goal_id": "00000T1315EYG3376Q1RY62006",
+              "message": "Workflow status changed: quality -> governance",
+              "round_idx": 0,
+              "severity": "info"
+            },
+            "logs": [
+              {
+                "actor": "refine",
+                "category": "git",
+                "datetime": "2026-09-10T16:28:07Z",
+                "details": {
+                  "node_id": "default",
+                  "remote": "origin",
+                  "target_branch": "main",
+                  "target_commit": "0b6cc819de716b1b118f40c4465d114290117699"
+                },
+                "goal_id": "00000T1315EYG3376Q1RY62006",
+                "message": "Local main already carried the fetched tip",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "state",
+                "datetime": "2026-09-10T16:28:07Z",
+                "details": {
+                  "node_id": "default"
+                },
+                "goal_id": "00000T1315EYG3376Q1RY62006",
+                "message": "Workflow status changed: todo -> plan",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "git",
+                "datetime": "2026-09-10T16:28:07Z",
+                "details": {
+                  "base_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+                  "branch": "refine/00000T1315EYG3376Q1RY62006/round-1",
+                  "branch_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+                  "node_id": "default",
+                  "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T1315EYG3376Q1RY62006-round-1"
+                },
+                "goal_id": "00000T1315EYG3376Q1RY62006",
+                "message": "Created implementation worktree for refine/00000T1315EYG3376Q1RY62006/round-1",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "state",
+                "datetime": "2026-09-10T16:32:00Z",
+                "details": {
+                  "node_id": "default"
+                },
+                "goal_id": "00000T1315EYG3376Q1RY62006",
+                "message": "Workflow status changed: plan -> implement",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "agent",
+                "datetime": "2026-09-10T16:42:04Z",
+                "details": {
+                  "branch": "refine/00000T1315EYG3376Q1RY62006/round-1",
+                  "node_id": "default",
+                  "output": "workflow.implement.enter:default-implement: Restored production email-fetch dispatch while preserving application authorization. Verification passed; changes are ready for Refine's candidate and Quality handoff.",
+                  "provider": "codex",
+                  "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T1315EYG3376Q1RY62006-round-1"
+                },
+                "goal_id": "00000T1315EYG3376Q1RY62006",
+                "message": "Goal agent completed",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "git",
+                "datetime": "2026-09-10T16:42:04Z",
+                "details": {
+                  "branch": "refine/00000T1315EYG3376Q1RY62006/round-1",
+                  "commit": "036c0802c771a6cc5865a8bc4d669480e1a76c57",
+                  "node_id": "default",
+                  "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T1315EYG3376Q1RY62006-round-1"
+                },
+                "goal_id": "00000T1315EYG3376Q1RY62006",
+                "message": "Committed implementation branch refine/00000T1315EYG3376Q1RY62006/round-1",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "state",
+                "datetime": "2026-09-10T16:42:04Z",
+                "details": {
+                  "node_id": "default"
+                },
+                "goal_id": "00000T1315EYG3376Q1RY62006",
+                "message": "Workflow status changed: implement -> quality",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "quality",
+                "datetime": "2026-09-10T16:46:49Z",
+                "details": {
+                  "candidate_commit": "036c0802c771a6cc5865a8bc4d669480e1a76c57",
+                  "node_id": "default",
+                  "report": "workflow.quality.enter:default-quality: Independent Quality review passed with no findings or changes. Focused tests, compiled CLI regressions, release build and required checks passed on the pinned candidate."
+                },
+                "goal_id": "00000T1315EYG3376Q1RY62006",
+                "message": "Quality Agent completed candidate review and corrections",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "quality",
+                "datetime": "2026-09-10T16:50:24Z",
+                "details": {
+                  "candidate_commit": "036c0802c771a6cc5865a8bc4d669480e1a76c57",
+                  "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T1315EYG3376Q1RY62006-round-1",
+                  "diagnostics": [
+                    "Event invocation 227d4c60eaa92ef8ce7cccc2cacbeb1c3a11a7cd825e45be4483ce9da052a4b8: automation/invocations/227d4c60eaa92ef8ce7cccc2cacbeb1c3a11a7cd825e45be4483ce9da052a4b8.json",
+                    "Observed supervised process proc-1789059016109-1129590-1070 exited 0. stdout: vice_start_command_failure_preserves_health_and_exact_evidence ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_start_clears_stale_failure_but_observes_a_new_failure ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_start_times_out_without_hiding_the_manager_context ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_stop_command_failure_keeps_active_status_and_recovery_evidence ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_stop_timeout_never_persists_stopped ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_stop_waits_for_confirmed_shutdown ... ok\ntest surfaces::cli::tests::system::daemon::system_lifecycle_commands_default_to_8082 ... ok\ntest surfaces::cli::tests::system::daemon::system_start_migrates_and_detaches_an_unavailable_port_scoped_project ... ok\ntest surfaces::cli::tests::system::daemon::system_start_owns_foreground_web_options ... ok\ntest surfaces::cli::tests::system::daemon::system_start_resolves_relative_runtime_root_before_spawning_daemon ... ok\ntest surfaces::cli::tests::system::daemon::system_status_reports_current_version_and_running_ports ... ok\ntest surfaces::cli::tests::system::installation::retired_system_install_and_uninstall_commands_are_not_parseable ... ok\ntest surfaces::cli::tests::system::installation::system_service_install_repair_and_service_uninstall_use_installation_service ... ok\ntest surfaces::cli::tests::system::installation::system_update_is_owned_by_the_launcher_not_the_deployed_binary ... ok\ntest surfaces::cli::tests::system::release_workers::system_start_recovers_jira_export_and_public_retry_launches_supervised_worker ... ok\ntest surfaces::cli::tests::system::release_workers::system_start_refuses_jira_retry_when_orphan_exit_cannot_be_confirmed ... ok\ntest surfaces::cli::tests::todos::todo_commands_dispatch_through_the_shared_file_todo_service ... ok\n\ntest result: ok. 72 passed; 0 failed; 0 ignored; 0 measured; 1098 filtered out; finished in 4.13s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                    "Observed supervised process proc-1789059020489-1129590-1073 exited 0. stdout: d_by_deterministic_identity ... ok\ntest application::development_requests::tests::intake::per_record_failure_retains_successful_imports_and_durable_retry_evidence ... ok\ntest application::development_requests::tests::interrupted_schema_one_migration_write_retains_retryable_legacy_record ... ok\ntest application::development_requests::tests::jmap_patch_uses_the_provider_email_id_as_the_dynamic_object_key ... ok\ntest application::development_requests::tests::legacy_agent_cli_config_is_tolerated_but_inactive_and_omitted ... ok\ntest application::development_requests::tests::linked_and_terminal_schema_one_records_retry_without_duplication ... ok\ntest application::development_requests::tests::local_contract_is_normalized_reread_and_bound_to_one_target ... ok\ntest application::development_requests::tests::local_contract_rejects_a_relative_target ... ok\ntest application::development_requests::tests::local_request_record_round_trips_as_the_durable_retry_queue ... ok\ntest application::development_requests::tests::mime_extraction_keeps_body_and_text_attachments_only ... ok\ntest application::development_requests::tests::one_shot_fetch_checks_target_before_secrets_or_records ... ok\ntest application::development_requests::tests::pending_query_selects_the_recipient_address_without_a_mailbox ... ok\ntest application::development_requests::tests::request_identity_is_stable_and_goal_compatible ... ok\ntest application::development_requests::tests::schema_one_received_is_upgraded_from_raw_mail_before_goal_authoring ... ok\ntest application::development_requests::tests::schema_one_received_links_an_existing_legacy_goal_without_raw_mail_or_rewrite ... ok\ntest application::development_requests::tests::unavailable_schema_one_raw_mail_is_retryable_and_creates_no_goal ... ok\ntest application::development_requests::tests::unsupported_record_is_unchanged_and_does_not_starve_later_valid_record ... ok\n\ntest result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 1145 filtered out; finished in 0.14s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                    "Observed supervised process proc-1789059020873-1129590-1076 exited 0. stdout: running 4 tests\ntest production_cli_product_commands_require_daemon ... ok\ntest production_cli_rejects_target_root_argument ... ok\ntest production_email_fetch_reaches_capability_with_the_configured_target ... ok\ntest production_email_fetch_rejects_mismatched_target_before_secrets_or_ledger ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running tests/cli_target_root.rs (target/debug/deps/cli_target_root-104a832b35e27d28)",
+                    "Observed supervised process proc-1789059021142-1129590-1079 exited 0. stderr: Finished `release` profile [optimized] target(s) in 0.09s",
+                    "Observed supervised process proc-1789059021374-1129590-1082 exited 0. stdout: running 4 tests\ntest production_cli_product_commands_require_daemon ... ok\ntest production_cli_rejects_target_root_argument ... ok\ntest production_email_fetch_reaches_capability_with_the_configured_target ... ok\ntest production_email_fetch_rejects_mismatched_target_before_secrets_or_ledger ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s stderr: Finished `release` profile [optimized] target(s) in 0.09s\n     Running tests/cli_target_root.rs (target/release/deps/cli_target_root-7e5c92834630595f)",
+                    "Observed supervised process proc-1789059021642-1129590-1085 exited 0.",
+                    "Observed supervised process proc-1789059023522-1129590-1088 exited 0.",
+                    "Observed supervised process proc-1789059023648-1129590-1091 exited 0."
+                  ],
+                  "evaluation_scope": "isolated_candidate",
+                  "operation_id": "1a08c370376113c7671",
+                  "provider_attempts": [],
+                  "quality_proof": {
+                    "checked_at": "2026-09-10T16:50:24Z",
+                    "checked_candidate_commit": "036c0802c771a6cc5865a8bc4d669480e1a76c57",
+                    "evaluation_scope": "isolated_candidate",
+                    "goal_id": "00000T1315EYG3376Q1RY62006",
+                    "operation_id": "1a08c370376113c7671",
+                    "results": [
+                      {
+                        "command": "cargo test --locked --lib surfaces::cli::tests -- --test-threads=1",
+                        "evidence": "Observed supervised process proc-1789059016109-1129590-1070 exited 0. stdout: vice_start_command_failure_preserves_health_and_exact_evidence ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_start_clears_stale_failure_but_observes_a_new_failure ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_start_times_out_without_hiding_the_manager_context ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_stop_command_failure_keeps_active_status_and_recovery_evidence ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_stop_timeout_never_persists_stopped ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_stop_waits_for_confirmed_shutdown ... ok\ntest surfaces::cli::tests::system::daemon::system_lifecycle_commands_default_to_8082 ... ok\ntest surfaces::cli::tests::system::daemon::system_start_migrates_and_detaches_an_unavailable_port_scoped_project ... ok\ntest surfaces::cli::tests::system::daemon::system_start_owns_foreground_web_options ... ok\ntest surfaces::cli::tests::system::daemon::system_start_resolves_relative_runtime_root_before_spawning_daemon ... ok\ntest surfaces::cli::tests::system::daemon::system_status_reports_current_version_and_running_ports ... ok\ntest surfaces::cli::tests::system::installation::retired_system_install_and_uninstall_commands_are_not_parseable ... ok\ntest surfaces::cli::tests::system::installation::system_service_install_repair_and_service_uninstall_use_installation_service ... ok\ntest surfaces::cli::tests::system::installation::system_update_is_owned_by_the_launcher_not_the_deployed_binary ... ok\ntest surfaces::cli::tests::system::release_workers::system_start_recovers_jira_export_and_public_retry_launches_supervised_worker ... ok\ntest surfaces::cli::tests::system::release_workers::system_start_refuses_jira_retry_when_orphan_exit_cannot_be_confirmed ... ok\ntest surfaces::cli::tests::todos::todo_commands_dispatch_through_the_shared_file_todo_service ... ok\n\ntest result: ok. 72 passed; 0 failed; 0 ignored; 0 measured; 1098 filtered out; finished in 4.13s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                        "exit_code": 0,
+                        "process_id": "proc-1789059016109-1129590-1070",
+                        "status": "passed",
+                        "test": "workflow.quality.enter:default-quality: CLI routing and unrelated command restrictions"
+                      },
+                      {
+                        "command": "cargo test --locked --lib application::development_requests:: -- --test-threads=1",
+                        "evidence": "Observed supervised process proc-1789059020489-1129590-1073 exited 0. stdout: d_by_deterministic_identity ... ok\ntest application::development_requests::tests::intake::per_record_failure_retains_successful_imports_and_durable_retry_evidence ... ok\ntest application::development_requests::tests::interrupted_schema_one_migration_write_retains_retryable_legacy_record ... ok\ntest application::development_requests::tests::jmap_patch_uses_the_provider_email_id_as_the_dynamic_object_key ... ok\ntest application::development_requests::tests::legacy_agent_cli_config_is_tolerated_but_inactive_and_omitted ... ok\ntest application::development_requests::tests::linked_and_terminal_schema_one_records_retry_without_duplication ... ok\ntest application::development_requests::tests::local_contract_is_normalized_reread_and_bound_to_one_target ... ok\ntest application::development_requests::tests::local_contract_rejects_a_relative_target ... ok\ntest application::development_requests::tests::local_request_record_round_trips_as_the_durable_retry_queue ... ok\ntest application::development_requests::tests::mime_extraction_keeps_body_and_text_attachments_only ... ok\ntest application::development_requests::tests::one_shot_fetch_checks_target_before_secrets_or_records ... ok\ntest application::development_requests::tests::pending_query_selects_the_recipient_address_without_a_mailbox ... ok\ntest application::development_requests::tests::request_identity_is_stable_and_goal_compatible ... ok\ntest application::development_requests::tests::schema_one_received_is_upgraded_from_raw_mail_before_goal_authoring ... ok\ntest application::development_requests::tests::schema_one_received_links_an_existing_legacy_goal_without_raw_mail_or_rewrite ... ok\ntest application::development_requests::tests::unavailable_schema_one_raw_mail_is_retryable_and_creates_no_goal ... ok\ntest application::development_requests::tests::unsupported_record_is_unchanged_and_does_not_starve_later_valid_record ... ok\n\ntest result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 1145 filtered out; finished in 0.14s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                        "exit_code": 0,
+                        "process_id": "proc-1789059020489-1129590-1073",
+                        "status": "passed",
+                        "test": "workflow.quality.enter:default-quality: Email capability and durable recovery"
+                      },
+                      {
+                        "command": "cargo test --locked --test cli_target_root -- --test-threads=1",
+                        "evidence": "Observed supervised process proc-1789059020873-1129590-1076 exited 0. stdout: running 4 tests\ntest production_cli_product_commands_require_daemon ... ok\ntest production_cli_rejects_target_root_argument ... ok\ntest production_email_fetch_reaches_capability_with_the_configured_target ... ok\ntest production_email_fetch_rejects_mismatched_target_before_secrets_or_ledger ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running tests/cli_target_root.rs (target/debug/deps/cli_target_root-104a832b35e27d28)",
+                        "exit_code": 0,
+                        "process_id": "proc-1789059020873-1129590-1076",
+                        "status": "passed",
+                        "test": "workflow.quality.enter:default-quality: Compiled production dispatch and target authorization"
+                      },
+                      {
+                        "command": "cargo build --release --locked --bin refine",
+                        "evidence": "Observed supervised process proc-1789059021142-1129590-1079 exited 0. stderr: Finished `release` profile [optimized] target(s) in 0.09s",
+                        "exit_code": 0,
+                        "process_id": "proc-1789059021142-1129590-1079",
+                        "status": "passed",
+                        "test": "workflow.quality.enter:default-quality: Production release build"
+                      },
+                      {
+                        "command": "cargo test --release --locked --test cli_target_root -- --test-threads=1",
+                        "evidence": "Observed supervised process proc-1789059021374-1129590-1082 exited 0. stdout: running 4 tests\ntest production_cli_product_commands_require_daemon ... ok\ntest production_cli_rejects_target_root_argument ... ok\ntest production_email_fetch_reaches_capability_with_the_configured_target ... ok\ntest production_email_fetch_rejects_mismatched_target_before_secrets_or_ledger ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s stderr: Finished `release` profile [optimized] target(s) in 0.09s\n     Running tests/cli_target_root.rs (target/release/deps/cli_target_root-7e5c92834630595f)",
+                        "exit_code": 0,
+                        "process_id": "proc-1789059021374-1129590-1082",
+                        "status": "passed",
+                        "test": "workflow.quality.enter:default-quality: Release-binary dispatch regressions"
+                      },
+                      {
+                        "command": "cargo fmt --all -- --check",
+                        "evidence": "Observed supervised process proc-1789059021642-1129590-1085 exited 0.",
+                        "exit_code": 0,
+                        "process_id": "proc-1789059021642-1129590-1085",
+                        "status": "passed",
+                        "test": "workflow.quality.enter:default-quality: Rust formatting"
+                      },
+                      {
+                        "command": "git diff --check 0b6cc819de716b1b118f40c4465d114290117699 036c0802c771a6cc5865a8bc4d669480e1a76c57",
+                        "evidence": "Observed supervised process proc-1789059023522-1129590-1088 exited 0.",
+                        "exit_code": 0,
+                        "process_id": "proc-1789059023522-1129590-1088",
+                        "status": "passed",
+                        "test": "workflow.quality.enter:default-quality: Candidate whitespace"
+                      },
+                      {
+                        "command": "python3 -m json.tool docs/runbooks/skills/fetch-goals-from-email.json > /dev/null",
+                        "evidence": "Observed supervised process proc-1789059023648-1129590-1091 exited 0.",
+                        "exit_code": 0,
+                        "process_id": "proc-1789059023648-1129590-1091",
+                        "status": "passed",
+                        "test": "workflow.quality.enter:default-quality: Skill JSON validity"
+                      }
+                    ],
+                    "round_idx": 0,
+                    "schema_version": 1,
+                    "source_candidate_commit": "036c0802c771a6cc5865a8bc4d669480e1a76c57",
+                    "state": "passed"
+                  },
+                  "results": [
+                    {
+                      "command": "cargo test --locked --lib surfaces::cli::tests -- --test-threads=1",
+                      "evidence": "Observed supervised process proc-1789059016109-1129590-1070 exited 0. stdout: vice_start_command_failure_preserves_health_and_exact_evidence ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_start_clears_stale_failure_but_observes_a_new_failure ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_start_times_out_without_hiding_the_manager_context ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_stop_command_failure_keeps_active_status_and_recovery_evidence ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_stop_timeout_never_persists_stopped ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_stop_waits_for_confirmed_shutdown ... ok\ntest surfaces::cli::tests::system::daemon::system_lifecycle_commands_default_to_8082 ... ok\ntest surfaces::cli::tests::system::daemon::system_start_migrates_and_detaches_an_unavailable_port_scoped_project ... ok\ntest surfaces::cli::tests::system::daemon::system_start_owns_foreground_web_options ... ok\ntest surfaces::cli::tests::system::daemon::system_start_resolves_relative_runtime_root_before_spawning_daemon ... ok\ntest surfaces::cli::tests::system::daemon::system_status_reports_current_version_and_running_ports ... ok\ntest surfaces::cli::tests::system::installation::retired_system_install_and_uninstall_commands_are_not_parseable ... ok\ntest surfaces::cli::tests::system::installation::system_service_install_repair_and_service_uninstall_use_installation_service ... ok\ntest surfaces::cli::tests::system::installation::system_update_is_owned_by_the_launcher_not_the_deployed_binary ... ok\ntest surfaces::cli::tests::system::release_workers::system_start_recovers_jira_export_and_public_retry_launches_supervised_worker ... ok\ntest surfaces::cli::tests::system::release_workers::system_start_refuses_jira_retry_when_orphan_exit_cannot_be_confirmed ... ok\ntest surfaces::cli::tests::todos::todo_commands_dispatch_through_the_shared_file_todo_service ... ok\n\ntest result: ok. 72 passed; 0 failed; 0 ignored; 0 measured; 1098 filtered out; finished in 4.13s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                      "exit_code": 0,
+                      "process_id": "proc-1789059016109-1129590-1070",
+                      "status": "passed",
+                      "test": "workflow.quality.enter:default-quality: CLI routing and unrelated command restrictions"
+                    },
+                    {
+                      "command": "cargo test --locked --lib application::development_requests:: -- --test-threads=1",
+                      "evidence": "Observed supervised process proc-1789059020489-1129590-1073 exited 0. stdout: d_by_deterministic_identity ... ok\ntest application::development_requests::tests::intake::per_record_failure_retains_successful_imports_and_durable_retry_evidence ... ok\ntest application::development_requests::tests::interrupted_schema_one_migration_write_retains_retryable_legacy_record ... ok\ntest application::development_requests::tests::jmap_patch_uses_the_provider_email_id_as_the_dynamic_object_key ... ok\ntest application::development_requests::tests::legacy_agent_cli_config_is_tolerated_but_inactive_and_omitted ... ok\ntest application::development_requests::tests::linked_and_terminal_schema_one_records_retry_without_duplication ... ok\ntest application::development_requests::tests::local_contract_is_normalized_reread_and_bound_to_one_target ... ok\ntest application::development_requests::tests::local_contract_rejects_a_relative_target ... ok\ntest application::development_requests::tests::local_request_record_round_trips_as_the_durable_retry_queue ... ok\ntest application::development_requests::tests::mime_extraction_keeps_body_and_text_attachments_only ... ok\ntest application::development_requests::tests::one_shot_fetch_checks_target_before_secrets_or_records ... ok\ntest application::development_requests::tests::pending_query_selects_the_recipient_address_without_a_mailbox ... ok\ntest application::development_requests::tests::request_identity_is_stable_and_goal_compatible ... ok\ntest application::development_requests::tests::schema_one_received_is_upgraded_from_raw_mail_before_goal_authoring ... ok\ntest application::development_requests::tests::schema_one_received_links_an_existing_legacy_goal_without_raw_mail_or_rewrite ... ok\ntest application::development_requests::tests::unavailable_schema_one_raw_mail_is_retryable_and_creates_no_goal ... ok\ntest application::development_requests::tests::unsupported_record_is_unchanged_and_does_not_starve_later_valid_record ... ok\n\ntest result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 1145 filtered out; finished in 0.14s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                      "exit_code": 0,
+                      "process_id": "proc-1789059020489-1129590-1073",
+                      "status": "passed",
+                      "test": "workflow.quality.enter:default-quality: Email capability and durable recovery"
+                    },
+                    {
+                      "command": "cargo test --locked --test cli_target_root -- --test-threads=1",
+                      "evidence": "Observed supervised process proc-1789059020873-1129590-1076 exited 0. stdout: running 4 tests\ntest production_cli_product_commands_require_daemon ... ok\ntest production_cli_rejects_target_root_argument ... ok\ntest production_email_fetch_reaches_capability_with_the_configured_target ... ok\ntest production_email_fetch_rejects_mismatched_target_before_secrets_or_ledger ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running tests/cli_target_root.rs (target/debug/deps/cli_target_root-104a832b35e27d28)",
+                      "exit_code": 0,
+                      "process_id": "proc-1789059020873-1129590-1076",
+                      "status": "passed",
+                      "test": "workflow.quality.enter:default-quality: Compiled production dispatch and target authorization"
+                    },
+                    {
+                      "command": "cargo build --release --locked --bin refine",
+                      "evidence": "Observed supervised process proc-1789059021142-1129590-1079 exited 0. stderr: Finished `release` profile [optimized] target(s) in 0.09s",
+                      "exit_code": 0,
+                      "process_id": "proc-1789059021142-1129590-1079",
+                      "status": "passed",
+                      "test": "workflow.quality.enter:default-quality: Production release build"
+                    },
+                    {
+                      "command": "cargo test --release --locked --test cli_target_root -- --test-threads=1",
+                      "evidence": "Observed supervised process proc-1789059021374-1129590-1082 exited 0. stdout: running 4 tests\ntest production_cli_product_commands_require_daemon ... ok\ntest production_cli_rejects_target_root_argument ... ok\ntest production_email_fetch_reaches_capability_with_the_configured_target ... ok\ntest production_email_fetch_rejects_mismatched_target_before_secrets_or_ledger ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s stderr: Finished `release` profile [optimized] target(s) in 0.09s\n     Running tests/cli_target_root.rs (target/release/deps/cli_target_root-7e5c92834630595f)",
+                      "exit_code": 0,
+                      "process_id": "proc-1789059021374-1129590-1082",
+                      "status": "passed",
+                      "test": "workflow.quality.enter:default-quality: Release-binary dispatch regressions"
+                    },
+                    {
+                      "command": "cargo fmt --all -- --check",
+                      "evidence": "Observed supervised process proc-1789059021642-1129590-1085 exited 0.",
+                      "exit_code": 0,
+                      "process_id": "proc-1789059021642-1129590-1085",
+                      "status": "passed",
+                      "test": "workflow.quality.enter:default-quality: Rust formatting"
+                    },
+                    {
+                      "command": "git diff --check 0b6cc819de716b1b118f40c4465d114290117699 036c0802c771a6cc5865a8bc4d669480e1a76c57",
+                      "evidence": "Observed supervised process proc-1789059023522-1129590-1088 exited 0.",
+                      "exit_code": 0,
+                      "process_id": "proc-1789059023522-1129590-1088",
+                      "status": "passed",
+                      "test": "workflow.quality.enter:default-quality: Candidate whitespace"
+                    },
+                    {
+                      "command": "python3 -m json.tool docs/runbooks/skills/fetch-goals-from-email.json > /dev/null",
+                      "evidence": "Observed supervised process proc-1789059023648-1129590-1091 exited 0.",
+                      "exit_code": 0,
+                      "process_id": "proc-1789059023648-1129590-1091",
+                      "status": "passed",
+                      "test": "workflow.quality.enter:default-quality: Skill JSON validity"
+                    }
+                  ],
+                  "source_candidate_commit": "036c0802c771a6cc5865a8bc4d669480e1a76c57"
+                },
+                "goal_id": "00000T1315EYG3376Q1RY62006",
+                "message": "All Quality Skills passed with supervised evidence.",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "state",
+                "datetime": "2026-09-10T16:50:24Z",
+                "details": {
+                  "node_id": "default"
+                },
+                "goal_id": "00000T1315EYG3376Q1RY62006",
+                "message": "Workflow status changed: quality -> governance",
+                "round_idx": 0,
+                "severity": "info"
+              }
+            ],
+            "meta_rule_state": "unclassified",
+            "product_state": "unclassified",
+            "prompt": "Fix the production CLI dispatch conflict that prevents the standalone Fetch Goals from Email Skill from importing requests into the selected project's Backlog.\n\nObserved failure:\nThe Skill prescribed this command, which was run from /home/buddy/projects/refine-next:\n'/home/buddy/projects/refine/bin/refine' system fetch-email-goals --runtime-root '/home/buddy/projects/refine/run/8082' --target-root '/home/buddy/projects/refine-next'\n\nIt exited with code 1:\ndirect --target-root CLI dispatch is not supported in normal operation; use the daemon API for target state mutations instead (/home/buddy/projects/refine-next)\n\nThe failure occurs before email fetching and before a JSON result is produced. No Goals were imported or recovered by that invocation. A read-only check found 34 existing request.json records retained under /home/buddy/projects/refine/run/8082/self-development-email/requests.\n\nDiagnosis:\nsrc/surfaces/cli/dispatch.rs applies a generic #[cfg(not(test))] explicit_target_root_path rejection before dispatch. That helper includes SystemAction::FetchEmailGoals, whose target_root is required. The existing handler in src/surfaces/cli/dispatch/system.rs is therefore unreachable in normal operation. The unit test email_fetch_cli_requires_the_pinned_target_before_accessing_mail in src/surfaces/cli/tests/system/commands.rs bypasses the production guard through cfg(test), allowing this regression to escape detection.\n\nRequested change:\nImplement a narrowly scoped dispatch correction that restores the documented one-shot capability while preserving the restrictions on other commands and the email capability's existing authorization and retry behavior. Keep docs/runbooks/development-request-email.md and docs/runbooks/skills/fetch-goals-from-email.json consistent with the supported command.\n\nAcceptance criteria:\n1. The documented system fetch-email-goals command, with separately and safely quoted runtime-root and target-root arguments, reaches the email-fetch capability in a production build.\n2. A mismatched configured target is rejected before secret or request-ledger access.\n3. Sender filtering, MIME extraction, deterministic Goal IDs, duplicate prevention, remote acknowledgement, and durable retries remain intact.\n4. Successful fetches return the documented JSON fields, including fetched_count, batch_limit, goal_ids, and errors. Per-record failures retain successful imports and retry evidence while returning a nonzero exit.\n5. Regression coverage executes the compiled CLI with production dispatch checks enabled and would fail on the current bug. Cover both reaching the fetch capability for the intended target and rejecting a mismatched target without secret or ledger access. Existing restrictions on unrelated commands remain effective.\n6. Fetching retains ordinary Backlog creation behavior without approving Goals, changing Review decisions, or sending replies. Preserve the Skill's 25-message batch limit, maximum ten batches, and stop-on-command-failure behavior.\n7. Run the focused CLI and development-request checks plus appropriate compiled-binary regression validation. Use isolated fixtures; preserve the live mailbox, token, raw email source, request ledger, and existing Goals.\n\nDeliver the scoped fix and validation evidence through the ordinary Goal/Round workflow.",
+            "quality_agent_report": "workflow.quality.enter:default-quality: Independent Quality review passed with no findings or changes. Focused tests, compiled CLI regressions, release build and required checks passed on the pinned candidate.",
+            "quality_candidate_commit": "036c0802c771a6cc5865a8bc4d669480e1a76c57",
+            "quality_checked_at": "2026-09-10T16:50:24Z",
+            "quality_details": {
+              "candidate_commit": "036c0802c771a6cc5865a8bc4d669480e1a76c57",
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T1315EYG3376Q1RY62006-round-1",
+              "diagnostics": [
+                "Event invocation 227d4c60eaa92ef8ce7cccc2cacbeb1c3a11a7cd825e45be4483ce9da052a4b8: automation/invocations/227d4c60eaa92ef8ce7cccc2cacbeb1c3a11a7cd825e45be4483ce9da052a4b8.json",
+                "Observed supervised process proc-1789059016109-1129590-1070 exited 0. stdout: vice_start_command_failure_preserves_health_and_exact_evidence ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_start_clears_stale_failure_but_observes_a_new_failure ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_start_times_out_without_hiding_the_manager_context ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_stop_command_failure_keeps_active_status_and_recovery_evidence ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_stop_timeout_never_persists_stopped ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_stop_waits_for_confirmed_shutdown ... ok\ntest surfaces::cli::tests::system::daemon::system_lifecycle_commands_default_to_8082 ... ok\ntest surfaces::cli::tests::system::daemon::system_start_migrates_and_detaches_an_unavailable_port_scoped_project ... ok\ntest surfaces::cli::tests::system::daemon::system_start_owns_foreground_web_options ... ok\ntest surfaces::cli::tests::system::daemon::system_start_resolves_relative_runtime_root_before_spawning_daemon ... ok\ntest surfaces::cli::tests::system::daemon::system_status_reports_current_version_and_running_ports ... ok\ntest surfaces::cli::tests::system::installation::retired_system_install_and_uninstall_commands_are_not_parseable ... ok\ntest surfaces::cli::tests::system::installation::system_service_install_repair_and_service_uninstall_use_installation_service ... ok\ntest surfaces::cli::tests::system::installation::system_update_is_owned_by_the_launcher_not_the_deployed_binary ... ok\ntest surfaces::cli::tests::system::release_workers::system_start_recovers_jira_export_and_public_retry_launches_supervised_worker ... ok\ntest surfaces::cli::tests::system::release_workers::system_start_refuses_jira_retry_when_orphan_exit_cannot_be_confirmed ... ok\ntest surfaces::cli::tests::todos::todo_commands_dispatch_through_the_shared_file_todo_service ... ok\n\ntest result: ok. 72 passed; 0 failed; 0 ignored; 0 measured; 1098 filtered out; finished in 4.13s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                "Observed supervised process proc-1789059020489-1129590-1073 exited 0. stdout: d_by_deterministic_identity ... ok\ntest application::development_requests::tests::intake::per_record_failure_retains_successful_imports_and_durable_retry_evidence ... ok\ntest application::development_requests::tests::interrupted_schema_one_migration_write_retains_retryable_legacy_record ... ok\ntest application::development_requests::tests::jmap_patch_uses_the_provider_email_id_as_the_dynamic_object_key ... ok\ntest application::development_requests::tests::legacy_agent_cli_config_is_tolerated_but_inactive_and_omitted ... ok\ntest application::development_requests::tests::linked_and_terminal_schema_one_records_retry_without_duplication ... ok\ntest application::development_requests::tests::local_contract_is_normalized_reread_and_bound_to_one_target ... ok\ntest application::development_requests::tests::local_contract_rejects_a_relative_target ... ok\ntest application::development_requests::tests::local_request_record_round_trips_as_the_durable_retry_queue ... ok\ntest application::development_requests::tests::mime_extraction_keeps_body_and_text_attachments_only ... ok\ntest application::development_requests::tests::one_shot_fetch_checks_target_before_secrets_or_records ... ok\ntest application::development_requests::tests::pending_query_selects_the_recipient_address_without_a_mailbox ... ok\ntest application::development_requests::tests::request_identity_is_stable_and_goal_compatible ... ok\ntest application::development_requests::tests::schema_one_received_is_upgraded_from_raw_mail_before_goal_authoring ... ok\ntest application::development_requests::tests::schema_one_received_links_an_existing_legacy_goal_without_raw_mail_or_rewrite ... ok\ntest application::development_requests::tests::unavailable_schema_one_raw_mail_is_retryable_and_creates_no_goal ... ok\ntest application::development_requests::tests::unsupported_record_is_unchanged_and_does_not_starve_later_valid_record ... ok\n\ntest result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 1145 filtered out; finished in 0.14s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                "Observed supervised process proc-1789059020873-1129590-1076 exited 0. stdout: running 4 tests\ntest production_cli_product_commands_require_daemon ... ok\ntest production_cli_rejects_target_root_argument ... ok\ntest production_email_fetch_reaches_capability_with_the_configured_target ... ok\ntest production_email_fetch_rejects_mismatched_target_before_secrets_or_ledger ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running tests/cli_target_root.rs (target/debug/deps/cli_target_root-104a832b35e27d28)",
+                "Observed supervised process proc-1789059021142-1129590-1079 exited 0. stderr: Finished `release` profile [optimized] target(s) in 0.09s",
+                "Observed supervised process proc-1789059021374-1129590-1082 exited 0. stdout: running 4 tests\ntest production_cli_product_commands_require_daemon ... ok\ntest production_cli_rejects_target_root_argument ... ok\ntest production_email_fetch_reaches_capability_with_the_configured_target ... ok\ntest production_email_fetch_rejects_mismatched_target_before_secrets_or_ledger ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s stderr: Finished `release` profile [optimized] target(s) in 0.09s\n     Running tests/cli_target_root.rs (target/release/deps/cli_target_root-7e5c92834630595f)",
+                "Observed supervised process proc-1789059021642-1129590-1085 exited 0.",
+                "Observed supervised process proc-1789059023522-1129590-1088 exited 0.",
+                "Observed supervised process proc-1789059023648-1129590-1091 exited 0."
+              ],
+              "evaluation_scope": "isolated_candidate",
+              "operation_id": "1a08c370376113c7671",
+              "provider_attempts": [],
+              "quality_proof": {
+                "checked_at": "2026-09-10T16:50:24Z",
+                "checked_candidate_commit": "036c0802c771a6cc5865a8bc4d669480e1a76c57",
+                "evaluation_scope": "isolated_candidate",
+                "goal_id": "00000T1315EYG3376Q1RY62006",
+                "operation_id": "1a08c370376113c7671",
+                "results": [
+                  {
+                    "command": "cargo test --locked --lib surfaces::cli::tests -- --test-threads=1",
+                    "evidence": "Observed supervised process proc-1789059016109-1129590-1070 exited 0. stdout: vice_start_command_failure_preserves_health_and_exact_evidence ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_start_clears_stale_failure_but_observes_a_new_failure ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_start_times_out_without_hiding_the_manager_context ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_stop_command_failure_keeps_active_status_and_recovery_evidence ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_stop_timeout_never_persists_stopped ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_stop_waits_for_confirmed_shutdown ... ok\ntest surfaces::cli::tests::system::daemon::system_lifecycle_commands_default_to_8082 ... ok\ntest surfaces::cli::tests::system::daemon::system_start_migrates_and_detaches_an_unavailable_port_scoped_project ... ok\ntest surfaces::cli::tests::system::daemon::system_start_owns_foreground_web_options ... ok\ntest surfaces::cli::tests::system::daemon::system_start_resolves_relative_runtime_root_before_spawning_daemon ... ok\ntest surfaces::cli::tests::system::daemon::system_status_reports_current_version_and_running_ports ... ok\ntest surfaces::cli::tests::system::installation::retired_system_install_and_uninstall_commands_are_not_parseable ... ok\ntest surfaces::cli::tests::system::installation::system_service_install_repair_and_service_uninstall_use_installation_service ... ok\ntest surfaces::cli::tests::system::installation::system_update_is_owned_by_the_launcher_not_the_deployed_binary ... ok\ntest surfaces::cli::tests::system::release_workers::system_start_recovers_jira_export_and_public_retry_launches_supervised_worker ... ok\ntest surfaces::cli::tests::system::release_workers::system_start_refuses_jira_retry_when_orphan_exit_cannot_be_confirmed ... ok\ntest surfaces::cli::tests::todos::todo_commands_dispatch_through_the_shared_file_todo_service ... ok\n\ntest result: ok. 72 passed; 0 failed; 0 ignored; 0 measured; 1098 filtered out; finished in 4.13s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                    "exit_code": 0,
+                    "process_id": "proc-1789059016109-1129590-1070",
+                    "status": "passed",
+                    "test": "workflow.quality.enter:default-quality: CLI routing and unrelated command restrictions"
+                  },
+                  {
+                    "command": "cargo test --locked --lib application::development_requests:: -- --test-threads=1",
+                    "evidence": "Observed supervised process proc-1789059020489-1129590-1073 exited 0. stdout: d_by_deterministic_identity ... ok\ntest application::development_requests::tests::intake::per_record_failure_retains_successful_imports_and_durable_retry_evidence ... ok\ntest application::development_requests::tests::interrupted_schema_one_migration_write_retains_retryable_legacy_record ... ok\ntest application::development_requests::tests::jmap_patch_uses_the_provider_email_id_as_the_dynamic_object_key ... ok\ntest application::development_requests::tests::legacy_agent_cli_config_is_tolerated_but_inactive_and_omitted ... ok\ntest application::development_requests::tests::linked_and_terminal_schema_one_records_retry_without_duplication ... ok\ntest application::development_requests::tests::local_contract_is_normalized_reread_and_bound_to_one_target ... ok\ntest application::development_requests::tests::local_contract_rejects_a_relative_target ... ok\ntest application::development_requests::tests::local_request_record_round_trips_as_the_durable_retry_queue ... ok\ntest application::development_requests::tests::mime_extraction_keeps_body_and_text_attachments_only ... ok\ntest application::development_requests::tests::one_shot_fetch_checks_target_before_secrets_or_records ... ok\ntest application::development_requests::tests::pending_query_selects_the_recipient_address_without_a_mailbox ... ok\ntest application::development_requests::tests::request_identity_is_stable_and_goal_compatible ... ok\ntest application::development_requests::tests::schema_one_received_is_upgraded_from_raw_mail_before_goal_authoring ... ok\ntest application::development_requests::tests::schema_one_received_links_an_existing_legacy_goal_without_raw_mail_or_rewrite ... ok\ntest application::development_requests::tests::unavailable_schema_one_raw_mail_is_retryable_and_creates_no_goal ... ok\ntest application::development_requests::tests::unsupported_record_is_unchanged_and_does_not_starve_later_valid_record ... ok\n\ntest result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 1145 filtered out; finished in 0.14s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                    "exit_code": 0,
+                    "process_id": "proc-1789059020489-1129590-1073",
+                    "status": "passed",
+                    "test": "workflow.quality.enter:default-quality: Email capability and durable recovery"
+                  },
+                  {
+                    "command": "cargo test --locked --test cli_target_root -- --test-threads=1",
+                    "evidence": "Observed supervised process proc-1789059020873-1129590-1076 exited 0. stdout: running 4 tests\ntest production_cli_product_commands_require_daemon ... ok\ntest production_cli_rejects_target_root_argument ... ok\ntest production_email_fetch_reaches_capability_with_the_configured_target ... ok\ntest production_email_fetch_rejects_mismatched_target_before_secrets_or_ledger ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running tests/cli_target_root.rs (target/debug/deps/cli_target_root-104a832b35e27d28)",
+                    "exit_code": 0,
+                    "process_id": "proc-1789059020873-1129590-1076",
+                    "status": "passed",
+                    "test": "workflow.quality.enter:default-quality: Compiled production dispatch and target authorization"
+                  },
+                  {
+                    "command": "cargo build --release --locked --bin refine",
+                    "evidence": "Observed supervised process proc-1789059021142-1129590-1079 exited 0. stderr: Finished `release` profile [optimized] target(s) in 0.09s",
+                    "exit_code": 0,
+                    "process_id": "proc-1789059021142-1129590-1079",
+                    "status": "passed",
+                    "test": "workflow.quality.enter:default-quality: Production release build"
+                  },
+                  {
+                    "command": "cargo test --release --locked --test cli_target_root -- --test-threads=1",
+                    "evidence": "Observed supervised process proc-1789059021374-1129590-1082 exited 0. stdout: running 4 tests\ntest production_cli_product_commands_require_daemon ... ok\ntest production_cli_rejects_target_root_argument ... ok\ntest production_email_fetch_reaches_capability_with_the_configured_target ... ok\ntest production_email_fetch_rejects_mismatched_target_before_secrets_or_ledger ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s stderr: Finished `release` profile [optimized] target(s) in 0.09s\n     Running tests/cli_target_root.rs (target/release/deps/cli_target_root-7e5c92834630595f)",
+                    "exit_code": 0,
+                    "process_id": "proc-1789059021374-1129590-1082",
+                    "status": "passed",
+                    "test": "workflow.quality.enter:default-quality: Release-binary dispatch regressions"
+                  },
+                  {
+                    "command": "cargo fmt --all -- --check",
+                    "evidence": "Observed supervised process proc-1789059021642-1129590-1085 exited 0.",
+                    "exit_code": 0,
+                    "process_id": "proc-1789059021642-1129590-1085",
+                    "status": "passed",
+                    "test": "workflow.quality.enter:default-quality: Rust formatting"
+                  },
+                  {
+                    "command": "git diff --check 0b6cc819de716b1b118f40c4465d114290117699 036c0802c771a6cc5865a8bc4d669480e1a76c57",
+                    "evidence": "Observed supervised process proc-1789059023522-1129590-1088 exited 0.",
+                    "exit_code": 0,
+                    "process_id": "proc-1789059023522-1129590-1088",
+                    "status": "passed",
+                    "test": "workflow.quality.enter:default-quality: Candidate whitespace"
+                  },
+                  {
+                    "command": "python3 -m json.tool docs/runbooks/skills/fetch-goals-from-email.json > /dev/null",
+                    "evidence": "Observed supervised process proc-1789059023648-1129590-1091 exited 0.",
+                    "exit_code": 0,
+                    "process_id": "proc-1789059023648-1129590-1091",
+                    "status": "passed",
+                    "test": "workflow.quality.enter:default-quality: Skill JSON validity"
+                  }
+                ],
+                "round_idx": 0,
+                "schema_version": 1,
+                "source_candidate_commit": "036c0802c771a6cc5865a8bc4d669480e1a76c57",
+                "state": "passed"
+              },
+              "results": [
+                {
+                  "command": "cargo test --locked --lib surfaces::cli::tests -- --test-threads=1",
+                  "evidence": "Observed supervised process proc-1789059016109-1129590-1070 exited 0. stdout: vice_start_command_failure_preserves_health_and_exact_evidence ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_start_clears_stale_failure_but_observes_a_new_failure ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_start_times_out_without_hiding_the_manager_context ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_stop_command_failure_keeps_active_status_and_recovery_evidence ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_stop_timeout_never_persists_stopped ... ok\ntest surfaces::cli::tests::system::daemon::service_managed_stop_waits_for_confirmed_shutdown ... ok\ntest surfaces::cli::tests::system::daemon::system_lifecycle_commands_default_to_8082 ... ok\ntest surfaces::cli::tests::system::daemon::system_start_migrates_and_detaches_an_unavailable_port_scoped_project ... ok\ntest surfaces::cli::tests::system::daemon::system_start_owns_foreground_web_options ... ok\ntest surfaces::cli::tests::system::daemon::system_start_resolves_relative_runtime_root_before_spawning_daemon ... ok\ntest surfaces::cli::tests::system::daemon::system_status_reports_current_version_and_running_ports ... ok\ntest surfaces::cli::tests::system::installation::retired_system_install_and_uninstall_commands_are_not_parseable ... ok\ntest surfaces::cli::tests::system::installation::system_service_install_repair_and_service_uninstall_use_installation_service ... ok\ntest surfaces::cli::tests::system::installation::system_update_is_owned_by_the_launcher_not_the_deployed_binary ... ok\ntest surfaces::cli::tests::system::release_workers::system_start_recovers_jira_export_and_public_retry_launches_supervised_worker ... ok\ntest surfaces::cli::tests::system::release_workers::system_start_refuses_jira_retry_when_orphan_exit_cannot_be_confirmed ... ok\ntest surfaces::cli::tests::todos::todo_commands_dispatch_through_the_shared_file_todo_service ... ok\n\ntest result: ok. 72 passed; 0 failed; 0 ignored; 0 measured; 1098 filtered out; finished in 4.13s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                  "exit_code": 0,
+                  "process_id": "proc-1789059016109-1129590-1070",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: CLI routing and unrelated command restrictions"
+                },
+                {
+                  "command": "cargo test --locked --lib application::development_requests:: -- --test-threads=1",
+                  "evidence": "Observed supervised process proc-1789059020489-1129590-1073 exited 0. stdout: d_by_deterministic_identity ... ok\ntest application::development_requests::tests::intake::per_record_failure_retains_successful_imports_and_durable_retry_evidence ... ok\ntest application::development_requests::tests::interrupted_schema_one_migration_write_retains_retryable_legacy_record ... ok\ntest application::development_requests::tests::jmap_patch_uses_the_provider_email_id_as_the_dynamic_object_key ... ok\ntest application::development_requests::tests::legacy_agent_cli_config_is_tolerated_but_inactive_and_omitted ... ok\ntest application::development_requests::tests::linked_and_terminal_schema_one_records_retry_without_duplication ... ok\ntest application::development_requests::tests::local_contract_is_normalized_reread_and_bound_to_one_target ... ok\ntest application::development_requests::tests::local_contract_rejects_a_relative_target ... ok\ntest application::development_requests::tests::local_request_record_round_trips_as_the_durable_retry_queue ... ok\ntest application::development_requests::tests::mime_extraction_keeps_body_and_text_attachments_only ... ok\ntest application::development_requests::tests::one_shot_fetch_checks_target_before_secrets_or_records ... ok\ntest application::development_requests::tests::pending_query_selects_the_recipient_address_without_a_mailbox ... ok\ntest application::development_requests::tests::request_identity_is_stable_and_goal_compatible ... ok\ntest application::development_requests::tests::schema_one_received_is_upgraded_from_raw_mail_before_goal_authoring ... ok\ntest application::development_requests::tests::schema_one_received_links_an_existing_legacy_goal_without_raw_mail_or_rewrite ... ok\ntest application::development_requests::tests::unavailable_schema_one_raw_mail_is_retryable_and_creates_no_goal ... ok\ntest application::development_requests::tests::unsupported_record_is_unchanged_and_does_not_starve_later_valid_record ... ok\n\ntest result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 1145 filtered out; finished in 0.14s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                  "exit_code": 0,
+                  "process_id": "proc-1789059020489-1129590-1073",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: Email capability and durable recovery"
+                },
+                {
+                  "command": "cargo test --locked --test cli_target_root -- --test-threads=1",
+                  "evidence": "Observed supervised process proc-1789059020873-1129590-1076 exited 0. stdout: running 4 tests\ntest production_cli_product_commands_require_daemon ... ok\ntest production_cli_rejects_target_root_argument ... ok\ntest production_email_fetch_reaches_capability_with_the_configured_target ... ok\ntest production_email_fetch_rejects_mismatched_target_before_secrets_or_ledger ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running tests/cli_target_root.rs (target/debug/deps/cli_target_root-104a832b35e27d28)",
+                  "exit_code": 0,
+                  "process_id": "proc-1789059020873-1129590-1076",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: Compiled production dispatch and target authorization"
+                },
+                {
+                  "command": "cargo build --release --locked --bin refine",
+                  "evidence": "Observed supervised process proc-1789059021142-1129590-1079 exited 0. stderr: Finished `release` profile [optimized] target(s) in 0.09s",
+                  "exit_code": 0,
+                  "process_id": "proc-1789059021142-1129590-1079",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: Production release build"
+                },
+                {
+                  "command": "cargo test --release --locked --test cli_target_root -- --test-threads=1",
+                  "evidence": "Observed supervised process proc-1789059021374-1129590-1082 exited 0. stdout: running 4 tests\ntest production_cli_product_commands_require_daemon ... ok\ntest production_cli_rejects_target_root_argument ... ok\ntest production_email_fetch_reaches_capability_with_the_configured_target ... ok\ntest production_email_fetch_rejects_mismatched_target_before_secrets_or_ledger ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s stderr: Finished `release` profile [optimized] target(s) in 0.09s\n     Running tests/cli_target_root.rs (target/release/deps/cli_target_root-7e5c92834630595f)",
+                  "exit_code": 0,
+                  "process_id": "proc-1789059021374-1129590-1082",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: Release-binary dispatch regressions"
+                },
+                {
+                  "command": "cargo fmt --all -- --check",
+                  "evidence": "Observed supervised process proc-1789059021642-1129590-1085 exited 0.",
+                  "exit_code": 0,
+                  "process_id": "proc-1789059021642-1129590-1085",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: Rust formatting"
+                },
+                {
+                  "command": "git diff --check 0b6cc819de716b1b118f40c4465d114290117699 036c0802c771a6cc5865a8bc4d669480e1a76c57",
+                  "evidence": "Observed supervised process proc-1789059023522-1129590-1088 exited 0.",
+                  "exit_code": 0,
+                  "process_id": "proc-1789059023522-1129590-1088",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: Candidate whitespace"
+                },
+                {
+                  "command": "python3 -m json.tool docs/runbooks/skills/fetch-goals-from-email.json > /dev/null",
+                  "evidence": "Observed supervised process proc-1789059023648-1129590-1091 exited 0.",
+                  "exit_code": 0,
+                  "process_id": "proc-1789059023648-1129590-1091",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: Skill JSON validity"
+                }
+              ],
+              "source_candidate_commit": "036c0802c771a6cc5865a8bc4d669480e1a76c57"
+            },
+            "quality_message": "All Quality Skills passed with supervised evidence.",
+            "quality_skill_results": [
+              {
+                "artifacts": {
+                  "tests": [
+                    {
+                      "command": "cargo test --locked --lib surfaces::cli::tests -- --test-threads=1",
+                      "evidence": "72 passed; 0 failed.",
+                      "status": "passed",
+                      "test": "CLI behavior and unrelated restrictions"
+                    },
+                    {
+                      "command": "cargo test --locked --lib application::development_requests::tests -- --test-threads=1",
+                      "evidence": "22 passed; 0 failed. Covers authorization, sender filtering, durable retries, deduplication and Backlog creation.",
+                      "status": "passed",
+                      "test": "Email intake and recovery"
+                    },
+                    {
+                      "command": "cargo test --locked --test cli_target_root -- --test-threads=1",
+                      "evidence": "4 passed; 0 failed. Configured target reaches secret lookup; mismatched target preserves fixture state. Paths contain spaces and apostrophes.",
+                      "status": "passed",
+                      "test": "Compiled production dispatch and authorization boundary"
+                    },
+                    {
+                      "command": "cargo build --release --locked --bin refine",
+                      "evidence": "Exit 0.",
+                      "status": "passed",
+                      "test": "Production release build"
+                    },
+                    {
+                      "command": "cargo test --release --locked --test cli_target_root -- --test-threads=1",
+                      "evidence": "4 passed; 0 failed.",
+                      "status": "passed",
+                      "test": "Release-binary dispatch regressions"
+                    },
+                    {
+                      "command": "target/debug/deps/refine-8328488576a1416d application::development_requests::email_source::tests --test-threads=1",
+                      "evidence": "2 passed; 0 failed.",
+                      "status": "passed",
+                      "test": "MIME body and attachment extraction"
+                    },
+                    {
+                      "command": "target/debug/deps/refine-8328488576a1416d application::development_requests::records::tests --test-threads=1",
+                      "evidence": "1 passed; 0 failed.",
+                      "status": "passed",
+                      "test": "Unsupported records retain original bytes"
+                    },
+                    {
+                      "command": "cargo fmt --all -- --check",
+                      "evidence": "Exit 0.",
+                      "status": "passed",
+                      "test": "Rust formatting"
+                    },
+                    {
+                      "command": "git diff --check 0b6cc819de716b1b118f40c4465d114290117699 036c0802c771a6cc5865a8bc4d669480e1a76c57",
+                      "evidence": "Exit 0; working-tree git diff --check also passed.",
+                      "status": "passed",
+                      "test": "Candidate whitespace"
+                    },
+                    {
+                      "command": "python3 -m json.tool docs/runbooks/skills/fetch-goals-from-email.json > /dev/null",
+                      "evidence": "Exit 0. Additional Python assertions verified argument structure, batch limits and immediate stop on failure.",
+                      "status": "passed",
+                      "test": "Skill configuration"
+                    }
+                  ]
+                },
+                "binding_id": "workflow.quality.enter:default-quality",
+                "evidence": [
+                  "Reviewed candidate 036c0802c771a6cc5865a8bc4d669480e1a76c57 against the finalized plan and relevant CLI/Skills intent. No findings or corrections; HEAD matches and the worktree remains clean.",
+                  "Only FetchEmailGoals is exempted from the generic guard. Application-owned authorization runs before secret or ledger processing; unrelated restrictions remain effective.",
+                  "Intake tests verify successful imports survive per-record failures, retry evidence persists, deterministic recovery prevents duplicates, and imported Goals remain ordinary Backlog items.",
+                  "Source review confirms fetched_count is added and the CLI prints JSON before returning nonzero for per-record errors. Authenticated CLI success and partial-error output were not exercised.",
+                  "Runbook and Skill preserve separate safely quoted arguments, 25-message batches, ten-batch maximum, immediate stop on failure, and no approval, Review changes or replies.",
+                  "Retained implementation logs show both new routing tests failing against the original guard. Candidate debug and release regressions were independently rerun and passed.",
+                  "Verification used isolated fixtures. No live mailbox, credentials, email source, request ledger or existing Goals were used. No deployment, daemon restart, Goal-state change, merge or push occurred.",
+                  "Logs, review evidence and the completion report are retained in /tmp/refine-email-quality-a84874e2/."
+                ],
+                "invocation_id": "a84874e207a5022c3e58a83b4a4b2f3f0aad80ce4d2caa26c60683b491efdaf0",
+                "outcome": "success",
+                "role": "quality",
+                "summary": "Independent Quality review passed with no findings or changes. Focused tests, compiled CLI regressions, release build and required checks passed on the pinned candidate."
+              }
+            ],
+            "quality_state": "passed",
+            "reporter": "Buddy Williams",
+            "rule_state": "unclassified",
+            "updated": "2026-09-10T16:50:24Z",
+            "workflow_attempt_authority": {
+              "claimed_at": "2026-09-10T16:28:06Z",
+              "round_idx": 0,
+              "workflow_revision": 3
+            },
+            "workflow_reconciliation": null,
+            "workflow_recovery": null
+          }
+        ],
+        "status": "governance",
+        "target_branch": "main",
+        "updated": "2026-09-10T16:50:24Z",
+        "workflow_revision": 33
+      },
+      "system": {
+        "candidate_commit": "036c0802c771a6cc5865a8bc4d669480e1a76c57",
+        "node_id": "default",
+        "project_root": "/home/buddy/projects/refine-next",
+        "workflow_step": "governance",
+        "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T1315EYG3376Q1RY62006-round-1"
+      }
+    },
+    "metadata": {
+      "behavior": "EventSkill",
+      "event_operation_id": "1a08c3a474f113c7673",
+      "goal_id": "00000T1315EYG3376Q1RY62006",
+      "kind": "workflow",
+      "node_id": "default",
+      "provider": "codex",
+      "round_idx": 0,
+      "target_app_id": "/home/buddy/projects/refine-next",
+      "workflow_revision": 3,
+      "workflow_state": "governance"
+    }
+  },
+  "bindings": [
+    {
+      "binding": {
+        "id": "default-governance",
+        "skill_id": "default-governance",
+        "enabled": true,
+        "mode": "blocking",
+        "order": 0,
+        "scope": {
+          "node_id": null
+        },
+        "overrides": null,
+        "inputs": {}
+      },
+      "skill": {
+        "id": "default-governance",
+        "name": "Governance",
+        "prompt": "## Governance review\n\nReview the exact candidate against the project's stated intent and attached Skills. Read the accepted plans, implementation and Quality evidence and actual diff. Report actual violations with evidence, not hypothetical risks or preferences. Do not edit files, merge, push or change Goal state. A finding must identify the violated intent or invariant, its concrete consequence, and an actionable recovery request. Group related symptoms by their underlying cause; an alternative design preference alone is not a violation.\n\n## Product intent\n\nRefine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.\n\n## Project rules\n\n- Keep domain concepts, invariants, and pure policy in `src/model`; shared behavior and orchestration in `src/application`; Git, process, host, storage, provider, and telemetry mechanisms in `src/infrastructure`; and adapters for people and machines in `src/surfaces`. Keep `error.rs` as a neutral shared boundary. Model remains independent of the other areas, and code outside Surfaces does not depend on surface adapters.\n- Maintain a consistent architecture by extending the existing semantic responsibilities and dependency boundaries described in `docs/intent/01-design.md`. Prefer existing concepts and shared owners. A new or refined domain concept is appropriate when it explains the required behavior and reduces duplicated policy or special cases while preserving those boundaries.\n- Preserve Rust-based flat-file persistence, file indexes, and in-memory caching. Keep CLI and API work under 50 ms, excluding time spent waiting on LLMs or outside tools.\n- Maintain affected documentation, especially `docs/intent/*`, and preserve its established format. Apply the scope limits in the intent guidance below.\n- Keep Refine agent-first by using installed coding-agent CLIs. Do not duplicate or reimplement coding-agent functionality.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
+        "role": "governance",
+        "enabled": true,
+        "scope": {
+          "node_id": null
+        },
+        "parameters": [],
+        "provenance": "refine-default-v1"
+      },
+      "parameters": {}
+    }
+  ],
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-10T16:50:24.702472220+00:00",
+  "completed_at": null,
+  "error": null,
+  "action_applied": false
+}
