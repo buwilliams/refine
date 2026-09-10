@@ -106,8 +106,25 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-09-10T08:29:38Z",
+        "criticism": {
+          "completed_at": "2026-09-10T08:31:52Z",
+          "git_after": {
+            "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "result": {
+            "summary": "The plan covers guarded Review recovery, exact-candidate proof, publication failures, and atomic fenced settlement."
+          },
+          "started_at": "2026-09-10T08:29:38Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-09-10T08:31:52Z",
         "proposal": {
           "completed_at": "2026-09-10T08:29:38Z",
           "git_after": {
@@ -158,7 +175,7 @@
         "schema_version": 2,
         "started_at": "2026-09-10T08:26:08Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T08:29:38Z"
+        "updated_at": "2026-09-10T08:31:52Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -172,7 +189,7 @@
       "quality_state": "unclassified",
       "reporter": "ethan.jacobson@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T08:29:38Z",
+      "updated": "2026-09-10T08:31:52Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T08:26:07Z",
         "round_idx": 0,
@@ -184,6 +201,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-09-10T08:29:38Z",
-  "workflow_revision": 9
+  "updated": "2026-09-10T08:31:52Z",
+  "workflow_revision": 11
 }

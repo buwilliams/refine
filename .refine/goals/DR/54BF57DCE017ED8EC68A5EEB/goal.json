@@ -106,8 +106,37 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "criticize",
-        "phase_started_at": "2026-09-10T08:28:59Z",
+        "criticism": {
+          "completed_at": "2026-09-10T08:31:29Z",
+          "git_after": {
+            "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "result": {
+            "findings": [
+              {
+                "checklist_item_ids": [
+                  "P5",
+                  "P6"
+                ],
+                "description": "Governance publishes the candidate before integration using an ordinary push (engine/behaviors/mod.rs and git/worktrees/service_adapter.rs); if the target then advances, replay rewrites the already-published branch and the next push fails as non-fast-forward despite a clean replay, which P5-P6 do not address.",
+                "id": "C1",
+                "material": true,
+                "recommendation": "Add replacement publication fenced by the exact previously published remote candidate SHA, preserving concurrent remote changes, so a late-target retry can publish and integrate the replacement after its gates pass."
+              }
+            ],
+            "summary": "The plan needs safe republication of already-published candidates after replay."
+          },
+          "started_at": "2026-09-10T08:28:59Z"
+        },
+        "phase": "revise",
+        "phase_started_at": "2026-09-10T08:31:29Z",
         "proposal": {
           "completed_at": "2026-09-10T08:28:59Z",
           "git_after": {
@@ -162,7 +191,7 @@
         "schema_version": 2,
         "started_at": "2026-09-10T08:26:05Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T08:28:59Z"
+        "updated_at": "2026-09-10T08:31:29Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -176,7 +205,7 @@
       "quality_state": "unclassified",
       "reporter": "ethan.jacobson@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T08:28:59Z",
+      "updated": "2026-09-10T08:31:29Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T08:26:04Z",
         "round_idx": 0,
@@ -188,6 +217,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-09-10T08:28:59Z",
-  "workflow_revision": 9
+  "updated": "2026-09-10T08:31:29Z",
+  "workflow_revision": 11
 }
