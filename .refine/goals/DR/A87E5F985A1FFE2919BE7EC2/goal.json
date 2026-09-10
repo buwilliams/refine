@@ -4842,6 +4842,105 @@
           "source": "workflow.implement.enter",
           "state": "succeeded"
         },
+        "4478edd5badecce4edcc0b86f463b3a13dde29491a0458acc575e3d1163e322d": {
+          "candidate_commit": "34660f8e680c56c09ce52c89ddf552c78b3c7d75",
+          "results": {
+            "default-quality": {
+              "artifacts": {
+                "tests": [
+                  {
+                    "command": "cargo test --lib model::automation::gate_evidence -- --test-threads=1",
+                    "evidence": "Exit 0; 4 passed.",
+                    "status": "passed",
+                    "test": "Model selection, receipt validity and compatibility"
+                  },
+                  {
+                    "command": "cargo test --lib governance -- --test-threads=1",
+                    "evidence": "Exit 0; 86 passed, including Q1 attribution and malformed/unproved integration intents.",
+                    "status": "passed",
+                    "test": "Recovery, settlement, lifecycle gates and authority fencing"
+                  },
+                  {
+                    "command": "cargo test --lib application::events:: -- --test-threads=1",
+                    "evidence": "Exit 0; 21 passed. Three policy tests moved to Model.",
+                    "status": "passed",
+                    "test": "Application event execution and Skill evidence"
+                  },
+                  {
+                    "command": "cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1",
+                    "evidence": "Exit 0; 6 passed.",
+                    "status": "passed",
+                    "test": "Pinned configuration replay and supervised Quality proof"
+                  },
+                  {
+                    "command": "cargo test --lib candidate_refresh -- --test-threads=1",
+                    "evidence": "Exit 0; 16 passed.",
+                    "status": "passed",
+                    "test": "Candidate refresh and bounded recovery"
+                  },
+                  {
+                    "command": "cargo test --lib application::work_items::tests::workflow -- --test-threads=1",
+                    "evidence": "Exit 0; 12 passed.",
+                    "status": "passed",
+                    "test": "Shared workflow transitions"
+                  },
+                  {
+                    "command": "cargo test --lib surfaces::cli::tests::goals::lifecycle -- --test-threads=1",
+                    "evidence": "Exit 0; 5 passed.",
+                    "status": "passed",
+                    "test": "CLI recovery and strict approval"
+                  },
+                  {
+                    "command": "cargo test --lib web_server_governance_retry_from_review -- --test-threads=1",
+                    "evidence": "Exit 0; 1 passed.",
+                    "status": "passed",
+                    "test": "API shared recovery eligibility"
+                  },
+                  {
+                    "command": "node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js",
+                    "evidence": "Exit 0; 6 passed, no skips.",
+                    "status": "passed",
+                    "test": "Browser recovery diagnostics and JavaScript syntax"
+                  },
+                  {
+                    "command": "set -o pipefail\ngit diff --name-only b47569adb8d4c5d1d7335ba91729a3e486a38fe0 HEAD -- '*.rs' | xargs -r rustfmt --check --edition 2024 --config skip_children=true",
+                    "evidence": "Exit 0; all 53 changed Rust files passed.",
+                    "status": "passed",
+                    "test": "Changed Rust formatting"
+                  },
+                  {
+                    "command": "git diff --check 59af87d23c3c14881f3969ef316146e7aa2e3273 HEAD",
+                    "evidence": "Exit 0; no whitespace errors.",
+                    "status": "passed",
+                    "test": "Recovery Round patch whitespace"
+                  },
+                  {
+                    "command": "git diff --check b47569adb8d4c5d1d7335ba91729a3e486a38fe0 HEAD",
+                    "evidence": "Exit 0; no whitespace errors.",
+                    "status": "passed",
+                    "test": "Complete candidate patch whitespace"
+                  }
+                ]
+              },
+              "binding_id": "default-quality",
+              "evidence": [
+                "Independently reviewed candidate 34660f8e680c56c09ce52c89ddf552c78b3c7d75 against the finalized plans and relevant intent. No unresolved findings or corrections were needed.",
+                "Required Skill selection and receipt validation now have one authoritative Model implementation. Application retains invocation orchestration, receipt construction, configuration persistence and timestamp acquisition. Validation decisions, diagnostics and receipt construction are preserved.",
+                "Existing tests cover exact candidate identity, required and absent Skills, invalid evidence, configuration replay, originating-attempt effects, publication attribution, deduplication, lifecycle gates and strict approval.",
+                "An auxiliary source-comparison script initially failed because its normalization changed an extra parenthesis. Correcting that script confirmed equivalence without source changes.",
+                "All requested checks ran with zero test failures or ignored/skipped tests. Full-suite, Clippy and live-environment recovery were not exercised.",
+                "Final checkout remains clean at the pinned candidate. All 62 candidate file hashes and retained Goal branch refs are unchanged. No Goal advancement, approval, merge, push, deployment or daemon restart was performed.",
+                "Execution logs and preservation audits are retained under /tmp/refine-quality-4478edd5/."
+              ],
+              "invocation_id": "4478edd5badecce4edcc0b86f463b3a13dde29491a0458acc575e3d1163e322d",
+              "outcome": "success",
+              "role": "quality",
+              "summary": "Verified the Model policy extraction and preserved recovery behavior on the exact candidate. All requested checks passed; no defects found."
+            }
+          },
+          "source": "workflow.quality.enter",
+          "state": "succeeded"
+        },
         "a89b53d559e1fed6aa0292a860e192bcd93333bf90aa2473904c31ab6b09cefe": {
           "candidate_commit": null,
           "results": {
@@ -5105,13 +5204,109 @@
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
       "prompt": "In a managed recovery Round for Goal DRA87E5F985A1FFE2919BE7EC2, preserve candidate 59af87d23c3c14881f3969ef316146e7aa2e3273 and all prior Round artifacts. Move required_bindings and the pure receipt-validity policy from src/application/events/evidence.rs into a cohesive Model module extending the existing automation semantics. Update Application callers and relocate the corresponding policy tests. Keep invocation orchestration, configuration persistence and timestamp acquisition in Application. Preserve receipt compatibility, exact-candidate validation, required Skill checks, Q1 effect attribution, replay deduplication, lifecycle gates and strict approval. Avoid unrelated refactoring. Run the relocated Model tests and the existing governance, application::events::, quality_resume, candidate_refresh, CLI/API recovery and browser diagnostics checks; check changed Rust formatting and patch whitespace. Report actual commands and results. Update intent documentation only if its contract changes. Do not manually advance Goal state, approve, merge, push, deploy or restart the serving installation.",
+      "quality_agent_report": "workflow.quality.enter:default-quality: Verified the Model policy extraction and preserved recovery behavior on the exact candidate. All requested checks passed; no defects found.",
+      "quality_candidate_commit": "34660f8e680c56c09ce52c89ddf552c78b3c7d75",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
+      "quality_skill_results": [
+        {
+          "artifacts": {
+            "tests": [
+              {
+                "command": "cargo test --lib model::automation::gate_evidence -- --test-threads=1",
+                "evidence": "Exit 0; 4 passed.",
+                "status": "passed",
+                "test": "Model selection, receipt validity and compatibility"
+              },
+              {
+                "command": "cargo test --lib governance -- --test-threads=1",
+                "evidence": "Exit 0; 86 passed, including Q1 attribution and malformed/unproved integration intents.",
+                "status": "passed",
+                "test": "Recovery, settlement, lifecycle gates and authority fencing"
+              },
+              {
+                "command": "cargo test --lib application::events:: -- --test-threads=1",
+                "evidence": "Exit 0; 21 passed. Three policy tests moved to Model.",
+                "status": "passed",
+                "test": "Application event execution and Skill evidence"
+              },
+              {
+                "command": "cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1",
+                "evidence": "Exit 0; 6 passed.",
+                "status": "passed",
+                "test": "Pinned configuration replay and supervised Quality proof"
+              },
+              {
+                "command": "cargo test --lib candidate_refresh -- --test-threads=1",
+                "evidence": "Exit 0; 16 passed.",
+                "status": "passed",
+                "test": "Candidate refresh and bounded recovery"
+              },
+              {
+                "command": "cargo test --lib application::work_items::tests::workflow -- --test-threads=1",
+                "evidence": "Exit 0; 12 passed.",
+                "status": "passed",
+                "test": "Shared workflow transitions"
+              },
+              {
+                "command": "cargo test --lib surfaces::cli::tests::goals::lifecycle -- --test-threads=1",
+                "evidence": "Exit 0; 5 passed.",
+                "status": "passed",
+                "test": "CLI recovery and strict approval"
+              },
+              {
+                "command": "cargo test --lib web_server_governance_retry_from_review -- --test-threads=1",
+                "evidence": "Exit 0; 1 passed.",
+                "status": "passed",
+                "test": "API shared recovery eligibility"
+              },
+              {
+                "command": "node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js",
+                "evidence": "Exit 0; 6 passed, no skips.",
+                "status": "passed",
+                "test": "Browser recovery diagnostics and JavaScript syntax"
+              },
+              {
+                "command": "set -o pipefail\ngit diff --name-only b47569adb8d4c5d1d7335ba91729a3e486a38fe0 HEAD -- '*.rs' | xargs -r rustfmt --check --edition 2024 --config skip_children=true",
+                "evidence": "Exit 0; all 53 changed Rust files passed.",
+                "status": "passed",
+                "test": "Changed Rust formatting"
+              },
+              {
+                "command": "git diff --check 59af87d23c3c14881f3969ef316146e7aa2e3273 HEAD",
+                "evidence": "Exit 0; no whitespace errors.",
+                "status": "passed",
+                "test": "Recovery Round patch whitespace"
+              },
+              {
+                "command": "git diff --check b47569adb8d4c5d1d7335ba91729a3e486a38fe0 HEAD",
+                "evidence": "Exit 0; no whitespace errors.",
+                "status": "passed",
+                "test": "Complete candidate patch whitespace"
+              }
+            ]
+          },
+          "binding_id": "workflow.quality.enter:default-quality",
+          "evidence": [
+            "Independently reviewed candidate 34660f8e680c56c09ce52c89ddf552c78b3c7d75 against the finalized plans and relevant intent. No unresolved findings or corrections were needed.",
+            "Required Skill selection and receipt validation now have one authoritative Model implementation. Application retains invocation orchestration, receipt construction, configuration persistence and timestamp acquisition. Validation decisions, diagnostics and receipt construction are preserved.",
+            "Existing tests cover exact candidate identity, required and absent Skills, invalid evidence, configuration replay, originating-attempt effects, publication attribution, deduplication, lifecycle gates and strict approval.",
+            "An auxiliary source-comparison script initially failed because its normalization changed an extra parenthesis. Correcting that script confirmed equivalence without source changes.",
+            "All requested checks ran with zero test failures or ignored/skipped tests. Full-suite, Clippy and live-environment recovery were not exercised.",
+            "Final checkout remains clean at the pinned candidate. All 62 candidate file hashes and retained Goal branch refs are unchanged. No Goal advancement, approval, merge, push, deployment or daemon restart was performed.",
+            "Execution logs and preservation audits are retained under /tmp/refine-quality-4478edd5/."
+          ],
+          "invocation_id": "4478edd5badecce4edcc0b86f463b3a13dde29491a0458acc575e3d1163e322d",
+          "outcome": "success",
+          "role": "quality",
+          "summary": "Verified the Model policy extraction and preserved recovery behavior on the exact candidate. All requested checks passed; no defects found."
+        }
+      ],
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T15:36:04Z",
+      "updated": "2026-09-10T15:40:23Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T15:24:12Z",
         "round_idx": 3,
@@ -5123,7 +5318,7 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-10T15:36:04Z",
+  "updated": "2026-09-10T15:40:23Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:37.079960889+00:00",
@@ -5243,5 +5438,5 @@
       "to": "quality"
     }
   ],
-  "workflow_revision": 104
+  "workflow_revision": 108
 }
