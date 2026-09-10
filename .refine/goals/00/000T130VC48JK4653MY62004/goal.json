@@ -1,9 +1,9 @@
 {
-  "base_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+  "base_commit": "47a0059f14971ba766b231183bd5cb1a218450f8",
   "branch_name": "refine/00000T130VC48JK4653MY62004/round-1",
-  "candidate_commit": "9a6c56c9c089cb0a78d83f23db7fff17f89c3a69",
+  "candidate_commit": "b6dfd178b0f4bac23f1b018e7c3510c04560f636",
   "created": "2026-09-10T16:16:39Z",
-  "event_generation": 5,
+  "event_generation": 6,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T130VC48JK4653MY62004",
@@ -42,7 +42,7 @@
         "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
       },
       "assignee": "Buddy Williams",
-      "constitution_state": "unclassified",
+      "constitution_state": null,
       "created": "2026-09-10T16:16:39Z",
       "event_configuration": {
         "events": {
@@ -715,10 +715,10 @@
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
-      "governance_candidate_commit": "",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_candidate_commit": null,
+      "governance_checked_at": null,
+      "governance_details": null,
+      "governance_message": null,
       "governance_rule_actions": [],
       "guidance_decision": {
         "applied": [],
@@ -867,14 +867,14 @@
       "implementation_report": "workflow.implement.enter:default-implement: Implemented shared Alt+Up/Down modifier preservation and completed verification. Changes remain uncommitted for Refine’s candidate and Quality workflow.",
       "implementation_reported_at": "2026-09-10T16:42:56Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": null,
+      "product_state": null,
       "prompt": "In the Web UI, the toolbar agent, \"Alt + Up\" isn't working right now, but is required for Codex agents.",
       "quality_agent_report": "workflow.quality.enter:default-quality: Corrected a shared input-queue lifecycle defect, added two browser regressions, and passed all required checks. No unresolved findings.",
-      "quality_candidate_commit": "9a6c56c9c089cb0a78d83f23db7fff17f89c3a69",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
+      "quality_candidate_commit": null,
+      "quality_checked_at": null,
+      "quality_details": null,
+      "quality_message": null,
       "quality_skill_results": [
         {
           "artifacts": {
@@ -939,22 +939,127 @@
           "summary": "Corrected a shared input-queue lifecycle defect, added two browser regressions, and passed all required checks. No unresolved findings."
         }
       ],
-      "quality_state": "unclassified",
+      "quality_state": null,
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-09-10T16:53:24Z",
+      "rule_state": null,
+      "updated": "2026-09-10T16:56:55Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T16:22:58Z",
         "round_idx": 0,
         "workflow_revision": 2
       },
+      "workflow_candidate_refresh": {
+        "authorizing_status": "governance",
+        "branch": "refine/00000T130VC48JK4653MY62004/round-1",
+        "node_id": "default",
+        "original_base_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+        "original_candidate_commit": "9a6c56c9c089cb0a78d83f23db7fff17f89c3a69",
+        "previous_gate_evidence": {
+          "constitution_state": "unclassified",
+          "governance_candidate_commit": "",
+          "governance_checked_at": "",
+          "governance_details": "",
+          "governance_message": "",
+          "meta_rule_state": "unclassified",
+          "product_state": "unclassified",
+          "quality_candidate_commit": "9a6c56c9c089cb0a78d83f23db7fff17f89c3a69",
+          "quality_checked_at": "2026-09-10T16:56:54Z",
+          "quality_details": {
+            "candidate_commit": "9a6c56c9c089cb0a78d83f23db7fff17f89c3a69",
+            "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T130VC48JK4653MY62004-round-1",
+            "diagnostics": [
+              "Event invocation 4ce24c8925b3f5fa679fe5cf3c2d442138e665f232d94383ac27d0bf7fb9212a: automation/invocations/4ce24c8925b3f5fa679fe5cf3c2d442138e665f232d94383ac27d0bf7fb9212a.json",
+              "Observed supervised process proc-1789059376457-1129590-1202 exited 0. stdout: s exactly once (6.121812ms)\n✔ the navigation override ignores other event phases, composition and modifier combinations (1.723313ms)\n✔ the navigation override requires focus, visibility and current terminal state (6.159094ms)\n✔ a replaced renderer cannot invoke keyboard policy on the current session (0.714451ms)\n✔ retained output consumes Alt navigation without emitting after exit or session loss (1.635845ms)\n✔ Alt vertical arrows preserve modifiers with real xterm on Linux x86_64 (1474.973513ms)\n✔ Alt vertical arrows preserve modifiers with real xterm on Win32 (1375.105641ms)\n✔ Alt vertical arrows preserve modifiers with real xterm on MacIntel (1022.503943ms)\n✔ neighboring arrow shortcuts keep xterm encoding on Linux x86_64 (1778.807169ms)\n✔ neighboring arrow shortcuts keep xterm encoding on Win32 (1703.906354ms)\n✔ neighboring arrow shortcuts keep xterm encoding on MacIntel (1749.300302ms)\n✔ Alt vertical arrows emit once per keydown including repeat, never on keyup (1138.908859ms)\n✔ composition leaves Alt arrows to xterm without the navigation override (1086.584975ms)\n✔ outside focus and an open palette keep their own keyboard behavior (1018.166674ms)\n✔ retained output consumes Alt arrows after exit or loss of session (1087.951639ms)\n✔ Alt arrow input belongs to its originating tab through switching and renderer replacement (1120.736559ms)\n✔ session replacement before flush discards buffered Alt arrows (1087.059308ms)\n✔ session exit before flush discards buffered Alt arrows (879.296839ms)\n✔ Alt arrows waiting behind a request are discarded when their session becomes unusable (2217.61744ms)\n✔ all profiles and provider fixtures preserve Alt arrows and existing control keys (1856.595295ms)\n✔ paste gestures cannot send input after exit or loss of a managed session (1964.326996ms)\n✔ empty and unreadable native paste events cannot fall through to xterm (1415.909803ms)\nℹ tests 137\nℹ suites 0\nℹ pass 137\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 35799.884162",
+              "Observed supervised process proc-1789059412461-1129590-1205 exited 0.",
+              "Observed supervised process proc-1789059414337-1129590-1208 exited 0."
+            ],
+            "evaluation_scope": "isolated_candidate",
+            "operation_id": "1a08c3d09fb113c7675",
+            "provider_attempts": [],
+            "quality_proof": {
+              "checked_at": "2026-09-10T16:56:54Z",
+              "checked_candidate_commit": "9a6c56c9c089cb0a78d83f23db7fff17f89c3a69",
+              "evaluation_scope": "isolated_candidate",
+              "goal_id": "00000T130VC48JK4653MY62004",
+              "operation_id": "1a08c3d09fb113c7675",
+              "results": [
+                {
+                  "command": "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal*.test.js tests/web_supervisor_toolbar.test.js tests/web_goal_log_tail.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js",
+                  "evidence": "Observed supervised process proc-1789059376457-1129590-1202 exited 0. stdout: s exactly once (6.121812ms)\n✔ the navigation override ignores other event phases, composition and modifier combinations (1.723313ms)\n✔ the navigation override requires focus, visibility and current terminal state (6.159094ms)\n✔ a replaced renderer cannot invoke keyboard policy on the current session (0.714451ms)\n✔ retained output consumes Alt navigation without emitting after exit or session loss (1.635845ms)\n✔ Alt vertical arrows preserve modifiers with real xterm on Linux x86_64 (1474.973513ms)\n✔ Alt vertical arrows preserve modifiers with real xterm on Win32 (1375.105641ms)\n✔ Alt vertical arrows preserve modifiers with real xterm on MacIntel (1022.503943ms)\n✔ neighboring arrow shortcuts keep xterm encoding on Linux x86_64 (1778.807169ms)\n✔ neighboring arrow shortcuts keep xterm encoding on Win32 (1703.906354ms)\n✔ neighboring arrow shortcuts keep xterm encoding on MacIntel (1749.300302ms)\n✔ Alt vertical arrows emit once per keydown including repeat, never on keyup (1138.908859ms)\n✔ composition leaves Alt arrows to xterm without the navigation override (1086.584975ms)\n✔ outside focus and an open palette keep their own keyboard behavior (1018.166674ms)\n✔ retained output consumes Alt arrows after exit or loss of session (1087.951639ms)\n✔ Alt arrow input belongs to its originating tab through switching and renderer replacement (1120.736559ms)\n✔ session replacement before flush discards buffered Alt arrows (1087.059308ms)\n✔ session exit before flush discards buffered Alt arrows (879.296839ms)\n✔ Alt arrows waiting behind a request are discarded when their session becomes unusable (2217.61744ms)\n✔ all profiles and provider fixtures preserve Alt arrows and existing control keys (1856.595295ms)\n✔ paste gestures cannot send input after exit or loss of a managed session (1964.326996ms)\n✔ empty and unreadable native paste events cannot fall through to xterm (1415.909803ms)\nℹ tests 137\nℹ suites 0\nℹ pass 137\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 35799.884162",
+                  "exit_code": 0,
+                  "process_id": "proc-1789059376457-1129590-1202",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: Shared terminal keyboard behavior and affected surface regressions"
+                },
+                {
+                  "command": "cargo fmt --all -- --check",
+                  "evidence": "Observed supervised process proc-1789059412461-1129590-1205 exited 0.",
+                  "exit_code": 0,
+                  "process_id": "proc-1789059412461-1129590-1205",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: Rust formatting"
+                },
+                {
+                  "command": "git diff --check && git diff 0b6cc819de716b1b118f40c4465d114290117699 9a6c56c9c089cb0a78d83f23db7fff17f89c3a69 --check",
+                  "evidence": "Observed supervised process proc-1789059414337-1129590-1208 exited 0.",
+                  "exit_code": 0,
+                  "process_id": "proc-1789059414337-1129590-1208",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: Worktree and complete candidate whitespace"
+                }
+              ],
+              "round_idx": 0,
+              "schema_version": 1,
+              "source_candidate_commit": "9a6c56c9c089cb0a78d83f23db7fff17f89c3a69",
+              "state": "passed"
+            },
+            "results": [
+              {
+                "command": "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal*.test.js tests/web_supervisor_toolbar.test.js tests/web_goal_log_tail.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js",
+                "evidence": "Observed supervised process proc-1789059376457-1129590-1202 exited 0. stdout: s exactly once (6.121812ms)\n✔ the navigation override ignores other event phases, composition and modifier combinations (1.723313ms)\n✔ the navigation override requires focus, visibility and current terminal state (6.159094ms)\n✔ a replaced renderer cannot invoke keyboard policy on the current session (0.714451ms)\n✔ retained output consumes Alt navigation without emitting after exit or session loss (1.635845ms)\n✔ Alt vertical arrows preserve modifiers with real xterm on Linux x86_64 (1474.973513ms)\n✔ Alt vertical arrows preserve modifiers with real xterm on Win32 (1375.105641ms)\n✔ Alt vertical arrows preserve modifiers with real xterm on MacIntel (1022.503943ms)\n✔ neighboring arrow shortcuts keep xterm encoding on Linux x86_64 (1778.807169ms)\n✔ neighboring arrow shortcuts keep xterm encoding on Win32 (1703.906354ms)\n✔ neighboring arrow shortcuts keep xterm encoding on MacIntel (1749.300302ms)\n✔ Alt vertical arrows emit once per keydown including repeat, never on keyup (1138.908859ms)\n✔ composition leaves Alt arrows to xterm without the navigation override (1086.584975ms)\n✔ outside focus and an open palette keep their own keyboard behavior (1018.166674ms)\n✔ retained output consumes Alt arrows after exit or loss of session (1087.951639ms)\n✔ Alt arrow input belongs to its originating tab through switching and renderer replacement (1120.736559ms)\n✔ session replacement before flush discards buffered Alt arrows (1087.059308ms)\n✔ session exit before flush discards buffered Alt arrows (879.296839ms)\n✔ Alt arrows waiting behind a request are discarded when their session becomes unusable (2217.61744ms)\n✔ all profiles and provider fixtures preserve Alt arrows and existing control keys (1856.595295ms)\n✔ paste gestures cannot send input after exit or loss of a managed session (1964.326996ms)\n✔ empty and unreadable native paste events cannot fall through to xterm (1415.909803ms)\nℹ tests 137\nℹ suites 0\nℹ pass 137\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 35799.884162",
+                "exit_code": 0,
+                "process_id": "proc-1789059376457-1129590-1202",
+                "status": "passed",
+                "test": "workflow.quality.enter:default-quality: Shared terminal keyboard behavior and affected surface regressions"
+              },
+              {
+                "command": "cargo fmt --all -- --check",
+                "evidence": "Observed supervised process proc-1789059412461-1129590-1205 exited 0.",
+                "exit_code": 0,
+                "process_id": "proc-1789059412461-1129590-1205",
+                "status": "passed",
+                "test": "workflow.quality.enter:default-quality: Rust formatting"
+              },
+              {
+                "command": "git diff --check && git diff 0b6cc819de716b1b118f40c4465d114290117699 9a6c56c9c089cb0a78d83f23db7fff17f89c3a69 --check",
+                "evidence": "Observed supervised process proc-1789059414337-1129590-1208 exited 0.",
+                "exit_code": 0,
+                "process_id": "proc-1789059414337-1129590-1208",
+                "status": "passed",
+                "test": "workflow.quality.enter:default-quality: Worktree and complete candidate whitespace"
+              }
+            ],
+            "source_candidate_commit": "9a6c56c9c089cb0a78d83f23db7fff17f89c3a69"
+          },
+          "quality_message": "All Quality Skills passed with supervised evidence.",
+          "quality_state": "passed",
+          "rule_state": "unclassified"
+        },
+        "refreshed_at": "2026-09-10T16:56:55Z",
+        "replacement_base_commit": "47a0059f14971ba766b231183bd5cb1a218450f8",
+        "replacement_candidate_commit": "b6dfd178b0f4bac23f1b018e7c3510c04560f636",
+        "round_idx": 0,
+        "state": "refreshed",
+        "workflow_revision": 2,
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T130VC48JK4653MY62004-round-1"
+      },
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "quality",
+  "status": "governance",
   "target_branch": "main",
-  "updated": "2026-09-10T16:53:24Z",
+  "updated": "2026-09-10T16:56:55Z",
   "workflow_events": [
     {
       "at": "2026-09-10T16:16:39.697881485+00:00",
@@ -1000,7 +1105,16 @@
       "node_id": "default",
       "round_idx": 0,
       "to": "quality"
+    },
+    {
+      "at": "2026-09-10T16:56:55.105775609+00:00",
+      "forced": false,
+      "from": "quality",
+      "generation": 6,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "governance"
     }
   ],
-  "workflow_revision": 28
+  "workflow_revision": 32
 }
