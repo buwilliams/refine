@@ -544,11 +544,91 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-quality": {
+      "invocation_id": "227d4c60eaa92ef8ce7cccc2cacbeb1c3a11a7cd825e45be4483ce9da052a4b8",
+      "binding_id": "default-quality",
+      "role": "quality",
+      "outcome": "success",
+      "summary": "Observational review found no defects in the pinned candidate. Read-only checks passed; behavioral tests and release commands are proposed for Refine-supervised evaluation.",
+      "evidence": [
+        "HEAD remains 036c0802c771a6cc5865a8bc4d669480e1a76c57 and git status --porcelain=v1 is empty. No files, Goal state or Git state were intentionally changed; no merge, push, deployment or daemon restart occurred.",
+        "Reviewed the finalized plan against CLI, Skills, Backlog and Surface Principles intent. The only production-code change exempts FetchEmailGoals from the generic direct-target guard. Caller review found no other production use of the classification helper.",
+        "Application authorization rejects a mismatched canonical target before project-state resolution, fetch-lock acquisition, secret lookup or request-ledger processing. Compiled regressions use paths containing spaces and apostrophes, malformed-secret evidence and unchanged fixture snapshots.",
+        "The unchanged Application capability retains sender filtering, durable recording before acknowledgement, deterministic identities, retry evidence and shared Backlog authoring. The cohesive intake test module exercises acknowledgement failure, record-write interruption, partial success and interrupted Goal linking.",
+        "Source review confirms fetched_count is added to the result and the CLI prints JSON before returning failure for nonempty errors. Authenticated CLI success and partial-error output remain unexercised.",
+        "Read-only Python assertions verified separate runbook command arguments, valid Skill JSON, 25-message batches, ten-batch maximum, immediate stop on failure and unchanged approval, Review and reply restrictions.",
+        "Inspected retained logs under /tmp/refine-email-quality-a84874e2/ and /tmp/refine-email-dispatch-e68b7463-evidence/. The retained implementation patch matches all eight candidate diff blocks; only block ordering differs. Historical test results are distinguished from checks executed during this invocation.",
+        "Live mailbox, credentials, request ledger, raw email and existing Goals were not accessed."
+      ],
+      "artifacts": {
+        "tests": [
+          {
+            "command": "cargo test --locked --lib surfaces::cli::tests -- --test-threads=1",
+            "evidence": "Proposed supervised check. Retained candidate log reports 72 passed; not rerun during this observational invocation.",
+            "status": "pending",
+            "test": "CLI routing and unrelated command restrictions"
+          },
+          {
+            "command": "cargo test --locked --lib application::development_requests:: -- --test-threads=1",
+            "evidence": "Proposed supervised check covering intake, authorization, retries, deduplication, Backlog creation, MIME and record schemas. Retained separate logs report 22 intake, 2 MIME and 1 schema tests passed.",
+            "status": "pending",
+            "test": "Email capability and durable recovery"
+          },
+          {
+            "command": "cargo test --locked --test cli_target_root -- --test-threads=1",
+            "evidence": "Proposed supervised check. Retained candidate log reports 4 passed. Original-guard log shows both new email routing tests failing.",
+            "status": "pending",
+            "test": "Compiled production dispatch and target authorization"
+          },
+          {
+            "command": "cargo build --release --locked --bin refine",
+            "evidence": "Proposed supervised build. Retained candidate log reports successful release compilation.",
+            "status": "pending",
+            "test": "Production release build"
+          },
+          {
+            "command": "cargo test --release --locked --test cli_target_root -- --test-threads=1",
+            "evidence": "Proposed supervised check. Retained candidate log reports 4 passed.",
+            "status": "pending",
+            "test": "Release-binary dispatch regressions"
+          },
+          {
+            "command": "cargo fmt --all -- --check",
+            "evidence": "Executed during this invocation; exit 0.",
+            "status": "passed",
+            "test": "Rust formatting"
+          },
+          {
+            "command": "git diff --check 0b6cc819de716b1b118f40c4465d114290117699 036c0802c771a6cc5865a8bc4d669480e1a76c57",
+            "evidence": "Executed during this invocation; exit 0. Working-tree whitespace check also passed.",
+            "status": "passed",
+            "test": "Candidate whitespace"
+          },
+          {
+            "command": "python3 -m json.tool docs/runbooks/skills/fetch-goals-from-email.json > /dev/null",
+            "evidence": "Executed during this invocation; exit 0.",
+            "status": "passed",
+            "test": "Skill JSON validity"
+          }
+        ]
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-quality",
+      "diagnostic": null,
+      "operation_id": "1a08c370376113c7671",
+      "process_id": "proc-1789058812422-1129590-1067",
+      "raw_output": "{\n  \"artifacts\": {\n    \"tests\": [\n      {\n        \"command\": \"cargo test --locked --lib surfaces::cli::tests -- --test-threads=1\",\n        \"evidence\": \"Proposed supervised check. Retained candidate log reports 72 passed; not rerun during this observational invocation.\",\n        \"status\": \"pending\",\n        \"test\": \"CLI routing and unrelated command restrictions\"\n      },\n      {\n        \"command\": \"cargo test --locked --lib application::development_requests:: -- --test-threads=1\",\n        \"evidence\": \"Proposed supervised check covering intake, authorization, retries, deduplication, Backlog creation, MIME and record schemas. Retained separate logs report 22 intake, 2 MIME and 1 schema tests passed.\",\n        \"status\": \"pending\",\n        \"test\": \"Email capability and durable recovery\"\n      },\n      {\n        \"command\": \"cargo test --locked --test cli_target_root -- --test-threads=1\",\n        \"evidence\": \"Proposed supervised check. Retained candidate log reports 4 passed. Original-guard log shows both new email routing tests failing.\",\n        \"status\": \"pending\",\n        \"test\": \"Compiled production dispatch and target authorization\"\n      },\n      {\n        \"command\": \"cargo build --release --locked --bin refine\",\n        \"evidence\": \"Proposed supervised build. Retained candidate log reports successful release compilation.\",\n        \"status\": \"pending\",\n        \"test\": \"Production release build\"\n      },\n      {\n        \"command\": \"cargo test --release --locked --test cli_target_root -- --test-threads=1\",\n        \"evidence\": \"Proposed supervised check. Retained candidate log reports 4 passed.\",\n        \"status\": \"pending\",\n        \"test\": \"Release-binary dispatch regressions\"\n      },\n      {\n        \"command\": \"cargo fmt --all -- --check\",\n        \"evidence\": \"Executed during this invocation; exit 0.\",\n        \"status\": \"passed\",\n        \"test\": \"Rust formatting\"\n      },\n      {\n        \"command\": \"git diff --check 0b6cc819de716b1b118f40c4465d114290117699 036c0802c771a6cc5865a8bc4d669480e1a76c57\",\n        \"evidence\": \"Executed during this invocation; exit 0. Working-tree whitespace check also passed.\",\n        \"status\": \"passed\",\n        \"test\": \"Candidate whitespace\"\n      },\n      {\n        \"command\": \"python3 -m json.tool docs/runbooks/skills/fetch-goals-from-email.json > /dev/null\",\n        \"evidence\": \"Executed during this invocation; exit 0.\",\n        \"status\": \"passed\",\n        \"test\": \"Skill JSON validity\"\n      }\n    ]\n  },\n  \"binding_id\": \"default-quality\",\n  \"invocation_id\": \"227d4c60eaa92ef8ce7cccc2cacbeb1c3a11a7cd825e45be4483ce9da052a4b8\",\n  \"outcome\": \"success\",\n  \"role\": \"quality\",\n  \"summary\": \"Observational review found no defects in the pinned candidate. Read-only checks passed; behavioral tests and release commands are proposed for Refine-supervised evaluation.\",\n  \"evidence\": [\n    \"HEAD remains 036c0802c771a6cc5865a8bc4d669480e1a76c57 and git status --porcelain=v1 is empty. No files, Goal state or Git state were intentionally changed; no merge, push, deployment or daemon restart occurred.\",\n    \"Reviewed the finalized plan against CLI, Skills, Backlog and Surface Principles intent. The only production-code change exempts FetchEmailGoals from the generic direct-target guard. Caller review found no other production use of the classification helper.\",\n    \"Application authorization rejects a mismatched canonical target before project-state resolution, fetch-lock acquisition, secret lookup or request-ledger processing. Compiled regressions use paths containing spaces and apostrophes, malformed-secret evidence and unchanged fixture snapshots.\",\n    \"The unchanged Application capability retains sender filtering, durable recording before acknowledgement, deterministic identities, retry evidence and shared Backlog authoring. The cohesive intake test module exercises acknowledgement failure, record-write interruption, partial success and interrupted Goal linking.\",\n    \"Source review confirms fetched_count is added to the result and the CLI prints JSON before returning failure for nonempty errors. Authenticated CLI success and partial-error output remain unexercised.\",\n    \"Read-only Python assertions verified separate runbook command arguments, valid Skill JSON, 25-message batches, ten-batch maximum, immediate stop on failure and unchanged approval, Review and reply restrictions.\",\n    \"Inspected retained logs under /tmp/refine-email-quality-a84874e2/ and /tmp/refine-email-dispatch-e68b7463-evidence/. The retained implementation patch matches all eight candidate diff blocks; only block ordering differs. Historical test results are distinguished from checks executed during this invocation.\",\n    \"Live mailbox, credentials, request ledger, raw email and existing Goals were not accessed.\"\n  ]\n}\n",
+      "workflow_revision": 3
+    }
+  ],
   "created_at": "2026-09-10T16:46:51.553999432+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-10T16:50:15.990076789+00:00",
   "error": null,
   "action_applied": false
 }
