@@ -1653,11 +1653,94 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-quality": {
+      "invocation_id": "5dd7f85c9a35de5fc2fe73f2487eac2197944e4ebd3180c893589e5eaf0578d9",
+      "binding_id": "default-quality",
+      "role": "quality",
+      "outcome": "success",
+      "summary": "Observational review found no additional material defects. Read-only checks passed; regression commands are proposed for Refine supervision against the exact replacement candidate.",
+      "evidence": [
+        "Reviewed candidate b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5 against the finalized Round 2 plan and relevant design, worktree, Skills and workflow intent contracts.",
+        "Traced retained-history authorization, detached replay and recovery, planning reconciliation, replacement Quality proof, conflict-resolution scope and exact-SHA publication leases. No additional material defects were identified.",
+        "Executed git range-diff 7b430a6a3bc0d692f03e71da68d06f3e9534dead..9baf06e5524dcc10c1a12dfa9db765d86f42ff6e b47569adb8d4c5d1d7335ba91729a3e486a38fe0..b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5. Both implementation and Quality commits were patch-equivalent. Intervening target changes affect terminal clipboard behavior.",
+        "Existing tests cover the required behavior and prior Quality corrections. Runtime results supplied for 9baf06e5 are historical evidence, not passes for b1426cf5; exact replacement verification remains pending.",
+        "No files or Git state were intentionally changed. No Goal-state mutation, merge, push, deployment or daemon restart was performed; the final checkout check remained clean."
+      ],
+      "artifacts": {
+        "tests": [
+          {
+            "command": "test \"$(git rev-parse HEAD)\" = b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5 && test \"$(git branch --show-current)\" = refine/DR54BF57DCE017ED8EC68A5EEB/round-2 && test -z \"$(git --no-optional-locks status --porcelain=v1)\" && git merge-base --is-ancestor b47569adb8d4c5d1d7335ba91729a3e486a38fe0 b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5",
+            "evidence": "Executed; exit 0.",
+            "status": "passed",
+            "test": "Pinned candidate identity, clean checkout and base ancestry"
+          },
+          {
+            "command": "git diff --check b47569adb8d4c5d1d7335ba91729a3e486a38fe0 b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5",
+            "evidence": "Executed; no whitespace diagnostics.",
+            "status": "passed",
+            "test": "Candidate diff whitespace"
+          },
+          {
+            "command": "git diff --name-only --diff-filter=ACMR b47569adb8d4c5d1d7335ba91729a3e486a38fe0 b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5 -- '*.rs' | xargs rustfmt --check --edition 2024 --config skip_children=true",
+            "evidence": "Executed; exit 0 across 40 changed Rust files.",
+            "status": "passed",
+            "test": "Formatting of changed Rust files"
+          },
+          {
+            "command": "cargo test --lib application::workflow -- --test-threads=1 --skip multiple_plan_skills_contribute_separate_namespaced_checklists",
+            "evidence": "Proposed for supervised execution against b1426cf5. Excludes the previously reported baseline fixture; its source and the single-trigger validator are unchanged from the pinned base.",
+            "status": "pending",
+            "test": "Workflow lineage, replay, retries, replacement gates, conflicts, publication races and interruption"
+          },
+          {
+            "command": "cargo test --lib application::events::tests -- --test-threads=1",
+            "evidence": "Proposed for supervised execution; not run during this observational invocation.",
+            "status": "pending",
+            "test": "Current Skill invocation and execution contracts"
+          },
+          {
+            "command": "cargo test --lib infrastructure::git::worktrees -- --test-threads=1",
+            "evidence": "Proposed for supervised execution; not run during this observational invocation.",
+            "status": "pending",
+            "test": "Shared Git worktree creation and recovery"
+          },
+          {
+            "command": "cargo test --lib infrastructure::process::supervisor::operations -- --test-threads=1",
+            "evidence": "Proposed for supervised execution; not run during this observational invocation.",
+            "status": "pending",
+            "test": "Durable operation coordination and recovery"
+          },
+          {
+            "command": "cargo test --lib architecture_tests -- --test-threads=1",
+            "evidence": "Proposed for supervised execution after workflow module restructuring.",
+            "status": "pending",
+            "test": "Semantic architecture boundaries"
+          },
+          {
+            "command": "cargo check --all-targets",
+            "evidence": "Proposed for supervised execution against the replacement candidate.",
+            "status": "pending",
+            "test": "All-target compilation"
+          }
+        ]
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-quality",
+      "diagnostic": null,
+      "operation_id": "1a08bd390b8113c7639",
+      "process_id": "proc-1789052294062-1129590-593",
+      "raw_output": "{\n  \"binding_id\": \"default-quality\",\n  \"invocation_id\": \"5dd7f85c9a35de5fc2fe73f2487eac2197944e4ebd3180c893589e5eaf0578d9\",\n  \"outcome\": \"success\",\n  \"role\": \"quality\",\n  \"summary\": \"Observational review found no additional material defects. Read-only checks passed; regression commands are proposed for Refine supervision against the exact replacement candidate.\",\n  \"artifacts\": {\n    \"tests\": [\n      {\n        \"test\": \"Pinned candidate identity, clean checkout and base ancestry\",\n        \"command\": \"test \\\"$(git rev-parse HEAD)\\\" = b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5 && test \\\"$(git branch --show-current)\\\" = refine/DR54BF57DCE017ED8EC68A5EEB/round-2 && test -z \\\"$(git --no-optional-locks status --porcelain=v1)\\\" && git merge-base --is-ancestor b47569adb8d4c5d1d7335ba91729a3e486a38fe0 b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5\",\n        \"status\": \"passed\",\n        \"evidence\": \"Executed; exit 0.\"\n      },\n      {\n        \"test\": \"Candidate diff whitespace\",\n        \"command\": \"git diff --check b47569adb8d4c5d1d7335ba91729a3e486a38fe0 b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5\",\n        \"status\": \"passed\",\n        \"evidence\": \"Executed; no whitespace diagnostics.\"\n      },\n      {\n        \"test\": \"Formatting of changed Rust files\",\n        \"command\": \"git diff --name-only --diff-filter=ACMR b47569adb8d4c5d1d7335ba91729a3e486a38fe0 b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5 -- '*.rs' | xargs rustfmt --check --edition 2024 --config skip_children=true\",\n        \"status\": \"passed\",\n        \"evidence\": \"Executed; exit 0 across 40 changed Rust files.\"\n      },\n      {\n        \"test\": \"Workflow lineage, replay, retries, replacement gates, conflicts, publication races and interruption\",\n        \"command\": \"cargo test --lib application::workflow -- --test-threads=1 --skip multiple_plan_skills_contribute_separate_namespaced_checklists\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed for supervised execution against b1426cf5. Excludes the previously reported baseline fixture; its source and the single-trigger validator are unchanged from the pinned base.\"\n      },\n      {\n        \"test\": \"Current Skill invocation and execution contracts\",\n        \"command\": \"cargo test --lib application::events::tests -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed for supervised execution; not run during this observational invocation.\"\n      },\n      {\n        \"test\": \"Shared Git worktree creation and recovery\",\n        \"command\": \"cargo test --lib infrastructure::git::worktrees -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed for supervised execution; not run during this observational invocation.\"\n      },\n      {\n        \"test\": \"Durable operation coordination and recovery\",\n        \"command\": \"cargo test --lib infrastructure::process::supervisor::operations -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed for supervised execution; not run during this observational invocation.\"\n      },\n      {\n        \"test\": \"Semantic architecture boundaries\",\n        \"command\": \"cargo test --lib architecture_tests -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed for supervised execution after workflow module restructuring.\"\n      },\n      {\n        \"test\": \"All-target compilation\",\n        \"command\": \"cargo check --all-targets\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed for supervised execution against the replacement candidate.\"\n      }\n    ]\n  },\n  \"evidence\": [\n    \"Reviewed candidate b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5 against the finalized Round 2 plan and relevant design, worktree, Skills and workflow intent contracts.\",\n    \"Traced retained-history authorization, detached replay and recovery, planning reconciliation, replacement Quality proof, conflict-resolution scope and exact-SHA publication leases. No additional material defects were identified.\",\n    \"Executed git range-diff 7b430a6a3bc0d692f03e71da68d06f3e9534dead..9baf06e5524dcc10c1a12dfa9db765d86f42ff6e b47569adb8d4c5d1d7335ba91729a3e486a38fe0..b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5. Both implementation and Quality commits were patch-equivalent. Intervening target changes affect terminal clipboard behavior.\",\n    \"Existing tests cover the required behavior and prior Quality corrections. Runtime results supplied for 9baf06e5 are historical evidence, not passes for b1426cf5; exact replacement verification remains pending.\",\n    \"No files or Git state were intentionally changed. No Goal-state mutation, merge, push, deployment or daemon restart was performed; the final checkout check remained clean.\"\n  ]\n}\n",
+      "workflow_revision": 18
+    }
+  ],
   "created_at": "2026-09-10T14:58:13.719527206+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-10T15:02:35.924595868+00:00",
   "error": null,
   "action_applied": false
 }
