@@ -1,9 +1,9 @@
 {
   "base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
   "branch_name": "refine/DRCBAA3A2FC4ABDDCEC2B87473/round-3",
-  "candidate_commit": "b3465d05ac29dd4c597d2971b84d82ed07377b77",
+  "candidate_commit": "ddf7ce84c7806cf0f81e4e430101753658008403",
   "created": "2026-09-10T08:26:07Z",
-  "event_generation": 7,
+  "event_generation": 8,
   "feature_id": null,
   "feature_order": null,
   "id": "DRCBAA3A2FC4ABDDCEC2B87473",
@@ -3232,6 +3232,106 @@
           },
           "source": "workflow.plan.enter",
           "state": "succeeded"
+        },
+        "d2a05a4d887369639d1165d945551f06b3791b7650c829301fa0047b473e19a4": {
+          "candidate_commit": null,
+          "results": {
+            "default-implement": {
+              "artifacts": {
+                "implementation_evidence": {
+                  "checklist": [
+                    {
+                      "evidence": "Used the pinned Round 3 branch at b3465d05ac29dd4c597d2971b84d82ed07377b77. Read the retained Round 2 plan and failed invocation, compared subsequent main changes, and preserved earlier work.",
+                      "id": "workflow.plan.enter:default-plan:P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Shared Model validation now requires complete invocation context, matching configuration revision and selected bindings, explicit Accept authority, matching submission/outcome attribution and candidate, and a completed receipt with causal timestamps. Negative regressions pass.",
+                      "id": "workflow.plan.enter:default-plan:P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Event acceptance captures durable invocation authority. Immediate and deferred acceptance preserve submission time, atomic settlement, existing exact-candidate proof and lock ordering, without creating human decisions.",
+                      "id": "workflow.plan.enter:default-plan:P3",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added explicit Skill, workflow and operator recovery provenance across retry, undo, new-Round and successor operations, including deferred transitions and restart/replay. Stale authority is rejected.",
+                      "id": "workflow.plan.enter:default-plan:P4",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Behavioral regressions verify automatic recovery 1→1 and operator recovery 2→2 while preserving earlier automatic 1→2 lineage. Successor Rounds count once; Failed alone does not imply intervention. Unknown evidence and immutable settlements remain preserved.",
+                      "id": "workflow.plan.enter:default-plan:P5",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Persistence regressions reject malformed automatic evidence during merge, hydration, authority recovery and archival. Valid settlements retain causal evidence through synchronization, deletion and log pruning.",
+                      "id": "workflow.plan.enter:default-plan:P6",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Passed 65 work-item, 27 Event and 174 workflow tests covering recovery, immediate/deferred acceptance, replay, stale authority, successors, required intervention, rejection, cancellation and retained history.",
+                      "id": "workflow.plan.enter:default-plan:P7",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Six-Goal fixture passed: decisions 3/1, acceptance 3/4, automatic/failure rates 1/6, first-Round success 2/6, average Rounds 8/6. Boundaries, grouping, legacy coverage and archive deduplication passed. Benchmark: 10,000 three-Round Goals; cold 1709.764 ms, warm 0.105 ms, incremental 34.059 ms; zero routine history reads.",
+                      "id": "workflow.plan.enter:default-plan:P8",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Updated six affected intent pages. Extracted automatic successor orchestration into a cohesive Application module; causal validation remains in Model.",
+                      "id": "workflow.plan.enter:default-plan:P9",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Required compilation, Rust, synchronization, CLI/API and browser checks passed. Matching Chromium was installed; the browser suite passed 280 tests with zero skips.",
+                      "id": "workflow.plan.enter:default-plan:P10",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Formatting passed for 90 candidate Rust files. Tracked and nine untracked files passed whitespace checks. Candidate identity and the 34-file working-tree manifest were verified. Changes remain uncommitted for Refine.",
+                      "id": "workflow.plan.enter:default-plan:P11",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "cargo check --all-targets --locked: passed.",
+                    "cargo test --lib model::goal -- --test-threads=1: 4 passed.",
+                    "cargo test --lib application::work_items -- --test-threads=1 --nocapture: 65 passed, including fixture and benchmark.",
+                    "cargo test --lib application::events -- --test-threads=1: 27 passed.",
+                    "cargo test --lib application::persistence_sync -- --test-threads=1: 119 passed.",
+                    "cargo test --lib application::workflow -- --test-threads=1: 174 passed.",
+                    "cargo test --lib application::projects::projection -- --test-threads=1: 20 passed.",
+                    "cargo test --lib model::workflow -- --test-threads=1: 4 passed.",
+                    "cargo test --lib model::feature -- --test-threads=1: 4 passed.",
+                    "cargo test --lib surfaces::web_server -- --test-threads=1: 169 passed.",
+                    "cargo test --test sync_regressions --test sync_simulation -- --test-threads=1: 5 and 26 passed.",
+                    "cargo run --manifest-path xtask/Cargo.toml -- test-cli: 1 integration suite passed.",
+                    "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules cargo run --manifest-path xtask/Cargo.toml -- test-browser: 280 passed, 0 failed, 0 skipped; Chromium 153.0.8010.12 launched successfully.",
+                    "node --test tests/web_dashboard_review_results.test.js tests/web_goal_review.test.js: 4 passed, 0 failed, 0 skipped.",
+                    "cargo run --manifest-path xtask/Cargo.toml -- check-static-assets: passed; 67 assets.",
+                    "rustfmt --check --edition 2024 --config skip_children=true over candidate changes and untracked Rust files: 90 files passed.",
+                    "git diff --check 7b430a6a3bc0d692f03e71da68d06f3e9534dead and separate untracked-file whitespace checks: passed."
+                  ]
+                }
+              },
+              "binding_id": "default-implement",
+              "evidence": [
+                "Workspace: /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRCBAA3A2FC4ABDDCEC2B87473-round-2. Branch: refine/DRCBAA3A2FC4ABDDCEC2B87473/round-3. HEAD: b3465d05ac29dd4c597d2971b84d82ed07377b77.",
+                "34 changed files remain uncommitted. Changed-file manifest SHA-256: 2df1ae9a230c9678ee2457223a29758128e24e9f1c45e095e5d318452334c229. Manifest: /tmp/round3-candidate-manifest.json. Full report: /tmp/round3-implementation-evidence.json.",
+                "Intermediate failures were corrected: incomplete invocation fixtures, overly strict recovery validation of abbreviated historical candidates, and a stale-authority fixture using an ignored update field. Final reported runs have no failures or skips; earlier logs remain retained.",
+                "No Goal-state mutation, workflow advancement, commit, push, merge, deployment or serving-daemon restart was performed."
+              ],
+              "invocation_id": "d2a05a4d887369639d1165d945551f06b3791b7650c829301fa0047b473e19a4",
+              "outcome": "success",
+              "role": "implement",
+              "summary": "Implemented automatic-settlement validation and explicit recovery provenance. Required verification passed, including Chromium rendering. Changes are ready for Refine candidate capture and Quality."
+            }
+          },
+          "source": "workflow.implement.enter",
+          "state": "succeeded"
         }
       },
       "failure_at": "",
@@ -3242,7 +3342,12 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [],
+        "context_version": 1,
+        "recorded_at": "2026-09-10T15:55:20Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
@@ -3253,6 +3358,7 @@
           "round_idx": 2,
           "target_branch": "main"
         },
+        "completed_at": "2026-09-10T15:55:20Z",
         "final_plan": {
           "completed_at": "2026-09-10T15:32:58Z",
           "git_after": {
@@ -3315,6 +3421,89 @@
             "summary": "workflow.plan.enter:default-plan: Correct automatic-settlement validation and recovery provenance on the retained candidate, preserve existing durable history and Quality corrections, and verify persistence, metrics and affected surfaces."
           },
           "started_at": "2026-09-10T15:23:37Z"
+        },
+        "implementation": {
+          "completed_at": "2026-09-10T15:55:20Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Used the pinned Round 3 branch at b3465d05ac29dd4c597d2971b84d82ed07377b77. Read the retained Round 2 plan and failed invocation, compared subsequent main changes, and preserved earlier work.",
+                "id": "workflow.plan.enter:default-plan:P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Shared Model validation now requires complete invocation context, matching configuration revision and selected bindings, explicit Accept authority, matching submission/outcome attribution and candidate, and a completed receipt with causal timestamps. Negative regressions pass.",
+                "id": "workflow.plan.enter:default-plan:P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Event acceptance captures durable invocation authority. Immediate and deferred acceptance preserve submission time, atomic settlement, existing exact-candidate proof and lock ordering, without creating human decisions.",
+                "id": "workflow.plan.enter:default-plan:P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added explicit Skill, workflow and operator recovery provenance across retry, undo, new-Round and successor operations, including deferred transitions and restart/replay. Stale authority is rejected.",
+                "id": "workflow.plan.enter:default-plan:P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Behavioral regressions verify automatic recovery 1→1 and operator recovery 2→2 while preserving earlier automatic 1→2 lineage. Successor Rounds count once; Failed alone does not imply intervention. Unknown evidence and immutable settlements remain preserved.",
+                "id": "workflow.plan.enter:default-plan:P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Persistence regressions reject malformed automatic evidence during merge, hydration, authority recovery and archival. Valid settlements retain causal evidence through synchronization, deletion and log pruning.",
+                "id": "workflow.plan.enter:default-plan:P6",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Passed 65 work-item, 27 Event and 174 workflow tests covering recovery, immediate/deferred acceptance, replay, stale authority, successors, required intervention, rejection, cancellation and retained history.",
+                "id": "workflow.plan.enter:default-plan:P7",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Six-Goal fixture passed: decisions 3/1, acceptance 3/4, automatic/failure rates 1/6, first-Round success 2/6, average Rounds 8/6. Boundaries, grouping, legacy coverage and archive deduplication passed. Benchmark: 10,000 three-Round Goals; cold 1709.764 ms, warm 0.105 ms, incremental 34.059 ms; zero routine history reads.",
+                "id": "workflow.plan.enter:default-plan:P8",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated six affected intent pages. Extracted automatic successor orchestration into a cohesive Application module; causal validation remains in Model.",
+                "id": "workflow.plan.enter:default-plan:P9",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Required compilation, Rust, synchronization, CLI/API and browser checks passed. Matching Chromium was installed; the browser suite passed 280 tests with zero skips.",
+                "id": "workflow.plan.enter:default-plan:P10",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Formatting passed for 90 candidate Rust files. Tracked and nine untracked files passed whitespace checks. Candidate identity and the 34-file working-tree manifest were verified. Changes remain uncommitted for Refine.",
+                "id": "workflow.plan.enter:default-plan:P11",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "cargo check --all-targets --locked: passed.",
+              "cargo test --lib model::goal -- --test-threads=1: 4 passed.",
+              "cargo test --lib application::work_items -- --test-threads=1 --nocapture: 65 passed, including fixture and benchmark.",
+              "cargo test --lib application::events -- --test-threads=1: 27 passed.",
+              "cargo test --lib application::persistence_sync -- --test-threads=1: 119 passed.",
+              "cargo test --lib application::workflow -- --test-threads=1: 174 passed.",
+              "cargo test --lib application::projects::projection -- --test-threads=1: 20 passed.",
+              "cargo test --lib model::workflow -- --test-threads=1: 4 passed.",
+              "cargo test --lib model::feature -- --test-threads=1: 4 passed.",
+              "cargo test --lib surfaces::web_server -- --test-threads=1: 169 passed.",
+              "cargo test --test sync_regressions --test sync_simulation -- --test-threads=1: 5 and 26 passed.",
+              "cargo run --manifest-path xtask/Cargo.toml -- test-cli: 1 integration suite passed.",
+              "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules cargo run --manifest-path xtask/Cargo.toml -- test-browser: 280 passed, 0 failed, 0 skipped; Chromium 153.0.8010.12 launched successfully.",
+              "node --test tests/web_dashboard_review_results.test.js tests/web_goal_review.test.js: 4 passed, 0 failed, 0 skipped.",
+              "cargo run --manifest-path xtask/Cargo.toml -- check-static-assets: passed; 67 assets.",
+              "rustfmt --check --edition 2024 --config skip_children=true over candidate changes and untracked Rust files: 90 files passed.",
+              "git diff --check 7b430a6a3bc0d692f03e71da68d06f3e9534dead and separate untracked-file whitespace checks: passed."
+            ]
+          },
+          "report": "workflow.implement.enter:default-implement: Implemented automatic-settlement validation and explicit recovery provenance. Required verification passed, including Chromium rendering. Changes are ready for Refine candidate capture and Quality.",
+          "started_at": "2026-09-10T15:32:59Z"
         },
         "phase": "implement",
         "phase_started_at": "2026-09-10T15:32:59Z",
@@ -3383,11 +3572,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-09-10T15:23:37Z",
-        "state": "in_progress",
-        "updated_at": "2026-09-10T15:32:59Z"
+        "state": "completed",
+        "updated_at": "2026-09-10T15:55:20Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "workflow.implement.enter:default-implement: Implemented automatic-settlement validation and explicit recovery provenance. Required verification passed, including Chromium rendering. Changes are ready for Refine candidate capture and Quality.",
+      "implementation_reported_at": "2026-09-10T15:55:20Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -3398,7 +3587,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T15:32:59Z",
+      "updated": "2026-09-10T15:55:21Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T15:23:36Z",
         "round_idx": 2,
@@ -3408,9 +3597,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-10T15:32:59Z",
+  "updated": "2026-09-10T15:55:21Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:36.799534192+00:00",
@@ -3474,7 +3663,16 @@
       "node_id": "default",
       "round_idx": 2,
       "to": "implement"
+    },
+    {
+      "at": "2026-09-10T15:55:21.146036791+00:00",
+      "forced": false,
+      "from": "implement",
+      "generation": 8,
+      "node_id": "default",
+      "round_idx": 2,
+      "to": "quality"
     }
   ],
-  "workflow_revision": 62
+  "workflow_revision": 69
 }
