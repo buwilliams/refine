@@ -1,7 +1,7 @@
 {
   "base_commit": "0b6cc819de716b1b118f40c4465d114290117699",
   "branch_name": "refine/00000T130VC48JK4653MY62004/round-1",
-  "candidate_commit": "8cb7f307a671f134a8288a76ffb81362e344545a",
+  "candidate_commit": "9a6c56c9c089cb0a78d83f23db7fff17f89c3a69",
   "created": "2026-09-10T16:16:39Z",
   "event_generation": 5,
   "feature_id": null,
@@ -583,6 +583,75 @@
           "source": "workflow.plan.enter",
           "state": "succeeded"
         },
+        "1ac7b8b9c4a66bca36de924c931473cfea7cdc01c3cffa5b36eb0fc8ff3f78ab": {
+          "candidate_commit": "8cb7f307a671f134a8288a76ffb81362e344545a",
+          "results": {
+            "default-quality": {
+              "artifacts": {
+                "tests": [
+                  {
+                    "command": "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal_keyboard.test.js tests/web_terminal_keyboard_browser.test.js",
+                    "evidence": "Exit 0: 20 passed, 0 failed, 0 skipped, including 15 real Chromium/xterm tests.",
+                    "status": "passed",
+                    "test": "Exact Alt-arrow bytes and keyboard/session lifecycle behavior"
+                  },
+                  {
+                    "command": "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal*.test.js tests/web_supervisor_toolbar.test.js tests/web_goal_log_tail.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js",
+                    "evidence": "Exit 0 after correction: 137 passed, 0 failed, 0 skipped.",
+                    "status": "passed",
+                    "test": "Focused terminal, clipboard, toolbar and palette regressions"
+                  },
+                  {
+                    "command": "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/*.test.js",
+                    "evidence": "Exit 0: 319 passed, 0 failed, 0 skipped.",
+                    "status": "passed",
+                    "test": "Full web suite"
+                  },
+                  {
+                    "command": "cargo fmt --all -- --check",
+                    "evidence": "Exit 0.",
+                    "status": "passed",
+                    "test": "Rust formatting"
+                  },
+                  {
+                    "command": "cargo test --lib --bins -- --test-threads=1",
+                    "evidence": "Exit 0: 1159 passed, 0 failed, 6 existing helper/systemd tests ignored; binary target had 0 tests.",
+                    "status": "passed",
+                    "test": "Rust and backend integration regressions"
+                  },
+                  {
+                    "command": "cargo build --release --locked",
+                    "evidence": "Exit 0.",
+                    "status": "passed",
+                    "test": "Locked release build"
+                  },
+                  {
+                    "command": "git diff --check && git diff 0b6cc819de716b1b118f40c4465d114290117699 --check",
+                    "evidence": "Exit 0.",
+                    "status": "passed",
+                    "test": "Quality correction and complete candidate whitespace"
+                  }
+                ]
+              },
+              "binding_id": "default-quality",
+              "evidence": [
+                "Reviewed candidate 8cb7f307a671f134a8288a76ffb81362e344545a against the finalized plan and relevant Terminal, Toolbar and Command Palette intent. The four extracted keyboard helpers are byte-for-byte unchanged; shared capability ownership is preserved.",
+                "Corrected one shared input-queue lifecycle defect: buffered input could be sent after observed exit, and deferred sends lacked session revalidation. toolbar.js now checks exit at flush and checks session identity and exit immediately before sending.",
+                "Added two browser regressions covering exit before flush and exit/session loss/replacement behind a pending request. Command NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test --test-name-pattern='session exit before flush|Alt arrows waiting behind' tests/web_terminal_keyboard_browser.test.js initially exited 1 with both tests observing unwanted input after exit. Both pass after correction.",
+                "Baseline command NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test --test-name-pattern='^Alt vertical arrows preserve modifiers' /tmp/refine-alt-arrows-quality-ANG0CA/baseline/tests/web_terminal_keyboard_browser.test.js exited 1 against archived baseline 0b6cc819de716b1b118f40c4465d114290117699: Linux and Windows fixtures emitted ESC[1;5A instead of ESC[1;3A; macOS passed.",
+                "Browser verification uses real Chromium/xterm with platform settings and intercepted HTTP input requests. No native Codex smoke test or physical Windows/macOS test was run.",
+                "Logs, baseline reproduction, correction patch and validated completion JSON are retained in /tmp/refine-alt-arrows-quality-ANG0CA.",
+                "HEAD remains the pinned candidate. Only toolbar.js and web_terminal_keyboard_browser.test.js have uncommitted Quality corrections for Refine to capture and verify. No Goal state change, merge, push, deployment or serving-daemon restart was performed."
+              ],
+              "invocation_id": "1ac7b8b9c4a66bca36de924c931473cfea7cdc01c3cffa5b36eb0fc8ff3f78ab",
+              "outcome": "success",
+              "role": "quality",
+              "summary": "Corrected a shared input-queue lifecycle defect, added two browser regressions, and passed all required checks. No unresolved findings."
+            }
+          },
+          "source": "workflow.quality.enter",
+          "state": "succeeded"
+        },
         "76bdee316505e24fa944bbb2f5132422c0955b8e9333efdab5a7c51bc2056c47": {
           "candidate_commit": null,
           "results": {
@@ -801,13 +870,79 @@
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
       "prompt": "In the Web UI, the toolbar agent, \"Alt + Up\" isn't working right now, but is required for Codex agents.",
+      "quality_agent_report": "workflow.quality.enter:default-quality: Corrected a shared input-queue lifecycle defect, added two browser regressions, and passed all required checks. No unresolved findings.",
+      "quality_candidate_commit": "9a6c56c9c089cb0a78d83f23db7fff17f89c3a69",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
+      "quality_skill_results": [
+        {
+          "artifacts": {
+            "tests": [
+              {
+                "command": "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal_keyboard.test.js tests/web_terminal_keyboard_browser.test.js",
+                "evidence": "Exit 0: 20 passed, 0 failed, 0 skipped, including 15 real Chromium/xterm tests.",
+                "status": "passed",
+                "test": "Exact Alt-arrow bytes and keyboard/session lifecycle behavior"
+              },
+              {
+                "command": "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal*.test.js tests/web_supervisor_toolbar.test.js tests/web_goal_log_tail.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js",
+                "evidence": "Exit 0 after correction: 137 passed, 0 failed, 0 skipped.",
+                "status": "passed",
+                "test": "Focused terminal, clipboard, toolbar and palette regressions"
+              },
+              {
+                "command": "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/*.test.js",
+                "evidence": "Exit 0: 319 passed, 0 failed, 0 skipped.",
+                "status": "passed",
+                "test": "Full web suite"
+              },
+              {
+                "command": "cargo fmt --all -- --check",
+                "evidence": "Exit 0.",
+                "status": "passed",
+                "test": "Rust formatting"
+              },
+              {
+                "command": "cargo test --lib --bins -- --test-threads=1",
+                "evidence": "Exit 0: 1159 passed, 0 failed, 6 existing helper/systemd tests ignored; binary target had 0 tests.",
+                "status": "passed",
+                "test": "Rust and backend integration regressions"
+              },
+              {
+                "command": "cargo build --release --locked",
+                "evidence": "Exit 0.",
+                "status": "passed",
+                "test": "Locked release build"
+              },
+              {
+                "command": "git diff --check && git diff 0b6cc819de716b1b118f40c4465d114290117699 --check",
+                "evidence": "Exit 0.",
+                "status": "passed",
+                "test": "Quality correction and complete candidate whitespace"
+              }
+            ]
+          },
+          "binding_id": "workflow.quality.enter:default-quality",
+          "evidence": [
+            "Reviewed candidate 8cb7f307a671f134a8288a76ffb81362e344545a against the finalized plan and relevant Terminal, Toolbar and Command Palette intent. The four extracted keyboard helpers are byte-for-byte unchanged; shared capability ownership is preserved.",
+            "Corrected one shared input-queue lifecycle defect: buffered input could be sent after observed exit, and deferred sends lacked session revalidation. toolbar.js now checks exit at flush and checks session identity and exit immediately before sending.",
+            "Added two browser regressions covering exit before flush and exit/session loss/replacement behind a pending request. Command NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test --test-name-pattern='session exit before flush|Alt arrows waiting behind' tests/web_terminal_keyboard_browser.test.js initially exited 1 with both tests observing unwanted input after exit. Both pass after correction.",
+            "Baseline command NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test --test-name-pattern='^Alt vertical arrows preserve modifiers' /tmp/refine-alt-arrows-quality-ANG0CA/baseline/tests/web_terminal_keyboard_browser.test.js exited 1 against archived baseline 0b6cc819de716b1b118f40c4465d114290117699: Linux and Windows fixtures emitted ESC[1;5A instead of ESC[1;3A; macOS passed.",
+            "Browser verification uses real Chromium/xterm with platform settings and intercepted HTTP input requests. No native Codex smoke test or physical Windows/macOS test was run.",
+            "Logs, baseline reproduction, correction patch and validated completion JSON are retained in /tmp/refine-alt-arrows-quality-ANG0CA.",
+            "HEAD remains the pinned candidate. Only toolbar.js and web_terminal_keyboard_browser.test.js have uncommitted Quality corrections for Refine to capture and verify. No Goal state change, merge, push, deployment or serving-daemon restart was performed."
+          ],
+          "invocation_id": "1ac7b8b9c4a66bca36de924c931473cfea7cdc01c3cffa5b36eb0fc8ff3f78ab",
+          "outcome": "success",
+          "role": "quality",
+          "summary": "Corrected a shared input-queue lifecycle defect, added two browser regressions, and passed all required checks. No unresolved findings."
+        }
+      ],
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T16:42:57Z",
+      "updated": "2026-09-10T16:53:24Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T16:22:58Z",
         "round_idx": 0,
@@ -819,7 +954,7 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-10T16:42:57Z",
+  "updated": "2026-09-10T16:53:24Z",
   "workflow_events": [
     {
       "at": "2026-09-10T16:16:39.697881485+00:00",
@@ -867,5 +1002,5 @@
       "to": "quality"
     }
   ],
-  "workflow_revision": 24
+  "workflow_revision": 28
 }

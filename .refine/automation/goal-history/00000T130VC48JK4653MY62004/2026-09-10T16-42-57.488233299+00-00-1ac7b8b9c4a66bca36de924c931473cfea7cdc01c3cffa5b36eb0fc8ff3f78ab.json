@@ -1,5 +1,5 @@
 {
-  "completed_at": null,
+  "completed_at": "2026-09-10T16:53:24.659974730+00:00",
   "config_revision": 26,
   "created_at": "2026-09-10T16:42:57.488233299+00:00",
   "error": null,
@@ -12,6 +12,6 @@
   "goal_id": "00000T130VC48JK4653MY62004",
   "id": "1ac7b8b9c4a66bca36de924c931473cfea7cdc01c3cffa5b36eb0fc8ff3f78ab",
   "node_id": "default",
-  "result_count": 0,
-  "state": "running"
+  "result_count": 1,
+  "state": "succeeded"
 }
