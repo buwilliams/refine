@@ -3,7 +3,7 @@
   "branch_name": "refine/DR54BF57DCE017ED8EC68A5EEB/round-3",
   "candidate_commit": "b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5",
   "created": "2026-09-10T08:26:04Z",
-  "event_generation": 7,
+  "event_generation": 8,
   "feature_id": null,
   "feature_order": null,
   "id": "DR54BF57DCE017ED8EC68A5EEB",
@@ -3150,6 +3150,81 @@
           }
         }
       },
+      "event_results": {
+        "069e11f223d473cdf6a75885fe4a5ef89bfb4bddc80be1243b8d194655370677": {
+          "candidate_commit": null,
+          "results": {
+            "default-plan": {
+              "artifacts": {
+                "plan": {
+                  "checklist": [
+                    {
+                      "description": "Add shared replay-resumption preparation after WorkflowEngine claims current attempt authority and before either hydration path performs branch discovery, worktree creation or ancestry rejection. Locate the workspace from validated current-Round handoff or retained workspace evidence, with the deterministic managed path as fallback. Verify repository membership and Goal/Round/branch identity; support retained paths whose directory name differs from the current branch.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Extract journal reconciliation into a cohesive candidate_refresh recovery module usable before full context hydration. For clean detached completion or attached replacement without Goal persistence, retain original and replacement commits, restore the original using fenced Git recovery, archive interruption evidence, and let normal refresh retry. When durable Goal evidence proves replacement persistence, reconcile its handoff and acknowledge the journal idempotently; never restore the original.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Acquire the workspace lease before recovery mutation, then use short repository-lock holds with fresh authority and durable-identity checks. Share the reconciliation logic with ordinary candidate refresh without nesting repository locks. Treat workspace contention as retryable preparation contention. Keep target refresh, conflict resolution and replacement gates in their existing execution paths and lease boundaries.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Fail closed on malformed or mismatched journals, foreign workspaces, changed refs or HEAD, unavailable history, dirty index/working files, and untracked work. Preserve journals and files without acknowledgement or destructive cleanup. Classify persisted replacements before considering rollback, including persistence readback after errors. Preserve supported interrupted-conflict recovery without discarding user edits.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Make both hydration paths consume the reconciled workspace and reread durable candidate/base identities before constructing execution context. Preserve original handoff identity, accepted plans and archived evidence. Retain ordinary ancestry rejection when no matching journal authorizes recovery, plus existing missing-worktree recreation and existing-work base behavior.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Add deterministic regressions under worktree_resume that seed real journal states and resume through WorkflowEngine::execute_work(), exercising preparation and execution without constructing WorkflowContext. Cover all three interruption windows across Plan, Implement, Quality and Governance; repeated restart; retained nondefault paths; dirty/staged/untracked work; unexpected refs; authority loss; and workspace contention. Assert preserved commits, files, journals, handoff identity and Round evidence.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Extend engine-level checks to prove recovered replacements receive current applicable Quality and Governance checks for their exact SHA before publication or integration. Cover stale original proof, absent replacement proof, reusable exact replacement proof, retained failed proof, and subsequent target advancement. Preserve publication intent and the previously confirmed remote SHA throughout handoff reconciliation.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Update only the replay-resumption passages in docs/intent/03-application/01-agents/05-merge-review-git-worktrees.md and docs/intent/03-application/02-workflow/11-consistency-contract.md. Keep Application recovery policy separate from Infrastructure Git mechanics and split expanded tests by responsibility. Verify with cargo test --lib application::workflow::tests::worktree_resume -- --test-threads=1; cargo test --lib application::workflow::tests::candidate_refresh -- --test-threads=1; cargo test --lib application::workflow::tests::round_base -- --test-threads=1; cargo test --lib replacement_skills -- --test-threads=1; cargo test --lib infrastructure::git::worktrees -- --test-threads=1; cargo test --lib architecture_tests; cargo check --all-targets; changed-file rustfmt checks; and git diff --check. Report actual results and any separately established baseline failures.",
+                      "id": "P8"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "C1",
+                      "resolution": "Weakening ancestry checks or teaching ordinary branch discovery to accept detached checkouts would allow unproven adoption. P1-P2 instead admit only a validated managed workspace with matching journal and durable Goal evidence."
+                    },
+                    {
+                      "criticism_id": "C2",
+                      "resolution": "Moving the entire refresh before hydration would move replay and gate orchestration outside existing execution coordination. P2-P3 move only journal reconciliation earlier and reuse normal refresh afterward. Unpersisted work restores and retries; persisted replacements are acknowledged without rollback."
+                    },
+                    {
+                      "criticism_id": "C3",
+                      "resolution": "Direct-context interruption tests bypass the reported defect. P6-P7 require engine preparation and execution, with preservation and exact-candidate gate assertions."
+                    }
+                  ],
+                  "summary": "Repair replay interruption recovery against retained candidate b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5 by reconciling trusted journals before hydration, preserving durable replacements and prior evidence, and proving normal engine resumption across all four phases."
+                }
+              },
+              "binding_id": "default-plan",
+              "evidence": [
+                "Read-only Git checks confirmed clean HEAD b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5 on refine/DR54BF57DCE017ED8EC68A5EEB/round-3 in the pinned round-2 directory. Round 2 and Round 3 refs both retain that candidate; the recorded base is its ancestor.",
+                "Source tracing confirmed engine/execution/mod.rs:367-372 hydrates before candidate_refresh/mod.rs:171-196 reconciles journals. context/execution.rs rejects replacement ancestry and materializes worktrees; worktrees/worktrees.rs:299 discovers only attached branches.",
+                "Inspected replay.rs, refresh persistence, candidate handoffs, workspace/repository coordination, replacement checks, and the affected intent contracts. Existing interruption tests in candidate_refresh/proven_history.rs construct contexts directly; worktree_resume.rs provides an engine-entry fixture.",
+                "Used interruption-state analysis and self-critique to scope the correction. No repository files or Git state were changed, and no tests were run during this observational invocation. Checklist commands are proposed verification."
+              ],
+              "invocation_id": "069e11f223d473cdf6a75885fe4a5ef89bfb4bddc80be1243b8d194655370677",
+              "outcome": "success",
+              "role": "plan",
+              "summary": "Completed a scoped implementation plan for replay recovery before hydration, with preservation fences and engine-level verification."
+            }
+          },
+          "source": "workflow.plan.enter",
+          "state": "succeeded"
+        }
+      },
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
@@ -3169,12 +3244,114 @@
           "round_idx": 2,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-09-10T15:08:46Z",
+        "final_plan": {
+          "completed_at": "2026-09-10T15:12:02Z",
+          "git_after": {
+            "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-3",
+            "head_commit": "b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-3",
+            "head_commit": "b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Add shared replay-resumption preparation after WorkflowEngine claims current attempt authority and before either hydration path performs branch discovery, worktree creation or ancestry rejection. Locate the workspace from validated current-Round handoff or retained workspace evidence, with the deterministic managed path as fallback. Verify repository membership and Goal/Round/branch identity; support retained paths whose directory name differs from the current branch.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Extract journal reconciliation into a cohesive candidate_refresh recovery module usable before full context hydration. For clean detached completion or attached replacement without Goal persistence, retain original and replacement commits, restore the original using fenced Git recovery, archive interruption evidence, and let normal refresh retry. When durable Goal evidence proves replacement persistence, reconcile its handoff and acknowledge the journal idempotently; never restore the original.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Acquire the workspace lease before recovery mutation, then use short repository-lock holds with fresh authority and durable-identity checks. Share the reconciliation logic with ordinary candidate refresh without nesting repository locks. Treat workspace contention as retryable preparation contention. Keep target refresh, conflict resolution and replacement gates in their existing execution paths and lease boundaries.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Fail closed on malformed or mismatched journals, foreign workspaces, changed refs or HEAD, unavailable history, dirty index/working files, and untracked work. Preserve journals and files without acknowledgement or destructive cleanup. Classify persisted replacements before considering rollback, including persistence readback after errors. Preserve supported interrupted-conflict recovery without discarding user edits.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Make both hydration paths consume the reconciled workspace and reread durable candidate/base identities before constructing execution context. Preserve original handoff identity, accepted plans and archived evidence. Retain ordinary ancestry rejection when no matching journal authorizes recovery, plus existing missing-worktree recreation and existing-work base behavior.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Add deterministic regressions under worktree_resume that seed real journal states and resume through WorkflowEngine::execute_work(), exercising preparation and execution without constructing WorkflowContext. Cover all three interruption windows across Plan, Implement, Quality and Governance; repeated restart; retained nondefault paths; dirty/staged/untracked work; unexpected refs; authority loss; and workspace contention. Assert preserved commits, files, journals, handoff identity and Round evidence.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Extend engine-level checks to prove recovered replacements receive current applicable Quality and Governance checks for their exact SHA before publication or integration. Cover stale original proof, absent replacement proof, reusable exact replacement proof, retained failed proof, and subsequent target advancement. Preserve publication intent and the previously confirmed remote SHA throughout handoff reconciliation.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              },
+              {
+                "description": "Update only the replay-resumption passages in docs/intent/03-application/01-agents/05-merge-review-git-worktrees.md and docs/intent/03-application/02-workflow/11-consistency-contract.md. Keep Application recovery policy separate from Infrastructure Git mechanics and split expanded tests by responsibility. Verify with cargo test --lib application::workflow::tests::worktree_resume -- --test-threads=1; cargo test --lib application::workflow::tests::candidate_refresh -- --test-threads=1; cargo test --lib application::workflow::tests::round_base -- --test-threads=1; cargo test --lib replacement_skills -- --test-threads=1; cargo test --lib infrastructure::git::worktrees -- --test-threads=1; cargo test --lib architecture_tests; cargo check --all-targets; changed-file rustfmt checks; and git diff --check. Report actual results and any separately established baseline failures.",
+                "id": "workflow.plan.enter:default-plan:P8"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Repair replay interruption recovery against retained candidate b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5 by reconciling trusted journals before hydration, preserving durable replacements and prior evidence, and proving normal engine resumption across all four phases."
+          },
+          "started_at": "2026-09-10T15:08:46Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-09-10T15:12:03Z",
+        "proposal": {
+          "completed_at": "2026-09-10T15:12:02Z",
+          "git_after": {
+            "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-3",
+            "head_commit": "b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-3",
+            "head_commit": "b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Add shared replay-resumption preparation after WorkflowEngine claims current attempt authority and before either hydration path performs branch discovery, worktree creation or ancestry rejection. Locate the workspace from validated current-Round handoff or retained workspace evidence, with the deterministic managed path as fallback. Verify repository membership and Goal/Round/branch identity; support retained paths whose directory name differs from the current branch.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Extract journal reconciliation into a cohesive candidate_refresh recovery module usable before full context hydration. For clean detached completion or attached replacement without Goal persistence, retain original and replacement commits, restore the original using fenced Git recovery, archive interruption evidence, and let normal refresh retry. When durable Goal evidence proves replacement persistence, reconcile its handoff and acknowledge the journal idempotently; never restore the original.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Acquire the workspace lease before recovery mutation, then use short repository-lock holds with fresh authority and durable-identity checks. Share the reconciliation logic with ordinary candidate refresh without nesting repository locks. Treat workspace contention as retryable preparation contention. Keep target refresh, conflict resolution and replacement gates in their existing execution paths and lease boundaries.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Fail closed on malformed or mismatched journals, foreign workspaces, changed refs or HEAD, unavailable history, dirty index/working files, and untracked work. Preserve journals and files without acknowledgement or destructive cleanup. Classify persisted replacements before considering rollback, including persistence readback after errors. Preserve supported interrupted-conflict recovery without discarding user edits.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Make both hydration paths consume the reconciled workspace and reread durable candidate/base identities before constructing execution context. Preserve original handoff identity, accepted plans and archived evidence. Retain ordinary ancestry rejection when no matching journal authorizes recovery, plus existing missing-worktree recreation and existing-work base behavior.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Add deterministic regressions under worktree_resume that seed real journal states and resume through WorkflowEngine::execute_work(), exercising preparation and execution without constructing WorkflowContext. Cover all three interruption windows across Plan, Implement, Quality and Governance; repeated restart; retained nondefault paths; dirty/staged/untracked work; unexpected refs; authority loss; and workspace contention. Assert preserved commits, files, journals, handoff identity and Round evidence.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Extend engine-level checks to prove recovered replacements receive current applicable Quality and Governance checks for their exact SHA before publication or integration. Cover stale original proof, absent replacement proof, reusable exact replacement proof, retained failed proof, and subsequent target advancement. Preserve publication intent and the previously confirmed remote SHA throughout handoff reconciliation.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              },
+              {
+                "description": "Update only the replay-resumption passages in docs/intent/03-application/01-agents/05-merge-review-git-worktrees.md and docs/intent/03-application/02-workflow/11-consistency-contract.md. Keep Application recovery policy separate from Infrastructure Git mechanics and split expanded tests by responsibility. Verify with cargo test --lib application::workflow::tests::worktree_resume -- --test-threads=1; cargo test --lib application::workflow::tests::candidate_refresh -- --test-threads=1; cargo test --lib application::workflow::tests::round_base -- --test-threads=1; cargo test --lib replacement_skills -- --test-threads=1; cargo test --lib infrastructure::git::worktrees -- --test-threads=1; cargo test --lib architecture_tests; cargo check --all-targets; changed-file rustfmt checks; and git diff --check. Report actual results and any separately established baseline failures.",
+                "id": "workflow.plan.enter:default-plan:P8"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Repair replay interruption recovery against retained candidate b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5 by reconciling trusted journals before hydration, preserving durable replacements and prior evidence, and proving normal engine resumption across all four phases."
+          },
+          "started_at": "2026-09-10T15:08:46Z"
+        },
         "schema_version": 2,
         "started_at": "2026-09-10T15:08:46Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T15:08:46Z"
+        "updated_at": "2026-09-10T15:12:03Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -3188,7 +3365,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T15:08:46Z",
+      "updated": "2026-09-10T15:12:03Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T15:08:46Z",
         "round_idx": 2,
@@ -3198,9 +3375,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-09-10T15:08:46Z",
+  "updated": "2026-09-10T15:12:03Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:36.990956802+00:00",
@@ -3264,7 +3441,16 @@
       "node_id": "default",
       "round_idx": 2,
       "to": "plan"
+    },
+    {
+      "at": "2026-09-10T15:12:03.049478675+00:00",
+      "forced": false,
+      "from": "plan",
+      "generation": 8,
+      "node_id": "default",
+      "round_idx": 2,
+      "to": "implement"
     }
   ],
-  "workflow_revision": 62
+  "workflow_revision": 68
 }
