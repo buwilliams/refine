@@ -911,11 +911,44 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-governance": {
+      "invocation_id": "b180adc7aec9cc5a4821c38ccfca88f360f569184a59521c78eccf7b9fe7ed63",
+      "binding_id": "default-governance",
+      "role": "governance",
+      "outcome": "success",
+      "summary": "No actual violations found in the exact candidate. The scoped dispatch correction satisfies the accepted plan and preserves shared capability ownership and email intake invariants.",
+      "evidence": [
+        "Verified clean worktree and HEAD 036c0802c771a6cc5865a8bc4d669480e1a76c57. Reviewed the complete eight-file diff against base 0b6cc819de716b1b118f40c4465d114290117699, accepted plan P1–P6, implementation evidence and candidate-bound Quality proof.",
+        "src/surfaces/cli/dispatch.rs:699–701 exempts only FetchEmailGoals. The production guard and unrelated classifications remain intact. The CLI continues calling the existing Application capability, consistent with docs/intent/01-design.md and the CLI and Skills intent.",
+        "src/application/development_requests/mod.rs:118–129 rejects mismatched canonical targets before secret lookup, fetch-lock acquisition or ledger processing. The capability, MIME extraction, provider implementation, record persistence and CLI handler are byte-identical to the base.",
+        "tests/cli_target_root.rs:40–110 executes CARGO_BIN_EXE_refine with separate arguments containing spaces and apostrophes. Matching-target coverage requires the specific missing-secret error; mismatched-target coverage requires the authorization error and unchanged fixture contents. Retained cli-target-before.log shows both regressions failing on the original guard.",
+        "The supplied supervised Quality proof reports 72 CLI tests, 25 development-request tests, four debug and four release compiled-CLI tests passing, plus release build, formatting, whitespace and JSON checks. Retained independent Quality logs corroborate these results. Tests were not rerun during this observational review.",
+        "The cohesive 275-line intake test module covers sender filtering, durable recording before acknowledgement, retries, partial success, deterministic deduplication and ordinary Backlog creation. Source confirms fetched_count inclusion and JSON printing before nonzero exit for per-record errors. Authenticated CLI success and partial-error output were not exercised.",
+        "Runbook, Skill and affected CLI intent consistently preserve separate quoted arguments, 25-message batches, ten-batch maximum, immediate stop on command failure and no approval, Review changes or replies. Read-only JSON assertions and candidate git diff --check passed.",
+        "Proposed repeat checks from the pinned workspace: cargo test --locked --lib surfaces::cli::tests -- --test-threads=1; cargo test --locked --lib application::development_requests:: -- --test-threads=1; cargo test --release --locked --test cli_target_root -- --test-threads=1. No files, Goal state, mailbox data or Git state were intentionally changed; no merge, push or deployment occurred."
+      ],
+      "artifacts": {
+        "recovery_analysis": null,
+        "recovery_round_prompt": null,
+        "violations": []
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-governance",
+      "diagnostic": null,
+      "operation_id": null,
+      "process_id": "proc-1789059024763-1129590-1095",
+      "raw_output": "{\n  \"artifacts\": {\n    \"recovery_analysis\": null,\n    \"recovery_round_prompt\": null,\n    \"violations\": []\n  },\n  \"binding_id\": \"default-governance\",\n  \"evidence\": [\n    \"Verified clean worktree and HEAD 036c0802c771a6cc5865a8bc4d669480e1a76c57. Reviewed the complete eight-file diff against base 0b6cc819de716b1b118f40c4465d114290117699, accepted plan P1–P6, implementation evidence and candidate-bound Quality proof.\",\n    \"src/surfaces/cli/dispatch.rs:699–701 exempts only FetchEmailGoals. The production guard and unrelated classifications remain intact. The CLI continues calling the existing Application capability, consistent with docs/intent/01-design.md and the CLI and Skills intent.\",\n    \"src/application/development_requests/mod.rs:118–129 rejects mismatched canonical targets before secret lookup, fetch-lock acquisition or ledger processing. The capability, MIME extraction, provider implementation, record persistence and CLI handler are byte-identical to the base.\",\n    \"tests/cli_target_root.rs:40–110 executes CARGO_BIN_EXE_refine with separate arguments containing spaces and apostrophes. Matching-target coverage requires the specific missing-secret error; mismatched-target coverage requires the authorization error and unchanged fixture contents. Retained cli-target-before.log shows both regressions failing on the original guard.\",\n    \"The supplied supervised Quality proof reports 72 CLI tests, 25 development-request tests, four debug and four release compiled-CLI tests passing, plus release build, formatting, whitespace and JSON checks. Retained independent Quality logs corroborate these results. Tests were not rerun during this observational review.\",\n    \"The cohesive 275-line intake test module covers sender filtering, durable recording before acknowledgement, retries, partial success, deterministic deduplication and ordinary Backlog creation. Source confirms fetched_count inclusion and JSON printing before nonzero exit for per-record errors. Authenticated CLI success and partial-error output were not exercised.\",\n    \"Runbook, Skill and affected CLI intent consistently preserve separate quoted arguments, 25-message batches, ten-batch maximum, immediate stop on command failure and no approval, Review changes or replies. Read-only JSON assertions and candidate git diff --check passed.\",\n    \"Proposed repeat checks from the pinned workspace: cargo test --locked --lib surfaces::cli::tests -- --test-threads=1; cargo test --locked --lib application::development_requests:: -- --test-threads=1; cargo test --release --locked --test cli_target_root -- --test-threads=1. No files, Goal state, mailbox data or Git state were intentionally changed; no merge, push or deployment occurred.\"\n  ],\n  \"invocation_id\": \"b180adc7aec9cc5a4821c38ccfca88f360f569184a59521c78eccf7b9fe7ed63\",\n  \"outcome\": \"success\",\n  \"role\": \"governance\",\n  \"summary\": \"No actual violations found in the exact candidate. The scoped dispatch correction satisfies the accepted plan and preserves shared capability ownership and email intake invariants.\"\n}\n",
+      "workflow_revision": 3
+    }
+  ],
   "created_at": "2026-09-10T16:50:24.702472220+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-10T16:52:33.816642833+00:00",
   "error": null,
   "action_applied": false
 }
