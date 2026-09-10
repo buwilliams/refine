@@ -123,6 +123,49 @@
           },
           "started_at": "2026-09-10T08:28:48Z"
         },
+        "final_plan": {
+          "completed_at": "2026-09-10T08:31:58Z",
+          "git_after": {
+            "branch": "refine/DR40B8829DD3748E280BBEE7EE/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR40B8829DD3748E280BBEE7EE/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Add auto_approve to the existing node settings service with a false default when absent on new or existing installations, validated boolean values, and consistent support through the shared settings API, CLI, and runtime settings copy action.",
+                "id": "P1"
+              },
+              {
+                "description": "Make the development-request service read the worker node's current saved auto_approve setting at each automatic approval decision and keep email-linked Goals in Review when the setting is false or cannot be read reliably.",
+                "id": "P2"
+              },
+              {
+                "description": "Continue recording the first observed Review time while automatic approval is disabled so subsequent approval attempts apply setting changes without restarting the worker and honor the existing auto_approve_after_seconds delay from that recorded time when enabled.",
+                "id": "P3"
+              },
+              {
+                "description": "Route enabled automatic acceptance through approve_reviewed_goal while preserving explicit manual acceptance, follow-up Rounds, completed Goals, and resolution notifications after either approval path reaches Done even when automatic approval is disabled or its setting is unreadable.",
+                "id": "P4"
+              },
+              {
+                "description": "Add an Auto-approve control to Node Runtime Config using the existing edit and autosave flow, explaining its node scope, email-request applicability, default manual acceptance, and effect on requests already waiting in Review.",
+                "id": "P5"
+              },
+              {
+                "description": "Update the affected Review and Settings intent pages and the development-request email runbook in their existing formats to describe the flag, its false default, conditional delay, and manual acceptance and follow-up Round actions.",
+                "id": "P6"
+              }
+            ],
+            "summary": "Add a node-scoped Auto-approve control that defaults to false, so email-request Goals remain in Review for QA acceptance unless automatic approval is explicitly enabled."
+          },
+          "started_at": "2026-09-10T08:30:27Z"
+        },
         "phase": "revise",
         "phase_started_at": "2026-09-10T08:30:27Z",
         "proposal": {
@@ -171,7 +214,7 @@
         "schema_version": 2,
         "started_at": "2026-09-10T08:26:03Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T08:30:27Z"
+        "updated_at": "2026-09-10T08:31:58Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -185,7 +228,7 @@
       "quality_state": "unclassified",
       "reporter": "ethan.jacobson@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T08:30:27Z",
+      "updated": "2026-09-10T08:31:58Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T08:26:03Z",
         "round_idx": 0,
@@ -197,6 +240,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-09-10T08:30:27Z",
-  "workflow_revision": 11
+  "updated": "2026-09-10T08:31:58Z",
+  "workflow_revision": 12
 }
