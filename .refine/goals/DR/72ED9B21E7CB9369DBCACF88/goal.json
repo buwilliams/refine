@@ -3,7 +3,7 @@
   "branch_name": "refine/DR72ED9B21E7CB9369DBCACF88/round-6",
   "candidate_commit": null,
   "created": "2026-09-10T08:26:05Z",
-  "event_generation": 16,
+  "event_generation": 17,
   "feature_id": "00000T130Z0R6J0GJMARY62005",
   "feature_order": 1,
   "id": "DR72ED9B21E7CB9369DBCACF88",
@@ -6443,6 +6443,90 @@
           }
         }
       },
+      "event_results": {
+        "73f671abd2c32ff7c9b541e1321a29f402a7e2c8454855b4fa5a343f59dbfc3d": {
+          "candidate_commit": null,
+          "results": {
+            "default-plan": {
+              "artifacts": {
+                "plan": {
+                  "checklist": [
+                    {
+                      "description": "Implement only in the supplied Round 6 workspace from pinned base 0b6cc819de716b1b118f40c4465d114290117699. Capture preservation snapshots before edits. Selectively adapt the retained isolation delta from 39ae4cfa, preserving main's declared-base creation, records/completion/parameters modules, occurrence configuration, capacity admission and Quality evidence coverage. Preserve all previous attempts and worktrees; leave candidate capture and integration to Refine.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Extend infrastructure/git/worktrees with one reusable managed-workspace commitment and validator. Prove canonical repository, owned location, linked registration and backlink, physical registration identity, and the Application-supplied branch or exact candidate. Reject primary, unrelated, replaced and nested checkouts. Canonically resolve agent_subpath to an existing contained directory. Reuse dirty owned work without reset; recreate missing checkouts only from unambiguous durable ownership and base/candidate evidence.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Extend Events invocation ownership for executable Backlog/Todo lifecycle bindings using existing occurrence and transition records. Persist Goal, Round/request, node, occurrence identity, configured target-derived source commit and owned workspace before materialization; persist registration before launch. Scheduler and lifecycle dispatch must reuse the same admitted occurrence and configuration. Lifecycle output must not supply implementation refs. Keep disabled/context-only bindings checkout-free, ordinary queueing state-only, and implementation materialization after capacity and atomic Todo-to-Plan admission.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Carry the admitted workspace through WorkflowContext, Event preparation/execution, ordered bindings, completion repair, Quality, recovery and provider resume/fallback. Synchronize cwd, system.workspace and workspace-derived parameters before freezing launch context. Revalidate ownership before provider launch and candidate staging, commits, correction capture and refresh. Sanitize inherited Git directory, worktree, index, object and configuration overrides in shared Git/process owners before applying deliberate internal overrides. Preserve explicit Custom Skill and toolbar contexts.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Strengthen application/workflow/gates.rs with shared validation of each pinned blocking result using existing SkillResult identity and artifact validators. Retain GateAssessment semantics: pending missing evidence is Missing; cancellation, terminal missing evidence and invalid contracts are Fault; valid blocking findings are Finding. Valid successful blocking results satisfy permission despite background failure/error. Keep execution_state and historical recorded state independent; report invalid or missing evidence with invocation and binding IDs.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Make Events workflow and manual-transition adapters retain required invocation IDs, pinned bindings/configuration and original workspace commitments independently of returned results. After later Skills finish, reread and validate every required invocation, current Goal/Round/node authority and original registration before transition approval or settlement. Use shared assessment and consistent short-lock ordering. Validate cached completion before reuse; preserve failed/cancelled records without relaunch. Preserve immediate cancellation, idempotency and existing capacity/checkout serialization.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Apply workspace and result validation to Quality Skill evaluation, supervised commands and retained-review consumption. Route legacy post_build execution through the existing isolated exact-source reconciliation path. Preserve main's content-bound completion receipts, requirement coverage and retained failed findings. Report repair must continue to consume retained output without repeating completed work or changing verdicts. Preserve source-versus-checked candidate identity and fail visibly when original workspace ownership cannot be proved.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Adapt retained regressions to current owners and exercise actual Event dispatch, manual settlement and WorkflowTodo.advance with deterministic providers. Cover fresh Backlog/Todo lifecycle work, cancelled Entry, partial/malformed results, late cancellation or workspace replacement, cached completion, restart/resume, changed authority/configuration, target advancement, wrong branches, symlink/nested-repository escape and inherited Git overrides. Assert primary HEAD, raw index bytes and staged/unstaged/untracked contents remain unchanged across automated work. Verify no duplicate provider work and no lifecycle output in implementation candidates.",
+                      "id": "P8"
+                    },
+                    {
+                      "description": "Preserve and extend execution_outcomes_and_gate_permission_are_independent through scheduler and manual transitions with successful blocking results plus background failure/error. Retain occurrence-configuration, durable-receipt, observational-repair, shared-capacity and state-only Backlog promotion regressions. Extract touched workspace, lifecycle, settlement and authoring responsibilities into cohesive modules; reuse main's existing module boundaries. Update only affected Skills, Events, Todo, worktree, Goal Agent, Quality and process intent passages.",
+                      "id": "P9"
+                    },
+                    {
+                      "description": "Run new regressions before and after correction. Run cargo test --lib <filter> -- --test-threads=1 separately and serially for application::events::, application::workflow::tests::execution_ownership, authored_todo_start, infrastructure::git::worktrees::tests, worktree_resume, quality::tests::, application::workflow::tests::candidate_refresh, application::workflow::tests::quality_recovery, application::workflow::tests::quality_base_refresh, round_base, workflow::engine::behaviors::tests::, launch_environment, infrastructure::agents::invocation::tests and infrastructure::process::subprocess::. Require nonzero selections. Then run the full serial library suite, cargo check --all-targets, cargo clippy --all-targets, cargo fmt --all -- --check and git diff --check. Report exact commands, counts, failures, skips and candidate identity; verify alleged baseline failures against this Round's pinned base and compare preservation snapshots.",
+                      "id": "P10"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "C1",
+                      "resolution": "Whole-candidate replay would restore obsolete aggregate-state gating and duplicate modules that main now owns. Selectively adapt workspace mechanisms and regressions while extending GateAssessment, completion receipts and current Quality coverage."
+                    },
+                    {
+                      "criticism_id": "C2",
+                      "resolution": "Requiring an implementation branch for every Goal-bound Skill breaks legitimate pre-Plan execution. Invocation-owned lifecycle workspaces satisfy isolation without primary-checkout fallback or eager implementation materialization."
+                    },
+                    {
+                      "criticism_id": "C3",
+                      "resolution": "Validating only returned results permits missing requirements to disappear; validating only at launch misses later cancellation or registration replacement. Pin requirements independently and revalidate them at settlement, without making background execution outcome a second admission policy."
+                    }
+                  ],
+                  "summary": "Automated execution currently trusts a cwd or branch without consistently proving workspace ownership through reuse and settlement. Strengthen the existing Git worktree capability for physical identity, Events and Workflow for durable ownership, and GateAssessment for required-result validity. Every automated launch and candidate write must use its admitted checkout; advancement must depend on complete valid blocking evidence while preserving visible background failures."
+                }
+              },
+              "binding_id": "default-plan",
+              "evidence": [
+                "Round 6 HEAD and local main both resolve to 0b6cc819de716b1b118f40c4465d114290117699. The assigned branch is refine/DR72ED9B21E7CB9369DBCACF88/round-6.",
+                "The retained round-2 directory remains clean at 39ae4cfa4d28739d41a6bc3c9465e064d9f92106 on the round-4 branch. Its merge base with Round 6 is b47569adb8d4c5d1d7335ba91729a3e486a38fe0. Inspected its isolation implementation and the recovery evidence directory.",
+                "Current main provides GateAssessment, occurrence-pinned gate_configuration, durable completion receipts, observational report repair, shared capacity admission and Quality requirement coverage. The retained blocking.rs instead requires aggregate Succeeded state for settlement.",
+                "Source inspection confirmed primary-checkout fallback in events/dispatch.rs and events/workflow.rs, terminal reuse without workspace validation in events/execution.rs, and legacy post_build Quality selecting target_root in quality/service/runner.rs.",
+                "Final observations confirm unchanged HEAD, status, raw index hashes and tracked/untracked content hashes for Round 6, the primary checkout and the retained candidate. All three remain clean. No files or Git state were changed; tests were not run during this observational invocation."
+              ],
+              "invocation_id": "73f671abd2c32ff7c9b541e1321a29f402a7e2c8454855b4fa5a343f59dbfc3d",
+              "outcome": "success",
+              "role": "plan",
+              "summary": "Completed read-only planning against the pinned Round 6 base, reconciling retained isolation work with current gate and completion semantics."
+            }
+          },
+          "source": "workflow.plan.enter",
+          "state": "succeeded"
+        }
+      },
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
@@ -6462,12 +6546,130 @@
           "round_idx": 5,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-09-10T16:22:58Z",
+        "final_plan": {
+          "completed_at": "2026-09-10T16:28:10Z",
+          "git_after": {
+            "branch": "refine/DR72ED9B21E7CB9369DBCACF88/round-6",
+            "head_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR72ED9B21E7CB9369DBCACF88/round-6",
+            "head_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Implement only in the supplied Round 6 workspace from pinned base 0b6cc819de716b1b118f40c4465d114290117699. Capture preservation snapshots before edits. Selectively adapt the retained isolation delta from 39ae4cfa, preserving main's declared-base creation, records/completion/parameters modules, occurrence configuration, capacity admission and Quality evidence coverage. Preserve all previous attempts and worktrees; leave candidate capture and integration to Refine.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Extend infrastructure/git/worktrees with one reusable managed-workspace commitment and validator. Prove canonical repository, owned location, linked registration and backlink, physical registration identity, and the Application-supplied branch or exact candidate. Reject primary, unrelated, replaced and nested checkouts. Canonically resolve agent_subpath to an existing contained directory. Reuse dirty owned work without reset; recreate missing checkouts only from unambiguous durable ownership and base/candidate evidence.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Extend Events invocation ownership for executable Backlog/Todo lifecycle bindings using existing occurrence and transition records. Persist Goal, Round/request, node, occurrence identity, configured target-derived source commit and owned workspace before materialization; persist registration before launch. Scheduler and lifecycle dispatch must reuse the same admitted occurrence and configuration. Lifecycle output must not supply implementation refs. Keep disabled/context-only bindings checkout-free, ordinary queueing state-only, and implementation materialization after capacity and atomic Todo-to-Plan admission.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Carry the admitted workspace through WorkflowContext, Event preparation/execution, ordered bindings, completion repair, Quality, recovery and provider resume/fallback. Synchronize cwd, system.workspace and workspace-derived parameters before freezing launch context. Revalidate ownership before provider launch and candidate staging, commits, correction capture and refresh. Sanitize inherited Git directory, worktree, index, object and configuration overrides in shared Git/process owners before applying deliberate internal overrides. Preserve explicit Custom Skill and toolbar contexts.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Strengthen application/workflow/gates.rs with shared validation of each pinned blocking result using existing SkillResult identity and artifact validators. Retain GateAssessment semantics: pending missing evidence is Missing; cancellation, terminal missing evidence and invalid contracts are Fault; valid blocking findings are Finding. Valid successful blocking results satisfy permission despite background failure/error. Keep execution_state and historical recorded state independent; report invalid or missing evidence with invocation and binding IDs.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Make Events workflow and manual-transition adapters retain required invocation IDs, pinned bindings/configuration and original workspace commitments independently of returned results. After later Skills finish, reread and validate every required invocation, current Goal/Round/node authority and original registration before transition approval or settlement. Use shared assessment and consistent short-lock ordering. Validate cached completion before reuse; preserve failed/cancelled records without relaunch. Preserve immediate cancellation, idempotency and existing capacity/checkout serialization.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Apply workspace and result validation to Quality Skill evaluation, supervised commands and retained-review consumption. Route legacy post_build execution through the existing isolated exact-source reconciliation path. Preserve main's content-bound completion receipts, requirement coverage and retained failed findings. Report repair must continue to consume retained output without repeating completed work or changing verdicts. Preserve source-versus-checked candidate identity and fail visibly when original workspace ownership cannot be proved.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              },
+              {
+                "description": "Adapt retained regressions to current owners and exercise actual Event dispatch, manual settlement and WorkflowTodo.advance with deterministic providers. Cover fresh Backlog/Todo lifecycle work, cancelled Entry, partial/malformed results, late cancellation or workspace replacement, cached completion, restart/resume, changed authority/configuration, target advancement, wrong branches, symlink/nested-repository escape and inherited Git overrides. Assert primary HEAD, raw index bytes and staged/unstaged/untracked contents remain unchanged across automated work. Verify no duplicate provider work and no lifecycle output in implementation candidates.",
+                "id": "workflow.plan.enter:default-plan:P8"
+              },
+              {
+                "description": "Preserve and extend execution_outcomes_and_gate_permission_are_independent through scheduler and manual transitions with successful blocking results plus background failure/error. Retain occurrence-configuration, durable-receipt, observational-repair, shared-capacity and state-only Backlog promotion regressions. Extract touched workspace, lifecycle, settlement and authoring responsibilities into cohesive modules; reuse main's existing module boundaries. Update only affected Skills, Events, Todo, worktree, Goal Agent, Quality and process intent passages.",
+                "id": "workflow.plan.enter:default-plan:P9"
+              },
+              {
+                "description": "Run new regressions before and after correction. Run cargo test --lib <filter> -- --test-threads=1 separately and serially for application::events::, application::workflow::tests::execution_ownership, authored_todo_start, infrastructure::git::worktrees::tests, worktree_resume, quality::tests::, application::workflow::tests::candidate_refresh, application::workflow::tests::quality_recovery, application::workflow::tests::quality_base_refresh, round_base, workflow::engine::behaviors::tests::, launch_environment, infrastructure::agents::invocation::tests and infrastructure::process::subprocess::. Require nonzero selections. Then run the full serial library suite, cargo check --all-targets, cargo clippy --all-targets, cargo fmt --all -- --check and git diff --check. Report exact commands, counts, failures, skips and candidate identity; verify alleged baseline failures against this Round's pinned base and compare preservation snapshots.",
+                "id": "workflow.plan.enter:default-plan:P10"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Automated execution currently trusts a cwd or branch without consistently proving workspace ownership through reuse and settlement. Strengthen the existing Git worktree capability for physical identity, Events and Workflow for durable ownership, and GateAssessment for required-result validity. Every automated launch and candidate write must use its admitted checkout; advancement must depend on complete valid blocking evidence while preserving visible background failures."
+          },
+          "started_at": "2026-09-10T16:22:58Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-09-10T16:28:10Z",
+        "proposal": {
+          "completed_at": "2026-09-10T16:28:10Z",
+          "git_after": {
+            "branch": "refine/DR72ED9B21E7CB9369DBCACF88/round-6",
+            "head_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR72ED9B21E7CB9369DBCACF88/round-6",
+            "head_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Implement only in the supplied Round 6 workspace from pinned base 0b6cc819de716b1b118f40c4465d114290117699. Capture preservation snapshots before edits. Selectively adapt the retained isolation delta from 39ae4cfa, preserving main's declared-base creation, records/completion/parameters modules, occurrence configuration, capacity admission and Quality evidence coverage. Preserve all previous attempts and worktrees; leave candidate capture and integration to Refine.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Extend infrastructure/git/worktrees with one reusable managed-workspace commitment and validator. Prove canonical repository, owned location, linked registration and backlink, physical registration identity, and the Application-supplied branch or exact candidate. Reject primary, unrelated, replaced and nested checkouts. Canonically resolve agent_subpath to an existing contained directory. Reuse dirty owned work without reset; recreate missing checkouts only from unambiguous durable ownership and base/candidate evidence.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Extend Events invocation ownership for executable Backlog/Todo lifecycle bindings using existing occurrence and transition records. Persist Goal, Round/request, node, occurrence identity, configured target-derived source commit and owned workspace before materialization; persist registration before launch. Scheduler and lifecycle dispatch must reuse the same admitted occurrence and configuration. Lifecycle output must not supply implementation refs. Keep disabled/context-only bindings checkout-free, ordinary queueing state-only, and implementation materialization after capacity and atomic Todo-to-Plan admission.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Carry the admitted workspace through WorkflowContext, Event preparation/execution, ordered bindings, completion repair, Quality, recovery and provider resume/fallback. Synchronize cwd, system.workspace and workspace-derived parameters before freezing launch context. Revalidate ownership before provider launch and candidate staging, commits, correction capture and refresh. Sanitize inherited Git directory, worktree, index, object and configuration overrides in shared Git/process owners before applying deliberate internal overrides. Preserve explicit Custom Skill and toolbar contexts.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Strengthen application/workflow/gates.rs with shared validation of each pinned blocking result using existing SkillResult identity and artifact validators. Retain GateAssessment semantics: pending missing evidence is Missing; cancellation, terminal missing evidence and invalid contracts are Fault; valid blocking findings are Finding. Valid successful blocking results satisfy permission despite background failure/error. Keep execution_state and historical recorded state independent; report invalid or missing evidence with invocation and binding IDs.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Make Events workflow and manual-transition adapters retain required invocation IDs, pinned bindings/configuration and original workspace commitments independently of returned results. After later Skills finish, reread and validate every required invocation, current Goal/Round/node authority and original registration before transition approval or settlement. Use shared assessment and consistent short-lock ordering. Validate cached completion before reuse; preserve failed/cancelled records without relaunch. Preserve immediate cancellation, idempotency and existing capacity/checkout serialization.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Apply workspace and result validation to Quality Skill evaluation, supervised commands and retained-review consumption. Route legacy post_build execution through the existing isolated exact-source reconciliation path. Preserve main's content-bound completion receipts, requirement coverage and retained failed findings. Report repair must continue to consume retained output without repeating completed work or changing verdicts. Preserve source-versus-checked candidate identity and fail visibly when original workspace ownership cannot be proved.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              },
+              {
+                "description": "Adapt retained regressions to current owners and exercise actual Event dispatch, manual settlement and WorkflowTodo.advance with deterministic providers. Cover fresh Backlog/Todo lifecycle work, cancelled Entry, partial/malformed results, late cancellation or workspace replacement, cached completion, restart/resume, changed authority/configuration, target advancement, wrong branches, symlink/nested-repository escape and inherited Git overrides. Assert primary HEAD, raw index bytes and staged/unstaged/untracked contents remain unchanged across automated work. Verify no duplicate provider work and no lifecycle output in implementation candidates.",
+                "id": "workflow.plan.enter:default-plan:P8"
+              },
+              {
+                "description": "Preserve and extend execution_outcomes_and_gate_permission_are_independent through scheduler and manual transitions with successful blocking results plus background failure/error. Retain occurrence-configuration, durable-receipt, observational-repair, shared-capacity and state-only Backlog promotion regressions. Extract touched workspace, lifecycle, settlement and authoring responsibilities into cohesive modules; reuse main's existing module boundaries. Update only affected Skills, Events, Todo, worktree, Goal Agent, Quality and process intent passages.",
+                "id": "workflow.plan.enter:default-plan:P9"
+              },
+              {
+                "description": "Run new regressions before and after correction. Run cargo test --lib <filter> -- --test-threads=1 separately and serially for application::events::, application::workflow::tests::execution_ownership, authored_todo_start, infrastructure::git::worktrees::tests, worktree_resume, quality::tests::, application::workflow::tests::candidate_refresh, application::workflow::tests::quality_recovery, application::workflow::tests::quality_base_refresh, round_base, workflow::engine::behaviors::tests::, launch_environment, infrastructure::agents::invocation::tests and infrastructure::process::subprocess::. Require nonzero selections. Then run the full serial library suite, cargo check --all-targets, cargo clippy --all-targets, cargo fmt --all -- --check and git diff --check. Report exact commands, counts, failures, skips and candidate identity; verify alleged baseline failures against this Round's pinned base and compare preservation snapshots.",
+                "id": "workflow.plan.enter:default-plan:P10"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Automated execution currently trusts a cwd or branch without consistently proving workspace ownership through reuse and settlement. Strengthen the existing Git worktree capability for physical identity, Events and Workflow for durable ownership, and GateAssessment for required-result validity. Every automated launch and candidate write must use its admitted checkout; advancement must depend on complete valid blocking evidence while preserving visible background failures."
+          },
+          "started_at": "2026-09-10T16:22:58Z"
+        },
         "schema_version": 2,
         "started_at": "2026-09-10T16:22:58Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T16:22:58Z"
+        "updated_at": "2026-09-10T16:28:10Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -6481,7 +6683,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T16:22:58Z",
+      "updated": "2026-09-10T16:28:10Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T16:22:57Z",
         "round_idx": 5,
@@ -6491,9 +6693,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-09-10T16:22:58Z",
+  "updated": "2026-09-10T16:28:10Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:36.706264729+00:00",
@@ -6638,7 +6840,16 @@
       "node_id": "default",
       "round_idx": 5,
       "to": "plan"
+    },
+    {
+      "at": "2026-09-10T16:28:10.215190372+00:00",
+      "forced": false,
+      "from": "plan",
+      "generation": 17,
+      "node_id": "default",
+      "round_idx": 5,
+      "to": "implement"
     }
   ],
-  "workflow_revision": 113
+  "workflow_revision": 119
 }

@@ -1,0 +1,284 @@
+{
+  "id": "a6ba729a09980a783fca46819e740a0b30000159f84782a003c0466730928b7f",
+  "event": {
+    "id": "workflow.plan.enter",
+    "name": "Workflow Plan Enter",
+    "kind": "system",
+    "source": "workflow.plan.enter",
+    "enabled": true,
+    "scope": {
+      "node_id": null
+    },
+    "parameters": [],
+    "bindings": [
+      {
+        "id": "default-plan",
+        "skill_id": "default-plan",
+        "enabled": true,
+        "mode": "blocking",
+        "order": 0,
+        "scope": {
+          "node_id": null
+        },
+        "overrides": null,
+        "inputs": {}
+      }
+    ],
+    "on_success": null
+  },
+  "config_revision": 26,
+  "context": {
+    "node_id": "default",
+    "target_root": "/home/buddy/projects/refine-next",
+    "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T1315EYG3376Q1RY62006-round-1",
+    "provider": "codex",
+    "goal_id": "00000T1315EYG3376Q1RY62006",
+    "round_idx": 0,
+    "workflow_revision": 3,
+    "candidate_commit": null,
+    "data": {
+      "context": {
+        "assembled_at": "2026-09-10T16:28:07Z",
+        "current_round": {
+          "assignee": "Buddy Williams",
+          "prompt": "Fix the production CLI dispatch conflict that prevents the standalone Fetch Goals from Email Skill from importing requests into the selected project's Backlog.\n\nObserved failure:\nThe Skill prescribed this command, which was run from /home/buddy/projects/refine-next:\n'/home/buddy/projects/refine/bin/refine' system fetch-email-goals --runtime-root '/home/buddy/projects/refine/run/8082' --target-root '/home/buddy/projects/refine-next'\n\nIt exited with code 1:\ndirect --target-root CLI dispatch is not supported in normal operation; use the daemon API for target state mutations instead (/home/buddy/projects/refine-next)\n\nThe failure occurs before email fetching and before a JSON result is produced. No Goals were imported or recovered by that invocation. A read-only check found 34 existing request.json records retained under /home/buddy/projects/refine/run/8082/self-development-email/requests.\n\nDiagnosis:\nsrc/surfaces/cli/dispatch.rs applies a generic #[cfg(not(test))] explicit_target_root_path rejection before dispatch. That helper includes SystemAction::FetchEmailGoals, whose target_root is required. The existing handler in src/surfaces/cli/dispatch/system.rs is therefore unreachable in normal operation. The unit test email_fetch_cli_requires_the_pinned_target_before_accessing_mail in src/surfaces/cli/tests/system/commands.rs bypasses the production guard through cfg(test), allowing this regression to escape detection.\n\nRequested change:\nImplement a narrowly scoped dispatch correction that restores the documented one-shot capability while preserving the restrictions on other commands and the email capability's existing authorization and retry behavior. Keep docs/runbooks/development-request-email.md and docs/runbooks/skills/fetch-goals-from-email.json consistent with the supported command.\n\nAcceptance criteria:\n1. The documented system fetch-email-goals command, with separately and safely quoted runtime-root and target-root arguments, reaches the email-fetch capability in a production build.\n2. A mismatched configured target is rejected before secret or request-ledger access.\n3. Sender filtering, MIME extraction, deterministic Goal IDs, duplicate prevention, remote acknowledgement, and durable retries remain intact.\n4. Successful fetches return the documented JSON fields, including fetched_count, batch_limit, goal_ids, and errors. Per-record failures retain successful imports and retry evidence while returning a nonzero exit.\n5. Regression coverage executes the compiled CLI with production dispatch checks enabled and would fail on the current bug. Cover both reaching the fetch capability for the intended target and rejecting a mismatched target without secret or ledger access. Existing restrictions on unrelated commands remain effective.\n6. Fetching retains ordinary Backlog creation behavior without approving Goals, changing Review decisions, or sending replies. Preserve the Skill's 25-message batch limit, maximum ten batches, and stop-on-command-failure behavior.\n7. Run the focused CLI and development-request checks plus appropriate compiled-binary regression validation. Use isolated fixtures; preserve the live mailbox, token, raw email source, request ledger, and existing Goals.\n\nDeliver the scoped fix and validation evidence through the ordinary Goal/Round workflow.",
+          "reporter": "Buddy Williams",
+          "round": 1
+        },
+        "goal": {
+          "assignee": "Buddy Williams",
+          "id": "00000T1315EYG3376Q1RY62006",
+          "name": "Fix Fetch Goals from Email being blocked by CLI dispatch",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "Buddy Williams"
+        },
+        "governance": {
+          "configured": false,
+          "constitution": "",
+          "product": "",
+          "rules": []
+        },
+        "guidance_candidates": [],
+        "previous_rounds": [],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "event": {},
+      "goal": {
+        "assignee": "Buddy Williams",
+        "base_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+        "branch_name": "refine/00000T1315EYG3376Q1RY62006/round-1",
+        "candidate_commit": null,
+        "created": "2026-09-10T16:27:40Z",
+        "event_generation": 3,
+        "feature_id": null,
+        "feature_order": null,
+        "id": "00000T1315EYG3376Q1RY62006",
+        "name": "Fix Fetch Goals from Email being blocked by CLI dispatch",
+        "node_display_name": "Default",
+        "node_id": "default",
+        "notes": [],
+        "priority": "low",
+        "reporter": "Buddy Williams",
+        "round_count": 1,
+        "rounds": [
+          {
+            "assignee": "Buddy Williams",
+            "constitution_state": "unclassified",
+            "created": "2026-09-10T16:28:05Z",
+            "failure_at": "",
+            "failure_category": "",
+            "failure_message": "",
+            "governance_candidate_commit": "",
+            "governance_checked_at": "",
+            "governance_details": "",
+            "governance_message": "",
+            "governance_rule_actions": [],
+            "guidance_decision": null,
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+                "context_digest": "ddf4edcf4ee1b89a00b1d4a1534e292739d9671d3321e5a5b2505cb56e81fe5e",
+                "context_version": 1,
+                "goal_id": "00000T1315EYG3376Q1RY62006",
+                "implementation_branch": "refine/00000T1315EYG3376Q1RY62006/round-1",
+                "round_idx": 0,
+                "target_branch": "main"
+              },
+              "phase": "plan",
+              "phase_started_at": "2026-09-10T16:28:07Z",
+              "schema_version": 2,
+              "started_at": "2026-09-10T16:28:07Z",
+              "state": "in_progress",
+              "updated_at": "2026-09-10T16:28:07Z"
+            },
+            "implementation_report": null,
+            "implementation_reported_at": null,
+            "latest_log": {
+              "actor": "refine",
+              "category": "git",
+              "datetime": "2026-09-10T16:28:07Z",
+              "details": {
+                "base_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+                "branch": "refine/00000T1315EYG3376Q1RY62006/round-1",
+                "branch_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+                "node_id": "default",
+                "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T1315EYG3376Q1RY62006-round-1"
+              },
+              "goal_id": "00000T1315EYG3376Q1RY62006",
+              "message": "Created implementation worktree for refine/00000T1315EYG3376Q1RY62006/round-1",
+              "round_idx": 0,
+              "severity": "info"
+            },
+            "latest_state_log": {
+              "actor": "refine",
+              "category": "state",
+              "datetime": "2026-09-10T16:28:07Z",
+              "details": {
+                "node_id": "default"
+              },
+              "goal_id": "00000T1315EYG3376Q1RY62006",
+              "message": "Workflow status changed: todo -> plan",
+              "round_idx": 0,
+              "severity": "info"
+            },
+            "latest_workflow_log": {
+              "actor": "refine",
+              "category": "state",
+              "datetime": "2026-09-10T16:28:07Z",
+              "details": {
+                "node_id": "default"
+              },
+              "goal_id": "00000T1315EYG3376Q1RY62006",
+              "message": "Workflow status changed: todo -> plan",
+              "round_idx": 0,
+              "severity": "info"
+            },
+            "logs": [
+              {
+                "actor": "refine",
+                "category": "git",
+                "datetime": "2026-09-10T16:28:07Z",
+                "details": {
+                  "node_id": "default",
+                  "remote": "origin",
+                  "target_branch": "main",
+                  "target_commit": "0b6cc819de716b1b118f40c4465d114290117699"
+                },
+                "goal_id": "00000T1315EYG3376Q1RY62006",
+                "message": "Local main already carried the fetched tip",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "state",
+                "datetime": "2026-09-10T16:28:07Z",
+                "details": {
+                  "node_id": "default"
+                },
+                "goal_id": "00000T1315EYG3376Q1RY62006",
+                "message": "Workflow status changed: todo -> plan",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "git",
+                "datetime": "2026-09-10T16:28:07Z",
+                "details": {
+                  "base_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+                  "branch": "refine/00000T1315EYG3376Q1RY62006/round-1",
+                  "branch_commit": "0b6cc819de716b1b118f40c4465d114290117699",
+                  "node_id": "default",
+                  "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T1315EYG3376Q1RY62006-round-1"
+                },
+                "goal_id": "00000T1315EYG3376Q1RY62006",
+                "message": "Created implementation worktree for refine/00000T1315EYG3376Q1RY62006/round-1",
+                "round_idx": 0,
+                "severity": "info"
+              }
+            ],
+            "meta_rule_state": "unclassified",
+            "product_state": "unclassified",
+            "prompt": "Fix the production CLI dispatch conflict that prevents the standalone Fetch Goals from Email Skill from importing requests into the selected project's Backlog.\n\nObserved failure:\nThe Skill prescribed this command, which was run from /home/buddy/projects/refine-next:\n'/home/buddy/projects/refine/bin/refine' system fetch-email-goals --runtime-root '/home/buddy/projects/refine/run/8082' --target-root '/home/buddy/projects/refine-next'\n\nIt exited with code 1:\ndirect --target-root CLI dispatch is not supported in normal operation; use the daemon API for target state mutations instead (/home/buddy/projects/refine-next)\n\nThe failure occurs before email fetching and before a JSON result is produced. No Goals were imported or recovered by that invocation. A read-only check found 34 existing request.json records retained under /home/buddy/projects/refine/run/8082/self-development-email/requests.\n\nDiagnosis:\nsrc/surfaces/cli/dispatch.rs applies a generic #[cfg(not(test))] explicit_target_root_path rejection before dispatch. That helper includes SystemAction::FetchEmailGoals, whose target_root is required. The existing handler in src/surfaces/cli/dispatch/system.rs is therefore unreachable in normal operation. The unit test email_fetch_cli_requires_the_pinned_target_before_accessing_mail in src/surfaces/cli/tests/system/commands.rs bypasses the production guard through cfg(test), allowing this regression to escape detection.\n\nRequested change:\nImplement a narrowly scoped dispatch correction that restores the documented one-shot capability while preserving the restrictions on other commands and the email capability's existing authorization and retry behavior. Keep docs/runbooks/development-request-email.md and docs/runbooks/skills/fetch-goals-from-email.json consistent with the supported command.\n\nAcceptance criteria:\n1. The documented system fetch-email-goals command, with separately and safely quoted runtime-root and target-root arguments, reaches the email-fetch capability in a production build.\n2. A mismatched configured target is rejected before secret or request-ledger access.\n3. Sender filtering, MIME extraction, deterministic Goal IDs, duplicate prevention, remote acknowledgement, and durable retries remain intact.\n4. Successful fetches return the documented JSON fields, including fetched_count, batch_limit, goal_ids, and errors. Per-record failures retain successful imports and retry evidence while returning a nonzero exit.\n5. Regression coverage executes the compiled CLI with production dispatch checks enabled and would fail on the current bug. Cover both reaching the fetch capability for the intended target and rejecting a mismatched target without secret or ledger access. Existing restrictions on unrelated commands remain effective.\n6. Fetching retains ordinary Backlog creation behavior without approving Goals, changing Review decisions, or sending replies. Preserve the Skill's 25-message batch limit, maximum ten batches, and stop-on-command-failure behavior.\n7. Run the focused CLI and development-request checks plus appropriate compiled-binary regression validation. Use isolated fixtures; preserve the live mailbox, token, raw email source, request ledger, and existing Goals.\n\nDeliver the scoped fix and validation evidence through the ordinary Goal/Round workflow.",
+            "quality_checked_at": "",
+            "quality_details": "",
+            "quality_message": "",
+            "quality_state": "unclassified",
+            "reporter": "Buddy Williams",
+            "rule_state": "unclassified",
+            "updated": "2026-09-10T16:28:07Z",
+            "workflow_attempt_authority": {
+              "claimed_at": "2026-09-10T16:28:06Z",
+              "round_idx": 0,
+              "workflow_revision": 3
+            },
+            "workflow_reconciliation": null,
+            "workflow_recovery": null
+          }
+        ],
+        "status": "plan",
+        "target_branch": "main",
+        "updated": "2026-09-10T16:28:07Z",
+        "workflow_revision": 11
+      },
+      "system": {
+        "candidate_commit": null,
+        "node_id": "default",
+        "project_root": "/home/buddy/projects/refine-next",
+        "workflow_step": "plan",
+        "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T1315EYG3376Q1RY62006-round-1"
+      }
+    },
+    "metadata": {
+      "behavior": "EventSkill",
+      "event_operation_id": "1a08c25e12e113c766c",
+      "goal_id": "00000T1315EYG3376Q1RY62006",
+      "kind": "workflow",
+      "node_id": "default",
+      "provider": "codex",
+      "round_idx": 0,
+      "target_app_id": "/home/buddy/projects/refine-next",
+      "workflow_revision": 3,
+      "workflow_state": "plan"
+    }
+  },
+  "bindings": [
+    {
+      "binding": {
+        "id": "default-plan",
+        "skill_id": "default-plan",
+        "enabled": true,
+        "mode": "blocking",
+        "order": 0,
+        "scope": {
+          "node_id": null
+        },
+        "overrides": null,
+        "inputs": {}
+      },
+      "skill": {
+        "id": "default-plan",
+        "name": "Plan",
+        "prompt": "## Plan\n\nProduce a complete, concise implementation plan for the current Goal Round. Inspect the repository and applicable context, resolve assumptions, consider alternatives and critique your proposed solution before finalizing it. Choose the planning method appropriate to the work. For behavior changes, identify the underlying cause, governing concept or invariant, and existing owner before listing edits. Prefer strengthening an existing concept; introduce one only when it clarifies the behavior and reduces special cases. For a scoped finding recovery Round, use the finding as evidence, reconsider whether the accepted approach explains the failure, and plan a coherent correction against the retained candidate. Inspect relevant changes on the current target branch to avoid duplicating or contradicting concepts it already provides; keep the assigned candidate unchanged. Do not change repository files. Return an actionable plan with stable checklist IDs and meaningful verification.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
+        "role": "plan",
+        "enabled": true,
+        "scope": {
+          "node_id": null
+        },
+        "parameters": [],
+        "provenance": "refine-default-v1"
+      },
+      "parameters": {}
+    }
+  ],
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-10T16:28:07.837955354+00:00",
+  "completed_at": null,
+  "error": null,
+  "action_applied": false
+}
