@@ -106,6 +106,7 @@ pub(super) fn bootstrap_remote_node_with_runtime(
             sensitive: false,
             metadata: Default::default(),
         })?;
+    output.require_complete_capture()?;
     Ok(RemoteRunResult {
         node_id: request.node_id,
         command,

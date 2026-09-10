@@ -572,6 +572,7 @@ impl FleetService for FileFleetService {
             sensitive: false,
             metadata: Default::default(),
         })?;
+        output.require_complete_capture()?;
         Ok(RemoteRunResult {
             node_id: node_id.to_string(),
             command,

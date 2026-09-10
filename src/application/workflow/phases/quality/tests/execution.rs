@@ -487,10 +487,17 @@ fn quality_operation_restart_recovery_interrupts_and_terminates_its_provider() {
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
     unsafe { std::env::set_var("REFINE_SMOKE_AI_PATH", &fixture.smoke_ai) };
-    let operation = fixture
-        .runner()
-        .start_goal_checks("GOAL1", "smoke-ai", Default::default())
+    // Use the same registration/execution path as start_goal_checks, retaining
+    // completion so fixture deletion cannot race the worker's final writes.
+    let runner = fixture.runner();
+    let (operation, request) = runner
+        .register_goal_checks("GOAL1", "smoke-ai", Default::default())
         .unwrap();
+    let id = operation.id.clone();
+    let (completed, completion) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = completed.send(runner.run_registered(&id, request));
+    });
     wait_for_operation_process(&fixture.runtime_root, &operation.id);
     let recovered = FileOperationRegistry::new(&fixture.runtime_root)
         .recover_active_supervised()
@@ -514,6 +521,9 @@ fn quality_operation_restart_recovery_interrupts_and_terminates_its_provider() {
                 .unwrap_or("")
                 .contains(&operation.id))
     );
+    let _ = completion
+        .recv_timeout(std::time::Duration::from_secs(2))
+        .expect("recovered Quality worker did not finish");
     restore_smoke_ai(previous);
     fs::remove_dir_all(fixture.temp_root).unwrap();
 }

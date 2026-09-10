@@ -14,7 +14,7 @@ impl FileProcessSupervisor {
         });
     }
 
-    fn wait_for_reaper_idle(&self, process_id: &str) -> RefineResult<()> {
+    pub(super) fn wait_for_reaper_idle(&self, process_id: &str) -> RefineResult<()> {
         let deadline = Instant::now() + Duration::from_secs(1);
         loop {
             let reaper_owned = self
@@ -393,5 +393,29 @@ impl ProcessSupervisor for FileProcessSupervisor {
             recovered.push(process);
         }
         Ok(recovered)
+    }
+}
+
+/// Every return path transfers guardian handle reaping to the existing deferred
+/// lifecycle lane. Dropping a handle never kills a guardian or proves scope exit.
+pub(super) struct ReapedChild(pub Option<std::process::Child>);
+impl std::ops::Deref for ReapedChild {
+    type Target = std::process::Child;
+    fn deref(&self) -> &Self::Target {
+        self.0.as_ref().unwrap()
+    }
+}
+impl std::ops::DerefMut for ReapedChild {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.0.as_mut().unwrap()
+    }
+}
+impl Drop for ReapedChild {
+    fn drop(&mut self) {
+        if let Some(mut child) = self.0.take() {
+            std::thread::spawn(move || {
+                let _ = child.wait();
+            });
+        }
     }
 }

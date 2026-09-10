@@ -6,6 +6,7 @@ pub(crate) struct UnobservedChild {
     pub group: OwnedGroup,
     pub child_pid: u32,
     child_identity: String,
+    reaper: Option<FileProcessSupervisor>,
 }
 impl UnobservedChild {
     pub fn launch(supervisor: &FileProcessSupervisor, tracked: bool, mut metadata: Value) -> Self {
@@ -101,6 +102,7 @@ impl UnobservedChild {
             group,
             child_pid,
             child_identity,
+            reaper: tracked.then(|| supervisor.clone()),
         }
     }
     pub fn child_alive(&self) -> bool {
@@ -117,5 +119,13 @@ impl UnobservedChild {
 impl Drop for UnobservedChild {
     fn drop(&mut self) {
         self.kill_child();
+        if let Some(supervisor) = &self.reaper {
+            // Kernel exit proof precedes the launching supervisor's final
+            // archive writes. Fixture roots cannot be deleted until both end.
+            let settled = supervisor.wait_for_reaper_idle(&self.group.process.id);
+            if !std::thread::panicking() {
+                settled.expect("fixture reaper did not finish");
+            }
+        }
     }
 }

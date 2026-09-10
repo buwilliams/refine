@@ -118,6 +118,7 @@ impl FileTargetAppService {
                 metadata: process_metadata,
             },
         )?;
+        output.require_complete_capture()?;
         Ok(TargetAppOperation {
             id: new_operation_id(&format!("target-{kind}")),
             kind: kind.to_string(),

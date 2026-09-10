@@ -37,6 +37,8 @@ The daemon's workflow recovery path holds one local launch fence. It stops the o
 
 PTY session settlement treats the workload result and the execution scope separately. A validated workload-status receipt finalizes provider output and structured results; guardian status only describes the ownership helper. Completion, natural exit, capture faults and deadlines use shared bounded scope termination. Missing proof retains local capacity and artifacts, refuses replacement and reports uncertainty without granting new Goal settlement authority. A failed scope settlement preserves the original provider failure and any structured workload result in local evidence.
 
+Standard subprocess capture also separates workload results from scope exit. A bounded final drain releases the caller while surviving or unverified descendants still consume deduplicated capacity and protect evidence. Incomplete capture is explicit and cannot be accepted as a complete machine-readable result. This does not grant new Goal mutation authority or permit worker replacement before proven scope exit.
+
 ## Future Direction
 
 Refine should keep execution ownership proportional to the cost of duplicate work. If future non-idempotent operations require stronger coordination, that protection should be scoped to the side-effect boundary itself rather than recreating a general durable worker-lock system for every workflow step.

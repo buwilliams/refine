@@ -299,3 +299,6 @@ use settlement_evidence::{assert_origin, originating_evidence};
 
 #[cfg(target_os = "linux")]
 mod pty;
+
+#[cfg(target_os = "linux")]
+mod standard_capture;

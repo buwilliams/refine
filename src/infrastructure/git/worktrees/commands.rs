@@ -142,6 +142,7 @@ impl FileGitWorktreeService {
                 metadata,
             },
         )?;
+        output.require_complete_capture()?;
         Ok(HostCommandOutput {
             success: output.success(),
             exit_code: output.process.exit_code,
