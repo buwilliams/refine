@@ -4485,11 +4485,41 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-governance": {
+      "invocation_id": "42b213febec05d0c785cff0ff8326fdabfa66153bff0394d66492cc4bedc1854",
+      "binding_id": "default-governance",
+      "role": "governance",
+      "outcome": "success",
+      "summary": "No actual governance violations found in the pinned candidate; the previous bounded-capture finding is resolved.",
+      "evidence": [
+        "Verified clean HEAD 3fb8b4bf8377f07a4acc7d1e18b8f8e7ea8abbd9. Reviewed candidate changes against base a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e, accepted plans, affected intent, implementation reports and Quality evidence.",
+        "The prior violation is resolved: standard capture uses bounded nonblocking reads and a fixed 200 ms post-workload drain. Deadlines remain effective, incomplete output is explicit, and output-dependent callers reject incomplete capture.",
+        "Reviewed regressions covering quiet and writing descendants retaining stdout, stderr or both, preserved workload status, retained capacity and artifacts, proof-gated release, and subsequent workflow admission.",
+        "All 960 hashes in /tmp/refine-r6-quality/verified-files.json match the candidate. Retained Quality logs report 42 subprocess tests and 12 worker-liveness tests passed; the full suite reports 1287 passed, zero failed and six ignored. Compilation, formatting and release checks passed. macOS remains unverified.",
+        "Read-only git diff --check against the pinned base passed. No behavioral tests were run during Governance; no files, Git state or Goal state were changed."
+      ],
+      "artifacts": {
+        "recovery_analysis": null,
+        "recovery_round_prompt": null,
+        "violations": []
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-governance",
+      "diagnostic": null,
+      "operation_id": null,
+      "process_id": "proc-1789077362440-1129590-1573",
+      "raw_output": "{\n  \"artifacts\": {\n    \"recovery_analysis\": null,\n    \"recovery_round_prompt\": null,\n    \"violations\": []\n  },\n  \"binding_id\": \"default-governance\",\n  \"evidence\": [\n    \"Verified clean HEAD 3fb8b4bf8377f07a4acc7d1e18b8f8e7ea8abbd9. Reviewed candidate changes against base a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e, accepted plans, affected intent, implementation reports and Quality evidence.\",\n    \"The prior violation is resolved: standard capture uses bounded nonblocking reads and a fixed 200 ms post-workload drain. Deadlines remain effective, incomplete output is explicit, and output-dependent callers reject incomplete capture.\",\n    \"Reviewed regressions covering quiet and writing descendants retaining stdout, stderr or both, preserved workload status, retained capacity and artifacts, proof-gated release, and subsequent workflow admission.\",\n    \"All 960 hashes in /tmp/refine-r6-quality/verified-files.json match the candidate. Retained Quality logs report 42 subprocess tests and 12 worker-liveness tests passed; the full suite reports 1287 passed, zero failed and six ignored. Compilation, formatting and release checks passed. macOS remains unverified.\",\n    \"Read-only git diff --check against the pinned base passed. No behavioral tests were run during Governance; no files, Git state or Goal state were changed.\"\n  ],\n  \"invocation_id\": \"42b213febec05d0c785cff0ff8326fdabfa66153bff0394d66492cc4bedc1854\",\n  \"outcome\": \"success\",\n  \"role\": \"governance\",\n  \"summary\": \"No actual governance violations found in the pinned candidate; the previous bounded-capture finding is resolved.\"\n}",
+      "workflow_revision": 130
+    }
+  ],
   "created_at": "2026-09-10T21:56:02.379069093+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-10T21:57:17.216989707+00:00",
   "error": null,
   "action_applied": false
 }

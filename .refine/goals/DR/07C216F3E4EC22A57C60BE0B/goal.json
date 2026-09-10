@@ -3,7 +3,7 @@
   "branch_name": "refine/DR07C216F3E4EC22A57C60BE0B/round-6",
   "candidate_commit": "3fb8b4bf8377f07a4acc7d1e18b8f8e7ea8abbd9",
   "created": "2026-09-10T08:26:00Z",
-  "event_generation": 22,
+  "event_generation": 23,
   "feature_id": "00000T130Z0R6J0GJMARY62005",
   "feature_order": 2,
   "id": "DR07C216F3E4EC22A57C60BE0B",
@@ -8212,7 +8212,7 @@
         "kind": "governance",
         "source_round": 5
       },
-      "constitution_state": "unclassified",
+      "constitution_state": "passed",
       "created": "2026-09-10T20:42:02Z",
       "event_configuration": {
         "events": {
@@ -8768,6 +8768,32 @@
           "source": "workflow.quality.enter",
           "state": "succeeded"
         },
+        "42b213febec05d0c785cff0ff8326fdabfa66153bff0394d66492cc4bedc1854": {
+          "candidate_commit": "3fb8b4bf8377f07a4acc7d1e18b8f8e7ea8abbd9",
+          "results": {
+            "default-governance": {
+              "artifacts": {
+                "recovery_analysis": null,
+                "recovery_round_prompt": null,
+                "violations": []
+              },
+              "binding_id": "default-governance",
+              "evidence": [
+                "Verified clean HEAD 3fb8b4bf8377f07a4acc7d1e18b8f8e7ea8abbd9. Reviewed candidate changes against base a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e, accepted plans, affected intent, implementation reports and Quality evidence.",
+                "The prior violation is resolved: standard capture uses bounded nonblocking reads and a fixed 200 ms post-workload drain. Deadlines remain effective, incomplete output is explicit, and output-dependent callers reject incomplete capture.",
+                "Reviewed regressions covering quiet and writing descendants retaining stdout, stderr or both, preserved workload status, retained capacity and artifacts, proof-gated release, and subsequent workflow admission.",
+                "All 960 hashes in /tmp/refine-r6-quality/verified-files.json match the candidate. Retained Quality logs report 42 subprocess tests and 12 worker-liveness tests passed; the full suite reports 1287 passed, zero failed and six ignored. Compilation, formatting and release checks passed. macOS remains unverified.",
+                "Read-only git diff --check against the pinned base passed. No behavioral tests were run during Governance; no files, Git state or Goal state were changed."
+              ],
+              "invocation_id": "42b213febec05d0c785cff0ff8326fdabfa66153bff0394d66492cc4bedc1854",
+              "outcome": "success",
+              "role": "governance",
+              "summary": "No actual governance violations found in the pinned candidate; the previous bounded-capture finding is resolved."
+            }
+          },
+          "source": "workflow.governance.enter",
+          "state": "succeeded"
+        },
         "6d8b27036e1c4655273949fa327eedcfd5256444b69efe5d6fd56ad47a5a84ab": {
           "candidate_commit": null,
           "results": {
@@ -8924,10 +8950,39 @@
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
-      "governance_candidate_commit": "",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_candidate_commit": "3fb8b4bf8377f07a4acc7d1e18b8f8e7ea8abbd9",
+      "governance_checked_at": "2026-09-10T21:57:17Z",
+      "governance_details": {
+        "candidate_commit": "3fb8b4bf8377f07a4acc7d1e18b8f8e7ea8abbd9",
+        "configured": true,
+        "failed_actions": [],
+        "phase": "post_implementation",
+        "skill_results": [
+          {
+            "artifacts": {
+              "recovery_analysis": null,
+              "recovery_round_prompt": null,
+              "violations": []
+            },
+            "binding_id": "workflow.governance.enter:default-governance",
+            "evidence": [
+              "Verified clean HEAD 3fb8b4bf8377f07a4acc7d1e18b8f8e7ea8abbd9. Reviewed candidate changes against base a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e, accepted plans, affected intent, implementation reports and Quality evidence.",
+              "The prior violation is resolved: standard capture uses bounded nonblocking reads and a fixed 200 ms post-workload drain. Deadlines remain effective, incomplete output is explicit, and output-dependent callers reject incomplete capture.",
+              "Reviewed regressions covering quiet and writing descendants retaining stdout, stderr or both, preserved workload status, retained capacity and artifacts, proof-gated release, and subsequent workflow admission.",
+              "All 960 hashes in /tmp/refine-r6-quality/verified-files.json match the candidate. Retained Quality logs report 42 subprocess tests and 12 worker-liveness tests passed; the full suite reports 1287 passed, zero failed and six ignored. Compilation, formatting and release checks passed. macOS remains unverified.",
+              "Read-only git diff --check against the pinned base passed. No behavioral tests were run during Governance; no files, Git state or Goal state were changed."
+            ],
+            "invocation_id": "42b213febec05d0c785cff0ff8326fdabfa66153bff0394d66492cc4bedc1854",
+            "outcome": "success",
+            "role": "governance",
+            "summary": "No actual governance violations found in the pinned candidate; the previous bounded-capture finding is resolved."
+          }
+        ],
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR07C216F3E4EC22A57C60BE0B-round-4"
+      },
+      "governance_message": "Governance checks passed.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
       "governance_rule_actions": [],
       "guidance_decision": {
         "applied": [],
@@ -9118,8 +9173,8 @@
       "implementation_report": "workflow.implement.enter:default-implement: Implemented bounded standard capture, explicit incomplete-output evidence and ownership-safe settlement. All required final Linux checks passed.",
       "implementation_reported_at": "2026-09-10T21:42:39Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "Preserve the candidate and prior evidence. Correct standard run_to_completion capture in src/infrastructure/process/subprocess/execution.rs so a validated workload-exit receipt starts bounded output finalization rather than an indefinite wait for descendant-held pipes. Keep the guardian alive, retain capacity and artifacts while ownership remains pending, preserve workload status and captured output, and report incomplete capture explicitly. Avoid unbounded reader joins and preserve timeout enforcement through settlement. Add deterministic regressions with a setsid descendant retaining stdout, stderr, and both after leader exit, including quiet and continuously writing descendants. Assert bounded return, actual descendant state, retained capacity and artifacts, and eventual release only after trustworthy scope-exit proof. Through supported supervision, run cargo test --lib infrastructure::process::subprocess -- --test-threads=1 and cargo test --lib worker_liveness -- --test-threads=1, followed by the required candidate checks. Retain existing PTY, identity, settlement and retention regressions. Refine owns candidate capture and advancement.",
       "quality_agent_report": "workflow.quality.enter:default-quality: Reviewed the candidate independently. No additional defects found; all required Linux checks passed.",
       "quality_candidate_commit": "3fb8b4bf8377f07a4acc7d1e18b8f8e7ea8abbd9",
@@ -9283,20 +9338,30 @@
       ],
       "quality_state": "passed",
       "reporter": "Refine",
-      "rule_state": "unclassified",
-      "updated": "2026-09-10T21:56:02Z",
-      "workflow_attempt_authority": {
-        "claimed_at": "2026-09-10T20:42:02Z",
-        "round_idx": 5,
-        "workflow_revision": 130
+      "rule_state": "passed",
+      "updated": "2026-09-10T21:57:22Z",
+      "workflow_attempt_authority": null,
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "3fb8b4bf8377f07a4acc7d1e18b8f8e7ea8abbd9",
+        "integrated_at": "2026-09-10T21:57:22.104375475+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n .../03-application/02-workflow/00-overview.md      |   8 +-\n .../02-workflow/11-consistency-contract.md         |   4 +\n .../03-application/03-execution-ownership.md       |   8 +\n docs/intent/04-infrastructure/01-process.md        |  11 +\n docs/intent/05-surfaces/02-cli.md                  |   4 +\n src/application/agents/sessions/mod.rs             |  11 +-\n src/application/agents/sessions/output_capture.rs  | 190 ++++++\n src/application/agents/sessions/ownership_tests.rs | 486 ++++++++++++++\n src/application/agents/sessions/pty_lifecycle.rs   | 483 ++++++++++++++\n src/application/agents/sessions/session_runtime.rs | 518 +++------------\n src/application/agents/sessions/tests.rs           |  10 +-\n src/application/diagnostics/processes/mod.rs       |   2 +\n src/application/events/execution/runner.rs         |   8 +\n src/application/events/gate_configuration.rs       |  39 ++\n src/application/events/mod.rs                      |   2 +-\n src/application/events/workflow.rs                 |   7 +-\n src/application/fleet/service/mod.rs               |   1 +\n src/application/fleet/service/remote.rs            |   1 +\n src/application/guidance/mod.rs                    |  67 +-\n src/application/maintenance/worktrees/mod.rs       |   6 +-\n src/application/maintenance/worktrees/tests.rs     |   3 +\n .../worktrees/tests/retained_processes.rs          | 117 ++++\n src/application/projects/registry/mod.rs           |   2 +\n src/application/system/installation/os_backend.rs  |   3 +\n src/application/system/target_apps/commands.rs     |   1 +\n src/application/work_items/mod.rs                  |   9 +\n .../work_items/service/workflow_attempts.rs        |  54 +-\n src/application/workers/maintenance.rs             | 253 +++++++\n src/application/workers/maintenance/tests.rs       | 371 +++++++++++\n src/application/workers/mod.rs                     |   5 +\n src/application/workers/tests.rs                   |  23 +\n src/application/workers/worker_specs.rs            |  24 +-\n src/application/workers/workflow.rs                |  28 +-\n src/application/workers/workflow_recovery.rs       | 290 ++++++++\n src/application/workers/workflow_recovery/tests.rs | 511 ++++++++++++++\n src/application/workers/worktree_cleanup.rs        |  61 +-\n .../workflow/engine/execution/admission.rs         | 193 ++++++\n .../workflow/engine/execution/attempt.rs           | 344 ++++++++++\n .../workflow/engine/execution/attempt/tests.rs     | 114 ++++\n src/application/workflow/engine/execution/mod.rs   | 740 +++++----------------\n src/application/workflow/engine/execution/retry.rs |  75 +++\n .../workflow/engine/execution/test_hooks.rs        |  68 ++\n src/application/workflow/engine/mod.rs             |   2 +\n src/application/workflow/engine/policy/capacity.rs |  71 ++\n src/application/workflow/engine/policy/mod.rs      |  46 +-\n src/application/workflow/health/admission.rs       | 234 +++++++\n src/application/workflow/health/admission/tests.rs | 223 +++++++\n src/application/workflow/health/mod.rs             | 250 +++++++\n src/application/workflow/health/ownership.rs       |  51 ++\n src/application/workflow/health/ticks.rs           | 113 ++++\n src/application/workflow/mod.rs                    |   1 +\n .../workflow/phases/quality/service/settings.rs    |   1 +\n .../workflow/phases/quality/tests/execution.rs     |  16 +-\n .../recovery/failure_settlement/evidence.rs        | 139 ++++\n .../workflow/recovery/failure_settlement/mod.rs    | 108 +--\n .../workflow/tests/failure_settlement.rs           | 118 +++-\n src/application/workflow/tests/mod.rs              |   1 +\n src/application/workflow/tests/planning_repair.rs  |   6 +-\n src/application/workflow/tests/worker_liveness.rs  | 304 +++++++++\n .../workflow/tests/worker_liveness/pty.rs          | 128 ++++\n .../workflow/tests/worker_liveness/scheduling.rs   | 253 +++++++\n .../tests/worker_liveness/settlement_evidence.rs   | 222 +++++++\n .../tests/worker_liveness/standard_capture.rs      | 115 ++++\n src/infrastructure/agents/invocation/service.rs    |   1 +\n src/infrastructure/git/locks/mod.rs                |  43 +-\n src/infrastructure/git/repository/mod.rs           |   1 +\n src/infrastructure/git/worktrees/commands.rs       |   1 +\n .../process/subprocess/artifact_retirement.rs      | 410 ++++++++++++\n src/infrastructure/process/subprocess/capture.rs   |  88 +++\n .../process/subprocess/command_spec.rs             |  33 +-\n src/infrastructure/process/subprocess/execution.rs | 406 +++++++----\n src/infrastructure/process/subprocess/mod.rs       |  31 +-\n .../process/subprocess/owned_groups.rs             | 508 ++++++++++++++\n .../process/subprocess/owned_groups/assessment.rs  |  74 +++\n .../subprocess/owned_groups/identity_tests.rs      |  70 ++\n .../subprocess/owned_groups/launch_scope.rs        | 265 ++++++++\n .../subprocess/owned_groups/launch_tests.rs        | 143 ++++\n .../process/subprocess/owned_groups/quiescence.rs  | 106 +++\n .../subprocess/owned_groups/scope_guardian.rs      | 263 ++++++++\n .../process/subprocess/owned_groups/stop.rs        | 109 +++\n .../subprocess/owned_groups/test_fixture.rs        | 131 ++++\n .../process/subprocess/owned_groups/tests.rs       | 491 ++++++++++++++\n .../process/subprocess/registration_identity.rs    | 205 ++++++\n src/infrastructure/process/subprocess/registry.rs  | 355 +---------\n .../process/subprocess/scheduler_observation.rs    |  61 ++\n .../process/subprocess/supervision.rs              |  81 ++-\n .../process/subprocess/termination.rs              | 129 +---\n .../process/subprocess/test_hooks.rs               |  30 +\n .../process/subprocess/tests/capture.rs            | 406 +++++++++++\n src/infrastructure/process/subprocess/tests/mod.rs |   3 +\n .../process/subprocess/tests/registry.rs           |   3 +-\n .../process/subprocess/workflow_registration.rs    |  42 --\n .../process/supervisor/coordination/mod.rs         |  48 +-\n .../process/supervisor/lifecycle/mod.rs            |   4 +-\n .../process/supervisor/operations/cancellation.rs  |  34 +-\n .../process/supervisor/operations/mod.rs           |   3 +\n .../supervisor/operations/ownership_tests.rs       | 118 ++++\n .../process/supervisor/operations/recovery.rs      |  65 +-\n .../process/supervisor/operations/storage.rs       |  32 +-\n .../process/supervisor/security/host_commands.rs   |   4 +\n src/main.rs                                        |   2 +\n src/surfaces/cli/dispatch/system.rs                |   1 +\n src/surfaces/cli/tests/system/daemon.rs            |  13 +-\n src/surfaces/web_server/http.rs                    |   2 +-\n src/surfaces/web_server/http/background_loops.rs   | 162 +++--\n .../http/background_loops_retention_tests.rs       | 173 +++++\n src/surfaces/web_server/server.rs                  |   8 +-\n .../web_server/tests/http_transport/runtime.rs     |  26 +\n 108 files changed, 10849 insertions(+), 1892 deletions(-)\n create mode 100644 src/application/agents/sessions/output_capture.rs\n create mode 100644 src/application/agents/sessions/ownership_tests.rs\n create mode 100644 src/application/agents/sessions/pty_lifecycle.rs\n create mode 100644 src/application/maintenance/worktrees/tests/retained_processes.rs\n create mode 100644 src/application/workers/maintenance.rs\n create mode 100644 src/application/workers/maintenance/tests.rs\n create mode 100644 src/application/workers/workflow_recovery.rs\n create mode 100644 src/application/workers/workflow_recovery/tests.rs\n create mode 100644 src/application/workflow/engine/execution/admission.rs\n create mode 100644 src/application/workflow/engine/execution/attempt.rs\n create mode 100644 src/application/workflow/engine/execution/attempt/tests.rs\n create mode 100644 src/application/workflow/engine/execution/retry.rs\n create mode 100644 src/application/workflow/engine/execution/test_hooks.rs\n create mode 100644 src/application/workflow/engine/policy/capacity.rs\n create mode 100644 src/application/workflow/health/admission.rs\n create mode 100644 src/application/workflow/health/admission/tests.rs\n create mode 100644 src/application/workflow/health/mod.rs\n create mode 100644 src/application/workflow/health/ownership.rs\n create mode 100644 src/application/workflow/health/ticks.rs\n create mode 100644 src/application/workflow/recovery/failure_settlement/evidence.rs\n create mode 100644 src/application/workflow/tests/worker_liveness.rs\n create mode 100644 src/application/workflow/tests/worker_liveness/pty.rs\n create mode 100644 src/application/workflow/tests/worker_liveness/scheduling.rs\n create mode 100644 src/application/workflow/tests/worker_liveness/settlement_evidence.rs\n create mode 100644 src/application/workflow/tests/worker_liveness/standard_capture.rs\n create mode 100644 src/infrastructure/process/subprocess/artifact_retirement.rs\n create mode 100644 src/infrastructure/process/subprocess/capture.rs\n create mode 100644 src/infrastructure/process/subprocess/owned_groups.rs\n create mode 100644 src/infrastructure/process/subprocess/owned_groups/assessment.rs\n create mode 100644 src/infrastructure/process/subprocess/owned_groups/identity_tests.rs\n create mode 100644 src/infrastructure/process/subprocess/owned_groups/launch_scope.rs\n create mode 100644 src/infrastructure/process/subprocess/owned_groups/launch_tests.rs\n create mode 100644 src/infrastructure/process/subprocess/owned_groups/quiescence.rs\n create mode 100644 src/infrastructure/process/subprocess/owned_groups/scope_guardian.rs\n create mode 100644 src/infrastructure/process/subprocess/owned_groups/stop.rs\n create mode 100644 src/infrastructure/process/subprocess/owned_groups/test_fixture.rs\n create mode 100644 src/infrastructure/process/subprocess/owned_groups/tests.rs\n create mode 100644 src/infrastructure/process/subprocess/registration_identity.rs\n create mode 100644 src/infrastructure/process/subprocess/scheduler_observation.rs\n create mode 100644 src/infrastructure/process/subprocess/tests/capture.rs\n create mode 100644 src/infrastructure/process/supervisor/operations/ownership_tests.rs\n create mode 100644 src/surfaces/web_server/http/background_loops_retention_tests.rs",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "c170bf5dd862c641f9fd0118e56b0b9177126ce0"
       },
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "governance",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-09-10T21:56:02Z",
+  "updated": "2026-09-10T21:57:22Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:37.178169037+00:00",
@@ -9495,7 +9560,16 @@
       "node_id": "default",
       "round_idx": 5,
       "to": "governance"
+    },
+    {
+      "at": "2026-09-10T21:57:22.496411898+00:00",
+      "forced": false,
+      "from": "governance",
+      "generation": 23,
+      "node_id": "default",
+      "round_idx": 5,
+      "to": "review"
     }
   ],
-  "workflow_revision": 160
+  "workflow_revision": 167
 }
