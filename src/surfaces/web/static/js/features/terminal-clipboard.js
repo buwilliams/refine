@@ -30,7 +30,12 @@ function handleTerminalClipboardKeydown(e, terminal = terminalStateFor()) {
   const paste = ((e.ctrlKey || e.metaKey) && key === "v")
     || (e.shiftKey && !e.ctrlKey && key === "insert");
   if ((!copy && !paste) || (copy && !terminalSelection(terminal))) return false;
-  if (paste && (!terminal.sessionId || terminal.exited)) return false;
+  if (paste && (!terminal.sessionId || terminal.exited)) {
+    // Retained output remains copyable, but xterm must not interpret a paste
+    // shortcut as control input after its managed session has ended.
+    e.preventDefault();
+    return true;
+  }
   if (e.ctrlKey && e.shiftKey && !e.metaKey && (key === "c" || key === "v")) {
     // Terminal-specific shortcuts have no portable browser default. Cancel
     // them even on failure; failed copies retain their text for manual recovery.
@@ -233,11 +238,11 @@ function copyTerminalTextWithSelection(text) {
 
 function handleTerminalPaste(e, terminal = terminalStateFor()) {
   if (!terminalClipboardHasFocus(terminal)) return false;
-  if (!terminal?.sessionId || terminal.exited) return false;
   // Own empty and rejected events too, so xterm cannot duplicate the operation
   // or bypass a failed clipboard read through its own paste listener.
   e.preventDefault();
   e.stopPropagation();
+  if (!terminal.sessionId || terminal.exited) return true;
   try {
     const text = e.clipboardData?.getData("text/plain");
     if (typeof text !== "string") throw new Error("Browser paste data is unavailable.");
