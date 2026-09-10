@@ -1,10 +1,10 @@
 {
-  "id": "79dbb208ed2a9fc8884d5ee53d3a0aedc4b2ae2c2dcf055b13284186adb82e28",
+  "id": "acb126ce63a61f19495ca9f027394ed611dae1bf39c74d069cf0b50e86e23f47",
   "event": {
-    "id": "workflow.governance.enter",
-    "name": "Workflow Governance Enter",
+    "id": "workflow.plan.enter",
+    "name": "Workflow Plan Enter",
     "kind": "system",
-    "source": "workflow.governance.enter",
+    "source": "workflow.plan.enter",
     "enabled": true,
     "scope": {
       "node_id": null
@@ -12,8 +12,8 @@
     "parameters": [],
     "bindings": [
       {
-        "id": "default-governance",
-        "skill_id": "default-governance",
+        "id": "default-plan",
+        "skill_id": "default-plan",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -33,17 +33,17 @@
     "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR07C216F3E4EC22A57C60BE0B-round-4",
     "provider": "codex",
     "goal_id": "DR07C216F3E4EC22A57C60BE0B",
-    "round_idx": 4,
-    "workflow_revision": 96,
-    "candidate_commit": "3d221f8f5b5877d39da99aed12ded63df9cbd5d6",
+    "round_idx": 5,
+    "workflow_revision": 130,
+    "candidate_commit": null,
     "data": {
       "context": {
-        "assembled_at": "2026-09-10T19:36:50Z",
+        "assembled_at": "2026-09-10T20:42:02Z",
         "current_round": {
           "assignee": "Refine",
-          "prompt": "Recover Goal DR07C216F3E4EC22A57C60BE0B in a fresh Refine-managed implementation Round using the target tip selected at admission. Preserve all previous attempts, branches, worktrees, commits, uncommitted files and evidence. Inspect and selectively retain candidate 8087e73c50825c99eb780c504b913e0c34c3c596, including its operation/deadline corrections and bounded scope-receipt test. Round 4 was based on a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e. Read its finalized plan, failed invocation /home/buddy/projects/refine-next/.git/refine-live-state/automation/invocations/3ec0b553d86c4fe2ece68ffc7d36eabbd571b6897308b4b0251f9eff6af7f376.json, preceding Quality invocation e279bd1c5559f8462990cb4e888bd06f8e5d5975cca5a187c8591e5b86afe627.json, and /tmp/refine-r4-quality/{reproductions.json,final-results.json,quality.patch}. Follow current Skills and affected execution-ownership/process intent.\n\nComplete adoption of FileProcessSupervisor ownership across PTY settlement and artifact retirement. In src/application/agents/sessions/session_runtime.rs, distinguish workload PID/status from guardian identity/status. Route completion, timeout and error termination through the shared bounded ownership mechanism, preserving the guardian while it adopts and reaps descendants and produces trustworthy scope-exit proof. Audit related launch-failure and reader-settlement paths. Consume workload-status evidence separately from whole-scope completion; preserve output, exit semantics and structured completion results without waiting indefinitely for detached descendants. Bound settlement and reader shutdown. If termination or proof is unavailable, retain capacity and artifacts and surface actionable uncertainty without claiming exit. Preserve identity fences, overlapping-stop coordination, survivor resume, original deadlines, Toolbar protection, human-input exceptions and settlement authority. Continue using maintain_daemon; do not introduce another scheduler or reaper.\n\nCorrect sweep_orphan_process_logs in src/surfaces/web_server/http/background_loops.rs to use shared ownership and artifact-retirement rules. Missing primary registration alone must not authorize deletion. Preserve stdout, stderr and stdin evidence for Live, Unverified, corrupt or unreadable ownership and while artifact handoff remains active. Recheck retirement eligibility under appropriate coordination. Proven-exited artifacts should remain removable after the existing retention interval. Keep the HTTP surface thin and avoid duplicating ownership policy.\n\nAdd deterministic regressions through run_goal_agent and the actual retention consumer. Exercise valid completion, hard-cap/idle failure, natural workload exit and relevant setup/capture failures with controlled guardian timing and a setsid descendant surviving leader exit before descendant observation. Verify real descendant state, identity-bound exit proof, group_pending, capacity accounting and replacement eligibility; an empty list() is insufficient. Cover missing primary registration and unavailable ownership evidence. Assert safe eventual release when proof becomes available and explicit retained uncertainty otherwise. Through the same workflow runner, prove another eligible Goal enters Plan within one poll interval after a PTY failure safely releases capacity. Test all three aged log types with Live, Unverified, corrupt/unreadable and proven-exited ownership, including active handoff and unexpired retention. Preserve existing operation-revision, cancellation, deadline, settlement-panic and worktree-protection regressions.\n\nRun focused checks through supported Refine supervision: cargo test --lib <filter> -- --test-threads=1 for application::agents::sessions, surfaces::web_server::http::background_loops, worker_liveness, failure_settlement, infrastructure::process::subprocess, infrastructure::process::supervisor, application::workers, application::maintenance::worktrees, application::workflow::health and surfaces::web_server::tests::http_transport::runtime. Ensure new tests are selected. Run cargo check --all-targets --locked, cargo fmt --all -- --check, cargo test --lib --bins -- --test-threads=1, cargo build --release --locked and git diff --check. Report exact commands, nonzero selected counts, failures, ignored/skipped checks, logs and candidate identity. Establish any baseline failure against this new Round's pinned base. Prior Linux passes do not cover these missing behaviors; macOS remains unverified because the earlier cross-check failed compiling aws-lc-sys with unsupported Darwin compiler flags. Update only affected intent documentation. Refine owns candidate capture and workflow advancement; do not directly edit Goal state, approve, push, merge, deploy or restart the supervising daemon.",
+          "prompt": "Preserve the candidate and prior evidence. Correct standard run_to_completion capture in src/infrastructure/process/subprocess/execution.rs so a validated workload-exit receipt starts bounded output finalization rather than an indefinite wait for descendant-held pipes. Keep the guardian alive, retain capacity and artifacts while ownership remains pending, preserve workload status and captured output, and report incomplete capture explicitly. Avoid unbounded reader joins and preserve timeout enforcement through settlement. Add deterministic regressions with a setsid descendant retaining stdout, stderr, and both after leader exit, including quiet and continuously writing descendants. Assert bounded return, actual descendant state, retained capacity and artifacts, and eventual release only after trustworthy scope-exit proof. Through supported supervision, run cargo test --lib infrastructure::process::subprocess -- --test-threads=1 and cargo test --lib worker_liveness -- --test-threads=1, followed by the required candidate checks. Retain existing PTY, identity, settlement and retention regressions. Refine owns candidate capture and advancement.",
           "reporter": "Refine",
-          "round": 5
+          "round": 6
         },
         "goal": {
           "assignee": "Refine",
@@ -62,7 +62,7 @@
             }
           ],
           "priority": "low",
-          "reporter": "ethan.jacobson@insurity.com"
+          "reporter": "Ethan Jacobson"
         },
         "governance": {
           "configured": false,
@@ -73,7 +73,7 @@
         "guidance_candidates": [],
         "previous_rounds": [
           {
-            "assignee": "ethan.jacobson@insurity.com",
+            "assignee": "Ethan Jacobson",
             "implementation_plan": {
               "binding": {
                 "base_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
@@ -229,11 +229,11 @@
               "updated_at": "2026-09-10T08:35:20Z"
             },
             "prompt": "From: Ethan Jacobson <ethan.jacobson@insurity.com>\nSubject: Refine daemon bug\n\nBody:\n## Summary\r\n  The workflow runner-worker loop stops making progress after it fails to durably settle a\r\n  stale-candidate integration, yet its OS process stays alive. Once wedged, the daemon admits\r\n  no new work (Todo Goals never reach Plan), stops reaping agents past their hard cap, and\r\n  stops cleaning worktrees �X indefinitely, until a manual daemon restart. Nothing detects or\r\n  surfaces the dead loop: `refine next` reports \"all-quiet\" and `system status` reports\r\n  daemon_healthy=true with running_workflow_processes=0.\r\n\r\n  ## Field evidence (Refine 4.2.0, node bo2lnxnevo02-ethan, daemon port 8082)\r\n  - Last log entry of ANY kind: 2026-08-18T21:50:00Z (category=workflow):\r\n    \"Goal failure was not durably settled (attempt superseded); original error:\r\n     Candidate 11818bcf�K is stale: recorded base 2a4dccff�K is not <current>\".\r\n    Preceding lines show repeated \"Candidate �K is stale\" / \"! [rejected] �K non-fast-forward\"\r\n    while integrating round branches during concurrent activity on merge_target_branch\r\n    `insurity-claims`.\r\n  - ~44h later: zero subsequent log lines. No \"Workflow status changed\" since 08-18T21:48.\r\n  - A Goal created + started today sits in `todo` and is never admitted to `plan`.\r\n  - system status: daemon_healthy=true, running_workflow_processes=0,\r\n    parallel_run_cap=2 (capacity free). refine next: suggestion \"all-quiet\".\r\n  - State-sync is healthy (sync_recovered 2026-08-18T13:48; `sync --preview` fast-forwards;\r\n    origin push of refine/state succeeded today) �X so sync is NOT the blocker.\r\n  - Collateral from the stalled loop: 3 agent sessions alive 21�V27h, far past\r\n    agent_hard_cap_seconds=7200 and agent_idle_timeout_seconds=900, unreaped; 7 orphaned\r\n    worktrees under .git/refine-worktrees not cleaned. This indicates the SAME loop that\r\n    admits work also owns reaping/cleanup, and all of it stopped together.\r\n  - Restarting the daemon respawns the worker and immediately resumes admission, reaping,\r\n    and cleanup.\r\n\r\n  ## Root-cause hypothesis (confirm in code)\r\n  The \"Goal failure was not durably settled (attempt superseded)\" path �X reached when a\r\n  candidate's recorded base is stale and the failure record is superseded by a concurrent\r\n  attempt �X is not handled as a recoverable per-Goal outcome. Instead of logging the failure\r\n  and continuing the loop to the next Goal, the worker's main loop exits or deadlocks (e.g.\r\n  an error propagates out of the loop body, an await never completes, or a lock/worktree is\r\n  left held). The supervisor keeps the process alive (so `system status` looks healthy) but\r\n  the loop no longer ticks.\r\n\r\n  Start in the workflow runner-worker entrypoint (`refine system runner-worker --kind\r\n  workflow`) and the engine loop under src/application/workflow/engine/execution/. Find where\r\n  \"Goal failure was not durably settled (attempt superseded)\" and the stale-candidate error\r\n  (\"Candidate �K is stale: recorded base �K\") are produced, and trace what happens to the loop\r\n  after that error �X specifically whether the error escapes the per-Goal iteration boundary.\r\n\r\n  ## Required behavior\r\n  1. A per-Goal failure �X including \"attempt superseded\" / stale-candidate / non-fast-forward\r\n     push rejection �X must be caught at the per-Goal boundary, recorded durably (Goal ->\r\n     failed or a recovery Round), and the worker loop MUST continue to the next Goal. No\r\n     single-Goal integration failure may terminate or wedge the loop.\r\n  2. Liveness detection: the worker must emit a periodic heartbeat/tick, and the daemon must\r\n     detect a stalled loop (alive process, no progress/heartbeat within a bound) and either\r\n     auto-restart the worker or mark itself unhealthy. system status must report a wedged\r\n     worker as NOT healthy.\r\n  3. Observability: when a Todo Goal has been waiting past a threshold with free capacity and\r\n     no active runs, `refine next` must surface it (e.g. \"workflow worker not advancing:\r\n     last tick <ts>, N Goals stuck in todo\") with a remediation command, instead of\r\n     \"all-quiet\".\r\n  4. Decouple or make independently resilient the periodic duties driven by this loop\r\n     (admission, agent hard-cap/idle reaping, worktree cleanup) so one wedged concern does\r\n     not silently stop the others.\r\n\r\n  ## Reproduction\r\n  1. Start a Goal whose implementation round races the merge_target_branch so its candidate\r\n     goes stale on integration (recorded base no longer current), and arrange a concurrent\r\n     attempt so the failure is \"superseded\" and cannot be durably settled.\r\n  2. Observe the worker log the \"attempt superseded\" line and then stop ticking.\r\n  3. Create + start another Goal; it stays in `todo` and is never admitted; refine next says\r\n     \"all-quiet\"; running_workflow_processes stays 0; agents past hard cap go unreaped.\r\n  4. Restart the daemon �� admission/reaping/cleanup resume. Confirms the loop, not the data,\r\n     was the blocker.\r\n\r\n  ## Acceptance criteria\r\n  - A stale-candidate / superseded-attempt integration failure records the Goal outcome and\r\n    the worker continues to the next Goal WITHOUT wedging; a follow-up Todo Goal is admitted\r\n    to Plan within one poll interval.\r\n  - A wedged/stalled worker loop is detected (heartbeat/tick watchdog) and auto-recovered or\r\n    reported unhealthy in system status �X no manual restart required.\r\n  - refine next surfaces a stuck-Todo-with-idle-worker condition instead of \"all-quiet\".\r\n  - Reaper and worktree-cleanup keep running independent of an admission-path failure.\r\n  - Regression tests (style of src/application/workflow/tests/ and\r\n    src/infrastructure/process/supervisor/lifecycle/tests.rs): inject a superseded/stale\r\n    candidate failure and assert the loop survives and the next Goal is admitted; assert the\r\n    watchdog flags a non-ticking worker.\r\n\r\n  ## Constraints\r\n  - Preserve fail-closed safety for genuine content conflicts and never auto-merge contested\r\n    Goal records; this fix is about loop survival, liveness detection, and surfacing �X not\r\n    about weakening conflict handling.\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nEthan Jacobson\r\nEthan.Jacobson@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
-            "reporter": "ethan.jacobson@insurity.com",
+            "reporter": "Ethan Jacobson",
             "round": 1
           },
           {
-            "assignee": "ethan.jacobson@insurity.com",
+            "assignee": "Ethan Jacobson",
             "guidance_decision": {
               "applied": [],
               "context_version": 1,
@@ -936,6 +936,349 @@
             "quality_state": "failed",
             "reporter": "Buddy Williams",
             "round": 4
+          },
+          {
+            "assignee": "Refine",
+            "constitution_state": "passed",
+            "governance_checked_at": "2026-09-10T20:42:01Z",
+            "governance_details": {
+              "candidate_commit": "3d221f8f5b5877d39da99aed12ded63df9cbd5d6",
+              "configured": true,
+              "failed_actions": [
+                {
+                  "evidence": null,
+                  "message": "docs/intent/04-infrastructure/01-process.md:113 requires detached descendants to retain capacity without withholding the workload result, consistent with accepted Round-4 plan P3. In src/infrastructure/process/subprocess/execution.rs:287-291, the workload receipt sets status, but line 220 continues waiting until both output readers finish. Lines 222-224 disable hard-cap and stall enforcement once status is present. The readers block on read until EOF (workflow_registration.rs:24-42). Consequently, a surviving descendant retaining either output pipe prevents run_to_completion from returning indefinitely despite proven workload exit; supervised Git callers can retain their repository-operation waits. The regression at owned_groups/launch_tests.rs:81-101 redirects both descendant streams to /dev/null and misses this case. Recover by bounding post-workload capture and reader shutdown while retaining pending ownership, with regressions that keep the inherited pipes open.",
+                  "rule_id": "workflow.governance.enter:default-governance:execution-ownership.workload-result-independent-of-scope",
+                  "state": "failed"
+                }
+              ],
+              "phase": "post_implementation",
+              "skill_results": [
+                {
+                  "artifacts": {
+                    "recovery_analysis": "Candidate 3d221f8f5b5877d39da99aed12ded63df9cbd5d6 fixes the reviewed PTY and retention defects, but standard subprocess completion still couples workload results to descendant-held output pipes. This is a source-established violation; no behavioral reproduction was run during this observational review. The passing regression avoids this condition by redirecting the descendant's streams.",
+                    "recovery_round_prompt": "Preserve the candidate and prior evidence. Correct standard run_to_completion capture in src/infrastructure/process/subprocess/execution.rs so a validated workload-exit receipt starts bounded output finalization rather than an indefinite wait for descendant-held pipes. Keep the guardian alive, retain capacity and artifacts while ownership remains pending, preserve workload status and captured output, and report incomplete capture explicitly. Avoid unbounded reader joins and preserve timeout enforcement through settlement. Add deterministic regressions with a setsid descendant retaining stdout, stderr, and both after leader exit, including quiet and continuously writing descendants. Assert bounded return, actual descendant state, retained capacity and artifacts, and eventual release only after trustworthy scope-exit proof. Through supported supervision, run cargo test --lib infrastructure::process::subprocess -- --test-threads=1 and cargo test --lib worker_liveness -- --test-threads=1, followed by the required candidate checks. Retain existing PTY, identity, settlement and retention regressions. Refine owns candidate capture and advancement.",
+                    "violations": [
+                      {
+                        "message": "docs/intent/04-infrastructure/01-process.md:113 requires detached descendants to retain capacity without withholding the workload result, consistent with accepted Round-4 plan P3. In src/infrastructure/process/subprocess/execution.rs:287-291, the workload receipt sets status, but line 220 continues waiting until both output readers finish. Lines 222-224 disable hard-cap and stall enforcement once status is present. The readers block on read until EOF (workflow_registration.rs:24-42). Consequently, a surviving descendant retaining either output pipe prevents run_to_completion from returning indefinitely despite proven workload exit; supervised Git callers can retain their repository-operation waits. The regression at owned_groups/launch_tests.rs:81-101 redirects both descendant streams to /dev/null and misses this case. Recover by bounding post-workload capture and reader shutdown while retaining pending ownership, with regressions that keep the inherited pipes open.",
+                        "rule_id": "execution-ownership.workload-result-independent-of-scope"
+                      }
+                    ]
+                  },
+                  "binding_id": "workflow.governance.enter:default-governance",
+                  "evidence": [
+                    "Verified clean HEAD 3d221f8f5b5877d39da99aed12ded63df9cbd5d6 and reviewed the candidate diff against a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e, accepted plans, affected intent and retained Quality evidence.",
+                    "All 957 hashes in /tmp/refine-r5-quality/final/verified-files.json match the current candidate. The retained full-suite log reports 1279 passed, 0 failed and 6 ignored; macOS remains unverified.",
+                    "Read-only git diff --check a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e HEAD passed. No files, Git state or Goal state were changed; no behavioral tests were run."
+                  ],
+                  "invocation_id": "79dbb208ed2a9fc8884d5ee53d3a0aedc4b2ae2c2dcf055b13284186adb82e28",
+                  "outcome": "failure",
+                  "role": "governance",
+                  "summary": "One violation: standard subprocess output capture can indefinitely withhold a completed workload's result."
+                }
+              ],
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR07C216F3E4EC22A57C60BE0B-round-4"
+            },
+            "governance_message": "One violation: standard subprocess output capture can indefinitely withhold a completed workload's result.",
+            "governance_rule_actions": [
+              {
+                "evidence": null,
+                "message": "docs/intent/04-infrastructure/01-process.md:113 requires detached descendants to retain capacity without withholding the workload result, consistent with accepted Round-4 plan P3. In src/infrastructure/process/subprocess/execution.rs:287-291, the workload receipt sets status, but line 220 continues waiting until both output readers finish. Lines 222-224 disable hard-cap and stall enforcement once status is present. The readers block on read until EOF (workflow_registration.rs:24-42). Consequently, a surviving descendant retaining either output pipe prevents run_to_completion from returning indefinitely despite proven workload exit; supervised Git callers can retain their repository-operation waits. The regression at owned_groups/launch_tests.rs:81-101 redirects both descendant streams to /dev/null and misses this case. Recover by bounding post-workload capture and reader shutdown while retaining pending ownership, with regressions that keep the inherited pipes open.",
+                "rule_id": "workflow.governance.enter:default-governance:execution-ownership.workload-result-independent-of-scope",
+                "state": "failed"
+              }
+            ],
+            "guidance_decision": {
+              "applied": [],
+              "context_version": 1,
+              "recorded_at": "2026-09-10T20:22:32Z",
+              "skipped": []
+            },
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e",
+                "context_digest": "f30b9f09cfcf4e04bc1619e655d9ba2a5e0d2f31225ea7e46dc13375f12306d9",
+                "context_version": 1,
+                "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+                "implementation_branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-5",
+                "round_idx": 4,
+                "target_branch": "main"
+              },
+              "completed_at": "2026-09-10T20:22:31Z",
+              "final_plan": {
+                "completed_at": "2026-09-10T19:41:36Z",
+                "git_after": {
+                  "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-5",
+                  "head_commit": "8087e73c50825c99eb780c504b913e0c34c3c596",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-5",
+                  "head_commit": "8087e73c50825c99eb780c504b913e0c34c3c596",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Implement within the supplied managed workspace on Round 5 branch at 8087e73c, retaining its operation/deadline corrections and bounded scope-receipt regression. The verified pinned base and local main are a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e. Preserve existing admission reservations, fairness, lifecycle gates, worker health and settlement authority. Preserve prior attempts and evidence; leave candidate capture and workflow advancement to Refine.",
+                      "id": "workflow.plan.enter:default-plan:P1"
+                    },
+                    {
+                      "description": "Extract cohesive PTY launch lifecycle handling from session_runtime.rs. Represent the guardian handle/identity separately from the registered workload PID/identity and LaunchScope. Preserve the registration-before-start gate. Audit helper attachment, reader/writer setup, metadata encoding, handoff acquisition, registration and release failures. Before release, abort the gated workload through bounded launch cleanup; after possible release, require shared ownership termination. Retain evidence whenever launch or exit is uncertain.",
+                      "id": "workflow.plan.enter:default-plan:P2"
+                    },
+                    {
+                      "description": "Use the identity-validated workload_status receipt for workload exit and signal-reader finalization. Use guardian status only for scope lifecycle and helper failure. Route completion-signal, hard-cap, idle, transport and capture-error termination through FileProcessSupervisor's bounded owned-group mechanism, keeping the guardian available to adopt and reap descendants. Preserve workload exit semantics, completion report, guidance, implementation evidence and planning_result independently of scope completion. Preserve the original failure when termination or capture also fails.",
+                      "id": "workflow.plan.enter:default-plan:P3"
+                    },
+                    {
+                      "description": "Give PTY termination/proof settlement one monotonic deadline using the existing two-second stop budget, including bounded coordination waits. Implement interruptible PTY reads and a bounded final-drain phase; an atomic flag alone cannot interrupt the current blocking read. Join readers only after completion and report incomplete capture explicitly. Avoid synchronous unbounded guardian waits; integrate deferred handle reaping with existing process lifecycle supervision. Keep Live/Unverified capacity, transcripts and command/signal evidence protected until eligible, and expose process identity, reason and supported diagnostics through shared Application health. Continue maintenance through maintain_daemon with original deadlines, Toolbar and human-input exceptions.",
+                      "id": "workflow.plan.enter:default-plan:P4"
+                    },
+                    {
+                      "description": "Extract shared artifact-retirement handling from subprocess/registry.rs and have sweep_orphan_process_logs delegate to it. Resolve ownership by process ID from retained evidence even without primary registration. Retain all three log types for Live, Unverified, missing, corrupt or unreadable evidence and active handoff. Under bounded cleanup/handoff coordination, reread registration identity, ownership, handoff and artifact age immediately before deletion. Share eligibility with existing cleanup callers, preserve lock ordering and prevent lock-file replacement races. Keep the current seven-day log retention interval.",
+                      "id": "workflow.plan.enter:default-plan:P5"
+                    },
+                    {
+                      "description": "Add deterministic regressions through run_goal_agent for valid structured completion, natural successful/nonzero workload exit, hard-cap and idle failure, plus launch, registration/release, capture and settlement failures. Gate guardian receipt timing and descendant observation; launch a setsid descendant and let its workload parent exit and be reaped before observation, without preloaded witnesses. Independently assert descendant state, guardian survival, identity-bound proof, group_pending and capacity. Cover missing primary registration, unavailable evidence, failed termination and proof identity mismatch. Assert bounded return with retained uncertainty, and eventual release when trustworthy proof becomes available.",
+                      "id": "workflow.plan.enter:default-plan:P6"
+                    },
+                    {
+                      "description": "Extend worker_liveness through the same WorkflowEngine runner and actual PTY provider path. With capacity exhausted, fail one PTY Goal, prove its descendants exited and its owned capacity released, then assert another independently eligible Goal enters Plan within one configured one-second poll interval. Also prove admission and actual worker replacement remain blocked while ownership is pending. Preserve cancellation/newer-claim authority, settlement-panic evidence, operation-revision, deadline, overlapping-stop, identity-reuse, survivor-resume and worktree-protection regressions.",
+                      "id": "workflow.plan.enter:default-plan:P7"
+                    },
+                    {
+                      "description": "Add tests under surfaces::web_server::http::background_loops that invoke the actual retention consumer for aged stdout, stderr and stdin artifacts. Cover Live, Unverified, missing, corrupt/unreadable and proven-exited ownership with absent primary registration; active handoff; unexpired retention; and registration or handoff changes between discovery and retirement. Assert preserved contents on deferral, continued processing of unrelated eligible artifacts, and eventual deletion after proof, lease release and retention expiry.",
+                      "id": "workflow.plan.enter:default-plan:P8"
+                    },
+                    {
+                      "description": "Update only docs/intent/03-application/03-execution-ownership.md and docs/intent/04-infrastructure/01-process.md where needed to clarify bounded PTY settlement, workload-versus-scope completion and coordinated retention. Change the workflow consistency contract only if settlement behavior changes. Keep launch lifecycle, output capture and artifact retirement in cohesive modules with responsibility-based tests; avoid expanding the existing 827-line session runtime and 732-line registry with additional mixed responsibilities.",
+                      "id": "workflow.plan.enter:default-plan:P9"
+                    },
+                    {
+                      "description": "Run supported Refine-supervised verification in the pinned workspace. Execute cargo test --lib <filter> -- --test-threads=1 separately for application::agents::sessions, surfaces::web_server::http::background_loops, worker_liveness, failure_settlement, infrastructure::process::subprocess, infrastructure::process::supervisor, application::workers, application::maintenance::worktrees, application::workflow::health and surfaces::web_server::tests::http_transport::runtime. Confirm each selects tests and includes the new regressions. Then run cargo check --all-targets --locked; cargo fmt --all -- --check; cargo test --lib --bins -- --test-threads=1; cargo build --release --locked; and git diff --check. Record exact commands, exit codes, selected/pass/failure/ignored counts, retained logs and source identity. Establish any baseline failure against a270fdaa in an isolated supervised comparison. Report macOS as unverified unless tested successfully; preserve the recorded aws-lc-sys Darwin-toolchain limitation. Do not approve, merge, push, deploy or restart the supervising daemon.",
+                      "id": "workflow.plan.enter:default-plan:P10"
+                    }
+                  ],
+                  "summary": "workflow.plan.enter:default-plan: Complete shared execution-ownership adoption on retained candidate 8087e73c50825c99eb780c504b913e0c34c3c596. PTY handling conflates workload completion with guardian completion and can destroy the guardian before scope-exit proof; log retention treats missing registration as permission to delete evidence. FileProcessSupervisor already owns observation, bounded termination and artifact coordination. Application owns session results, maintenance and Goal settlement; HTTP should delegate retention. Preserve the invariant that workload results, complete execution exit and semantic Goal authority are separate: only trustworthy scope-exit proof releases owned capacity and permits artifact retirement."
+                },
+                "started_at": "2026-09-10T19:36:50Z"
+              },
+              "implementation": {
+                "completed_at": "2026-09-10T20:22:31Z",
+                "execution": {
+                  "checklist": [
+                    {
+                      "evidence": "Implemented on Round 5 in the supplied managed workspace, retaining HEAD 8087e73c50825c99eb780c504b913e0c34c3c596 and base a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e. Prior operation/deadline corrections remain intact. Changes are uncommitted for Refine capture.",
+                      "id": "workflow.plan.enter:default-plan:P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Extracted pty_lifecycle.rs with separate guardian handle, workload identity and launch scope. Registration precedes release. Gated failures abort through guardian reaping; possibly released failures use shared termination. Prompt leases survive through supervised handle reaping.",
+                      "id": "workflow.plan.enter:default-plan:P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "PTY polling consumes identity-bound workload-status receipts. Completion, natural exit, deadlines and capture/transport failures use shared scope termination. Structured completion is preserved in process evidence when settlement remains uncertain; original errors and workload exit semantics are retained.",
+                      "id": "workflow.plan.enter:default-plan:P3",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added one monotonic two-second stop deadline, interruptible reads, bounded final drain and deferred guardian-handle reaping. Shared capacity and Application health now retain and identify uncertain terminal registrations with missing group evidence. Existing maintenance and timeout exceptions remain covered.",
+                      "id": "workflow.plan.enter:default-plan:P4",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Extracted shared artifact retirement and delegated HTTP retention to it. Ownership, registration, handoff and age are rechecked under bounded coordination. Stable lock inodes prevent replacement races. Seven-day retention remains unchanged.",
+                      "id": "workflow.plan.enter:default-plan:P5",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Four new PTY regressions cover structured completion, successful/nonzero exit, hard-cap/idle failure, setup/release boundaries, capture, transport and settlement faults, missing/mismatched/delayed proof and failed termination. They verify actual setsid descendants, guardian survival, capacity, retained artifacts, actionable health and eventual proven release. Session suite: 41 passed.",
+                      "id": "workflow.plan.enter:default-plan:P6",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "The same WorkflowEngine regression exhausts capacity alongside another active Goal, verifies worker replacement refusal and retained Todo state during uncertainty, then admits follow-up Plan within one second after proven release. Worker-liveness suite: 11 passed. Existing authority, deadline, operation and worktree regressions passed.",
+                      "id": "workflow.plan.enter:default-plan:P7",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Actual retention-consumer tests cover all three aged log types with absent registration and live, unverified, missing, corrupt, unreadable or proven-exited ownership; handoff/registration changes after discovery; unexpired files; unrelated eligible artifacts; and eventual deletion. Background-loop suite: 4 passed.",
+                      "id": "workflow.plan.enter:default-plan:P8",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Updated only execution-ownership and process intent pages. Split launch, capture, retirement and registration-identity responsibilities into cohesive modules. Tests required additional shared capacity/health corrections and a runtime-local ignore marker for persistent supervisor locks; existing ignore policy is preserved.",
+                      "id": "workflow.plan.enter:default-plan:P9",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "All required Linux checks passed through Refine supervision on unchanged final files. Full suite: 1276 passed, zero failed, six existing tests ignored; binary target selected zero tests. macOS remains unverified, with the prior aws-lc-sys Darwin-toolchain limitation retained.",
+                      "id": "workflow.plan.enter:default-plan:P10",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "Logs below are under /tmp/refine-r5-implementation/. Every final command exited 0.",
+                    "cargo test --lib application::agents::sessions -- --test-threads=1: 41 passed; complete-1.log.",
+                    "cargo test --lib surfaces::web_server::http::background_loops -- --test-threads=1: 4 passed; complete-2.log.",
+                    "cargo test --lib worker_liveness -- --test-threads=1: 11 passed; complete-3.log.",
+                    "cargo test --lib failure_settlement -- --test-threads=1: 4 passed; complete-4.log.",
+                    "cargo test --lib infrastructure::process::subprocess -- --test-threads=1: 33 passed; complete-5.log.",
+                    "cargo test --lib infrastructure::process::supervisor -- --test-threads=1: 54 passed; complete-6.log.",
+                    "cargo test --lib application::workers -- --test-threads=1: 39 passed; complete-7.log.",
+                    "cargo test --lib application::maintenance::worktrees -- --test-threads=1: 20 passed; complete-8.log.",
+                    "cargo test --lib application::workflow::health -- --test-threads=1: 4 passed; complete-9.log.",
+                    "cargo test --lib surfaces::web_server::tests::http_transport::runtime -- --test-threads=1: 8 passed; complete-10.log.",
+                    "cargo check --all-targets --locked: passed; complete-11.log.",
+                    "cargo fmt --all -- --check: passed; complete-12.log.",
+                    "cargo test --lib --bins -- --test-threads=1: 1276 passed, zero failed, six ignored; binary target selected zero tests; complete-13.log.",
+                    "cargo build --release --locked: passed; complete-14.log.",
+                    "git diff --check: passed; complete-15.log.",
+                    "Pinned-base legacy-sync comparison passed 1 test. The candidate lock-file regression was corrected and passed both its focused rerun and final full suite. Exact comparison commands and logs are retained in completion.json and development-history.json."
+                  ]
+                },
+                "report": "workflow.implement.enter:default-implement: Completed shared ownership adoption for bounded PTY settlement and coordinated artifact retirement. Final Linux verification passed.",
+                "started_at": "2026-09-10T19:41:36Z"
+              },
+              "phase": "implement",
+              "phase_started_at": "2026-09-10T19:41:36Z",
+              "proposal": {
+                "completed_at": "2026-09-10T19:41:36Z",
+                "git_after": {
+                  "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-5",
+                  "head_commit": "8087e73c50825c99eb780c504b913e0c34c3c596",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-5",
+                  "head_commit": "8087e73c50825c99eb780c504b913e0c34c3c596",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Implement within the supplied managed workspace on Round 5 branch at 8087e73c, retaining its operation/deadline corrections and bounded scope-receipt regression. The verified pinned base and local main are a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e. Preserve existing admission reservations, fairness, lifecycle gates, worker health and settlement authority. Preserve prior attempts and evidence; leave candidate capture and workflow advancement to Refine.",
+                      "id": "workflow.plan.enter:default-plan:P1"
+                    },
+                    {
+                      "description": "Extract cohesive PTY launch lifecycle handling from session_runtime.rs. Represent the guardian handle/identity separately from the registered workload PID/identity and LaunchScope. Preserve the registration-before-start gate. Audit helper attachment, reader/writer setup, metadata encoding, handoff acquisition, registration and release failures. Before release, abort the gated workload through bounded launch cleanup; after possible release, require shared ownership termination. Retain evidence whenever launch or exit is uncertain.",
+                      "id": "workflow.plan.enter:default-plan:P2"
+                    },
+                    {
+                      "description": "Use the identity-validated workload_status receipt for workload exit and signal-reader finalization. Use guardian status only for scope lifecycle and helper failure. Route completion-signal, hard-cap, idle, transport and capture-error termination through FileProcessSupervisor's bounded owned-group mechanism, keeping the guardian available to adopt and reap descendants. Preserve workload exit semantics, completion report, guidance, implementation evidence and planning_result independently of scope completion. Preserve the original failure when termination or capture also fails.",
+                      "id": "workflow.plan.enter:default-plan:P3"
+                    },
+                    {
+                      "description": "Give PTY termination/proof settlement one monotonic deadline using the existing two-second stop budget, including bounded coordination waits. Implement interruptible PTY reads and a bounded final-drain phase; an atomic flag alone cannot interrupt the current blocking read. Join readers only after completion and report incomplete capture explicitly. Avoid synchronous unbounded guardian waits; integrate deferred handle reaping with existing process lifecycle supervision. Keep Live/Unverified capacity, transcripts and command/signal evidence protected until eligible, and expose process identity, reason and supported diagnostics through shared Application health. Continue maintenance through maintain_daemon with original deadlines, Toolbar and human-input exceptions.",
+                      "id": "workflow.plan.enter:default-plan:P4"
+                    },
+                    {
+                      "description": "Extract shared artifact-retirement handling from subprocess/registry.rs and have sweep_orphan_process_logs delegate to it. Resolve ownership by process ID from retained evidence even without primary registration. Retain all three log types for Live, Unverified, missing, corrupt or unreadable evidence and active handoff. Under bounded cleanup/handoff coordination, reread registration identity, ownership, handoff and artifact age immediately before deletion. Share eligibility with existing cleanup callers, preserve lock ordering and prevent lock-file replacement races. Keep the current seven-day log retention interval.",
+                      "id": "workflow.plan.enter:default-plan:P5"
+                    },
+                    {
+                      "description": "Add deterministic regressions through run_goal_agent for valid structured completion, natural successful/nonzero workload exit, hard-cap and idle failure, plus launch, registration/release, capture and settlement failures. Gate guardian receipt timing and descendant observation; launch a setsid descendant and let its workload parent exit and be reaped before observation, without preloaded witnesses. Independently assert descendant state, guardian survival, identity-bound proof, group_pending and capacity. Cover missing primary registration, unavailable evidence, failed termination and proof identity mismatch. Assert bounded return with retained uncertainty, and eventual release when trustworthy proof becomes available.",
+                      "id": "workflow.plan.enter:default-plan:P6"
+                    },
+                    {
+                      "description": "Extend worker_liveness through the same WorkflowEngine runner and actual PTY provider path. With capacity exhausted, fail one PTY Goal, prove its descendants exited and its owned capacity released, then assert another independently eligible Goal enters Plan within one configured one-second poll interval. Also prove admission and actual worker replacement remain blocked while ownership is pending. Preserve cancellation/newer-claim authority, settlement-panic evidence, operation-revision, deadline, overlapping-stop, identity-reuse, survivor-resume and worktree-protection regressions.",
+                      "id": "workflow.plan.enter:default-plan:P7"
+                    },
+                    {
+                      "description": "Add tests under surfaces::web_server::http::background_loops that invoke the actual retention consumer for aged stdout, stderr and stdin artifacts. Cover Live, Unverified, missing, corrupt/unreadable and proven-exited ownership with absent primary registration; active handoff; unexpired retention; and registration or handoff changes between discovery and retirement. Assert preserved contents on deferral, continued processing of unrelated eligible artifacts, and eventual deletion after proof, lease release and retention expiry.",
+                      "id": "workflow.plan.enter:default-plan:P8"
+                    },
+                    {
+                      "description": "Update only docs/intent/03-application/03-execution-ownership.md and docs/intent/04-infrastructure/01-process.md where needed to clarify bounded PTY settlement, workload-versus-scope completion and coordinated retention. Change the workflow consistency contract only if settlement behavior changes. Keep launch lifecycle, output capture and artifact retirement in cohesive modules with responsibility-based tests; avoid expanding the existing 827-line session runtime and 732-line registry with additional mixed responsibilities.",
+                      "id": "workflow.plan.enter:default-plan:P9"
+                    },
+                    {
+                      "description": "Run supported Refine-supervised verification in the pinned workspace. Execute cargo test --lib <filter> -- --test-threads=1 separately for application::agents::sessions, surfaces::web_server::http::background_loops, worker_liveness, failure_settlement, infrastructure::process::subprocess, infrastructure::process::supervisor, application::workers, application::maintenance::worktrees, application::workflow::health and surfaces::web_server::tests::http_transport::runtime. Confirm each selects tests and includes the new regressions. Then run cargo check --all-targets --locked; cargo fmt --all -- --check; cargo test --lib --bins -- --test-threads=1; cargo build --release --locked; and git diff --check. Record exact commands, exit codes, selected/pass/failure/ignored counts, retained logs and source identity. Establish any baseline failure against a270fdaa in an isolated supervised comparison. Report macOS as unverified unless tested successfully; preserve the recorded aws-lc-sys Darwin-toolchain limitation. Do not approve, merge, push, deploy or restart the supervising daemon.",
+                      "id": "workflow.plan.enter:default-plan:P10"
+                    }
+                  ],
+                  "summary": "workflow.plan.enter:default-plan: Complete shared execution-ownership adoption on retained candidate 8087e73c50825c99eb780c504b913e0c34c3c596. PTY handling conflates workload completion with guardian completion and can destroy the guardian before scope-exit proof; log retention treats missing registration as permission to delete evidence. FileProcessSupervisor already owns observation, bounded termination and artifact coordination. Application owns session results, maintenance and Goal settlement; HTTP should delegate retention. Preserve the invariant that workload results, complete execution exit and semantic Goal authority are separate: only trustworthy scope-exit proof releases owned capacity and permits artifact retirement."
+                },
+                "started_at": "2026-09-10T19:36:50Z"
+              },
+              "schema_version": 2,
+              "started_at": "2026-09-10T19:36:50Z",
+              "state": "completed",
+              "updated_at": "2026-09-10T20:22:31Z"
+            },
+            "implementation_report": "workflow.implement.enter:default-implement: Completed shared ownership adoption for bounded PTY settlement and coordinated artifact retirement. Final Linux verification passed.",
+            "implementation_reported_at": "2026-09-10T20:22:31Z",
+            "meta_rule_state": "passed",
+            "product_state": "passed",
+            "prompt": "Recover Goal DR07C216F3E4EC22A57C60BE0B in a fresh Refine-managed implementation Round using the target tip selected at admission. Preserve all previous attempts, branches, worktrees, commits, uncommitted files and evidence. Inspect and selectively retain candidate 8087e73c50825c99eb780c504b913e0c34c3c596, including its operation/deadline corrections and bounded scope-receipt test. Round 4 was based on a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e. Read its finalized plan, failed invocation /home/buddy/projects/refine-next/.git/refine-live-state/automation/invocations/3ec0b553d86c4fe2ece68ffc7d36eabbd571b6897308b4b0251f9eff6af7f376.json, preceding Quality invocation e279bd1c5559f8462990cb4e888bd06f8e5d5975cca5a187c8591e5b86afe627.json, and /tmp/refine-r4-quality/{reproductions.json,final-results.json,quality.patch}. Follow current Skills and affected execution-ownership/process intent.\n\nComplete adoption of FileProcessSupervisor ownership across PTY settlement and artifact retirement. In src/application/agents/sessions/session_runtime.rs, distinguish workload PID/status from guardian identity/status. Route completion, timeout and error termination through the shared bounded ownership mechanism, preserving the guardian while it adopts and reaps descendants and produces trustworthy scope-exit proof. Audit related launch-failure and reader-settlement paths. Consume workload-status evidence separately from whole-scope completion; preserve output, exit semantics and structured completion results without waiting indefinitely for detached descendants. Bound settlement and reader shutdown. If termination or proof is unavailable, retain capacity and artifacts and surface actionable uncertainty without claiming exit. Preserve identity fences, overlapping-stop coordination, survivor resume, original deadlines, Toolbar protection, human-input exceptions and settlement authority. Continue using maintain_daemon; do not introduce another scheduler or reaper.\n\nCorrect sweep_orphan_process_logs in src/surfaces/web_server/http/background_loops.rs to use shared ownership and artifact-retirement rules. Missing primary registration alone must not authorize deletion. Preserve stdout, stderr and stdin evidence for Live, Unverified, corrupt or unreadable ownership and while artifact handoff remains active. Recheck retirement eligibility under appropriate coordination. Proven-exited artifacts should remain removable after the existing retention interval. Keep the HTTP surface thin and avoid duplicating ownership policy.\n\nAdd deterministic regressions through run_goal_agent and the actual retention consumer. Exercise valid completion, hard-cap/idle failure, natural workload exit and relevant setup/capture failures with controlled guardian timing and a setsid descendant surviving leader exit before descendant observation. Verify real descendant state, identity-bound exit proof, group_pending, capacity accounting and replacement eligibility; an empty list() is insufficient. Cover missing primary registration and unavailable ownership evidence. Assert safe eventual release when proof becomes available and explicit retained uncertainty otherwise. Through the same workflow runner, prove another eligible Goal enters Plan within one poll interval after a PTY failure safely releases capacity. Test all three aged log types with Live, Unverified, corrupt/unreadable and proven-exited ownership, including active handoff and unexpired retention. Preserve existing operation-revision, cancellation, deadline, settlement-panic and worktree-protection regressions.\n\nRun focused checks through supported Refine supervision: cargo test --lib <filter> -- --test-threads=1 for application::agents::sessions, surfaces::web_server::http::background_loops, worker_liveness, failure_settlement, infrastructure::process::subprocess, infrastructure::process::supervisor, application::workers, application::maintenance::worktrees, application::workflow::health and surfaces::web_server::tests::http_transport::runtime. Ensure new tests are selected. Run cargo check --all-targets --locked, cargo fmt --all -- --check, cargo test --lib --bins -- --test-threads=1, cargo build --release --locked and git diff --check. Report exact commands, nonzero selected counts, failures, ignored/skipped checks, logs and candidate identity. Establish any baseline failure against this new Round's pinned base. Prior Linux passes do not cover these missing behaviors; macOS remains unverified because the earlier cross-check failed compiling aws-lc-sys with unsupported Darwin compiler flags. Update only affected intent documentation. Refine owns candidate capture and workflow advancement; do not directly edit Goal state, approve, push, merge, deploy or restart the supervising daemon.",
+            "quality_checked_at": "2026-09-10T20:39:26Z",
+            "quality_details": {
+              "candidate_commit": "3d221f8f5b5877d39da99aed12ded63df9cbd5d6",
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR07C216F3E4EC22A57C60BE0B-round-4",
+              "diagnostics": [
+                "Event invocation ac2f74f7c8c0a6a07dafc6d1d2f3a8016551af2e7184d1bb3c11b99036d911c8: automation/invocations/ac2f74f7c8c0a6a07dafc6d1d2f3a8016551af2e7184d1bb3c11b99036d911c8.json",
+                "Observed supervised process proc-1789072764024-1129590-1526 exited 0.",
+                "Observed supervised process proc-1789072765742-1129590-1529 exited 0."
+              ],
+              "evaluation_scope": "isolated_candidate",
+              "operation_id": "1a08d0a8fa5113c768a",
+              "provider_attempts": [],
+              "quality_proof": {
+                "checked_at": "2026-09-10T20:39:26Z",
+                "checked_candidate_commit": "3d221f8f5b5877d39da99aed12ded63df9cbd5d6",
+                "evaluation_scope": "isolated_candidate",
+                "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+                "operation_id": "1a08d0a8fa5113c768a",
+                "results": [
+                  {
+                    "command": "cargo fmt --all -- --check",
+                    "evidence": "Observed supervised process proc-1789072764024-1129590-1526 exited 0.",
+                    "exit_code": 0,
+                    "process_id": "proc-1789072764024-1129590-1526",
+                    "status": "passed",
+                    "test": "workflow.quality.enter:default-quality: Candidate formatting"
+                  },
+                  {
+                    "command": "git diff --check a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e HEAD",
+                    "evidence": "Observed supervised process proc-1789072765742-1129590-1529 exited 0.",
+                    "exit_code": 0,
+                    "process_id": "proc-1789072765742-1129590-1529",
+                    "status": "passed",
+                    "test": "workflow.quality.enter:default-quality: Candidate patch whitespace"
+                  }
+                ],
+                "round_idx": 4,
+                "schema_version": 1,
+                "source_candidate_commit": "3d221f8f5b5877d39da99aed12ded63df9cbd5d6",
+                "state": "passed"
+              },
+              "results": [
+                {
+                  "command": "cargo fmt --all -- --check",
+                  "evidence": "Observed supervised process proc-1789072764024-1129590-1526 exited 0.",
+                  "exit_code": 0,
+                  "process_id": "proc-1789072764024-1129590-1526",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: Candidate formatting"
+                },
+                {
+                  "command": "git diff --check a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e HEAD",
+                  "evidence": "Observed supervised process proc-1789072765742-1129590-1529 exited 0.",
+                  "exit_code": 0,
+                  "process_id": "proc-1789072765742-1129590-1529",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: Candidate patch whitespace"
+                }
+              ],
+              "source_candidate_commit": "3d221f8f5b5877d39da99aed12ded63df9cbd5d6"
+            },
+            "quality_message": "All Quality Skills passed with supervised evidence.",
+            "quality_state": "passed",
+            "reporter": "Refine",
+            "round": 5,
+            "rule_state": "failed"
           }
         ],
         "version": 1,
@@ -945,10 +1288,10 @@
       "goal": {
         "assignee": "Refine",
         "base_commit": "a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e",
-        "branch_name": "refine/DR07C216F3E4EC22A57C60BE0B/round-5",
+        "branch_name": "refine/DR07C216F3E4EC22A57C60BE0B/round-6",
         "candidate_commit": "3d221f8f5b5877d39da99aed12ded63df9cbd5d6",
         "created": "2026-09-10T08:26:00Z",
-        "event_generation": 17,
+        "event_generation": 19,
         "feature_id": "00000T130Z0R6J0GJMARY62005",
         "feature_order": 2,
         "id": "DR07C216F3E4EC22A57C60BE0B",
@@ -966,7 +1309,7 @@
         ],
         "priority": "low",
         "reporter": "Ethan Jacobson",
-        "round_count": 5,
+        "round_count": 6,
         "rounds": [
           {
             "assignee": "Ethan Jacobson",
@@ -2744,16 +3087,63 @@
               "kind": "quality",
               "source_round": 4
             },
-            "constitution_state": "unclassified",
+            "constitution_state": "passed",
             "created": "2026-09-10T19:36:49Z",
             "failure_at": "",
             "failure_category": "",
             "failure_message": "",
-            "governance_candidate_commit": "",
-            "governance_checked_at": "",
-            "governance_details": "",
-            "governance_message": "",
-            "governance_rule_actions": [],
+            "governance_candidate_commit": "3d221f8f5b5877d39da99aed12ded63df9cbd5d6",
+            "governance_checked_at": "2026-09-10T20:42:01Z",
+            "governance_details": {
+              "candidate_commit": "3d221f8f5b5877d39da99aed12ded63df9cbd5d6",
+              "configured": true,
+              "failed_actions": [
+                {
+                  "evidence": null,
+                  "message": "docs/intent/04-infrastructure/01-process.md:113 requires detached descendants to retain capacity without withholding the workload result, consistent with accepted Round-4 plan P3. In src/infrastructure/process/subprocess/execution.rs:287-291, the workload receipt sets status, but line 220 continues waiting until both output readers finish. Lines 222-224 disable hard-cap and stall enforcement once status is present. The readers block on read until EOF (workflow_registration.rs:24-42). Consequently, a surviving descendant retaining either output pipe prevents run_to_completion from returning indefinitely despite proven workload exit; supervised Git callers can retain their repository-operation waits. The regression at owned_groups/launch_tests.rs:81-101 redirects both descendant streams to /dev/null and misses this case. Recover by bounding post-workload capture and reader shutdown while retaining pending ownership, with regressions that keep the inherited pipes open.",
+                  "rule_id": "workflow.governance.enter:default-governance:execution-ownership.workload-result-independent-of-scope",
+                  "state": "failed"
+                }
+              ],
+              "phase": "post_implementation",
+              "skill_results": [
+                {
+                  "artifacts": {
+                    "recovery_analysis": "Candidate 3d221f8f5b5877d39da99aed12ded63df9cbd5d6 fixes the reviewed PTY and retention defects, but standard subprocess completion still couples workload results to descendant-held output pipes. This is a source-established violation; no behavioral reproduction was run during this observational review. The passing regression avoids this condition by redirecting the descendant's streams.",
+                    "recovery_round_prompt": "Preserve the candidate and prior evidence. Correct standard run_to_completion capture in src/infrastructure/process/subprocess/execution.rs so a validated workload-exit receipt starts bounded output finalization rather than an indefinite wait for descendant-held pipes. Keep the guardian alive, retain capacity and artifacts while ownership remains pending, preserve workload status and captured output, and report incomplete capture explicitly. Avoid unbounded reader joins and preserve timeout enforcement through settlement. Add deterministic regressions with a setsid descendant retaining stdout, stderr, and both after leader exit, including quiet and continuously writing descendants. Assert bounded return, actual descendant state, retained capacity and artifacts, and eventual release only after trustworthy scope-exit proof. Through supported supervision, run cargo test --lib infrastructure::process::subprocess -- --test-threads=1 and cargo test --lib worker_liveness -- --test-threads=1, followed by the required candidate checks. Retain existing PTY, identity, settlement and retention regressions. Refine owns candidate capture and advancement.",
+                    "violations": [
+                      {
+                        "message": "docs/intent/04-infrastructure/01-process.md:113 requires detached descendants to retain capacity without withholding the workload result, consistent with accepted Round-4 plan P3. In src/infrastructure/process/subprocess/execution.rs:287-291, the workload receipt sets status, but line 220 continues waiting until both output readers finish. Lines 222-224 disable hard-cap and stall enforcement once status is present. The readers block on read until EOF (workflow_registration.rs:24-42). Consequently, a surviving descendant retaining either output pipe prevents run_to_completion from returning indefinitely despite proven workload exit; supervised Git callers can retain their repository-operation waits. The regression at owned_groups/launch_tests.rs:81-101 redirects both descendant streams to /dev/null and misses this case. Recover by bounding post-workload capture and reader shutdown while retaining pending ownership, with regressions that keep the inherited pipes open.",
+                        "rule_id": "execution-ownership.workload-result-independent-of-scope"
+                      }
+                    ]
+                  },
+                  "binding_id": "workflow.governance.enter:default-governance",
+                  "evidence": [
+                    "Verified clean HEAD 3d221f8f5b5877d39da99aed12ded63df9cbd5d6 and reviewed the candidate diff against a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e, accepted plans, affected intent and retained Quality evidence.",
+                    "All 957 hashes in /tmp/refine-r5-quality/final/verified-files.json match the current candidate. The retained full-suite log reports 1279 passed, 0 failed and 6 ignored; macOS remains unverified.",
+                    "Read-only git diff --check a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e HEAD passed. No files, Git state or Goal state were changed; no behavioral tests were run."
+                  ],
+                  "invocation_id": "79dbb208ed2a9fc8884d5ee53d3a0aedc4b2ae2c2dcf055b13284186adb82e28",
+                  "outcome": "failure",
+                  "role": "governance",
+                  "summary": "One violation: standard subprocess output capture can indefinitely withhold a completed workload's result."
+                }
+              ],
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR07C216F3E4EC22A57C60BE0B-round-4"
+            },
+            "governance_message": "One violation: standard subprocess output capture can indefinitely withhold a completed workload's result.",
+            "governance_recovery_analysis": "Candidate 3d221f8f5b5877d39da99aed12ded63df9cbd5d6 fixes the reviewed PTY and retention defects, but standard subprocess completion still couples workload results to descendant-held output pipes. This is a source-established violation; no behavioral reproduction was run during this observational review. The passing regression avoids this condition by redirecting the descendant's streams.",
+            "governance_recovery_attempt": 2,
+            "governance_recovery_round_prompt": "Preserve the candidate and prior evidence. Correct standard run_to_completion capture in src/infrastructure/process/subprocess/execution.rs so a validated workload-exit receipt starts bounded output finalization rather than an indefinite wait for descendant-held pipes. Keep the guardian alive, retain capacity and artifacts while ownership remains pending, preserve workload status and captured output, and report incomplete capture explicitly. Avoid unbounded reader joins and preserve timeout enforcement through settlement. Add deterministic regressions with a setsid descendant retaining stdout, stderr, and both after leader exit, including quiet and continuously writing descendants. Assert bounded return, actual descendant state, retained capacity and artifacts, and eventual release only after trustworthy scope-exit proof. Through supported supervision, run cargo test --lib infrastructure::process::subprocess -- --test-threads=1 and cargo test --lib worker_liveness -- --test-threads=1, followed by the required candidate checks. Retain existing PTY, identity, settlement and retention regressions. Refine owns candidate capture and advancement.",
+            "governance_rule_actions": [
+              {
+                "evidence": null,
+                "message": "docs/intent/04-infrastructure/01-process.md:113 requires detached descendants to retain capacity without withholding the workload result, consistent with accepted Round-4 plan P3. In src/infrastructure/process/subprocess/execution.rs:287-291, the workload receipt sets status, but line 220 continues waiting until both output readers finish. Lines 222-224 disable hard-cap and stall enforcement once status is present. The readers block on read until EOF (workflow_registration.rs:24-42). Consequently, a surviving descendant retaining either output pipe prevents run_to_completion from returning indefinitely despite proven workload exit; supervised Git callers can retain their repository-operation waits. The regression at owned_groups/launch_tests.rs:81-101 redirects both descendant streams to /dev/null and misses this case. Recover by bounding post-workload capture and reader shutdown while retaining pending ownership, with regressions that keep the inherited pipes open.",
+                "rule_id": "workflow.governance.enter:default-governance:execution-ownership.workload-result-independent-of-scope",
+                "state": "failed"
+              }
+            ],
             "guidance_decision": {
               "applied": [],
               "context_version": 1,
@@ -2976,42 +3366,6 @@
             },
             "implementation_report": "workflow.implement.enter:default-implement: Completed shared ownership adoption for bounded PTY settlement and coordinated artifact retirement. Final Linux verification passed.",
             "implementation_reported_at": "2026-09-10T20:22:31Z",
-            "latest_log": {
-              "actor": "refine",
-              "category": "state",
-              "datetime": "2026-09-10T20:39:26Z",
-              "details": {
-                "node_id": "default"
-              },
-              "goal_id": "DR07C216F3E4EC22A57C60BE0B",
-              "message": "Workflow status changed: quality -> governance",
-              "round_idx": 4,
-              "severity": "info"
-            },
-            "latest_state_log": {
-              "actor": "refine",
-              "category": "state",
-              "datetime": "2026-09-10T20:39:26Z",
-              "details": {
-                "node_id": "default"
-              },
-              "goal_id": "DR07C216F3E4EC22A57C60BE0B",
-              "message": "Workflow status changed: quality -> governance",
-              "round_idx": 4,
-              "severity": "info"
-            },
-            "latest_workflow_log": {
-              "actor": "refine",
-              "category": "state",
-              "datetime": "2026-09-10T20:39:26Z",
-              "details": {
-                "node_id": "default"
-              },
-              "goal_id": "DR07C216F3E4EC22A57C60BE0B",
-              "message": "Workflow status changed: quality -> governance",
-              "round_idx": 4,
-              "severity": "info"
-            },
             "logs": [
               {
                 "actor": "refine",
@@ -3190,10 +3544,73 @@
                 "message": "Workflow status changed: quality -> governance",
                 "round_idx": 4,
                 "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "governance",
+                "datetime": "2026-09-10T20:42:01Z",
+                "details": {
+                  "candidate_commit": "3d221f8f5b5877d39da99aed12ded63df9cbd5d6",
+                  "configured": true,
+                  "failed_actions": [
+                    {
+                      "evidence": null,
+                      "message": "docs/intent/04-infrastructure/01-process.md:113 requires detached descendants to retain capacity without withholding the workload result, consistent with accepted Round-4 plan P3. In src/infrastructure/process/subprocess/execution.rs:287-291, the workload receipt sets status, but line 220 continues waiting until both output readers finish. Lines 222-224 disable hard-cap and stall enforcement once status is present. The readers block on read until EOF (workflow_registration.rs:24-42). Consequently, a surviving descendant retaining either output pipe prevents run_to_completion from returning indefinitely despite proven workload exit; supervised Git callers can retain their repository-operation waits. The regression at owned_groups/launch_tests.rs:81-101 redirects both descendant streams to /dev/null and misses this case. Recover by bounding post-workload capture and reader shutdown while retaining pending ownership, with regressions that keep the inherited pipes open.",
+                      "rule_id": "workflow.governance.enter:default-governance:execution-ownership.workload-result-independent-of-scope",
+                      "state": "failed"
+                    }
+                  ],
+                  "node_id": "default",
+                  "phase": "post_implementation",
+                  "skill_results": [
+                    {
+                      "artifacts": {
+                        "recovery_analysis": "Candidate 3d221f8f5b5877d39da99aed12ded63df9cbd5d6 fixes the reviewed PTY and retention defects, but standard subprocess completion still couples workload results to descendant-held output pipes. This is a source-established violation; no behavioral reproduction was run during this observational review. The passing regression avoids this condition by redirecting the descendant's streams.",
+                        "recovery_round_prompt": "Preserve the candidate and prior evidence. Correct standard run_to_completion capture in src/infrastructure/process/subprocess/execution.rs so a validated workload-exit receipt starts bounded output finalization rather than an indefinite wait for descendant-held pipes. Keep the guardian alive, retain capacity and artifacts while ownership remains pending, preserve workload status and captured output, and report incomplete capture explicitly. Avoid unbounded reader joins and preserve timeout enforcement through settlement. Add deterministic regressions with a setsid descendant retaining stdout, stderr, and both after leader exit, including quiet and continuously writing descendants. Assert bounded return, actual descendant state, retained capacity and artifacts, and eventual release only after trustworthy scope-exit proof. Through supported supervision, run cargo test --lib infrastructure::process::subprocess -- --test-threads=1 and cargo test --lib worker_liveness -- --test-threads=1, followed by the required candidate checks. Retain existing PTY, identity, settlement and retention regressions. Refine owns candidate capture and advancement.",
+                        "violations": [
+                          {
+                            "message": "docs/intent/04-infrastructure/01-process.md:113 requires detached descendants to retain capacity without withholding the workload result, consistent with accepted Round-4 plan P3. In src/infrastructure/process/subprocess/execution.rs:287-291, the workload receipt sets status, but line 220 continues waiting until both output readers finish. Lines 222-224 disable hard-cap and stall enforcement once status is present. The readers block on read until EOF (workflow_registration.rs:24-42). Consequently, a surviving descendant retaining either output pipe prevents run_to_completion from returning indefinitely despite proven workload exit; supervised Git callers can retain their repository-operation waits. The regression at owned_groups/launch_tests.rs:81-101 redirects both descendant streams to /dev/null and misses this case. Recover by bounding post-workload capture and reader shutdown while retaining pending ownership, with regressions that keep the inherited pipes open.",
+                            "rule_id": "execution-ownership.workload-result-independent-of-scope"
+                          }
+                        ]
+                      },
+                      "binding_id": "workflow.governance.enter:default-governance",
+                      "evidence": [
+                        "Verified clean HEAD 3d221f8f5b5877d39da99aed12ded63df9cbd5d6 and reviewed the candidate diff against a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e, accepted plans, affected intent and retained Quality evidence.",
+                        "All 957 hashes in /tmp/refine-r5-quality/final/verified-files.json match the current candidate. The retained full-suite log reports 1279 passed, 0 failed and 6 ignored; macOS remains unverified.",
+                        "Read-only git diff --check a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e HEAD passed. No files, Git state or Goal state were changed; no behavioral tests were run."
+                      ],
+                      "invocation_id": "79dbb208ed2a9fc8884d5ee53d3a0aedc4b2ae2c2dcf055b13284186adb82e28",
+                      "outcome": "failure",
+                      "role": "governance",
+                      "summary": "One violation: standard subprocess output capture can indefinitely withhold a completed workload's result."
+                    }
+                  ],
+                  "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR07C216F3E4EC22A57C60BE0B-round-4"
+                },
+                "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+                "message": "Governance checks failed",
+                "round_idx": 4,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "governance",
+                "datetime": "2026-09-10T20:42:02Z",
+                "details": {
+                  "attempt": 2,
+                  "max_automatic_round_retries": 5,
+                  "node_id": "default",
+                  "source_round": 5
+                },
+                "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+                "message": "Governance drafted a fresh automatic recovery Round",
+                "round_idx": 4,
+                "severity": "info"
               }
             ],
-            "meta_rule_state": "unclassified",
-            "product_state": "unclassified",
+            "meta_rule_state": "passed",
+            "product_state": "passed",
             "prompt": "Recover Goal DR07C216F3E4EC22A57C60BE0B in a fresh Refine-managed implementation Round using the target tip selected at admission. Preserve all previous attempts, branches, worktrees, commits, uncommitted files and evidence. Inspect and selectively retain candidate 8087e73c50825c99eb780c504b913e0c34c3c596, including its operation/deadline corrections and bounded scope-receipt test. Round 4 was based on a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e. Read its finalized plan, failed invocation /home/buddy/projects/refine-next/.git/refine-live-state/automation/invocations/3ec0b553d86c4fe2ece68ffc7d36eabbd571b6897308b4b0251f9eff6af7f376.json, preceding Quality invocation e279bd1c5559f8462990cb4e888bd06f8e5d5975cca5a187c8591e5b86afe627.json, and /tmp/refine-r4-quality/{reproductions.json,final-results.json,quality.patch}. Follow current Skills and affected execution-ownership/process intent.\n\nComplete adoption of FileProcessSupervisor ownership across PTY settlement and artifact retirement. In src/application/agents/sessions/session_runtime.rs, distinguish workload PID/status from guardian identity/status. Route completion, timeout and error termination through the shared bounded ownership mechanism, preserving the guardian while it adopts and reaps descendants and produces trustworthy scope-exit proof. Audit related launch-failure and reader-settlement paths. Consume workload-status evidence separately from whole-scope completion; preserve output, exit semantics and structured completion results without waiting indefinitely for detached descendants. Bound settlement and reader shutdown. If termination or proof is unavailable, retain capacity and artifacts and surface actionable uncertainty without claiming exit. Preserve identity fences, overlapping-stop coordination, survivor resume, original deadlines, Toolbar protection, human-input exceptions and settlement authority. Continue using maintain_daemon; do not introduce another scheduler or reaper.\n\nCorrect sweep_orphan_process_logs in src/surfaces/web_server/http/background_loops.rs to use shared ownership and artifact-retirement rules. Missing primary registration alone must not authorize deletion. Preserve stdout, stderr and stdin evidence for Live, Unverified, corrupt or unreadable ownership and while artifact handoff remains active. Recheck retirement eligibility under appropriate coordination. Proven-exited artifacts should remain removable after the existing retention interval. Keep the HTTP surface thin and avoid duplicating ownership policy.\n\nAdd deterministic regressions through run_goal_agent and the actual retention consumer. Exercise valid completion, hard-cap/idle failure, natural workload exit and relevant setup/capture failures with controlled guardian timing and a setsid descendant surviving leader exit before descendant observation. Verify real descendant state, identity-bound exit proof, group_pending, capacity accounting and replacement eligibility; an empty list() is insufficient. Cover missing primary registration and unavailable ownership evidence. Assert safe eventual release when proof becomes available and explicit retained uncertainty otherwise. Through the same workflow runner, prove another eligible Goal enters Plan within one poll interval after a PTY failure safely releases capacity. Test all three aged log types with Live, Unverified, corrupt/unreadable and proven-exited ownership, including active handoff and unexpired retention. Preserve existing operation-revision, cancellation, deadline, settlement-panic and worktree-protection regressions.\n\nRun focused checks through supported Refine supervision: cargo test --lib <filter> -- --test-threads=1 for application::agents::sessions, surfaces::web_server::http::background_loops, worker_liveness, failure_settlement, infrastructure::process::subprocess, infrastructure::process::supervisor, application::workers, application::maintenance::worktrees, application::workflow::health and surfaces::web_server::tests::http_transport::runtime. Ensure new tests are selected. Run cargo check --all-targets --locked, cargo fmt --all -- --check, cargo test --lib --bins -- --test-threads=1, cargo build --release --locked and git diff --check. Report exact commands, nonzero selected counts, failures, ignored/skipped checks, logs and candidate identity. Establish any baseline failure against this new Round's pinned base. Prior Linux passes do not cover these missing behaviors; macOS remains unverified because the earlier cross-check failed compiling aws-lc-sys with unsupported Darwin compiler flags. Update only affected intent documentation. Refine owns candidate capture and workflow advancement; do not directly edit Goal state, approve, push, merge, deploy or restart the supervising daemon.",
             "quality_agent_report": "workflow.quality.enter:default-quality: Corrected stale process identity handling, added three regressions, and passed final Linux verification.",
             "quality_candidate_commit": "3d221f8f5b5877d39da99aed12ded63df9cbd5d6",
@@ -3371,8 +3788,8 @@
             ],
             "quality_state": "passed",
             "reporter": "Refine",
-            "rule_state": "unclassified",
-            "updated": "2026-09-10T20:39:26Z",
+            "rule_state": "failed",
+            "updated": "2026-09-10T20:42:02Z",
             "workflow_attempt_authority": {
               "claimed_at": "2026-09-10T19:36:49Z",
               "round_idx": 4,
@@ -3380,39 +3797,165 @@
             },
             "workflow_reconciliation": null,
             "workflow_recovery": null
+          },
+          {
+            "assignee": "Refine",
+            "automatic_retry": {
+              "attempt": 2,
+              "generated_at": "2026-09-10T20:42:02Z",
+              "kind": "governance",
+              "source_round": 5
+            },
+            "constitution_state": "unclassified",
+            "created": "2026-09-10T20:42:02Z",
+            "failure_at": "",
+            "failure_category": "",
+            "failure_message": "",
+            "governance_candidate_commit": "",
+            "governance_checked_at": "",
+            "governance_details": "",
+            "governance_message": "",
+            "governance_rule_actions": [],
+            "guidance_decision": null,
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e",
+                "context_digest": "bf2c01a902cd2c542fed7460f3a3a2472443bb2bba562cf6fe2b1ba2e9bbd44e",
+                "context_version": 1,
+                "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+                "implementation_branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-6",
+                "round_idx": 5,
+                "target_branch": "main"
+              },
+              "phase": "plan",
+              "phase_started_at": "2026-09-10T20:42:02Z",
+              "schema_version": 2,
+              "started_at": "2026-09-10T20:42:02Z",
+              "state": "in_progress",
+              "updated_at": "2026-09-10T20:42:02Z"
+            },
+            "implementation_report": null,
+            "implementation_reported_at": null,
+            "latest_log": {
+              "actor": "refine",
+              "category": "git",
+              "datetime": "2026-09-10T20:42:02Z",
+              "details": {
+                "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-6",
+                "candidate_commit": "3d221f8f5b5877d39da99aed12ded63df9cbd5d6",
+                "node_id": "default",
+                "source_branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-5",
+                "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR07C216F3E4EC22A57C60BE0B-round-4"
+              },
+              "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+              "message": "Scoped governance recovery continues on the retained candidate worktree",
+              "round_idx": 5,
+              "severity": "info"
+            },
+            "latest_state_log": {
+              "actor": "refine",
+              "category": "state",
+              "datetime": "2026-09-10T20:42:02Z",
+              "details": {
+                "node_id": "default"
+              },
+              "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+              "message": "Workflow status changed: todo -> plan",
+              "round_idx": 5,
+              "severity": "info"
+            },
+            "latest_workflow_log": {
+              "actor": "refine",
+              "category": "state",
+              "datetime": "2026-09-10T20:42:02Z",
+              "details": {
+                "node_id": "default"
+              },
+              "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+              "message": "Workflow status changed: todo -> plan",
+              "round_idx": 5,
+              "severity": "info"
+            },
+            "logs": [
+              {
+                "actor": "refine",
+                "category": "state",
+                "datetime": "2026-09-10T20:42:02Z",
+                "details": {
+                  "node_id": "default"
+                },
+                "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+                "message": "Workflow status changed: todo -> plan",
+                "round_idx": 5,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "git",
+                "datetime": "2026-09-10T20:42:02Z",
+                "details": {
+                  "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-6",
+                  "candidate_commit": "3d221f8f5b5877d39da99aed12ded63df9cbd5d6",
+                  "node_id": "default",
+                  "source_branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-5",
+                  "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR07C216F3E4EC22A57C60BE0B-round-4"
+                },
+                "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+                "message": "Scoped governance recovery continues on the retained candidate worktree",
+                "round_idx": 5,
+                "severity": "info"
+              }
+            ],
+            "meta_rule_state": "unclassified",
+            "product_state": "unclassified",
+            "prompt": "Preserve the candidate and prior evidence. Correct standard run_to_completion capture in src/infrastructure/process/subprocess/execution.rs so a validated workload-exit receipt starts bounded output finalization rather than an indefinite wait for descendant-held pipes. Keep the guardian alive, retain capacity and artifacts while ownership remains pending, preserve workload status and captured output, and report incomplete capture explicitly. Avoid unbounded reader joins and preserve timeout enforcement through settlement. Add deterministic regressions with a setsid descendant retaining stdout, stderr, and both after leader exit, including quiet and continuously writing descendants. Assert bounded return, actual descendant state, retained capacity and artifacts, and eventual release only after trustworthy scope-exit proof. Through supported supervision, run cargo test --lib infrastructure::process::subprocess -- --test-threads=1 and cargo test --lib worker_liveness -- --test-threads=1, followed by the required candidate checks. Retain existing PTY, identity, settlement and retention regressions. Refine owns candidate capture and advancement.",
+            "quality_checked_at": "",
+            "quality_details": "",
+            "quality_message": "",
+            "quality_state": "unclassified",
+            "reporter": "Refine",
+            "rule_state": "unclassified",
+            "updated": "2026-09-10T20:42:02Z",
+            "workflow_attempt_authority": {
+              "claimed_at": "2026-09-10T20:42:02Z",
+              "round_idx": 5,
+              "workflow_revision": 130
+            },
+            "workflow_reconciliation": null,
+            "workflow_recovery": null
           }
         ],
-        "status": "governance",
+        "status": "plan",
         "target_branch": "main",
-        "updated": "2026-09-10T20:39:26Z",
-        "workflow_revision": 127
+        "updated": "2026-09-10T20:42:02Z",
+        "workflow_revision": 138
       },
       "system": {
-        "candidate_commit": "3d221f8f5b5877d39da99aed12ded63df9cbd5d6",
+        "candidate_commit": null,
         "node_id": "default",
         "project_root": "/home/buddy/projects/refine-next",
-        "workflow_step": "governance",
+        "workflow_step": "plan",
         "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR07C216F3E4EC22A57C60BE0B-round-4"
       }
     },
     "metadata": {
       "behavior": "EventSkill",
-      "event_operation_id": "1a08d0bf6e5113c768c",
+      "event_operation_id": "1a08d0e58bf113c768e",
       "goal_id": "DR07C216F3E4EC22A57C60BE0B",
       "kind": "workflow",
       "node_id": "default",
       "provider": "codex",
-      "round_idx": 4,
+      "round_idx": 5,
       "target_app_id": "/home/buddy/projects/refine-next",
-      "workflow_revision": 96,
-      "workflow_state": "governance"
+      "workflow_revision": 130,
+      "workflow_state": "plan"
     }
   },
   "bindings": [
     {
       "binding": {
-        "id": "default-governance",
-        "skill_id": "default-governance",
+        "id": "default-plan",
+        "skill_id": "default-plan",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -3423,10 +3966,10 @@
         "inputs": {}
       },
       "skill": {
-        "id": "default-governance",
-        "name": "Governance",
-        "prompt": "## Governance review\n\nReview the exact candidate against the project's stated intent and attached Skills. Read the accepted plans, implementation and Quality evidence and actual diff. Report actual violations with evidence, not hypothetical risks or preferences. Do not edit files, merge, push or change Goal state. A finding must identify the violated intent or invariant, its concrete consequence, and an actionable recovery request. Group related symptoms by their underlying cause; an alternative design preference alone is not a violation.\n\n## Product intent\n\nRefine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.\n\n## Project rules\n\n- Keep domain concepts, invariants, and pure policy in `src/model`; shared behavior and orchestration in `src/application`; Git, process, host, storage, provider, and telemetry mechanisms in `src/infrastructure`; and adapters for people and machines in `src/surfaces`. Keep `error.rs` as a neutral shared boundary. Model remains independent of the other areas, and code outside Surfaces does not depend on surface adapters.\n- Maintain a consistent architecture by extending the existing semantic responsibilities and dependency boundaries described in `docs/intent/01-design.md`. Prefer existing concepts and shared owners. A new or refined domain concept is appropriate when it explains the required behavior and reduces duplicated policy or special cases while preserving those boundaries.\n- Preserve Rust-based flat-file persistence, file indexes, and in-memory caching. Keep CLI and API work under 50 ms, excluding time spent waiting on LLMs or outside tools.\n- Maintain affected documentation, especially `docs/intent/*`, and preserve its established format. Apply the scope limits in the intent guidance below.\n- Keep Refine agent-first by using installed coding-agent CLIs. Do not duplicate or reimplement coding-agent functionality.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
-        "role": "governance",
+        "id": "default-plan",
+        "name": "Plan",
+        "prompt": "## Plan\n\nProduce a complete, concise implementation plan for the current Goal Round. Inspect the repository and applicable context, resolve assumptions, consider alternatives and critique your proposed solution before finalizing it. Choose the planning method appropriate to the work. For behavior changes, identify the underlying cause, governing concept or invariant, and existing owner before listing edits. Prefer strengthening an existing concept; introduce one only when it clarifies the behavior and reduces special cases. For a scoped finding recovery Round, use the finding as evidence, reconsider whether the accepted approach explains the failure, and plan a coherent correction against the retained candidate. Inspect relevant changes on the current target branch to avoid duplicating or contradicting concepts it already provides; keep the assigned candidate unchanged. Do not change repository files. Return an actionable plan with stable checklist IDs and meaningful verification.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
+        "role": "plan",
         "enabled": true,
         "scope": {
           "node_id": null
@@ -3437,44 +3980,11 @@
       "parameters": {}
     }
   ],
-  "state": "failed",
-  "results": {
-    "default-governance": {
-      "invocation_id": "79dbb208ed2a9fc8884d5ee53d3a0aedc4b2ae2c2dcf055b13284186adb82e28",
-      "binding_id": "default-governance",
-      "role": "governance",
-      "outcome": "failure",
-      "summary": "One violation: standard subprocess output capture can indefinitely withhold a completed workload's result.",
-      "evidence": [
-        "Verified clean HEAD 3d221f8f5b5877d39da99aed12ded63df9cbd5d6 and reviewed the candidate diff against a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e, accepted plans, affected intent and retained Quality evidence.",
-        "All 957 hashes in /tmp/refine-r5-quality/final/verified-files.json match the current candidate. The retained full-suite log reports 1279 passed, 0 failed and 6 ignored; macOS remains unverified.",
-        "Read-only git diff --check a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e HEAD passed. No files, Git state or Goal state were changed; no behavioral tests were run."
-      ],
-      "artifacts": {
-        "recovery_analysis": "Candidate 3d221f8f5b5877d39da99aed12ded63df9cbd5d6 fixes the reviewed PTY and retention defects, but standard subprocess completion still couples workload results to descendant-held output pipes. This is a source-established violation; no behavioral reproduction was run during this observational review. The passing regression avoids this condition by redirecting the descendant's streams.",
-        "recovery_round_prompt": "Preserve the candidate and prior evidence. Correct standard run_to_completion capture in src/infrastructure/process/subprocess/execution.rs so a validated workload-exit receipt starts bounded output finalization rather than an indefinite wait for descendant-held pipes. Keep the guardian alive, retain capacity and artifacts while ownership remains pending, preserve workload status and captured output, and report incomplete capture explicitly. Avoid unbounded reader joins and preserve timeout enforcement through settlement. Add deterministic regressions with a setsid descendant retaining stdout, stderr, and both after leader exit, including quiet and continuously writing descendants. Assert bounded return, actual descendant state, retained capacity and artifacts, and eventual release only after trustworthy scope-exit proof. Through supported supervision, run cargo test --lib infrastructure::process::subprocess -- --test-threads=1 and cargo test --lib worker_liveness -- --test-threads=1, followed by the required candidate checks. Retain existing PTY, identity, settlement and retention regressions. Refine owns candidate capture and advancement.",
-        "violations": [
-          {
-            "message": "docs/intent/04-infrastructure/01-process.md:113 requires detached descendants to retain capacity without withholding the workload result, consistent with accepted Round-4 plan P3. In src/infrastructure/process/subprocess/execution.rs:287-291, the workload receipt sets status, but line 220 continues waiting until both output readers finish. Lines 222-224 disable hard-cap and stall enforcement once status is present. The readers block on read until EOF (workflow_registration.rs:24-42). Consequently, a surviving descendant retaining either output pipe prevents run_to_completion from returning indefinitely despite proven workload exit; supervised Git callers can retain their repository-operation waits. The regression at owned_groups/launch_tests.rs:81-101 redirects both descendant streams to /dev/null and misses this case. Recover by bounding post-workload capture and reader shutdown while retaining pending ownership, with regressions that keep the inherited pipes open.",
-            "rule_id": "execution-ownership.workload-result-independent-of-scope"
-          }
-        ]
-      }
-    }
-  },
-  "attempts": [
-    {
-      "attempt": 0,
-      "binding_id": "default-governance",
-      "diagnostic": null,
-      "operation_id": null,
-      "process_id": "proc-1789072766743-1129590-1533",
-      "raw_output": "{\n  \"artifacts\": {\n    \"recovery_analysis\": \"Candidate 3d221f8f5b5877d39da99aed12ded63df9cbd5d6 fixes the reviewed PTY and retention defects, but standard subprocess completion still couples workload results to descendant-held output pipes. This is a source-established violation; no behavioral reproduction was run during this observational review. The passing regression avoids this condition by redirecting the descendant's streams.\",\n    \"recovery_round_prompt\": \"Preserve the candidate and prior evidence. Correct standard run_to_completion capture in src/infrastructure/process/subprocess/execution.rs so a validated workload-exit receipt starts bounded output finalization rather than an indefinite wait for descendant-held pipes. Keep the guardian alive, retain capacity and artifacts while ownership remains pending, preserve workload status and captured output, and report incomplete capture explicitly. Avoid unbounded reader joins and preserve timeout enforcement through settlement. Add deterministic regressions with a setsid descendant retaining stdout, stderr, and both after leader exit, including quiet and continuously writing descendants. Assert bounded return, actual descendant state, retained capacity and artifacts, and eventual release only after trustworthy scope-exit proof. Through supported supervision, run cargo test --lib infrastructure::process::subprocess -- --test-threads=1 and cargo test --lib worker_liveness -- --test-threads=1, followed by the required candidate checks. Retain existing PTY, identity, settlement and retention regressions. Refine owns candidate capture and advancement.\",\n    \"violations\": [\n      {\n        \"rule_id\": \"execution-ownership.workload-result-independent-of-scope\",\n        \"message\": \"docs/intent/04-infrastructure/01-process.md:113 requires detached descendants to retain capacity without withholding the workload result, consistent with accepted Round-4 plan P3. In src/infrastructure/process/subprocess/execution.rs:287-291, the workload receipt sets status, but line 220 continues waiting until both output readers finish. Lines 222-224 disable hard-cap and stall enforcement once status is present. The readers block on read until EOF (workflow_registration.rs:24-42). Consequently, a surviving descendant retaining either output pipe prevents run_to_completion from returning indefinitely despite proven workload exit; supervised Git callers can retain their repository-operation waits. The regression at owned_groups/launch_tests.rs:81-101 redirects both descendant streams to /dev/null and misses this case. Recover by bounding post-workload capture and reader shutdown while retaining pending ownership, with regressions that keep the inherited pipes open.\"\n      }\n    ]\n  },\n  \"binding_id\": \"default-governance\",\n  \"evidence\": [\n    \"Verified clean HEAD 3d221f8f5b5877d39da99aed12ded63df9cbd5d6 and reviewed the candidate diff against a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e, accepted plans, affected intent and retained Quality evidence.\",\n    \"All 957 hashes in /tmp/refine-r5-quality/final/verified-files.json match the current candidate. The retained full-suite log reports 1279 passed, 0 failed and 6 ignored; macOS remains unverified.\",\n    \"Read-only git diff --check a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e HEAD passed. No files, Git state or Goal state were changed; no behavioral tests were run.\"\n  ],\n  \"invocation_id\": \"79dbb208ed2a9fc8884d5ee53d3a0aedc4b2ae2c2dcf055b13284186adb82e28\",\n  \"outcome\": \"failure\",\n  \"role\": \"governance\",\n  \"summary\": \"One violation: standard subprocess output capture can indefinitely withhold a completed workload's result.\"\n}\n",
-      "workflow_revision": 96
-    }
-  ],
-  "created_at": "2026-09-10T20:39:26.673213963+00:00",
-  "completed_at": "2026-09-10T20:42:01.852637855+00:00",
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-10T20:42:02.795268396+00:00",
+  "completed_at": null,
   "error": null,
   "action_applied": false
 }
