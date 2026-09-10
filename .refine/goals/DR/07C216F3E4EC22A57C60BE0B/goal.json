@@ -3,7 +3,7 @@
   "branch_name": "refine/DR07C216F3E4EC22A57C60BE0B/round-6",
   "candidate_commit": "3d221f8f5b5877d39da99aed12ded63df9cbd5d6",
   "created": "2026-09-10T08:26:00Z",
-  "event_generation": 19,
+  "event_generation": 20,
   "feature_id": "00000T130Z0R6J0GJMARY62005",
   "feature_order": 2,
   "id": "DR07C216F3E4EC22A57C60BE0B",
@@ -8700,6 +8700,83 @@
           }
         }
       },
+      "event_results": {
+        "acb126ce63a61f19495ca9f027394ed611dae1bf39c74d069cf0b50e86e23f47": {
+          "candidate_commit": null,
+          "results": {
+            "default-plan": {
+              "artifacts": {
+                "plan": {
+                  "checklist": [
+                    {
+                      "description": "Implement against the retained candidate in the supplied Round-6 workspace. Preserve prior PTY, identity, settlement, deadline and retention corrections. Local main remains at pinned base a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e, with no intervening target changes to reconcile. Leave candidate capture and advancement to Refine.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Extract standard output capture from workflow_registration.rs into a cohesive Infrastructure module. Use interruptible reads, bounded buffering and explicit per-stream EOF, failure and incomplete outcomes. Make cancellation effective for quiet pipes and continuously ready pipes; check deadlines between bounded batches. Join only finished readers and avoid leaving blocked reader threads behind.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Update run_to_completion so the first validated workload-exit receipt starts a fixed monotonic final-drain deadline, proposed at 200 ms. Output activity must not extend it. Preserve buffered output, callback ordering and workload exit status. Distinguish guardian failure from workload completion. Remove synchronous unbounded child waits and reader joins from completion, timeout and error settlement.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Keep original completion and stall deadlines effective through capture settlement. Deadline expiry and capture faults use shared bounded ownership termination, preserving the guardian and original failure; normal capture expiry must not kill descendants merely to obtain EOF. Reuse existing deferred handle reaping. Record incomplete streams, reason, workload status and artifact paths in returned process details and retained evidence. Audit output-dependent callers so incomplete capture cannot silently become complete machine-readable output.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Preserve shared Live/Exited/Unverified ownership semantics independently of capture completion. Retain deduplicated capacity, registration/proof evidence and output artifacts while ownership is pending, including absent primary registration. Exercise actual capacity and retirement consumers; permit release and retention-eligible cleanup only after identity-bound scope-exit proof.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Add deterministic standard run_to_completion regressions for setsid descendants retaining stdout, stderr and both, each quiet and continuously writing after leader exit. Gate readiness and leader exit, independently inspect descendant and guardian identities, and assert bounded return, preserved success/nonzero/signal status, captured markers and explicit incomplete streams. Include ordinary EOF, finite trailing output, deadline expiry during finalization, capture failure and unavailable/mismatched proof. Use bounded test supervision and cleanup; account explicitly for writer SIGPIPE/EPIPE after capture closes. Prove pending capacity/artifact retention and eventual release through trustworthy proof.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Extend worker_liveness through the existing runner and standard supervised subprocess path: workload completion must release its caller's wait while pending descendants still consume capacity; unrelated work progresses when capacity permits, and queued work enters Plan within one poll interval after proven release. Preserve existing PTY, replacement-refusal, identity, settlement-panic and retention regressions. Clarify bounded standard capture and incomplete-output reporting only in affected process and execution-ownership intent pages.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Through supported Refine supervision, run cargo test --lib infrastructure::process::subprocess -- --test-threads=1 and cargo test --lib worker_liveness -- --test-threads=1. Then run cargo check --all-targets --locked; cargo fmt --all -- --check; cargo test --lib --bins -- --test-threads=1; cargo build --release --locked; and git diff --check. Record exact source identity, commands, selected counts, exits, failures, ignored tests and retained logs. Run sequentially without replacing an executable under test. Establish alleged baseline failures independently; do not inherit exclusions or claim macOS verification.",
+                      "id": "P8"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "C1",
+                      "resolution": "The finding demonstrates incomplete adoption of workload-versus-scope completion, not a defect requiring guardian replacement. Correct capture within its existing Infrastructure owner and retain shared ownership proof."
+                    },
+                    {
+                      "criticism_id": "C2",
+                      "resolution": "A timeout around blocking reader joins is insufficient. Interruptible reads, bounded buffering, deadline checks during continuous output and joining only completed readers address both quiet and active inherited pipes."
+                    },
+                    {
+                      "criticism_id": "C3",
+                      "resolution": "Immediate pipe closure can discard buffered output and affect writing descendants. Use a bounded final drain, report incomplete capture explicitly, inspect actual descendant state and require scope-exit proof independently of EOF or capture completion."
+                    }
+                  ],
+                  "summary": "Correct standard subprocess capture on retained candidate 3d221f8f5b5877d39da99aed12ded63df9cbd5d6. The existing workload-versus-scope distinction remains sound, but execution.rs still requires reader EOF after workload exit and disables deadline enforcement during that wait. Strengthen FileProcessSupervisor's capture lifecycle so workload results return within a bound while pending ownership retains capacity and artifacts."
+                }
+              },
+              "binding_id": "default-plan",
+              "evidence": [
+                "Verified src/model/goal/implementation_plan.rs defines CriticismResolution as an object containing criticism_id and resolution; corrected the previously invalid string entries.",
+                "Readback: branch refine/DR07C216F3E4EC22A57C60BE0B/round-6; HEAD 3d221f8f5b5877d39da99aed12ded63df9cbd5d6; local main a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e; working tree clean.",
+                "Source inspection confirms execution.rs waits for both readers after status becomes available, gates timeout handling on status.is_none(), and later performs unconditional reader joins.",
+                "workflow_registration.rs readers block until EOF. The existing detached-scope regression redirects both descendant output streams to /dev/null, excluding the reported failure.",
+                "Reviewed existing PTY interruptible capture and bounded finalization, plus process and execution-ownership intent. These provide the existing concepts to strengthen without introducing another ownership mechanism.",
+                "This correction was observational: no files or Git state changed and no behavioral tests ran. Verification commands above are proposed, not reported passes."
+              ],
+              "invocation_id": "acb126ce63a61f19495ca9f027394ed611dae1bf39c74d069cf0b50e86e23f47",
+              "outcome": "success",
+              "role": "plan",
+              "summary": "Returned the corrected implementation-plan JSON with object-valued criticism resolutions and actionable verification against the unchanged retained candidate."
+            }
+          },
+          "source": "workflow.plan.enter",
+          "state": "succeeded"
+        }
+      },
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
@@ -8719,12 +8796,114 @@
           "round_idx": 5,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-09-10T20:42:02Z",
+        "final_plan": {
+          "completed_at": "2026-09-10T20:45:10Z",
+          "git_after": {
+            "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-6",
+            "head_commit": "3d221f8f5b5877d39da99aed12ded63df9cbd5d6",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-6",
+            "head_commit": "3d221f8f5b5877d39da99aed12ded63df9cbd5d6",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Implement against the retained candidate in the supplied Round-6 workspace. Preserve prior PTY, identity, settlement, deadline and retention corrections. Local main remains at pinned base a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e, with no intervening target changes to reconcile. Leave candidate capture and advancement to Refine.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Extract standard output capture from workflow_registration.rs into a cohesive Infrastructure module. Use interruptible reads, bounded buffering and explicit per-stream EOF, failure and incomplete outcomes. Make cancellation effective for quiet pipes and continuously ready pipes; check deadlines between bounded batches. Join only finished readers and avoid leaving blocked reader threads behind.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Update run_to_completion so the first validated workload-exit receipt starts a fixed monotonic final-drain deadline, proposed at 200 ms. Output activity must not extend it. Preserve buffered output, callback ordering and workload exit status. Distinguish guardian failure from workload completion. Remove synchronous unbounded child waits and reader joins from completion, timeout and error settlement.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Keep original completion and stall deadlines effective through capture settlement. Deadline expiry and capture faults use shared bounded ownership termination, preserving the guardian and original failure; normal capture expiry must not kill descendants merely to obtain EOF. Reuse existing deferred handle reaping. Record incomplete streams, reason, workload status and artifact paths in returned process details and retained evidence. Audit output-dependent callers so incomplete capture cannot silently become complete machine-readable output.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Preserve shared Live/Exited/Unverified ownership semantics independently of capture completion. Retain deduplicated capacity, registration/proof evidence and output artifacts while ownership is pending, including absent primary registration. Exercise actual capacity and retirement consumers; permit release and retention-eligible cleanup only after identity-bound scope-exit proof.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Add deterministic standard run_to_completion regressions for setsid descendants retaining stdout, stderr and both, each quiet and continuously writing after leader exit. Gate readiness and leader exit, independently inspect descendant and guardian identities, and assert bounded return, preserved success/nonzero/signal status, captured markers and explicit incomplete streams. Include ordinary EOF, finite trailing output, deadline expiry during finalization, capture failure and unavailable/mismatched proof. Use bounded test supervision and cleanup; account explicitly for writer SIGPIPE/EPIPE after capture closes. Prove pending capacity/artifact retention and eventual release through trustworthy proof.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Extend worker_liveness through the existing runner and standard supervised subprocess path: workload completion must release its caller's wait while pending descendants still consume capacity; unrelated work progresses when capacity permits, and queued work enters Plan within one poll interval after proven release. Preserve existing PTY, replacement-refusal, identity, settlement-panic and retention regressions. Clarify bounded standard capture and incomplete-output reporting only in affected process and execution-ownership intent pages.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              },
+              {
+                "description": "Through supported Refine supervision, run cargo test --lib infrastructure::process::subprocess -- --test-threads=1 and cargo test --lib worker_liveness -- --test-threads=1. Then run cargo check --all-targets --locked; cargo fmt --all -- --check; cargo test --lib --bins -- --test-threads=1; cargo build --release --locked; and git diff --check. Record exact source identity, commands, selected counts, exits, failures, ignored tests and retained logs. Run sequentially without replacing an executable under test. Establish alleged baseline failures independently; do not inherit exclusions or claim macOS verification.",
+                "id": "workflow.plan.enter:default-plan:P8"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Correct standard subprocess capture on retained candidate 3d221f8f5b5877d39da99aed12ded63df9cbd5d6. The existing workload-versus-scope distinction remains sound, but execution.rs still requires reader EOF after workload exit and disables deadline enforcement during that wait. Strengthen FileProcessSupervisor's capture lifecycle so workload results return within a bound while pending ownership retains capacity and artifacts."
+          },
+          "started_at": "2026-09-10T20:42:02Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-09-10T20:45:10Z",
+        "proposal": {
+          "completed_at": "2026-09-10T20:45:10Z",
+          "git_after": {
+            "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-6",
+            "head_commit": "3d221f8f5b5877d39da99aed12ded63df9cbd5d6",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-6",
+            "head_commit": "3d221f8f5b5877d39da99aed12ded63df9cbd5d6",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Implement against the retained candidate in the supplied Round-6 workspace. Preserve prior PTY, identity, settlement, deadline and retention corrections. Local main remains at pinned base a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e, with no intervening target changes to reconcile. Leave candidate capture and advancement to Refine.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Extract standard output capture from workflow_registration.rs into a cohesive Infrastructure module. Use interruptible reads, bounded buffering and explicit per-stream EOF, failure and incomplete outcomes. Make cancellation effective for quiet pipes and continuously ready pipes; check deadlines between bounded batches. Join only finished readers and avoid leaving blocked reader threads behind.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Update run_to_completion so the first validated workload-exit receipt starts a fixed monotonic final-drain deadline, proposed at 200 ms. Output activity must not extend it. Preserve buffered output, callback ordering and workload exit status. Distinguish guardian failure from workload completion. Remove synchronous unbounded child waits and reader joins from completion, timeout and error settlement.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Keep original completion and stall deadlines effective through capture settlement. Deadline expiry and capture faults use shared bounded ownership termination, preserving the guardian and original failure; normal capture expiry must not kill descendants merely to obtain EOF. Reuse existing deferred handle reaping. Record incomplete streams, reason, workload status and artifact paths in returned process details and retained evidence. Audit output-dependent callers so incomplete capture cannot silently become complete machine-readable output.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Preserve shared Live/Exited/Unverified ownership semantics independently of capture completion. Retain deduplicated capacity, registration/proof evidence and output artifacts while ownership is pending, including absent primary registration. Exercise actual capacity and retirement consumers; permit release and retention-eligible cleanup only after identity-bound scope-exit proof.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Add deterministic standard run_to_completion regressions for setsid descendants retaining stdout, stderr and both, each quiet and continuously writing after leader exit. Gate readiness and leader exit, independently inspect descendant and guardian identities, and assert bounded return, preserved success/nonzero/signal status, captured markers and explicit incomplete streams. Include ordinary EOF, finite trailing output, deadline expiry during finalization, capture failure and unavailable/mismatched proof. Use bounded test supervision and cleanup; account explicitly for writer SIGPIPE/EPIPE after capture closes. Prove pending capacity/artifact retention and eventual release through trustworthy proof.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Extend worker_liveness through the existing runner and standard supervised subprocess path: workload completion must release its caller's wait while pending descendants still consume capacity; unrelated work progresses when capacity permits, and queued work enters Plan within one poll interval after proven release. Preserve existing PTY, replacement-refusal, identity, settlement-panic and retention regressions. Clarify bounded standard capture and incomplete-output reporting only in affected process and execution-ownership intent pages.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              },
+              {
+                "description": "Through supported Refine supervision, run cargo test --lib infrastructure::process::subprocess -- --test-threads=1 and cargo test --lib worker_liveness -- --test-threads=1. Then run cargo check --all-targets --locked; cargo fmt --all -- --check; cargo test --lib --bins -- --test-threads=1; cargo build --release --locked; and git diff --check. Record exact source identity, commands, selected counts, exits, failures, ignored tests and retained logs. Run sequentially without replacing an executable under test. Establish alleged baseline failures independently; do not inherit exclusions or claim macOS verification.",
+                "id": "workflow.plan.enter:default-plan:P8"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Correct standard subprocess capture on retained candidate 3d221f8f5b5877d39da99aed12ded63df9cbd5d6. The existing workload-versus-scope distinction remains sound, but execution.rs still requires reader EOF after workload exit and disables deadline enforcement during that wait. Strengthen FileProcessSupervisor's capture lifecycle so workload results return within a bound while pending ownership retains capacity and artifacts."
+          },
+          "started_at": "2026-09-10T20:42:02Z"
+        },
         "schema_version": 2,
         "started_at": "2026-09-10T20:42:02Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T20:42:02Z"
+        "updated_at": "2026-09-10T20:45:10Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -8738,7 +8917,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T20:42:02Z",
+      "updated": "2026-09-10T20:45:10Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T20:42:02Z",
         "round_idx": 5,
@@ -8748,9 +8927,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-09-10T20:42:02Z",
+  "updated": "2026-09-10T20:45:10Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:37.178169037+00:00",
@@ -8922,7 +9101,16 @@
       "node_id": "default",
       "round_idx": 5,
       "to": "plan"
+    },
+    {
+      "at": "2026-09-10T20:45:10.461380882+00:00",
+      "forced": false,
+      "from": "plan",
+      "generation": 20,
+      "node_id": "default",
+      "round_idx": 5,
+      "to": "implement"
     }
   ],
-  "workflow_revision": 138
+  "workflow_revision": 144
 }
