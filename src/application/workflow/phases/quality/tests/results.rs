@@ -159,6 +159,18 @@ fn quality_service_uses_agent_to_evaluate_every_plain_text_test() {
         fs::set_permissions(&smoke_ai, permissions).unwrap();
     }
     let candidate_commit = init_git_candidate(&candidate_root);
+    let candidate_repo = candidate_root;
+    let candidate_root = candidate_repo.join(".git/refine-worktrees/refine-GOAL1-round-1");
+    git_output(
+        &candidate_repo,
+        &[
+            "worktree",
+            "add",
+            "-b",
+            "refine/GOAL1/round-1",
+            candidate_root.to_str().unwrap(),
+        ],
+    );
     let _guard = smoke_ai_env_lock()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -187,8 +199,18 @@ fn quality_service_uses_agent_to_evaluate_every_plain_text_test() {
             source_candidate_commit: Some(candidate_commit.clone()),
             evaluation_scope: "isolated_candidate".to_string(),
             candidate_commit: candidate_commit.clone(),
-            identity_commitment: None,
-            process_metadata: quality_operation_metadata(&runtime_root),
+            identity_commitment: Some(super::super::identity::QualityIdentityCommitment::isolated(
+                "GOAL1",
+                0,
+                "refine/GOAL1/round-1",
+                &candidate_root,
+                &candidate_commit,
+            )),
+            process_metadata: quality_operation_metadata(
+                &runtime_root,
+                &candidate_root,
+                &refine_dir,
+            ),
         })
         .unwrap();
     assert!(result.ok, "{result:#?}");
@@ -307,6 +329,18 @@ fn quality_rejects_agent_pass_without_successful_observed_execution() {
     .unwrap();
     make_executable(&smoke_ai);
     let candidate_commit = init_git_candidate(&candidate_root);
+    let candidate_repo = candidate_root;
+    let candidate_root = candidate_repo.join(".git/refine-worktrees/refine-GOAL1-round-1");
+    git_output(
+        &candidate_repo,
+        &[
+            "worktree",
+            "add",
+            "-b",
+            "refine/GOAL1/round-1",
+            candidate_root.to_str().unwrap(),
+        ],
+    );
     let _guard = smoke_ai_env_lock()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -329,9 +363,19 @@ fn quality_rejects_agent_pass_without_successful_observed_execution() {
             cwd: candidate_root.display().to_string(),
             source_candidate_commit: Some(candidate_commit.clone()),
             evaluation_scope: "isolated_candidate".to_string(),
-            candidate_commit,
-            identity_commitment: None,
-            process_metadata: quality_operation_metadata(&runtime_root),
+            candidate_commit: candidate_commit.clone(),
+            identity_commitment: Some(super::super::identity::QualityIdentityCommitment::isolated(
+                "GOAL1",
+                0,
+                "refine/GOAL1/round-1",
+                &candidate_root,
+                &candidate_commit,
+            )),
+            process_metadata: quality_operation_metadata(
+                &runtime_root,
+                &candidate_root,
+                &refine_dir,
+            ),
         })
         .unwrap();
     assert!(!result.ok);
@@ -358,6 +402,18 @@ fn quality_runs_supervised_commands_with_bash_process_substitution() {
     .unwrap();
     make_executable(&smoke_ai);
     let candidate_commit = init_git_candidate(&candidate_root);
+    let candidate_repo = candidate_root;
+    let candidate_root = candidate_repo.join(".git/refine-worktrees/refine-GOAL1-round-1");
+    git_output(
+        &candidate_repo,
+        &[
+            "worktree",
+            "add",
+            "-b",
+            "refine/GOAL1/round-1",
+            candidate_root.to_str().unwrap(),
+        ],
+    );
     let _guard = smoke_ai_env_lock()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -381,9 +437,19 @@ fn quality_runs_supervised_commands_with_bash_process_substitution() {
             cwd: candidate_root.display().to_string(),
             source_candidate_commit: Some(candidate_commit.clone()),
             evaluation_scope: "isolated_candidate".to_string(),
-            candidate_commit,
-            identity_commitment: None,
-            process_metadata: quality_operation_metadata(&runtime_root),
+            candidate_commit: candidate_commit.clone(),
+            identity_commitment: Some(super::super::identity::QualityIdentityCommitment::isolated(
+                "GOAL1",
+                0,
+                "refine/GOAL1/round-1",
+                &candidate_root,
+                &candidate_commit,
+            )),
+            process_metadata: quality_operation_metadata(
+                &runtime_root,
+                &candidate_root,
+                &refine_dir,
+            ),
         })
         .unwrap();
 
@@ -449,6 +515,18 @@ fn quality_accepts_no_match_evidence_when_command_encodes_pass_semantics() {
     .unwrap();
     make_executable(&smoke_ai);
     let candidate_commit = init_git_candidate(&candidate_root);
+    let candidate_repo = candidate_root;
+    let candidate_root = candidate_repo.join(".git/refine-worktrees/refine-GOAL1-round-1");
+    git_output(
+        &candidate_repo,
+        &[
+            "worktree",
+            "add",
+            "-b",
+            "refine/GOAL1/round-1",
+            candidate_root.to_str().unwrap(),
+        ],
+    );
     let _guard = smoke_ai_env_lock()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -472,9 +550,19 @@ fn quality_accepts_no_match_evidence_when_command_encodes_pass_semantics() {
             cwd: candidate_root.display().to_string(),
             source_candidate_commit: Some(candidate_commit.clone()),
             evaluation_scope: "isolated_candidate".to_string(),
-            candidate_commit,
-            identity_commitment: None,
-            process_metadata: quality_operation_metadata(&runtime_root),
+            candidate_commit: candidate_commit.clone(),
+            identity_commitment: Some(super::super::identity::QualityIdentityCommitment::isolated(
+                "GOAL1",
+                0,
+                "refine/GOAL1/round-1",
+                &candidate_root,
+                &candidate_commit,
+            )),
+            process_metadata: quality_operation_metadata(
+                &runtime_root,
+                &candidate_root,
+                &refine_dir,
+            ),
         })
         .unwrap();
 
@@ -505,6 +593,18 @@ fn quality_detects_candidate_mutation_and_preserves_it() {
     .unwrap();
     make_executable(&smoke_ai);
     let candidate_commit = init_git_candidate(&candidate_root);
+    let candidate_repo = candidate_root;
+    let candidate_root = candidate_repo.join(".git/refine-worktrees/refine-GOAL1-round-1");
+    git_output(
+        &candidate_repo,
+        &[
+            "worktree",
+            "add",
+            "-b",
+            "refine/GOAL1/round-1",
+            candidate_root.to_str().unwrap(),
+        ],
+    );
     let _guard = smoke_ai_env_lock()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -527,9 +627,19 @@ fn quality_detects_candidate_mutation_and_preserves_it() {
             cwd: candidate_root.display().to_string(),
             source_candidate_commit: Some(candidate_commit.clone()),
             evaluation_scope: "isolated_candidate".to_string(),
-            candidate_commit,
-            identity_commitment: None,
-            process_metadata: quality_operation_metadata(&runtime_root),
+            candidate_commit: candidate_commit.clone(),
+            identity_commitment: Some(super::super::identity::QualityIdentityCommitment::isolated(
+                "GOAL1",
+                0,
+                "refine/GOAL1/round-1",
+                &candidate_root,
+                &candidate_commit,
+            )),
+            process_metadata: quality_operation_metadata(
+                &runtime_root,
+                &candidate_root,
+                &refine_dir,
+            ),
         })
         .unwrap_err();
     assert!(

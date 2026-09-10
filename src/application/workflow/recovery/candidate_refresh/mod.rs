@@ -92,12 +92,17 @@ pub(crate) fn workflow_conflict_resolution_enabled(settings: &JsonObject) -> boo
 /// = off` maps to `None`; both fall back exactly to pre-resolver behavior.
 pub(crate) fn workflow_conflict_resolver(
     ctx: &WorkflowContext<'_>,
-) -> Option<InstalledAgentResolver> {
-    workflow_conflict_resolution_enabled(&ctx.settings).then(|| InstalledAgentResolver {
+) -> RefineResult<Option<InstalledAgentResolver>> {
+    if !workflow_conflict_resolution_enabled(&ctx.settings) {
+        return Ok(None);
+    }
+    Ok(Some(InstalledAgentResolver {
         provider: ctx.provider.clone(),
         agents_runtime_root: ctx.runtime_root.join("agents"),
+        managed_worktree: Some(ctx.refresh_workspace()?),
+        agent_subpath: setting_string(&ctx.settings, "agent_subpath", ""),
         stall_timeout_seconds: agent_idle_timeout(&ctx.settings).map(|timeout| timeout.as_secs()),
-    })
+    }))
 }
 
 pub(crate) fn refresh_candidate_for_target_advancement(
@@ -105,7 +110,7 @@ pub(crate) fn refresh_candidate_for_target_advancement(
     authority_status: GoalStatus,
     max_automatic_round_retries: u32,
 ) -> RefineResult<CandidateRefreshOutcome> {
-    let resolver = workflow_conflict_resolver(ctx);
+    let resolver = workflow_conflict_resolver(ctx)?;
     refresh_candidate_with_resolver(
         ctx,
         authority_status,
@@ -180,7 +185,7 @@ fn locked_refresh_attempt(
     let original_base = required(&detail, "base_commit", &ctx.goal_id)?;
     let original_candidate = required(&detail, "candidate_commit", &ctx.goal_id)?;
     let target_branch = required(&detail, "target_branch", &ctx.goal_id)?;
-    let worktree = ctx.require_worktree_path()?.to_string();
+    let worktree = ctx.refresh_workspace()?.path.display().to_string();
     if ctx.require_branch()? != branch || ctx.require_commit()? != original_candidate {
         return Err(RefineError::Conflict(format!(
             "Goal {} hydrated candidate identity changed before the {} candidate refresh",
@@ -190,7 +195,7 @@ fn locked_refresh_attempt(
     }
 
     let target_git = FileGitWorktreeService::with_runtime_root(ctx.target_root, ctx.runtime_root);
-    let worktree_git = FileGitWorktreeService::with_runtime_root(&worktree, ctx.runtime_root);
+    let worktree_git = ctx.refresh_git()?;
     let resolved_base = target_git.resolve_commit(&original_base);
     let resolved_candidate = target_git.resolve_commit(&original_candidate);
     let target_commit = target_git.resolve_commit(&target_branch)?;
@@ -398,8 +403,7 @@ fn resolve_conflicted_refresh(
     pending: ConflictedRefresh,
 ) -> RefineResult<CandidateRefreshOutcome> {
     let target_root = ctx.target_root.to_path_buf();
-    let worktree_git =
-        FileGitWorktreeService::with_runtime_root(&pending.worktree, ctx.runtime_root);
+    let worktree_git = ctx.refresh_git()?;
     let target_git = FileGitWorktreeService::with_runtime_root(&target_root, ctx.runtime_root);
     let workspace = PathBuf::from(&pending.worktree);
 
@@ -465,6 +469,7 @@ fn resolve_conflicted_refresh(
             attempt: invocation,
             feedback: feedback.as_deref(),
         };
+        ctx.refresh_workspace()?.validate()?;
         let outcome = match resolver.resolve(&request) {
             Ok(outcome) => outcome,
             Err(error) => {
@@ -672,8 +677,7 @@ fn abort_conflicted_refresh_and_queue(
     conflict_resolution: Value,
 ) -> RefineResult<CandidateRefreshOutcome> {
     let target_root = ctx.target_root.to_path_buf();
-    let worktree_git =
-        FileGitWorktreeService::with_runtime_root(&pending.worktree, ctx.runtime_root);
+    let worktree_git = ctx.refresh_git()?;
     let (recovery, restored) = with_repository_git_lock(&target_root, || {
         let recovery = worktree_git.recover()?;
         let restored = worktree_git.head_ref()?;

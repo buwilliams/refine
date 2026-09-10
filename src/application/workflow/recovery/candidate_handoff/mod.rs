@@ -22,6 +22,23 @@ pub(crate) fn register_candidate_handoff(
 ) -> RefineResult<OperationHandle> {
     let registry = FileOperationRegistry::new(runtime_root);
     let owner = handoff_owner(target_root, goal_id, round_idx);
+    for operation in registry.recover()? {
+        if operation.owner != owner
+            && operation.request.get("kind").and_then(Value::as_str) == Some(HANDOFF_KIND)
+            && operation.request.get("target_root").and_then(Value::as_str) == target_root.to_str()
+            && (operation.request.get("branch").and_then(Value::as_str) == Some(branch)
+                || operation
+                    .request
+                    .get("worktree_path")
+                    .and_then(Value::as_str)
+                    == Some(worktree_path))
+        {
+            return Err(RefineError::Degraded(format!(
+                "candidate workspace is already owned by handoff {}; existing work was preserved",
+                operation.id
+            )));
+        }
+    }
     if let Some(operation) = active_handoff(&registry, &owner)? {
         validate_handoff(
             &operation,

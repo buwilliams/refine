@@ -39,6 +39,7 @@ use super::{
 mod cancellation;
 mod execution;
 mod provider_output;
+mod registration;
 mod runner;
 mod settings;
 mod settlement;

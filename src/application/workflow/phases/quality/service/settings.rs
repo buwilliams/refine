@@ -155,6 +155,7 @@ impl FileQualityService {
         security.authorize_host_command("quality", command)?;
         let (shell, args) = shell_program_args(command);
         let observed_shell = shell.clone();
+        crate::infrastructure::git::worktrees::validate_workspace_launch(&metadata, Some(cwd))?;
         let output = FileProcessSupervisor::with_allowed_commands(
             runtime_root,
             security.allowed_commands.iter().cloned(),
@@ -231,6 +232,34 @@ impl FileQualityService {
                         &request.node_id,
                     )?;
             }
+            let commitment = request.identity_commitment.as_ref().ok_or_else(|| RefineError::Degraded("Quality has no Goal/Round candidate commitment; restart evaluation through the Quality runner".into()))?;
+            {
+                let target = operation
+                    .request
+                    .get("target_root")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        RefineError::Degraded(
+                            "Quality operation has no target repository".to_string(),
+                        )
+                    })?;
+                validate_quality_identity(
+                    &self.refine_dir,
+                    Path::new(target),
+                    runtime_root,
+                    commitment,
+                    boundary,
+                )?;
+            }
+            if request.evaluation_scope != ISOLATED_CANDIDATE
+                || !request.process_metadata.contains_key("managed_worktree")
+            {
+                return Err(RefineError::Degraded("Quality requires an admitted isolated candidate workspace; regenerate legacy evidence through the Quality runner".into()));
+            }
+            crate::infrastructure::git::worktrees::validate_workspace_launch(
+                &request.process_metadata,
+                Some(Path::new(&request.cwd)),
+            )?;
             return Ok(());
         }
         Err(RefineError::Conflict(format!(

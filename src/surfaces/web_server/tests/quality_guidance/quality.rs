@@ -125,8 +125,14 @@ fn web_server_manages_quality_skill_and_checks() {
     let runtime_root = temp_root.join("run/8080");
     let smoke_ai = temp_root.join("smoke-ai");
     init_git_app(&app_root);
-    git(&app_root, &["branch", "-m", "refine/GOAL1/round-1"]).unwrap();
     let candidate_commit = git_stdout(&app_root, &["rev-parse", "HEAD"]);
+    let git_service = crate::infrastructure::git::worktrees::FileGitWorktreeService::new(&app_root);
+    let branch = "refine/GOAL1/round-1";
+    let workspace = git_service.managed_worktree_path(branch).unwrap();
+    git_service
+        .ensure_worktree_from_base(branch, &workspace, &candidate_commit)
+        .unwrap();
+
     let refine_dir = refine_dir_for_target_root(&app_root).unwrap();
     let work_items = FileWorkItemService::new(&refine_dir);
     work_items

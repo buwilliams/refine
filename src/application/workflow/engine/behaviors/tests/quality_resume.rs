@@ -254,7 +254,8 @@ impl QualityResumeFixture {
         behavior_test_git(&target_root, &["commit", "-m", "base"]);
         let base = behavior_test_git(&target_root, &["rev-parse", "HEAD"]);
         let branch = "refine/GOAL1/round-1".to_string();
-        let worktree = temp_root.join("candidate");
+        let worktree = target_root.join(".git/refine-worktrees/refine-GOAL1-round-1");
+        fs::create_dir_all(worktree.parent().unwrap()).unwrap();
         behavior_test_git(
             &target_root,
             &["worktree", "add", "-b", &branch, worktree.to_str().unwrap()],

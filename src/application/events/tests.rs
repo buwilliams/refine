@@ -10,6 +10,26 @@ impl Fixture {
         std::fs::create_dir_all(&path).unwrap();
         Self(path)
     }
+    fn repository(&self) {
+        let git = |args: &[&str]| {
+            let output = std::process::Command::new("git")
+                .current_dir(&self.0)
+                .args(args)
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        };
+        if !self.0.join(".git").exists() {
+            git(&["init", "-q", "-b", "main"]);
+            git(&["config", "user.email", "events@example.invalid"]);
+            git(&["config", "user.name", "Events fixture"]);
+            git(&["commit", "--allow-empty", "-qm", "fixture"]);
+        }
+    }
     fn service(&self) -> FileEventService {
         FileEventService::with_runtime_root(self.0.join("state"), self.0.join("runtime"))
     }
@@ -221,6 +241,8 @@ print(json.dumps(contract))
         node_id: "default".into(),
         target_root: fixture.0.clone(),
         cwd: fixture.0.clone(),
+        workspace: None,
+        lifecycle: None,
         provider: "smoke-ai".into(),
         goal_id: None,
         round_idx: None,
@@ -500,7 +522,9 @@ fn manual_transition_waits_for_exit_evidence_and_cancellation_can_supersede_it()
     use crate::application::work_items::FileWorkItemService;
     use crate::model::workflow::GoalStatus;
     let fixture = Fixture::new();
+    fixture.repository();
     let service = fixture.service();
+    let _smoke = super::test_support::SmokeSkill::install(&service, &fixture.0);
     add_gate(&service, "workflow.backlog.exit", false);
     let work = FileWorkItemService::new(&service.refine_dir);
     for id in ["GATE1", "GATE2"] {
@@ -508,6 +532,7 @@ fn manual_transition_waits_for_exit_evidence_and_cancellation_can_supersede_it()
             .unwrap();
         work.append_goal_round_summary(id, "Reporter", "Do work")
             .unwrap();
+
         let error = work
             .transition_goal_status(id, GoalStatus::Todo)
             .unwrap_err();
@@ -518,23 +543,12 @@ fn manual_transition_waits_for_exit_evidence_and_cancellation_can_supersede_it()
     let runs = service.invocations(0, 100).unwrap();
     for run in runs["items"].as_array().unwrap() {
         let id = run["id"].as_str().unwrap();
-        let mut invocation = service.invocation(id).unwrap();
-        for binding in &invocation.bindings {
-            invocation.results.insert(
-                binding.binding.id.clone(),
-                SkillResult {
-                    invocation_id: invocation.id.clone(),
-                    binding_id: binding.binding.id.clone(),
-                    role: binding.skill.role.clone(),
-                    outcome: "success".into(),
-                    summary: "Observed exit checks passed".into(),
-                    evidence: vec!["Fixture observed the exit check".into()],
-                    artifacts: json!({}),
-                },
-            );
-        }
-        invocation.state = InvocationState::Succeeded;
-        service.save_invocation(&invocation).unwrap();
+        let invocation = service.invocation(id).unwrap();
+        assert!(invocation.context.lifecycle.is_some());
+        let result = service
+            .execute(id, || service.validate_manual_authority(&invocation))
+            .unwrap();
+        assert_eq!(result.state, InvocationState::Succeeded, "{result:?}");
     }
     work.cancel_goal_summary("GATE2").unwrap();
     service.dispatch_goal_events(&fixture.0).unwrap();

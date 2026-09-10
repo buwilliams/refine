@@ -1,3 +1,4 @@
+mod resume;
 use super::*;
 
 struct ProviderCommandExecution<'a> {
@@ -319,6 +320,7 @@ impl HostAgentProviderService {
             })?,
         );
         let supervisor = FileProcessSupervisor::new(self.prompt_runtime_root()?);
+        crate::infrastructure::git::worktrees::validate_workspace_launch(&metadata, cwd)?;
         let process = supervisor.launch(ManagedProcessSpec {
             owner: ProcessOwner::Agent,
             command: prepared.binary,
@@ -431,72 +433,6 @@ impl HostAgentProviderService {
         )
     }
 
-    pub fn resume_detailed(
-        &self,
-        provider: &str,
-        session_id: &str,
-    ) -> RefineResult<ProviderInvocationResult> {
-        self.resume_detailed_with_output(provider, session_id, |_| {})
-    }
-
-    pub fn resume_detailed_with_output<F>(
-        &self,
-        provider: &str,
-        session_id: &str,
-        on_output: F,
-    ) -> RefineResult<ProviderInvocationResult>
-    where
-        F: FnMut(String),
-    {
-        self.resume_detailed_with_output_and_metadata(
-            provider,
-            session_id,
-            Default::default(),
-            on_output,
-        )
-    }
-
-    pub fn resume_detailed_with_output_and_metadata<F>(
-        &self,
-        provider: &str,
-        session_id: &str,
-        process_metadata: Map<String, Value>,
-        on_output: F,
-    ) -> RefineResult<ProviderInvocationResult>
-    where
-        F: FnMut(String),
-    {
-        let (spec, binary) = self.resolve_binary_for_provider(provider)?;
-        if !spec.supports_resume {
-            return Err(RefineError::InvalidInput(format!(
-                "{} does not support provider-session resume",
-                spec.display_name
-            )));
-        }
-        let args = spec.chat_args(&binary, "", Some(session_id), None);
-        let launch_environment = EffectiveLaunchEnvironment::assemble(&ProcessOwner::Agent, &[])?;
-        let Some((launch_binary, launch_args)) = args.split_first() else {
-            return Err(RefineError::InvalidInput(
-                "provider command cannot be empty".to_string(),
-            ));
-        };
-        launch_environment.validate_launch(launch_binary, launch_args)?;
-        self.run_provider_command_result_with_output(
-            ProviderCommandExecution {
-                args: &args,
-                stdin: None,
-                cwd: None,
-                launch_environment: &launch_environment,
-                environment_overrides: &[],
-                output_format: &spec.output_format,
-                process_metadata,
-                authorization_command: None,
-                stall_timeout_seconds: None,
-            },
-            on_output,
-        )
-    }
-
     fn run_provider_command_result_with_output<F>(
         &self,
         launch: ProviderCommandExecution<'_>,
@@ -511,6 +447,10 @@ impl HostAgentProviderService {
             ));
         };
         let runtime_root = self.prompt_runtime_root()?;
+        crate::infrastructure::git::worktrees::validate_workspace_launch(
+            &launch.process_metadata,
+            launch.cwd,
+        )?;
         let mut formatter = ProviderActivityFormatter::new(launch.output_format);
         let output = FileProcessSupervisor::new(runtime_root)
             .run_to_completion_with_prepared_environment(

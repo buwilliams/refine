@@ -2,6 +2,7 @@ use super::*;
 
 impl QualityService for FileQualityService {
     fn run_checks(&self, request: QualityCheckRequest) -> RefineResult<QualityCheckResult> {
+        self.ensure_operation_active(&request, "before Quality checks")?;
         if self.refine_dir.join("automation/config.json").exists() {
             return self.run_skill_checks(request);
         }

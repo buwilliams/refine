@@ -14,6 +14,10 @@ pub struct InvocationContext {
     pub node_id: String,
     pub target_root: PathBuf,
     pub cwd: PathBuf,
+    #[serde(default)]
+    pub workspace: Option<crate::infrastructure::git::worktrees::ManagedWorktree>,
+    #[serde(default)]
+    pub lifecycle: Option<super::execution::LifecycleWorkspace>,
     pub provider: String,
     #[serde(default)]
     pub goal_id: Option<String>,

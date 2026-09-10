@@ -110,6 +110,8 @@ pub(super) fn retained_reviews(
             if !matches!(result.outcome.as_str(), "success" | "failure") {
                 continue;
             }
+            invocation.blocking_results()?;
+            invocation.context.validate_workspace(&service.refine_dir)?;
             let key = requirement.key();
             // Never erase a valid failed finding with a later success for the same candidate.
             if accepted
@@ -146,12 +148,42 @@ mod tests {
     fn only_matching_final_content_covers_requirements_and_failed_findings_are_retained() {
         let temp =
             std::env::temp_dir().join(format!("refine-review-evidence-{}", uuid::Uuid::new_v4()));
-        let service = FileEventService::new(&temp);
+        std::fs::create_dir_all(&temp).unwrap();
+        for args in [
+            vec!["init", "-q", "-b", "main"],
+            vec!["config", "user.name", "Test"],
+            vec!["config", "user.email", "test@example.invalid"],
+            vec!["commit", "--allow-empty", "-qm", "base"],
+        ] {
+            assert!(
+                std::process::Command::new("git")
+                    .current_dir(&temp)
+                    .args(args)
+                    .status()
+                    .unwrap()
+                    .success()
+            );
+        }
+        let git = FileGitWorktreeService::new(&temp);
+        let commit = git.resolve_commit("HEAD").unwrap();
+        let branch = "refine/REVIEW/round-1";
+        let checkout = git.managed_worktree_path(branch).unwrap();
+        git.ensure_worktree_from_base(branch, &checkout, &commit)
+            .unwrap();
+        let service = FileEventService::new(temp.join("state"));
+        let work = FileWorkItemService::new(&service.refine_dir);
+        work.create_goal_summary("Review", Some("REVIEW")).unwrap();
+        work.append_goal_round_summary("REVIEW", "test", "Check candidate")
+            .unwrap();
+        work.update_goal_git_refs("REVIEW", branch, "main", &commit, Some(&commit))
+            .unwrap();
         let config = service.config().unwrap();
         let context = InvocationContext {
             node_id: "default".into(),
             target_root: temp.clone(),
-            cwd: temp.clone(),
+            cwd: checkout.clone(),
+            workspace: None,
+            lifecycle: None,
             provider: "smoke-ai".into(),
             goal_id: Some("REVIEW".into()),
             round_idx: Some(0),
@@ -196,8 +228,8 @@ mod tests {
                     role: "quality".into(),
                     outcome: outcome.into(),
                     summary: outcome.into(),
-                    evidence: vec![],
-                    artifacts: json!({"tests":[]}),
+                    evidence: vec!["Observed check".into()],
+                    artifacts: json!({"tests":[{"test":"observed", "command":"true", "status":"passed", "evidence":"observed"}]}),
                 },
             );
             invocation.attempts.push(json!({"binding_id":binding.binding.id,"attempt":0,"process_id":"managed-review","raw_output":"retained",
@@ -237,6 +269,13 @@ mod tests {
             retained_reviews(&service, &required, &next_round, &round, "FINAL-TREE")
                 .unwrap()
                 .is_empty()
+        );
+        std::fs::rename(&checkout, temp.join("retained-checkout")).unwrap();
+        let error =
+            retained_reviews(&service, &required, &context, &round, "FINAL-TREE").unwrap_err();
+        assert!(
+            error.to_string().contains("managed workspace unavailable"),
+            "{error}"
         );
         std::fs::remove_dir_all(temp).unwrap();
     }

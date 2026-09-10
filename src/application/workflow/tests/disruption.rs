@@ -211,7 +211,9 @@ impl DisruptionFixture {
     /// Runs the real governed planning trio (smoke-ai fixture phases) so the
     /// Round carries a genuine persisted final plan.
     fn run_real_planning(&self) -> WorkflowContext<'_> {
-        let ctx = self.claim(GoalStatus::Plan);
+        let mut ctx = self.claim(GoalStatus::Plan);
+        ctx.branch = Some(BRANCH.into());
+        ctx.worktree_path = Some(self.worktree.display().to_string());
         let goal = self.work_items.show_goal_detail(GOAL).unwrap();
         let agent_context = goal["rounds"][0]["agent_context"].clone();
         run_governed_implementation_planning(&ctx, &goal, &agent_context, &self.worktree, BRANCH)

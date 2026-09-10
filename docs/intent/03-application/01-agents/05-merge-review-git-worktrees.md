@@ -19,8 +19,8 @@ Git is central because it is existing infrastructure users already trust. Refine
 
 This Application behavior should connect workflow with the user's source repository:
 
-- implementation work can happen in an isolated branch or worktree;
-- todo Goals remain state-only regardless of queue size; an implementation
+- automated Goal work requires an admitted managed linked worktree;
+- ordinary Todo queueing remains state-only regardless of queue size; an implementation
   worktree is created only after scheduler capacity is acquired and the Goal is
   durably in Plan;
 - a Round branch is born at the base the Goal records — the resolved merge
@@ -66,6 +66,12 @@ This Application behavior should connect workflow with the user's source reposit
   commit evidence remains inspectable after a safe ref name is retired;
 
 Review should be a real boundary in workflow. It lets later ordered Feature work proceed when appropriate, but it should not erase the need for evidence or final judgment.
+
+Automated Goal work requires a canonical, registered linked worktree in the intended repository's managed location, bound to the current Goal, Round, and branch or exact candidate. A matching branch in the primary checkout or an unrelated linked checkout is not ownership. Admission verifies the registration and its backlink; launches and candidate writes revalidate that commitment. Missing checkouts may be recreated from unambiguous retained branch and candidate evidence. Changed registrations, wrong branches, or ownership conflicts stop with an actionable infrastructure error and preserve existing files and index state. Recovery Rounds use their own worktrees and retain the source Round's checkout. Branches are created at the declared target base, independently of the developer's checked-out branch.
+
+Executable Backlog and Todo lifecycle Skills have separate invocation-owned branches and managed paths, pinned to a configured target ref and immutable source commit. Their checkout does not become the Round implementation candidate or rewrite its base. Admission records logical ownership before creation and physical registration before launch; restart reuses the original registration and preserves dirty work. An existing branch or path without the original registration is an explicit recovery error. Disabled and context-only bindings need no checkout.
+
+Legacy post-build Quality evidence is regenerated, when required by reconciliation, in an isolated checkout of the exact source candidate. Retained passing or terminal failed proofs and the existing main-branch integration, checkout synchronization, and human Review boundaries remain authoritative.
 
 ## Future Direction
 

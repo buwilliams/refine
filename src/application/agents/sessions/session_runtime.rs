@@ -124,6 +124,10 @@ where
     F: FnMut(GoalAgentAttention),
     O: FnMut(&FileProcessSupervisor, &ManagedProcess, &GoalAgentSettlement) -> RefineResult<()>,
 {
+    crate::infrastructure::git::worktrees::validate_workspace_launch(
+        &launch.metadata,
+        Some(&launch.cwd),
+    )?;
     let cwd = launch.cwd.canonicalize().map_err(|error| {
         RefineError::InvalidInput(format!(
             "Goal Agent cwd {} is not available: {error}",
@@ -302,6 +306,7 @@ where
     pty_command.args(&command.args);
     pty_command.cwd(&cwd);
     command.launch_environment.apply_to_pty(&mut pty_command);
+    crate::infrastructure::git::worktrees::validate_workspace_launch(&metadata, Some(&cwd))?;
     let mut child = match pair.slave.spawn_command(pty_command) {
         Ok(child) => child,
         Err(error) => {

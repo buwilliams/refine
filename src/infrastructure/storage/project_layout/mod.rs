@@ -39,7 +39,11 @@ pub fn git_common_dir(target_root: &Path) -> RefineResult<PathBuf> {
 }
 
 fn git_common_dir_uncached(target_root: &Path) -> RefineResult<PathBuf> {
-    let output = Command::new("git")
+    let mut command = Command::new("git");
+    crate::infrastructure::process::launch_environment::remove_inherited_git_environment(
+        &mut command,
+    );
+    let output = command
         .args(["rev-parse", "--git-common-dir"])
         .current_dir(target_root)
         .env("GIT_TERMINAL_PROMPT", "0")
@@ -180,7 +184,11 @@ fn prepare_refine_dir_uncached(target_root: &Path) -> RefineResult<PathBuf> {
 }
 
 fn tracked_legacy_state(target_root: &Path) -> RefineResult<Vec<String>> {
-    let output = Command::new("git")
+    let mut command = Command::new("git");
+    crate::infrastructure::process::launch_environment::remove_inherited_git_environment(
+        &mut command,
+    );
+    let output = command
         .args(["ls-files", "--", LEGACY_REFINE_DIR])
         .current_dir(target_root)
         .env("GIT_TERMINAL_PROMPT", "0")

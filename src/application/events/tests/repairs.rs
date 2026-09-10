@@ -10,6 +10,8 @@ fn prepared(fixture: &Fixture, source: &str) -> EventInvocation {
         node_id: "default".into(),
         target_root: fixture.0.clone(),
         cwd: fixture.0.clone(),
+        workspace: None,
+        lifecycle: None,
         provider: "smoke-ai".into(),
         goal_id: None,
         round_idx: None,
@@ -23,15 +25,15 @@ fn prepared(fixture: &Fixture, source: &str) -> EventInvocation {
         .unwrap()
 }
 fn result(invocation: &EventInvocation, binding: &PinnedBinding, outcome: &str) -> SkillResult {
-    SkillResult {
-        invocation_id: invocation.id.clone(),
-        binding_id: binding.binding.id.clone(),
-        role: binding.skill.role.clone(),
-        outcome: outcome.into(),
-        summary: outcome.into(),
-        evidence: vec![],
-        artifacts: json!({}),
-    }
+    let mut result: SkillResult = serde_json::from_value(result_contract(
+        &invocation.id,
+        &binding.binding.id,
+        &binding.skill.role,
+    ))
+    .unwrap();
+    result.outcome = outcome.into();
+    result.summary = outcome.into();
+    result
 }
 
 #[test]
@@ -81,6 +83,35 @@ fn execution_outcomes_and_gate_permission_are_independent() {
 
 #[cfg(unix)]
 struct ProviderEnv(Option<std::ffi::OsString>);
+
+#[test]
+fn blocking_gate_rejects_spoofed_identity_and_malformed_artifacts() {
+    let fixture = Fixture::new();
+    let mut invocation = prepared(&fixture, "workflow.plan.enter");
+    let binding = invocation.bindings[0].clone();
+    let mut accepted: SkillResult = serde_json::from_value(result_contract(
+        &invocation.id,
+        &binding.binding.id,
+        &binding.skill.role,
+    ))
+    .unwrap();
+    invocation.state = InvocationState::Succeeded;
+    invocation
+        .results
+        .insert(binding.binding.id.clone(), accepted.clone());
+    assert_eq!(invocation.gate_assessment(), GateAssessment::Satisfied);
+    accepted.invocation_id = "different-invocation".into();
+    invocation
+        .results
+        .insert(binding.binding.id.clone(), accepted.clone());
+    assert_eq!(invocation.gate_assessment(), GateAssessment::Fault);
+    accepted.invocation_id = invocation.id.clone();
+    accepted.artifacts = json!({"plan": {"summary": "missing checklist"}});
+    invocation
+        .results
+        .insert(binding.binding.id.clone(), accepted);
+    assert_eq!(invocation.gate_assessment(), GateAssessment::Fault);
+}
 #[cfg(unix)]
 impl Drop for ProviderEnv {
     fn drop(&mut self) {

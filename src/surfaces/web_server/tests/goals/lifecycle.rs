@@ -720,7 +720,8 @@ fn browser_terminal_stop_fails_the_goal_after_stopping_its_local_agent() {
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let temp_root = unique_temp_dir("http-goal-agent-terminal-stop");
     let app_root = temp_root.join("app");
-    let refine_dir = app_root.join(".refine");
+    init_git_app(&app_root);
+    let refine_dir = refine_dir_for_target_root(&app_root).unwrap();
     let runtime_root = temp_root.join("run/8082");
     let active_node = "terminal-stop-active-node";
     let provider = temp_root.join("smoke-ai");
@@ -765,6 +766,26 @@ fn browser_terminal_stop_fails_the_goal_after_stopping_its_local_agent() {
     work_items
         .advance_automated_goal_status("GOAL-TERMINAL-STOP", GoalStatus::Plan)
         .unwrap();
+    let git_service = crate::infrastructure::git::worktrees::FileGitWorktreeService::new(&app_root);
+    let base = git_service.resolve_commit("HEAD").unwrap();
+    let branch = "refine/GOAL-TERMINAL-STOP/round-1";
+    let workspace_path = git_service.managed_worktree_path(branch).unwrap();
+    git_service
+        .ensure_worktree_from_base(branch, &workspace_path, &base)
+        .unwrap();
+    work_items
+        .update_goal_git_refs("GOAL-TERMINAL-STOP", branch, "main", &base, None)
+        .unwrap();
+    let workspace = crate::infrastructure::git::worktrees::ManagedWorktree {
+        repository: app_root.clone(),
+        path: workspace_path.clone(),
+        branch: branch.into(),
+        commit: None,
+        allow_rebase: false,
+        registration: None,
+    }
+    .pin()
+    .unwrap();
     let runtime_for_thread = runtime_root.clone();
     let app_for_thread = app_root.clone();
     let session_thread = thread::spawn(move || {
@@ -778,12 +799,13 @@ fn browser_terminal_stop_fails_the_goal_after_stopping_its_local_agent() {
             json!(app_for_thread.display().to_string()),
         );
         metadata.insert("round_idx".to_string(), json!(0));
+        metadata.insert("managed_worktree".into(), json!(workspace));
         metadata.insert("workflow_state".to_string(), json!("in-progress"));
         run_goal_agent(
             GoalAgentLaunch {
                 provider_session: None,
                 runtime_root: runtime_for_thread,
-                cwd: app_for_thread,
+                cwd: workspace_path,
                 provider: "smoke-ai".to_string(),
                 prompt: "Implement Goal GOAL-TERMINAL-STOP".to_string(),
                 metadata,

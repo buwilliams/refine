@@ -44,6 +44,8 @@ pub fn goal_context(goal: &Value) -> Value {
                     round,
                     &[
                         "prompt",
+                        "reporter",
+                        "assignee",
                         "created",
                         "updated",
                         "implementation_report",

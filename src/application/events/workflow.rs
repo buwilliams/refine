@@ -1,5 +1,6 @@
 //! Workflow adapters bind generic Skill results to the existing semantic gates.
-use super::{FileEventService, InvocationContext};
+use super::execution::BlockingInvocation;
+use super::{FileEventService, InvocationContext, InvocationState};
 use crate::application::workflow::engine::context::WorkflowContext;
 use crate::error::{RefineError, RefineResult};
 use crate::infrastructure::process::supervisor::coordination::with_record_lock;
@@ -17,6 +18,23 @@ pub fn run(
     data: Value,
     variant: &str,
 ) -> RefineResult<Vec<SkillResult>> {
+    Ok(run_checked(ctx, status, edge, cwd, data, variant)?.results)
+}
+
+#[derive(Default)]
+struct WorkflowResults {
+    results: Vec<SkillResult>,
+    required: Vec<BlockingInvocation>,
+}
+
+fn run_checked(
+    ctx: &WorkflowContext<'_>,
+    status: GoalStatus,
+    edge: &str,
+    cwd: &Path,
+    data: Value,
+    variant: &str,
+) -> RefineResult<WorkflowResults> {
     ctx.revalidate_authority(status.clone())?;
     let source = format!("workflow.{}.{}", status.as_str(), edge);
     let config = FileEventService::new(ctx.refine_dir()).gate_configuration(
@@ -50,10 +68,25 @@ pub fn run(
         )));
     }
     let goal = ctx.work_items.show_goal_detail(&ctx.goal_id)?;
-    let context = InvocationContext {
+    if events.iter().all(|event| {
+        config
+            .bindings(event, &ctx.node_id)
+            .iter()
+            .all(|(binding, _)| binding.mode == BindingMode::Context)
+    }) {
+        return Ok(WorkflowResults::default());
+    }
+    let preplan = status == GoalStatus::Todo;
+    let mut context = InvocationContext {
         node_id: ctx.node_id.clone(),
         target_root: ctx.target_root.into(),
         cwd: cwd.into(),
+        workspace: if preplan {
+            None
+        } else {
+            Some(ctx.managed_worktree()?)
+        },
+        lifecycle: None,
         provider: ctx.provider.clone(),
         goal_id: Some(ctx.goal_id.clone()),
         round_idx: Some(ctx.round_idx),
@@ -62,7 +95,20 @@ pub fn run(
         data: json!({"goal": super::execution::goal_context(&goal), "system": {"node_id": ctx.node_id, "project_root": ctx.target_root, "workspace": cwd, "workflow_step": status.as_str(), "candidate_commit": ctx.commit}, "context": data}),
         metadata: ctx.workflow_process_metadata(status.as_str(), "EventSkill"),
     };
-    let mut results = Vec::new();
+    // Todo has no implementation checkout yet. Entry reuses the durable occurrence
+    // dispatched by the lifecycle worker; otherwise the current workflow claim
+    // authorizes a separate invocation-owned checkout for the Todo-to-Plan edge.
+    if preplan
+        && edge == "enter"
+        && let Some(occurrence) = goal["workflow_events"].as_array().and_then(|items| {
+            items
+                .iter()
+                .find(|item| item["generation"] == goal["event_generation"] && item["to"] == "todo")
+        })
+    {
+        context.data["occurrence"] = occurrence.clone();
+    }
+    let mut checked = WorkflowResults::default();
     for event in events {
         if config
             .bindings(event, &ctx.node_id)
@@ -81,6 +127,9 @@ pub fn run(
         );
         let invocation =
             service.prepare_pinned(&config, event, context.clone(), BTreeMap::new(), &key)?;
+        if let Some(required) = BlockingInvocation::pin(&invocation) {
+            checked.required.push(required);
+        }
         let mut invocation =
             service.execute_with_metadata(&invocation.id, Some(&context.metadata), || {
                 ctx.revalidate_authority(status.clone())
@@ -108,25 +157,34 @@ pub fn run(
             )?;
             Ok(())
         })?;
-        if invocation.gate_assessment()
-            == crate::application::workflow::gates::GateAssessment::Fault
+        let blocking = config
+            .bindings(event, &ctx.node_id)
+            .iter()
+            .any(|(binding, _)| binding.mode == BindingMode::Blocking);
+        if blocking && invocation.bindings.is_empty() && invocation.state == InvocationState::Error
         {
             return Err(invocation.execution_error());
         }
-        results.extend(
+        checked.results.extend(
             invocation
-                .bindings
-                .iter()
-                .filter(|b| b.binding.mode == BindingMode::Blocking)
-                .filter_map(|b| invocation.results.get(&b.binding.id))
-                .cloned()
+                .blocking_results()?
+                .into_iter()
                 .map(|mut result| {
                     result.binding_id = format!("{}:{}", event.id, result.binding_id);
                     result
                 }),
         );
     }
-    Ok(results)
+    // A later binding/event may have invalidated an earlier completion. Preserve
+    // failed findings as results, but never return incomplete or replaced evidence.
+    with_record_lock(&ctx.refine_dir(), &ctx.goal_id, || {
+        ctx.revalidate_authority(status)?;
+        for required in &checked.required {
+            required.validate_completion(&service)?;
+        }
+        Ok(())
+    })?;
+    Ok(checked)
 }
 
 pub fn require_success(results: &[SkillResult]) -> RefineResult<()> {
@@ -145,10 +203,19 @@ pub fn exit(ctx: &WorkflowContext<'_>, from: GoalStatus, to: GoalStatus) -> Refi
         .as_deref()
         .map(Path::new)
         .unwrap_or(ctx.target_root);
+    let mut checked = WorkflowResults::default();
     if !["plan", "implement", "quality", "governance"].contains(&from.as_str()) {
-        require_success(&run(ctx, from.clone(), "enter", cwd, json!({}), "")?)?;
+        checked = run_checked(
+            ctx,
+            from.clone(),
+            "enter",
+            cwd,
+            json!({"destination":to.as_str()}),
+            "",
+        )?;
+        require_success(&checked.results)?;
     }
-    let results = run(
+    let results = run_checked(
         ctx,
         from.clone(),
         "exit",
@@ -156,8 +223,17 @@ pub fn exit(ctx: &WorkflowContext<'_>, from: GoalStatus, to: GoalStatus) -> Refi
         json!({"destination": to.as_str()}),
         &format!("to-{}-{}", to.as_str(), ctx.commit.as_deref().unwrap_or("")),
     )?;
-    require_success(&results)?;
-    ctx.revalidate_authority(from)?;
-    let goal = ctx.work_items.show_goal_detail(&ctx.goal_id)?;
-    super::transitions::approve_exit(&ctx.refine_dir(), &goal, to.as_str())
+    require_success(&results.results)?;
+    checked.required.extend(results.required);
+    // Later Skills may run after an entry verdict was accepted. Recheck every
+    // blocking invocation at settlement before authorizing the status change.
+    with_record_lock(&ctx.refine_dir(), &ctx.goal_id, || {
+        ctx.revalidate_authority(from)?;
+        let service = FileEventService::with_runtime_root(ctx.refine_dir(), ctx.runtime_root);
+        service.settle_blocking(&checked.required, |validation| {
+            validation?;
+            let goal = ctx.work_items.show_goal_detail(&ctx.goal_id)?;
+            super::transitions::approve_exit(&ctx.refine_dir(), &goal, to.as_str())
+        })
+    })
 }

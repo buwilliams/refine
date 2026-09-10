@@ -109,6 +109,8 @@ Worktree cleanup is separate from Stop and cancellation; neither process action 
 
 `workflow_paused` is the canonical shared automation gate. Pausing blocks new Goal admission and lets automatic Git sync and inactive-worktree cleanup quiesce at safe repository-operation boundaries. Already active Goal executions continue unless their Agents are stopped separately. The daemon, API, and runner supervision remain available; quiesced repository workers settle normally instead of being treated as failed or permanently terminated. Resuming makes admission and those workers eligible to run again.
 
+Managed Goal agent launches require explicit cwd and a retained workspace admission, including provider-session resumes and fresh-launch fallbacks. Process Infrastructure revalidates the linked registration immediately before launch; Application supplies and checks the Goal, Round, and candidate authority. Inherited Git repository, worktree, index, object-store, and configuration redirection is removed after host-shell capture for agents, Quality checks, and managed Git commands. Deliberate internal per-command overrides, such as an isolated temporary index, remain supported. These checks do not attach general Toolbar or standalone sessions to a Goal.
+
 ## Future Direction
 
 Process Infrastructure should gain better resource observation, isolation, health checks, remote-node visibility, and provenance without turning node-local runtime facts into synchronized locks. Scaling should preserve the cheap-restart model: durable semantic work, transient workers, and clear Application authority over Goals.

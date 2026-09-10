@@ -91,6 +91,11 @@ pub(crate) fn run(
     let id = invocation.id.clone();
     let provider = HostAgentProviderService::with_runtime_root(service.runtime()?);
     let git = FileGitWorktreeService::with_runtime_root(&context.cwd, service.runtime()?);
+    let git = if let Some(workspace) = &context.workspace {
+        git.with_managed_worktree(workspace.clone())?
+    } else {
+        git
+    };
     let previous: Vec<_> = invocation
         .attempts
         .iter()
@@ -191,6 +196,11 @@ pub(crate) fn run(
             service.save_invocation(&current)?;
             drop(current);
             // The raw response is durable even if checkout observation or authority fails.
+            // Observe it before the authority callback so a settled provider receipt
+            // remains reusable after shutdown; the Git service fences each write.
+            if let Some(workspace) = &context.workspace {
+                workspace.validate_cwd(&context.cwd)?;
+            }
             receipt.checkout = observe(&git, &context.cwd)?;
             receipt.checkout_recorded = true;
             receipt.observational_violation =
