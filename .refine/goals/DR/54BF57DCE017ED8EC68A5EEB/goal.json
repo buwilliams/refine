@@ -135,6 +135,71 @@
           },
           "started_at": "2026-09-10T08:28:59Z"
         },
+        "final_plan": {
+          "completed_at": "2026-09-10T08:33:19Z",
+          "git_after": {
+            "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Create fresh Round worktrees from one resolved declared target, read their initial HEAD for the Goal base, candidate handoff, and planning binding, and distinguish creation from resumption so reopening existing work preserves its original base.",
+                "id": "P1"
+              },
+              {
+                "description": "Extend the existing Git capability and candidate-refresh workflow to derive the replay range from the candidate and current target merge base and replay it onto that exact target commit, handling mismatched recorded bases even when the target has not moved and preserving merge changes and already-applied work.",
+                "id": "P2"
+              },
+              {
+                "description": "Prepare lineage before Plan and Implement agents launch or resume, expose base, target, and worktree mismatches in their context, and reconcile affected planning bindings and handoff records through existing authority checks while preserving prior artifacts and unfinished work.",
+                "id": "P3"
+              },
+              {
+                "description": "Re-resolve the declared target for Quality and Governance recovery Rounds, branch from the retained candidate and replay that new branch when needed before implementation, and record its refreshed base and candidate without rewriting the source Round's evidence.",
+                "id": "P4"
+              },
+              {
+                "description": "Use the shared replay path at the Quality boundary and before integration, replace the strict recorded-base rejection and unmoved-target terminal failure with recoverable refresh routing, and retry late target movement through the existing bounded integration loop.",
+                "id": "P5"
+              },
+              {
+                "description": "Persist original and replacement base and candidate identities with the actual replay base, invalidate superseded gate projections, and rerun Quality and Governance for each replacement before publication while retaining the existing target lease and commit fences.",
+                "id": "P6"
+              },
+              {
+                "description": "Extend existing durable handoff evidence to record publication intent before pushing and retain the publication remote, candidate branch, last confirmed published candidate SHA, and pending replacement identity across refreshes and interrupted attempts.",
+                "id": "P7"
+              },
+              {
+                "description": "Republish the exact passing replacement through the shared Git capability with an atomic comparison against the candidate branch's recorded previously published remote SHA, recognize an already-published identical replacement on retry, and preserve and report any other remote change without adopting it as a new expected SHA or force-updating the target.",
+                "id": "P8"
+              },
+              {
+                "description": "Keep conflict resolution and abort recovery in the existing managed worktree path, preserve the original candidate on unsuccessful replay, report unresolved conflicting paths, and distinguish unsafe or unavailable history, dirty worktrees, authority loss, publication races, and Git errors from content conflicts.",
+                "id": "P9"
+              },
+              {
+                "description": "Update only the affected worktree and workflow intent pages to describe actual creation bases, early lineage repair, retry re-anchoring, automatic replay, fenced replacement publication, and recoverable conflict outcomes in their established format.",
+                "id": "P10"
+              }
+            ],
+            "criticism_resolutions": [
+              {
+                "criticism_id": "C1",
+                "resolution": "P7-P8 retain publication authority across replay and restart and replace ordinary republication with an atomic update fenced by the exact previously published remote candidate SHA; P5-P6 route late target movement through replacement Quality and Governance before this update, while retries recognize an identical published replacement and preserve all other remote changes."
+              }
+            ],
+            "summary": "Make worktree bindings reflect their actual target-based starting commit and extend the existing refresh workflow to replay stale or divergent candidates onto the current target, rerun their gates, and safely republish replacements against the exact previously published candidate so clean work can integrate despite target movement without overwriting concurrent remote changes."
+          },
+          "started_at": "2026-09-10T08:31:29Z"
+        },
         "phase": "revise",
         "phase_started_at": "2026-09-10T08:31:29Z",
         "proposal": {
@@ -191,7 +256,7 @@
         "schema_version": 2,
         "started_at": "2026-09-10T08:26:05Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T08:31:29Z"
+        "updated_at": "2026-09-10T08:33:19Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -205,7 +270,7 @@
       "quality_state": "unclassified",
       "reporter": "ethan.jacobson@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T08:31:29Z",
+      "updated": "2026-09-10T08:33:19Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T08:26:04Z",
         "round_idx": 0,
@@ -217,6 +282,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-09-10T08:31:29Z",
-  "workflow_revision": 11
+  "updated": "2026-09-10T08:33:19Z",
+  "workflow_revision": 12
 }
