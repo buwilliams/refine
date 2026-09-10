@@ -1,7 +1,7 @@
 {
   "base_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
   "branch_name": "refine/DR40B8829DD3748E280BBEE7EE/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "b10ae03fcf6ab1644ba33d18fec92ac0b18e3f55",
   "created": "2026-09-10T08:26:02Z",
   "feature_id": null,
   "feature_order": null,
@@ -95,7 +95,28 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-09-10T08:43:42Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
@@ -106,6 +127,7 @@
           "round_idx": 0,
           "target_branch": "main"
         },
+        "completed_at": "2026-09-10T08:43:41Z",
         "criticism": {
           "completed_at": "2026-09-10T08:30:27Z",
           "git_after": {
@@ -172,6 +194,59 @@
           "message": "Executing the finalized plan does not necessarily violate any supplied governance rule or enabled guidance.",
           "status": "passed"
         },
+        "implementation": {
+          "completed_at": "2026-09-10T08:43:41Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Added auto_approve=false to the existing node settings codec and runtime copy section. JSON booleans and true/false strings normalize through the shared service; invalid values are rejected without changing saved state. Tests cover new and existing nodes, API PATCH/GET, CLI show/set, and runtime copying.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "The email-request service loads FileSettingsService with the worker runtime root at every Review approval decision. Missing or false values retain Review; settings read/validation failures retain Review and record retry evidence. Tests prove the worker node setting takes precedence over the default node.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "The first observed Review timestamp is persisted before reading the approval flag. Repeated polls preserve it while disabled or settings are invalid. Tests toggle the same running service and verify that enabling honors auto_approve_after_seconds from the recorded time, including requests already waiting.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Automatic acceptance still calls approve_reviewed_goal and rejects missing Governance evidence. Done notification handling remains independent of settings reads. Tests cover manual acceptance with disabled or invalid settings, exactly one notification, unchanged completed records, follow-up Rounds, and approval without another Git integration. Review and notification logic was extracted into a focused module.",
+                "id": "P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Node Runtime Config exposes Auto-approve through the existing editable field and autosave flow, explaining node scope, email requests, manual default, waiting requests, and delay. JavaScript tests exercise saved/default rendering, commit-event autosave, and rollback after rejected saves. The existing runtime render/bind/autosave file remains one cohesive surface; new tests use focused modules.",
+                "id": "P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated docs/intent/03-application/02-workflow/07-review.md, docs/intent/05-surfaces/03-browser/12-settings.md, and docs/runbooks/development-request-email.md in their existing formats. Documented the false default, conditional delay, live toggles, manual Approve action, follow-up Rounds, and notifications after either approval path.",
+                "id": "P6",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "cargo test --lib application::development_requests:: -- --test-threads=1: 24 passed, 0 failed, 0 ignored.",
+              "cargo test --lib infrastructure::process::supervisor::config:: -- --test-threads=1: 24 passed, 0 failed, 0 ignored.",
+              "cargo test --lib surfaces::cli::tests::config:: -- --test-threads=1: 7 passed, 0 failed, 0 ignored.",
+              "cargo test --lib surfaces::web_server::tests::project_runtime:: -- --test-threads=1: 9 passed, 0 failed, 0 ignored.",
+              "cargo test --lib surfaces::web_server::tests::nodes_fleet:: -- --test-threads=1: 5 passed, 0 failed, 0 ignored.",
+              "cargo test --lib application::workflow::governance::integration::tests::review:: -- --test-threads=1: 1 passed, 0 failed, 0 ignored.",
+              "cargo test --lib surfaces::web_server::tests::static_surface::settings:: -- --test-threads=1: 4 passed, 0 failed, 0 ignored.",
+              "node --test tests/web_settings*.test.js tests/runtime_upgrade_banner.test.js: 17 passed, 0 failed, 0 skipped. Existing runtime_upgrade_banner.test.js emitted Node's module-type warning.",
+              "node --check src/surfaces/web/static/js/features/settings_runtime.js: exit 0.",
+              "git diff --cached --name-only -z -- '*.rs' | xargs -0 -r rustfmt --edition 2024 --config skip_children=true --check: exit 0 before commit.",
+              "git diff --cached --check: exit 0 before commit.",
+              "git rev-parse HEAD: b10ae03fcf6ab1644ba33d18fec92ac0b18e3f55; git status --porcelain=v1: empty after commit."
+            ]
+          },
+          "report": "Implemented node-scoped Auto-approve, default false, with live email-worker decisions, Runtime Config autosave, shared API/CLI/copy support, and updated documentation. Candidate commit b10ae03fcf6ab1644ba33d18fec92ac0b18e3f55; worktree clean. Verification: 74 targeted Rust tests and 17 JavaScript tests passed, no skips; formatting, syntax, and whitespace checks passed.",
+          "started_at": "2026-09-10T08:32:42Z"
+        },
         "phase": "implement",
         "phase_started_at": "2026-09-10T08:32:42Z",
         "proposal": {
@@ -219,11 +294,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-09-10T08:26:03Z",
-        "state": "in_progress",
-        "updated_at": "2026-09-10T08:32:42Z"
+        "state": "completed",
+        "updated_at": "2026-09-10T08:43:41Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Implemented node-scoped Auto-approve, default false, with live email-worker decisions, Runtime Config autosave, shared API/CLI/copy support, and updated documentation. Candidate commit b10ae03fcf6ab1644ba33d18fec92ac0b18e3f55; worktree clean. Verification: 74 targeted Rust tests and 17 JavaScript tests passed, no skips; formatting, syntax, and whitespace checks passed.",
+      "implementation_reported_at": "2026-09-10T08:43:41Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -234,7 +309,7 @@
       "quality_state": "unclassified",
       "reporter": "ethan.jacobson@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T08:32:42Z",
+      "updated": "2026-09-10T08:43:42Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T08:26:03Z",
         "round_idx": 0,
@@ -244,8 +319,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-10T08:32:42Z",
-  "workflow_revision": 15
+  "updated": "2026-09-10T08:43:42Z",
+  "workflow_revision": 20
 }
