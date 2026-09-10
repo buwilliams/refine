@@ -937,11 +937,60 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-quality": {
+      "invocation_id": "7c53d7a891e9ea2c0794e142fd62f78e252d2822068f885b4a81b002c4b09194",
+      "binding_id": "default-quality",
+      "role": "quality",
+      "outcome": "success",
+      "summary": "Observational review passed for the pinned refreshed candidate: 137 focused tests passed without skips, additional launch/exit/restart probes passed, and no unresolved defects were found.",
+      "evidence": [
+        "Reviewed pinned candidate b6dfd178b0f4bac23f1b018e7c3510c04560f636 against the finalized plan and Terminal, Toolbar, and Command Palette intent. No unresolved findings.",
+        "Git range-diff confirmed both refreshed commits preserve the previously reviewed patches. All four extracted keyboard helpers are byte-for-byte unchanged from the pinned base.",
+        "The shared browser adapter preserves Alt+Up/Down as ESC[1;3A/B. Shortcut meaning remains owned by the attached application. Input transport revalidates session identity and exit before deferred sends; backend forwarding remains unchanged.",
+        "An additional read-only Node stdin browser probe using tests/support/terminal_browser passed for Agent and Skill. It exercised actual launch controls, automatic input flushing, terminal_exit events, retained output, and explicit Restart. Input reached session-1 before exit, was suppressed after exit, and reached only session-3 after restart.",
+        "The listed commands were executed against the pinned candidate and are suitable for supervised verification. Full web/Rust suites and the release build were not rerun during this focused observational review.",
+        "Browser coverage uses real Chromium/xterm with platform settings and intercepted daemon requests. Native Codex conversation behavior and physical Windows/macOS environments were not tested.",
+        "Final HEAD remains b6dfd178b0f4bac23f1b018e7c3510c04560f636 on the pinned Round branch; git status is clean. No source edits, Git mutations, Goal changes, merge, push, deployment, or daemon restart occurred."
+      ],
+      "artifacts": {
+        "tests": [
+          {
+            "command": "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal*.test.js tests/web_supervisor_toolbar.test.js tests/web_goal_log_tail.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js",
+            "evidence": "Exit 0: 137 passed, 0 failed, 0 skipped. Real Chromium/xterm tests verified exact Alt-arrow bytes, modifiers, repeat, focus, profiles, clipboard compatibility, renderer replacement, and buffered/deferred session fencing.",
+            "status": "passed",
+            "test": "Shared terminal keyboard behavior and affected surface regressions"
+          },
+          {
+            "command": "cargo fmt --all -- --check",
+            "evidence": "Exit 0.",
+            "status": "passed",
+            "test": "Rust formatting"
+          },
+          {
+            "command": "git diff --check && git diff 47a0059f14971ba766b231183bd5cb1a218450f8 b6dfd178b0f4bac23f1b018e7c3510c04560f636 --check",
+            "evidence": "Exit 0.",
+            "status": "passed",
+            "test": "Worktree and complete candidate whitespace"
+          }
+        ]
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-quality",
+      "diagnostic": null,
+      "operation_id": "1a08c403fdf113c7677",
+      "process_id": "proc-1789059416820-1129590-1215",
+      "raw_output": "{\n  \"artifacts\": {\n    \"tests\": [\n      {\n        \"command\": \"NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal*.test.js tests/web_supervisor_toolbar.test.js tests/web_goal_log_tail.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js\",\n        \"evidence\": \"Exit 0: 137 passed, 0 failed, 0 skipped. Real Chromium/xterm tests verified exact Alt-arrow bytes, modifiers, repeat, focus, profiles, clipboard compatibility, renderer replacement, and buffered/deferred session fencing.\",\n        \"status\": \"passed\",\n        \"test\": \"Shared terminal keyboard behavior and affected surface regressions\"\n      },\n      {\n        \"command\": \"cargo fmt --all -- --check\",\n        \"evidence\": \"Exit 0.\",\n        \"status\": \"passed\",\n        \"test\": \"Rust formatting\"\n      },\n      {\n        \"command\": \"git diff --check && git diff 47a0059f14971ba766b231183bd5cb1a218450f8 b6dfd178b0f4bac23f1b018e7c3510c04560f636 --check\",\n        \"evidence\": \"Exit 0.\",\n        \"status\": \"passed\",\n        \"test\": \"Worktree and complete candidate whitespace\"\n      }\n    ]\n  },\n  \"binding_id\": \"default-quality\",\n  \"evidence\": [\n    \"Reviewed pinned candidate b6dfd178b0f4bac23f1b018e7c3510c04560f636 against the finalized plan and Terminal, Toolbar, and Command Palette intent. No unresolved findings.\",\n    \"Git range-diff confirmed both refreshed commits preserve the previously reviewed patches. All four extracted keyboard helpers are byte-for-byte unchanged from the pinned base.\",\n    \"The shared browser adapter preserves Alt+Up/Down as ESC[1;3A/B. Shortcut meaning remains owned by the attached application. Input transport revalidates session identity and exit before deferred sends; backend forwarding remains unchanged.\",\n    \"An additional read-only Node stdin browser probe using tests/support/terminal_browser passed for Agent and Skill. It exercised actual launch controls, automatic input flushing, terminal_exit events, retained output, and explicit Restart. Input reached session-1 before exit, was suppressed after exit, and reached only session-3 after restart.\",\n    \"The listed commands were executed against the pinned candidate and are suitable for supervised verification. Full web/Rust suites and the release build were not rerun during this focused observational review.\",\n    \"Browser coverage uses real Chromium/xterm with platform settings and intercepted daemon requests. Native Codex conversation behavior and physical Windows/macOS environments were not tested.\",\n    \"Final HEAD remains b6dfd178b0f4bac23f1b018e7c3510c04560f636 on the pinned Round branch; git status is clean. No source edits, Git mutations, Goal changes, merge, push, deployment, or daemon restart occurred.\"\n  ],\n  \"invocation_id\": \"7c53d7a891e9ea2c0794e142fd62f78e252d2822068f885b4a81b002c4b09194\",\n  \"outcome\": \"success\",\n  \"role\": \"quality\",\n  \"summary\": \"Observational review passed for the pinned refreshed candidate: 137 focused tests passed without skips, additional launch/exit/restart probes passed, and no unresolved defects were found.\"\n}\n",
+      "workflow_revision": 2
+    }
+  ],
   "created_at": "2026-09-10T16:56:56.482940716+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-10T17:00:23.341708636+00:00",
   "error": null,
   "action_applied": false
 }
