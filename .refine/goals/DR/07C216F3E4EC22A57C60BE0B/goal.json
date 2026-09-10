@@ -1,7 +1,7 @@
 {
   "base_commit": "a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e",
   "branch_name": "refine/DR07C216F3E4EC22A57C60BE0B/round-5",
-  "candidate_commit": "462118664ddf8754de2b4c3f60b4febe19a051c1",
+  "candidate_commit": "3d221f8f5b5877d39da99aed12ded63df9cbd5d6",
   "created": "2026-09-10T08:26:00Z",
   "event_generation": 16,
   "feature_id": "00000T130Z0R6J0GJMARY62005",
@@ -6258,6 +6258,121 @@
           "source": "workflow.implement.enter",
           "state": "succeeded"
         },
+        "83faa29411d7e81e33b08f6444382c980db3b9a4d0bea0e73098ae7c774caf39": {
+          "candidate_commit": "462118664ddf8754de2b4c3f60b4febe19a051c1",
+          "results": {
+            "default-quality": {
+              "artifacts": {
+                "tests": [
+                  {
+                    "command": "cargo test --lib application::agents::sessions -- --test-threads=1",
+                    "evidence": "42 passed.",
+                    "status": "passed",
+                    "test": "PTY settlement and replacement protection"
+                  },
+                  {
+                    "command": "cargo test --lib surfaces::web_server::http::background_loops -- --test-threads=1",
+                    "evidence": "4 passed.",
+                    "status": "passed",
+                    "test": "Artifact retention"
+                  },
+                  {
+                    "command": "cargo test --lib worker_liveness -- --test-threads=1",
+                    "evidence": "11 passed.",
+                    "status": "passed",
+                    "test": "Failure containment and follow-up admission"
+                  },
+                  {
+                    "command": "cargo test --lib failure_settlement -- --test-threads=1",
+                    "evidence": "4 passed.",
+                    "status": "passed",
+                    "test": "Settlement authority and evidence"
+                  },
+                  {
+                    "command": "cargo test --lib infrastructure::process::subprocess -- --test-threads=1",
+                    "evidence": "35 passed.",
+                    "status": "passed",
+                    "test": "Ownership and termination"
+                  },
+                  {
+                    "command": "cargo test --lib infrastructure::process::supervisor -- --test-threads=1",
+                    "evidence": "54 passed.",
+                    "status": "passed",
+                    "test": "Process supervision"
+                  },
+                  {
+                    "command": "cargo test --lib application::workers -- --test-threads=1",
+                    "evidence": "39 passed.",
+                    "status": "passed",
+                    "test": "Worker recovery and maintenance"
+                  },
+                  {
+                    "command": "cargo test --lib application::maintenance::worktrees -- --test-threads=1",
+                    "evidence": "20 passed.",
+                    "status": "passed",
+                    "test": "Worktree protection"
+                  },
+                  {
+                    "command": "cargo test --lib application::workflow::health -- --test-threads=1",
+                    "evidence": "4 passed.",
+                    "status": "passed",
+                    "test": "Shared workflow health"
+                  },
+                  {
+                    "command": "cargo test --lib surfaces::web_server::tests::http_transport::runtime -- --test-threads=1",
+                    "evidence": "8 passed.",
+                    "status": "passed",
+                    "test": "HTTP runtime"
+                  },
+                  {
+                    "command": "cargo check --all-targets --locked",
+                    "evidence": "Exit 0.",
+                    "status": "passed",
+                    "test": "Compilation"
+                  },
+                  {
+                    "command": "cargo fmt --all -- --check",
+                    "evidence": "Exit 0.",
+                    "status": "passed",
+                    "test": "Formatting"
+                  },
+                  {
+                    "command": "cargo test --lib --bins -- --test-threads=1",
+                    "evidence": "1279 passed, 0 failed, 6 existing tests ignored. Binary target selected 0 tests.",
+                    "status": "passed",
+                    "test": "Full suite"
+                  },
+                  {
+                    "command": "cargo build --release --locked",
+                    "evidence": "Exit 0.",
+                    "status": "passed",
+                    "test": "Release build"
+                  },
+                  {
+                    "command": "git diff --check",
+                    "evidence": "Exit 0.",
+                    "status": "passed",
+                    "test": "Patch whitespace"
+                  }
+                ]
+              },
+              "binding_id": "default-quality",
+              "evidence": [
+                "Reviewed candidate 462118664ddf8754de2b4c3f60b4febe19a051c1. Seven changed files remain uncommitted for Refine capture.",
+                "Reproduced and corrected stale termination accepting a mismatched PID and stale terminal updates overwriting replacement registration. Added three regressions, including run_goal_agent coverage proving replacement descendants, capacity and artifacts remain protected.",
+                "All final checks ran through FileProcessSupervisor with ProcessOwner::Quality. Verified 957 source hashes unchanged. Exact commands, results and logs: /tmp/refine-r5-quality/final/final-results.json. Report: /tmp/refine-r5-quality/quality-completion.json. Patch: /tmp/refine-r5-quality/quality.patch.",
+                "Two defect reproductions exited 101 before correction. An earlier superseded full run failed 10 tests because my overlapping rebuild replaced its running executable. Failures are retained in findings.json and development-history.json under /tmp/refine-r5-quality/. The final full run passed without overlapping rebuilds.",
+                "No unresolved findings remain. Six ignored tests and reasons are recorded in /tmp/refine-r5-quality/ignored-tests.json. macOS remains unverified. No Goal state changes, commits, merges, pushes, deployment or supervising-daemon restart occurred."
+              ],
+              "invocation_id": "83faa29411d7e81e33b08f6444382c980db3b9a4d0bea0e73098ae7c774caf39",
+              "outcome": "success",
+              "role": "quality",
+              "summary": "Corrected stale process identity handling, added three regressions, and passed final Linux verification."
+            }
+          },
+          "source": "workflow.quality.enter",
+          "state": "succeeded"
+        },
         "ce761fc8ceda747f31465e9b9e75c0bdc69c2efe9ea33cc74f4e1c61bcf411d4": {
           "candidate_commit": null,
           "results": {
@@ -6580,13 +6695,125 @@
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
       "prompt": "Recover Goal DR07C216F3E4EC22A57C60BE0B in a fresh Refine-managed implementation Round using the target tip selected at admission. Preserve all previous attempts, branches, worktrees, commits, uncommitted files and evidence. Inspect and selectively retain candidate 8087e73c50825c99eb780c504b913e0c34c3c596, including its operation/deadline corrections and bounded scope-receipt test. Round 4 was based on a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e. Read its finalized plan, failed invocation /home/buddy/projects/refine-next/.git/refine-live-state/automation/invocations/3ec0b553d86c4fe2ece68ffc7d36eabbd571b6897308b4b0251f9eff6af7f376.json, preceding Quality invocation e279bd1c5559f8462990cb4e888bd06f8e5d5975cca5a187c8591e5b86afe627.json, and /tmp/refine-r4-quality/{reproductions.json,final-results.json,quality.patch}. Follow current Skills and affected execution-ownership/process intent.\n\nComplete adoption of FileProcessSupervisor ownership across PTY settlement and artifact retirement. In src/application/agents/sessions/session_runtime.rs, distinguish workload PID/status from guardian identity/status. Route completion, timeout and error termination through the shared bounded ownership mechanism, preserving the guardian while it adopts and reaps descendants and produces trustworthy scope-exit proof. Audit related launch-failure and reader-settlement paths. Consume workload-status evidence separately from whole-scope completion; preserve output, exit semantics and structured completion results without waiting indefinitely for detached descendants. Bound settlement and reader shutdown. If termination or proof is unavailable, retain capacity and artifacts and surface actionable uncertainty without claiming exit. Preserve identity fences, overlapping-stop coordination, survivor resume, original deadlines, Toolbar protection, human-input exceptions and settlement authority. Continue using maintain_daemon; do not introduce another scheduler or reaper.\n\nCorrect sweep_orphan_process_logs in src/surfaces/web_server/http/background_loops.rs to use shared ownership and artifact-retirement rules. Missing primary registration alone must not authorize deletion. Preserve stdout, stderr and stdin evidence for Live, Unverified, corrupt or unreadable ownership and while artifact handoff remains active. Recheck retirement eligibility under appropriate coordination. Proven-exited artifacts should remain removable after the existing retention interval. Keep the HTTP surface thin and avoid duplicating ownership policy.\n\nAdd deterministic regressions through run_goal_agent and the actual retention consumer. Exercise valid completion, hard-cap/idle failure, natural workload exit and relevant setup/capture failures with controlled guardian timing and a setsid descendant surviving leader exit before descendant observation. Verify real descendant state, identity-bound exit proof, group_pending, capacity accounting and replacement eligibility; an empty list() is insufficient. Cover missing primary registration and unavailable ownership evidence. Assert safe eventual release when proof becomes available and explicit retained uncertainty otherwise. Through the same workflow runner, prove another eligible Goal enters Plan within one poll interval after a PTY failure safely releases capacity. Test all three aged log types with Live, Unverified, corrupt/unreadable and proven-exited ownership, including active handoff and unexpired retention. Preserve existing operation-revision, cancellation, deadline, settlement-panic and worktree-protection regressions.\n\nRun focused checks through supported Refine supervision: cargo test --lib <filter> -- --test-threads=1 for application::agents::sessions, surfaces::web_server::http::background_loops, worker_liveness, failure_settlement, infrastructure::process::subprocess, infrastructure::process::supervisor, application::workers, application::maintenance::worktrees, application::workflow::health and surfaces::web_server::tests::http_transport::runtime. Ensure new tests are selected. Run cargo check --all-targets --locked, cargo fmt --all -- --check, cargo test --lib --bins -- --test-threads=1, cargo build --release --locked and git diff --check. Report exact commands, nonzero selected counts, failures, ignored/skipped checks, logs and candidate identity. Establish any baseline failure against this new Round's pinned base. Prior Linux passes do not cover these missing behaviors; macOS remains unverified because the earlier cross-check failed compiling aws-lc-sys with unsupported Darwin compiler flags. Update only affected intent documentation. Refine owns candidate capture and workflow advancement; do not directly edit Goal state, approve, push, merge, deploy or restart the supervising daemon.",
+      "quality_agent_report": "workflow.quality.enter:default-quality: Corrected stale process identity handling, added three regressions, and passed final Linux verification.",
+      "quality_candidate_commit": "3d221f8f5b5877d39da99aed12ded63df9cbd5d6",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
+      "quality_skill_results": [
+        {
+          "artifacts": {
+            "tests": [
+              {
+                "command": "cargo test --lib application::agents::sessions -- --test-threads=1",
+                "evidence": "42 passed.",
+                "status": "passed",
+                "test": "PTY settlement and replacement protection"
+              },
+              {
+                "command": "cargo test --lib surfaces::web_server::http::background_loops -- --test-threads=1",
+                "evidence": "4 passed.",
+                "status": "passed",
+                "test": "Artifact retention"
+              },
+              {
+                "command": "cargo test --lib worker_liveness -- --test-threads=1",
+                "evidence": "11 passed.",
+                "status": "passed",
+                "test": "Failure containment and follow-up admission"
+              },
+              {
+                "command": "cargo test --lib failure_settlement -- --test-threads=1",
+                "evidence": "4 passed.",
+                "status": "passed",
+                "test": "Settlement authority and evidence"
+              },
+              {
+                "command": "cargo test --lib infrastructure::process::subprocess -- --test-threads=1",
+                "evidence": "35 passed.",
+                "status": "passed",
+                "test": "Ownership and termination"
+              },
+              {
+                "command": "cargo test --lib infrastructure::process::supervisor -- --test-threads=1",
+                "evidence": "54 passed.",
+                "status": "passed",
+                "test": "Process supervision"
+              },
+              {
+                "command": "cargo test --lib application::workers -- --test-threads=1",
+                "evidence": "39 passed.",
+                "status": "passed",
+                "test": "Worker recovery and maintenance"
+              },
+              {
+                "command": "cargo test --lib application::maintenance::worktrees -- --test-threads=1",
+                "evidence": "20 passed.",
+                "status": "passed",
+                "test": "Worktree protection"
+              },
+              {
+                "command": "cargo test --lib application::workflow::health -- --test-threads=1",
+                "evidence": "4 passed.",
+                "status": "passed",
+                "test": "Shared workflow health"
+              },
+              {
+                "command": "cargo test --lib surfaces::web_server::tests::http_transport::runtime -- --test-threads=1",
+                "evidence": "8 passed.",
+                "status": "passed",
+                "test": "HTTP runtime"
+              },
+              {
+                "command": "cargo check --all-targets --locked",
+                "evidence": "Exit 0.",
+                "status": "passed",
+                "test": "Compilation"
+              },
+              {
+                "command": "cargo fmt --all -- --check",
+                "evidence": "Exit 0.",
+                "status": "passed",
+                "test": "Formatting"
+              },
+              {
+                "command": "cargo test --lib --bins -- --test-threads=1",
+                "evidence": "1279 passed, 0 failed, 6 existing tests ignored. Binary target selected 0 tests.",
+                "status": "passed",
+                "test": "Full suite"
+              },
+              {
+                "command": "cargo build --release --locked",
+                "evidence": "Exit 0.",
+                "status": "passed",
+                "test": "Release build"
+              },
+              {
+                "command": "git diff --check",
+                "evidence": "Exit 0.",
+                "status": "passed",
+                "test": "Patch whitespace"
+              }
+            ]
+          },
+          "binding_id": "workflow.quality.enter:default-quality",
+          "evidence": [
+            "Reviewed candidate 462118664ddf8754de2b4c3f60b4febe19a051c1. Seven changed files remain uncommitted for Refine capture.",
+            "Reproduced and corrected stale termination accepting a mismatched PID and stale terminal updates overwriting replacement registration. Added three regressions, including run_goal_agent coverage proving replacement descendants, capacity and artifacts remain protected.",
+            "All final checks ran through FileProcessSupervisor with ProcessOwner::Quality. Verified 957 source hashes unchanged. Exact commands, results and logs: /tmp/refine-r5-quality/final/final-results.json. Report: /tmp/refine-r5-quality/quality-completion.json. Patch: /tmp/refine-r5-quality/quality.patch.",
+            "Two defect reproductions exited 101 before correction. An earlier superseded full run failed 10 tests because my overlapping rebuild replaced its running executable. Failures are retained in findings.json and development-history.json under /tmp/refine-r5-quality/. The final full run passed without overlapping rebuilds.",
+            "No unresolved findings remain. Six ignored tests and reasons are recorded in /tmp/refine-r5-quality/ignored-tests.json. macOS remains unverified. No Goal state changes, commits, merges, pushes, deployment or supervising-daemon restart occurred."
+          ],
+          "invocation_id": "83faa29411d7e81e33b08f6444382c980db3b9a4d0bea0e73098ae7c774caf39",
+          "outcome": "success",
+          "role": "quality",
+          "summary": "Corrected stale process identity handling, added three regressions, and passed final Linux verification."
+        }
+      ],
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T20:22:32Z",
+      "updated": "2026-09-10T20:37:54Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T19:36:49Z",
         "round_idx": 4,
@@ -6598,7 +6825,7 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-10T20:22:32Z",
+  "updated": "2026-09-10T20:37:54Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:37.178169037+00:00",
@@ -6745,5 +6972,5 @@
       "to": "quality"
     }
   ],
-  "workflow_revision": 119
+  "workflow_revision": 123
 }
