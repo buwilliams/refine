@@ -1,5 +1,5 @@
 {
-  "id": "dbfad5f546b738c8b35c532e19e90cecfe5ecda025ee63bc31165845984103e4",
+  "id": "2929b7e8ae050a027f664ec99a1106eacb10aa05e88563126424482ccc17adc4",
   "event": {
     "id": "workflow.quality.enter",
     "name": "Workflow Quality Enter",
@@ -35,342 +35,14 @@
     "goal_id": "DRCBAA3A2FC4ABDDCEC2B87473",
     "round_idx": 1,
     "workflow_revision": 18,
-    "candidate_commit": "99172365aaa3409f10886c3b00bb0026b0ccb790",
+    "candidate_commit": "b3465d05ac29dd4c597d2971b84d82ed07377b77",
     "data": {
-      "context": {
-        "agent_context": {
-          "assembled_at": "2026-09-10T13:43:06Z",
-          "current_round": {
-            "assignee": "ethan.jacobson@insurity.com",
-            "prompt": "Make human acceptance, rejection, cancellation, failure and recovery measurable from durable Goal history.\n\nThe request remains valid, but its description of every passed Quality/Governance gate reaching Done is outdated. Current Skills run checks, integration leads to Review, and approval is a separate decision. Passing a Skill, or having no required check Skills, must never be counted as human acceptance. Round 1 has substantial uncommitted work but no candidate or completed verification; reassess it against current lifecycle and Skill execution code.\n\nRecord immutable human decision events with a stable identity, Goal, Round, node, reviewer, decision time, accepted or rejected result, optional reason and exact candidate. Make rejection a supported outcome distinct from cancellation, with an explicit path to a new Round that retains the rejection. Record terminal outcomes with completion time, resolution type, failure category where applicable, manual intervention, total and recovery Rounds, and first-Round success. Keep integration facts separate from acceptance, and classify automatic completion only when its actual authority is recorded. Capture Skill failures and execution errors without mistaking every failed Skill attempt or automatic retry for final Goal failure.\n\nUse shared work-item operations for CLI, API, browser and bulk decisions. Persist decisions and status atomically, fence stale or duplicate requests, preserve exact-candidate approval requirements, and retain earlier outcomes when work reopens. Keep this history through synchronization, log pruning and supported deletion or archival. Preserve original decision and completion timestamps and attribution; report unknown legacy data instead of inventing it.\n\nProvide a shared query and CLI/API report over a date range, grouped by node, reporter or Feature, with time buckets, outcome counts, human accept rate, automatic resolution rate, first-Round success, average Rounds and failure rate. Define deduplication and denominators, expose missing-data coverage and use null for an empty denominator. Extend existing indexes and caches so routine queries do not scan every Round or run history.\n\nVerify acceptance, rejection, Skill failure followed by recovery, cancellation, reopen, duplicate and stale submissions, sync conflicts, retention and legacy records. Check known fixture totals, rates, date boundaries and query performance.\n\nThis is a recovery Round following the Skills review on 10 September 2026. Start from current main in a new managed Round worktree. Preserve Round 1, its plans, logs, branches, commits and uncommitted files; inspect and selectively reuse useful work instead of replaying the whole old attempt. Use the current Skills and docs/intent contracts, not archived Governance, Quality or Guidance configuration or the old fixed planning sequence. Refine owns workflow advancement and integration; human approval remains separate. Update only affected documentation and report focused verification with actual results.",
-            "reporter": "Buddy Williams",
-            "round": 2
-          },
-          "goal": {
-            "assignee": "ethan.jacobson@insurity.com",
-            "id": "DRCBAA3A2FC4ABDDCEC2B87473",
-            "name": "Record durable Goal decisions and resolution metrics",
-            "node_id": "default",
-            "priority": "low",
-            "reporter": "ethan.jacobson@insurity.com"
-          },
-          "governance": {
-            "configured": false,
-            "constitution": "",
-            "product": "",
-            "rules": []
-          },
-          "guidance_candidates": [],
-          "previous_rounds": [
-            {
-              "assignee": "ethan.jacobson@insurity.com",
-              "implementation_plan": {
-                "binding": {
-                  "base_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
-                  "context_digest": "c88687895f79c5b5151767240a2b52d7afcd78423857c1f59ae7ca4f53a1b925",
-                  "context_version": 1,
-                  "goal_id": "DRCBAA3A2FC4ABDDCEC2B87473",
-                  "implementation_branch": "refine/DRCBAA3A2FC4ABDDCEC2B87473/round-1",
-                  "round_idx": 0,
-                  "target_branch": "main"
-                },
-                "criticism": {
-                  "completed_at": "2026-09-10T08:31:51Z",
-                  "git_after": {
-                    "branch": "refine/DRCBAA3A2FC4ABDDCEC2B87473/round-1",
-                    "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
-                    "status_porcelain": []
-                  },
-                  "git_before": {
-                    "branch": "refine/DRCBAA3A2FC4ABDDCEC2B87473/round-1",
-                    "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
-                    "status_porcelain": []
-                  },
-                  "result": {
-                    "summary": "The plan covers durable review decisions, terminal outcomes, recovery, synchronization, retention, and metrics without material omissions."
-                  },
-                  "started_at": "2026-09-10T08:30:02Z"
-                },
-                "final_plan": {
-                  "completed_at": "2026-09-10T08:34:01Z",
-                  "git_after": {
-                    "branch": "refine/DRCBAA3A2FC4ABDDCEC2B87473/round-1",
-                    "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
-                    "status_porcelain": []
-                  },
-                  "git_before": {
-                    "branch": "refine/DRCBAA3A2FC4ABDDCEC2B87473/round-1",
-                    "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
-                    "status_porcelain": []
-                  },
-                  "result": {
-                    "checklist": [
-                      {
-                        "description": "Define Rejected as a settled outcome distinct from Cancelled and Failed, preserve Governance integration into pending Review, classify only proven automated completion into Done as auto_integrated, and retain Failed as recoverable while counting its settlement as unsuccessful.",
-                        "id": "P1"
-                      },
-                      {
-                        "description": "Extend the Goal model with immutable human decision events containing goal_id, one-based round, node_id, actor, decided_at, accepted or rejected decision, optional reason and candidate_commit, and terminal snapshots containing final_status, auto_integrated or human_accepted or human_rejected or cancelled or failed resolution, completed_at, failure_category when failed, manual_intervention_required, total_rounds, recovery_rounds and first_round_success, with stable identities and captured node, reporter and Feature attribution.",
-                        "id": "P2"
-                      },
-                      {
-                        "description": "Add shared decision and outcome operations within the existing work-item capability that persist status, immutable events and the current outcome reference atomically under the existing Goal lock and revision checks, ensuring an unaudited decision or settlement cannot be acknowledged.",
-                        "id": "P3"
-                      },
-                      {
-                        "description": "Implement acceptance and rejection with explicit reviewer identity and human decision provenance, existing acceptance proof requirements, locked revalidation of ownership, Review status, Round and exact candidate, and request identities that return the original event on identical retries while rejecting stale or contradictory submissions.",
-                        "id": "P4"
-                      },
-                      {
-                        "description": "Make rejection settle the Goal as Rejected with its decision and reason, exclude it from scheduling and successful Feature completion, and permit an explicit recovery or new Round from the current target state while retaining integrated code and the complete rejection history.",
-                        "id": "P5"
-                      },
-                      {
-                        "description": "Route existing CLI, API, browser and bulk acceptance paths through the shared decision operation, add corresponding rejection actions and optional reasons, capture identity from explicit input or the selected acting reviewer, and keep automated review provenance distinct while preventing generic status changes from manufacturing human acceptance.",
-                        "id": "P6"
-                      },
-                      {
-                        "description": "Capture terminal snapshots at every authoritative completion, cancellation and failure settlement, including bulk changes, process-stop failures, exhausted recovery and already-integrated recovery paths, preserving stale-worker and cancellation authority and recording exact integration and structured failure evidence before mutable failure fields are cleared.",
-                        "id": "P7"
-                      },
-                      {
-                        "description": "Derive total_rounds from distinct recorded Rounds and recovery_rounds from explicit automatic or operator recovery lineage, mark required operator recovery or rejection as manual intervention while excluding ordinary final acceptance and automatic retries, and allow first_round_success only for successful first-Round completion without prior failure, rejection or required intervention.",
-                        "id": "P8"
-                      },
-                      {
-                        "description": "Persist timestamped reopening and outcome supersession when undo, retry or a new Round resumes settled work, preserve every earlier decision and terminal snapshot unchanged, and distinguish separate settlements within one Round so recovery remains auditable without duplicating the current Goal outcome.",
-                        "id": "P9"
-                      },
-                      {
-                        "description": "Preserve source updated timestamps during synchronization and no-op bulk operations, advance updated only for genuine Goal changes, and keep each event's decided_at and completed_at unchanged through metadata edits, transfer, projection refresh and reconciliation.",
-                        "id": "P10"
-                      },
-                      {
-                        "description": "Extend existing persistence-sync merge and recovery rules to preserve the union of immutable audit entries by identity and their original timestamps and attribution, reject modifications to an existing event or incompatible lifecycle outcomes, and retain audit history through both automated and operator-authorized conflict resolution.",
-                        "id": "P11"
-                      },
-                      {
-                        "description": "Retain decisions, terminal snapshots and lifecycle history outside runtime log and telemetry pruning, require durable synchronized archival retention before Goal or Feature deletion, and deduplicate archived and live copies by stable identities so deletion cannot erase or double-count metrics evidence.",
-                        "id": "P12"
-                      },
-                      {
-                        "description": "Keep legacy Goal records readable without new fields, derive historical classifications and timestamps only from surviving durable evidence, and report unknown classifications and undated coverage separately without inventing human decisions or including unsupported records in attributed rates and time buckets.",
-                        "id": "P13"
-                      },
-                      {
-                        "description": "Extend existing file-index and projection mechanisms with rebuildable decision and outcome indexes, incremental refresh after mutations and synchronization, and cached date and grouping aggregates so ordinary non-external metrics queries stay under 50 ms without scanning complete Goal histories.",
-                        "id": "P14"
-                      },
-                      {
-                        "description": "Expose the shared metrics query through refine metrics and the API with machine-readable totals and UTC day, week or month buckets over an inclusive-start and exclusive-end date range, optional grouping by node, reporter or Feature, and attribution captured when each event occurred.",
-                        "id": "P15"
-                      },
-                      {
-                        "description": "Count each Goal's latest unsuperseded terminal outcome as of the query end within the range by completed_at, count unique human decisions within the range by decided_at, calculate human accept rate as accepted divided by accepted plus rejected and auto-resolution, first-round-success and terminal-failure rates as their respective counts divided by classified terminal Goals, and report average total_rounds, explicit numerators and denominators, unknown coverage and null values for empty denominators consistently across totals, groups and time buckets.",
-                        "id": "P16"
-                      },
-                      {
-                        "description": "Update only affected model, workflow, persistence-sync, CLI, API, Goal browser and Feature intent pages in their established format to describe durable review, Rejected, recovery history and metric definitions, keeping domain types, shared mutation policy, persistence projections and surface adapters within their existing responsibility boundaries.",
-                        "id": "P17"
-                      }
-                    ],
-                    "summary": "Add permanent human review decisions and Goal outcome history so Refine can distinguish acceptance, rejection, automated completion, cancellation and failure, preserve evidence and timestamps through recovery, deletion and synchronization, and report attributable resolution trends without relying on pruned execution logs."
-                  },
-                  "started_at": "2026-09-10T08:31:51Z"
-                },
-                "governance_precheck": {
-                  "attempt": 1,
-                  "checked_at": "2026-09-10T08:35:02Z",
-                  "message": "Executing the finalized plan as written does not necessarily violate any supplied governance rule or enabled guidance.",
-                  "status": "passed"
-                },
-                "phase": "implement",
-                "phase_started_at": "2026-09-10T08:35:02Z",
-                "proposal": {
-                  "completed_at": "2026-09-10T08:30:02Z",
-                  "git_after": {
-                    "branch": "refine/DRCBAA3A2FC4ABDDCEC2B87473/round-1",
-                    "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
-                    "status_porcelain": []
-                  },
-                  "git_before": {
-                    "branch": "refine/DRCBAA3A2FC4ABDDCEC2B87473/round-1",
-                    "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
-                    "status_porcelain": []
-                  },
-                  "result": {
-                    "checklist": [
-                      {
-                        "description": "Extend the existing Goal model with rejected status, immutable review decisions containing goal_id, one-based round, node_id, actor, decided_at, accepted or rejected decision, optional reason and candidate_commit, and terminal snapshots containing final_status, resolution, completed_at, failure_category, manual_intervention_required, total_rounds, recovery_rounds and first_round_success, with stable event identities and captured node, reporter and Feature attribution.",
-                        "id": "P1"
-                      },
-                      {
-                        "description": "Define terminal resolutions as auto_integrated, human_accepted, human_rejected, cancelled and failed, preserve Governance integration into pending Review, reserve auto_integrated for proven automated completion into Done, and keep Failed recoverable while treating it as an unsuccessful settled outcome for reporting.",
-                        "id": "P2"
-                      },
-                      {
-                        "description": "Add focused decision and outcome modules within the existing work-item capability that commit status, immutable audit entries and the current outcome reference together through the existing Goal lock, record revision checks and durable atomic replacement, so failed writes cannot acknowledge an unaudited decision or completion.",
-                        "id": "P3"
-                      },
-                      {
-                        "description": "Implement shared accept and reject operations that require explicit reviewer identity and human decision provenance, retain the existing acceptance proof checks, revalidate ownership, Review status, Round and exact candidate under the mutation lock, and use request identities to make retries return the original decision and timestamp while rejecting stale or contradictory submissions.",
-                        "id": "P4"
-                      },
-                      {
-                        "description": "Make rejection settle the Goal as Rejected without reverting integrated code or automatically creating another Round, stop it from being scheduled or treated as successful Feature work, and provide explicit reopening through the existing recovery and Round capabilities while preserving its rejection reason and decision history.",
-                        "id": "P5"
-                      },
-                      {
-                        "description": "Route CLI approval, API approve and verify aliases, browser acceptance and bulk completion through the shared decision capability, add matching rejection actions and optional reasons, obtain reviewer identity from explicit input or the selected acting reviewer, and prevent generic status writes or automated callers from fabricating human acceptance.",
-                        "id": "P6"
-                      },
-                      {
-                        "description": "Capture terminal snapshots at every authoritative completion, cancellation and failure settlement, including bulk operations, process-stop failures, exhausted recovery and already-integrated recovery paths, using exact integration and structured failure evidence before mutable failure fields are cleared and preserving existing stale-worker and cancellation fences.",
-                        "id": "P7"
-                      },
-                      {
-                        "description": "Derive total_rounds from distinct recorded Rounds, count recovery_rounds from explicit automatic or operator recovery lineage, record required operator recovery or rejection as manual intervention while excluding ordinary final acceptance and automatic retries, and mark first_round_success only for successful completion in the first Round without earlier failure, rejection or required intervention.",
-                        "id": "P8"
-                      },
-                      {
-                        "description": "Record reopening and outcome supersession when undo, retry or a new Round resumes settled work, retain every previous decision and terminal snapshot unchanged, and distinguish repeated settlements within the same Round so recovery cannot erase failures or duplicate current Goal outcomes.",
-                        "id": "P9"
-                      },
-                      {
-                        "description": "Preserve source updated values during synchronization and no-op bulk operations, advance updated only for genuine Goal mutations, and write decided_at and completed_at once for their originating events without replacing them during metadata edits, transfer, projection refresh or reconciliation.",
-                        "id": "P10"
-                      },
-                      {
-                        "description": "Extend the existing persistence-sync merge and recovery rules to retain the union of immutable audit entries by event identity, preserve event timestamps and attribution, reject changes to an existing event or competing lifecycle outcomes, and prevent automated conflict resolution from rewriting or dropping committed decision history.",
-                        "id": "P11"
-                      },
-                      {
-                        "description": "Keep audit-bearing Goal state outside runtime log and telemetry retention, durably retain its decision and outcome history in synchronized archival state before Goal or Feature deletion, and deduplicate live and archived copies so deleting work never removes its metrics evidence.",
-                        "id": "P12"
-                      },
-                      {
-                        "description": "Read legacy Goals without requiring new fields, derive historical outcomes only where surviving durable evidence proves their classification and timestamp, and expose unknown or undated coverage separately while excluding unsupported human decisions and missing timestamps from attributed rates and time buckets.",
-                        "id": "P13"
-                      },
-                      {
-                        "description": "Extend the existing file-index and projection mechanisms with rebuildable outcome and decision indexes, incremental updates after local mutations and synchronization, and cached date and grouping aggregates so ordinary non-external metrics requests remain under 50 ms without scanning all Goal histories or pruned logs.",
-                        "id": "P14"
-                      },
-                      {
-                        "description": "Expose a shared metrics query through refine metrics and the API with machine-readable totals and UTC day, week or month buckets over an inclusive-start and exclusive-end date range, optional node, reporter and Feature grouping, and historical attribution taken from each recorded event rather than current mutable metadata.",
-                        "id": "P15"
-                      },
-                      {
-                        "description": "Count each Goal through its latest unsuperseded terminal outcome as of the query end and bucket that outcome by completed_at, calculate human accept rate from unique human decisions by decided_at as accepted divided by accepted plus rejected, and report auto-resolution, first-round-success and terminal-failure rates over classified terminal Goals plus average total rounds, explicit numerators and denominators, unknown coverage and null rates for empty denominators.",
-                        "id": "P16"
-                      },
-                      {
-                        "description": "Update only the affected model, workflow, persistence-sync, CLI, API and Goal browser intent pages in their established format to explain durable decisions, Rejected, recovery history and metric definitions, keeping model types, mutation policy, projection logic and surface adapters in cohesive modules under the repository's current architecture.",
-                        "id": "P17"
-                      }
-                    ],
-                    "summary": "Add permanent, attributable human review decisions and Goal outcome history so Refine can distinguish acceptance, rejection, automatic completion, cancellation, and failure, preserve their original timestamps through recovery and synchronization, and report trustworthy resolution trends without relying on execution logs."
-                  },
-                  "started_at": "2026-09-10T08:26:10Z"
-                },
-                "schema_version": 2,
-                "started_at": "2026-09-10T08:26:10Z",
-                "state": "in_progress",
-                "updated_at": "2026-09-10T08:35:02Z"
-              },
-              "prompt": "From: Ethan Jacobson <ethan.jacobson@insurity.com>\nSubject: Feature request: durable metrics for Goal resolution outcomes\n\nBody:\nCONTEXT / PROBLEM\r\nWe tried to measure how often Refine correctly resolves Goals and could not, because:\r\n- There is no durable \"Failed\" or human-\"Rejected\" outcome. `done` is reached by auto-\r\n  integration (Quality+Governance pass) OR by a human clearing the review queue - the two\r\n  are indistinguishable after the fact.\r\n- Human review decisions are not recorded: no actor, no timestamp, no accept/reject, no reason.\r\n- The `updated` timestamp is overwritten by bulk state-sync (e.g. 15 Goals sharing one\r\n  1-second timestamp), so approval time can't be recovered.\r\n- Per-Goal execution logs are pruned to a rolling ~63-Goal window; failure history for the\r\n  other ~1080 Goals is gone.\r\nNet: we can compute \"reached done\" (95%) and \"first-round resolution\" (~72%), but NOT a real\r\nhuman accept-rate or fail-rate.\r\n\r\nWHAT WE NEED\r\n\r\n1. Durable review-decision audit event, one per human accept/reject, never pruned:\r\n   { goal_id, round, node_id, actor, decided_at, decision: accepted|rejected,\r\n     reason (optional free text), candidate_commit }\r\n\r\n2. Explicit \"rejected\" outcome distinct from `cancelled`. A QA person rejecting a candidate\r\n   must be recordable as rejected (with reason), not disappear into cancelled/re-round/limbo.\r\n\r\n3. Durable per-Goal terminal outcome, written at completion and never pruned:\r\n   { final_status, resolution: auto_integrated|human_accepted|human_rejected|cancelled,\r\n     failure_category (if failed), manual_intervention_required: bool,\r\n     total_rounds, recovery_rounds, first_round_success: bool }\r\n\r\n4. Preserve decision timestamps. Stop bulk-sync from overwriting `updated`; add a dedicated\r\n   `decided_at` / `completed_at` that sync does not touch.\r\n\r\n5. Query/report surface: `refine metrics` (or log export filters) that returns, over a date\r\n   range and grouped by node/reporter/feature:\r\n   - counts by resolution type (auto / accepted / rejected / cancelled / failed)\r\n   - human accept rate = accepted / (accepted + rejected)\r\n   - auto-resolution rate, first-round-success rate, avg rounds, terminal-failure rate\r\n   - all as a time series (so trend over time is one command, not log-mining)\r\n\r\nPRIORITY\r\n(1)-(3) are the core: without a recorded, un-pruned accept/reject decision and terminal\r\noutcome, no success metric is computable. (4)-(5) make it queryable and trendable.\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nEthan Jacobson\r\nEthan.Jacobson@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
-              "reporter": "ethan.jacobson@insurity.com",
-              "round": 1
-            }
-          ],
-          "version": 1,
-          "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
-        },
-        "implementation_report": "workflow.implement.enter:default-implement: Implemented durable decisions, rejection, settlement and recovery history, synchronized archival retention, and indexed CLI/API metrics. Verification passed with 33 browser tests skipped because Playwright/Chromium was unavailable.",
-        "plans": {
-          "checklist": [
-            {
-              "description": "Use the supplied Round 2 worktree throughout implementation and verification. Selectively reuse Round 1 outcome types, decision validation, archive handling and fixture ideas after reassessment; replace its automatic-completion inference and persistence hooks. Preserve the entire Round 1 worktree, branch, uncommitted files and historical artifacts. Leave integration, workflow advancement and serving-installation operations to Refine.",
-              "id": "workflow.plan.enter:default-plan:P1"
-            },
-            {
-              "description": "Add backward-compatible audit types in focused model/goal modules: immutable human decisions, terminal outcomes, recovery/reopening events and explicit completion authority. Decisions carry stable event/request identities, Goal, one-based Round, node, reviewer, original decision time, accepted/rejected result, optional reason and exact candidate. Outcomes capture completion time, resolution, failure category/evidence, intervention, Round counts and first-Round success. Capture Goal reporter and Feature attribution at occurrence time, independently of reviewer identity.",
-              "id": "workflow.plan.enter:default-plan:P2"
-            },
-            {
-              "description": "Add shared decision and settlement operations under application/work_items. Require request ID, explicit human provenance, reviewer and expected node, Round, candidate and revision/generation. Identical retries return the original receipt/event without changing timestamps; conflicting reuse and stale submissions fail without mutation. Commit decision, status, outcome and current-outcome reference in one durable Goal replacement under existing record locks and revision fencing. Validate immutable identities and causal references on every audit-bearing write.",
-              "id": "workflow.plan.enter:default-plan:P3"
-            },
-            {
-              "description": "Compose decisions with current Event transition gates. Persist a fenced pending request and original submission time when Skills defer a transition; expose pending separately from completion. Materialize the decision and terminal outcome atomically only when the transition actually settles, retaining decided_at and assigning completed_at at settlement. Deferred execution must revalidate ownership, revision, candidate and approval proof. Failed, cancelled or superseded gates retain request and Skill evidence without creating a completed acceptance. Never hold Goal locks while Skills execute.",
-              "id": "workflow.plan.enter:default-plan:P4"
-            },
-            {
-              "description": "Move review orchestration into the shared work-item capability and extract/reuse the existing integration-proof helper. Acceptance must retain successful exact-candidate integration, target ancestry and required publication checks, with proof and Goal identity fenced through final commit using established lock ordering. Rejection requires the reviewed exact candidate but does not need successful acceptance proof. Approval never integrates again. Generic status writes cannot create Done or Rejected without corresponding authorized evidence.",
-              "id": "workflow.plan.enter:default-plan:P5"
-            },
-            {
-              "description": "Add Rejected to workflow serialization, operations, projections, filters, browser presentation and the Skills trigger catalog. Rejected is settled, unsuccessful and unschedulable; like Failed, it holds ordered Feature work until explicit recovery. Preserve existing Review ordering behavior and Feature final-state rollup semantics while exposing rejected counts separately from successful completion. Support an explicit new Round from the current target after rejection, retaining integrated code and the rejection. Cancellation remains distinct.",
-              "id": "workflow.plan.enter:default-plan:P6"
-            },
-            {
-              "description": "Route CLI approval, API approve/verify aliases, browser actions and bulk acceptance/rejection through the same operation. Add rejection and optional reasons, use the selected acting reviewer or explicit CLI/API identity, and submit the candidate the caller actually reviewed. Bulk requests contain per-Goal identities and return individual completed, pending, stale and failed results. Preserve idempotency across browser reloads and transport retries; do not infer the reviewer from the Goal reporter or assignee.",
-              "id": "workflow.plan.enter:default-plan:P7"
-            },
-            {
-              "description": "Capture settlements at authoritative cancellation, process-stop failure, workflow-attempt failure, exhausted recovery and successful completion boundaries, preserving existing cancellation and stale-worker fences. Record Skill findings and execution errors using invocation/binding identities, candidate, timestamps and structured categories; retain compact durable evidence independent of process logs. Automatic retries and failed Skill attempts alone do not settle the Goal as Failed. Integration and no-required-Skills results remain check/integration facts. An existing configured automatic accept action must use shared proof validation and record its actual invocation, action and pinned configuration authority; otherwise no automatic resolution is classified.",
-              "id": "workflow.plan.enter:default-plan:P8"
-            },
-            {
-              "description": "Record immutable reopening/supersession events for undo, retry and new Rounds without modifying prior settlements. Count distinct Rounds; count recovery Rounds only from explicit successor lineage, excluding same-Round execution/output retries. Record required operator intervention separately from ordinary acceptance and automatic retry. First-Round success means successful resolution in Round 1 without earlier failed/rejected settlement, a recovery Round or required intervention. Preserve unknown historical lineage or intervention values rather than defaulting them to false.",
-              "id": "workflow.plan.enter:default-plan:P9"
-            },
-            {
-              "description": "Preserve original audit timestamps and attribution through metadata edits, transfer, synchronization and cache rebuilding. Keep current byte-preserving sync behavior and the existing top-level updated merge rule. Make unchanged bulk/status/metadata requests true no-ops; advance updated and revision for actual semantic changes, including Event receipts. Avoid Round 1's recursive removal of every field named updated when comparing records.",
-              "id": "workflow.plan.enter:default-plan:P10"
-            },
-            {
-              "description": "Extend application/persistence_sync validation across structural merge, fast-forward/hydration, agent resolution and live/remote recovery. Union independent immutable events by identity; reject same-ID payload changes, missing causal references and incompatible current settlements. Existing authority selection may settle current lifecycle through explicit reconciliation evidence but must retain both original histories. Validate archive coverage before publishing or applying deletion. Preserve ownership rules, retained refs and compare-and-swap publication.",
-              "id": "workflow.plan.enter:default-plan:P11"
-            },
-            {
-              "description": "Archive a Goal's audit and legacy coverage metadata in synchronized, inspectable durable state before supported Goal, bulk or Feature deletion. Make archive-before-delete restartable and idempotent; failed archival leaves the Goal present. Apply archives before dependent deletions during hydration. Keep decisions, outcomes, recovery lineage and required Skill summaries outside runtime retention. Deduplicate archive/live copies by event identity and preserve history across repeated archival, synchronization and reopening.",
-              "id": "workflow.plan.enter:default-plan:P12"
-            },
-            {
-              "description": "Extend existing project projections and Event indexes with compact decision, settlement, supersession and coverage entries, date/group lookups and bounded aggregate caches. Update incrementally after local mutations, Skill settlement, synchronization and archival. Use recoverable index-update markers/generations so a crash after a durable record write cannot silently serve stale totals. Rebuild missing/corrupt projections from durable records only as a recovery path; routine queries must not traverse Goal Rounds or invocation histories. Keep schema/derivation in Model, query policy in Application and storage mechanisms in Infrastructure.",
-              "id": "workflow.plan.enter:default-plan:P13"
-            },
-            {
-              "description": "Expose one shared query through refine metrics and GET /work/metrics using existing HTTP normalization. Support inclusive-start/exclusive-end UTC ranges, day/Monday-week/month buckets and node, Goal-reporter or Feature grouping. Default outcome counts use each Goal's unsuperseded settlement as of the exclusive end, included by completed_at; reopened unresolved Goals have no current settlement. Also return a clearly separate settlement-event series retaining earlier failures/rejections and recovery counts. Human decisions are independently deduplicated and dated by decided_at. Historical grouping uses captured attribution.",
-              "id": "workflow.plan.enter:default-plan:P14"
-            },
-            {
-              "description": "Define human accept rate as accepted decisions/(accepted+rejected decisions). Define automatic-resolution and terminal-failure rates over classified current terminal Goals in the selected window. Define first-Round success over that population with a known success flag, and average Rounds over records with known total_rounds. Return each numerator, denominator and excluded count; use null for empty denominators. Expose unknown classification, missing dates/attribution, incomplete recovery data and unresolved conflicts. Undated legacy records belong to explicitly unwindowed coverage, never invented time buckets; surviving integration evidence alone cannot establish human acceptance.",
-              "id": "workflow.plan.enter:default-plan:P15"
-            },
-            {
-              "description": "Add focused behavioral verification for immediate/deferred acceptance and rejection, exact-candidate proof, duplicate and contradictory retries, concurrent stale submissions, pending-gate cancellation, automatic authority, zero required Skills, Skill finding/error followed by recovery, terminal failure, cancellation, same/new-Round reopen, Feature ordering, sync conflicts and archive retention. Inject persistence/index/archive failures and restart between durable-write stages. Verify legacy readability, immutable timestamps/attribution, and browser/CLI/API/bulk parity. Place tests beside their cohesive responsibility rather than expanding existing large service files.",
-              "id": "workflow.plan.enter:default-plan:P16"
-            },
-            {
-              "description": "Verify known metrics with six classified final Goals: three human accepted, one authorized automatic, one failed and one cancelled; include an earlier rejection followed by acceptance and a Skill-failure recovery without terminal failure. Expect accepted/rejected decision counts 3/1, accept rate 3/4, automatic and failure rates 1/6, first-Round success 2/6 and average Rounds 8/6; the separate settlement history retains the earlier rejection. Add unknown legacy and duplicate archived copies without changing those denominators. Test boundary instants, offsets, leap/month/week boundaries, grouped totals and empty populations. Benchmark cold rebuild separately from warm and incrementally refreshed queries on at least 10,000 multi-Round Goals; instrument zero history-file reads on routine queries and measure against a 50 ms local-query target.",
-              "id": "workflow.plan.enter:default-plan:P17"
-            },
-            {
-              "description": "Update only affected intent pages for Goal history, Skills transitions, review/done/failed/cancelled/rejected behavior, persistence retention, CLI/API and Goal/Feature surfaces, including the metrics definitions. Verify from the pinned worktree with cargo check --all-targets --locked; cargo test --lib application::work_items -- --test-threads=1; equivalent separate filters for application::events, application::workflow, application::persistence_sync, application::projects::projection, model::workflow, model::feature and surfaces::web_server; cargo test --test sync_regressions --test sync_simulation -- --test-threads=1; and existing xtask test-cli/test-browser/check-static-assets commands. Finish with changed-file formatting checks and git diff --check. Report actual selected test counts, failures, skips, candidate identity and benchmark results; do not claim the proposed checks have already passed.",
-              "id": "workflow.plan.enter:default-plan:P18"
-            }
-          ],
-          "summary": "workflow.plan.enter:default-plan: Implement durable Goal decisions, settlements and recovery history on the clean Round 2 base f880b7767149e4de43d5bc4d4786247d1e536a8c. Selectively adapt Round 1 work to current Skills execution, deferred transitions and exact-candidate approval. Keep integration separate from acceptance, preserve history through synchronization and deletion, and expose indexed CLI/API metrics."
-        }
-      },
       "event": {},
       "goal": {
         "assignee": "ethan.jacobson@insurity.com",
         "base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
         "branch_name": "refine/DRCBAA3A2FC4ABDDCEC2B87473/round-2",
-        "candidate_commit": "99172365aaa3409f10886c3b00bb0026b0ccb790",
+        "candidate_commit": "b3465d05ac29dd4c597d2971b84d82ed07377b77",
         "created": "2026-09-10T08:26:07Z",
         "event_generation": 4,
         "feature_id": null,
@@ -1045,45 +717,15 @@
             "implementation_reported_at": "2026-09-10T14:53:20Z",
             "latest_log": {
               "actor": "refine",
-              "category": "candidate_refresh",
-              "datetime": "2026-09-10T14:53:21Z",
+              "category": "quality",
+              "datetime": "2026-09-10T15:13:36Z",
               "details": {
+                "candidate_commit": "b3465d05ac29dd4c597d2971b84d82ed07377b77",
                 "node_id": "default",
-                "original_candidate_commit": "a5a3f69cc4f94c4c7b410976e27d218fa1ff670b",
-                "refresh_evidence": {
-                  "authorizing_status": "quality",
-                  "branch": "refine/DRCBAA3A2FC4ABDDCEC2B87473/round-2",
-                  "node_id": "default",
-                  "original_base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
-                  "original_candidate_commit": "a5a3f69cc4f94c4c7b410976e27d218fa1ff670b",
-                  "previous_gate_evidence": {
-                    "constitution_state": "unclassified",
-                    "governance_candidate_commit": "",
-                    "governance_checked_at": "",
-                    "governance_details": "",
-                    "governance_message": "",
-                    "meta_rule_state": "unclassified",
-                    "product_state": "unclassified",
-                    "quality_candidate_commit": null,
-                    "quality_checked_at": "",
-                    "quality_details": "",
-                    "quality_message": "",
-                    "quality_state": "unclassified",
-                    "rule_state": "unclassified"
-                  },
-                  "refreshed_at": "2026-09-10T14:53:21Z",
-                  "replacement_base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
-                  "replacement_candidate_commit": "99172365aaa3409f10886c3b00bb0026b0ccb790",
-                  "round_idx": 1,
-                  "state": "refreshed",
-                  "workflow_revision": 18,
-                  "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRCBAA3A2FC4ABDDCEC2B87473-round-2"
-                },
-                "replacement_base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
-                "replacement_candidate_commit": "99172365aaa3409f10886c3b00bb0026b0ccb790"
+                "report": "workflow.quality.enter:default-quality: Reviewed the finalized plan and candidate, corrected decision-fencing, synchronization, archival-retention and browser-reporting defects, and passed focused verification. Chromium-dependent browser coverage remains skipped."
               },
               "goal_id": "DRCBAA3A2FC4ABDDCEC2B87473",
-              "message": "Refreshed the candidate onto the advanced target before Quality",
+              "message": "Quality Agent completed candidate review and corrections",
               "round_idx": 1,
               "severity": "info"
             },
@@ -1253,19 +895,155 @@
                 "message": "Refreshed the candidate onto the advanced target before Quality",
                 "round_idx": 1,
                 "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "quality",
+                "datetime": "2026-09-10T15:13:36Z",
+                "details": {
+                  "candidate_commit": "b3465d05ac29dd4c597d2971b84d82ed07377b77",
+                  "node_id": "default",
+                  "report": "workflow.quality.enter:default-quality: Reviewed the finalized plan and candidate, corrected decision-fencing, synchronization, archival-retention and browser-reporting defects, and passed focused verification. Chromium-dependent browser coverage remains skipped."
+                },
+                "goal_id": "DRCBAA3A2FC4ABDDCEC2B87473",
+                "message": "Quality Agent completed candidate review and corrections",
+                "round_idx": 1,
+                "severity": "info"
               }
             ],
             "meta_rule_state": null,
             "product_state": null,
             "prompt": "Make human acceptance, rejection, cancellation, failure and recovery measurable from durable Goal history.\n\nThe request remains valid, but its description of every passed Quality/Governance gate reaching Done is outdated. Current Skills run checks, integration leads to Review, and approval is a separate decision. Passing a Skill, or having no required check Skills, must never be counted as human acceptance. Round 1 has substantial uncommitted work but no candidate or completed verification; reassess it against current lifecycle and Skill execution code.\n\nRecord immutable human decision events with a stable identity, Goal, Round, node, reviewer, decision time, accepted or rejected result, optional reason and exact candidate. Make rejection a supported outcome distinct from cancellation, with an explicit path to a new Round that retains the rejection. Record terminal outcomes with completion time, resolution type, failure category where applicable, manual intervention, total and recovery Rounds, and first-Round success. Keep integration facts separate from acceptance, and classify automatic completion only when its actual authority is recorded. Capture Skill failures and execution errors without mistaking every failed Skill attempt or automatic retry for final Goal failure.\n\nUse shared work-item operations for CLI, API, browser and bulk decisions. Persist decisions and status atomically, fence stale or duplicate requests, preserve exact-candidate approval requirements, and retain earlier outcomes when work reopens. Keep this history through synchronization, log pruning and supported deletion or archival. Preserve original decision and completion timestamps and attribution; report unknown legacy data instead of inventing it.\n\nProvide a shared query and CLI/API report over a date range, grouped by node, reporter or Feature, with time buckets, outcome counts, human accept rate, automatic resolution rate, first-Round success, average Rounds and failure rate. Define deduplication and denominators, expose missing-data coverage and use null for an empty denominator. Extend existing indexes and caches so routine queries do not scan every Round or run history.\n\nVerify acceptance, rejection, Skill failure followed by recovery, cancellation, reopen, duplicate and stale submissions, sync conflicts, retention and legacy records. Check known fixture totals, rates, date boundaries and query performance.\n\nThis is a recovery Round following the Skills review on 10 September 2026. Start from current main in a new managed Round worktree. Preserve Round 1, its plans, logs, branches, commits and uncommitted files; inspect and selectively reuse useful work instead of replaying the whole old attempt. Use the current Skills and docs/intent contracts, not archived Governance, Quality or Guidance configuration or the old fixed planning sequence. Refine owns workflow advancement and integration; human approval remains separate. Update only affected documentation and report focused verification with actual results.",
-            "quality_candidate_commit": null,
+            "quality_agent_report": "workflow.quality.enter:default-quality: Reviewed the finalized plan and candidate, corrected decision-fencing, synchronization, archival-retention and browser-reporting defects, and passed focused verification. Chromium-dependent browser coverage remains skipped.",
+            "quality_candidate_commit": "b3465d05ac29dd4c597d2971b84d82ed07377b77",
             "quality_checked_at": null,
             "quality_details": null,
             "quality_message": null,
+            "quality_skill_results": [
+              {
+                "artifacts": {
+                  "tests": [
+                    {
+                      "command": "cargo check --all-targets --locked",
+                      "evidence": "Exit 0.",
+                      "status": "passed",
+                      "test": "Candidate compilation"
+                    },
+                    {
+                      "command": "cargo test --lib application::work_items -- --test-threads=1 --nocapture",
+                      "evidence": "62 passed; 0 failed. Includes known metrics fixture and 10,000-Goal benchmark.",
+                      "status": "passed",
+                      "test": "Decisions, recovery, retention and metrics"
+                    },
+                    {
+                      "command": "cargo test --lib application::events -- --test-threads=1",
+                      "evidence": "23 passed; 0 failed.",
+                      "status": "passed",
+                      "test": "Skill evidence and automatic decision authority"
+                    },
+                    {
+                      "command": "cargo test --lib application::workflow -- --test-threads=1",
+                      "evidence": "174 passed; 0 failed.",
+                      "status": "passed",
+                      "test": "Workflow integration, failure and recovery"
+                    },
+                    {
+                      "command": "cargo test --lib application::persistence_sync -- --test-threads=1",
+                      "evidence": "116 passed; 0 failed.",
+                      "status": "passed",
+                      "test": "Synchronization conflicts and durable audit retention"
+                    },
+                    {
+                      "command": "cargo test --lib application::projects::projection -- --test-threads=1",
+                      "evidence": "20 passed; 0 failed.",
+                      "status": "passed",
+                      "test": "Goal and Feature projections"
+                    },
+                    {
+                      "command": "cargo test --lib model::workflow -- --test-threads=1",
+                      "evidence": "4 passed; 0 failed.",
+                      "status": "passed",
+                      "test": "Workflow status contracts"
+                    },
+                    {
+                      "command": "cargo test --lib model::feature -- --test-threads=1",
+                      "evidence": "4 passed; 0 failed.",
+                      "status": "passed",
+                      "test": "Feature ordering and outcome contracts"
+                    },
+                    {
+                      "command": "cargo test --lib surfaces::web_server -- --test-threads=1",
+                      "evidence": "169 passed; 0 failed.",
+                      "status": "passed",
+                      "test": "API and web-server behavior"
+                    },
+                    {
+                      "command": "cargo test --test sync_regressions --test sync_simulation -- --test-threads=1",
+                      "evidence": "sync_regressions: 5 passed. sync_simulation: 26 passed. No failures.",
+                      "status": "passed",
+                      "test": "Synchronization integration and failure scenarios"
+                    },
+                    {
+                      "command": "cargo run --manifest-path xtask/Cargo.toml -- test-cli",
+                      "evidence": "1 integration suite passed; 0 failed.",
+                      "status": "passed",
+                      "test": "CLI review and metrics behavior"
+                    },
+                    {
+                      "command": "cargo run --manifest-path xtask/Cargo.toml -- test-browser",
+                      "evidence": "Exit 0; 217 passed, 0 failed, 63 skipped for unavailable Playwright Chromium.",
+                      "status": "passed",
+                      "test": "Browser behavior"
+                    },
+                    {
+                      "command": "node --test tests/web_dashboard_review_results.test.js tests/web_goal_review.test.js",
+                      "evidence": "4 passed; 0 failed; 0 skipped.",
+                      "status": "passed",
+                      "test": "Review result reporting and transport retries"
+                    },
+                    {
+                      "command": "cargo run --manifest-path xtask/Cargo.toml -- check-static-assets",
+                      "evidence": "Exit 0; 67 assets present.",
+                      "status": "passed",
+                      "test": "Static asset completeness"
+                    },
+                    {
+                      "command": "set -o pipefail; { git diff --name-only 7b430a6a3bc0d692f03e71da68d06f3e9534dead -- '*.rs'; git ls-files --others --exclude-standard -- '*.rs'; } | sort -u | xargs -r rustfmt --check --edition 2024 --config skip_children=true",
+                      "evidence": "Exit 0; 80 changed Rust files checked.",
+                      "status": "passed",
+                      "test": "Changed Rust file formatting"
+                    },
+                    {
+                      "command": "git diff --check 7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+                      "evidence": "Exit 0; no whitespace findings.",
+                      "status": "passed",
+                      "test": "Candidate whitespace"
+                    }
+                  ]
+                },
+                "binding_id": "workflow.quality.enter:default-quality",
+                "evidence": [
+                  "Started from clean candidate 99172365aaa3409f10886c3b00bb0026b0ccb790 on base 7b430a6a3bc0d692f03e71da68d06f3e9534dead. Quality corrections remain uncommitted in the pinned Round 2 worktree across 15 files for Refine to commit and re-pin. No Goal state changes, merge, push, deployment or serving-daemon restart were performed.",
+                  "Three added sync regressions initially failed. Corrected legacy terminal synchronization after Skill evidence, immutable history-coverage validation, and archive validation/legacy coverage before deletion. The final persistence-sync suite passed.",
+                  "Automatic acceptance now carries the Goal snapshot that authorized its invocation into the shared decision fence. Other automatic lifecycle actions retain their Goal mutation lock. Added coverage for replacement after validation, stale candidates, explicit automatic authority, absent acceptance actions and idempotent replay.",
+                  "Two dashboard regressions initially failed. Acceptance and rejection now consistently report completed, pending, stale and failed results, while retaining unsettled selections.",
+                  "A late Skill-error regression initially failed with Goal NotFound after supported deletion. Late evidence now creates an additional immutable archive without recreating the Goal or duplicating metrics. Tests verify retry deduplication, invocation-journal recovery after archive unavailability, and retention after log pruning.",
+                  "Intermediate correction checks caught a missing test import and recursive repository-lock acquisition. Both were corrected before the final passing Event suite.",
+                  "The six-Goal fixture passed: accepted/rejected decisions 3/1, human accept rate 3/4, automatic and failure rates 1/6, first-Round success 2/6, average Rounds 8/6. Boundary, grouping, legacy and archive-deduplication assertions passed.",
+                  "Final 10,000-Goal benchmark: cold 1407.867 ms, warm 0.123 ms, incrementally refreshed query 31.421 ms; routine history-file reads were zero.",
+                  "Browser verification observed 217 passed, 0 failed and 63 skipped because Playwright Chromium was unavailable. Those browser-rendering scenarios remain unverified.",
+                  "Formatting passed for 80 changed Rust files. Tracked and three untracked files passed whitespace checks."
+                ],
+                "invocation_id": "dbfad5f546b738c8b35c532e19e90cecfe5ecda025ee63bc31165845984103e4",
+                "outcome": "success",
+                "role": "quality",
+                "summary": "Reviewed the finalized plan and candidate, corrected decision-fencing, synchronization, archival-retention and browser-reporting defects, and passed focused verification. Chromium-dependent browser coverage remains skipped."
+              }
+            ],
             "quality_state": null,
             "reporter": "Buddy Williams",
             "rule_state": null,
-            "updated": "2026-09-10T14:53:21Z",
+            "updated": "2026-09-10T15:13:36Z",
             "workflow_attempt_authority": {
               "claimed_at": "2026-09-10T13:43:05Z",
               "round_idx": 1,
@@ -1306,25 +1084,27 @@
         ],
         "status": "quality",
         "target_branch": "main",
-        "updated": "2026-09-10T14:53:21Z",
-        "workflow_revision": 41
+        "updated": "2026-09-10T15:13:36Z",
+        "workflow_revision": 45
       },
       "system": {
-        "candidate_commit": "99172365aaa3409f10886c3b00bb0026b0ccb790",
+        "candidate_commit": "b3465d05ac29dd4c597d2971b84d82ed07377b77",
         "node_id": "default",
-        "project_root": "/home/buddy/projects/refine-next",
-        "workflow_step": "quality",
         "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRCBAA3A2FC4ABDDCEC2B87473-round-2"
-      }
+      },
+      "verification_only": true
     },
     "metadata": {
-      "behavior": "EventSkill",
-      "event_operation_id": "1a08bcf1bf9113c7633",
+      "behavior": "WorkflowQuality",
+      "candidate_commit": "b3465d05ac29dd4c597d2971b84d82ed07377b77",
+      "event_operation_id": "1a08be1ac11113c7643",
       "goal_id": "DRCBAA3A2FC4ABDDCEC2B87473",
-      "kind": "workflow",
+      "kind": "quality",
       "node_id": "default",
+      "operation_id": "1a08be1aa02113c7642",
       "provider": "codex",
       "round_idx": 1,
+      "runtime_root": "/home/buddy/projects/refine/run/8082",
       "target_app_id": "/home/buddy/projects/refine-next",
       "workflow_revision": 18,
       "workflow_state": "quality"
@@ -1359,141 +1139,11 @@
       "parameters": {}
     }
   ],
-  "state": "succeeded",
-  "results": {
-    "default-quality": {
-      "invocation_id": "dbfad5f546b738c8b35c532e19e90cecfe5ecda025ee63bc31165845984103e4",
-      "binding_id": "default-quality",
-      "role": "quality",
-      "outcome": "success",
-      "summary": "Reviewed the finalized plan and candidate, corrected decision-fencing, synchronization, archival-retention and browser-reporting defects, and passed focused verification. Chromium-dependent browser coverage remains skipped.",
-      "evidence": [
-        "Started from clean candidate 99172365aaa3409f10886c3b00bb0026b0ccb790 on base 7b430a6a3bc0d692f03e71da68d06f3e9534dead. Quality corrections remain uncommitted in the pinned Round 2 worktree across 15 files for Refine to commit and re-pin. No Goal state changes, merge, push, deployment or serving-daemon restart were performed.",
-        "Three added sync regressions initially failed. Corrected legacy terminal synchronization after Skill evidence, immutable history-coverage validation, and archive validation/legacy coverage before deletion. The final persistence-sync suite passed.",
-        "Automatic acceptance now carries the Goal snapshot that authorized its invocation into the shared decision fence. Other automatic lifecycle actions retain their Goal mutation lock. Added coverage for replacement after validation, stale candidates, explicit automatic authority, absent acceptance actions and idempotent replay.",
-        "Two dashboard regressions initially failed. Acceptance and rejection now consistently report completed, pending, stale and failed results, while retaining unsettled selections.",
-        "A late Skill-error regression initially failed with Goal NotFound after supported deletion. Late evidence now creates an additional immutable archive without recreating the Goal or duplicating metrics. Tests verify retry deduplication, invocation-journal recovery after archive unavailability, and retention after log pruning.",
-        "Intermediate correction checks caught a missing test import and recursive repository-lock acquisition. Both were corrected before the final passing Event suite.",
-        "The six-Goal fixture passed: accepted/rejected decisions 3/1, human accept rate 3/4, automatic and failure rates 1/6, first-Round success 2/6, average Rounds 8/6. Boundary, grouping, legacy and archive-deduplication assertions passed.",
-        "Final 10,000-Goal benchmark: cold 1407.867 ms, warm 0.123 ms, incrementally refreshed query 31.421 ms; routine history-file reads were zero.",
-        "Browser verification observed 217 passed, 0 failed and 63 skipped because Playwright Chromium was unavailable. Those browser-rendering scenarios remain unverified.",
-        "Formatting passed for 80 changed Rust files. Tracked and three untracked files passed whitespace checks."
-      ],
-      "artifacts": {
-        "tests": [
-          {
-            "command": "cargo check --all-targets --locked",
-            "evidence": "Exit 0.",
-            "status": "passed",
-            "test": "Candidate compilation"
-          },
-          {
-            "command": "cargo test --lib application::work_items -- --test-threads=1 --nocapture",
-            "evidence": "62 passed; 0 failed. Includes known metrics fixture and 10,000-Goal benchmark.",
-            "status": "passed",
-            "test": "Decisions, recovery, retention and metrics"
-          },
-          {
-            "command": "cargo test --lib application::events -- --test-threads=1",
-            "evidence": "23 passed; 0 failed.",
-            "status": "passed",
-            "test": "Skill evidence and automatic decision authority"
-          },
-          {
-            "command": "cargo test --lib application::workflow -- --test-threads=1",
-            "evidence": "174 passed; 0 failed.",
-            "status": "passed",
-            "test": "Workflow integration, failure and recovery"
-          },
-          {
-            "command": "cargo test --lib application::persistence_sync -- --test-threads=1",
-            "evidence": "116 passed; 0 failed.",
-            "status": "passed",
-            "test": "Synchronization conflicts and durable audit retention"
-          },
-          {
-            "command": "cargo test --lib application::projects::projection -- --test-threads=1",
-            "evidence": "20 passed; 0 failed.",
-            "status": "passed",
-            "test": "Goal and Feature projections"
-          },
-          {
-            "command": "cargo test --lib model::workflow -- --test-threads=1",
-            "evidence": "4 passed; 0 failed.",
-            "status": "passed",
-            "test": "Workflow status contracts"
-          },
-          {
-            "command": "cargo test --lib model::feature -- --test-threads=1",
-            "evidence": "4 passed; 0 failed.",
-            "status": "passed",
-            "test": "Feature ordering and outcome contracts"
-          },
-          {
-            "command": "cargo test --lib surfaces::web_server -- --test-threads=1",
-            "evidence": "169 passed; 0 failed.",
-            "status": "passed",
-            "test": "API and web-server behavior"
-          },
-          {
-            "command": "cargo test --test sync_regressions --test sync_simulation -- --test-threads=1",
-            "evidence": "sync_regressions: 5 passed. sync_simulation: 26 passed. No failures.",
-            "status": "passed",
-            "test": "Synchronization integration and failure scenarios"
-          },
-          {
-            "command": "cargo run --manifest-path xtask/Cargo.toml -- test-cli",
-            "evidence": "1 integration suite passed; 0 failed.",
-            "status": "passed",
-            "test": "CLI review and metrics behavior"
-          },
-          {
-            "command": "cargo run --manifest-path xtask/Cargo.toml -- test-browser",
-            "evidence": "Exit 0; 217 passed, 0 failed, 63 skipped for unavailable Playwright Chromium.",
-            "status": "passed",
-            "test": "Browser behavior"
-          },
-          {
-            "command": "node --test tests/web_dashboard_review_results.test.js tests/web_goal_review.test.js",
-            "evidence": "4 passed; 0 failed; 0 skipped.",
-            "status": "passed",
-            "test": "Review result reporting and transport retries"
-          },
-          {
-            "command": "cargo run --manifest-path xtask/Cargo.toml -- check-static-assets",
-            "evidence": "Exit 0; 67 assets present.",
-            "status": "passed",
-            "test": "Static asset completeness"
-          },
-          {
-            "command": "set -o pipefail; { git diff --name-only 7b430a6a3bc0d692f03e71da68d06f3e9534dead -- '*.rs'; git ls-files --others --exclude-standard -- '*.rs'; } | sort -u | xargs -r rustfmt --check --edition 2024 --config skip_children=true",
-            "evidence": "Exit 0; 80 changed Rust files checked.",
-            "status": "passed",
-            "test": "Changed Rust file formatting"
-          },
-          {
-            "command": "git diff --check 7b430a6a3bc0d692f03e71da68d06f3e9534dead",
-            "evidence": "Exit 0; no whitespace findings.",
-            "status": "passed",
-            "test": "Candidate whitespace"
-          }
-        ]
-      }
-    }
-  },
-  "attempts": [
-    {
-      "attempt": 0,
-      "binding_id": "default-quality",
-      "diagnostic": null,
-      "operation_id": null,
-      "process_id": "proc-1789052001315-1129590-445",
-      "raw_output": "{\n  \"binding_id\": \"default-quality\",\n  \"invocation_id\": \"dbfad5f546b738c8b35c532e19e90cecfe5ecda025ee63bc31165845984103e4\",\n  \"role\": \"quality\",\n  \"outcome\": \"success\",\n  \"summary\": \"Reviewed the finalized plan and candidate, corrected decision-fencing, synchronization, archival-retention and browser-reporting defects, and passed focused verification. Chromium-dependent browser coverage remains skipped.\",\n  \"evidence\": [\n    \"Started from clean candidate 99172365aaa3409f10886c3b00bb0026b0ccb790 on base 7b430a6a3bc0d692f03e71da68d06f3e9534dead. Quality corrections remain uncommitted in the pinned Round 2 worktree across 15 files for Refine to commit and re-pin. No Goal state changes, merge, push, deployment or serving-daemon restart were performed.\",\n    \"Three added sync regressions initially failed. Corrected legacy terminal synchronization after Skill evidence, immutable history-coverage validation, and archive validation/legacy coverage before deletion. The final persistence-sync suite passed.\",\n    \"Automatic acceptance now carries the Goal snapshot that authorized its invocation into the shared decision fence. Other automatic lifecycle actions retain their Goal mutation lock. Added coverage for replacement after validation, stale candidates, explicit automatic authority, absent acceptance actions and idempotent replay.\",\n    \"Two dashboard regressions initially failed. Acceptance and rejection now consistently report completed, pending, stale and failed results, while retaining unsettled selections.\",\n    \"A late Skill-error regression initially failed with Goal NotFound after supported deletion. Late evidence now creates an additional immutable archive without recreating the Goal or duplicating metrics. Tests verify retry deduplication, invocation-journal recovery after archive unavailability, and retention after log pruning.\",\n    \"Intermediate correction checks caught a missing test import and recursive repository-lock acquisition. Both were corrected before the final passing Event suite.\",\n    \"The six-Goal fixture passed: accepted/rejected decisions 3/1, human accept rate 3/4, automatic and failure rates 1/6, first-Round success 2/6, average Rounds 8/6. Boundary, grouping, legacy and archive-deduplication assertions passed.\",\n    \"Final 10,000-Goal benchmark: cold 1407.867 ms, warm 0.123 ms, incrementally refreshed query 31.421 ms; routine history-file reads were zero.\",\n    \"Browser verification observed 217 passed, 0 failed and 63 skipped because Playwright Chromium was unavailable. Those browser-rendering scenarios remain unverified.\",\n    \"Formatting passed for 80 changed Rust files. Tracked and three untracked files passed whitespace checks.\"\n  ],\n  \"artifacts\": {\n    \"tests\": [\n      {\n        \"test\": \"Candidate compilation\",\n        \"command\": \"cargo check --all-targets --locked\",\n        \"status\": \"passed\",\n        \"evidence\": \"Exit 0.\"\n      },\n      {\n        \"test\": \"Decisions, recovery, retention and metrics\",\n        \"command\": \"cargo test --lib application::work_items -- --test-threads=1 --nocapture\",\n        \"status\": \"passed\",\n        \"evidence\": \"62 passed; 0 failed. Includes known metrics fixture and 10,000-Goal benchmark.\"\n      },\n      {\n        \"test\": \"Skill evidence and automatic decision authority\",\n        \"command\": \"cargo test --lib application::events -- --test-threads=1\",\n        \"status\": \"passed\",\n        \"evidence\": \"23 passed; 0 failed.\"\n      },\n      {\n        \"test\": \"Workflow integration, failure and recovery\",\n        \"command\": \"cargo test --lib application::workflow -- --test-threads=1\",\n        \"status\": \"passed\",\n        \"evidence\": \"174 passed; 0 failed.\"\n      },\n      {\n        \"test\": \"Synchronization conflicts and durable audit retention\",\n        \"command\": \"cargo test --lib application::persistence_sync -- --test-threads=1\",\n        \"status\": \"passed\",\n        \"evidence\": \"116 passed; 0 failed.\"\n      },\n      {\n        \"test\": \"Goal and Feature projections\",\n        \"command\": \"cargo test --lib application::projects::projection -- --test-threads=1\",\n        \"status\": \"passed\",\n        \"evidence\": \"20 passed; 0 failed.\"\n      },\n      {\n        \"test\": \"Workflow status contracts\",\n        \"command\": \"cargo test --lib model::workflow -- --test-threads=1\",\n        \"status\": \"passed\",\n        \"evidence\": \"4 passed; 0 failed.\"\n      },\n      {\n        \"test\": \"Feature ordering and outcome contracts\",\n        \"command\": \"cargo test --lib model::feature -- --test-threads=1\",\n        \"status\": \"passed\",\n        \"evidence\": \"4 passed; 0 failed.\"\n      },\n      {\n        \"test\": \"API and web-server behavior\",\n        \"command\": \"cargo test --lib surfaces::web_server -- --test-threads=1\",\n        \"status\": \"passed\",\n        \"evidence\": \"169 passed; 0 failed.\"\n      },\n      {\n        \"test\": \"Synchronization integration and failure scenarios\",\n        \"command\": \"cargo test --test sync_regressions --test sync_simulation -- --test-threads=1\",\n        \"status\": \"passed\",\n        \"evidence\": \"sync_regressions: 5 passed. sync_simulation: 26 passed. No failures.\"\n      },\n      {\n        \"test\": \"CLI review and metrics behavior\",\n        \"command\": \"cargo run --manifest-path xtask/Cargo.toml -- test-cli\",\n        \"status\": \"passed\",\n        \"evidence\": \"1 integration suite passed; 0 failed.\"\n      },\n      {\n        \"test\": \"Browser behavior\",\n        \"command\": \"cargo run --manifest-path xtask/Cargo.toml -- test-browser\",\n        \"status\": \"passed\",\n        \"evidence\": \"Exit 0; 217 passed, 0 failed, 63 skipped for unavailable Playwright Chromium.\"\n      },\n      {\n        \"test\": \"Review result reporting and transport retries\",\n        \"command\": \"node --test tests/web_dashboard_review_results.test.js tests/web_goal_review.test.js\",\n        \"status\": \"passed\",\n        \"evidence\": \"4 passed; 0 failed; 0 skipped.\"\n      },\n      {\n        \"test\": \"Static asset completeness\",\n        \"command\": \"cargo run --manifest-path xtask/Cargo.toml -- check-static-assets\",\n        \"status\": \"passed\",\n        \"evidence\": \"Exit 0; 67 assets present.\"\n      },\n      {\n        \"test\": \"Changed Rust file formatting\",\n        \"command\": \"set -o pipefail; { git diff --name-only 7b430a6a3bc0d692f03e71da68d06f3e9534dead -- '*.rs'; git ls-files --others --exclude-standard -- '*.rs'; } | sort -u | xargs -r rustfmt --check --edition 2024 --config skip_children=true\",\n        \"status\": \"passed\",\n        \"evidence\": \"Exit 0; 80 changed Rust files checked.\"\n      },\n      {\n        \"test\": \"Candidate whitespace\",\n        \"command\": \"git diff --check 7b430a6a3bc0d692f03e71da68d06f3e9534dead\",\n        \"status\": \"passed\",\n        \"evidence\": \"Exit 0; no whitespace findings.\"\n      }\n    ]\n  }\n}",
-      "workflow_revision": 18
-    }
-  ],
-  "created_at": "2026-09-10T14:53:21.255419129+00:00",
-  "completed_at": "2026-09-10T15:13:36.304840978+00:00",
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-10T15:13:37.694289498+00:00",
+  "completed_at": null,
   "error": null,
   "action_applied": false
 }

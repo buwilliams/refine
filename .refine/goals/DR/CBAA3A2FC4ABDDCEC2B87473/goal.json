@@ -1,7 +1,7 @@
 {
   "base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
   "branch_name": "refine/DRCBAA3A2FC4ABDDCEC2B87473/round-2",
-  "candidate_commit": "99172365aaa3409f10886c3b00bb0026b0ccb790",
+  "candidate_commit": "b3465d05ac29dd4c597d2971b84d82ed07377b77",
   "created": "2026-09-10T08:26:07Z",
   "event_generation": 4,
   "feature_id": null,
@@ -1199,6 +1199,132 @@
           "source": "workflow.implement.enter",
           "state": "succeeded"
         },
+        "dbfad5f546b738c8b35c532e19e90cecfe5ecda025ee63bc31165845984103e4": {
+          "candidate_commit": "99172365aaa3409f10886c3b00bb0026b0ccb790",
+          "results": {
+            "default-quality": {
+              "artifacts": {
+                "tests": [
+                  {
+                    "command": "cargo check --all-targets --locked",
+                    "evidence": "Exit 0.",
+                    "status": "passed",
+                    "test": "Candidate compilation"
+                  },
+                  {
+                    "command": "cargo test --lib application::work_items -- --test-threads=1 --nocapture",
+                    "evidence": "62 passed; 0 failed. Includes known metrics fixture and 10,000-Goal benchmark.",
+                    "status": "passed",
+                    "test": "Decisions, recovery, retention and metrics"
+                  },
+                  {
+                    "command": "cargo test --lib application::events -- --test-threads=1",
+                    "evidence": "23 passed; 0 failed.",
+                    "status": "passed",
+                    "test": "Skill evidence and automatic decision authority"
+                  },
+                  {
+                    "command": "cargo test --lib application::workflow -- --test-threads=1",
+                    "evidence": "174 passed; 0 failed.",
+                    "status": "passed",
+                    "test": "Workflow integration, failure and recovery"
+                  },
+                  {
+                    "command": "cargo test --lib application::persistence_sync -- --test-threads=1",
+                    "evidence": "116 passed; 0 failed.",
+                    "status": "passed",
+                    "test": "Synchronization conflicts and durable audit retention"
+                  },
+                  {
+                    "command": "cargo test --lib application::projects::projection -- --test-threads=1",
+                    "evidence": "20 passed; 0 failed.",
+                    "status": "passed",
+                    "test": "Goal and Feature projections"
+                  },
+                  {
+                    "command": "cargo test --lib model::workflow -- --test-threads=1",
+                    "evidence": "4 passed; 0 failed.",
+                    "status": "passed",
+                    "test": "Workflow status contracts"
+                  },
+                  {
+                    "command": "cargo test --lib model::feature -- --test-threads=1",
+                    "evidence": "4 passed; 0 failed.",
+                    "status": "passed",
+                    "test": "Feature ordering and outcome contracts"
+                  },
+                  {
+                    "command": "cargo test --lib surfaces::web_server -- --test-threads=1",
+                    "evidence": "169 passed; 0 failed.",
+                    "status": "passed",
+                    "test": "API and web-server behavior"
+                  },
+                  {
+                    "command": "cargo test --test sync_regressions --test sync_simulation -- --test-threads=1",
+                    "evidence": "sync_regressions: 5 passed. sync_simulation: 26 passed. No failures.",
+                    "status": "passed",
+                    "test": "Synchronization integration and failure scenarios"
+                  },
+                  {
+                    "command": "cargo run --manifest-path xtask/Cargo.toml -- test-cli",
+                    "evidence": "1 integration suite passed; 0 failed.",
+                    "status": "passed",
+                    "test": "CLI review and metrics behavior"
+                  },
+                  {
+                    "command": "cargo run --manifest-path xtask/Cargo.toml -- test-browser",
+                    "evidence": "Exit 0; 217 passed, 0 failed, 63 skipped for unavailable Playwright Chromium.",
+                    "status": "passed",
+                    "test": "Browser behavior"
+                  },
+                  {
+                    "command": "node --test tests/web_dashboard_review_results.test.js tests/web_goal_review.test.js",
+                    "evidence": "4 passed; 0 failed; 0 skipped.",
+                    "status": "passed",
+                    "test": "Review result reporting and transport retries"
+                  },
+                  {
+                    "command": "cargo run --manifest-path xtask/Cargo.toml -- check-static-assets",
+                    "evidence": "Exit 0; 67 assets present.",
+                    "status": "passed",
+                    "test": "Static asset completeness"
+                  },
+                  {
+                    "command": "set -o pipefail; { git diff --name-only 7b430a6a3bc0d692f03e71da68d06f3e9534dead -- '*.rs'; git ls-files --others --exclude-standard -- '*.rs'; } | sort -u | xargs -r rustfmt --check --edition 2024 --config skip_children=true",
+                    "evidence": "Exit 0; 80 changed Rust files checked.",
+                    "status": "passed",
+                    "test": "Changed Rust file formatting"
+                  },
+                  {
+                    "command": "git diff --check 7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+                    "evidence": "Exit 0; no whitespace findings.",
+                    "status": "passed",
+                    "test": "Candidate whitespace"
+                  }
+                ]
+              },
+              "binding_id": "default-quality",
+              "evidence": [
+                "Started from clean candidate 99172365aaa3409f10886c3b00bb0026b0ccb790 on base 7b430a6a3bc0d692f03e71da68d06f3e9534dead. Quality corrections remain uncommitted in the pinned Round 2 worktree across 15 files for Refine to commit and re-pin. No Goal state changes, merge, push, deployment or serving-daemon restart were performed.",
+                "Three added sync regressions initially failed. Corrected legacy terminal synchronization after Skill evidence, immutable history-coverage validation, and archive validation/legacy coverage before deletion. The final persistence-sync suite passed.",
+                "Automatic acceptance now carries the Goal snapshot that authorized its invocation into the shared decision fence. Other automatic lifecycle actions retain their Goal mutation lock. Added coverage for replacement after validation, stale candidates, explicit automatic authority, absent acceptance actions and idempotent replay.",
+                "Two dashboard regressions initially failed. Acceptance and rejection now consistently report completed, pending, stale and failed results, while retaining unsettled selections.",
+                "A late Skill-error regression initially failed with Goal NotFound after supported deletion. Late evidence now creates an additional immutable archive without recreating the Goal or duplicating metrics. Tests verify retry deduplication, invocation-journal recovery after archive unavailability, and retention after log pruning.",
+                "Intermediate correction checks caught a missing test import and recursive repository-lock acquisition. Both were corrected before the final passing Event suite.",
+                "The six-Goal fixture passed: accepted/rejected decisions 3/1, human accept rate 3/4, automatic and failure rates 1/6, first-Round success 2/6, average Rounds 8/6. Boundary, grouping, legacy and archive-deduplication assertions passed.",
+                "Final 10,000-Goal benchmark: cold 1407.867 ms, warm 0.123 ms, incrementally refreshed query 31.421 ms; routine history-file reads were zero.",
+                "Browser verification observed 217 passed, 0 failed and 63 skipped because Playwright Chromium was unavailable. Those browser-rendering scenarios remain unverified.",
+                "Formatting passed for 80 changed Rust files. Tracked and three untracked files passed whitespace checks."
+              ],
+              "invocation_id": "dbfad5f546b738c8b35c532e19e90cecfe5ecda025ee63bc31165845984103e4",
+              "outcome": "success",
+              "role": "quality",
+              "summary": "Reviewed the finalized plan and candidate, corrected decision-fencing, synchronization, archival-retention and browser-reporting defects, and passed focused verification. Chromium-dependent browser coverage remains skipped."
+            }
+          },
+          "source": "workflow.quality.enter",
+          "state": "succeeded"
+        },
         "e38cfe41790835a44c853b6f8f34a5ddeff70b11cb4edf9274188a3a182ab68b": {
           "candidate_commit": null,
           "results": {
@@ -1669,14 +1795,136 @@
       "meta_rule_state": null,
       "product_state": null,
       "prompt": "Make human acceptance, rejection, cancellation, failure and recovery measurable from durable Goal history.\n\nThe request remains valid, but its description of every passed Quality/Governance gate reaching Done is outdated. Current Skills run checks, integration leads to Review, and approval is a separate decision. Passing a Skill, or having no required check Skills, must never be counted as human acceptance. Round 1 has substantial uncommitted work but no candidate or completed verification; reassess it against current lifecycle and Skill execution code.\n\nRecord immutable human decision events with a stable identity, Goal, Round, node, reviewer, decision time, accepted or rejected result, optional reason and exact candidate. Make rejection a supported outcome distinct from cancellation, with an explicit path to a new Round that retains the rejection. Record terminal outcomes with completion time, resolution type, failure category where applicable, manual intervention, total and recovery Rounds, and first-Round success. Keep integration facts separate from acceptance, and classify automatic completion only when its actual authority is recorded. Capture Skill failures and execution errors without mistaking every failed Skill attempt or automatic retry for final Goal failure.\n\nUse shared work-item operations for CLI, API, browser and bulk decisions. Persist decisions and status atomically, fence stale or duplicate requests, preserve exact-candidate approval requirements, and retain earlier outcomes when work reopens. Keep this history through synchronization, log pruning and supported deletion or archival. Preserve original decision and completion timestamps and attribution; report unknown legacy data instead of inventing it.\n\nProvide a shared query and CLI/API report over a date range, grouped by node, reporter or Feature, with time buckets, outcome counts, human accept rate, automatic resolution rate, first-Round success, average Rounds and failure rate. Define deduplication and denominators, expose missing-data coverage and use null for an empty denominator. Extend existing indexes and caches so routine queries do not scan every Round or run history.\n\nVerify acceptance, rejection, Skill failure followed by recovery, cancellation, reopen, duplicate and stale submissions, sync conflicts, retention and legacy records. Check known fixture totals, rates, date boundaries and query performance.\n\nThis is a recovery Round following the Skills review on 10 September 2026. Start from current main in a new managed Round worktree. Preserve Round 1, its plans, logs, branches, commits and uncommitted files; inspect and selectively reuse useful work instead of replaying the whole old attempt. Use the current Skills and docs/intent contracts, not archived Governance, Quality or Guidance configuration or the old fixed planning sequence. Refine owns workflow advancement and integration; human approval remains separate. Update only affected documentation and report focused verification with actual results.",
-      "quality_candidate_commit": null,
+      "quality_agent_report": "workflow.quality.enter:default-quality: Reviewed the finalized plan and candidate, corrected decision-fencing, synchronization, archival-retention and browser-reporting defects, and passed focused verification. Chromium-dependent browser coverage remains skipped.",
+      "quality_candidate_commit": "b3465d05ac29dd4c597d2971b84d82ed07377b77",
       "quality_checked_at": null,
       "quality_details": null,
       "quality_message": null,
+      "quality_skill_results": [
+        {
+          "artifacts": {
+            "tests": [
+              {
+                "command": "cargo check --all-targets --locked",
+                "evidence": "Exit 0.",
+                "status": "passed",
+                "test": "Candidate compilation"
+              },
+              {
+                "command": "cargo test --lib application::work_items -- --test-threads=1 --nocapture",
+                "evidence": "62 passed; 0 failed. Includes known metrics fixture and 10,000-Goal benchmark.",
+                "status": "passed",
+                "test": "Decisions, recovery, retention and metrics"
+              },
+              {
+                "command": "cargo test --lib application::events -- --test-threads=1",
+                "evidence": "23 passed; 0 failed.",
+                "status": "passed",
+                "test": "Skill evidence and automatic decision authority"
+              },
+              {
+                "command": "cargo test --lib application::workflow -- --test-threads=1",
+                "evidence": "174 passed; 0 failed.",
+                "status": "passed",
+                "test": "Workflow integration, failure and recovery"
+              },
+              {
+                "command": "cargo test --lib application::persistence_sync -- --test-threads=1",
+                "evidence": "116 passed; 0 failed.",
+                "status": "passed",
+                "test": "Synchronization conflicts and durable audit retention"
+              },
+              {
+                "command": "cargo test --lib application::projects::projection -- --test-threads=1",
+                "evidence": "20 passed; 0 failed.",
+                "status": "passed",
+                "test": "Goal and Feature projections"
+              },
+              {
+                "command": "cargo test --lib model::workflow -- --test-threads=1",
+                "evidence": "4 passed; 0 failed.",
+                "status": "passed",
+                "test": "Workflow status contracts"
+              },
+              {
+                "command": "cargo test --lib model::feature -- --test-threads=1",
+                "evidence": "4 passed; 0 failed.",
+                "status": "passed",
+                "test": "Feature ordering and outcome contracts"
+              },
+              {
+                "command": "cargo test --lib surfaces::web_server -- --test-threads=1",
+                "evidence": "169 passed; 0 failed.",
+                "status": "passed",
+                "test": "API and web-server behavior"
+              },
+              {
+                "command": "cargo test --test sync_regressions --test sync_simulation -- --test-threads=1",
+                "evidence": "sync_regressions: 5 passed. sync_simulation: 26 passed. No failures.",
+                "status": "passed",
+                "test": "Synchronization integration and failure scenarios"
+              },
+              {
+                "command": "cargo run --manifest-path xtask/Cargo.toml -- test-cli",
+                "evidence": "1 integration suite passed; 0 failed.",
+                "status": "passed",
+                "test": "CLI review and metrics behavior"
+              },
+              {
+                "command": "cargo run --manifest-path xtask/Cargo.toml -- test-browser",
+                "evidence": "Exit 0; 217 passed, 0 failed, 63 skipped for unavailable Playwright Chromium.",
+                "status": "passed",
+                "test": "Browser behavior"
+              },
+              {
+                "command": "node --test tests/web_dashboard_review_results.test.js tests/web_goal_review.test.js",
+                "evidence": "4 passed; 0 failed; 0 skipped.",
+                "status": "passed",
+                "test": "Review result reporting and transport retries"
+              },
+              {
+                "command": "cargo run --manifest-path xtask/Cargo.toml -- check-static-assets",
+                "evidence": "Exit 0; 67 assets present.",
+                "status": "passed",
+                "test": "Static asset completeness"
+              },
+              {
+                "command": "set -o pipefail; { git diff --name-only 7b430a6a3bc0d692f03e71da68d06f3e9534dead -- '*.rs'; git ls-files --others --exclude-standard -- '*.rs'; } | sort -u | xargs -r rustfmt --check --edition 2024 --config skip_children=true",
+                "evidence": "Exit 0; 80 changed Rust files checked.",
+                "status": "passed",
+                "test": "Changed Rust file formatting"
+              },
+              {
+                "command": "git diff --check 7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+                "evidence": "Exit 0; no whitespace findings.",
+                "status": "passed",
+                "test": "Candidate whitespace"
+              }
+            ]
+          },
+          "binding_id": "workflow.quality.enter:default-quality",
+          "evidence": [
+            "Started from clean candidate 99172365aaa3409f10886c3b00bb0026b0ccb790 on base 7b430a6a3bc0d692f03e71da68d06f3e9534dead. Quality corrections remain uncommitted in the pinned Round 2 worktree across 15 files for Refine to commit and re-pin. No Goal state changes, merge, push, deployment or serving-daemon restart were performed.",
+            "Three added sync regressions initially failed. Corrected legacy terminal synchronization after Skill evidence, immutable history-coverage validation, and archive validation/legacy coverage before deletion. The final persistence-sync suite passed.",
+            "Automatic acceptance now carries the Goal snapshot that authorized its invocation into the shared decision fence. Other automatic lifecycle actions retain their Goal mutation lock. Added coverage for replacement after validation, stale candidates, explicit automatic authority, absent acceptance actions and idempotent replay.",
+            "Two dashboard regressions initially failed. Acceptance and rejection now consistently report completed, pending, stale and failed results, while retaining unsettled selections.",
+            "A late Skill-error regression initially failed with Goal NotFound after supported deletion. Late evidence now creates an additional immutable archive without recreating the Goal or duplicating metrics. Tests verify retry deduplication, invocation-journal recovery after archive unavailability, and retention after log pruning.",
+            "Intermediate correction checks caught a missing test import and recursive repository-lock acquisition. Both were corrected before the final passing Event suite.",
+            "The six-Goal fixture passed: accepted/rejected decisions 3/1, human accept rate 3/4, automatic and failure rates 1/6, first-Round success 2/6, average Rounds 8/6. Boundary, grouping, legacy and archive-deduplication assertions passed.",
+            "Final 10,000-Goal benchmark: cold 1407.867 ms, warm 0.123 ms, incrementally refreshed query 31.421 ms; routine history-file reads were zero.",
+            "Browser verification observed 217 passed, 0 failed and 63 skipped because Playwright Chromium was unavailable. Those browser-rendering scenarios remain unverified.",
+            "Formatting passed for 80 changed Rust files. Tracked and three untracked files passed whitespace checks."
+          ],
+          "invocation_id": "dbfad5f546b738c8b35c532e19e90cecfe5ecda025ee63bc31165845984103e4",
+          "outcome": "success",
+          "role": "quality",
+          "summary": "Reviewed the finalized plan and candidate, corrected decision-fencing, synchronization, archival-retention and browser-reporting defects, and passed focused verification. Chromium-dependent browser coverage remains skipped."
+        }
+      ],
       "quality_state": null,
       "reporter": "Buddy Williams",
       "rule_state": null,
-      "updated": "2026-09-10T14:53:21Z",
+      "updated": "2026-09-10T15:13:36Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T13:43:05Z",
         "round_idx": 1,
@@ -1717,7 +1965,7 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-10T14:53:21Z",
+  "updated": "2026-09-10T15:13:36Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:36.799534192+00:00",
@@ -1756,5 +2004,5 @@
       "to": "quality"
     }
   ],
-  "workflow_revision": 41
+  "workflow_revision": 45
 }
