@@ -3,7 +3,7 @@
   "branch_name": "refine/DR72ED9B21E7CB9369DBCACF88/round-3",
   "candidate_commit": "256f7fa161d12f9a82fdd99c6933f551c5173677",
   "created": "2026-09-10T08:26:05Z",
-  "event_generation": 6,
+  "event_generation": 7,
   "feature_id": null,
   "feature_order": null,
   "id": "DR72ED9B21E7CB9369DBCACF88",
@@ -2562,6 +2562,93 @@
           }
         }
       },
+      "event_results": {
+        "3c9e07053a2eeaada7d74c93997d609201cb5b30bec28a0f60ff02c48e109379": {
+          "candidate_commit": null,
+          "results": {
+            "default-plan": {
+              "artifacts": {
+                "plan": {
+                  "checklist": [
+                    {
+                      "description": "Continue from pinned candidate 256f7fa161d12f9a82fdd99c6933f551c5173677 through the supplied recovery handoff. Before implementation, record candidate and retained-work preservation snapshots and reproduce with `cargo test --lib fresh_goal_backlog_exit_skill_remains_runnable_before_round_materialization -- --test-threads=1`. Preserve ensure_worktree_from_base, Round 2 isolation, and runner.rs cached-success revalidation. Current local main, 7b430a6a3bc0d692f03e71da68d06f3e9534dead, is already the candidate’s ancestor; no wholesale replay is needed.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Add explicit lifecycle workspace ownership to the existing invocation context: repository, Goal, current Round and authored request, node, event source, transition or occurrence identity, configured target ref, immutable resolved source commit, owned branch/path, and pinned physical registration. Application events own admission policy; shared Git infrastructure supplies creation and validation. Distinguish this ownership from implementation and exact-candidate workspaces. Missing implementation evidence must remain an error outside explicitly authorized lifecycle execution.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Prepare lifecycle workspaces only for applicable executable bindings, after validating inputs and current authority. Persist ownership and the target-derived source commitment before materialization; use an invocation-specific branch in the existing managed worktree namespace and shared Git creation/locking capabilities. Never derive the source from the primary checkout’s HEAD, update Goal branch/base/candidate fields, or refresh the primary checkout. Persist registration before launch. Reuse admitted work without resetting dirty contents; interrupted admission must either recover from unambiguous ownership evidence or fail visibly without adopting a replacement.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Update transitions.rs, dispatch.rs and execution preparation so lifecycle context selects the admitted checkout. Resolve agent_subpath with the shared canonical-containment helper, reject nested repositories and escapes, and synchronize cwd, system.workspace and workspace-derived parameters before freezing launch context. Carry the same admission through ordered bindings, diagnostic repairs, process resumes and fresh-launch fallbacks. Preserve independent Custom Skill and toolbar contexts. Put lifecycle admission and authority helpers in cohesive modules rather than expanding mixed dispatch responsibilities.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Recheck Goal, Round/request, node and transition or durable-occurrence authority before workspace creation, launches, result acceptance and transition settlement. Revalidate registration, repository, branch and cwd before launches and writes, retaining Git-environment sanitization. Apply these checks when prepare_pinned returns an existing invocation and when cached success is consumed for settlement. Preserve failed/cancelled evidence, immediate cancellation, existing capacity controls and idempotent transitions. Use short existing record/repository locks; never hold a Goal lock while an agent runs.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Extend the retained fresh-Goal regression through deterministic smoke-ai execution and successful Backlog-to-Todo settlement, starting without that Goal’s implementation branch/worktree. Remove goal_workspace and fabricated success from the manual-transition fixture. Cover Backlog Enter/Exit and Todo Enter/Exit where applicable, blocking/background bindings, disabled/context-only bindings, ordered execution, repairs, restart/replay, source-target advancement, changed Round/request/node, cancellation and stale settlement. Test missing/replaced registrations, wrong branches, unrelated repositories, symlink escapes and inherited Git redirection. Assert staged, unstaged and untracked primary contents, HEAD and raw index bytes remain unchanged; lifecycle output never becomes the implementation candidate.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Run `cargo test --lib <filter> -- --test-threads=1` separately and sequentially for these filters: fresh_goal_backlog_exit_skill_remains_runnable_before_round_materialization; application::events::; application::workflow::tests::execution_ownership; authored_todo_start; infrastructure::git::worktrees::tests; worktree_resume; quality::tests::; application::workflow::tests::candidate_refresh; application::workflow::tests::quality_recovery; application::workflow::tests::quality_base_refresh; round_base; workflow::engine::behaviors::tests::; launch_environment; infrastructure::agents::invocation::tests; infrastructure::process::subprocess::. Explicitly confirm execution_ownership includes backlog_promotion_changes_only_goal_state_and_does_not_create_worktrees. Require nonzero selections and retain cached-success/replaced-registration coverage.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Update only affected Skills, Events workspace, managed-worktree and Todo intent passages to explain invocation-owned pre-Plan execution while preserving implementation admission. Run `cargo check --all-targets`, `cargo clippy --all-targets`, changed-file `rustfmt --check --edition 2024 --config skip_children=true`, and `git diff --check 256f7fa161d12f9a82fdd99c6933f551c5173677`. Report actual commands, counts, failures and skips; identify unchanged Clippy warnings separately. Compare preservation snapshots. Leave Goal advancement, integration, publication and serving-installation changes to Refine.",
+                      "id": "P8"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "C1",
+                      "resolution": "Creating an implementation workspace early would violate Todo admission. Use explicit lifecycle invocation ownership instead; ordinary queueing and bindings requiring no execution create no checkout."
+                    },
+                    {
+                      "criticism_id": "C2",
+                      "resolution": "Changing cwd alone leaves system.workspace and mapped parameters stale because resolve_bindings currently precedes admission. Finalize workspace context before freezing workspace-dependent parameters and prompts."
+                    },
+                    {
+                      "criticism_id": "C3",
+                      "resolution": "A generated branch name alone cannot prove ownership across crashes or registration replacement. Persist source and owner commitments, pin physical registration, and fail closed when interrupted admission cannot be proved. Never reset retained Skill edits during replay."
+                    },
+                    {
+                      "criticism_id": "C4",
+                      "resolution": "Cached-success validation in runner.rs does not cover every direct reuse path: prepare_pinned returns existing records, and transition dispatch consumes their terminal state. Revalidate authority and workspace at consumption and settlement without rewriting retained results."
+                    },
+                    {
+                      "criticism_id": "C5",
+                      "resolution": "The supplied handoff registers the Round 3 branch at the retained round-2 directory. Use the invocation’s pinned checkout for this correction; do not infer paths from Round numbers or perform branch/directory surgery. Preserve strict admission errors in product execution."
+                    }
+                  ],
+                  "summary": "Correct the retained candidate’s pre-Plan Skill regression by admitting invocation-owned lifecycle workspaces independently of implementation branches. Preserve state-only queueing, atomic Todo-to-Plan admission, existing workspace isolation, and retained recovery evidence."
+                }
+              },
+              "binding_id": "default-plan",
+              "evidence": [
+                "Read-only Git inspection confirmed HEAD 256f7fa161d12f9a82fdd99c6933f551c5173677, branch refine/DR72ED9B21E7CB9369DBCACF88/round-3, and clean status in the pinned round-2 directory. Round 1 and Round 2 refs remain present.",
+                "`git merge-base main HEAD` returned 7b430a6a3bc0d692f03e71da68d06f3e9534dead. Candidate changes comprise the implementation and Quality commits; the ensure_worktree_from_base implementation is unchanged from main.",
+                "execution/workspace.rs requires branch_name in goal_branch for executable Goal-bound Skills. transitions.rs reaches prepare_pinned through manual_context before a fresh Goal has an implementation branch.",
+                "execution.rs resolves binding parameters before workspace admission. transitions.rs directly consumes existing invocation states; runner.rs already revalidates retained successful workspaces.",
+                "The retained /tmp/dr72-quality-events-final.log records 26 passed, 1 failed, 0 ignored. The failure reports 'Goal Skill workspace unavailable: missing Round branch'. These are historical results inspected this turn, not newly executed tests.",
+                "The existing manual-transition fixture precreates a Goal workspace and manually writes Succeeded. The fresh regression currently stops at Pending admission rather than proving process execution and settlement.",
+                "Read the candidate’s architecture, Skills, Events, managed-worktree and Todo intent contracts. No applicable AGENTS.md was found.",
+                "`git diff --check main HEAD` exited 0. No files or Git state were changed; compilation and tests are proposed for implementation."
+              ],
+              "invocation_id": "3c9e07053a2eeaada7d74c93997d609201cb5b30bec28a0f60ff02c48e109379",
+              "outcome": "success",
+              "role": "plan",
+              "summary": "Completed read-only investigation and finalized a scoped lifecycle-workspace recovery plan with stable checklist IDs, resolved critiques and meaningful verification."
+            }
+          },
+          "source": "workflow.plan.enter",
+          "state": "succeeded"
+        }
+      },
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
@@ -2581,12 +2668,114 @@
           "round_idx": 2,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-09-10T14:52:33Z",
+        "final_plan": {
+          "completed_at": "2026-09-10T14:56:42Z",
+          "git_after": {
+            "branch": "refine/DR72ED9B21E7CB9369DBCACF88/round-3",
+            "head_commit": "256f7fa161d12f9a82fdd99c6933f551c5173677",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR72ED9B21E7CB9369DBCACF88/round-3",
+            "head_commit": "256f7fa161d12f9a82fdd99c6933f551c5173677",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Continue from pinned candidate 256f7fa161d12f9a82fdd99c6933f551c5173677 through the supplied recovery handoff. Before implementation, record candidate and retained-work preservation snapshots and reproduce with `cargo test --lib fresh_goal_backlog_exit_skill_remains_runnable_before_round_materialization -- --test-threads=1`. Preserve ensure_worktree_from_base, Round 2 isolation, and runner.rs cached-success revalidation. Current local main, 7b430a6a3bc0d692f03e71da68d06f3e9534dead, is already the candidate’s ancestor; no wholesale replay is needed.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Add explicit lifecycle workspace ownership to the existing invocation context: repository, Goal, current Round and authored request, node, event source, transition or occurrence identity, configured target ref, immutable resolved source commit, owned branch/path, and pinned physical registration. Application events own admission policy; shared Git infrastructure supplies creation and validation. Distinguish this ownership from implementation and exact-candidate workspaces. Missing implementation evidence must remain an error outside explicitly authorized lifecycle execution.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Prepare lifecycle workspaces only for applicable executable bindings, after validating inputs and current authority. Persist ownership and the target-derived source commitment before materialization; use an invocation-specific branch in the existing managed worktree namespace and shared Git creation/locking capabilities. Never derive the source from the primary checkout’s HEAD, update Goal branch/base/candidate fields, or refresh the primary checkout. Persist registration before launch. Reuse admitted work without resetting dirty contents; interrupted admission must either recover from unambiguous ownership evidence or fail visibly without adopting a replacement.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Update transitions.rs, dispatch.rs and execution preparation so lifecycle context selects the admitted checkout. Resolve agent_subpath with the shared canonical-containment helper, reject nested repositories and escapes, and synchronize cwd, system.workspace and workspace-derived parameters before freezing launch context. Carry the same admission through ordered bindings, diagnostic repairs, process resumes and fresh-launch fallbacks. Preserve independent Custom Skill and toolbar contexts. Put lifecycle admission and authority helpers in cohesive modules rather than expanding mixed dispatch responsibilities.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Recheck Goal, Round/request, node and transition or durable-occurrence authority before workspace creation, launches, result acceptance and transition settlement. Revalidate registration, repository, branch and cwd before launches and writes, retaining Git-environment sanitization. Apply these checks when prepare_pinned returns an existing invocation and when cached success is consumed for settlement. Preserve failed/cancelled evidence, immediate cancellation, existing capacity controls and idempotent transitions. Use short existing record/repository locks; never hold a Goal lock while an agent runs.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Extend the retained fresh-Goal regression through deterministic smoke-ai execution and successful Backlog-to-Todo settlement, starting without that Goal’s implementation branch/worktree. Remove goal_workspace and fabricated success from the manual-transition fixture. Cover Backlog Enter/Exit and Todo Enter/Exit where applicable, blocking/background bindings, disabled/context-only bindings, ordered execution, repairs, restart/replay, source-target advancement, changed Round/request/node, cancellation and stale settlement. Test missing/replaced registrations, wrong branches, unrelated repositories, symlink escapes and inherited Git redirection. Assert staged, unstaged and untracked primary contents, HEAD and raw index bytes remain unchanged; lifecycle output never becomes the implementation candidate.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Run `cargo test --lib <filter> -- --test-threads=1` separately and sequentially for these filters: fresh_goal_backlog_exit_skill_remains_runnable_before_round_materialization; application::events::; application::workflow::tests::execution_ownership; authored_todo_start; infrastructure::git::worktrees::tests; worktree_resume; quality::tests::; application::workflow::tests::candidate_refresh; application::workflow::tests::quality_recovery; application::workflow::tests::quality_base_refresh; round_base; workflow::engine::behaviors::tests::; launch_environment; infrastructure::agents::invocation::tests; infrastructure::process::subprocess::. Explicitly confirm execution_ownership includes backlog_promotion_changes_only_goal_state_and_does_not_create_worktrees. Require nonzero selections and retain cached-success/replaced-registration coverage.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              },
+              {
+                "description": "Update only affected Skills, Events workspace, managed-worktree and Todo intent passages to explain invocation-owned pre-Plan execution while preserving implementation admission. Run `cargo check --all-targets`, `cargo clippy --all-targets`, changed-file `rustfmt --check --edition 2024 --config skip_children=true`, and `git diff --check 256f7fa161d12f9a82fdd99c6933f551c5173677`. Report actual commands, counts, failures and skips; identify unchanged Clippy warnings separately. Compare preservation snapshots. Leave Goal advancement, integration, publication and serving-installation changes to Refine.",
+                "id": "workflow.plan.enter:default-plan:P8"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Correct the retained candidate’s pre-Plan Skill regression by admitting invocation-owned lifecycle workspaces independently of implementation branches. Preserve state-only queueing, atomic Todo-to-Plan admission, existing workspace isolation, and retained recovery evidence."
+          },
+          "started_at": "2026-09-10T14:52:33Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-09-10T14:56:42Z",
+        "proposal": {
+          "completed_at": "2026-09-10T14:56:42Z",
+          "git_after": {
+            "branch": "refine/DR72ED9B21E7CB9369DBCACF88/round-3",
+            "head_commit": "256f7fa161d12f9a82fdd99c6933f551c5173677",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR72ED9B21E7CB9369DBCACF88/round-3",
+            "head_commit": "256f7fa161d12f9a82fdd99c6933f551c5173677",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Continue from pinned candidate 256f7fa161d12f9a82fdd99c6933f551c5173677 through the supplied recovery handoff. Before implementation, record candidate and retained-work preservation snapshots and reproduce with `cargo test --lib fresh_goal_backlog_exit_skill_remains_runnable_before_round_materialization -- --test-threads=1`. Preserve ensure_worktree_from_base, Round 2 isolation, and runner.rs cached-success revalidation. Current local main, 7b430a6a3bc0d692f03e71da68d06f3e9534dead, is already the candidate’s ancestor; no wholesale replay is needed.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Add explicit lifecycle workspace ownership to the existing invocation context: repository, Goal, current Round and authored request, node, event source, transition or occurrence identity, configured target ref, immutable resolved source commit, owned branch/path, and pinned physical registration. Application events own admission policy; shared Git infrastructure supplies creation and validation. Distinguish this ownership from implementation and exact-candidate workspaces. Missing implementation evidence must remain an error outside explicitly authorized lifecycle execution.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Prepare lifecycle workspaces only for applicable executable bindings, after validating inputs and current authority. Persist ownership and the target-derived source commitment before materialization; use an invocation-specific branch in the existing managed worktree namespace and shared Git creation/locking capabilities. Never derive the source from the primary checkout’s HEAD, update Goal branch/base/candidate fields, or refresh the primary checkout. Persist registration before launch. Reuse admitted work without resetting dirty contents; interrupted admission must either recover from unambiguous ownership evidence or fail visibly without adopting a replacement.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Update transitions.rs, dispatch.rs and execution preparation so lifecycle context selects the admitted checkout. Resolve agent_subpath with the shared canonical-containment helper, reject nested repositories and escapes, and synchronize cwd, system.workspace and workspace-derived parameters before freezing launch context. Carry the same admission through ordered bindings, diagnostic repairs, process resumes and fresh-launch fallbacks. Preserve independent Custom Skill and toolbar contexts. Put lifecycle admission and authority helpers in cohesive modules rather than expanding mixed dispatch responsibilities.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Recheck Goal, Round/request, node and transition or durable-occurrence authority before workspace creation, launches, result acceptance and transition settlement. Revalidate registration, repository, branch and cwd before launches and writes, retaining Git-environment sanitization. Apply these checks when prepare_pinned returns an existing invocation and when cached success is consumed for settlement. Preserve failed/cancelled evidence, immediate cancellation, existing capacity controls and idempotent transitions. Use short existing record/repository locks; never hold a Goal lock while an agent runs.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Extend the retained fresh-Goal regression through deterministic smoke-ai execution and successful Backlog-to-Todo settlement, starting without that Goal’s implementation branch/worktree. Remove goal_workspace and fabricated success from the manual-transition fixture. Cover Backlog Enter/Exit and Todo Enter/Exit where applicable, blocking/background bindings, disabled/context-only bindings, ordered execution, repairs, restart/replay, source-target advancement, changed Round/request/node, cancellation and stale settlement. Test missing/replaced registrations, wrong branches, unrelated repositories, symlink escapes and inherited Git redirection. Assert staged, unstaged and untracked primary contents, HEAD and raw index bytes remain unchanged; lifecycle output never becomes the implementation candidate.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Run `cargo test --lib <filter> -- --test-threads=1` separately and sequentially for these filters: fresh_goal_backlog_exit_skill_remains_runnable_before_round_materialization; application::events::; application::workflow::tests::execution_ownership; authored_todo_start; infrastructure::git::worktrees::tests; worktree_resume; quality::tests::; application::workflow::tests::candidate_refresh; application::workflow::tests::quality_recovery; application::workflow::tests::quality_base_refresh; round_base; workflow::engine::behaviors::tests::; launch_environment; infrastructure::agents::invocation::tests; infrastructure::process::subprocess::. Explicitly confirm execution_ownership includes backlog_promotion_changes_only_goal_state_and_does_not_create_worktrees. Require nonzero selections and retain cached-success/replaced-registration coverage.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              },
+              {
+                "description": "Update only affected Skills, Events workspace, managed-worktree and Todo intent passages to explain invocation-owned pre-Plan execution while preserving implementation admission. Run `cargo check --all-targets`, `cargo clippy --all-targets`, changed-file `rustfmt --check --edition 2024 --config skip_children=true`, and `git diff --check 256f7fa161d12f9a82fdd99c6933f551c5173677`. Report actual commands, counts, failures and skips; identify unchanged Clippy warnings separately. Compare preservation snapshots. Leave Goal advancement, integration, publication and serving-installation changes to Refine.",
+                "id": "workflow.plan.enter:default-plan:P8"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Correct the retained candidate’s pre-Plan Skill regression by admitting invocation-owned lifecycle workspaces independently of implementation branches. Preserve state-only queueing, atomic Todo-to-Plan admission, existing workspace isolation, and retained recovery evidence."
+          },
+          "started_at": "2026-09-10T14:52:33Z"
+        },
         "schema_version": 2,
         "started_at": "2026-09-10T14:52:33Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T14:52:33Z"
+        "updated_at": "2026-09-10T14:56:42Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -2600,7 +2789,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T14:52:33Z",
+      "updated": "2026-09-10T14:56:42Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T14:52:32Z",
         "round_idx": 2,
@@ -2610,9 +2799,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-09-10T14:52:33Z",
+  "updated": "2026-09-10T14:56:42Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:36.706264729+00:00",
@@ -2667,7 +2856,16 @@
       "node_id": "default",
       "round_idx": 2,
       "to": "plan"
+    },
+    {
+      "at": "2026-09-10T14:56:42.754325936+00:00",
+      "forced": false,
+      "from": "plan",
+      "generation": 7,
+      "node_id": "default",
+      "round_idx": 2,
+      "to": "implement"
     }
   ],
-  "workflow_revision": 56
+  "workflow_revision": 62
 }
