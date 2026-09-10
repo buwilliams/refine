@@ -960,11 +960,88 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "failed",
+  "results": {
+    "default-quality": {
+      "invocation_id": "177db40b9ee753eb9820904dad44b5a3d2b7608618316d841a5ac15ae868bda6",
+      "binding_id": "default-quality",
+      "role": "quality",
+      "outcome": "failure",
+      "summary": "Observational review found an ownership gap after parent exit and missing structured evidence after settlement panics. Read-only formatting and whitespace checks passed; behavioral checks are proposed for Refine supervision.",
+      "evidence": [
+        "Verified HEAD ab318054adf5a5418ee3ae8bec348c98232916f2 in the pinned Round-2 workspace. Final git status was empty; working-tree and staged diffs both exited 0.",
+        "F1 — High: src/infrastructure/process/subprocess/owned_groups.rs:331-369 discovers processes through the original group, existing witnesses and current ancestry. If a registered leader launches an isolated child and exits before another observation, that child has neither matching group membership nor retained ancestry. The scan returns empty, and lines 192-197 persist confirmed_exit=true. Capacity and replacement checks can consequently accept exit while the child survives. Preserve ownership across this interval or report exit as unverified. Add a deterministic regression that registers the leader, launches a setsid child, lets the leader exit before observation, then checks capacity retention and replacement refusal. Existing tests cover previously witnessed descendants and children launched during an active stop.",
+        "F2 — Medium: src/application/workflow/engine/execution/attempt.rs:33-37 catches settlement panics outside settle_goal_failure. A panic before failure_settlement/mod.rs:63 bypasses structured runtime evidence entirely; the fallback prints no originating Round or claim revision. This violates docs/intent/03-application/02-workflow/11-consistency-contract.md:55. Catch settlement faults before the evidence-finalization path and persist an unpersisted-evidence outcome containing the original error, stage and authority. The existing panic regression asserts follow-up admission but does not assert this evidence.",
+        "Both findings are based on source inspection, not runtime reproductions. Behavioral commands are proposed, not reported as passes. Prior invocation test results were not reused as current verification.",
+        "No files, Goal state, commits or refs were changed. No merge, push, deployment or serving-daemon restart occurred."
+      ],
+      "artifacts": {
+        "tests": [
+          {
+            "command": "git diff --check b47569adb8d4c5d1d7335ba91729a3e486a38fe0 ab318054adf5a5418ee3ae8bec348c98232916f2",
+            "evidence": "Executed; exit 0.",
+            "status": "passed",
+            "test": "Candidate patch whitespace"
+          },
+          {
+            "command": "python3 - <<'PY'\nimport subprocess\nfiles = subprocess.check_output(['git', 'diff', '--name-only', 'b47569adb8d4c5d1d7335ba91729a3e486a38fe0', 'ab318054adf5a5418ee3ae8bec348c98232916f2', '--', '*.rs'], text=True).splitlines()\np = subprocess.run(['rustfmt', '--edition', '2024', '--config', 'skip_children=true', '--check', *files], capture_output=True, text=True)\nprint(f'Scoped rustfmt: {len(files)} changed Rust files; exit {p.returncode}')\nprint((p.stdout + p.stderr)[:5500])\nraise SystemExit(p.returncode)\nPY",
+            "evidence": "Executed; 56 files checked, exit 0.",
+            "status": "passed",
+            "test": "Formatting of changed Rust files"
+          },
+          {
+            "command": "cargo test --lib worker_liveness -- --test-threads=1",
+            "evidence": "Proposed for Refine supervision. Extend settlement-panic coverage to assert originating failure evidence.",
+            "status": "not_run",
+            "test": "Failure containment and follow-up admission"
+          },
+          {
+            "command": "cargo test --lib infrastructure::process::subprocess -- --test-threads=1",
+            "evidence": "Proposed for Refine supervision. Add the parent-exit regression described in finding F1.",
+            "status": "not_run",
+            "test": "Process ownership and termination"
+          },
+          {
+            "command": "cargo test --lib application::workers -- --test-threads=1",
+            "evidence": "Proposed for Refine supervision.",
+            "status": "not_run",
+            "test": "Watchdog recovery and independent deadline maintenance"
+          },
+          {
+            "command": "cargo test --lib application::maintenance::worktrees -- --test-threads=1",
+            "evidence": "Proposed for Refine supervision.",
+            "status": "not_run",
+            "test": "Cleanup preserves live work and retained evidence"
+          },
+          {
+            "command": "cargo test --lib application::workflow::health -- --test-threads=1",
+            "evidence": "Proposed for Refine supervision.",
+            "status": "not_run",
+            "test": "Admission diagnostics distinguish legitimate waiting"
+          },
+          {
+            "command": "cargo test --lib surfaces::web_server::tests::http_transport::runtime -- --test-threads=1",
+            "evidence": "Proposed for Refine supervision.",
+            "status": "not_run",
+            "test": "HTTP remains reachable during workflow degradation"
+          }
+        ]
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-quality",
+      "diagnostic": null,
+      "operation_id": "1a08bebb561113c764c",
+      "process_id": "proc-1789053876245-1129590-744",
+      "raw_output": "{\n  \"artifacts\": {\n    \"tests\": [\n      {\n        \"test\": \"Candidate patch whitespace\",\n        \"command\": \"git diff --check b47569adb8d4c5d1d7335ba91729a3e486a38fe0 ab318054adf5a5418ee3ae8bec348c98232916f2\",\n        \"status\": \"passed\",\n        \"evidence\": \"Executed; exit 0.\"\n      },\n      {\n        \"test\": \"Formatting of changed Rust files\",\n        \"command\": \"python3 - <<'PY'\\nimport subprocess\\nfiles = subprocess.check_output(['git', 'diff', '--name-only', 'b47569adb8d4c5d1d7335ba91729a3e486a38fe0', 'ab318054adf5a5418ee3ae8bec348c98232916f2', '--', '*.rs'], text=True).splitlines()\\np = subprocess.run(['rustfmt', '--edition', '2024', '--config', 'skip_children=true', '--check', *files], capture_output=True, text=True)\\nprint(f'Scoped rustfmt: {len(files)} changed Rust files; exit {p.returncode}')\\nprint((p.stdout + p.stderr)[:5500])\\nraise SystemExit(p.returncode)\\nPY\",\n        \"status\": \"passed\",\n        \"evidence\": \"Executed; 56 files checked, exit 0.\"\n      },\n      {\n        \"test\": \"Failure containment and follow-up admission\",\n        \"command\": \"cargo test --lib worker_liveness -- --test-threads=1\",\n        \"status\": \"not_run\",\n        \"evidence\": \"Proposed for Refine supervision. Extend settlement-panic coverage to assert originating failure evidence.\"\n      },\n      {\n        \"test\": \"Process ownership and termination\",\n        \"command\": \"cargo test --lib infrastructure::process::subprocess -- --test-threads=1\",\n        \"status\": \"not_run\",\n        \"evidence\": \"Proposed for Refine supervision. Add the parent-exit regression described in finding F1.\"\n      },\n      {\n        \"test\": \"Watchdog recovery and independent deadline maintenance\",\n        \"command\": \"cargo test --lib application::workers -- --test-threads=1\",\n        \"status\": \"not_run\",\n        \"evidence\": \"Proposed for Refine supervision.\"\n      },\n      {\n        \"test\": \"Cleanup preserves live work and retained evidence\",\n        \"command\": \"cargo test --lib application::maintenance::worktrees -- --test-threads=1\",\n        \"status\": \"not_run\",\n        \"evidence\": \"Proposed for Refine supervision.\"\n      },\n      {\n        \"test\": \"Admission diagnostics distinguish legitimate waiting\",\n        \"command\": \"cargo test --lib application::workflow::health -- --test-threads=1\",\n        \"status\": \"not_run\",\n        \"evidence\": \"Proposed for Refine supervision.\"\n      },\n      {\n        \"test\": \"HTTP remains reachable during workflow degradation\",\n        \"command\": \"cargo test --lib surfaces::web_server::tests::http_transport::runtime -- --test-threads=1\",\n        \"status\": \"not_run\",\n        \"evidence\": \"Proposed for Refine supervision.\"\n      }\n    ]\n  },\n  \"binding_id\": \"default-quality\",\n  \"evidence\": [\n    \"Verified HEAD ab318054adf5a5418ee3ae8bec348c98232916f2 in the pinned Round-2 workspace. Final git status was empty; working-tree and staged diffs both exited 0.\",\n    \"F1 — High: src/infrastructure/process/subprocess/owned_groups.rs:331-369 discovers processes through the original group, existing witnesses and current ancestry. If a registered leader launches an isolated child and exits before another observation, that child has neither matching group membership nor retained ancestry. The scan returns empty, and lines 192-197 persist confirmed_exit=true. Capacity and replacement checks can consequently accept exit while the child survives. Preserve ownership across this interval or report exit as unverified. Add a deterministic regression that registers the leader, launches a setsid child, lets the leader exit before observation, then checks capacity retention and replacement refusal. Existing tests cover previously witnessed descendants and children launched during an active stop.\",\n    \"F2 — Medium: src/application/workflow/engine/execution/attempt.rs:33-37 catches settlement panics outside settle_goal_failure. A panic before failure_settlement/mod.rs:63 bypasses structured runtime evidence entirely; the fallback prints no originating Round or claim revision. This violates docs/intent/03-application/02-workflow/11-consistency-contract.md:55. Catch settlement faults before the evidence-finalization path and persist an unpersisted-evidence outcome containing the original error, stage and authority. The existing panic regression asserts follow-up admission but does not assert this evidence.\",\n    \"Both findings are based on source inspection, not runtime reproductions. Behavioral commands are proposed, not reported as passes. Prior invocation test results were not reused as current verification.\",\n    \"No files, Goal state, commits or refs were changed. No merge, push, deployment or serving-daemon restart occurred.\"\n  ],\n  \"invocation_id\": \"177db40b9ee753eb9820904dad44b5a3d2b7608618316d841a5ac15ae868bda6\",\n  \"outcome\": \"failure\",\n  \"role\": \"quality\",\n  \"summary\": \"Observational review found an ownership gap after parent exit and missing structured evidence after settlement panics. Read-only formatting and whitespace checks passed; behavioral checks are proposed for Refine supervision.\"\n}\n",
+      "workflow_revision": 18
+    }
+  ],
   "created_at": "2026-09-10T15:24:35.927830536+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-10T15:30:09.197657224+00:00",
   "error": null,
   "action_applied": false
 }
