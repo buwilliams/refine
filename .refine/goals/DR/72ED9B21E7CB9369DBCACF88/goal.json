@@ -106,12 +106,59 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-09-10T08:26:06Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-09-10T08:28:49Z",
+        "proposal": {
+          "completed_at": "2026-09-10T08:28:49Z",
+          "git_after": {
+            "branch": "refine/DR72ED9B21E7CB9369DBCACF88/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR72ED9B21E7CB9369DBCACF88/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Extend the existing Git worktree capability to require a registered, canonically resolved linked checkout in the expected repository and owned location with the phase's recorded branch or commit, rejecting the main checkout and unrelated worktrees even when their branch matches.",
+                "id": "P1"
+              },
+              {
+                "description": "Enforce this workspace requirement during initial creation, restart, retained recovery handoffs, and exact-candidate checkout reuse, recreating missing managed checkouts from durable branch and candidate evidence while reporting ambiguous ownership or branch conflicts without moving, stashing, staging, or deleting existing work.",
+                "id": "P2"
+              },
+              {
+                "description": "Resolve agent_subpath to an existing directory canonically contained within the admitted worktree and carry that workspace explicitly through planning, implementation, correction, Governance, and recovery launches, including provider-session resumes and fresh-launch fallbacks.",
+                "id": "P3"
+              },
+              {
+                "description": "Recheck workspace ownership and Git identity at agent launch and before Refine stages, commits, or refreshes candidate changes so stale paths, changed registrations, and branch switches fail through the existing recoverable infrastructure-error boundary.",
+                "id": "P4"
+              },
+              {
+                "description": "Remove inherited Git repository and index redirection variables from managed Goal and Quality processes and their Git invocations while preserving deliberate per-command overrides needed by existing isolated Git operations.",
+                "id": "P5"
+              },
+              {
+                "description": "Route legacy Quality execution that currently selects the main checkout through the existing exact-source-candidate reconciliation worktree path while preserving retained proof, candidate identity, and terminal failed-result semantics.",
+                "id": "P6"
+              },
+              {
+                "description": "Update the affected Goal Agent and worktree intent pages to make automated workspace isolation mandatory and describe ownership-conflict recovery while preserving the documented integration and human Review handoff.",
+                "id": "P7"
+              }
+            ],
+            "summary": "Keep all automated Goal authoring, checks, corrections, and recovery in dedicated Refine-owned worktrees so concurrent manual development is protected from unfinished Goal edits and staging in the developer's checkout."
+          },
+          "started_at": "2026-09-10T08:26:07Z"
+        },
         "schema_version": 2,
         "started_at": "2026-09-10T08:26:06Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T08:26:06Z"
+        "updated_at": "2026-09-10T08:28:49Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -125,7 +172,7 @@
       "quality_state": "unclassified",
       "reporter": "ethan.jacobson@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T08:26:07Z",
+      "updated": "2026-09-10T08:28:49Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T08:26:06Z",
         "round_idx": 0,
@@ -137,6 +184,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-09-10T08:26:07Z",
-  "workflow_revision": 7
+  "updated": "2026-09-10T08:28:49Z",
+  "workflow_revision": 9
 }
