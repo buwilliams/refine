@@ -3034,11 +3034,63 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-quality": {
+      "invocation_id": "1bf267b01edc88075f4c208fbe92293de2ddfbfd8a3276d80ab05332fe6d2bd4",
+      "binding_id": "default-quality",
+      "role": "quality",
+      "outcome": "success",
+      "summary": "Observational review found no additional defects; retained behavioral evidence matches the exact candidate, and read-only checks passed.",
+      "evidence": [
+        "Verified clean HEAD 3fb8b4bf8377f07a4acc7d1e18b8f8e7ea8abbd9 in the pinned workspace. All 960 retained verification-manifest hashes match current files.",
+        "Reviewed finalized recovery plan, affected intent, bounded capture, deadline settlement, output-dependent callers, ownership retention and same-runner admission tests. No additional defects found.",
+        "Read retained logs and Quality supervision receipts under /tmp/refine-r6-quality and /tmp/refine-r5-implementation/supervision. The full-suite log records 1287 passed, zero failed and six ignored; binary target selected zero tests.",
+        "Behavioral checks were not rerun. Six ignored tests are not passes; macOS remains unverified. No files, Git state or Goal state changed."
+      ],
+      "artifacts": {
+        "tests": [
+          {
+            "command": "cargo test --lib infrastructure::process::subprocess -- --test-threads=1",
+            "evidence": "Proposed supervised recheck. Retained candidate-matched log complete-1.log records 42 passed, zero failed; not rerun during this observational invocation.",
+            "status": "passed",
+            "test": "Bounded capture and retained descendant ownership"
+          },
+          {
+            "command": "cargo test --lib worker_liveness -- --test-threads=1",
+            "evidence": "Proposed supervised recheck. Retained candidate-matched log complete-2.log records 12 passed, zero failed; not rerun during this observational invocation.",
+            "status": "passed",
+            "test": "Failure containment and follow-up admission"
+          },
+          {
+            "command": "cargo fmt --all -- --check",
+            "evidence": "Ran during this invocation; exit 0.",
+            "status": "passed",
+            "test": "Candidate formatting"
+          },
+          {
+            "command": "git diff --check a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e HEAD",
+            "evidence": "Ran during this invocation; exit 0.",
+            "status": "passed",
+            "test": "Candidate patch whitespace"
+          }
+        ]
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-quality",
+      "diagnostic": null,
+      "operation_id": "1a08d506bce113c7691",
+      "process_id": "proc-1789077253798-1129590-1557",
+      "raw_output": "{\n  \"artifacts\": {\n    \"tests\": [\n      {\n        \"command\": \"cargo test --lib infrastructure::process::subprocess -- --test-threads=1\",\n        \"evidence\": \"Proposed supervised recheck. Retained candidate-matched log complete-1.log records 42 passed, zero failed; not rerun during this observational invocation.\",\n        \"status\": \"passed\",\n        \"test\": \"Bounded capture and retained descendant ownership\"\n      },\n      {\n        \"command\": \"cargo test --lib worker_liveness -- --test-threads=1\",\n        \"evidence\": \"Proposed supervised recheck. Retained candidate-matched log complete-2.log records 12 passed, zero failed; not rerun during this observational invocation.\",\n        \"status\": \"passed\",\n        \"test\": \"Failure containment and follow-up admission\"\n      },\n      {\n        \"command\": \"cargo fmt --all -- --check\",\n        \"evidence\": \"Ran during this invocation; exit 0.\",\n        \"status\": \"passed\",\n        \"test\": \"Candidate formatting\"\n      },\n      {\n        \"command\": \"git diff --check a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e HEAD\",\n        \"evidence\": \"Ran during this invocation; exit 0.\",\n        \"status\": \"passed\",\n        \"test\": \"Candidate patch whitespace\"\n      }\n    ]\n  },\n  \"binding_id\": \"default-quality\",\n  \"evidence\": [\n    \"Verified clean HEAD 3fb8b4bf8377f07a4acc7d1e18b8f8e7ea8abbd9 in the pinned workspace. All 960 retained verification-manifest hashes match current files.\",\n    \"Reviewed finalized recovery plan, affected intent, bounded capture, deadline settlement, output-dependent callers, ownership retention and same-runner admission tests. No additional defects found.\",\n    \"Read retained logs and Quality supervision receipts under /tmp/refine-r6-quality and /tmp/refine-r5-implementation/supervision. The full-suite log records 1287 passed, zero failed and six ignored; binary target selected zero tests.\",\n    \"Behavioral checks were not rerun. Six ignored tests are not passes; macOS remains unverified. No files, Git state or Goal state changed.\"\n  ],\n  \"invocation_id\": \"1bf267b01edc88075f4c208fbe92293de2ddfbfd8a3276d80ab05332fe6d2bd4\",\n  \"outcome\": \"success\",\n  \"role\": \"quality\",\n  \"summary\": \"Observational review found no additional defects; retained behavioral evidence matches the exact candidate, and read-only checks passed.\"\n}",
+      "workflow_revision": 130
+    }
+  ],
   "created_at": "2026-09-10T21:54:13.472188947+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-10T21:55:28.730494784+00:00",
   "error": null,
   "action_applied": false
 }
