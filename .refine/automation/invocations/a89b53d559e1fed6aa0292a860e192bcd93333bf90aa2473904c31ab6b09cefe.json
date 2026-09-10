@@ -1,10 +1,10 @@
 {
-  "id": "fbc5912467a594e4619ec91e3af194fcf6e53d68cd85d88f796a8235a1fe63da",
+  "id": "a89b53d559e1fed6aa0292a860e192bcd93333bf90aa2473904c31ab6b09cefe",
   "event": {
-    "id": "workflow.governance.enter",
-    "name": "Workflow Governance Enter",
+    "id": "workflow.plan.enter",
+    "name": "Workflow Plan Enter",
     "kind": "system",
-    "source": "workflow.governance.enter",
+    "source": "workflow.plan.enter",
     "enabled": true,
     "scope": {
       "node_id": null
@@ -12,8 +12,8 @@
     "parameters": [],
     "bindings": [
       {
-        "id": "default-governance",
-        "skill_id": "default-governance",
+        "id": "default-plan",
+        "skill_id": "default-plan",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -33,17 +33,17 @@
     "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRA87E5F985A1FFE2919BE7EC2-round-2",
     "provider": "codex",
     "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
-    "round_idx": 2,
-    "workflow_revision": 48,
-    "candidate_commit": "59af87d23c3c14881f3969ef316146e7aa2e3273",
+    "round_idx": 3,
+    "workflow_revision": 82,
+    "candidate_commit": null,
     "data": {
       "context": {
-        "assembled_at": "2026-09-10T14:56:19Z",
+        "assembled_at": "2026-09-10T15:24:12Z",
         "current_round": {
           "assignee": "Refine",
-          "prompt": "Implement a fresh managed recovery Round for Goal DRA87E5F985A1FFE2919BE7EC2 from current main. Preserve both previous Rounds, including their branches, commits, uncommitted files, plans, logs and failure evidence. Inspect and selectively reuse Round 2 candidate f0bcaaac7feb35efec438cbcc4bf36bfa57cd993, including its Quality correction that pins Skill configuration before invocation and preserves configuration on replay. Complete the supported Review integration-settlement recovery behavior under current Skills and docs/intent contracts.\n\nFix Quality finding Q1 from invocation f4577f5a926319479c8c06b7e3834c2cba05e45a842b0d2fdb142df218bdc506. In src/application/workflow/governance/integration/resume.rs, recover_integrated_candidate_locked currently requires publication before reconciling prepared integration effects. Under the existing target lease, repository lock and authority checks, reconcile retained integration_intent records against freshly observed exact local ancestry before returning for incomplete publication. Validate the candidate and recorded integration identity against the applicable target. When attempt A completed the local merge but crashed before recording its effect, append that proven local effect to A's originating Round and workflow revision, retaining its original integration identity, pushed=false and publication_required=true. Reuse the existing integration_effects capability; historical retention must not grant A authority, replace current settlement projections, or advance replacement work. An intent whose exact integration commit is absent from the local target remains unconfirmed.\n\nLet authoritative attempt B finish required publication through the existing workflow and retain publication under B. Keep local completion distinct from publication completion; subsequent recovery must not relabel B's publication as A's. Preserve original observations and diagnostics, and make replay retain stable, deduplicated effects. Require fresh local and required published target proof before atomic settlement with Review. Preserve strict human approval, lifecycle Skill gates, candidate-bound supervised Quality proof, explicit completed no-required-Skills receipts, and rejection of missing, failed, pending or mismatched evidence. Content equality cannot transfer proof between commit identities. Retain existing bounded handling of publication rejection and concurrent target movement without force-pushing.\n\nAdd a deterministic regression beside crash_after_ref_motion_recovers_the_prepared_effect_on_its_originating_attempt. Configure a temporary remote still at the base; retain A's integration intent and completed local target movement, omit A's completed-effect record, then claim B and resume through the normal workflow to Review. Assert A retains its exact completed local effect with publication still distinguished, B retains successful publication, and stale A cannot settle or advance work. Exercise interruption or failed publication followed by retry, repeated recovery before and after settlement, and preservation of both attempts' evidence. Retain coverage for no-remote recovery, interruption after publication, cancellation, supersession and unproved intents. Demonstrate the new regression fails before the correction and passes afterward within the new managed worktree.\n\nRun the new regression and focused checks using cargo test --lib governance -- --test-threads=1, cargo test --lib application::events:: -- --test-threads=1, cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1, and cargo test --lib candidate_refresh -- --test-threads=1. Verify retained surface behavior with the existing CLI/API recovery tests and node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js. Check changed Rust formatting and patch whitespace. Report actual commands, selected test counts, results and any baseline failures or unexecuted checks. Update only documentation affected by the correction. Refine owns candidate publication, integration and workflow advancement; do not manually change Goal state, approve, merge, push, deploy or restart the serving installation.",
+          "prompt": "In a managed recovery Round for Goal DRA87E5F985A1FFE2919BE7EC2, preserve candidate 59af87d23c3c14881f3969ef316146e7aa2e3273 and all prior Round artifacts. Move required_bindings and the pure receipt-validity policy from src/application/events/evidence.rs into a cohesive Model module extending the existing automation semantics. Update Application callers and relocate the corresponding policy tests. Keep invocation orchestration, configuration persistence and timestamp acquisition in Application. Preserve receipt compatibility, exact-candidate validation, required Skill checks, Q1 effect attribution, replay deduplication, lifecycle gates and strict approval. Avoid unrelated refactoring. Run the relocated Model tests and the existing governance, application::events::, quality_resume, candidate_refresh, CLI/API recovery and browser diagnostics checks; check changed Rust formatting and patch whitespace. Report actual commands and results. Update intent documentation only if its contract changes. Do not manually advance Goal state, approve, merge, push, deploy or restart the serving installation.",
           "reporter": "Refine",
-          "round": 3
+          "round": 4
         },
         "goal": {
           "assignee": "Refine",
@@ -467,6 +467,460 @@
             "quality_state": "failed",
             "reporter": "Buddy Williams",
             "round": 2
+          },
+          {
+            "assignee": "Refine",
+            "constitution_state": "passed",
+            "governance_checked_at": "2026-09-10T15:24:11Z",
+            "governance_details": {
+              "candidate_commit": "59af87d23c3c14881f3969ef316146e7aa2e3273",
+              "configured": true,
+              "failed_actions": [
+                {
+                  "evidence": null,
+                  "message": "src/application/events/evidence.rs:36-51 defines required Skill selection, and :90-150 defines the domain conditions for accepting candidate-bound gate receipts. Both functions derive policy solely from supplied values, without orchestration or external effects. Their placement contradicts the project rule and docs/intent/01-design.md:23, which assign invariants and pure derivations to Model. Move this policy and its tests behind the existing Model automation boundary, retaining execution and persistence in Application.",
+                  "rule_id": "workflow.governance.enter:default-governance:ARCH-MODEL-PURE-POLICY",
+                  "state": "failed"
+                }
+              ],
+              "phase": "post_implementation",
+              "skill_results": [
+                {
+                  "artifacts": {
+                    "recovery_analysis": "The Q1 correction is supported by source inspection and retained passing Quality evidence. One architecture violation remains: newly introduced, side-effect-free Skill gate policy resides in Application despite the explicit requirement that Model own domain invariants and pure policy.",
+                    "recovery_round_prompt": "In a managed recovery Round for Goal DRA87E5F985A1FFE2919BE7EC2, preserve candidate 59af87d23c3c14881f3969ef316146e7aa2e3273 and all prior Round artifacts. Move required_bindings and the pure receipt-validity policy from src/application/events/evidence.rs into a cohesive Model module extending the existing automation semantics. Update Application callers and relocate the corresponding policy tests. Keep invocation orchestration, configuration persistence and timestamp acquisition in Application. Preserve receipt compatibility, exact-candidate validation, required Skill checks, Q1 effect attribution, replay deduplication, lifecycle gates and strict approval. Avoid unrelated refactoring. Run the relocated Model tests and the existing governance, application::events::, quality_resume, candidate_refresh, CLI/API recovery and browser diagnostics checks; check changed Rust formatting and patch whitespace. Report actual commands and results. Update intent documentation only if its contract changes. Do not manually advance Goal state, approve, merge, push, deploy or restart the serving installation.",
+                    "violations": [
+                      {
+                        "message": "src/application/events/evidence.rs:36-51 defines required Skill selection, and :90-150 defines the domain conditions for accepting candidate-bound gate receipts. Both functions derive policy solely from supplied values, without orchestration or external effects. Their placement contradicts the project rule and docs/intent/01-design.md:23, which assign invariants and pure derivations to Model. Move this policy and its tests behind the existing Model automation boundary, retaining execution and persistence in Application.",
+                        "rule_id": "ARCH-MODEL-PURE-POLICY"
+                      }
+                    ]
+                  },
+                  "binding_id": "workflow.governance.enter:default-governance",
+                  "evidence": [
+                    "Verified clean HEAD 59af87d23c3c14881f3969ef316146e7aa2e3273 on the Round 3 branch. All 59 changed files match the retained Quality SHA-256 manifest.",
+                    "Reviewed accepted plans, implementation reports, candidate diff, affected intent, and Quality evidence. Existing Model automation policy is in src/model/automation.rs, including result_role and bindings.",
+                    "Read regression-before.log: the Q1 regression failed because A's completed effect was absent. Retained Quality logs show the corrected regression passed, governance 86 passed, events 24 passed, quality_resume 6 passed, candidate_refresh 16 passed, workflow 12 passed, CLI 5 passed and API 1 passed.",
+                    "Read-only git diff --check against the pinned base passed. Tests were not rerun during this observational invocation; recovery check commands are proposed above. No files, Goal state, branches or commits were changed."
+                  ],
+                  "invocation_id": "fbc5912467a594e4619ec91e3af194fcf6e53d68cd85d88f796a8235a1fe63da",
+                  "outcome": "failure",
+                  "role": "governance",
+                  "summary": "Q1 is corrected; one Model policy ownership violation requires scoped recovery."
+                }
+              ],
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRA87E5F985A1FFE2919BE7EC2-round-2"
+            },
+            "governance_message": "Q1 is corrected; one Model policy ownership violation requires scoped recovery.",
+            "governance_rule_actions": [
+              {
+                "evidence": null,
+                "message": "src/application/events/evidence.rs:36-51 defines required Skill selection, and :90-150 defines the domain conditions for accepting candidate-bound gate receipts. Both functions derive policy solely from supplied values, without orchestration or external effects. Their placement contradicts the project rule and docs/intent/01-design.md:23, which assign invariants and pure derivations to Model. Move this policy and its tests behind the existing Model automation boundary, retaining execution and persistence in Application.",
+                "rule_id": "workflow.governance.enter:default-governance:ARCH-MODEL-PURE-POLICY",
+                "state": "failed"
+              }
+            ],
+            "guidance_decision": {
+              "applied": [],
+              "context_version": 1,
+              "recorded_at": "2026-09-10T15:10:17Z",
+              "skipped": []
+            },
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+                "context_digest": "08a46f7426b2a74daf2b0fa2b3c5061156375e28bdc1e4651cc12445eb6c3fd0",
+                "context_version": 1,
+                "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+                "implementation_branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-3",
+                "round_idx": 2,
+                "target_branch": "main"
+              },
+              "completed_at": "2026-09-10T15:10:17Z",
+              "final_plan": {
+                "completed_at": "2026-09-10T15:00:31Z",
+                "git_after": {
+                  "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-3",
+                  "head_commit": "f0bcaaac7feb35efec438cbcc4bf36bfa57cd993",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-3",
+                  "head_commit": "f0bcaaac7feb35efec438cbcc4bf36bfa57cd993",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Continue in the invocation-pinned Round 3 branch and retained candidate worktree. Preserve both previous Rounds and the existing Skill configuration pinning/replay correction; limit implementation to Q1 and its verification.",
+                      "id": "workflow.plan.enter:default-plan:P1"
+                    },
+                    {
+                      "description": "Add crash_after_ref_motion_with_pending_publication_preserves_attempt_effects beside the existing crash regression in governance/tests/skill_gates.rs. Retain A’s exact integration intent and completed local merge with a temporary remote still at base, omit A’s completed effect, claim B, and demonstrate the attribution assertion fails before changing production code.",
+                      "id": "workflow.plan.enter:default-plan:P2"
+                    },
+                    {
+                      "description": "In integration/resume.rs, reconcile prepared local effects before the incomplete-publication return under existing lease, repository-lock and authority checks. Validate the candidate, target branch, remote, originating Round/revision, successful merge and exact candidate-to-integration-to-local ancestry; leave malformed, mismatched or unproved intents unconfirmed.",
+                      "id": "workflow.plan.enter:default-plan:P3"
+                    },
+                    {
+                      "description": "Use the existing integration_effects capability to retain A’s proven local effect without publishing a settlement projection. Preserve its integration identity, timestamp, diagnostics, pushed=false and recorded publication requirement. Deduplicate replay by originating attempt, exact integration identity and completion phase, retaining original records and never attributing B’s later publication to A.",
+                      "id": "workflow.plan.enter:default-plan:P4"
+                    },
+                    {
+                      "description": "Let B complete publication through the existing workflow, retaining B’s publication evidence. Exercise deterministic publication rejection followed by retry, interruption after publication, repeated recovery before settlement and idempotent requests afterward; assert both attempts’ evidence survives and stale A cannot settle, publish or advance replacement work. Preserve fresh target proof, atomic Review settlement, lifecycle gates, strict approval and bounded target-movement recovery.",
+                      "id": "workflow.plan.enter:default-plan:P5"
+                    },
+                    {
+                      "description": "Extend negative coverage to an integration commit absent from the local target despite candidate ancestry, mismatched identities and content equality without commit identity. Retain existing no-remote, cancellation, supersession, Skill receipt replay, missing/failed/pending evidence and explicit completed no-required-Skills coverage. Keep changes cohesive within the existing recovery and evidence responsibilities.",
+                      "id": "workflow.plan.enter:default-plan:P6"
+                    },
+                    {
+                      "description": "Clarify local-effect retention versus publication attribution in the affected merge/review and Governance intent pages. Run the new regression and specified focused Rust, CLI/API and JavaScript checks, changed-file Rust formatting and patch whitespace checks; report actual commands, selected counts, results, skips and unexecuted checks against the implementation candidate.",
+                      "id": "workflow.plan.enter:default-plan:P7"
+                    }
+                  ],
+                  "summary": "workflow.plan.enter:default-plan: Correct Q1 on the retained candidate so recovery preserves the originating attempt’s completed local integration before publication, while the authoritative replacement publishes and settles Review with distinct, replay-safe evidence."
+                },
+                "started_at": "2026-09-10T14:56:19Z"
+              },
+              "implementation": {
+                "completed_at": "2026-09-10T15:10:17Z",
+                "execution": {
+                  "checklist": [
+                    {
+                      "evidence": "Continued in the invocation-pinned Round 3 checkout. Limited changes to Q1, regression coverage and two affected intent pages; preserved prior branches, files and Skill corrections.",
+                      "id": "workflow.plan.enter:default-plan:P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added crash_after_ref_motion_with_pending_publication_preserves_attempt_effects beside the existing crash regression. Before production changes it failed because A had no completed effect; after correction it passed.",
+                      "id": "workflow.plan.enter:default-plan:P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "resume.rs now reconciles local integration intents before returning for incomplete publication. Validation requires matching candidate, target, remote and originating Round, a valid revision, successful merge, canonical integration identity and exact candidate-to-integration-to-local ancestry.",
+                      "id": "workflow.plan.enter:default-plan:P3",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Reused integration_effects to retain A’s local phase without replacing settlement projections. Preserved original identity, timestamp, diagnostics, pushed=false and publication requirement. Deduplication distinguishes originating attempt, exact integration and completion phase.",
+                      "id": "workflow.plan.enter:default-plan:P4",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Regression exercises two rejected publications, successful B publication, interruption before settlement, repeated recovery and atomic workflow completion to Review. Both attempts’ evidence survives; stale A cannot publish, settle or advance work; settled retry requests are idempotent.",
+                      "id": "workflow.plan.enter:default-plan:P5",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added coverage for 16 malformed, mismatched or unproved intents, including a candidate-descendant integration commit absent from the target. Verified duplicate observations preserve original evidence. Existing no-remote, cancellation, supersession, content-identity and Skill receipt regressions pass.",
+                      "id": "workflow.plan.enter:default-plan:P6",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Updated only merge/review and Governance intent pages. Completed requested Rust, CLI/API, JavaScript, formatting and whitespace verification. All seven changed/new files match the verification manifest.",
+                      "id": "workflow.plan.enter:default-plan:P7",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "cargo test --lib crash_after_ref_motion_with_pending_publication_preserves_attempt_effects -- --test-threads=1: before correction, exit 101 with the expected missing-A-effect assertion; afterward, 1 passed.",
+                    "cargo test --lib governance_recovery_leaves_malformed_mismatched_and_unproved_intents_unconfirmed -- --test-threads=1: 1 passed.",
+                    "cargo test --lib governance -- --test-threads=1: final run 86 passed. Initial run had 85 passed and one new-test setup failure; corrected the fixture to record observations through the existing API.",
+                    "cargo test --lib application::events:: -- --test-threads=1: 24 passed.",
+                    "cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1: 6 passed.",
+                    "cargo test --lib candidate_refresh -- --test-threads=1: 16 passed.",
+                    "cargo test --lib application::work_items::tests::workflow -- --test-threads=1: 12 passed.",
+                    "cargo test --lib surfaces::cli::tests::goals::lifecycle -- --test-threads=1: 5 passed.",
+                    "cargo test --lib web_server_governance_retry_from_review -- --test-threads=1: 1 passed.",
+                    "node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js: 6 passed, no skips.",
+                    "rustfmt --check --edition 2024 --config skip_children=true src/application/work_items/service/integration_effects.rs src/application/workflow/engine/behaviors/governance/tests.rs src/application/workflow/engine/behaviors/governance/tests/skill_gates.rs src/application/workflow/governance/integration/resume.rs src/application/workflow/engine/behaviors/governance/tests/integration_intents.rs: passed.",
+                    "git diff --check: passed.",
+                    "All final selected Rust runs had zero failures and zero ignored tests. No baseline failures were observed. All requested checks ran; the full test suite and live-environment recovery were not exercised."
+                  ]
+                },
+                "report": "workflow.implement.enter:default-implement: Corrected Q1: recovery retains the originating attempt’s proven local integration before publication, preserves distinct publication attribution, and deduplicates replay.",
+                "started_at": "2026-09-10T15:00:31Z"
+              },
+              "phase": "implement",
+              "phase_started_at": "2026-09-10T15:00:31Z",
+              "proposal": {
+                "completed_at": "2026-09-10T15:00:31Z",
+                "git_after": {
+                  "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-3",
+                  "head_commit": "f0bcaaac7feb35efec438cbcc4bf36bfa57cd993",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-3",
+                  "head_commit": "f0bcaaac7feb35efec438cbcc4bf36bfa57cd993",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Continue in the invocation-pinned Round 3 branch and retained candidate worktree. Preserve both previous Rounds and the existing Skill configuration pinning/replay correction; limit implementation to Q1 and its verification.",
+                      "id": "workflow.plan.enter:default-plan:P1"
+                    },
+                    {
+                      "description": "Add crash_after_ref_motion_with_pending_publication_preserves_attempt_effects beside the existing crash regression in governance/tests/skill_gates.rs. Retain A’s exact integration intent and completed local merge with a temporary remote still at base, omit A’s completed effect, claim B, and demonstrate the attribution assertion fails before changing production code.",
+                      "id": "workflow.plan.enter:default-plan:P2"
+                    },
+                    {
+                      "description": "In integration/resume.rs, reconcile prepared local effects before the incomplete-publication return under existing lease, repository-lock and authority checks. Validate the candidate, target branch, remote, originating Round/revision, successful merge and exact candidate-to-integration-to-local ancestry; leave malformed, mismatched or unproved intents unconfirmed.",
+                      "id": "workflow.plan.enter:default-plan:P3"
+                    },
+                    {
+                      "description": "Use the existing integration_effects capability to retain A’s proven local effect without publishing a settlement projection. Preserve its integration identity, timestamp, diagnostics, pushed=false and recorded publication requirement. Deduplicate replay by originating attempt, exact integration identity and completion phase, retaining original records and never attributing B’s later publication to A.",
+                      "id": "workflow.plan.enter:default-plan:P4"
+                    },
+                    {
+                      "description": "Let B complete publication through the existing workflow, retaining B’s publication evidence. Exercise deterministic publication rejection followed by retry, interruption after publication, repeated recovery before settlement and idempotent requests afterward; assert both attempts’ evidence survives and stale A cannot settle, publish or advance replacement work. Preserve fresh target proof, atomic Review settlement, lifecycle gates, strict approval and bounded target-movement recovery.",
+                      "id": "workflow.plan.enter:default-plan:P5"
+                    },
+                    {
+                      "description": "Extend negative coverage to an integration commit absent from the local target despite candidate ancestry, mismatched identities and content equality without commit identity. Retain existing no-remote, cancellation, supersession, Skill receipt replay, missing/failed/pending evidence and explicit completed no-required-Skills coverage. Keep changes cohesive within the existing recovery and evidence responsibilities.",
+                      "id": "workflow.plan.enter:default-plan:P6"
+                    },
+                    {
+                      "description": "Clarify local-effect retention versus publication attribution in the affected merge/review and Governance intent pages. Run the new regression and specified focused Rust, CLI/API and JavaScript checks, changed-file Rust formatting and patch whitespace checks; report actual commands, selected counts, results, skips and unexecuted checks against the implementation candidate.",
+                      "id": "workflow.plan.enter:default-plan:P7"
+                    }
+                  ],
+                  "summary": "workflow.plan.enter:default-plan: Correct Q1 on the retained candidate so recovery preserves the originating attempt’s completed local integration before publication, while the authoritative replacement publishes and settles Review with distinct, replay-safe evidence."
+                },
+                "started_at": "2026-09-10T14:56:19Z"
+              },
+              "schema_version": 2,
+              "started_at": "2026-09-10T14:56:19Z",
+              "state": "completed",
+              "updated_at": "2026-09-10T15:10:17Z"
+            },
+            "implementation_report": "workflow.implement.enter:default-implement: Corrected Q1: recovery retains the originating attempt’s proven local integration before publication, preserves distinct publication attribution, and deduplicates replay.",
+            "implementation_reported_at": "2026-09-10T15:10:17Z",
+            "meta_rule_state": "passed",
+            "product_state": "passed",
+            "prompt": "Implement a fresh managed recovery Round for Goal DRA87E5F985A1FFE2919BE7EC2 from current main. Preserve both previous Rounds, including their branches, commits, uncommitted files, plans, logs and failure evidence. Inspect and selectively reuse Round 2 candidate f0bcaaac7feb35efec438cbcc4bf36bfa57cd993, including its Quality correction that pins Skill configuration before invocation and preserves configuration on replay. Complete the supported Review integration-settlement recovery behavior under current Skills and docs/intent contracts.\n\nFix Quality finding Q1 from invocation f4577f5a926319479c8c06b7e3834c2cba05e45a842b0d2fdb142df218bdc506. In src/application/workflow/governance/integration/resume.rs, recover_integrated_candidate_locked currently requires publication before reconciling prepared integration effects. Under the existing target lease, repository lock and authority checks, reconcile retained integration_intent records against freshly observed exact local ancestry before returning for incomplete publication. Validate the candidate and recorded integration identity against the applicable target. When attempt A completed the local merge but crashed before recording its effect, append that proven local effect to A's originating Round and workflow revision, retaining its original integration identity, pushed=false and publication_required=true. Reuse the existing integration_effects capability; historical retention must not grant A authority, replace current settlement projections, or advance replacement work. An intent whose exact integration commit is absent from the local target remains unconfirmed.\n\nLet authoritative attempt B finish required publication through the existing workflow and retain publication under B. Keep local completion distinct from publication completion; subsequent recovery must not relabel B's publication as A's. Preserve original observations and diagnostics, and make replay retain stable, deduplicated effects. Require fresh local and required published target proof before atomic settlement with Review. Preserve strict human approval, lifecycle Skill gates, candidate-bound supervised Quality proof, explicit completed no-required-Skills receipts, and rejection of missing, failed, pending or mismatched evidence. Content equality cannot transfer proof between commit identities. Retain existing bounded handling of publication rejection and concurrent target movement without force-pushing.\n\nAdd a deterministic regression beside crash_after_ref_motion_recovers_the_prepared_effect_on_its_originating_attempt. Configure a temporary remote still at the base; retain A's integration intent and completed local target movement, omit A's completed-effect record, then claim B and resume through the normal workflow to Review. Assert A retains its exact completed local effect with publication still distinguished, B retains successful publication, and stale A cannot settle or advance work. Exercise interruption or failed publication followed by retry, repeated recovery before and after settlement, and preservation of both attempts' evidence. Retain coverage for no-remote recovery, interruption after publication, cancellation, supersession and unproved intents. Demonstrate the new regression fails before the correction and passes afterward within the new managed worktree.\n\nRun the new regression and focused checks using cargo test --lib governance -- --test-threads=1, cargo test --lib application::events:: -- --test-threads=1, cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1, and cargo test --lib candidate_refresh -- --test-threads=1. Verify retained surface behavior with the existing CLI/API recovery tests and node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js. Check changed Rust formatting and patch whitespace. Report actual commands, selected test counts, results and any baseline failures or unexecuted checks. Update only documentation affected by the correction. Refine owns candidate publication, integration and workflow advancement; do not manually change Goal state, approve, merge, push, deploy or restart the serving installation.",
+            "quality_checked_at": "2026-09-10T15:19:30Z",
+            "quality_details": {
+              "candidate_commit": "59af87d23c3c14881f3969ef316146e7aa2e3273",
+              "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRA87E5F985A1FFE2919BE7EC2-round-2",
+              "diagnostics": [
+                "Event invocation 07504c434eb70160153bd6b21b21bbc081ceb258cf12160dca8b327cfde0ba4b: automation/invocations/07504c434eb70160153bd6b21b21bbc081ceb258cf12160dca8b327cfde0ba4b.json",
+                "Observed supervised process proc-1789053500399-1129590-674 exited 0. stdout: running 1 test\ntest application::workflow::engine::behaviors::governance::tests::skill_gates::crash_after_ref_motion_with_pending_publication_preserves_attempt_effects ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1187 filtered out; finished in 1.93s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                "Observed supervised process proc-1789053502607-1129590-677 exited 0. stdout: flow::tests::disruption::force_stop_after_quality_proof_before_governance_reuses_the_proof ... ok\ntest application::workflow::tests::disruption::force_stop_mid_governance_with_transaction_marker_recovers_and_integrates ... ok\ntest application::workflow::tests::execution_ownership::cleanup_observes_candidate_handoff_through_governance_integration ... ok\ntest application::workflow::tests::governance::file_automation_fails_after_the_governance_recovery_budget_is_exhausted ... ok\ntest application::workflow::tests::governance::file_automation_stops_early_when_consecutive_governance_findings_are_identical ... ok\ntest application::workflow::tests::quality_base_refresh::a_later_target_move_still_refreshes_at_governance_and_retains_the_earlier_repin ... ok\ntest application::workflow::tests::worktree_resume::resume_reuses_a_durable_quality_proof_and_skips_straight_to_governance ... ok\ntest infrastructure::process::supervisor::config::tests::file_project_config_services_persist_governance_guidance_and_reporters ... ok\ntest infrastructure::process::supervisor::config::tests::governance_rejects_invalid_revision_shapes ... ok\ntest infrastructure::process::supervisor::config::tests::governance_rule_revisions_preserve_unrelated_fields_and_fence_stale_writers ... ok\ntest surfaces::cli::tests::goals::lifecycle::goal_retry_governance_from_review_uses_shared_evidence_diagnostics ... ok\ntest surfaces::web_server::tests::features::membership::web_server_governance_retry_from_review_uses_shared_exact_candidate_eligibility ... ok\ntest surfaces::web_server::tests::quality_guidance::governance::configuration_routes_report_detached_target_app ... ok\ntest surfaces::web_server::tests::quality_guidance::governance::web_server_manages_events_skills_and_reporters ... ok\ntest surfaces::web_server::tests::static_surface::work_items::static_goal_detail_uses_shared_governance_review_state_helpers ... ok\n\ntest result: ok. 86 passed; 0 failed; 0 ignored; 0 measured; 1102 filtered out; finished in 45.96s stderr: Blocking waiting for file lock on package cache\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\nPreparing worktree (detached HEAD 313afcb)\nPreparing worktree (detached HEAD 313afcb)",
+                "Observed supervised process proc-1789053548837-1129590-692 exited 0. stdout: nc_merges_disjoint_edits_fences_both_editors_and_rejects_broken_references ... ok\ntest application::events::tests::default_skills_complete_a_real_workflow_with_observed_quality_and_candidate_evidence ... ok\ntest application::events::tests::disabled_node_override_masks_only_its_project_binding ... ok\ntest application::events::tests::goal_and_system_paths_resolve_arrays_and_missing_shared_parameters_keep_requiredness ... ok\ntest application::events::tests::interrupted_index_updates_recover_without_replaying_completed_work ... ok\ntest application::events::tests::manual_request_identity_and_success_action_receipts_survive_replay ... ok\ntest application::events::tests::manual_skills_select_one_skill_validate_inputs_and_pin_replay_without_a_goal ... ok\ntest application::events::tests::manual_transition_waits_for_exit_evidence_and_cancellation_can_supersede_it ... ok\ntest application::events::tests::migration_preserves_content_is_idempotent_and_stale_writes_cannot_erase_edits ... ok\ntest application::events::tests::missing_automatic_input_settles_as_visible_error_instead_of_waiting_forever ... ok\ntest application::events::tests::ordered_independent_runs_collect_failure_preserve_evidence_and_do_not_replay ... ok\ntest application::events::tests::oversized_configuration_is_rejected_before_replacing_the_readable_document ... ok\ntest application::events::tests::single_trigger_save_rejects_multiple_and_derives_the_workflow_result_contract ... ok\ntest application::events::tests::skill_event_assignments_save_atomically_and_preserve_other_skills ... ok\ntest application::events::tests::startup_occurrences_are_idempotent_and_new_boots_get_new_invocations ... ok\ntest application::events::tests::typed_parameters_resolve_explicit_then_context_then_default_and_fail_on_missing ... ok\ntest application::events::tests::v2_migration_splits_assignments_preserves_overrides_and_is_idempotent ... ok\n\ntest result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 1164 filtered out; finished in 2.99s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                "Observed supervised process proc-1789053552078-1129590-695 exited 0. stdout: running 6 tests\ntest application::workflow::engine::behaviors::tests::quality_resume::empty_quality_and_governance_skills_pass_without_agents_and_retain_candidate_proof ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::receipt_replay::quality_receipt_replay_uses_the_original_skill_and_supervises_its_commands ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::resume_with_a_durable_quality_proof_transitions_without_any_provider_invocation ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::resume_with_a_proof_for_another_candidate_reruns_the_whole_quality_phase ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::resume_with_an_unresolvable_proof_candidate_reruns_the_whole_quality_phase ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::resume_with_persisted_correction_evidence_skips_the_agent_and_reruns_only_the_gate ... ok\n\ntest result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 1182 filtered out; finished in 7.09s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                "Observed supervised process proc-1789053559405-1129590-698 exited 0. stdout: resh::a_target_tip_moved_during_resolution_retries_boundedly_then_resolves ... ok\ntest application::workflow::tests::candidate_refresh::an_interrupted_rebase_is_aborted_before_the_recovery_round_is_queued ... ok\ntest application::workflow::tests::candidate_refresh::an_out_of_scope_edit_is_rejected_before_it_reaches_the_replacement ... ok\ntest application::workflow::tests::candidate_refresh::an_unavailable_resolver_falls_back_immediately_without_more_attempts ... ok\ntest application::workflow::tests::candidate_refresh::authority_loss_after_rebase_restores_the_original_candidate_branch ... ok\ntest application::workflow::tests::candidate_refresh::conflicted_refresh_resolves_in_place_without_holding_the_repository_lock ... ok\ntest application::workflow::tests::candidate_refresh::integration_merge_conflict_exhaustion_fails_with_integration_retry_exhausted ... ok\ntest application::workflow::tests::candidate_refresh::integration_merge_conflict_queues_one_fenced_recovery_round_with_the_conflicted_paths ... ok\ntest application::workflow::tests::candidate_refresh::integration_recovery_uses_the_next_shared_automatic_retry_attempt ... ok\ntest application::workflow::tests::candidate_refresh::refresh_conflict_aborts_and_queues_one_fenced_recovery_round ... ok\ntest application::workflow::tests::candidate_refresh::refresh_conflict_records_explicit_exhaustion_without_a_successor_round ... ok\ntest application::workflow::tests::candidate_refresh::rejected_resolutions_exhaust_the_budget_into_todays_fallback_with_a_question ... ok\ntest application::workflow::tests::candidate_refresh::repository_lease_serializes_competing_target_refreshes ... ok\ntest application::workflow::tests::candidate_refresh::target_advancement_rebases_a_provable_delta_and_records_both_identities ... ok\ntest application::workflow::tests::candidate_refresh::workflow_conflict_resolution_defaults_on_and_honors_off ... ok\n\ntest result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 1172 filtered out; finished in 4.63s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                "Observed supervised process proc-1789053564272-1129590-701 exited 0. stdout: running 12 tests\ntest application::work_items::tests::workflow::authored_todo_start_atomically_pins_nonempty_round ... ok\ntest application::work_items::tests::workflow::authored_todo_start_rejects_round_revision_change_before_execution ... ok\ntest application::work_items::tests::workflow::automatic_recovery_appends_past_a_claimed_recovery_round ... ok\ntest application::work_items::tests::workflow::automatic_recovery_reuses_a_round_claimed_by_the_retiring_attempt ... ok\ntest application::work_items::tests::workflow::automatic_recovery_reuses_an_unstarted_recovery_round ... ok\ntest application::work_items::tests::workflow::file_work_item_service_rejects_invalid_manual_transition ... ok\ntest application::work_items::tests::workflow::file_work_item_service_transitions_goal_via_refine_json ... ok\ntest application::work_items::tests::workflow::file_work_item_service_verifies_and_undoes_goal_workflow ... ok\ntest application::work_items::tests::workflow::integration_recovery_records_truthful_successor_and_clears_authority ... ok\ntest application::work_items::tests::workflow::integration_recovery_reuses_its_own_claimed_unworked_recovery_round ... ok\ntest application::work_items::tests::workflow::projected_status_transition_rejects_an_external_revision_change ... ok\ntest application::work_items::tests::workflow::reconciliation_recovery_clears_source_authority_and_requeues_todo ... ok\n\ntest result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 1176 filtered out; finished in 1.07s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                "Observed supervised process proc-1789053565579-1129590-704 exited 0. stdout: running 5 tests\ntest surfaces::cli::tests::goals::lifecycle::feature_transfer_command_moves_feature_and_member_goals_between_nodes ... ok\ntest surfaces::cli::tests::goals::lifecycle::goal_approve_and_undo_use_shared_file_work_item_service ... ok\ntest surfaces::cli::tests::goals::lifecycle::goal_edit_note_delete_use_shared_file_work_item_service ... ok\ntest surfaces::cli::tests::goals::lifecycle::goal_resolve_merged_cli_parses_and_dispatches_to_daemon_route ... ok\ntest surfaces::cli::tests::goals::lifecycle::goal_retry_governance_from_review_uses_shared_evidence_diagnostics ... ok\n\ntest result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 1183 filtered out; finished in 0.49s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                "Observed supervised process proc-1789053566314-1129590-707 exited 0. stdout: running 1 test\ntest surfaces::web_server::tests::features::membership::web_server_governance_retry_from_review_uses_shared_exact_candidate_eligibility ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1187 filtered out; finished in 0.10s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                "Observed supervised process proc-1789053566665-1129590-710 exited 0. stdout: ✔ Governance and Quality details render structured evidence as readable JSON (4.124295ms)\n✔ a failed Goal falls back to current error evidence when legacy failure fields are empty (2.152861ms)\n✔ Failure and Quality cards render the actionable summary safely and retain full Details (1.25951ms)\n✔ Implementation Plan renders final checklist, immutable history, outcomes, and failures safely (1.514686ms)\n✔ Review recovery controls use shared eligibility and keep acceptance separate (1.122527ms)\n✔ every shipped JavaScript asset passes the Node syntax gate (2578.174862ms)\nℹ tests 6\nℹ suites 0\nℹ pass 6\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 2699.227936",
+                "Observed supervised process proc-1789053569553-1129590-713 exited 0.",
+                "Observed supervised process proc-1789053569859-1129590-716 exited 0."
+              ],
+              "evaluation_scope": "isolated_candidate",
+              "operation_id": "1a08be23d13113c7644",
+              "provider_attempts": [],
+              "quality_proof": {
+                "checked_at": "2026-09-10T15:19:30Z",
+                "checked_candidate_commit": "59af87d23c3c14881f3969ef316146e7aa2e3273",
+                "evaluation_scope": "isolated_candidate",
+                "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+                "operation_id": "1a08be23d13113c7644",
+                "results": [
+                  {
+                    "command": "cargo test --lib crash_after_ref_motion_with_pending_publication_preserves_attempt_effects -- --test-threads=1",
+                    "evidence": "Observed supervised process proc-1789053500399-1129590-674 exited 0. stdout: running 1 test\ntest application::workflow::engine::behaviors::governance::tests::skill_gates::crash_after_ref_motion_with_pending_publication_preserves_attempt_effects ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1187 filtered out; finished in 1.93s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                    "exit_code": 0,
+                    "process_id": "proc-1789053500399-1129590-674",
+                    "status": "passed",
+                    "test": "workflow.quality.enter:default-quality: Originating local effect and replacement publication remain distinct"
+                  },
+                  {
+                    "command": "cargo test --lib governance -- --test-threads=1",
+                    "evidence": "Observed supervised process proc-1789053502607-1129590-677 exited 0. stdout: flow::tests::disruption::force_stop_after_quality_proof_before_governance_reuses_the_proof ... ok\ntest application::workflow::tests::disruption::force_stop_mid_governance_with_transaction_marker_recovers_and_integrates ... ok\ntest application::workflow::tests::execution_ownership::cleanup_observes_candidate_handoff_through_governance_integration ... ok\ntest application::workflow::tests::governance::file_automation_fails_after_the_governance_recovery_budget_is_exhausted ... ok\ntest application::workflow::tests::governance::file_automation_stops_early_when_consecutive_governance_findings_are_identical ... ok\ntest application::workflow::tests::quality_base_refresh::a_later_target_move_still_refreshes_at_governance_and_retains_the_earlier_repin ... ok\ntest application::workflow::tests::worktree_resume::resume_reuses_a_durable_quality_proof_and_skips_straight_to_governance ... ok\ntest infrastructure::process::supervisor::config::tests::file_project_config_services_persist_governance_guidance_and_reporters ... ok\ntest infrastructure::process::supervisor::config::tests::governance_rejects_invalid_revision_shapes ... ok\ntest infrastructure::process::supervisor::config::tests::governance_rule_revisions_preserve_unrelated_fields_and_fence_stale_writers ... ok\ntest surfaces::cli::tests::goals::lifecycle::goal_retry_governance_from_review_uses_shared_evidence_diagnostics ... ok\ntest surfaces::web_server::tests::features::membership::web_server_governance_retry_from_review_uses_shared_exact_candidate_eligibility ... ok\ntest surfaces::web_server::tests::quality_guidance::governance::configuration_routes_report_detached_target_app ... ok\ntest surfaces::web_server::tests::quality_guidance::governance::web_server_manages_events_skills_and_reporters ... ok\ntest surfaces::web_server::tests::static_surface::work_items::static_goal_detail_uses_shared_governance_review_state_helpers ... ok\n\ntest result: ok. 86 passed; 0 failed; 0 ignored; 0 measured; 1102 filtered out; finished in 45.96s stderr: Blocking waiting for file lock on package cache\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\nPreparing worktree (detached HEAD 313afcb)\nPreparing worktree (detached HEAD 313afcb)",
+                    "exit_code": 0,
+                    "process_id": "proc-1789053502607-1129590-677",
+                    "status": "passed",
+                    "test": "workflow.quality.enter:default-quality: Governance recovery, settlement, identity and authority fencing"
+                  },
+                  {
+                    "command": "cargo test --lib application::events:: -- --test-threads=1",
+                    "evidence": "Observed supervised process proc-1789053548837-1129590-692 exited 0. stdout: nc_merges_disjoint_edits_fences_both_editors_and_rejects_broken_references ... ok\ntest application::events::tests::default_skills_complete_a_real_workflow_with_observed_quality_and_candidate_evidence ... ok\ntest application::events::tests::disabled_node_override_masks_only_its_project_binding ... ok\ntest application::events::tests::goal_and_system_paths_resolve_arrays_and_missing_shared_parameters_keep_requiredness ... ok\ntest application::events::tests::interrupted_index_updates_recover_without_replaying_completed_work ... ok\ntest application::events::tests::manual_request_identity_and_success_action_receipts_survive_replay ... ok\ntest application::events::tests::manual_skills_select_one_skill_validate_inputs_and_pin_replay_without_a_goal ... ok\ntest application::events::tests::manual_transition_waits_for_exit_evidence_and_cancellation_can_supersede_it ... ok\ntest application::events::tests::migration_preserves_content_is_idempotent_and_stale_writes_cannot_erase_edits ... ok\ntest application::events::tests::missing_automatic_input_settles_as_visible_error_instead_of_waiting_forever ... ok\ntest application::events::tests::ordered_independent_runs_collect_failure_preserve_evidence_and_do_not_replay ... ok\ntest application::events::tests::oversized_configuration_is_rejected_before_replacing_the_readable_document ... ok\ntest application::events::tests::single_trigger_save_rejects_multiple_and_derives_the_workflow_result_contract ... ok\ntest application::events::tests::skill_event_assignments_save_atomically_and_preserve_other_skills ... ok\ntest application::events::tests::startup_occurrences_are_idempotent_and_new_boots_get_new_invocations ... ok\ntest application::events::tests::typed_parameters_resolve_explicit_then_context_then_default_and_fail_on_missing ... ok\ntest application::events::tests::v2_migration_splits_assignments_preserves_overrides_and_is_idempotent ... ok\n\ntest result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 1164 filtered out; finished in 2.99s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                    "exit_code": 0,
+                    "process_id": "proc-1789053548837-1129590-692",
+                    "status": "passed",
+                    "test": "workflow.quality.enter:default-quality: Pinned Skill evidence and event execution"
+                  },
+                  {
+                    "command": "cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1",
+                    "evidence": "Observed supervised process proc-1789053552078-1129590-695 exited 0. stdout: running 6 tests\ntest application::workflow::engine::behaviors::tests::quality_resume::empty_quality_and_governance_skills_pass_without_agents_and_retain_candidate_proof ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::receipt_replay::quality_receipt_replay_uses_the_original_skill_and_supervises_its_commands ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::resume_with_a_durable_quality_proof_transitions_without_any_provider_invocation ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::resume_with_a_proof_for_another_candidate_reruns_the_whole_quality_phase ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::resume_with_an_unresolvable_proof_candidate_reruns_the_whole_quality_phase ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::resume_with_persisted_correction_evidence_skips_the_agent_and_reruns_only_the_gate ... ok\n\ntest result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 1182 filtered out; finished in 7.09s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                    "exit_code": 0,
+                    "process_id": "proc-1789053552078-1129590-695",
+                    "status": "passed",
+                    "test": "workflow.quality.enter:default-quality: Quality proof and configuration-preserving replay"
+                  },
+                  {
+                    "command": "cargo test --lib candidate_refresh -- --test-threads=1",
+                    "evidence": "Observed supervised process proc-1789053559405-1129590-698 exited 0. stdout: resh::a_target_tip_moved_during_resolution_retries_boundedly_then_resolves ... ok\ntest application::workflow::tests::candidate_refresh::an_interrupted_rebase_is_aborted_before_the_recovery_round_is_queued ... ok\ntest application::workflow::tests::candidate_refresh::an_out_of_scope_edit_is_rejected_before_it_reaches_the_replacement ... ok\ntest application::workflow::tests::candidate_refresh::an_unavailable_resolver_falls_back_immediately_without_more_attempts ... ok\ntest application::workflow::tests::candidate_refresh::authority_loss_after_rebase_restores_the_original_candidate_branch ... ok\ntest application::workflow::tests::candidate_refresh::conflicted_refresh_resolves_in_place_without_holding_the_repository_lock ... ok\ntest application::workflow::tests::candidate_refresh::integration_merge_conflict_exhaustion_fails_with_integration_retry_exhausted ... ok\ntest application::workflow::tests::candidate_refresh::integration_merge_conflict_queues_one_fenced_recovery_round_with_the_conflicted_paths ... ok\ntest application::workflow::tests::candidate_refresh::integration_recovery_uses_the_next_shared_automatic_retry_attempt ... ok\ntest application::workflow::tests::candidate_refresh::refresh_conflict_aborts_and_queues_one_fenced_recovery_round ... ok\ntest application::workflow::tests::candidate_refresh::refresh_conflict_records_explicit_exhaustion_without_a_successor_round ... ok\ntest application::workflow::tests::candidate_refresh::rejected_resolutions_exhaust_the_budget_into_todays_fallback_with_a_question ... ok\ntest application::workflow::tests::candidate_refresh::repository_lease_serializes_competing_target_refreshes ... ok\ntest application::workflow::tests::candidate_refresh::target_advancement_rebases_a_provable_delta_and_records_both_identities ... ok\ntest application::workflow::tests::candidate_refresh::workflow_conflict_resolution_defaults_on_and_honors_off ... ok\n\ntest result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 1172 filtered out; finished in 4.63s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                    "exit_code": 0,
+                    "process_id": "proc-1789053559405-1129590-698",
+                    "status": "passed",
+                    "test": "workflow.quality.enter:default-quality: Candidate refresh and bounded recovery"
+                  },
+                  {
+                    "command": "cargo test --lib application::work_items::tests::workflow -- --test-threads=1",
+                    "evidence": "Observed supervised process proc-1789053564272-1129590-701 exited 0. stdout: running 12 tests\ntest application::work_items::tests::workflow::authored_todo_start_atomically_pins_nonempty_round ... ok\ntest application::work_items::tests::workflow::authored_todo_start_rejects_round_revision_change_before_execution ... ok\ntest application::work_items::tests::workflow::automatic_recovery_appends_past_a_claimed_recovery_round ... ok\ntest application::work_items::tests::workflow::automatic_recovery_reuses_a_round_claimed_by_the_retiring_attempt ... ok\ntest application::work_items::tests::workflow::automatic_recovery_reuses_an_unstarted_recovery_round ... ok\ntest application::work_items::tests::workflow::file_work_item_service_rejects_invalid_manual_transition ... ok\ntest application::work_items::tests::workflow::file_work_item_service_transitions_goal_via_refine_json ... ok\ntest application::work_items::tests::workflow::file_work_item_service_verifies_and_undoes_goal_workflow ... ok\ntest application::work_items::tests::workflow::integration_recovery_records_truthful_successor_and_clears_authority ... ok\ntest application::work_items::tests::workflow::integration_recovery_reuses_its_own_claimed_unworked_recovery_round ... ok\ntest application::work_items::tests::workflow::projected_status_transition_rejects_an_external_revision_change ... ok\ntest application::work_items::tests::workflow::reconciliation_recovery_clears_source_authority_and_requeues_todo ... ok\n\ntest result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 1176 filtered out; finished in 1.07s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                    "exit_code": 0,
+                    "process_id": "proc-1789053564272-1129590-701",
+                    "status": "passed",
+                    "test": "workflow.quality.enter:default-quality: Shared workflow transitions"
+                  },
+                  {
+                    "command": "cargo test --lib surfaces::cli::tests::goals::lifecycle -- --test-threads=1",
+                    "evidence": "Observed supervised process proc-1789053565579-1129590-704 exited 0. stdout: running 5 tests\ntest surfaces::cli::tests::goals::lifecycle::feature_transfer_command_moves_feature_and_member_goals_between_nodes ... ok\ntest surfaces::cli::tests::goals::lifecycle::goal_approve_and_undo_use_shared_file_work_item_service ... ok\ntest surfaces::cli::tests::goals::lifecycle::goal_edit_note_delete_use_shared_file_work_item_service ... ok\ntest surfaces::cli::tests::goals::lifecycle::goal_resolve_merged_cli_parses_and_dispatches_to_daemon_route ... ok\ntest surfaces::cli::tests::goals::lifecycle::goal_retry_governance_from_review_uses_shared_evidence_diagnostics ... ok\n\ntest result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 1183 filtered out; finished in 0.49s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                    "exit_code": 0,
+                    "process_id": "proc-1789053565579-1129590-704",
+                    "status": "passed",
+                    "test": "workflow.quality.enter:default-quality: CLI recovery and strict acceptance"
+                  },
+                  {
+                    "command": "cargo test --lib web_server_governance_retry_from_review -- --test-threads=1",
+                    "evidence": "Observed supervised process proc-1789053566314-1129590-707 exited 0. stdout: running 1 test\ntest surfaces::web_server::tests::features::membership::web_server_governance_retry_from_review_uses_shared_exact_candidate_eligibility ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1187 filtered out; finished in 0.10s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                    "exit_code": 0,
+                    "process_id": "proc-1789053566314-1129590-707",
+                    "status": "passed",
+                    "test": "workflow.quality.enter:default-quality: API uses shared Review recovery eligibility"
+                  },
+                  {
+                    "command": "node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js",
+                    "evidence": "Observed supervised process proc-1789053566665-1129590-710 exited 0. stdout: ✔ Governance and Quality details render structured evidence as readable JSON (4.124295ms)\n✔ a failed Goal falls back to current error evidence when legacy failure fields are empty (2.152861ms)\n✔ Failure and Quality cards render the actionable summary safely and retain full Details (1.25951ms)\n✔ Implementation Plan renders final checklist, immutable history, outcomes, and failures safely (1.514686ms)\n✔ Review recovery controls use shared eligibility and keep acceptance separate (1.122527ms)\n✔ every shipped JavaScript asset passes the Node syntax gate (2578.174862ms)\nℹ tests 6\nℹ suites 0\nℹ pass 6\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 2699.227936",
+                    "exit_code": 0,
+                    "process_id": "proc-1789053566665-1129590-710",
+                    "status": "passed",
+                    "test": "workflow.quality.enter:default-quality: Browser recovery controls, diagnostics and JavaScript syntax"
+                  },
+                  {
+                    "command": "set -o pipefail\ngit diff --name-only b47569adb8d4c5d1d7335ba91729a3e486a38fe0 HEAD -- '*.rs' | xargs -r rustfmt --check --edition 2024 --config skip_children=true",
+                    "evidence": "Observed supervised process proc-1789053569553-1129590-713 exited 0.",
+                    "exit_code": 0,
+                    "process_id": "proc-1789053569553-1129590-713",
+                    "status": "passed",
+                    "test": "workflow.quality.enter:default-quality: Changed Rust formatting"
+                  },
+                  {
+                    "command": "git diff --check b47569adb8d4c5d1d7335ba91729a3e486a38fe0 HEAD",
+                    "evidence": "Observed supervised process proc-1789053569859-1129590-716 exited 0.",
+                    "exit_code": 0,
+                    "process_id": "proc-1789053569859-1129590-716",
+                    "status": "passed",
+                    "test": "workflow.quality.enter:default-quality: Candidate patch whitespace"
+                  }
+                ],
+                "round_idx": 2,
+                "schema_version": 1,
+                "source_candidate_commit": "59af87d23c3c14881f3969ef316146e7aa2e3273",
+                "state": "passed"
+              },
+              "results": [
+                {
+                  "command": "cargo test --lib crash_after_ref_motion_with_pending_publication_preserves_attempt_effects -- --test-threads=1",
+                  "evidence": "Observed supervised process proc-1789053500399-1129590-674 exited 0. stdout: running 1 test\ntest application::workflow::engine::behaviors::governance::tests::skill_gates::crash_after_ref_motion_with_pending_publication_preserves_attempt_effects ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1187 filtered out; finished in 1.93s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                  "exit_code": 0,
+                  "process_id": "proc-1789053500399-1129590-674",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: Originating local effect and replacement publication remain distinct"
+                },
+                {
+                  "command": "cargo test --lib governance -- --test-threads=1",
+                  "evidence": "Observed supervised process proc-1789053502607-1129590-677 exited 0. stdout: flow::tests::disruption::force_stop_after_quality_proof_before_governance_reuses_the_proof ... ok\ntest application::workflow::tests::disruption::force_stop_mid_governance_with_transaction_marker_recovers_and_integrates ... ok\ntest application::workflow::tests::execution_ownership::cleanup_observes_candidate_handoff_through_governance_integration ... ok\ntest application::workflow::tests::governance::file_automation_fails_after_the_governance_recovery_budget_is_exhausted ... ok\ntest application::workflow::tests::governance::file_automation_stops_early_when_consecutive_governance_findings_are_identical ... ok\ntest application::workflow::tests::quality_base_refresh::a_later_target_move_still_refreshes_at_governance_and_retains_the_earlier_repin ... ok\ntest application::workflow::tests::worktree_resume::resume_reuses_a_durable_quality_proof_and_skips_straight_to_governance ... ok\ntest infrastructure::process::supervisor::config::tests::file_project_config_services_persist_governance_guidance_and_reporters ... ok\ntest infrastructure::process::supervisor::config::tests::governance_rejects_invalid_revision_shapes ... ok\ntest infrastructure::process::supervisor::config::tests::governance_rule_revisions_preserve_unrelated_fields_and_fence_stale_writers ... ok\ntest surfaces::cli::tests::goals::lifecycle::goal_retry_governance_from_review_uses_shared_evidence_diagnostics ... ok\ntest surfaces::web_server::tests::features::membership::web_server_governance_retry_from_review_uses_shared_exact_candidate_eligibility ... ok\ntest surfaces::web_server::tests::quality_guidance::governance::configuration_routes_report_detached_target_app ... ok\ntest surfaces::web_server::tests::quality_guidance::governance::web_server_manages_events_skills_and_reporters ... ok\ntest surfaces::web_server::tests::static_surface::work_items::static_goal_detail_uses_shared_governance_review_state_helpers ... ok\n\ntest result: ok. 86 passed; 0 failed; 0 ignored; 0 measured; 1102 filtered out; finished in 45.96s stderr: Blocking waiting for file lock on package cache\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\nPreparing worktree (detached HEAD 313afcb)\nPreparing worktree (detached HEAD 313afcb)",
+                  "exit_code": 0,
+                  "process_id": "proc-1789053502607-1129590-677",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: Governance recovery, settlement, identity and authority fencing"
+                },
+                {
+                  "command": "cargo test --lib application::events:: -- --test-threads=1",
+                  "evidence": "Observed supervised process proc-1789053548837-1129590-692 exited 0. stdout: nc_merges_disjoint_edits_fences_both_editors_and_rejects_broken_references ... ok\ntest application::events::tests::default_skills_complete_a_real_workflow_with_observed_quality_and_candidate_evidence ... ok\ntest application::events::tests::disabled_node_override_masks_only_its_project_binding ... ok\ntest application::events::tests::goal_and_system_paths_resolve_arrays_and_missing_shared_parameters_keep_requiredness ... ok\ntest application::events::tests::interrupted_index_updates_recover_without_replaying_completed_work ... ok\ntest application::events::tests::manual_request_identity_and_success_action_receipts_survive_replay ... ok\ntest application::events::tests::manual_skills_select_one_skill_validate_inputs_and_pin_replay_without_a_goal ... ok\ntest application::events::tests::manual_transition_waits_for_exit_evidence_and_cancellation_can_supersede_it ... ok\ntest application::events::tests::migration_preserves_content_is_idempotent_and_stale_writes_cannot_erase_edits ... ok\ntest application::events::tests::missing_automatic_input_settles_as_visible_error_instead_of_waiting_forever ... ok\ntest application::events::tests::ordered_independent_runs_collect_failure_preserve_evidence_and_do_not_replay ... ok\ntest application::events::tests::oversized_configuration_is_rejected_before_replacing_the_readable_document ... ok\ntest application::events::tests::single_trigger_save_rejects_multiple_and_derives_the_workflow_result_contract ... ok\ntest application::events::tests::skill_event_assignments_save_atomically_and_preserve_other_skills ... ok\ntest application::events::tests::startup_occurrences_are_idempotent_and_new_boots_get_new_invocations ... ok\ntest application::events::tests::typed_parameters_resolve_explicit_then_context_then_default_and_fail_on_missing ... ok\ntest application::events::tests::v2_migration_splits_assignments_preserves_overrides_and_is_idempotent ... ok\n\ntest result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 1164 filtered out; finished in 2.99s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                  "exit_code": 0,
+                  "process_id": "proc-1789053548837-1129590-692",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: Pinned Skill evidence and event execution"
+                },
+                {
+                  "command": "cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1",
+                  "evidence": "Observed supervised process proc-1789053552078-1129590-695 exited 0. stdout: running 6 tests\ntest application::workflow::engine::behaviors::tests::quality_resume::empty_quality_and_governance_skills_pass_without_agents_and_retain_candidate_proof ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::receipt_replay::quality_receipt_replay_uses_the_original_skill_and_supervises_its_commands ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::resume_with_a_durable_quality_proof_transitions_without_any_provider_invocation ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::resume_with_a_proof_for_another_candidate_reruns_the_whole_quality_phase ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::resume_with_an_unresolvable_proof_candidate_reruns_the_whole_quality_phase ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::resume_with_persisted_correction_evidence_skips_the_agent_and_reruns_only_the_gate ... ok\n\ntest result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 1182 filtered out; finished in 7.09s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                  "exit_code": 0,
+                  "process_id": "proc-1789053552078-1129590-695",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: Quality proof and configuration-preserving replay"
+                },
+                {
+                  "command": "cargo test --lib candidate_refresh -- --test-threads=1",
+                  "evidence": "Observed supervised process proc-1789053559405-1129590-698 exited 0. stdout: resh::a_target_tip_moved_during_resolution_retries_boundedly_then_resolves ... ok\ntest application::workflow::tests::candidate_refresh::an_interrupted_rebase_is_aborted_before_the_recovery_round_is_queued ... ok\ntest application::workflow::tests::candidate_refresh::an_out_of_scope_edit_is_rejected_before_it_reaches_the_replacement ... ok\ntest application::workflow::tests::candidate_refresh::an_unavailable_resolver_falls_back_immediately_without_more_attempts ... ok\ntest application::workflow::tests::candidate_refresh::authority_loss_after_rebase_restores_the_original_candidate_branch ... ok\ntest application::workflow::tests::candidate_refresh::conflicted_refresh_resolves_in_place_without_holding_the_repository_lock ... ok\ntest application::workflow::tests::candidate_refresh::integration_merge_conflict_exhaustion_fails_with_integration_retry_exhausted ... ok\ntest application::workflow::tests::candidate_refresh::integration_merge_conflict_queues_one_fenced_recovery_round_with_the_conflicted_paths ... ok\ntest application::workflow::tests::candidate_refresh::integration_recovery_uses_the_next_shared_automatic_retry_attempt ... ok\ntest application::workflow::tests::candidate_refresh::refresh_conflict_aborts_and_queues_one_fenced_recovery_round ... ok\ntest application::workflow::tests::candidate_refresh::refresh_conflict_records_explicit_exhaustion_without_a_successor_round ... ok\ntest application::workflow::tests::candidate_refresh::rejected_resolutions_exhaust_the_budget_into_todays_fallback_with_a_question ... ok\ntest application::workflow::tests::candidate_refresh::repository_lease_serializes_competing_target_refreshes ... ok\ntest application::workflow::tests::candidate_refresh::target_advancement_rebases_a_provable_delta_and_records_both_identities ... ok\ntest application::workflow::tests::candidate_refresh::workflow_conflict_resolution_defaults_on_and_honors_off ... ok\n\ntest result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 1172 filtered out; finished in 4.63s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                  "exit_code": 0,
+                  "process_id": "proc-1789053559405-1129590-698",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: Candidate refresh and bounded recovery"
+                },
+                {
+                  "command": "cargo test --lib application::work_items::tests::workflow -- --test-threads=1",
+                  "evidence": "Observed supervised process proc-1789053564272-1129590-701 exited 0. stdout: running 12 tests\ntest application::work_items::tests::workflow::authored_todo_start_atomically_pins_nonempty_round ... ok\ntest application::work_items::tests::workflow::authored_todo_start_rejects_round_revision_change_before_execution ... ok\ntest application::work_items::tests::workflow::automatic_recovery_appends_past_a_claimed_recovery_round ... ok\ntest application::work_items::tests::workflow::automatic_recovery_reuses_a_round_claimed_by_the_retiring_attempt ... ok\ntest application::work_items::tests::workflow::automatic_recovery_reuses_an_unstarted_recovery_round ... ok\ntest application::work_items::tests::workflow::file_work_item_service_rejects_invalid_manual_transition ... ok\ntest application::work_items::tests::workflow::file_work_item_service_transitions_goal_via_refine_json ... ok\ntest application::work_items::tests::workflow::file_work_item_service_verifies_and_undoes_goal_workflow ... ok\ntest application::work_items::tests::workflow::integration_recovery_records_truthful_successor_and_clears_authority ... ok\ntest application::work_items::tests::workflow::integration_recovery_reuses_its_own_claimed_unworked_recovery_round ... ok\ntest application::work_items::tests::workflow::projected_status_transition_rejects_an_external_revision_change ... ok\ntest application::work_items::tests::workflow::reconciliation_recovery_clears_source_authority_and_requeues_todo ... ok\n\ntest result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 1176 filtered out; finished in 1.07s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                  "exit_code": 0,
+                  "process_id": "proc-1789053564272-1129590-701",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: Shared workflow transitions"
+                },
+                {
+                  "command": "cargo test --lib surfaces::cli::tests::goals::lifecycle -- --test-threads=1",
+                  "evidence": "Observed supervised process proc-1789053565579-1129590-704 exited 0. stdout: running 5 tests\ntest surfaces::cli::tests::goals::lifecycle::feature_transfer_command_moves_feature_and_member_goals_between_nodes ... ok\ntest surfaces::cli::tests::goals::lifecycle::goal_approve_and_undo_use_shared_file_work_item_service ... ok\ntest surfaces::cli::tests::goals::lifecycle::goal_edit_note_delete_use_shared_file_work_item_service ... ok\ntest surfaces::cli::tests::goals::lifecycle::goal_resolve_merged_cli_parses_and_dispatches_to_daemon_route ... ok\ntest surfaces::cli::tests::goals::lifecycle::goal_retry_governance_from_review_uses_shared_evidence_diagnostics ... ok\n\ntest result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 1183 filtered out; finished in 0.49s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                  "exit_code": 0,
+                  "process_id": "proc-1789053565579-1129590-704",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: CLI recovery and strict acceptance"
+                },
+                {
+                  "command": "cargo test --lib web_server_governance_retry_from_review -- --test-threads=1",
+                  "evidence": "Observed supervised process proc-1789053566314-1129590-707 exited 0. stdout: running 1 test\ntest surfaces::web_server::tests::features::membership::web_server_governance_retry_from_review_uses_shared_exact_candidate_eligibility ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1187 filtered out; finished in 0.10s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+                  "exit_code": 0,
+                  "process_id": "proc-1789053566314-1129590-707",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: API uses shared Review recovery eligibility"
+                },
+                {
+                  "command": "node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js",
+                  "evidence": "Observed supervised process proc-1789053566665-1129590-710 exited 0. stdout: ✔ Governance and Quality details render structured evidence as readable JSON (4.124295ms)\n✔ a failed Goal falls back to current error evidence when legacy failure fields are empty (2.152861ms)\n✔ Failure and Quality cards render the actionable summary safely and retain full Details (1.25951ms)\n✔ Implementation Plan renders final checklist, immutable history, outcomes, and failures safely (1.514686ms)\n✔ Review recovery controls use shared eligibility and keep acceptance separate (1.122527ms)\n✔ every shipped JavaScript asset passes the Node syntax gate (2578.174862ms)\nℹ tests 6\nℹ suites 0\nℹ pass 6\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 2699.227936",
+                  "exit_code": 0,
+                  "process_id": "proc-1789053566665-1129590-710",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: Browser recovery controls, diagnostics and JavaScript syntax"
+                },
+                {
+                  "command": "set -o pipefail\ngit diff --name-only b47569adb8d4c5d1d7335ba91729a3e486a38fe0 HEAD -- '*.rs' | xargs -r rustfmt --check --edition 2024 --config skip_children=true",
+                  "evidence": "Observed supervised process proc-1789053569553-1129590-713 exited 0.",
+                  "exit_code": 0,
+                  "process_id": "proc-1789053569553-1129590-713",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: Changed Rust formatting"
+                },
+                {
+                  "command": "git diff --check b47569adb8d4c5d1d7335ba91729a3e486a38fe0 HEAD",
+                  "evidence": "Observed supervised process proc-1789053569859-1129590-716 exited 0.",
+                  "exit_code": 0,
+                  "process_id": "proc-1789053569859-1129590-716",
+                  "status": "passed",
+                  "test": "workflow.quality.enter:default-quality: Candidate patch whitespace"
+                }
+              ],
+              "source_candidate_commit": "59af87d23c3c14881f3969ef316146e7aa2e3273"
+            },
+            "quality_message": "All Quality Skills passed with supervised evidence.",
+            "quality_state": "passed",
+            "reporter": "Refine",
+            "round": 3,
+            "rule_state": "failed"
           }
         ],
         "version": 1,
@@ -476,10 +930,10 @@
       "goal": {
         "assignee": "Refine",
         "base_commit": "b47569adb8d4c5d1d7335ba91729a3e486a38fe0",
-        "branch_name": "refine/DRA87E5F985A1FFE2919BE7EC2/round-3",
+        "branch_name": "refine/DRA87E5F985A1FFE2919BE7EC2/round-4",
         "candidate_commit": "59af87d23c3c14881f3969ef316146e7aa2e3273",
         "created": "2026-09-10T08:26:05Z",
-        "event_generation": 9,
+        "event_generation": 11,
         "feature_id": null,
         "feature_order": null,
         "id": "DRA87E5F985A1FFE2919BE7EC2",
@@ -489,7 +943,7 @@
         "notes": [],
         "priority": "low",
         "reporter": "ethan.jacobson@insurity.com",
-        "round_count": 3,
+        "round_count": 4,
         "rounds": [
           {
             "assignee": "ethan.jacobson@insurity.com",
@@ -1377,16 +1831,64 @@
               "kind": "quality",
               "source_round": 2
             },
-            "constitution_state": null,
+            "constitution_state": "passed",
             "created": "2026-09-10T14:56:18Z",
             "failure_at": "",
             "failure_category": "",
             "failure_message": "",
-            "governance_candidate_commit": null,
-            "governance_checked_at": null,
-            "governance_details": null,
-            "governance_message": null,
-            "governance_rule_actions": [],
+            "governance_candidate_commit": "59af87d23c3c14881f3969ef316146e7aa2e3273",
+            "governance_checked_at": "2026-09-10T15:24:11Z",
+            "governance_details": {
+              "candidate_commit": "59af87d23c3c14881f3969ef316146e7aa2e3273",
+              "configured": true,
+              "failed_actions": [
+                {
+                  "evidence": null,
+                  "message": "src/application/events/evidence.rs:36-51 defines required Skill selection, and :90-150 defines the domain conditions for accepting candidate-bound gate receipts. Both functions derive policy solely from supplied values, without orchestration or external effects. Their placement contradicts the project rule and docs/intent/01-design.md:23, which assign invariants and pure derivations to Model. Move this policy and its tests behind the existing Model automation boundary, retaining execution and persistence in Application.",
+                  "rule_id": "workflow.governance.enter:default-governance:ARCH-MODEL-PURE-POLICY",
+                  "state": "failed"
+                }
+              ],
+              "phase": "post_implementation",
+              "skill_results": [
+                {
+                  "artifacts": {
+                    "recovery_analysis": "The Q1 correction is supported by source inspection and retained passing Quality evidence. One architecture violation remains: newly introduced, side-effect-free Skill gate policy resides in Application despite the explicit requirement that Model own domain invariants and pure policy.",
+                    "recovery_round_prompt": "In a managed recovery Round for Goal DRA87E5F985A1FFE2919BE7EC2, preserve candidate 59af87d23c3c14881f3969ef316146e7aa2e3273 and all prior Round artifacts. Move required_bindings and the pure receipt-validity policy from src/application/events/evidence.rs into a cohesive Model module extending the existing automation semantics. Update Application callers and relocate the corresponding policy tests. Keep invocation orchestration, configuration persistence and timestamp acquisition in Application. Preserve receipt compatibility, exact-candidate validation, required Skill checks, Q1 effect attribution, replay deduplication, lifecycle gates and strict approval. Avoid unrelated refactoring. Run the relocated Model tests and the existing governance, application::events::, quality_resume, candidate_refresh, CLI/API recovery and browser diagnostics checks; check changed Rust formatting and patch whitespace. Report actual commands and results. Update intent documentation only if its contract changes. Do not manually advance Goal state, approve, merge, push, deploy or restart the serving installation.",
+                    "violations": [
+                      {
+                        "message": "src/application/events/evidence.rs:36-51 defines required Skill selection, and :90-150 defines the domain conditions for accepting candidate-bound gate receipts. Both functions derive policy solely from supplied values, without orchestration or external effects. Their placement contradicts the project rule and docs/intent/01-design.md:23, which assign invariants and pure derivations to Model. Move this policy and its tests behind the existing Model automation boundary, retaining execution and persistence in Application.",
+                        "rule_id": "ARCH-MODEL-PURE-POLICY"
+                      }
+                    ]
+                  },
+                  "binding_id": "workflow.governance.enter:default-governance",
+                  "evidence": [
+                    "Verified clean HEAD 59af87d23c3c14881f3969ef316146e7aa2e3273 on the Round 3 branch. All 59 changed files match the retained Quality SHA-256 manifest.",
+                    "Reviewed accepted plans, implementation reports, candidate diff, affected intent, and Quality evidence. Existing Model automation policy is in src/model/automation.rs, including result_role and bindings.",
+                    "Read regression-before.log: the Q1 regression failed because A's completed effect was absent. Retained Quality logs show the corrected regression passed, governance 86 passed, events 24 passed, quality_resume 6 passed, candidate_refresh 16 passed, workflow 12 passed, CLI 5 passed and API 1 passed.",
+                    "Read-only git diff --check against the pinned base passed. Tests were not rerun during this observational invocation; recovery check commands are proposed above. No files, Goal state, branches or commits were changed."
+                  ],
+                  "invocation_id": "fbc5912467a594e4619ec91e3af194fcf6e53d68cd85d88f796a8235a1fe63da",
+                  "outcome": "failure",
+                  "role": "governance",
+                  "summary": "Q1 is corrected; one Model policy ownership violation requires scoped recovery."
+                }
+              ],
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRA87E5F985A1FFE2919BE7EC2-round-2"
+            },
+            "governance_message": "Q1 is corrected; one Model policy ownership violation requires scoped recovery.",
+            "governance_recovery_analysis": "The Q1 correction is supported by source inspection and retained passing Quality evidence. One architecture violation remains: newly introduced, side-effect-free Skill gate policy resides in Application despite the explicit requirement that Model own domain invariants and pure policy.",
+            "governance_recovery_attempt": 2,
+            "governance_recovery_round_prompt": "In a managed recovery Round for Goal DRA87E5F985A1FFE2919BE7EC2, preserve candidate 59af87d23c3c14881f3969ef316146e7aa2e3273 and all prior Round artifacts. Move required_bindings and the pure receipt-validity policy from src/application/events/evidence.rs into a cohesive Model module extending the existing automation semantics. Update Application callers and relocate the corresponding policy tests. Keep invocation orchestration, configuration persistence and timestamp acquisition in Application. Preserve receipt compatibility, exact-candidate validation, required Skill checks, Q1 effect attribution, replay deduplication, lifecycle gates and strict approval. Avoid unrelated refactoring. Run the relocated Model tests and the existing governance, application::events::, quality_resume, candidate_refresh, CLI/API recovery and browser diagnostics checks; check changed Rust formatting and patch whitespace. Report actual commands and results. Update intent documentation only if its contract changes. Do not manually advance Goal state, approve, merge, push, deploy or restart the serving installation.",
+            "governance_rule_actions": [
+              {
+                "evidence": null,
+                "message": "src/application/events/evidence.rs:36-51 defines required Skill selection, and :90-150 defines the domain conditions for accepting candidate-bound gate receipts. Both functions derive policy solely from supplied values, without orchestration or external effects. Their placement contradicts the project rule and docs/intent/01-design.md:23, which assign invariants and pure derivations to Model. Move this policy and its tests behind the existing Model automation boundary, retaining execution and persistence in Application.",
+                "rule_id": "workflow.governance.enter:default-governance:ARCH-MODEL-PURE-POLICY",
+                "state": "failed"
+              }
+            ],
             "guidance_decision": {
               "applied": [],
               "context_version": 1,
@@ -1566,42 +2068,6 @@
             },
             "implementation_report": "workflow.implement.enter:default-implement: Corrected Q1: recovery retains the originating attempt’s proven local integration before publication, preserves distinct publication attribution, and deduplicates replay.",
             "implementation_reported_at": "2026-09-10T15:10:17Z",
-            "latest_log": {
-              "actor": "refine",
-              "category": "state",
-              "datetime": "2026-09-10T15:19:30Z",
-              "details": {
-                "node_id": "default"
-              },
-              "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
-              "message": "Workflow status changed: quality -> governance",
-              "round_idx": 2,
-              "severity": "info"
-            },
-            "latest_state_log": {
-              "actor": "refine",
-              "category": "state",
-              "datetime": "2026-09-10T15:19:30Z",
-              "details": {
-                "node_id": "default"
-              },
-              "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
-              "message": "Workflow status changed: quality -> governance",
-              "round_idx": 2,
-              "severity": "info"
-            },
-            "latest_workflow_log": {
-              "actor": "refine",
-              "category": "state",
-              "datetime": "2026-09-10T15:19:30Z",
-              "details": {
-                "node_id": "default"
-              },
-              "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
-              "message": "Workflow status changed: quality -> governance",
-              "round_idx": 2,
-              "severity": "info"
-            },
             "logs": [
               {
                 "actor": "refine",
@@ -1977,10 +2443,74 @@
                 "message": "Workflow status changed: quality -> governance",
                 "round_idx": 2,
                 "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "governance",
+                "datetime": "2026-09-10T15:24:11Z",
+                "details": {
+                  "candidate_commit": "59af87d23c3c14881f3969ef316146e7aa2e3273",
+                  "configured": true,
+                  "failed_actions": [
+                    {
+                      "evidence": null,
+                      "message": "src/application/events/evidence.rs:36-51 defines required Skill selection, and :90-150 defines the domain conditions for accepting candidate-bound gate receipts. Both functions derive policy solely from supplied values, without orchestration or external effects. Their placement contradicts the project rule and docs/intent/01-design.md:23, which assign invariants and pure derivations to Model. Move this policy and its tests behind the existing Model automation boundary, retaining execution and persistence in Application.",
+                      "rule_id": "workflow.governance.enter:default-governance:ARCH-MODEL-PURE-POLICY",
+                      "state": "failed"
+                    }
+                  ],
+                  "node_id": "default",
+                  "phase": "post_implementation",
+                  "skill_results": [
+                    {
+                      "artifacts": {
+                        "recovery_analysis": "The Q1 correction is supported by source inspection and retained passing Quality evidence. One architecture violation remains: newly introduced, side-effect-free Skill gate policy resides in Application despite the explicit requirement that Model own domain invariants and pure policy.",
+                        "recovery_round_prompt": "In a managed recovery Round for Goal DRA87E5F985A1FFE2919BE7EC2, preserve candidate 59af87d23c3c14881f3969ef316146e7aa2e3273 and all prior Round artifacts. Move required_bindings and the pure receipt-validity policy from src/application/events/evidence.rs into a cohesive Model module extending the existing automation semantics. Update Application callers and relocate the corresponding policy tests. Keep invocation orchestration, configuration persistence and timestamp acquisition in Application. Preserve receipt compatibility, exact-candidate validation, required Skill checks, Q1 effect attribution, replay deduplication, lifecycle gates and strict approval. Avoid unrelated refactoring. Run the relocated Model tests and the existing governance, application::events::, quality_resume, candidate_refresh, CLI/API recovery and browser diagnostics checks; check changed Rust formatting and patch whitespace. Report actual commands and results. Update intent documentation only if its contract changes. Do not manually advance Goal state, approve, merge, push, deploy or restart the serving installation.",
+                        "violations": [
+                          {
+                            "message": "src/application/events/evidence.rs:36-51 defines required Skill selection, and :90-150 defines the domain conditions for accepting candidate-bound gate receipts. Both functions derive policy solely from supplied values, without orchestration or external effects. Their placement contradicts the project rule and docs/intent/01-design.md:23, which assign invariants and pure derivations to Model. Move this policy and its tests behind the existing Model automation boundary, retaining execution and persistence in Application.",
+                            "rule_id": "ARCH-MODEL-PURE-POLICY"
+                          }
+                        ]
+                      },
+                      "binding_id": "workflow.governance.enter:default-governance",
+                      "evidence": [
+                        "Verified clean HEAD 59af87d23c3c14881f3969ef316146e7aa2e3273 on the Round 3 branch. All 59 changed files match the retained Quality SHA-256 manifest.",
+                        "Reviewed accepted plans, implementation reports, candidate diff, affected intent, and Quality evidence. Existing Model automation policy is in src/model/automation.rs, including result_role and bindings.",
+                        "Read regression-before.log: the Q1 regression failed because A's completed effect was absent. Retained Quality logs show the corrected regression passed, governance 86 passed, events 24 passed, quality_resume 6 passed, candidate_refresh 16 passed, workflow 12 passed, CLI 5 passed and API 1 passed.",
+                        "Read-only git diff --check against the pinned base passed. Tests were not rerun during this observational invocation; recovery check commands are proposed above. No files, Goal state, branches or commits were changed."
+                      ],
+                      "invocation_id": "fbc5912467a594e4619ec91e3af194fcf6e53d68cd85d88f796a8235a1fe63da",
+                      "outcome": "failure",
+                      "role": "governance",
+                      "summary": "Q1 is corrected; one Model policy ownership violation requires scoped recovery."
+                    }
+                  ],
+                  "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRA87E5F985A1FFE2919BE7EC2-round-2"
+                },
+                "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+                "message": "Governance checks failed",
+                "round_idx": 2,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "governance",
+                "datetime": "2026-09-10T15:24:12Z",
+                "details": {
+                  "attempt": 2,
+                  "max_automatic_round_retries": 5,
+                  "node_id": "default",
+                  "source_round": 3
+                },
+                "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+                "message": "Governance drafted a fresh automatic recovery Round",
+                "round_idx": 2,
+                "severity": "info"
               }
             ],
-            "meta_rule_state": null,
-            "product_state": null,
+            "meta_rule_state": "passed",
+            "product_state": "passed",
             "prompt": "Implement a fresh managed recovery Round for Goal DRA87E5F985A1FFE2919BE7EC2 from current main. Preserve both previous Rounds, including their branches, commits, uncommitted files, plans, logs and failure evidence. Inspect and selectively reuse Round 2 candidate f0bcaaac7feb35efec438cbcc4bf36bfa57cd993, including its Quality correction that pins Skill configuration before invocation and preserves configuration on replay. Complete the supported Review integration-settlement recovery behavior under current Skills and docs/intent contracts.\n\nFix Quality finding Q1 from invocation f4577f5a926319479c8c06b7e3834c2cba05e45a842b0d2fdb142df218bdc506. In src/application/workflow/governance/integration/resume.rs, recover_integrated_candidate_locked currently requires publication before reconciling prepared integration effects. Under the existing target lease, repository lock and authority checks, reconcile retained integration_intent records against freshly observed exact local ancestry before returning for incomplete publication. Validate the candidate and recorded integration identity against the applicable target. When attempt A completed the local merge but crashed before recording its effect, append that proven local effect to A's originating Round and workflow revision, retaining its original integration identity, pushed=false and publication_required=true. Reuse the existing integration_effects capability; historical retention must not grant A authority, replace current settlement projections, or advance replacement work. An intent whose exact integration commit is absent from the local target remains unconfirmed.\n\nLet authoritative attempt B finish required publication through the existing workflow and retain publication under B. Keep local completion distinct from publication completion; subsequent recovery must not relabel B's publication as A's. Preserve original observations and diagnostics, and make replay retain stable, deduplicated effects. Require fresh local and required published target proof before atomic settlement with Review. Preserve strict human approval, lifecycle Skill gates, candidate-bound supervised Quality proof, explicit completed no-required-Skills receipts, and rejection of missing, failed, pending or mismatched evidence. Content equality cannot transfer proof between commit identities. Retain existing bounded handling of publication rejection and concurrent target movement without force-pushing.\n\nAdd a deterministic regression beside crash_after_ref_motion_recovers_the_prepared_effect_on_its_originating_attempt. Configure a temporary remote still at the base; retain A's integration intent and completed local target movement, omit A's completed-effect record, then claim B and resume through the normal workflow to Review. Assert A retains its exact completed local effect with publication still distinguished, B retains successful publication, and stale A cannot settle or advance work. Exercise interruption or failed publication followed by retry, repeated recovery before and after settlement, and preservation of both attempts' evidence. Retain coverage for no-remote recovery, interruption after publication, cancellation, supersession and unproved intents. Demonstrate the new regression fails before the correction and passes afterward within the new managed worktree.\n\nRun the new regression and focused checks using cargo test --lib governance -- --test-threads=1, cargo test --lib application::events:: -- --test-threads=1, cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1, and cargo test --lib candidate_refresh -- --test-threads=1. Verify retained surface behavior with the existing CLI/API recovery tests and node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js. Check changed Rust formatting and patch whitespace. Report actual commands, selected test counts, results and any baseline failures or unexecuted checks. Update only documentation affected by the correction. Refine owns candidate publication, integration and workflow advancement; do not manually change Goal state, approve, merge, push, deploy or restart the serving installation.",
             "quality_agent_report": "workflow.quality.enter:default-quality: Reviewed the exact candidate and verified the Q1 correction. All focused checks passed; no further defects found.",
             "quality_candidate_commit": "59af87d23c3c14881f3969ef316146e7aa2e3273",
@@ -2288,8 +2818,8 @@
             ],
             "quality_state": "passed",
             "reporter": "Refine",
-            "rule_state": null,
-            "updated": "2026-09-10T15:19:30Z",
+            "rule_state": "failed",
+            "updated": "2026-09-10T15:24:12Z",
             "workflow_attempt_authority": {
               "claimed_at": "2026-09-10T14:56:18Z",
               "round_idx": 2,
@@ -2326,39 +2856,165 @@
             },
             "workflow_reconciliation": null,
             "workflow_recovery": null
+          },
+          {
+            "assignee": "Refine",
+            "automatic_retry": {
+              "attempt": 2,
+              "generated_at": "2026-09-10T15:24:12Z",
+              "kind": "governance",
+              "source_round": 3
+            },
+            "constitution_state": "unclassified",
+            "created": "2026-09-10T15:24:12Z",
+            "failure_at": "",
+            "failure_category": "",
+            "failure_message": "",
+            "governance_candidate_commit": "",
+            "governance_checked_at": "",
+            "governance_details": "",
+            "governance_message": "",
+            "governance_rule_actions": [],
+            "guidance_decision": null,
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "b47569adb8d4c5d1d7335ba91729a3e486a38fe0",
+                "context_digest": "7347a850e85dd4aceeef2746a0075c32f6cd14c48745690d05b393cae2bb1240",
+                "context_version": 1,
+                "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+                "implementation_branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-4",
+                "round_idx": 3,
+                "target_branch": "main"
+              },
+              "phase": "plan",
+              "phase_started_at": "2026-09-10T15:24:12Z",
+              "schema_version": 2,
+              "started_at": "2026-09-10T15:24:12Z",
+              "state": "in_progress",
+              "updated_at": "2026-09-10T15:24:12Z"
+            },
+            "implementation_report": null,
+            "implementation_reported_at": null,
+            "latest_log": {
+              "actor": "refine",
+              "category": "git",
+              "datetime": "2026-09-10T15:24:12Z",
+              "details": {
+                "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-4",
+                "candidate_commit": "59af87d23c3c14881f3969ef316146e7aa2e3273",
+                "node_id": "default",
+                "source_branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-3",
+                "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRA87E5F985A1FFE2919BE7EC2-round-2"
+              },
+              "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+              "message": "Scoped governance recovery continues on the retained candidate worktree",
+              "round_idx": 3,
+              "severity": "info"
+            },
+            "latest_state_log": {
+              "actor": "refine",
+              "category": "state",
+              "datetime": "2026-09-10T15:24:12Z",
+              "details": {
+                "node_id": "default"
+              },
+              "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+              "message": "Workflow status changed: todo -> plan",
+              "round_idx": 3,
+              "severity": "info"
+            },
+            "latest_workflow_log": {
+              "actor": "refine",
+              "category": "state",
+              "datetime": "2026-09-10T15:24:12Z",
+              "details": {
+                "node_id": "default"
+              },
+              "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+              "message": "Workflow status changed: todo -> plan",
+              "round_idx": 3,
+              "severity": "info"
+            },
+            "logs": [
+              {
+                "actor": "refine",
+                "category": "state",
+                "datetime": "2026-09-10T15:24:12Z",
+                "details": {
+                  "node_id": "default"
+                },
+                "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+                "message": "Workflow status changed: todo -> plan",
+                "round_idx": 3,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "git",
+                "datetime": "2026-09-10T15:24:12Z",
+                "details": {
+                  "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-4",
+                  "candidate_commit": "59af87d23c3c14881f3969ef316146e7aa2e3273",
+                  "node_id": "default",
+                  "source_branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-3",
+                  "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRA87E5F985A1FFE2919BE7EC2-round-2"
+                },
+                "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+                "message": "Scoped governance recovery continues on the retained candidate worktree",
+                "round_idx": 3,
+                "severity": "info"
+              }
+            ],
+            "meta_rule_state": "unclassified",
+            "product_state": "unclassified",
+            "prompt": "In a managed recovery Round for Goal DRA87E5F985A1FFE2919BE7EC2, preserve candidate 59af87d23c3c14881f3969ef316146e7aa2e3273 and all prior Round artifacts. Move required_bindings and the pure receipt-validity policy from src/application/events/evidence.rs into a cohesive Model module extending the existing automation semantics. Update Application callers and relocate the corresponding policy tests. Keep invocation orchestration, configuration persistence and timestamp acquisition in Application. Preserve receipt compatibility, exact-candidate validation, required Skill checks, Q1 effect attribution, replay deduplication, lifecycle gates and strict approval. Avoid unrelated refactoring. Run the relocated Model tests and the existing governance, application::events::, quality_resume, candidate_refresh, CLI/API recovery and browser diagnostics checks; check changed Rust formatting and patch whitespace. Report actual commands and results. Update intent documentation only if its contract changes. Do not manually advance Goal state, approve, merge, push, deploy or restart the serving installation.",
+            "quality_checked_at": "",
+            "quality_details": "",
+            "quality_message": "",
+            "quality_state": "unclassified",
+            "reporter": "Refine",
+            "rule_state": "unclassified",
+            "updated": "2026-09-10T15:24:12Z",
+            "workflow_attempt_authority": {
+              "claimed_at": "2026-09-10T15:24:12Z",
+              "round_idx": 3,
+              "workflow_revision": 82
+            },
+            "workflow_reconciliation": null,
+            "workflow_recovery": null
           }
         ],
-        "status": "governance",
+        "status": "plan",
         "target_branch": "main",
-        "updated": "2026-09-10T15:19:30Z",
-        "workflow_revision": 79
+        "updated": "2026-09-10T15:24:12Z",
+        "workflow_revision": 90
       },
       "system": {
-        "candidate_commit": "59af87d23c3c14881f3969ef316146e7aa2e3273",
+        "candidate_commit": null,
         "node_id": "default",
         "project_root": "/home/buddy/projects/refine-next",
-        "workflow_step": "governance",
+        "workflow_step": "plan",
         "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRA87E5F985A1FFE2919BE7EC2-round-2"
       }
     },
     "metadata": {
       "behavior": "EventSkill",
-      "event_operation_id": "1a08be70f09113c7647",
+      "event_operation_id": "1a08beb5ca5113c764b",
       "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
       "kind": "workflow",
       "node_id": "default",
       "provider": "codex",
-      "round_idx": 2,
+      "round_idx": 3,
       "target_app_id": "/home/buddy/projects/refine-next",
-      "workflow_revision": 48,
-      "workflow_state": "governance"
+      "workflow_revision": 82,
+      "workflow_state": "plan"
     }
   },
   "bindings": [
     {
       "binding": {
-        "id": "default-governance",
-        "skill_id": "default-governance",
+        "id": "default-plan",
+        "skill_id": "default-plan",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -2369,10 +3025,10 @@
         "inputs": {}
       },
       "skill": {
-        "id": "default-governance",
-        "name": "Governance",
-        "prompt": "## Governance review\n\nReview the exact candidate against the project's stated intent and attached Skills. Read the accepted plans, implementation and Quality evidence and actual diff. Report actual violations with evidence, not hypothetical risks or preferences. Do not edit files, merge, push or change Goal state. A finding must include an actionable recovery request.\n\n## Product intent\n\nRefine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.\n\n## Project rules\n\n- Keep domain concepts, invariants, and pure policy in `src/model`; shared behavior and orchestration in `src/application`; Git, process, host, storage, provider, and telemetry mechanisms in `src/infrastructure`; and adapters for people and machines in `src/surfaces`. Keep `error.rs` as a neutral shared boundary. Model remains independent of the other areas, and code outside Surfaces does not depend on surface adapters.\n- Maintain a consistent architecture by extending the existing semantic responsibilities and dependency boundaries described in `docs/intent/01-design.md`. Do not invent new architectural concepts.\n- Preserve Rust-based flat-file persistence, file indexes, and in-memory caching. Keep CLI and API work under 50 ms, excluding time spent waiting on LLMs or outside tools.\n- Maintain affected documentation, especially `docs/intent/*`, and preserve its established format. Apply the scope limits in the intent guidance below.\n- Keep Refine agent-first by using installed coding-agent CLIs. Do not duplicate or reimplement coding-agent functionality.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
-        "role": "governance",
+        "id": "default-plan",
+        "name": "Plan",
+        "prompt": "## Plan\n\nProduce a complete, concise implementation plan for the current Goal Round. Inspect the repository and applicable context, resolve assumptions, consider alternatives and critique your proposed solution before finalizing it. Choose the planning method appropriate to the work. For a scoped finding recovery Round, focus the plan on the requested correction against the retained candidate. Do not change repository files. Return an actionable plan with stable checklist IDs and meaningful verification.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
+        "role": "plan",
         "enabled": true,
         "scope": {
           "node_id": null
@@ -2383,45 +3039,11 @@
       "parameters": {}
     }
   ],
-  "state": "failed",
-  "results": {
-    "default-governance": {
-      "invocation_id": "fbc5912467a594e4619ec91e3af194fcf6e53d68cd85d88f796a8235a1fe63da",
-      "binding_id": "default-governance",
-      "role": "governance",
-      "outcome": "failure",
-      "summary": "Q1 is corrected; one Model policy ownership violation requires scoped recovery.",
-      "evidence": [
-        "Verified clean HEAD 59af87d23c3c14881f3969ef316146e7aa2e3273 on the Round 3 branch. All 59 changed files match the retained Quality SHA-256 manifest.",
-        "Reviewed accepted plans, implementation reports, candidate diff, affected intent, and Quality evidence. Existing Model automation policy is in src/model/automation.rs, including result_role and bindings.",
-        "Read regression-before.log: the Q1 regression failed because A's completed effect was absent. Retained Quality logs show the corrected regression passed, governance 86 passed, events 24 passed, quality_resume 6 passed, candidate_refresh 16 passed, workflow 12 passed, CLI 5 passed and API 1 passed.",
-        "Read-only git diff --check against the pinned base passed. Tests were not rerun during this observational invocation; recovery check commands are proposed above. No files, Goal state, branches or commits were changed."
-      ],
-      "artifacts": {
-        "recovery_analysis": "The Q1 correction is supported by source inspection and retained passing Quality evidence. One architecture violation remains: newly introduced, side-effect-free Skill gate policy resides in Application despite the explicit requirement that Model own domain invariants and pure policy.",
-        "recovery_round_prompt": "In a managed recovery Round for Goal DRA87E5F985A1FFE2919BE7EC2, preserve candidate 59af87d23c3c14881f3969ef316146e7aa2e3273 and all prior Round artifacts. Move required_bindings and the pure receipt-validity policy from src/application/events/evidence.rs into a cohesive Model module extending the existing automation semantics. Update Application callers and relocate the corresponding policy tests. Keep invocation orchestration, configuration persistence and timestamp acquisition in Application. Preserve receipt compatibility, exact-candidate validation, required Skill checks, Q1 effect attribution, replay deduplication, lifecycle gates and strict approval. Avoid unrelated refactoring. Run the relocated Model tests and the existing governance, application::events::, quality_resume, candidate_refresh, CLI/API recovery and browser diagnostics checks; check changed Rust formatting and patch whitespace. Report actual commands and results. Update intent documentation only if its contract changes. Do not manually advance Goal state, approve, merge, push, deploy or restart the serving installation.",
-        "violations": [
-          {
-            "message": "src/application/events/evidence.rs:36-51 defines required Skill selection, and :90-150 defines the domain conditions for accepting candidate-bound gate receipts. Both functions derive policy solely from supplied values, without orchestration or external effects. Their placement contradicts the project rule and docs/intent/01-design.md:23, which assign invariants and pure derivations to Model. Move this policy and its tests behind the existing Model automation boundary, retaining execution and persistence in Application.",
-            "rule_id": "ARCH-MODEL-PURE-POLICY"
-          }
-        ]
-      }
-    }
-  },
-  "attempts": [
-    {
-      "attempt": 0,
-      "binding_id": "default-governance",
-      "diagnostic": null,
-      "operation_id": null,
-      "process_id": "proc-1789053570873-1129590-720",
-      "raw_output": "{\n  \"artifacts\": {\n    \"recovery_analysis\": \"The Q1 correction is supported by source inspection and retained passing Quality evidence. One architecture violation remains: newly introduced, side-effect-free Skill gate policy resides in Application despite the explicit requirement that Model own domain invariants and pure policy.\",\n    \"recovery_round_prompt\": \"In a managed recovery Round for Goal DRA87E5F985A1FFE2919BE7EC2, preserve candidate 59af87d23c3c14881f3969ef316146e7aa2e3273 and all prior Round artifacts. Move required_bindings and the pure receipt-validity policy from src/application/events/evidence.rs into a cohesive Model module extending the existing automation semantics. Update Application callers and relocate the corresponding policy tests. Keep invocation orchestration, configuration persistence and timestamp acquisition in Application. Preserve receipt compatibility, exact-candidate validation, required Skill checks, Q1 effect attribution, replay deduplication, lifecycle gates and strict approval. Avoid unrelated refactoring. Run the relocated Model tests and the existing governance, application::events::, quality_resume, candidate_refresh, CLI/API recovery and browser diagnostics checks; check changed Rust formatting and patch whitespace. Report actual commands and results. Update intent documentation only if its contract changes. Do not manually advance Goal state, approve, merge, push, deploy or restart the serving installation.\",\n    \"violations\": [\n      {\n        \"rule_id\": \"ARCH-MODEL-PURE-POLICY\",\n        \"message\": \"src/application/events/evidence.rs:36-51 defines required Skill selection, and :90-150 defines the domain conditions for accepting candidate-bound gate receipts. Both functions derive policy solely from supplied values, without orchestration or external effects. Their placement contradicts the project rule and docs/intent/01-design.md:23, which assign invariants and pure derivations to Model. Move this policy and its tests behind the existing Model automation boundary, retaining execution and persistence in Application.\"\n      }\n    ]\n  },\n  \"binding_id\": \"default-governance\",\n  \"evidence\": [\n    \"Verified clean HEAD 59af87d23c3c14881f3969ef316146e7aa2e3273 on the Round 3 branch. All 59 changed files match the retained Quality SHA-256 manifest.\",\n    \"Reviewed accepted plans, implementation reports, candidate diff, affected intent, and Quality evidence. Existing Model automation policy is in src/model/automation.rs, including result_role and bindings.\",\n    \"Read regression-before.log: the Q1 regression failed because A's completed effect was absent. Retained Quality logs show the corrected regression passed, governance 86 passed, events 24 passed, quality_resume 6 passed, candidate_refresh 16 passed, workflow 12 passed, CLI 5 passed and API 1 passed.\",\n    \"Read-only git diff --check against the pinned base passed. Tests were not rerun during this observational invocation; recovery check commands are proposed above. No files, Goal state, branches or commits were changed.\"\n  ],\n  \"invocation_id\": \"fbc5912467a594e4619ec91e3af194fcf6e53d68cd85d88f796a8235a1fe63da\",\n  \"outcome\": \"failure\",\n  \"role\": \"governance\",\n  \"summary\": \"Q1 is corrected; one Model policy ownership violation requires scoped recovery.\"\n}\n",
-      "workflow_revision": 48
-    }
-  ],
-  "created_at": "2026-09-10T15:19:30.808067907+00:00",
-  "completed_at": "2026-09-10T15:24:11.874459586+00:00",
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-10T15:24:12.791189967+00:00",
+  "completed_at": null,
   "error": null,
   "action_applied": false
 }
