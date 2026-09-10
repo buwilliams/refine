@@ -1,10 +1,10 @@
 {
-  "id": "a357dabc79bc4ce3c738c937b2c096a65038a717e0b3dbaedeefe51ecb84cc09",
+  "id": "dbfad5f546b738c8b35c532e19e90cecfe5ecda025ee63bc31165845984103e4",
   "event": {
-    "id": "workflow.implement.enter",
-    "name": "Workflow Implement Enter",
+    "id": "workflow.quality.enter",
+    "name": "Workflow Quality Enter",
     "kind": "system",
-    "source": "workflow.implement.enter",
+    "source": "workflow.quality.enter",
     "enabled": true,
     "scope": {
       "node_id": null
@@ -12,8 +12,8 @@
     "parameters": [],
     "bindings": [
       {
-        "id": "default-implement",
-        "skill_id": "default-implement",
+        "id": "default-quality",
+        "skill_id": "default-quality",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -35,7 +35,7 @@
     "goal_id": "DRCBAA3A2FC4ABDDCEC2B87473",
     "round_idx": 1,
     "workflow_revision": 18,
-    "candidate_commit": null,
+    "candidate_commit": "99172365aaa3409f10886c3b00bb0026b0ccb790",
     "data": {
       "context": {
         "agent_context": {
@@ -286,6 +286,7 @@
           "version": 1,
           "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
         },
+        "implementation_report": "workflow.implement.enter:default-implement: Implemented durable decisions, rejection, settlement and recovery history, synchronized archival retention, and indexed CLI/API metrics. Verification passed with 33 browser tests skipped because Playwright/Chromium was unavailable.",
         "plans": {
           "checklist": [
             {
@@ -367,11 +368,11 @@
       "event": {},
       "goal": {
         "assignee": "ethan.jacobson@insurity.com",
-        "base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+        "base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
         "branch_name": "refine/DRCBAA3A2FC4ABDDCEC2B87473/round-2",
-        "candidate_commit": null,
+        "candidate_commit": "99172365aaa3409f10886c3b00bb0026b0ccb790",
         "created": "2026-09-10T08:26:07Z",
-        "event_generation": 3,
+        "event_generation": 4,
         "feature_id": null,
         "feature_order": null,
         "id": "DRCBAA3A2FC4ABDDCEC2B87473",
@@ -708,17 +709,22 @@
           },
           {
             "assignee": "ethan.jacobson@insurity.com",
-            "constitution_state": "unclassified",
+            "constitution_state": null,
             "created": "2026-09-10T13:06:36Z",
             "failure_at": "",
             "failure_category": "",
             "failure_message": "",
-            "governance_candidate_commit": "",
-            "governance_checked_at": "",
-            "governance_details": "",
-            "governance_message": "",
+            "governance_candidate_commit": null,
+            "governance_checked_at": null,
+            "governance_details": null,
+            "governance_message": null,
             "governance_rule_actions": [],
-            "guidance_decision": null,
+            "guidance_decision": {
+              "applied": [],
+              "context_version": 1,
+              "recorded_at": "2026-09-10T14:53:20Z",
+              "skipped": []
+            },
             "implementation_plan": {
               "binding": {
                 "base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
@@ -729,6 +735,7 @@
                 "round_idx": 1,
                 "target_branch": "main"
               },
+              "completed_at": "2026-09-10T14:53:20Z",
               "final_plan": {
                 "completed_at": "2026-09-10T13:49:15Z",
                 "git_after": {
@@ -819,6 +826,122 @@
                   "summary": "workflow.plan.enter:default-plan: Implement durable Goal decisions, settlements and recovery history on the clean Round 2 base f880b7767149e4de43d5bc4d4786247d1e536a8c. Selectively adapt Round 1 work to current Skills execution, deferred transitions and exact-candidate approval. Keep integration separate from acceptance, preserve history through synchronization and deletion, and expose indexed CLI/API metrics."
                 },
                 "started_at": "2026-09-10T13:43:06Z"
+              },
+              "implementation": {
+                "completed_at": "2026-09-10T14:53:20Z",
+                "execution": {
+                  "checklist": [
+                    {
+                      "evidence": "Used the pinned Round 2 worktree. Selectively adapted Round 1 audit and fixture ideas while replacing completion inference and persistence hooks; preserved Round 1.",
+                      "id": "workflow.plan.enter:default-plan:P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added backward-compatible Goal audit types and validation in focused model/goal modules, including immutable decisions, submissions, settlements, reopening, attribution, and explicit completion authority.",
+                      "id": "workflow.plan.enter:default-plan:P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Shared review operations fence identity, revision, generation, ownership, Round and candidate. Duplicate, contradictory and concurrent submission tests pass. Injected replacement failure preserves the original Goal bytes.",
+                      "id": "workflow.plan.enter:default-plan:P3",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Deferred Event transitions retain pending requests and original submission times. Acceptance and rejection settle atomically after gate revalidation; failure, cancellation and supersession create no completed human decision.",
+                      "id": "workflow.plan.enter:default-plan:P4",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Extracted shared integration proof validation with repository-to-Goal lock ordering, exact-candidate ancestry and publication checks. Generic Done/Rejected writes are rejected; approval does not reintegrate.",
+                      "id": "workflow.plan.enter:default-plan:P5",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added Rejected across workflow, projections, filters, browser presentation and trigger catalog. Tests verify Feature blocking and explicit new-Round recovery while preserving rejection history.",
+                      "id": "workflow.plan.enter:default-plan:P6",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "CLI approve/reject, API approve/verify/reject, browser and bulk requests use shared decisions. CLI/API parity and browser request persistence across reloads and transport retries pass.",
+                      "id": "workflow.plan.enter:default-plan:P7",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Authoritative terminal writes capture settlement evidence before mutable failure fields clear. Skill findings, execution errors and repaired output failures persist independently. Automatic acceptance records pinned Skill authority without creating human decisions.",
+                      "id": "workflow.plan.enter:default-plan:P8",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Reopening retains prior settlements and records explicit recovery lineage. Tests cover automatic recovery, same-Round retry, rejection recovery, legacy recovery and cancellation before any Round; known zero Round counts remain zero.",
+                      "id": "workflow.plan.enter:default-plan:P9",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Semantic no-op writes preserve Goal timestamps and revisions. Comparison ignores only top-level bookkeeping; original audit timestamps and attribution survive metadata changes and synchronization.",
+                      "id": "workflow.plan.enter:default-plan:P10",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Sync unions immutable identities and validates hydration, structural merges, agent resolutions and explicit authority. Tests reject identity edits and competing settlements, and retain both histories during live/remote first-contact recovery.",
+                      "id": "workflow.plan.enter:default-plan:P11",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Supported deletion archives audit and coverage metadata first. Repeated archives are identical; failed or corrupt archives prevent deletion. Sync tests verify archive-first deletion propagation and preservation of original settlements.",
+                      "id": "workflow.plan.enter:default-plan:P12",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added compact projections, incremental index updates, bounded aggregate caches and recoverable write markers. Tests exercise interrupted index recovery and confirm zero history-file reads during routine queries.",
+                      "id": "workflow.plan.enter:default-plan:P13",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Shared metrics power refine metrics and GET /work/metrics, with UTC ranges, day/week/month buckets, historical grouping, current outcomes and a separate settlement-event series.",
+                      "id": "workflow.plan.enter:default-plan:P14",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Reports expose numerators, denominators, exclusions, nullable rates and missing-data coverage. Legacy timestamps and human acceptance are not inferred from updated or integration evidence.",
+                      "id": "workflow.plan.enter:default-plan:P15",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added behavioral tests for review gates, proof, retries, concurrency, cancellation, recovery, Feature ordering, sync, retention and legacy records, plus record/index/archive fault injection and invocation-journal recovery.",
+                      "id": "workflow.plan.enter:default-plan:P16",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Six-Goal fixture verifies decisions 3/1, acceptance 3/4, automatic/failure rates 1/6, first-Round success 2/6 and average Rounds 8/6. Benchmark: 10,000 three-Round Goals; cold 2243.692 ms, warm 0.171 ms, incremental 42.078 ms; routine history reads zero.",
+                      "id": "workflow.plan.enter:default-plan:P17",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Updated affected intent pages. Requested verification completed with the results below; earlier failures were corrected or resolved by serialized reruns. Formatting passed for 78 changed Rust files, with no tracked or untracked whitespace findings.",
+                      "id": "workflow.plan.enter:default-plan:P18",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "cargo check --all-targets --locked: passed.",
+                    "cargo test --lib application::work_items -- --test-threads=1: 62 passed.",
+                    "cargo test --lib application::events -- --test-threads=1: 21 passed.",
+                    "cargo test --lib application::workflow -- --test-threads=1: 174 passed.",
+                    "cargo test --lib application::persistence_sync -- --test-threads=1: 113 passed.",
+                    "cargo test --lib application::projects::projection -- --test-threads=1: 20 passed.",
+                    "cargo test --lib model::workflow -- --test-threads=1: 4 passed.",
+                    "cargo test --lib model::feature -- --test-threads=1: 4 passed.",
+                    "cargo test --lib surfaces::web_server -- --test-threads=1: 169 passed.",
+                    "cargo test --test sync_regressions --test sync_simulation -- --test-threads=1: 5 and 26 passed.",
+                    "cargo run --manifest-path xtask/Cargo.toml -- test-cli: 1 suite passed, including approval, rejection, identical retries, archival and metrics.",
+                    "cargo run --manifest-path xtask/Cargo.toml -- test-browser: 212 passed, 0 failed, 33 skipped because Playwright/Chromium was unavailable.",
+                    "cargo run --manifest-path xtask/Cargo.toml -- check-static-assets: passed; 66 assets present.",
+                    "cargo test --lib application::work_items::tests::metrics -- --test-threads=1 --nocapture: 2 passed; fixture totals, boundaries, grouping, empty populations and benchmark verified.",
+                    "Changed-file rustfmt --check: passed for 78 Rust files. git diff --check and whitespace checks for 28 untracked files: passed."
+                  ]
+                },
+                "report": "workflow.implement.enter:default-implement: Implemented durable decisions, rejection, settlement and recovery history, synchronized archival retention, and indexed CLI/API metrics. Verification passed with 33 browser tests skipped because Playwright/Chromium was unavailable.",
+                "started_at": "2026-09-10T13:49:15Z"
               },
               "phase": "implement",
               "phase_started_at": "2026-09-10T13:49:15Z",
@@ -915,44 +1038,76 @@
               },
               "schema_version": 2,
               "started_at": "2026-09-10T13:43:06Z",
-              "state": "in_progress",
-              "updated_at": "2026-09-10T13:49:15Z"
+              "state": "completed",
+              "updated_at": "2026-09-10T14:53:20Z"
             },
-            "implementation_report": null,
-            "implementation_reported_at": null,
+            "implementation_report": "workflow.implement.enter:default-implement: Implemented durable decisions, rejection, settlement and recovery history, synchronized archival retention, and indexed CLI/API metrics. Verification passed with 33 browser tests skipped because Playwright/Chromium was unavailable.",
+            "implementation_reported_at": "2026-09-10T14:53:20Z",
             "latest_log": {
               "actor": "refine",
-              "category": "state",
-              "datetime": "2026-09-10T13:49:15Z",
+              "category": "candidate_refresh",
+              "datetime": "2026-09-10T14:53:21Z",
               "details": {
-                "node_id": "default"
+                "node_id": "default",
+                "original_candidate_commit": "a5a3f69cc4f94c4c7b410976e27d218fa1ff670b",
+                "refresh_evidence": {
+                  "authorizing_status": "quality",
+                  "branch": "refine/DRCBAA3A2FC4ABDDCEC2B87473/round-2",
+                  "node_id": "default",
+                  "original_base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "original_candidate_commit": "a5a3f69cc4f94c4c7b410976e27d218fa1ff670b",
+                  "previous_gate_evidence": {
+                    "constitution_state": "unclassified",
+                    "governance_candidate_commit": "",
+                    "governance_checked_at": "",
+                    "governance_details": "",
+                    "governance_message": "",
+                    "meta_rule_state": "unclassified",
+                    "product_state": "unclassified",
+                    "quality_candidate_commit": null,
+                    "quality_checked_at": "",
+                    "quality_details": "",
+                    "quality_message": "",
+                    "quality_state": "unclassified",
+                    "rule_state": "unclassified"
+                  },
+                  "refreshed_at": "2026-09-10T14:53:21Z",
+                  "replacement_base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+                  "replacement_candidate_commit": "99172365aaa3409f10886c3b00bb0026b0ccb790",
+                  "round_idx": 1,
+                  "state": "refreshed",
+                  "workflow_revision": 18,
+                  "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRCBAA3A2FC4ABDDCEC2B87473-round-2"
+                },
+                "replacement_base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+                "replacement_candidate_commit": "99172365aaa3409f10886c3b00bb0026b0ccb790"
               },
               "goal_id": "DRCBAA3A2FC4ABDDCEC2B87473",
-              "message": "Workflow status changed: plan -> implement",
+              "message": "Refreshed the candidate onto the advanced target before Quality",
               "round_idx": 1,
               "severity": "info"
             },
             "latest_state_log": {
               "actor": "refine",
               "category": "state",
-              "datetime": "2026-09-10T13:49:15Z",
+              "datetime": "2026-09-10T14:53:20Z",
               "details": {
                 "node_id": "default"
               },
               "goal_id": "DRCBAA3A2FC4ABDDCEC2B87473",
-              "message": "Workflow status changed: plan -> implement",
+              "message": "Workflow status changed: implement -> quality",
               "round_idx": 1,
               "severity": "info"
             },
             "latest_workflow_log": {
               "actor": "refine",
               "category": "state",
-              "datetime": "2026-09-10T13:49:15Z",
+              "datetime": "2026-09-10T14:53:20Z",
               "details": {
                 "node_id": "default"
               },
               "goal_id": "DRCBAA3A2FC4ABDDCEC2B87473",
-              "message": "Workflow status changed: plan -> implement",
+              "message": "Workflow status changed: implement -> quality",
               "round_idx": 1,
               "severity": "info"
             },
@@ -1011,43 +1166,160 @@
                 "message": "Workflow status changed: plan -> implement",
                 "round_idx": 1,
                 "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "agent",
+                "datetime": "2026-09-10T14:53:20Z",
+                "details": {
+                  "branch": "refine/DRCBAA3A2FC4ABDDCEC2B87473/round-2",
+                  "node_id": "default",
+                  "output": "workflow.implement.enter:default-implement: Implemented durable decisions, rejection, settlement and recovery history, synchronized archival retention, and indexed CLI/API metrics. Verification passed with 33 browser tests skipped because Playwright/Chromium was unavailable.",
+                  "provider": "codex",
+                  "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRCBAA3A2FC4ABDDCEC2B87473-round-2"
+                },
+                "goal_id": "DRCBAA3A2FC4ABDDCEC2B87473",
+                "message": "Goal agent completed",
+                "round_idx": 1,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "git",
+                "datetime": "2026-09-10T14:53:20Z",
+                "details": {
+                  "branch": "refine/DRCBAA3A2FC4ABDDCEC2B87473/round-2",
+                  "commit": "a5a3f69cc4f94c4c7b410976e27d218fa1ff670b",
+                  "node_id": "default",
+                  "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRCBAA3A2FC4ABDDCEC2B87473-round-2"
+                },
+                "goal_id": "DRCBAA3A2FC4ABDDCEC2B87473",
+                "message": "Committed implementation branch refine/DRCBAA3A2FC4ABDDCEC2B87473/round-2",
+                "round_idx": 1,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "state",
+                "datetime": "2026-09-10T14:53:20Z",
+                "details": {
+                  "node_id": "default"
+                },
+                "goal_id": "DRCBAA3A2FC4ABDDCEC2B87473",
+                "message": "Workflow status changed: implement -> quality",
+                "round_idx": 1,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "candidate_refresh",
+                "datetime": "2026-09-10T14:53:21Z",
+                "details": {
+                  "node_id": "default",
+                  "original_candidate_commit": "a5a3f69cc4f94c4c7b410976e27d218fa1ff670b",
+                  "refresh_evidence": {
+                    "authorizing_status": "quality",
+                    "branch": "refine/DRCBAA3A2FC4ABDDCEC2B87473/round-2",
+                    "node_id": "default",
+                    "original_base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                    "original_candidate_commit": "a5a3f69cc4f94c4c7b410976e27d218fa1ff670b",
+                    "previous_gate_evidence": {
+                      "constitution_state": "unclassified",
+                      "governance_candidate_commit": "",
+                      "governance_checked_at": "",
+                      "governance_details": "",
+                      "governance_message": "",
+                      "meta_rule_state": "unclassified",
+                      "product_state": "unclassified",
+                      "quality_candidate_commit": null,
+                      "quality_checked_at": "",
+                      "quality_details": "",
+                      "quality_message": "",
+                      "quality_state": "unclassified",
+                      "rule_state": "unclassified"
+                    },
+                    "refreshed_at": "2026-09-10T14:53:21Z",
+                    "replacement_base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+                    "replacement_candidate_commit": "99172365aaa3409f10886c3b00bb0026b0ccb790",
+                    "round_idx": 1,
+                    "state": "refreshed",
+                    "workflow_revision": 18,
+                    "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRCBAA3A2FC4ABDDCEC2B87473-round-2"
+                  },
+                  "replacement_base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+                  "replacement_candidate_commit": "99172365aaa3409f10886c3b00bb0026b0ccb790"
+                },
+                "goal_id": "DRCBAA3A2FC4ABDDCEC2B87473",
+                "message": "Refreshed the candidate onto the advanced target before Quality",
+                "round_idx": 1,
+                "severity": "info"
               }
             ],
-            "meta_rule_state": "unclassified",
-            "product_state": "unclassified",
+            "meta_rule_state": null,
+            "product_state": null,
             "prompt": "Make human acceptance, rejection, cancellation, failure and recovery measurable from durable Goal history.\n\nThe request remains valid, but its description of every passed Quality/Governance gate reaching Done is outdated. Current Skills run checks, integration leads to Review, and approval is a separate decision. Passing a Skill, or having no required check Skills, must never be counted as human acceptance. Round 1 has substantial uncommitted work but no candidate or completed verification; reassess it against current lifecycle and Skill execution code.\n\nRecord immutable human decision events with a stable identity, Goal, Round, node, reviewer, decision time, accepted or rejected result, optional reason and exact candidate. Make rejection a supported outcome distinct from cancellation, with an explicit path to a new Round that retains the rejection. Record terminal outcomes with completion time, resolution type, failure category where applicable, manual intervention, total and recovery Rounds, and first-Round success. Keep integration facts separate from acceptance, and classify automatic completion only when its actual authority is recorded. Capture Skill failures and execution errors without mistaking every failed Skill attempt or automatic retry for final Goal failure.\n\nUse shared work-item operations for CLI, API, browser and bulk decisions. Persist decisions and status atomically, fence stale or duplicate requests, preserve exact-candidate approval requirements, and retain earlier outcomes when work reopens. Keep this history through synchronization, log pruning and supported deletion or archival. Preserve original decision and completion timestamps and attribution; report unknown legacy data instead of inventing it.\n\nProvide a shared query and CLI/API report over a date range, grouped by node, reporter or Feature, with time buckets, outcome counts, human accept rate, automatic resolution rate, first-Round success, average Rounds and failure rate. Define deduplication and denominators, expose missing-data coverage and use null for an empty denominator. Extend existing indexes and caches so routine queries do not scan every Round or run history.\n\nVerify acceptance, rejection, Skill failure followed by recovery, cancellation, reopen, duplicate and stale submissions, sync conflicts, retention and legacy records. Check known fixture totals, rates, date boundaries and query performance.\n\nThis is a recovery Round following the Skills review on 10 September 2026. Start from current main in a new managed Round worktree. Preserve Round 1, its plans, logs, branches, commits and uncommitted files; inspect and selectively reuse useful work instead of replaying the whole old attempt. Use the current Skills and docs/intent contracts, not archived Governance, Quality or Guidance configuration or the old fixed planning sequence. Refine owns workflow advancement and integration; human approval remains separate. Update only affected documentation and report focused verification with actual results.",
-            "quality_checked_at": "",
-            "quality_details": "",
-            "quality_message": "",
-            "quality_state": "unclassified",
+            "quality_candidate_commit": null,
+            "quality_checked_at": null,
+            "quality_details": null,
+            "quality_message": null,
+            "quality_state": null,
             "reporter": "Buddy Williams",
-            "rule_state": "unclassified",
-            "updated": "2026-09-10T13:49:15Z",
+            "rule_state": null,
+            "updated": "2026-09-10T14:53:21Z",
             "workflow_attempt_authority": {
               "claimed_at": "2026-09-10T13:43:05Z",
               "round_idx": 1,
               "workflow_revision": 18
             },
+            "workflow_candidate_refresh": {
+              "authorizing_status": "quality",
+              "branch": "refine/DRCBAA3A2FC4ABDDCEC2B87473/round-2",
+              "node_id": "default",
+              "original_base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+              "original_candidate_commit": "a5a3f69cc4f94c4c7b410976e27d218fa1ff670b",
+              "previous_gate_evidence": {
+                "constitution_state": "unclassified",
+                "governance_candidate_commit": "",
+                "governance_checked_at": "",
+                "governance_details": "",
+                "governance_message": "",
+                "meta_rule_state": "unclassified",
+                "product_state": "unclassified",
+                "quality_candidate_commit": null,
+                "quality_checked_at": "",
+                "quality_details": "",
+                "quality_message": "",
+                "quality_state": "unclassified",
+                "rule_state": "unclassified"
+              },
+              "refreshed_at": "2026-09-10T14:53:21Z",
+              "replacement_base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+              "replacement_candidate_commit": "99172365aaa3409f10886c3b00bb0026b0ccb790",
+              "round_idx": 1,
+              "state": "refreshed",
+              "workflow_revision": 18,
+              "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRCBAA3A2FC4ABDDCEC2B87473-round-2"
+            },
             "workflow_reconciliation": null,
             "workflow_recovery": null
           }
         ],
-        "status": "implement",
+        "status": "quality",
         "target_branch": "main",
-        "updated": "2026-09-10T13:49:15Z",
-        "workflow_revision": 32
+        "updated": "2026-09-10T14:53:21Z",
+        "workflow_revision": 41
       },
       "system": {
-        "candidate_commit": null,
+        "candidate_commit": "99172365aaa3409f10886c3b00bb0026b0ccb790",
         "node_id": "default",
         "project_root": "/home/buddy/projects/refine-next",
-        "workflow_step": "implement",
+        "workflow_step": "quality",
         "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRCBAA3A2FC4ABDDCEC2B87473-round-2"
       }
     },
     "metadata": {
       "behavior": "EventSkill",
-      "event_operation_id": "1a08b946d1c113c7613",
+      "event_operation_id": "1a08bcf1bf9113c7633",
       "goal_id": "DRCBAA3A2FC4ABDDCEC2B87473",
       "kind": "workflow",
       "node_id": "default",
@@ -1055,14 +1327,14 @@
       "round_idx": 1,
       "target_app_id": "/home/buddy/projects/refine-next",
       "workflow_revision": 18,
-      "workflow_state": "implement"
+      "workflow_state": "quality"
     }
   },
   "bindings": [
     {
       "binding": {
-        "id": "default-implement",
-        "skill_id": "default-implement",
+        "id": "default-quality",
+        "skill_id": "default-quality",
         "enabled": true,
         "mode": "blocking",
         "order": 0,
@@ -1073,10 +1345,10 @@
         "inputs": {}
       },
       "skill": {
-        "id": "default-implement",
-        "name": "Implement",
-        "prompt": "## Implement\n\nImplement the current Goal Round using every accepted plan and attached Skill. Inspect existing code, make the complete change, run appropriate verification, and report evidence for each checklist item. Preserve unrelated changes and historical evidence. Refine owns candidate commits, workflow advancement, Quality, Governance and integration.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
-        "role": "implement",
+        "id": "default-quality",
+        "name": "Quality",
+        "prompt": "## Quality review\n\nIndependently review the finalized plans and candidate implementation. Select or add meaningful tests, correct defects when needed, and run the relevant checks. Report actual commands, results and findings. Refine verifies the exact candidate and supervises evaluation commands.\n\n## Required behavior\n\nPreserve the relevant Goal and docs/intent product behavior. Keep Model, Application, Infrastructure, and Surfaces coherent; shared capabilities authoritative; local state and evidence inspectable and recoverable; and affected surfaces semantically consistent.\n\n## Review and verification\n\nJudge the candidate against the Goal and only the relevant docs/intent pages. Use the smallest deterministic checks that cover the affected behavior, adding or adjusting behavior-focused tests only when evidence is missing. Scale integration and failure-path checks to actual risk. Report exact commands, results, and remaining uncertainty. Do not require unrelated tests, documentation, refactors, or cleanup; documentation is relevant only when product intent or an architectural contract changes.\n\n## Acceptance checks\n\n- The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
+        "role": "quality",
         "enabled": true,
         "scope": {
           "node_id": null
@@ -1087,147 +1359,11 @@
       "parameters": {}
     }
   ],
-  "state": "succeeded",
-  "results": {
-    "default-implement": {
-      "invocation_id": "a357dabc79bc4ce3c738c937b2c096a65038a717e0b3dbaedeefe51ecb84cc09",
-      "binding_id": "default-implement",
-      "role": "implement",
-      "outcome": "success",
-      "summary": "Implemented durable decisions, rejection, settlement and recovery history, synchronized archival retention, and indexed CLI/API metrics. Verification passed with 33 browser tests skipped because Playwright/Chromium was unavailable.",
-      "evidence": [
-        "Changes remain uncommitted on refine/DRCBAA3A2FC4ABDDCEC2B87473/round-2 at HEAD f880b7767149e4de43d5bc4d4786247d1e536a8c. Candidate creation and integration remain with Refine.",
-        "Round 1 remains at 8f6de519c62a8a373b19482d5c7842068acfb35d with its 50 dirty entries preserved. The serving installation was not deployed or restarted.",
-        "Verification logs and file fingerprints are retained under /tmp/refine-r2-complete, /tmp/refine-r2-verified, and /tmp/refine-r2-final. The successful workflow rerun is /tmp/refine-r2-workflow-fixed.log."
-      ],
-      "artifacts": {
-        "implementation_evidence": {
-          "checklist": [
-            {
-              "evidence": "Used the pinned Round 2 worktree. Selectively adapted Round 1 audit and fixture ideas while replacing completion inference and persistence hooks; preserved Round 1.",
-              "id": "workflow.plan.enter:default-plan:P1",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Added backward-compatible Goal audit types and validation in focused model/goal modules, including immutable decisions, submissions, settlements, reopening, attribution, and explicit completion authority.",
-              "id": "workflow.plan.enter:default-plan:P2",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Shared review operations fence identity, revision, generation, ownership, Round and candidate. Duplicate, contradictory and concurrent submission tests pass. Injected replacement failure preserves the original Goal bytes.",
-              "id": "workflow.plan.enter:default-plan:P3",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Deferred Event transitions retain pending requests and original submission times. Acceptance and rejection settle atomically after gate revalidation; failure, cancellation and supersession create no completed human decision.",
-              "id": "workflow.plan.enter:default-plan:P4",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Extracted shared integration proof validation with repository-to-Goal lock ordering, exact-candidate ancestry and publication checks. Generic Done/Rejected writes are rejected; approval does not reintegrate.",
-              "id": "workflow.plan.enter:default-plan:P5",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Added Rejected across workflow, projections, filters, browser presentation and trigger catalog. Tests verify Feature blocking and explicit new-Round recovery while preserving rejection history.",
-              "id": "workflow.plan.enter:default-plan:P6",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "CLI approve/reject, API approve/verify/reject, browser and bulk requests use shared decisions. CLI/API parity and browser request persistence across reloads and transport retries pass.",
-              "id": "workflow.plan.enter:default-plan:P7",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Authoritative terminal writes capture settlement evidence before mutable failure fields clear. Skill findings, execution errors and repaired output failures persist independently. Automatic acceptance records pinned Skill authority without creating human decisions.",
-              "id": "workflow.plan.enter:default-plan:P8",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Reopening retains prior settlements and records explicit recovery lineage. Tests cover automatic recovery, same-Round retry, rejection recovery, legacy recovery and cancellation before any Round; known zero Round counts remain zero.",
-              "id": "workflow.plan.enter:default-plan:P9",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Semantic no-op writes preserve Goal timestamps and revisions. Comparison ignores only top-level bookkeeping; original audit timestamps and attribution survive metadata changes and synchronization.",
-              "id": "workflow.plan.enter:default-plan:P10",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Sync unions immutable identities and validates hydration, structural merges, agent resolutions and explicit authority. Tests reject identity edits and competing settlements, and retain both histories during live/remote first-contact recovery.",
-              "id": "workflow.plan.enter:default-plan:P11",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Supported deletion archives audit and coverage metadata first. Repeated archives are identical; failed or corrupt archives prevent deletion. Sync tests verify archive-first deletion propagation and preservation of original settlements.",
-              "id": "workflow.plan.enter:default-plan:P12",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Added compact projections, incremental index updates, bounded aggregate caches and recoverable write markers. Tests exercise interrupted index recovery and confirm zero history-file reads during routine queries.",
-              "id": "workflow.plan.enter:default-plan:P13",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Shared metrics power refine metrics and GET /work/metrics, with UTC ranges, day/week/month buckets, historical grouping, current outcomes and a separate settlement-event series.",
-              "id": "workflow.plan.enter:default-plan:P14",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Reports expose numerators, denominators, exclusions, nullable rates and missing-data coverage. Legacy timestamps and human acceptance are not inferred from updated or integration evidence.",
-              "id": "workflow.plan.enter:default-plan:P15",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Added behavioral tests for review gates, proof, retries, concurrency, cancellation, recovery, Feature ordering, sync, retention and legacy records, plus record/index/archive fault injection and invocation-journal recovery.",
-              "id": "workflow.plan.enter:default-plan:P16",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Six-Goal fixture verifies decisions 3/1, acceptance 3/4, automatic/failure rates 1/6, first-Round success 2/6 and average Rounds 8/6. Benchmark: 10,000 three-Round Goals; cold 2243.692 ms, warm 0.171 ms, incremental 42.078 ms; routine history reads zero.",
-              "id": "workflow.plan.enter:default-plan:P17",
-              "outcome": "completed"
-            },
-            {
-              "evidence": "Updated affected intent pages. Requested verification completed with the results below; earlier failures were corrected or resolved by serialized reruns. Formatting passed for 78 changed Rust files, with no tracked or untracked whitespace findings.",
-              "id": "workflow.plan.enter:default-plan:P18",
-              "outcome": "completed"
-            }
-          ],
-          "verification": [
-            "cargo check --all-targets --locked: passed.",
-            "cargo test --lib application::work_items -- --test-threads=1: 62 passed.",
-            "cargo test --lib application::events -- --test-threads=1: 21 passed.",
-            "cargo test --lib application::workflow -- --test-threads=1: 174 passed.",
-            "cargo test --lib application::persistence_sync -- --test-threads=1: 113 passed.",
-            "cargo test --lib application::projects::projection -- --test-threads=1: 20 passed.",
-            "cargo test --lib model::workflow -- --test-threads=1: 4 passed.",
-            "cargo test --lib model::feature -- --test-threads=1: 4 passed.",
-            "cargo test --lib surfaces::web_server -- --test-threads=1: 169 passed.",
-            "cargo test --test sync_regressions --test sync_simulation -- --test-threads=1: 5 and 26 passed.",
-            "cargo run --manifest-path xtask/Cargo.toml -- test-cli: 1 suite passed, including approval, rejection, identical retries, archival and metrics.",
-            "cargo run --manifest-path xtask/Cargo.toml -- test-browser: 212 passed, 0 failed, 33 skipped because Playwright/Chromium was unavailable.",
-            "cargo run --manifest-path xtask/Cargo.toml -- check-static-assets: passed; 66 assets present.",
-            "cargo test --lib application::work_items::tests::metrics -- --test-threads=1 --nocapture: 2 passed; fixture totals, boundaries, grouping, empty populations and benchmark verified.",
-            "Changed-file rustfmt --check: passed for 78 Rust files. git diff --check and whitespace checks for 28 untracked files: passed."
-          ]
-        }
-      }
-    }
-  },
-  "attempts": [
-    {
-      "attempt": 0,
-      "binding_id": "default-implement",
-      "diagnostic": null,
-      "operation_id": null,
-      "process_id": "proc-1789048155461-1129590-135",
-      "raw_output": "{\n  \"binding_id\": \"default-implement\",\n  \"invocation_id\": \"a357dabc79bc4ce3c738c937b2c096a65038a717e0b3dbaedeefe51ecb84cc09\",\n  \"role\": \"implement\",\n  \"outcome\": \"success\",\n  \"summary\": \"Implemented durable decisions, rejection, settlement and recovery history, synchronized archival retention, and indexed CLI/API metrics. Verification passed with 33 browser tests skipped because Playwright/Chromium was unavailable.\",\n  \"evidence\": [\n    \"Changes remain uncommitted on refine/DRCBAA3A2FC4ABDDCEC2B87473/round-2 at HEAD f880b7767149e4de43d5bc4d4786247d1e536a8c. Candidate creation and integration remain with Refine.\",\n    \"Round 1 remains at 8f6de519c62a8a373b19482d5c7842068acfb35d with its 50 dirty entries preserved. The serving installation was not deployed or restarted.\",\n    \"Verification logs and file fingerprints are retained under /tmp/refine-r2-complete, /tmp/refine-r2-verified, and /tmp/refine-r2-final. The successful workflow rerun is /tmp/refine-r2-workflow-fixed.log.\"\n  ],\n  \"artifacts\": {\n    \"implementation_evidence\": {\n      \"checklist\": [\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P1\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Used the pinned Round 2 worktree. Selectively adapted Round 1 audit and fixture ideas while replacing completion inference and persistence hooks; preserved Round 1.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P2\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Added backward-compatible Goal audit types and validation in focused model/goal modules, including immutable decisions, submissions, settlements, reopening, attribution, and explicit completion authority.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P3\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Shared review operations fence identity, revision, generation, ownership, Round and candidate. Duplicate, contradictory and concurrent submission tests pass. Injected replacement failure preserves the original Goal bytes.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P4\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Deferred Event transitions retain pending requests and original submission times. Acceptance and rejection settle atomically after gate revalidation; failure, cancellation and supersession create no completed human decision.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P5\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Extracted shared integration proof validation with repository-to-Goal lock ordering, exact-candidate ancestry and publication checks. Generic Done/Rejected writes are rejected; approval does not reintegrate.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P6\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Added Rejected across workflow, projections, filters, browser presentation and trigger catalog. Tests verify Feature blocking and explicit new-Round recovery while preserving rejection history.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P7\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"CLI approve/reject, API approve/verify/reject, browser and bulk requests use shared decisions. CLI/API parity and browser request persistence across reloads and transport retries pass.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P8\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Authoritative terminal writes capture settlement evidence before mutable failure fields clear. Skill findings, execution errors and repaired output failures persist independently. Automatic acceptance records pinned Skill authority without creating human decisions.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P9\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Reopening retains prior settlements and records explicit recovery lineage. Tests cover automatic recovery, same-Round retry, rejection recovery, legacy recovery and cancellation before any Round; known zero Round counts remain zero.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P10\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Semantic no-op writes preserve Goal timestamps and revisions. Comparison ignores only top-level bookkeeping; original audit timestamps and attribution survive metadata changes and synchronization.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P11\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Sync unions immutable identities and validates hydration, structural merges, agent resolutions and explicit authority. Tests reject identity edits and competing settlements, and retain both histories during live/remote first-contact recovery.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P12\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Supported deletion archives audit and coverage metadata first. Repeated archives are identical; failed or corrupt archives prevent deletion. Sync tests verify archive-first deletion propagation and preservation of original settlements.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P13\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Added compact projections, incremental index updates, bounded aggregate caches and recoverable write markers. Tests exercise interrupted index recovery and confirm zero history-file reads during routine queries.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P14\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Shared metrics power refine metrics and GET /work/metrics, with UTC ranges, day/week/month buckets, historical grouping, current outcomes and a separate settlement-event series.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P15\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Reports expose numerators, denominators, exclusions, nullable rates and missing-data coverage. Legacy timestamps and human acceptance are not inferred from updated or integration evidence.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P16\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Added behavioral tests for review gates, proof, retries, concurrency, cancellation, recovery, Feature ordering, sync, retention and legacy records, plus record/index/archive fault injection and invocation-journal recovery.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P17\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Six-Goal fixture verifies decisions 3/1, acceptance 3/4, automatic/failure rates 1/6, first-Round success 2/6 and average Rounds 8/6. Benchmark: 10,000 three-Round Goals; cold 2243.692 ms, warm 0.171 ms, incremental 42.078 ms; routine history reads zero.\"\n        },\n        {\n          \"id\": \"workflow.plan.enter:default-plan:P18\",\n          \"outcome\": \"completed\",\n          \"evidence\": \"Updated affected intent pages. Requested verification completed with the results below; earlier failures were corrected or resolved by serialized reruns. Formatting passed for 78 changed Rust files, with no tracked or untracked whitespace findings.\"\n        }\n      ],\n      \"verification\": [\n        \"cargo check --all-targets --locked: passed.\",\n        \"cargo test --lib application::work_items -- --test-threads=1: 62 passed.\",\n        \"cargo test --lib application::events -- --test-threads=1: 21 passed.\",\n        \"cargo test --lib application::workflow -- --test-threads=1: 174 passed.\",\n        \"cargo test --lib application::persistence_sync -- --test-threads=1: 113 passed.\",\n        \"cargo test --lib application::projects::projection -- --test-threads=1: 20 passed.\",\n        \"cargo test --lib model::workflow -- --test-threads=1: 4 passed.\",\n        \"cargo test --lib model::feature -- --test-threads=1: 4 passed.\",\n        \"cargo test --lib surfaces::web_server -- --test-threads=1: 169 passed.\",\n        \"cargo test --test sync_regressions --test sync_simulation -- --test-threads=1: 5 and 26 passed.\",\n        \"cargo run --manifest-path xtask/Cargo.toml -- test-cli: 1 suite passed, including approval, rejection, identical retries, archival and metrics.\",\n        \"cargo run --manifest-path xtask/Cargo.toml -- test-browser: 212 passed, 0 failed, 33 skipped because Playwright/Chromium was unavailable.\",\n        \"cargo run --manifest-path xtask/Cargo.toml -- check-static-assets: passed; 66 assets present.\",\n        \"cargo test --lib application::work_items::tests::metrics -- --test-threads=1 --nocapture: 2 passed; fixture totals, boundaries, grouping, empty populations and benchmark verified.\",\n        \"Changed-file rustfmt --check: passed for 78 Rust files. git diff --check and whitespace checks for 28 untracked files: passed.\"\n      ]\n    }\n  }\n}\n",
-      "workflow_revision": 18
-    }
-  ],
-  "created_at": "2026-09-10T13:49:15.404858075+00:00",
-  "completed_at": "2026-09-10T14:53:19.943630080+00:00",
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-10T14:53:21.255419129+00:00",
+  "completed_at": null,
   "error": null,
   "action_applied": false
 }
