@@ -1030,11 +1030,44 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-governance": {
+      "invocation_id": "09d1252bd78a8477915a8d0898ce55782cc3ec3272c51bb6dc70e1350310c6af",
+      "binding_id": "default-governance",
+      "role": "governance",
+      "outcome": "success",
+      "summary": "No evidenced violations found in the exact candidate. The implementation follows the accepted plan and affected architectural and surface intent.",
+      "evidence": [
+        "Verified clean worktree and HEAD b6dfd178b0f4bac23f1b018e7c3510c04560f636. Reviewed the complete nine-file diff against base 47a0059f14971ba766b231183bd5cb1a218450f8, accepted plan P1–P5, implementation report, and Quality evidence.",
+        "Compared the candidate with docs/intent/01-design.md and the Terminal, Toolbar, and Command Palette intent. The change preserves shared terminal ownership and native CLI shortcut semantics without introducing workflow, persistence, provider, or backend policy.",
+        "terminal-keyboard.js:3–24 preserves Alt+Up/Down bytes through the existing xterm hook, checks focus and renderer identity, and consumes matching gestures after session exit or loss. All four extracted helpers are byte-for-byte unchanged. Production and explicit test loaders include the new cohesive module.",
+        "toolbar.js:1586–1608 validates session identity and exit both at flush and immediately before deferred transmission. Browser regressions cover exit before flush and session invalidation behind a pending request.",
+        "git range-diff confirms both implementation and Quality patches are unchanged by the target refresh. Supplied Quality proof explicitly checks b6dfd178b0f4bac23f1b018e7c3510c04560f636 and records 137 passing focused tests, zero failures or skips, plus successful formatting and whitespace checks.",
+        "Read retained Quality logs under /tmp/refine-alt-arrows-quality-ANG0CA: baseline Linux and Windows fixtures emit ESC[1;5A instead of ESC[1;3A; corrected keyboard tests pass 20/20. Earlier full verification records 319 passing web tests and 1159 passing Rust tests with six ignored. These broader results precede the refresh; native Codex and physical Windows/macOS testing were not claimed.",
+        "Candidate whitespace check passed. No files, Goal state, branches, or commits were changed.",
+        "Proposed verification command, not executed during this observational review: with HEAD pinned to b6dfd178b0f4bac23f1b018e7c3510c04560f636, run NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal_keyboard.test.js tests/web_terminal_keyboard_browser.test.js."
+      ],
+      "artifacts": {
+        "recovery_analysis": null,
+        "recovery_round_prompt": null,
+        "violations": []
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-governance",
+      "diagnostic": null,
+      "operation_id": null,
+      "process_id": "proc-1789059661468-1129590-1227",
+      "raw_output": "{\n  \"artifacts\": {\n    \"recovery_analysis\": null,\n    \"recovery_round_prompt\": null,\n    \"violations\": []\n  },\n  \"binding_id\": \"default-governance\",\n  \"evidence\": [\n    \"Verified clean worktree and HEAD b6dfd178b0f4bac23f1b018e7c3510c04560f636. Reviewed the complete nine-file diff against base 47a0059f14971ba766b231183bd5cb1a218450f8, accepted plan P1–P5, implementation report, and Quality evidence.\",\n    \"Compared the candidate with docs/intent/01-design.md and the Terminal, Toolbar, and Command Palette intent. The change preserves shared terminal ownership and native CLI shortcut semantics without introducing workflow, persistence, provider, or backend policy.\",\n    \"terminal-keyboard.js:3–24 preserves Alt+Up/Down bytes through the existing xterm hook, checks focus and renderer identity, and consumes matching gestures after session exit or loss. All four extracted helpers are byte-for-byte unchanged. Production and explicit test loaders include the new cohesive module.\",\n    \"toolbar.js:1586–1608 validates session identity and exit both at flush and immediately before deferred transmission. Browser regressions cover exit before flush and session invalidation behind a pending request.\",\n    \"git range-diff confirms both implementation and Quality patches are unchanged by the target refresh. Supplied Quality proof explicitly checks b6dfd178b0f4bac23f1b018e7c3510c04560f636 and records 137 passing focused tests, zero failures or skips, plus successful formatting and whitespace checks.\",\n    \"Read retained Quality logs under /tmp/refine-alt-arrows-quality-ANG0CA: baseline Linux and Windows fixtures emit ESC[1;5A instead of ESC[1;3A; corrected keyboard tests pass 20/20. Earlier full verification records 319 passing web tests and 1159 passing Rust tests with six ignored. These broader results precede the refresh; native Codex and physical Windows/macOS testing were not claimed.\",\n    \"Candidate whitespace check passed. No files, Goal state, branches, or commits were changed.\",\n    \"Proposed verification command, not executed during this observational review: with HEAD pinned to b6dfd178b0f4bac23f1b018e7c3510c04560f636, run NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal_keyboard.test.js tests/web_terminal_keyboard_browser.test.js.\"\n  ],\n  \"invocation_id\": \"09d1252bd78a8477915a8d0898ce55782cc3ec3272c51bb6dc70e1350310c6af\",\n  \"outcome\": \"success\",\n  \"role\": \"governance\",\n  \"summary\": \"No evidenced violations found in the exact candidate. The implementation follows the accepted plan and affected architectural and surface intent.\"\n}\n",
+      "workflow_revision": 2
+    }
+  ],
   "created_at": "2026-09-10T17:01:01.405959719+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-10T17:03:25.060992621+00:00",
   "error": null,
   "action_applied": false
 }

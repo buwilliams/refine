@@ -3,7 +3,7 @@
   "branch_name": "refine/00000T130VC48JK4653MY62004/round-1",
   "candidate_commit": "b6dfd178b0f4bac23f1b018e7c3510c04560f636",
   "created": "2026-09-10T16:16:39Z",
-  "event_generation": 6,
+  "event_generation": 7,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T130VC48JK4653MY62004",
@@ -42,7 +42,7 @@
         "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
       },
       "assignee": "Buddy Williams",
-      "constitution_state": null,
+      "constitution_state": "passed",
       "created": "2026-09-10T16:16:39Z",
       "event_configuration": {
         "events": {
@@ -531,6 +531,35 @@
         }
       },
       "event_results": {
+        "09d1252bd78a8477915a8d0898ce55782cc3ec3272c51bb6dc70e1350310c6af": {
+          "candidate_commit": "b6dfd178b0f4bac23f1b018e7c3510c04560f636",
+          "results": {
+            "default-governance": {
+              "artifacts": {
+                "recovery_analysis": null,
+                "recovery_round_prompt": null,
+                "violations": []
+              },
+              "binding_id": "default-governance",
+              "evidence": [
+                "Verified clean worktree and HEAD b6dfd178b0f4bac23f1b018e7c3510c04560f636. Reviewed the complete nine-file diff against base 47a0059f14971ba766b231183bd5cb1a218450f8, accepted plan P1–P5, implementation report, and Quality evidence.",
+                "Compared the candidate with docs/intent/01-design.md and the Terminal, Toolbar, and Command Palette intent. The change preserves shared terminal ownership and native CLI shortcut semantics without introducing workflow, persistence, provider, or backend policy.",
+                "terminal-keyboard.js:3–24 preserves Alt+Up/Down bytes through the existing xterm hook, checks focus and renderer identity, and consumes matching gestures after session exit or loss. All four extracted helpers are byte-for-byte unchanged. Production and explicit test loaders include the new cohesive module.",
+                "toolbar.js:1586–1608 validates session identity and exit both at flush and immediately before deferred transmission. Browser regressions cover exit before flush and session invalidation behind a pending request.",
+                "git range-diff confirms both implementation and Quality patches are unchanged by the target refresh. Supplied Quality proof explicitly checks b6dfd178b0f4bac23f1b018e7c3510c04560f636 and records 137 passing focused tests, zero failures or skips, plus successful formatting and whitespace checks.",
+                "Read retained Quality logs under /tmp/refine-alt-arrows-quality-ANG0CA: baseline Linux and Windows fixtures emit ESC[1;5A instead of ESC[1;3A; corrected keyboard tests pass 20/20. Earlier full verification records 319 passing web tests and 1159 passing Rust tests with six ignored. These broader results precede the refresh; native Codex and physical Windows/macOS testing were not claimed.",
+                "Candidate whitespace check passed. No files, Goal state, branches, or commits were changed.",
+                "Proposed verification command, not executed during this observational review: with HEAD pinned to b6dfd178b0f4bac23f1b018e7c3510c04560f636, run NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal_keyboard.test.js tests/web_terminal_keyboard_browser.test.js."
+              ],
+              "invocation_id": "09d1252bd78a8477915a8d0898ce55782cc3ec3272c51bb6dc70e1350310c6af",
+              "outcome": "success",
+              "role": "governance",
+              "summary": "No evidenced violations found in the exact candidate. The implementation follows the accepted plan and affected architectural and surface intent."
+            }
+          },
+          "source": "workflow.governance.enter",
+          "state": "succeeded"
+        },
         "10244785817b2200dff3434ba7ec7a07e4dcd0ec9610b5ebc7ce91e850312b35": {
           "candidate_commit": null,
           "results": {
@@ -715,10 +744,42 @@
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
-      "governance_candidate_commit": null,
-      "governance_checked_at": null,
-      "governance_details": null,
-      "governance_message": null,
+      "governance_candidate_commit": "b6dfd178b0f4bac23f1b018e7c3510c04560f636",
+      "governance_checked_at": "2026-09-10T17:03:25Z",
+      "governance_details": {
+        "candidate_commit": "b6dfd178b0f4bac23f1b018e7c3510c04560f636",
+        "configured": true,
+        "failed_actions": [],
+        "phase": "post_implementation",
+        "skill_results": [
+          {
+            "artifacts": {
+              "recovery_analysis": null,
+              "recovery_round_prompt": null,
+              "violations": []
+            },
+            "binding_id": "workflow.governance.enter:default-governance",
+            "evidence": [
+              "Verified clean worktree and HEAD b6dfd178b0f4bac23f1b018e7c3510c04560f636. Reviewed the complete nine-file diff against base 47a0059f14971ba766b231183bd5cb1a218450f8, accepted plan P1–P5, implementation report, and Quality evidence.",
+              "Compared the candidate with docs/intent/01-design.md and the Terminal, Toolbar, and Command Palette intent. The change preserves shared terminal ownership and native CLI shortcut semantics without introducing workflow, persistence, provider, or backend policy.",
+              "terminal-keyboard.js:3–24 preserves Alt+Up/Down bytes through the existing xterm hook, checks focus and renderer identity, and consumes matching gestures after session exit or loss. All four extracted helpers are byte-for-byte unchanged. Production and explicit test loaders include the new cohesive module.",
+              "toolbar.js:1586–1608 validates session identity and exit both at flush and immediately before deferred transmission. Browser regressions cover exit before flush and session invalidation behind a pending request.",
+              "git range-diff confirms both implementation and Quality patches are unchanged by the target refresh. Supplied Quality proof explicitly checks b6dfd178b0f4bac23f1b018e7c3510c04560f636 and records 137 passing focused tests, zero failures or skips, plus successful formatting and whitespace checks.",
+              "Read retained Quality logs under /tmp/refine-alt-arrows-quality-ANG0CA: baseline Linux and Windows fixtures emit ESC[1;5A instead of ESC[1;3A; corrected keyboard tests pass 20/20. Earlier full verification records 319 passing web tests and 1159 passing Rust tests with six ignored. These broader results precede the refresh; native Codex and physical Windows/macOS testing were not claimed.",
+              "Candidate whitespace check passed. No files, Goal state, branches, or commits were changed.",
+              "Proposed verification command, not executed during this observational review: with HEAD pinned to b6dfd178b0f4bac23f1b018e7c3510c04560f636, run NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal_keyboard.test.js tests/web_terminal_keyboard_browser.test.js."
+            ],
+            "invocation_id": "09d1252bd78a8477915a8d0898ce55782cc3ec3272c51bb6dc70e1350310c6af",
+            "outcome": "success",
+            "role": "governance",
+            "summary": "No evidenced violations found in the exact candidate. The implementation follows the accepted plan and affected architectural and surface intent."
+          }
+        ],
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T130VC48JK4653MY62004-round-1"
+      },
+      "governance_message": "Governance checks passed.",
+      "governance_recovery_analysis": null,
+      "governance_recovery_round_prompt": null,
       "governance_rule_actions": [],
       "guidance_decision": {
         "applied": [],
@@ -867,8 +928,8 @@
       "implementation_report": "workflow.implement.enter:default-implement: Implemented shared Alt+Up/Down modifier preservation and completed verification. Changes remain uncommitted for Refine’s candidate and Quality workflow.",
       "implementation_reported_at": "2026-09-10T16:42:56Z",
       "logs": [],
-      "meta_rule_state": null,
-      "product_state": null,
+      "meta_rule_state": "passed",
+      "product_state": "passed",
       "prompt": "In the Web UI, the toolbar agent, \"Alt + Up\" isn't working right now, but is required for Codex agents.",
       "quality_agent_report": "workflow.quality.enter:default-quality: Corrected a shared input-queue lifecycle defect, added two browser regressions, and passed all required checks. No unresolved findings.",
       "quality_candidate_commit": "b6dfd178b0f4bac23f1b018e7c3510c04560f636",
@@ -1017,13 +1078,9 @@
       ],
       "quality_state": "passed",
       "reporter": "Buddy Williams",
-      "rule_state": null,
-      "updated": "2026-09-10T17:01:01Z",
-      "workflow_attempt_authority": {
-        "claimed_at": "2026-09-10T16:22:58Z",
-        "round_idx": 0,
-        "workflow_revision": 2
-      },
+      "rule_state": "passed",
+      "updated": "2026-09-10T17:03:30Z",
+      "workflow_attempt_authority": null,
       "workflow_candidate_refresh": {
         "authorizing_status": "governance",
         "branch": "refine/00000T130VC48JK4653MY62004/round-1",
@@ -1129,13 +1186,27 @@
         "workflow_revision": 2,
         "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T130VC48JK4653MY62004-round-1"
       },
+      "workflow_git_remote": "origin",
+      "workflow_integration": {
+        "candidate_commit": "b6dfd178b0f4bac23f1b018e7c3510c04560f636",
+        "integrated_at": "2026-09-10T17:03:29.742197033+00:00",
+        "merge": {
+          "conflicts": [],
+          "message": "Merge made by the 'ort' strategy.\n docs/intent/05-surfaces/03-browser/19-terminal.md  |   3 +\n src/surfaces/web/static/index.html                 |   1 +\n .../web/static/js/features/terminal-keyboard.js    |  97 +++++++\n src/surfaces/web/static/js/features/toolbar.js     |  81 +-----\n tests/support/terminal_clipboard_runtime.js        |   1 +\n tests/web_goal_log_tail.test.js                    |   1 +\n tests/web_supervisor_toolbar.test.js               |   1 +\n tests/web_terminal_keyboard.test.js                |  93 +++++++\n tests/web_terminal_keyboard_browser.test.js        | 301 +++++++++++++++++++++\n 9 files changed, 503 insertions(+), 76 deletions(-)\n create mode 100644 src/surfaces/web/static/js/features/terminal-keyboard.js\n create mode 100644 tests/web_terminal_keyboard.test.js\n create mode 100644 tests/web_terminal_keyboard_browser.test.js",
+          "ok": true
+        },
+        "pushed": true,
+        "remote": "origin",
+        "target_branch": "main",
+        "target_commit": "b6527c2d1e847a37e450aea8ceb6dce040aaec63"
+      },
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "governance",
+  "status": "review",
   "target_branch": "main",
-  "updated": "2026-09-10T17:01:01Z",
+  "updated": "2026-09-10T17:03:30Z",
   "workflow_events": [
     {
       "at": "2026-09-10T16:16:39.697881485+00:00",
@@ -1190,7 +1261,16 @@
       "node_id": "default",
       "round_idx": 0,
       "to": "governance"
+    },
+    {
+      "at": "2026-09-10T17:03:30.134254343+00:00",
+      "forced": false,
+      "from": "governance",
+      "generation": 7,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "review"
     }
   ],
-  "workflow_revision": 34
+  "workflow_revision": 41
 }
