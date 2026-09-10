@@ -3,7 +3,7 @@
   "branch_name": "refine/DR07C216F3E4EC22A57C60BE0B/round-6",
   "candidate_commit": "3fb8b4bf8377f07a4acc7d1e18b8f8e7ea8abbd9",
   "created": "2026-09-10T08:26:00Z",
-  "event_generation": 21,
+  "event_generation": 22,
   "feature_id": "00000T130Z0R6J0GJMARY62005",
   "feature_order": 2,
   "id": "DR07C216F3E4EC22A57C60BE0B",
@@ -9123,9 +9123,102 @@
       "prompt": "Preserve the candidate and prior evidence. Correct standard run_to_completion capture in src/infrastructure/process/subprocess/execution.rs so a validated workload-exit receipt starts bounded output finalization rather than an indefinite wait for descendant-held pipes. Keep the guardian alive, retain capacity and artifacts while ownership remains pending, preserve workload status and captured output, and report incomplete capture explicitly. Avoid unbounded reader joins and preserve timeout enforcement through settlement. Add deterministic regressions with a setsid descendant retaining stdout, stderr, and both after leader exit, including quiet and continuously writing descendants. Assert bounded return, actual descendant state, retained capacity and artifacts, and eventual release only after trustworthy scope-exit proof. Through supported supervision, run cargo test --lib infrastructure::process::subprocess -- --test-threads=1 and cargo test --lib worker_liveness -- --test-threads=1, followed by the required candidate checks. Retain existing PTY, identity, settlement and retention regressions. Refine owns candidate capture and advancement.",
       "quality_agent_report": "workflow.quality.enter:default-quality: Reviewed the candidate independently. No additional defects found; all required Linux checks passed.",
       "quality_candidate_commit": "3fb8b4bf8377f07a4acc7d1e18b8f8e7ea8abbd9",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
+      "quality_checked_at": "2026-09-10T21:56:01Z",
+      "quality_details": {
+        "candidate_commit": "3fb8b4bf8377f07a4acc7d1e18b8f8e7ea8abbd9",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR07C216F3E4EC22A57C60BE0B-round-4",
+        "diagnostics": [
+          "Event invocation 1bf267b01edc88075f4c208fbe92293de2ddfbfd8a3276d80ab05332fe6d2bd4: automation/invocations/1bf267b01edc88075f4c208fbe92293de2ddfbfd8a3276d80ab05332fe6d2bd4.json",
+          "Observed supervised process proc-1789077328835-1129590-1560 exited 0. stdout: ts_no_progress ... ok\ntest infrastructure::process::subprocess::tests::registry::file_process_supervisor_archives_launched_process_exit_and_output ... ok\ntest infrastructure::process::subprocess::tests::registry::file_process_supervisor_cleans_deferred_artifacts_after_handoff_release ... ok\ntest infrastructure::process::subprocess::tests::registry::file_process_supervisor_keeps_process_launch_separate_from_workflow_pause_and_recovers_stale_processes ... ok\ntest infrastructure::process::subprocess::tests::registry::file_process_supervisor_recovery_does_not_steal_completion_status ... ok\ntest infrastructure::process::subprocess::tests::registry::file_process_supervisor_tracks_running_processes_and_pause_state ... ok\ntest infrastructure::process::subprocess::tests::security::file_process_supervisor_enforces_allowed_commands ... ok\ntest infrastructure::process::subprocess::tests::security::file_process_supervisor_redacts_managed_prompt_argv_and_stdin_only ... ok\ntest infrastructure::process::subprocess::tests::security::file_process_supervisor_redacts_sensitive_process_details_and_stdin ... ok\ntest infrastructure::process::subprocess::tests::security::file_process_supervisor_strips_direct_api_keys_from_agent_processes ... ok\ntest infrastructure::process::subprocess::tests::security::managed_child_observes_the_exact_preflighted_effective_environment ... ok\ntest infrastructure::process::subprocess::tests::security::supervised_quality_command_discovers_only_allowlisted_shell_tools ... ok\ntest infrastructure::process::subprocess::tests::termination::file_process_supervisor_signals_registered_os_process ... ok\ntest infrastructure::process::subprocess::tests::termination::managed_completion_timeout_bounds_a_process_that_keeps_producing_output ... ok\ntest infrastructure::process::subprocess::tests::termination::requested_termination_keeps_registry_truth_until_process_exit ... ok\n\ntest result: ok. 42 passed; 0 failed; 0 ignored; 0 measured; 1251 filtered out; finished in 11.20s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+          "Observed supervised process proc-1789077340253-1129590-1563 exited 0. stdout: running 12 tests\ntest application::workflow::tests::worker_liveness::preparation_execution_and_settlement_panics_cannot_strand_active_entries ... ok\ntest application::workflow::tests::worker_liveness::preparation_fault_before_claim_preserves_goal_intent_and_releases_its_slot ... ok\ntest application::workflow::tests::worker_liveness::pty::pty_failure_admits_followup_within_poll_only_after_scope_release ... ok\ntest application::workflow::tests::worker_liveness::scheduling::blocked_preparation_keeps_real_controller_ticks_and_reserves_its_slot ... ok\ntest application::workflow::tests::worker_liveness::scheduling::completion_invalidates_an_empty_discovery_captured_before_capacity_was_released ... ok\ntest application::workflow::tests::worker_liveness::scheduling::one_failed_attempt_releases_capacity_within_one_poll_while_another_goal_stays_active ... ok\ntest application::workflow::tests::worker_liveness::scheduling::scheduler_recovers_transient_discovery_error_while_other_goal_is_alive ... ok\ntest application::workflow::tests::worker_liveness::settlement_evidence::settlement_panics_preserve_supersession_and_structured_fallback_without_delaying_followup ... ok\ntest application::workflow::tests::worker_liveness::settlement_evidence::stale_authority_errors_still_finalize_originating_evidence ... ok\ntest application::workflow::tests::worker_liveness::standard_capture::standard_capture_returns_while_pending_scope_blocks_followup_until_proven_release ... ok\ntest application::workflow::tests::worker_liveness::superseded_failure_preserves_new_intent_and_admits_followup_within_poll ... ok\ntest application::workflow::tests::worker_liveness::transient_settlement_rechecks_authority_and_exhausted_writes_release_capacity ... ok\n\ntest result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 1281 filtered out; finished in 19.20s stderr: tlement\":{\"unpersisted_evidence\":\"settlement panicked: injected originating settlement fault\"},\"runtime_evidence_persisted\":false,\"write_fault\":\"runtime evidence finalization panicked: injected write panic\",\"final_outcome\":{\"unpersisted_evidence\":\"UnpersistedEvidence(\\\"settlement panicked: injected originating settlement fault\\\"); runtime evidence: runtime evidence finalization panicked: injected write panic\"}}\nrefine workflow evidence: {\"goal_id\":\"GOAL2\",\"round_idx\":0,\"workflow_revision\":3,\"failure_stage\":\"workflow\",\"failure_at\":\"2026-09-10T21:55:55Z\",\"original_error\":\"originating integration error\",\"settlement\":\"authoritative_failure\",\"runtime_evidence_persisted\":false,\"write_fault\":\"File exists (os error 17)\",\"final_outcome\":{\"unpersisted_evidence\":\"AuthoritativeFailure; runtime evidence: File exists (os error 17)\"}}\nrefine workflow evidence: {\"goal_id\":\"GOAL1\",\"round_idx\":0,\"workflow_revision\":3,\"failure_stage\":\"workflow\",\"failure_at\":\"2026-09-10T21:55:55Z\",\"original_error\":\"workflow attempt was superseded\",\"settlement\":\"superseded_attempt\",\"runtime_evidence_persisted\":true}\nrefine workflow evidence: {\"goal_id\":\"GOAL1\",\"round_idx\":0,\"workflow_revision\":3,\"failure_stage\":\"workflow\",\"failure_at\":\"2026-09-10T21:55:57Z\",\"original_error\":\"Candidate 0a3b31d253b632c0c367954db4b9f993d31f78b8 is stale: recorded base 165bbabe9553af46322eeab79f0021201befc9d5 is not its ancestor\",\"settlement\":\"superseded_attempt\",\"runtime_evidence_persisted\":true}\nrefine workflow evidence: {\"goal_id\":\"GOAL1\",\"round_idx\":0,\"workflow_revision\":3,\"failure_stage\":\"workflow\",\"failure_at\":\"2026-09-10T21:55:58Z\",\"original_error\":\"integration failure\",\"settlement\":\"superseded_attempt\",\"runtime_evidence_persisted\":true}\nrefine workflow evidence: {\"goal_id\":\"GOAL1\",\"round_idx\":0,\"workflow_revision\":3,\"failure_stage\":\"workflow\",\"failure_at\":\"2026-09-10T21:55:59Z\",\"original_error\":\"integration failure\",\"settlement\":{\"unpersisted_evidence\":\"injected persistence fault\"},\"runtime_evidence_persisted\":true}",
+          "Observed supervised process proc-1789077359675-1129590-1566 exited 0.",
+          "Observed supervised process proc-1789077361426-1129590-1569 exited 0."
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "1a08d506bce113c7691",
+        "provider_attempts": [],
+        "quality_proof": {
+          "checked_at": "2026-09-10T21:56:01Z",
+          "checked_candidate_commit": "3fb8b4bf8377f07a4acc7d1e18b8f8e7ea8abbd9",
+          "evaluation_scope": "isolated_candidate",
+          "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+          "operation_id": "1a08d506bce113c7691",
+          "results": [
+            {
+              "command": "cargo test --lib infrastructure::process::subprocess -- --test-threads=1",
+              "evidence": "Observed supervised process proc-1789077328835-1129590-1560 exited 0. stdout: ts_no_progress ... ok\ntest infrastructure::process::subprocess::tests::registry::file_process_supervisor_archives_launched_process_exit_and_output ... ok\ntest infrastructure::process::subprocess::tests::registry::file_process_supervisor_cleans_deferred_artifacts_after_handoff_release ... ok\ntest infrastructure::process::subprocess::tests::registry::file_process_supervisor_keeps_process_launch_separate_from_workflow_pause_and_recovers_stale_processes ... ok\ntest infrastructure::process::subprocess::tests::registry::file_process_supervisor_recovery_does_not_steal_completion_status ... ok\ntest infrastructure::process::subprocess::tests::registry::file_process_supervisor_tracks_running_processes_and_pause_state ... ok\ntest infrastructure::process::subprocess::tests::security::file_process_supervisor_enforces_allowed_commands ... ok\ntest infrastructure::process::subprocess::tests::security::file_process_supervisor_redacts_managed_prompt_argv_and_stdin_only ... ok\ntest infrastructure::process::subprocess::tests::security::file_process_supervisor_redacts_sensitive_process_details_and_stdin ... ok\ntest infrastructure::process::subprocess::tests::security::file_process_supervisor_strips_direct_api_keys_from_agent_processes ... ok\ntest infrastructure::process::subprocess::tests::security::managed_child_observes_the_exact_preflighted_effective_environment ... ok\ntest infrastructure::process::subprocess::tests::security::supervised_quality_command_discovers_only_allowlisted_shell_tools ... ok\ntest infrastructure::process::subprocess::tests::termination::file_process_supervisor_signals_registered_os_process ... ok\ntest infrastructure::process::subprocess::tests::termination::managed_completion_timeout_bounds_a_process_that_keeps_producing_output ... ok\ntest infrastructure::process::subprocess::tests::termination::requested_termination_keeps_registry_truth_until_process_exit ... ok\n\ntest result: ok. 42 passed; 0 failed; 0 ignored; 0 measured; 1251 filtered out; finished in 11.20s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+              "exit_code": 0,
+              "process_id": "proc-1789077328835-1129590-1560",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Bounded capture and retained descendant ownership"
+            },
+            {
+              "command": "cargo test --lib worker_liveness -- --test-threads=1",
+              "evidence": "Observed supervised process proc-1789077340253-1129590-1563 exited 0. stdout: running 12 tests\ntest application::workflow::tests::worker_liveness::preparation_execution_and_settlement_panics_cannot_strand_active_entries ... ok\ntest application::workflow::tests::worker_liveness::preparation_fault_before_claim_preserves_goal_intent_and_releases_its_slot ... ok\ntest application::workflow::tests::worker_liveness::pty::pty_failure_admits_followup_within_poll_only_after_scope_release ... ok\ntest application::workflow::tests::worker_liveness::scheduling::blocked_preparation_keeps_real_controller_ticks_and_reserves_its_slot ... ok\ntest application::workflow::tests::worker_liveness::scheduling::completion_invalidates_an_empty_discovery_captured_before_capacity_was_released ... ok\ntest application::workflow::tests::worker_liveness::scheduling::one_failed_attempt_releases_capacity_within_one_poll_while_another_goal_stays_active ... ok\ntest application::workflow::tests::worker_liveness::scheduling::scheduler_recovers_transient_discovery_error_while_other_goal_is_alive ... ok\ntest application::workflow::tests::worker_liveness::settlement_evidence::settlement_panics_preserve_supersession_and_structured_fallback_without_delaying_followup ... ok\ntest application::workflow::tests::worker_liveness::settlement_evidence::stale_authority_errors_still_finalize_originating_evidence ... ok\ntest application::workflow::tests::worker_liveness::standard_capture::standard_capture_returns_while_pending_scope_blocks_followup_until_proven_release ... ok\ntest application::workflow::tests::worker_liveness::superseded_failure_preserves_new_intent_and_admits_followup_within_poll ... ok\ntest application::workflow::tests::worker_liveness::transient_settlement_rechecks_authority_and_exhausted_writes_release_capacity ... ok\n\ntest result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 1281 filtered out; finished in 19.20s stderr: tlement\":{\"unpersisted_evidence\":\"settlement panicked: injected originating settlement fault\"},\"runtime_evidence_persisted\":false,\"write_fault\":\"runtime evidence finalization panicked: injected write panic\",\"final_outcome\":{\"unpersisted_evidence\":\"UnpersistedEvidence(\\\"settlement panicked: injected originating settlement fault\\\"); runtime evidence: runtime evidence finalization panicked: injected write panic\"}}\nrefine workflow evidence: {\"goal_id\":\"GOAL2\",\"round_idx\":0,\"workflow_revision\":3,\"failure_stage\":\"workflow\",\"failure_at\":\"2026-09-10T21:55:55Z\",\"original_error\":\"originating integration error\",\"settlement\":\"authoritative_failure\",\"runtime_evidence_persisted\":false,\"write_fault\":\"File exists (os error 17)\",\"final_outcome\":{\"unpersisted_evidence\":\"AuthoritativeFailure; runtime evidence: File exists (os error 17)\"}}\nrefine workflow evidence: {\"goal_id\":\"GOAL1\",\"round_idx\":0,\"workflow_revision\":3,\"failure_stage\":\"workflow\",\"failure_at\":\"2026-09-10T21:55:55Z\",\"original_error\":\"workflow attempt was superseded\",\"settlement\":\"superseded_attempt\",\"runtime_evidence_persisted\":true}\nrefine workflow evidence: {\"goal_id\":\"GOAL1\",\"round_idx\":0,\"workflow_revision\":3,\"failure_stage\":\"workflow\",\"failure_at\":\"2026-09-10T21:55:57Z\",\"original_error\":\"Candidate 0a3b31d253b632c0c367954db4b9f993d31f78b8 is stale: recorded base 165bbabe9553af46322eeab79f0021201befc9d5 is not its ancestor\",\"settlement\":\"superseded_attempt\",\"runtime_evidence_persisted\":true}\nrefine workflow evidence: {\"goal_id\":\"GOAL1\",\"round_idx\":0,\"workflow_revision\":3,\"failure_stage\":\"workflow\",\"failure_at\":\"2026-09-10T21:55:58Z\",\"original_error\":\"integration failure\",\"settlement\":\"superseded_attempt\",\"runtime_evidence_persisted\":true}\nrefine workflow evidence: {\"goal_id\":\"GOAL1\",\"round_idx\":0,\"workflow_revision\":3,\"failure_stage\":\"workflow\",\"failure_at\":\"2026-09-10T21:55:59Z\",\"original_error\":\"integration failure\",\"settlement\":{\"unpersisted_evidence\":\"injected persistence fault\"},\"runtime_evidence_persisted\":true}",
+              "exit_code": 0,
+              "process_id": "proc-1789077340253-1129590-1563",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Failure containment and follow-up admission"
+            },
+            {
+              "command": "cargo fmt --all -- --check",
+              "evidence": "Observed supervised process proc-1789077359675-1129590-1566 exited 0.",
+              "exit_code": 0,
+              "process_id": "proc-1789077359675-1129590-1566",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Candidate formatting"
+            },
+            {
+              "command": "git diff --check a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e HEAD",
+              "evidence": "Observed supervised process proc-1789077361426-1129590-1569 exited 0.",
+              "exit_code": 0,
+              "process_id": "proc-1789077361426-1129590-1569",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Candidate patch whitespace"
+            }
+          ],
+          "round_idx": 5,
+          "schema_version": 1,
+          "source_candidate_commit": "3fb8b4bf8377f07a4acc7d1e18b8f8e7ea8abbd9",
+          "state": "passed"
+        },
+        "results": [
+          {
+            "command": "cargo test --lib infrastructure::process::subprocess -- --test-threads=1",
+            "evidence": "Observed supervised process proc-1789077328835-1129590-1560 exited 0. stdout: ts_no_progress ... ok\ntest infrastructure::process::subprocess::tests::registry::file_process_supervisor_archives_launched_process_exit_and_output ... ok\ntest infrastructure::process::subprocess::tests::registry::file_process_supervisor_cleans_deferred_artifacts_after_handoff_release ... ok\ntest infrastructure::process::subprocess::tests::registry::file_process_supervisor_keeps_process_launch_separate_from_workflow_pause_and_recovers_stale_processes ... ok\ntest infrastructure::process::subprocess::tests::registry::file_process_supervisor_recovery_does_not_steal_completion_status ... ok\ntest infrastructure::process::subprocess::tests::registry::file_process_supervisor_tracks_running_processes_and_pause_state ... ok\ntest infrastructure::process::subprocess::tests::security::file_process_supervisor_enforces_allowed_commands ... ok\ntest infrastructure::process::subprocess::tests::security::file_process_supervisor_redacts_managed_prompt_argv_and_stdin_only ... ok\ntest infrastructure::process::subprocess::tests::security::file_process_supervisor_redacts_sensitive_process_details_and_stdin ... ok\ntest infrastructure::process::subprocess::tests::security::file_process_supervisor_strips_direct_api_keys_from_agent_processes ... ok\ntest infrastructure::process::subprocess::tests::security::managed_child_observes_the_exact_preflighted_effective_environment ... ok\ntest infrastructure::process::subprocess::tests::security::supervised_quality_command_discovers_only_allowlisted_shell_tools ... ok\ntest infrastructure::process::subprocess::tests::termination::file_process_supervisor_signals_registered_os_process ... ok\ntest infrastructure::process::subprocess::tests::termination::managed_completion_timeout_bounds_a_process_that_keeps_producing_output ... ok\ntest infrastructure::process::subprocess::tests::termination::requested_termination_keeps_registry_truth_until_process_exit ... ok\n\ntest result: ok. 42 passed; 0 failed; 0 ignored; 0 measured; 1251 filtered out; finished in 11.20s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.08s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+            "exit_code": 0,
+            "process_id": "proc-1789077328835-1129590-1560",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Bounded capture and retained descendant ownership"
+          },
+          {
+            "command": "cargo test --lib worker_liveness -- --test-threads=1",
+            "evidence": "Observed supervised process proc-1789077340253-1129590-1563 exited 0. stdout: running 12 tests\ntest application::workflow::tests::worker_liveness::preparation_execution_and_settlement_panics_cannot_strand_active_entries ... ok\ntest application::workflow::tests::worker_liveness::preparation_fault_before_claim_preserves_goal_intent_and_releases_its_slot ... ok\ntest application::workflow::tests::worker_liveness::pty::pty_failure_admits_followup_within_poll_only_after_scope_release ... ok\ntest application::workflow::tests::worker_liveness::scheduling::blocked_preparation_keeps_real_controller_ticks_and_reserves_its_slot ... ok\ntest application::workflow::tests::worker_liveness::scheduling::completion_invalidates_an_empty_discovery_captured_before_capacity_was_released ... ok\ntest application::workflow::tests::worker_liveness::scheduling::one_failed_attempt_releases_capacity_within_one_poll_while_another_goal_stays_active ... ok\ntest application::workflow::tests::worker_liveness::scheduling::scheduler_recovers_transient_discovery_error_while_other_goal_is_alive ... ok\ntest application::workflow::tests::worker_liveness::settlement_evidence::settlement_panics_preserve_supersession_and_structured_fallback_without_delaying_followup ... ok\ntest application::workflow::tests::worker_liveness::settlement_evidence::stale_authority_errors_still_finalize_originating_evidence ... ok\ntest application::workflow::tests::worker_liveness::standard_capture::standard_capture_returns_while_pending_scope_blocks_followup_until_proven_release ... ok\ntest application::workflow::tests::worker_liveness::superseded_failure_preserves_new_intent_and_admits_followup_within_poll ... ok\ntest application::workflow::tests::worker_liveness::transient_settlement_rechecks_authority_and_exhausted_writes_release_capacity ... ok\n\ntest result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 1281 filtered out; finished in 19.20s stderr: tlement\":{\"unpersisted_evidence\":\"settlement panicked: injected originating settlement fault\"},\"runtime_evidence_persisted\":false,\"write_fault\":\"runtime evidence finalization panicked: injected write panic\",\"final_outcome\":{\"unpersisted_evidence\":\"UnpersistedEvidence(\\\"settlement panicked: injected originating settlement fault\\\"); runtime evidence: runtime evidence finalization panicked: injected write panic\"}}\nrefine workflow evidence: {\"goal_id\":\"GOAL2\",\"round_idx\":0,\"workflow_revision\":3,\"failure_stage\":\"workflow\",\"failure_at\":\"2026-09-10T21:55:55Z\",\"original_error\":\"originating integration error\",\"settlement\":\"authoritative_failure\",\"runtime_evidence_persisted\":false,\"write_fault\":\"File exists (os error 17)\",\"final_outcome\":{\"unpersisted_evidence\":\"AuthoritativeFailure; runtime evidence: File exists (os error 17)\"}}\nrefine workflow evidence: {\"goal_id\":\"GOAL1\",\"round_idx\":0,\"workflow_revision\":3,\"failure_stage\":\"workflow\",\"failure_at\":\"2026-09-10T21:55:55Z\",\"original_error\":\"workflow attempt was superseded\",\"settlement\":\"superseded_attempt\",\"runtime_evidence_persisted\":true}\nrefine workflow evidence: {\"goal_id\":\"GOAL1\",\"round_idx\":0,\"workflow_revision\":3,\"failure_stage\":\"workflow\",\"failure_at\":\"2026-09-10T21:55:57Z\",\"original_error\":\"Candidate 0a3b31d253b632c0c367954db4b9f993d31f78b8 is stale: recorded base 165bbabe9553af46322eeab79f0021201befc9d5 is not its ancestor\",\"settlement\":\"superseded_attempt\",\"runtime_evidence_persisted\":true}\nrefine workflow evidence: {\"goal_id\":\"GOAL1\",\"round_idx\":0,\"workflow_revision\":3,\"failure_stage\":\"workflow\",\"failure_at\":\"2026-09-10T21:55:58Z\",\"original_error\":\"integration failure\",\"settlement\":\"superseded_attempt\",\"runtime_evidence_persisted\":true}\nrefine workflow evidence: {\"goal_id\":\"GOAL1\",\"round_idx\":0,\"workflow_revision\":3,\"failure_stage\":\"workflow\",\"failure_at\":\"2026-09-10T21:55:59Z\",\"original_error\":\"integration failure\",\"settlement\":{\"unpersisted_evidence\":\"injected persistence fault\"},\"runtime_evidence_persisted\":true}",
+            "exit_code": 0,
+            "process_id": "proc-1789077340253-1129590-1563",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Failure containment and follow-up admission"
+          },
+          {
+            "command": "cargo fmt --all -- --check",
+            "evidence": "Observed supervised process proc-1789077359675-1129590-1566 exited 0.",
+            "exit_code": 0,
+            "process_id": "proc-1789077359675-1129590-1566",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Candidate formatting"
+          },
+          {
+            "command": "git diff --check a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e HEAD",
+            "evidence": "Observed supervised process proc-1789077361426-1129590-1569 exited 0.",
+            "exit_code": 0,
+            "process_id": "proc-1789077361426-1129590-1569",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Candidate patch whitespace"
+          }
+        ],
+        "source_candidate_commit": "3fb8b4bf8377f07a4acc7d1e18b8f8e7ea8abbd9"
+      },
+      "quality_message": "All Quality Skills passed with supervised evidence.",
       "quality_skill_results": [
         {
           "artifacts": {
@@ -9188,10 +9281,10 @@
           "summary": "Reviewed the candidate independently. No additional defects found; all required Linux checks passed."
         }
       ],
-      "quality_state": "unclassified",
+      "quality_state": "passed",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T21:54:12Z",
+      "updated": "2026-09-10T21:56:02Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T20:42:02Z",
         "round_idx": 5,
@@ -9201,9 +9294,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "quality",
+  "status": "governance",
   "target_branch": "main",
-  "updated": "2026-09-10T21:54:12Z",
+  "updated": "2026-09-10T21:56:02Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:37.178169037+00:00",
@@ -9393,7 +9486,16 @@
       "node_id": "default",
       "round_idx": 5,
       "to": "quality"
+    },
+    {
+      "at": "2026-09-10T21:56:02.194387547+00:00",
+      "forced": false,
+      "from": "quality",
+      "generation": 22,
+      "node_id": "default",
+      "round_idx": 5,
+      "to": "governance"
     }
   ],
-  "workflow_revision": 156
+  "workflow_revision": 160
 }
