@@ -3,7 +3,7 @@
   "branch_name": "refine/DR07C216F3E4EC22A57C60BE0B/round-5",
   "candidate_commit": "8087e73c50825c99eb780c504b913e0c34c3c596",
   "created": "2026-09-10T08:26:00Z",
-  "event_generation": 14,
+  "event_generation": 15,
   "feature_id": "00000T130Z0R6J0GJMARY62005",
   "feature_order": 2,
   "id": "DR07C216F3E4EC22A57C60BE0B",
@@ -6161,6 +6161,95 @@
           }
         }
       },
+      "event_results": {
+        "ce761fc8ceda747f31465e9b9e75c0bdc69c2efe9ea33cc74f4e1c61bcf411d4": {
+          "candidate_commit": null,
+          "results": {
+            "default-plan": {
+              "artifacts": {
+                "plan": {
+                  "checklist": [
+                    {
+                      "description": "Implement within the supplied managed workspace on Round 5 branch at 8087e73c, retaining its operation/deadline corrections and bounded scope-receipt regression. The verified pinned base and local main are a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e. Preserve existing admission reservations, fairness, lifecycle gates, worker health and settlement authority. Preserve prior attempts and evidence; leave candidate capture and workflow advancement to Refine.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Extract cohesive PTY launch lifecycle handling from session_runtime.rs. Represent the guardian handle/identity separately from the registered workload PID/identity and LaunchScope. Preserve the registration-before-start gate. Audit helper attachment, reader/writer setup, metadata encoding, handoff acquisition, registration and release failures. Before release, abort the gated workload through bounded launch cleanup; after possible release, require shared ownership termination. Retain evidence whenever launch or exit is uncertain.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Use the identity-validated workload_status receipt for workload exit and signal-reader finalization. Use guardian status only for scope lifecycle and helper failure. Route completion-signal, hard-cap, idle, transport and capture-error termination through FileProcessSupervisor's bounded owned-group mechanism, keeping the guardian available to adopt and reap descendants. Preserve workload exit semantics, completion report, guidance, implementation evidence and planning_result independently of scope completion. Preserve the original failure when termination or capture also fails.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Give PTY termination/proof settlement one monotonic deadline using the existing two-second stop budget, including bounded coordination waits. Implement interruptible PTY reads and a bounded final-drain phase; an atomic flag alone cannot interrupt the current blocking read. Join readers only after completion and report incomplete capture explicitly. Avoid synchronous unbounded guardian waits; integrate deferred handle reaping with existing process lifecycle supervision. Keep Live/Unverified capacity, transcripts and command/signal evidence protected until eligible, and expose process identity, reason and supported diagnostics through shared Application health. Continue maintenance through maintain_daemon with original deadlines, Toolbar and human-input exceptions.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Extract shared artifact-retirement handling from subprocess/registry.rs and have sweep_orphan_process_logs delegate to it. Resolve ownership by process ID from retained evidence even without primary registration. Retain all three log types for Live, Unverified, missing, corrupt or unreadable evidence and active handoff. Under bounded cleanup/handoff coordination, reread registration identity, ownership, handoff and artifact age immediately before deletion. Share eligibility with existing cleanup callers, preserve lock ordering and prevent lock-file replacement races. Keep the current seven-day log retention interval.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Add deterministic regressions through run_goal_agent for valid structured completion, natural successful/nonzero workload exit, hard-cap and idle failure, plus launch, registration/release, capture and settlement failures. Gate guardian receipt timing and descendant observation; launch a setsid descendant and let its workload parent exit and be reaped before observation, without preloaded witnesses. Independently assert descendant state, guardian survival, identity-bound proof, group_pending and capacity. Cover missing primary registration, unavailable evidence, failed termination and proof identity mismatch. Assert bounded return with retained uncertainty, and eventual release when trustworthy proof becomes available.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Extend worker_liveness through the same WorkflowEngine runner and actual PTY provider path. With capacity exhausted, fail one PTY Goal, prove its descendants exited and its owned capacity released, then assert another independently eligible Goal enters Plan within one configured one-second poll interval. Also prove admission and actual worker replacement remain blocked while ownership is pending. Preserve cancellation/newer-claim authority, settlement-panic evidence, operation-revision, deadline, overlapping-stop, identity-reuse, survivor-resume and worktree-protection regressions.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Add tests under surfaces::web_server::http::background_loops that invoke the actual retention consumer for aged stdout, stderr and stdin artifacts. Cover Live, Unverified, missing, corrupt/unreadable and proven-exited ownership with absent primary registration; active handoff; unexpired retention; and registration or handoff changes between discovery and retirement. Assert preserved contents on deferral, continued processing of unrelated eligible artifacts, and eventual deletion after proof, lease release and retention expiry.",
+                      "id": "P8"
+                    },
+                    {
+                      "description": "Update only docs/intent/03-application/03-execution-ownership.md and docs/intent/04-infrastructure/01-process.md where needed to clarify bounded PTY settlement, workload-versus-scope completion and coordinated retention. Change the workflow consistency contract only if settlement behavior changes. Keep launch lifecycle, output capture and artifact retirement in cohesive modules with responsibility-based tests; avoid expanding the existing 827-line session runtime and 732-line registry with additional mixed responsibilities.",
+                      "id": "P9"
+                    },
+                    {
+                      "description": "Run supported Refine-supervised verification in the pinned workspace. Execute cargo test --lib <filter> -- --test-threads=1 separately for application::agents::sessions, surfaces::web_server::http::background_loops, worker_liveness, failure_settlement, infrastructure::process::subprocess, infrastructure::process::supervisor, application::workers, application::maintenance::worktrees, application::workflow::health and surfaces::web_server::tests::http_transport::runtime. Confirm each selects tests and includes the new regressions. Then run cargo check --all-targets --locked; cargo fmt --all -- --check; cargo test --lib --bins -- --test-threads=1; cargo build --release --locked; and git diff --check. Record exact commands, exit codes, selected/pass/failure/ignored counts, retained logs and source identity. Establish any baseline failure against a270fdaa in an isolated supervised comparison. Report macOS as unverified unless tested successfully; preserve the recorded aws-lc-sys Darwin-toolchain limitation. Do not approve, merge, push, deploy or restart the supervising daemon.",
+                      "id": "P10"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "C1",
+                      "resolution": "Replacing child.kill alone would leave guardian-status polling and unbounded reader joins capable of stranding settlement. P2-P4 correct the complete launch/result/termination lifecycle while retaining the existing guardian and ownership assessment."
+                    },
+                    {
+                      "criticism_id": "C2",
+                      "resolution": "Waiting indefinitely for every descendant would withhold workload results; treating workload exit as scope exit would release capacity prematurely. P3-P4 preserve separate outcomes, bounded capture and explicit pending ownership. A detached blocked reader is not an acceptable shutdown mechanism."
+                    },
+                    {
+                      "criticism_id": "C3",
+                      "resolution": "Adding an ownership check only in HTTP would duplicate policy and leave a deletion race. P5 moves retirement into the existing supervisor owner and rechecks eligibility under coordination; P8 exercises the actual consumer."
+                    },
+                    {
+                      "criticism_id": "C4",
+                      "resolution": "Existing passing session tests and an empty list() do not prove execution exit because terminal records are excluded while owned groups can remain pending. P6-P8 require real descendant, proof, capacity, replacement and retained-artifact assertions, including same-runner follow-up admission."
+                    }
+                  ],
+                  "summary": "Complete shared execution-ownership adoption on retained candidate 8087e73c50825c99eb780c504b913e0c34c3c596. PTY handling conflates workload completion with guardian completion and can destroy the guardian before scope-exit proof; log retention treats missing registration as permission to delete evidence. FileProcessSupervisor already owns observation, bounded termination and artifact coordination. Application owns session results, maintenance and Goal settlement; HTTP should delegate retention. Preserve the invariant that workload results, complete execution exit and semantic Goal authority are separate: only trustworthy scope-exit proof releases owned capacity and permits artifact retirement."
+                }
+              },
+              "binding_id": "default-plan",
+              "evidence": [
+                "Verified the supplied workspace is clean, branch refine/DR07C216F3E4EC22A57C60BE0B/round-5, HEAD 8087e73c50825c99eb780c504b913e0c34c3c596. Local main equals the recorded base a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e. The invocation explicitly continues scoped recovery in the retained Round-4 directory.",
+                "Read the current Plan binding at configuration revision 26, supplied finalized Round-4 plan, failed invocation 3ec0b553d86c4fe2ece68ffc7d36eabbd571b6897308b4b0251f9eff6af7f376, preceding Quality invocation e279bd1c5559f8462990cb4e888bd06f8e5d5975cca5a187c8591e5b86afe627, and /tmp/refine-r4-quality/reproductions.json, final-results.json and quality.patch.",
+                "Verified quality.patch exactly matches the candidate's Quality commit delta; SHA256 9de2e435f0501eaadc84d42e269f15df70d83ca9a6d15d27171263756d119fb2. Its retained results report 1269 passed and six ignored; these are historical results, not verification performed during this Plan invocation.",
+                "Inspected session_runtime.rs:334-350, 550-559, 610-613 and 688-805; launch_scope.rs workload_status; owned-group assessment/stop; registry cleanup/handoff; and background_loops.rs:187-215. Vendored portable-pty confirms ChildKiller sends SIGHUP to the guardian. Source inspection supports both ownership-integration findings.",
+                "Inspected candidate execution-ownership/process intent and relevant target-branch history and implementations. Shared cleanup/handoff coordination already exists on main; the candidate supplies owned-group assessment, maintain_daemon and capacity protection.",
+                "Executed git diff --check a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e 8087e73c50825c99eb780c504b913e0c34c3c596 successfully. Final Git readback remains clean and unchanged. No behavioral tests, repository edits, Git mutations or Goal-state changes were performed."
+              ],
+              "invocation_id": "ce761fc8ceda747f31465e9b9e75c0bdc69c2efe9ea33cc74f4e1c61bcf411d4",
+              "outcome": "success",
+              "role": "plan",
+              "summary": "Completed an observational implementation plan for shared PTY ownership settlement and artifact retirement, with critique resolutions and deterministic consumer-level verification."
+            }
+          },
+          "source": "workflow.plan.enter",
+          "state": "succeeded"
+        }
+      },
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
@@ -6180,12 +6269,130 @@
           "round_idx": 4,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-09-10T19:36:50Z",
+        "final_plan": {
+          "completed_at": "2026-09-10T19:41:36Z",
+          "git_after": {
+            "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-5",
+            "head_commit": "8087e73c50825c99eb780c504b913e0c34c3c596",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-5",
+            "head_commit": "8087e73c50825c99eb780c504b913e0c34c3c596",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Implement within the supplied managed workspace on Round 5 branch at 8087e73c, retaining its operation/deadline corrections and bounded scope-receipt regression. The verified pinned base and local main are a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e. Preserve existing admission reservations, fairness, lifecycle gates, worker health and settlement authority. Preserve prior attempts and evidence; leave candidate capture and workflow advancement to Refine.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Extract cohesive PTY launch lifecycle handling from session_runtime.rs. Represent the guardian handle/identity separately from the registered workload PID/identity and LaunchScope. Preserve the registration-before-start gate. Audit helper attachment, reader/writer setup, metadata encoding, handoff acquisition, registration and release failures. Before release, abort the gated workload through bounded launch cleanup; after possible release, require shared ownership termination. Retain evidence whenever launch or exit is uncertain.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Use the identity-validated workload_status receipt for workload exit and signal-reader finalization. Use guardian status only for scope lifecycle and helper failure. Route completion-signal, hard-cap, idle, transport and capture-error termination through FileProcessSupervisor's bounded owned-group mechanism, keeping the guardian available to adopt and reap descendants. Preserve workload exit semantics, completion report, guidance, implementation evidence and planning_result independently of scope completion. Preserve the original failure when termination or capture also fails.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Give PTY termination/proof settlement one monotonic deadline using the existing two-second stop budget, including bounded coordination waits. Implement interruptible PTY reads and a bounded final-drain phase; an atomic flag alone cannot interrupt the current blocking read. Join readers only after completion and report incomplete capture explicitly. Avoid synchronous unbounded guardian waits; integrate deferred handle reaping with existing process lifecycle supervision. Keep Live/Unverified capacity, transcripts and command/signal evidence protected until eligible, and expose process identity, reason and supported diagnostics through shared Application health. Continue maintenance through maintain_daemon with original deadlines, Toolbar and human-input exceptions.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Extract shared artifact-retirement handling from subprocess/registry.rs and have sweep_orphan_process_logs delegate to it. Resolve ownership by process ID from retained evidence even without primary registration. Retain all three log types for Live, Unverified, missing, corrupt or unreadable evidence and active handoff. Under bounded cleanup/handoff coordination, reread registration identity, ownership, handoff and artifact age immediately before deletion. Share eligibility with existing cleanup callers, preserve lock ordering and prevent lock-file replacement races. Keep the current seven-day log retention interval.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Add deterministic regressions through run_goal_agent for valid structured completion, natural successful/nonzero workload exit, hard-cap and idle failure, plus launch, registration/release, capture and settlement failures. Gate guardian receipt timing and descendant observation; launch a setsid descendant and let its workload parent exit and be reaped before observation, without preloaded witnesses. Independently assert descendant state, guardian survival, identity-bound proof, group_pending and capacity. Cover missing primary registration, unavailable evidence, failed termination and proof identity mismatch. Assert bounded return with retained uncertainty, and eventual release when trustworthy proof becomes available.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Extend worker_liveness through the same WorkflowEngine runner and actual PTY provider path. With capacity exhausted, fail one PTY Goal, prove its descendants exited and its owned capacity released, then assert another independently eligible Goal enters Plan within one configured one-second poll interval. Also prove admission and actual worker replacement remain blocked while ownership is pending. Preserve cancellation/newer-claim authority, settlement-panic evidence, operation-revision, deadline, overlapping-stop, identity-reuse, survivor-resume and worktree-protection regressions.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              },
+              {
+                "description": "Add tests under surfaces::web_server::http::background_loops that invoke the actual retention consumer for aged stdout, stderr and stdin artifacts. Cover Live, Unverified, missing, corrupt/unreadable and proven-exited ownership with absent primary registration; active handoff; unexpired retention; and registration or handoff changes between discovery and retirement. Assert preserved contents on deferral, continued processing of unrelated eligible artifacts, and eventual deletion after proof, lease release and retention expiry.",
+                "id": "workflow.plan.enter:default-plan:P8"
+              },
+              {
+                "description": "Update only docs/intent/03-application/03-execution-ownership.md and docs/intent/04-infrastructure/01-process.md where needed to clarify bounded PTY settlement, workload-versus-scope completion and coordinated retention. Change the workflow consistency contract only if settlement behavior changes. Keep launch lifecycle, output capture and artifact retirement in cohesive modules with responsibility-based tests; avoid expanding the existing 827-line session runtime and 732-line registry with additional mixed responsibilities.",
+                "id": "workflow.plan.enter:default-plan:P9"
+              },
+              {
+                "description": "Run supported Refine-supervised verification in the pinned workspace. Execute cargo test --lib <filter> -- --test-threads=1 separately for application::agents::sessions, surfaces::web_server::http::background_loops, worker_liveness, failure_settlement, infrastructure::process::subprocess, infrastructure::process::supervisor, application::workers, application::maintenance::worktrees, application::workflow::health and surfaces::web_server::tests::http_transport::runtime. Confirm each selects tests and includes the new regressions. Then run cargo check --all-targets --locked; cargo fmt --all -- --check; cargo test --lib --bins -- --test-threads=1; cargo build --release --locked; and git diff --check. Record exact commands, exit codes, selected/pass/failure/ignored counts, retained logs and source identity. Establish any baseline failure against a270fdaa in an isolated supervised comparison. Report macOS as unverified unless tested successfully; preserve the recorded aws-lc-sys Darwin-toolchain limitation. Do not approve, merge, push, deploy or restart the supervising daemon.",
+                "id": "workflow.plan.enter:default-plan:P10"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Complete shared execution-ownership adoption on retained candidate 8087e73c50825c99eb780c504b913e0c34c3c596. PTY handling conflates workload completion with guardian completion and can destroy the guardian before scope-exit proof; log retention treats missing registration as permission to delete evidence. FileProcessSupervisor already owns observation, bounded termination and artifact coordination. Application owns session results, maintenance and Goal settlement; HTTP should delegate retention. Preserve the invariant that workload results, complete execution exit and semantic Goal authority are separate: only trustworthy scope-exit proof releases owned capacity and permits artifact retirement."
+          },
+          "started_at": "2026-09-10T19:36:50Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-09-10T19:41:36Z",
+        "proposal": {
+          "completed_at": "2026-09-10T19:41:36Z",
+          "git_after": {
+            "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-5",
+            "head_commit": "8087e73c50825c99eb780c504b913e0c34c3c596",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-5",
+            "head_commit": "8087e73c50825c99eb780c504b913e0c34c3c596",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Implement within the supplied managed workspace on Round 5 branch at 8087e73c, retaining its operation/deadline corrections and bounded scope-receipt regression. The verified pinned base and local main are a270fdaa3fd4bd4c0a443c0d634e1b53fb20827e. Preserve existing admission reservations, fairness, lifecycle gates, worker health and settlement authority. Preserve prior attempts and evidence; leave candidate capture and workflow advancement to Refine.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Extract cohesive PTY launch lifecycle handling from session_runtime.rs. Represent the guardian handle/identity separately from the registered workload PID/identity and LaunchScope. Preserve the registration-before-start gate. Audit helper attachment, reader/writer setup, metadata encoding, handoff acquisition, registration and release failures. Before release, abort the gated workload through bounded launch cleanup; after possible release, require shared ownership termination. Retain evidence whenever launch or exit is uncertain.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Use the identity-validated workload_status receipt for workload exit and signal-reader finalization. Use guardian status only for scope lifecycle and helper failure. Route completion-signal, hard-cap, idle, transport and capture-error termination through FileProcessSupervisor's bounded owned-group mechanism, keeping the guardian available to adopt and reap descendants. Preserve workload exit semantics, completion report, guidance, implementation evidence and planning_result independently of scope completion. Preserve the original failure when termination or capture also fails.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Give PTY termination/proof settlement one monotonic deadline using the existing two-second stop budget, including bounded coordination waits. Implement interruptible PTY reads and a bounded final-drain phase; an atomic flag alone cannot interrupt the current blocking read. Join readers only after completion and report incomplete capture explicitly. Avoid synchronous unbounded guardian waits; integrate deferred handle reaping with existing process lifecycle supervision. Keep Live/Unverified capacity, transcripts and command/signal evidence protected until eligible, and expose process identity, reason and supported diagnostics through shared Application health. Continue maintenance through maintain_daemon with original deadlines, Toolbar and human-input exceptions.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Extract shared artifact-retirement handling from subprocess/registry.rs and have sweep_orphan_process_logs delegate to it. Resolve ownership by process ID from retained evidence even without primary registration. Retain all three log types for Live, Unverified, missing, corrupt or unreadable evidence and active handoff. Under bounded cleanup/handoff coordination, reread registration identity, ownership, handoff and artifact age immediately before deletion. Share eligibility with existing cleanup callers, preserve lock ordering and prevent lock-file replacement races. Keep the current seven-day log retention interval.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Add deterministic regressions through run_goal_agent for valid structured completion, natural successful/nonzero workload exit, hard-cap and idle failure, plus launch, registration/release, capture and settlement failures. Gate guardian receipt timing and descendant observation; launch a setsid descendant and let its workload parent exit and be reaped before observation, without preloaded witnesses. Independently assert descendant state, guardian survival, identity-bound proof, group_pending and capacity. Cover missing primary registration, unavailable evidence, failed termination and proof identity mismatch. Assert bounded return with retained uncertainty, and eventual release when trustworthy proof becomes available.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Extend worker_liveness through the same WorkflowEngine runner and actual PTY provider path. With capacity exhausted, fail one PTY Goal, prove its descendants exited and its owned capacity released, then assert another independently eligible Goal enters Plan within one configured one-second poll interval. Also prove admission and actual worker replacement remain blocked while ownership is pending. Preserve cancellation/newer-claim authority, settlement-panic evidence, operation-revision, deadline, overlapping-stop, identity-reuse, survivor-resume and worktree-protection regressions.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              },
+              {
+                "description": "Add tests under surfaces::web_server::http::background_loops that invoke the actual retention consumer for aged stdout, stderr and stdin artifacts. Cover Live, Unverified, missing, corrupt/unreadable and proven-exited ownership with absent primary registration; active handoff; unexpired retention; and registration or handoff changes between discovery and retirement. Assert preserved contents on deferral, continued processing of unrelated eligible artifacts, and eventual deletion after proof, lease release and retention expiry.",
+                "id": "workflow.plan.enter:default-plan:P8"
+              },
+              {
+                "description": "Update only docs/intent/03-application/03-execution-ownership.md and docs/intent/04-infrastructure/01-process.md where needed to clarify bounded PTY settlement, workload-versus-scope completion and coordinated retention. Change the workflow consistency contract only if settlement behavior changes. Keep launch lifecycle, output capture and artifact retirement in cohesive modules with responsibility-based tests; avoid expanding the existing 827-line session runtime and 732-line registry with additional mixed responsibilities.",
+                "id": "workflow.plan.enter:default-plan:P9"
+              },
+              {
+                "description": "Run supported Refine-supervised verification in the pinned workspace. Execute cargo test --lib <filter> -- --test-threads=1 separately for application::agents::sessions, surfaces::web_server::http::background_loops, worker_liveness, failure_settlement, infrastructure::process::subprocess, infrastructure::process::supervisor, application::workers, application::maintenance::worktrees, application::workflow::health and surfaces::web_server::tests::http_transport::runtime. Confirm each selects tests and includes the new regressions. Then run cargo check --all-targets --locked; cargo fmt --all -- --check; cargo test --lib --bins -- --test-threads=1; cargo build --release --locked; and git diff --check. Record exact commands, exit codes, selected/pass/failure/ignored counts, retained logs and source identity. Establish any baseline failure against a270fdaa in an isolated supervised comparison. Report macOS as unverified unless tested successfully; preserve the recorded aws-lc-sys Darwin-toolchain limitation. Do not approve, merge, push, deploy or restart the supervising daemon.",
+                "id": "workflow.plan.enter:default-plan:P10"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Complete shared execution-ownership adoption on retained candidate 8087e73c50825c99eb780c504b913e0c34c3c596. PTY handling conflates workload completion with guardian completion and can destroy the guardian before scope-exit proof; log retention treats missing registration as permission to delete evidence. FileProcessSupervisor already owns observation, bounded termination and artifact coordination. Application owns session results, maintenance and Goal settlement; HTTP should delegate retention. Preserve the invariant that workload results, complete execution exit and semantic Goal authority are separate: only trustworthy scope-exit proof releases owned capacity and permits artifact retirement."
+          },
+          "started_at": "2026-09-10T19:36:50Z"
+        },
         "schema_version": 2,
         "started_at": "2026-09-10T19:36:50Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T19:36:50Z"
+        "updated_at": "2026-09-10T19:41:36Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -6199,7 +6406,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T19:36:50Z",
+      "updated": "2026-09-10T19:41:36Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T19:36:49Z",
         "round_idx": 4,
@@ -6209,9 +6416,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-09-10T19:36:50Z",
+  "updated": "2026-09-10T19:41:36Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:37.178169037+00:00",
@@ -6338,7 +6545,16 @@
       "node_id": "default",
       "round_idx": 4,
       "to": "plan"
+    },
+    {
+      "at": "2026-09-10T19:41:36.790754910+00:00",
+      "forced": false,
+      "from": "plan",
+      "generation": 15,
+      "node_id": "default",
+      "round_idx": 4,
+      "to": "implement"
     }
   ],
-  "workflow_revision": 104
+  "workflow_revision": 110
 }
