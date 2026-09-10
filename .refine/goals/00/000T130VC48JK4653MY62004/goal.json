@@ -871,10 +871,86 @@
       "product_state": null,
       "prompt": "In the Web UI, the toolbar agent, \"Alt + Up\" isn't working right now, but is required for Codex agents.",
       "quality_agent_report": "workflow.quality.enter:default-quality: Corrected a shared input-queue lifecycle defect, added two browser regressions, and passed all required checks. No unresolved findings.",
-      "quality_candidate_commit": null,
-      "quality_checked_at": null,
-      "quality_details": null,
-      "quality_message": null,
+      "quality_candidate_commit": "b6dfd178b0f4bac23f1b018e7c3510c04560f636",
+      "quality_checked_at": "2026-09-10T17:01:00Z",
+      "quality_details": {
+        "candidate_commit": "b6dfd178b0f4bac23f1b018e7c3510c04560f636",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-00000T130VC48JK4653MY62004-round-1",
+        "diagnostics": [
+          "Event invocation 7c53d7a891e9ea2c0794e142fd62f78e252d2822068f885b4a81b002c4b09194: automation/invocations/7c53d7a891e9ea2c0794e142fd62f78e252d2822068f885b4a81b002c4b09194.json",
+          "Observed supervised process proc-1789059623459-1129590-1218 exited 0. stdout: peats exactly once (5.712997ms)\n✔ the navigation override ignores other event phases, composition and modifier combinations (1.84249ms)\n✔ the navigation override requires focus, visibility and current terminal state (12.041345ms)\n✔ a replaced renderer cannot invoke keyboard policy on the current session (1.246583ms)\n✔ retained output consumes Alt navigation without emitting after exit or session loss (2.553284ms)\n✔ Alt vertical arrows preserve modifiers with real xterm on Linux x86_64 (1557.453867ms)\n✔ Alt vertical arrows preserve modifiers with real xterm on Win32 (1485.09777ms)\n✔ Alt vertical arrows preserve modifiers with real xterm on MacIntel (1024.782794ms)\n✔ neighboring arrow shortcuts keep xterm encoding on Linux x86_64 (1753.988884ms)\n✔ neighboring arrow shortcuts keep xterm encoding on Win32 (1759.411154ms)\n✔ neighboring arrow shortcuts keep xterm encoding on MacIntel (1667.384917ms)\n✔ Alt vertical arrows emit once per keydown including repeat, never on keyup (977.866794ms)\n✔ composition leaves Alt arrows to xterm without the navigation override (981.088442ms)\n✔ outside focus and an open palette keep their own keyboard behavior (1101.729596ms)\n✔ retained output consumes Alt arrows after exit or loss of session (1096.855883ms)\n✔ Alt arrow input belongs to its originating tab through switching and renderer replacement (1174.46511ms)\n✔ session replacement before flush discards buffered Alt arrows (1101.132222ms)\n✔ session exit before flush discards buffered Alt arrows (914.517189ms)\n✔ Alt arrows waiting behind a request are discarded when their session becomes unusable (2308.953457ms)\n✔ all profiles and provider fixtures preserve Alt arrows and existing control keys (1880.864974ms)\n✔ paste gestures cannot send input after exit or loss of a managed session (2134.893121ms)\n✔ empty and unreadable native paste events cannot fall through to xterm (1467.20816ms)\nℹ tests 137\nℹ suites 0\nℹ pass 137\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 34963.581089",
+          "Observed supervised process proc-1789059658633-1129590-1221 exited 0.",
+          "Observed supervised process proc-1789059660577-1129590-1224 exited 0."
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "1a08c403fdf113c7677",
+        "provider_attempts": [],
+        "quality_proof": {
+          "checked_at": "2026-09-10T17:01:00Z",
+          "checked_candidate_commit": "b6dfd178b0f4bac23f1b018e7c3510c04560f636",
+          "evaluation_scope": "isolated_candidate",
+          "goal_id": "00000T130VC48JK4653MY62004",
+          "operation_id": "1a08c403fdf113c7677",
+          "results": [
+            {
+              "command": "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal*.test.js tests/web_supervisor_toolbar.test.js tests/web_goal_log_tail.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js",
+              "evidence": "Observed supervised process proc-1789059623459-1129590-1218 exited 0. stdout: peats exactly once (5.712997ms)\n✔ the navigation override ignores other event phases, composition and modifier combinations (1.84249ms)\n✔ the navigation override requires focus, visibility and current terminal state (12.041345ms)\n✔ a replaced renderer cannot invoke keyboard policy on the current session (1.246583ms)\n✔ retained output consumes Alt navigation without emitting after exit or session loss (2.553284ms)\n✔ Alt vertical arrows preserve modifiers with real xterm on Linux x86_64 (1557.453867ms)\n✔ Alt vertical arrows preserve modifiers with real xterm on Win32 (1485.09777ms)\n✔ Alt vertical arrows preserve modifiers with real xterm on MacIntel (1024.782794ms)\n✔ neighboring arrow shortcuts keep xterm encoding on Linux x86_64 (1753.988884ms)\n✔ neighboring arrow shortcuts keep xterm encoding on Win32 (1759.411154ms)\n✔ neighboring arrow shortcuts keep xterm encoding on MacIntel (1667.384917ms)\n✔ Alt vertical arrows emit once per keydown including repeat, never on keyup (977.866794ms)\n✔ composition leaves Alt arrows to xterm without the navigation override (981.088442ms)\n✔ outside focus and an open palette keep their own keyboard behavior (1101.729596ms)\n✔ retained output consumes Alt arrows after exit or loss of session (1096.855883ms)\n✔ Alt arrow input belongs to its originating tab through switching and renderer replacement (1174.46511ms)\n✔ session replacement before flush discards buffered Alt arrows (1101.132222ms)\n✔ session exit before flush discards buffered Alt arrows (914.517189ms)\n✔ Alt arrows waiting behind a request are discarded when their session becomes unusable (2308.953457ms)\n✔ all profiles and provider fixtures preserve Alt arrows and existing control keys (1880.864974ms)\n✔ paste gestures cannot send input after exit or loss of a managed session (2134.893121ms)\n✔ empty and unreadable native paste events cannot fall through to xterm (1467.20816ms)\nℹ tests 137\nℹ suites 0\nℹ pass 137\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 34963.581089",
+              "exit_code": 0,
+              "process_id": "proc-1789059623459-1129590-1218",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Shared terminal keyboard behavior and affected surface regressions"
+            },
+            {
+              "command": "cargo fmt --all -- --check",
+              "evidence": "Observed supervised process proc-1789059658633-1129590-1221 exited 0.",
+              "exit_code": 0,
+              "process_id": "proc-1789059658633-1129590-1221",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Rust formatting"
+            },
+            {
+              "command": "git diff --check && git diff 47a0059f14971ba766b231183bd5cb1a218450f8 b6dfd178b0f4bac23f1b018e7c3510c04560f636 --check",
+              "evidence": "Observed supervised process proc-1789059660577-1129590-1224 exited 0.",
+              "exit_code": 0,
+              "process_id": "proc-1789059660577-1129590-1224",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Worktree and complete candidate whitespace"
+            }
+          ],
+          "round_idx": 0,
+          "schema_version": 1,
+          "source_candidate_commit": "b6dfd178b0f4bac23f1b018e7c3510c04560f636",
+          "state": "passed"
+        },
+        "results": [
+          {
+            "command": "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal*.test.js tests/web_supervisor_toolbar.test.js tests/web_goal_log_tail.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js",
+            "evidence": "Observed supervised process proc-1789059623459-1129590-1218 exited 0. stdout: peats exactly once (5.712997ms)\n✔ the navigation override ignores other event phases, composition and modifier combinations (1.84249ms)\n✔ the navigation override requires focus, visibility and current terminal state (12.041345ms)\n✔ a replaced renderer cannot invoke keyboard policy on the current session (1.246583ms)\n✔ retained output consumes Alt navigation without emitting after exit or session loss (2.553284ms)\n✔ Alt vertical arrows preserve modifiers with real xterm on Linux x86_64 (1557.453867ms)\n✔ Alt vertical arrows preserve modifiers with real xterm on Win32 (1485.09777ms)\n✔ Alt vertical arrows preserve modifiers with real xterm on MacIntel (1024.782794ms)\n✔ neighboring arrow shortcuts keep xterm encoding on Linux x86_64 (1753.988884ms)\n✔ neighboring arrow shortcuts keep xterm encoding on Win32 (1759.411154ms)\n✔ neighboring arrow shortcuts keep xterm encoding on MacIntel (1667.384917ms)\n✔ Alt vertical arrows emit once per keydown including repeat, never on keyup (977.866794ms)\n✔ composition leaves Alt arrows to xterm without the navigation override (981.088442ms)\n✔ outside focus and an open palette keep their own keyboard behavior (1101.729596ms)\n✔ retained output consumes Alt arrows after exit or loss of session (1096.855883ms)\n✔ Alt arrow input belongs to its originating tab through switching and renderer replacement (1174.46511ms)\n✔ session replacement before flush discards buffered Alt arrows (1101.132222ms)\n✔ session exit before flush discards buffered Alt arrows (914.517189ms)\n✔ Alt arrows waiting behind a request are discarded when their session becomes unusable (2308.953457ms)\n✔ all profiles and provider fixtures preserve Alt arrows and existing control keys (1880.864974ms)\n✔ paste gestures cannot send input after exit or loss of a managed session (2134.893121ms)\n✔ empty and unreadable native paste events cannot fall through to xterm (1467.20816ms)\nℹ tests 137\nℹ suites 0\nℹ pass 137\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 34963.581089",
+            "exit_code": 0,
+            "process_id": "proc-1789059623459-1129590-1218",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Shared terminal keyboard behavior and affected surface regressions"
+          },
+          {
+            "command": "cargo fmt --all -- --check",
+            "evidence": "Observed supervised process proc-1789059658633-1129590-1221 exited 0.",
+            "exit_code": 0,
+            "process_id": "proc-1789059658633-1129590-1221",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Rust formatting"
+          },
+          {
+            "command": "git diff --check && git diff 47a0059f14971ba766b231183bd5cb1a218450f8 b6dfd178b0f4bac23f1b018e7c3510c04560f636 --check",
+            "evidence": "Observed supervised process proc-1789059660577-1129590-1224 exited 0.",
+            "exit_code": 0,
+            "process_id": "proc-1789059660577-1129590-1224",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Worktree and complete candidate whitespace"
+          }
+        ],
+        "source_candidate_commit": "b6dfd178b0f4bac23f1b018e7c3510c04560f636"
+      },
+      "quality_message": "All Quality Skills passed with supervised evidence.",
       "quality_skill_results": [
         {
           "artifacts": {
@@ -939,10 +1015,10 @@
           "summary": "Corrected a shared input-queue lifecycle defect, added two browser regressions, and passed all required checks. No unresolved findings."
         }
       ],
-      "quality_state": null,
+      "quality_state": "passed",
       "reporter": "Buddy Williams",
       "rule_state": null,
-      "updated": "2026-09-10T16:56:55Z",
+      "updated": "2026-09-10T17:01:01Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T16:22:58Z",
         "round_idx": 0,
@@ -1059,7 +1135,7 @@
   ],
   "status": "governance",
   "target_branch": "main",
-  "updated": "2026-09-10T16:56:55Z",
+  "updated": "2026-09-10T17:01:01Z",
   "workflow_events": [
     {
       "at": "2026-09-10T16:16:39.697881485+00:00",
@@ -1116,5 +1192,5 @@
       "to": "governance"
     }
   ],
-  "workflow_revision": 32
+  "workflow_revision": 34
 }
