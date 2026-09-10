@@ -1,7 +1,7 @@
 {
   "base_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
   "branch_name": "refine/DRBAC01843C2EBE03D1CD08034/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "7f6988c7ea0b441ad71ec5fc0eb508451674caab",
   "created": "2026-09-10T08:26:07Z",
   "feature_id": null,
   "feature_order": null,
@@ -95,7 +95,28 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-09-10T08:44:53Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
@@ -106,6 +127,7 @@
           "round_idx": 0,
           "target_branch": "main"
         },
+        "completed_at": "2026-09-10T08:44:53Z",
         "criticism": {
           "completed_at": "2026-09-10T08:29:29Z",
           "git_after": {
@@ -172,6 +194,53 @@
           "message": "Executing the finalized plan as written does not require violating any supplied governance rule or enabled guidance.",
           "status": "passed"
         },
+        "implementation": {
+          "completed_at": "2026-09-10T08:44:53Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Enabled macOptionClickForcesSelection and displayed a platform-specific drag hint. Real xterm tests verified Shift-drag on Linux and Option-drag with a simulated Mac platform under mouse capture, while ordinary mouse input still reached the application.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Extracted shared copy/paste behavior into the focused 291-line terminal-clipboard.js module and loaded it in index.html. Ctrl+C, Ctrl+Shift+C, Cmd+C, native Copy, and the control capture the originating renderer's selection without requiring a live session.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added a native keyboard-accessible Copy selection header button whose disabled state follows xterm selection changes. Browser tests verified keyboard activation, exited/sessionless copying, and renderer/selection retention across tab changes. Selected output and unfinished copy recovery defer automatic restart; the explicit Restart action remains available.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Clipboard shortcuts require focus inside the active terminal. Verified Ctrl+C interruption without selection, terminal-native multiline bracketed paste exactly once, unchanged Agent Ctrl+Enter/Ctrl+Z behavior, and existing asynchronous/buffered paste session replacement guards.",
+                "id": "P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Clipboard API success, native Copy handling, or a true execCommand result is required before reporting success. Unavailable, throwing, and rejected writes use a selection fallback; failed fallbacks expose captured text in a labeled readonly textarea with Select text and Dismiss controls. Delayed results are fenced to the original attempt, renderer, and session. Tests verified recovery remains on an exited originating tab and preserves another tab's focus, plus manual-field selection across Toolbar redraws.",
+                "id": "P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated only docs/intent/05-surfaces/03-browser/19-terminal.md, preserving its established sections and documenting selection gestures, Copy selection, focused shortcuts, retained output, and manual recovery.",
+                "id": "P6",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "node --test tests/web_terminal_clipboard.test.js tests/web_supervisor_toolbar.test.js tests/web_goal_log_tail.test.js => 59 passed, 0 failed, 0 skipped; /tmp/refine-terminal-tests.log.",
+              "NODE_PATH=/home/buddy/projects/refine/node_modules node --test tests/web_terminal_clipboard_browser.test.js => 7 passed, 0 failed, 0 skipped using real Chromium; /tmp/refine-terminal-browser-tests.log. The Mac platform is simulated.",
+              "NODE_PATH=/home/buddy/projects/refine/node_modules node --test tests/web_*.test.js => 245 tests: 240 passed, 5 failed, 0 skipped; /tmp/refine-web-all-tests.log.",
+              "NODE_PATH=/home/buddy/projects/refine/node_modules node --test tests/web_screen_render.test.js, cwd /tmp/refine-terminal-copy-baseline.3800t2 (git archive of unchanged starting commit 8f6de519c62a8a373b19482d5c7842068acfb35d) => 23 passed, the same 5 failures, 0 skipped; /tmp/refine-terminal-copy-baseline-tests.log. Matched failures: Controls Node selector switches by ID and refreshes the visible Node context; Agent terminal renders transported ANSI control sequences through xterm; every Node, Project, and legacy Settings tab renders and refreshes; Refine dev source refreshes morph identical and changed status without replacement; runtime banner distinguishes trusted source relationships from unknown evidence.",
+              "git show --pretty= --name-only HEAD | rg '\\.js$' | xargs -r -n 1 node --check => all 9 changed/added JavaScript files passed.",
+              "git diff --cached --check before commit and git show --format= --check HEAD after commit => passed. git rev-parse HEAD => 7f6988c7ea0b441ad71ec5fc0eb508451674caab. git status --porcelain => empty."
+            ]
+          },
+          "report": "Implemented selection gestures, Copy selection, copying retained output, focused shortcuts, and clipboard recovery in local commit 7f6988c7ea0b441ad71ec5fc0eb508451674caab. Focused verification passed: 59 logic/lifecycle tests and 7 Chromium clipboard tests. Full web suite: 240 passed, 5 failures reproduced on the unchanged baseline. Working tree clean; no merge or push.",
+          "started_at": "2026-09-10T08:31:19Z"
+        },
         "phase": "implement",
         "phase_started_at": "2026-09-10T08:31:19Z",
         "proposal": {
@@ -215,11 +284,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-09-10T08:26:09Z",
-        "state": "in_progress",
-        "updated_at": "2026-09-10T08:31:19Z"
+        "state": "completed",
+        "updated_at": "2026-09-10T08:44:53Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Implemented selection gestures, Copy selection, copying retained output, focused shortcuts, and clipboard recovery in local commit 7f6988c7ea0b441ad71ec5fc0eb508451674caab. Focused verification passed: 59 logic/lifecycle tests and 7 Chromium clipboard tests. Full web suite: 240 passed, 5 failures reproduced on the unchanged baseline. Working tree clean; no merge or push.",
+      "implementation_reported_at": "2026-09-10T08:44:53Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -230,7 +299,7 @@
       "quality_state": "unclassified",
       "reporter": "ethan.jacobson@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T08:31:19Z",
+      "updated": "2026-09-10T08:44:53Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T08:26:09Z",
         "round_idx": 0,
@@ -240,8 +309,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-10T08:31:19Z",
-  "workflow_revision": 15
+  "updated": "2026-09-10T08:44:53Z",
+  "workflow_revision": 20
 }
