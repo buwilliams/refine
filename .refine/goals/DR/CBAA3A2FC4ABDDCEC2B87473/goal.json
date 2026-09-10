@@ -3,7 +3,7 @@
   "branch_name": "refine/DRCBAA3A2FC4ABDDCEC2B87473/round-3",
   "candidate_commit": "b3465d05ac29dd4c597d2971b84d82ed07377b77",
   "created": "2026-09-10T08:26:07Z",
-  "event_generation": 6,
+  "event_generation": 7,
   "feature_id": null,
   "feature_order": null,
   "id": "DRCBAA3A2FC4ABDDCEC2B87473",
@@ -3130,6 +3130,110 @@
           }
         }
       },
+      "event_results": {
+        "3fbb79ed186e5be223dccaf58a2145b5dfccc8a3a13cfaf3f9363390a24af896": {
+          "candidate_commit": null,
+          "results": {
+            "default-plan": {
+              "artifacts": {
+                "plan": {
+                  "checklist": [
+                    {
+                      "description": "Continue in the invocation-pinned worktree on the Round 3 branch at b3465d05ac29dd4c597d2971b84d82ed07377b77. Preserve earlier work and compare subsequent main changes without independently replacing or rebasing the assigned candidate.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Strengthen the shared Model validator to require complete automatic acceptance authority and exactly matching Skill submission, completed receipt and outcome. Validate identities, pinned configuration, attribution, Round, candidate and causal timestamps in both directions.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Make Event acceptance and shared review operations capture sufficient durable invocation context for historical validation. Preserve atomic settlement, deferred submission time, exact-candidate proof, ancestry, publication requirements and repository-to-Goal lock ordering.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Add explicit recovery-action provenance with stable identity, captured context and automatic invocation/workflow authority or operator evidence. Carry it through retry, undo, new-Round and automatic-successor operations, deferred transitions and restart/replay.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Derive reopening classification from the causing action, independently of successor-Round lineage. Count distinct recovery successor Rounds once, derive intervention from actual requirements, preserve unknown evidence and immutable settlements, and retain earlier failure as a first-Round-success disqualifier.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Apply shared causal validation across local writes, structural merge, hydration, agent resolution, authority-based synchronization recovery and archives. Retain complete evidence through archival, deletion and pruning without consulting invocation logs or rewriting earlier history.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Add behavioral Event, work-item and workflow regressions for automatic and operator retries, immediate/deferred settlement, restart, duplicate replay, stale authority, automatic successor creation and required intervention. Preserve existing review, rejection, cancellation and retention regressions.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Repair the automatic metrics fixture with complete causal evidence while preserving its population and denominators. Reverify date/group boundaries, legacy coverage, archive deduplication and the 10,000-Goal query benchmark.",
+                      "id": "P8"
+                    },
+                    {
+                      "description": "Update only affected Model, Events, resolution-metrics, persistence-retention and Failed/Done intent contracts. Keep validation, orchestration, storage and surface responsibilities in their existing layers and extract cohesive modules where needed.",
+                      "id": "P9"
+                    },
+                    {
+                      "description": "Run the required compilation, Model, application, synchronization and surface checks. Resolve Playwright and matching Chromium dependencies so rendering executes, and report remaining skips separately.",
+                      "id": "P10"
+                    },
+                    {
+                      "description": "Finish with changed-file formatting, whitespace checks and candidate readback. Report commands, counts, failures, skips and benchmark measurements; leave workflow advancement, integration and human approval to Refine.",
+                      "id": "P11"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "C1",
+                      "resolution": "The generic recovery prompt requests a fresh worktree, but this scoped invocation explicitly assigns the retained directory on the Round 3 branch. Follow that verified assignment and preserve earlier refs."
+                    },
+                    {
+                      "criticism_id": "C2",
+                      "resolution": "Checking only the Skill variant or submission fields leaves unsupported outcomes admissible. Validate the complete durable authority/submission/receipt/outcome relationship through one shared Model invariant."
+                    },
+                    {
+                      "criticism_id": "C3",
+                      "resolution": "Inherited Round markers and transient execution context cannot identify deferred or replayed retry causes. Persist action provenance separately from successor lineage and restore it during settlement."
+                    },
+                    {
+                      "criticism_id": "C4",
+                      "resolution": "Removing the Failed-to-intervention shortcut must not erase failure or turn uncertain history into success. Preserve earlier settlements, represent unknown evidence explicitly and derive first-Round success independently."
+                    }
+                  ],
+                  "summary": "Correct automatic-settlement validation and recovery provenance on the retained candidate, preserve existing durable history and Quality corrections, and verify persistence, metrics and affected surfaces."
+                }
+              },
+              "binding_id": "default-plan",
+              "evidence": [
+                "Contract correction: read the retained rejected response and its diagnostic. Preserved checklist IDs P1–P11 and criticism IDs C1–C4; checklist entries now contain only id and description. Verification is recorded here.",
+                "Observed workspace: /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRCBAA3A2FC4ABDDCEC2B87473-round-2. HEAD is b3465d05ac29dd4c597d2971b84d82ed07377b77 on refine/DRCBAA3A2FC4ABDDCEC2B87473/round-3, with clean status before and after inspection. The Round 2 branch retains that commit. Observed main is b47569adb8d4c5d1d7335ba91729a3e486a38fe0; the common base is 7b430a6a3bc0d692f03e71da68d06f3e9534dead. Main-only changes concern terminal clipboard behavior.",
+                "Read the retained Round 2 finalized plan and .git/refine-live-state/automation/invocations/2929b7e8ae050a027f664ec99a1106eacb10aa05e88563126424482ccc17adc4.json. That invocation records review findings with error null. Its proposed Rust regressions were not executed.",
+                "Confirmed src/model/goal/audit_validation.rs accepts automatic outcomes carrying the Skill authority variant without requiring a matching submission. Completed receipts only require an outcome with matching authority. src/application/work_items/tests/metrics.rs constructs automatic authority without a Skill submission or completed receipt.",
+                "Confirmed src/application/work_items/service/outcome_history.rs derives reopening authority and source Round from inherited markers and treats every Failed settlement as requiring intervention. Traced Event success actions, deferred requested snapshots, shared settlement and persistence consumers.",
+                "P2/P3 acceptance criteria: require nonblank invocation/action identities, explicit accept and structurally consistent pinned revision/Event/binding/Skill configuration. Preserve the existing convention that authority.binding_id identifies the pinned Event. Match captured Goal/node attribution, Round, exact candidate, authority and chronological evidence across submission, receipt and outcome. Automatic acceptance creates no human decision. Pending submissions remain valid without a settlement; retained validation uses captured context rather than current ownership or configuration.",
+                "P2/P3 negative verification: cover missing, null, empty, whitespace-only, malformed, duplicated and mismatched evidence; rejected requests disguised as acceptance; contradictory configuration; wrong attribution, Round or candidate; missing/noncompleted receipts; and invalid timestamp order. Exercise immediate/deferred acceptance, later configuration edits, stale fences, cancellation and gate failure. Successful checks, absent accept actions and zero required Skills must not manufacture acceptance.",
+                "P4/P5 behavioral criteria: a configured Skill retry of Failed Round 1 records AutomaticRecovery from 1 to 1, adds no recovery Round and invents no operator intervention. An operator retry within an automatically created Round 2 records OperatorRecovery from 2 to 2 while retaining the earlier automatic successor event. Repeated successor delivery counts that successor once. Earlier genuine Failed or Rejected settlements continue to prevent first-Round success.",
+                "P4–P7 replay verification: exercise actual Event/work-item paths with immediate and deferred gates. Interrupt after durable pending intent and after settlement before invocation acknowledgement. Duplicate delivery must preserve one reopening and its original identity/timestamps; stale node, Round, candidate, revision, generation or workflow authority must create none. Cover explicit intervention requirements and unknown legacy provenance. Skill errors and automatic retries alone must create neither terminal failure nor human acceptance.",
+                "P6 persistence verification: reject invalid automatic evidence through local writes, structural merge, hydration/fast-forward, agent resolution, live/remote authority recovery and archives. Round-trip valid automatic settlements and reopening history through synchronization, archival, deletion and invocation-log pruning. Preserve immutable evidence, archive/live deduplication and existing records after validation or archival failure. Reconciliation authority cannot legitimize invalid automatic evidence.",
+                "P8 metrics expectations: decisions 3 accepted/1 rejected; human accept rate 3/4; automatic and failure rates 1/6; first-Round success 2/6; average Rounds 8/6. Recheck inclusive-start/exclusive-end ranges, RFC3339 offsets, UTC day/Monday-week/month and leap-date boundaries, grouping, empty populations, unknown legacy coverage and archive deduplication. Measure cold, warm and incrementally refreshed queries separately over 10,000 multi-Round Goals; require zero routine history-file reads and a warm query within 50 ms.",
+                "P9 architecture rationale: the inspected intent assigns invariants to Model, shared mutation/provenance orchestration to Application, storage mechanisms to Infrastructure and thin adapters to Surfaces. No Governance rules are configured in the supplied context. Clarify only affected contracts and preserve existing decision fencing, rejection, cancellation, late Skill-evidence retention and browser receipts. Review files around 500 lines for mixed responsibilities without unrelated restructuring.",
+                "P10 proposed commands, not executed during this correction: cargo check --all-targets --locked; cargo test --lib model::goal -- --test-threads=1; cargo test --lib application::work_items -- --test-threads=1 --nocapture; cargo test --lib application::events -- --test-threads=1; cargo test --lib application::persistence_sync -- --test-threads=1; cargo test --lib application::workflow -- --test-threads=1; cargo test --test sync_regressions --test sync_simulation -- --test-threads=1.",
+                "P10 proposed surface/regression commands: cargo test --lib application::projects::projection -- --test-threads=1; cargo test --lib model::workflow -- --test-threads=1; cargo test --lib model::feature -- --test-threads=1; cargo test --lib surfaces::web_server -- --test-threads=1; node --test tests/web_dashboard_review_results.test.js tests/web_goal_review.test.js; cargo run --manifest-path xtask/Cargo.toml -- test-cli; cargo run --manifest-path xtask/Cargo.toml -- test-browser; cargo run --manifest-path xtask/Cargo.toml -- check-static-assets.",
+                "P10 browser verification must resolve Playwright in the test process and confirm an actual Chromium launch and executed rendering cases. Install missing test dependencies during implementation if necessary. Retained reports include Chromium skips; browser logic tests do not close that coverage gap.",
+                "P11 proposed final checks: run rustfmt --check --edition 2024 --config skip_children=true on changed and added Rust files; run git diff --check against the implementation base and inspect untracked additions for whitespace. Read back final HEAD, branch and working-tree status and report actual test counts and benchmark measurements.",
+                "Retained reports record four passing browser logic tests and clean formatting/whitespace checks. These were not rerun during this response correction; Rust suites, benchmarks and Chromium rendering likewise received no new verification here. This correction performed read-only inspection and changed no repository files, Goal state or Git state."
+              ],
+              "invocation_id": "3fbb79ed186e5be223dccaf58a2145b5dfccc8a3a13cfaf3f9363390a24af896",
+              "outcome": "success",
+              "role": "plan",
+              "summary": "Corrected the retained implementation plan to compact id/description checklist pairs, preserving scope and stable IDs and moving verification into evidence. No implementation or state changes were performed."
+            }
+          },
+          "source": "workflow.plan.enter",
+          "state": "succeeded"
+        }
+      },
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
@@ -3149,12 +3253,138 @@
           "round_idx": 2,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-09-10T15:23:37Z",
+        "final_plan": {
+          "completed_at": "2026-09-10T15:32:58Z",
+          "git_after": {
+            "branch": "refine/DRCBAA3A2FC4ABDDCEC2B87473/round-3",
+            "head_commit": "b3465d05ac29dd4c597d2971b84d82ed07377b77",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRCBAA3A2FC4ABDDCEC2B87473/round-3",
+            "head_commit": "b3465d05ac29dd4c597d2971b84d82ed07377b77",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Continue in the invocation-pinned worktree on the Round 3 branch at b3465d05ac29dd4c597d2971b84d82ed07377b77. Preserve earlier work and compare subsequent main changes without independently replacing or rebasing the assigned candidate.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Strengthen the shared Model validator to require complete automatic acceptance authority and exactly matching Skill submission, completed receipt and outcome. Validate identities, pinned configuration, attribution, Round, candidate and causal timestamps in both directions.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Make Event acceptance and shared review operations capture sufficient durable invocation context for historical validation. Preserve atomic settlement, deferred submission time, exact-candidate proof, ancestry, publication requirements and repository-to-Goal lock ordering.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Add explicit recovery-action provenance with stable identity, captured context and automatic invocation/workflow authority or operator evidence. Carry it through retry, undo, new-Round and automatic-successor operations, deferred transitions and restart/replay.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Derive reopening classification from the causing action, independently of successor-Round lineage. Count distinct recovery successor Rounds once, derive intervention from actual requirements, preserve unknown evidence and immutable settlements, and retain earlier failure as a first-Round-success disqualifier.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Apply shared causal validation across local writes, structural merge, hydration, agent resolution, authority-based synchronization recovery and archives. Retain complete evidence through archival, deletion and pruning without consulting invocation logs or rewriting earlier history.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Add behavioral Event, work-item and workflow regressions for automatic and operator retries, immediate/deferred settlement, restart, duplicate replay, stale authority, automatic successor creation and required intervention. Preserve existing review, rejection, cancellation and retention regressions.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              },
+              {
+                "description": "Repair the automatic metrics fixture with complete causal evidence while preserving its population and denominators. Reverify date/group boundaries, legacy coverage, archive deduplication and the 10,000-Goal query benchmark.",
+                "id": "workflow.plan.enter:default-plan:P8"
+              },
+              {
+                "description": "Update only affected Model, Events, resolution-metrics, persistence-retention and Failed/Done intent contracts. Keep validation, orchestration, storage and surface responsibilities in their existing layers and extract cohesive modules where needed.",
+                "id": "workflow.plan.enter:default-plan:P9"
+              },
+              {
+                "description": "Run the required compilation, Model, application, synchronization and surface checks. Resolve Playwright and matching Chromium dependencies so rendering executes, and report remaining skips separately.",
+                "id": "workflow.plan.enter:default-plan:P10"
+              },
+              {
+                "description": "Finish with changed-file formatting, whitespace checks and candidate readback. Report commands, counts, failures, skips and benchmark measurements; leave workflow advancement, integration and human approval to Refine.",
+                "id": "workflow.plan.enter:default-plan:P11"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Correct automatic-settlement validation and recovery provenance on the retained candidate, preserve existing durable history and Quality corrections, and verify persistence, metrics and affected surfaces."
+          },
+          "started_at": "2026-09-10T15:23:37Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-09-10T15:32:59Z",
+        "proposal": {
+          "completed_at": "2026-09-10T15:32:58Z",
+          "git_after": {
+            "branch": "refine/DRCBAA3A2FC4ABDDCEC2B87473/round-3",
+            "head_commit": "b3465d05ac29dd4c597d2971b84d82ed07377b77",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRCBAA3A2FC4ABDDCEC2B87473/round-3",
+            "head_commit": "b3465d05ac29dd4c597d2971b84d82ed07377b77",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Continue in the invocation-pinned worktree on the Round 3 branch at b3465d05ac29dd4c597d2971b84d82ed07377b77. Preserve earlier work and compare subsequent main changes without independently replacing or rebasing the assigned candidate.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Strengthen the shared Model validator to require complete automatic acceptance authority and exactly matching Skill submission, completed receipt and outcome. Validate identities, pinned configuration, attribution, Round, candidate and causal timestamps in both directions.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Make Event acceptance and shared review operations capture sufficient durable invocation context for historical validation. Preserve atomic settlement, deferred submission time, exact-candidate proof, ancestry, publication requirements and repository-to-Goal lock ordering.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Add explicit recovery-action provenance with stable identity, captured context and automatic invocation/workflow authority or operator evidence. Carry it through retry, undo, new-Round and automatic-successor operations, deferred transitions and restart/replay.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Derive reopening classification from the causing action, independently of successor-Round lineage. Count distinct recovery successor Rounds once, derive intervention from actual requirements, preserve unknown evidence and immutable settlements, and retain earlier failure as a first-Round-success disqualifier.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Apply shared causal validation across local writes, structural merge, hydration, agent resolution, authority-based synchronization recovery and archives. Retain complete evidence through archival, deletion and pruning without consulting invocation logs or rewriting earlier history.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Add behavioral Event, work-item and workflow regressions for automatic and operator retries, immediate/deferred settlement, restart, duplicate replay, stale authority, automatic successor creation and required intervention. Preserve existing review, rejection, cancellation and retention regressions.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              },
+              {
+                "description": "Repair the automatic metrics fixture with complete causal evidence while preserving its population and denominators. Reverify date/group boundaries, legacy coverage, archive deduplication and the 10,000-Goal query benchmark.",
+                "id": "workflow.plan.enter:default-plan:P8"
+              },
+              {
+                "description": "Update only affected Model, Events, resolution-metrics, persistence-retention and Failed/Done intent contracts. Keep validation, orchestration, storage and surface responsibilities in their existing layers and extract cohesive modules where needed.",
+                "id": "workflow.plan.enter:default-plan:P9"
+              },
+              {
+                "description": "Run the required compilation, Model, application, synchronization and surface checks. Resolve Playwright and matching Chromium dependencies so rendering executes, and report remaining skips separately.",
+                "id": "workflow.plan.enter:default-plan:P10"
+              },
+              {
+                "description": "Finish with changed-file formatting, whitespace checks and candidate readback. Report commands, counts, failures, skips and benchmark measurements; leave workflow advancement, integration and human approval to Refine.",
+                "id": "workflow.plan.enter:default-plan:P11"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Correct automatic-settlement validation and recovery provenance on the retained candidate, preserve existing durable history and Quality corrections, and verify persistence, metrics and affected surfaces."
+          },
+          "started_at": "2026-09-10T15:23:37Z"
+        },
         "schema_version": 2,
         "started_at": "2026-09-10T15:23:37Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T15:23:37Z"
+        "updated_at": "2026-09-10T15:32:59Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -3168,7 +3398,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T15:23:37Z",
+      "updated": "2026-09-10T15:32:59Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T15:23:36Z",
         "round_idx": 2,
@@ -3178,9 +3408,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-09-10T15:23:37Z",
+  "updated": "2026-09-10T15:32:59Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:36.799534192+00:00",
@@ -3235,7 +3465,16 @@
       "node_id": "default",
       "round_idx": 2,
       "to": "plan"
+    },
+    {
+      "at": "2026-09-10T15:32:58.931065680+00:00",
+      "forced": false,
+      "from": "plan",
+      "generation": 7,
+      "node_id": "default",
+      "round_idx": 2,
+      "to": "implement"
     }
   ],
-  "workflow_revision": 56
+  "workflow_revision": 62
 }
