@@ -1409,9 +1409,46 @@
       "prompt": "Provide a supported recovery path for a Goal stranded in Review when integration effects or publication occurred but successful settlement was interrupted.\n\nThis is still relevant after Skills: current approval requires settled integration, and RetryGovernance remains unavailable from Review. The four old Governance sub-states in the original report are historical evidence, not sufficient current authority. Round 1 retained unfinished retry and settlement changes without a candidate or verified completion; preserve them and its superseded-attempt failure.\n\nExtend the existing recovery capability so an eligible Review Goal can recheck or complete settlement through the normal workflow and return to Review for human acceptance. Keep approval strict. Resolve required Skill results and supervised candidate proof from the applicable pinned configuration, including an explicitly recorded case where no required Quality or Governance Skills apply. Never infer a pass from background/context Skills, obsolete configuration flags, a missing result or matching file content.\n\nUnder the existing target lease and Goal authority checks, compare the exact candidate with the current local and required published target. Recover settlement only from proof tied to that candidate and its actual integration. Content-equal commits with different identities need normal refresh or reconciliation and new checks when the candidate changes. Handle non-fast-forward publication and concurrent target movement through bounded existing recovery.\n\nRecord completed Git effects on the originating attempt even when it was cancelled or superseded, without advancing replacement work or reviving stale authority. Make settlement and entry to Review consistent and retries idempotent. CLI, API and browser guidance should expose the same allowed recovery and explain missing evidence clearly.\n\nVerify interrupted settlement before and after publication, an already-integrated exact candidate, content equality without identity, required Skills enabled or absent, failed and missing results, duplicate recovery, cancellation and supersession. Recovery must not approve the Goal, force-push a contested ref or rewrite historical results.\n\nThis is a recovery Round following the Skills review on 10 September 2026. Start from current main in a new managed Round worktree. Preserve Round 1, its plans, logs, branches, commits and uncommitted files; inspect and selectively reuse useful work instead of replaying the whole old attempt. Use the current Skills and docs/intent contracts, not archived Governance, Quality or Guidance configuration or the old fixed planning sequence. Refine owns workflow advancement and integration; human approval remains separate. Update only affected documentation and report focused verification with actual results.",
       "quality_agent_report": "workflow.quality.enter:default-quality: Reviewed the candidate and corrected a Skill receipt provenance defect. Focused regression checks pass with no unresolved findings.",
       "quality_candidate_commit": "f0bcaaac7feb35efec438cbcc4bf36bfa57cd993",
-      "quality_checked_at": null,
-      "quality_details": null,
-      "quality_message": null,
+      "quality_checked_at": "2026-09-10T14:52:22Z",
+      "quality_details": {
+        "candidate_commit": "f0bcaaac7feb35efec438cbcc4bf36bfa57cd993",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRA87E5F985A1FFE2919BE7EC2-round-2",
+        "diagnostics": [
+          "Event invocation f4577f5a926319479c8c06b7e3834c2cba05e45a842b0d2fdb142df218bdc506: automation/invocations/f4577f5a926319479c8c06b7e3834c2cba05e45a842b0d2fdb142df218bdc506.json"
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "1a08bca29fe113c762a",
+        "provider_attempts": [],
+        "quality_proof": {
+          "checked_at": "2026-09-10T14:52:22Z",
+          "checked_candidate_commit": "f0bcaaac7feb35efec438cbcc4bf36bfa57cd993",
+          "evaluation_scope": "isolated_candidate",
+          "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+          "operation_id": "1a08bca29fe113c762a",
+          "results": [
+            {
+              "command": "",
+              "evidence": "Found one defect in originating-attempt evidence recovery before publication. Read-only checks passed; no files or Git state were changed.",
+              "status": "failed",
+              "test": "workflow.quality.enter:default-quality"
+            }
+          ],
+          "round_idx": 1,
+          "schema_version": 1,
+          "source_candidate_commit": "f0bcaaac7feb35efec438cbcc4bf36bfa57cd993",
+          "state": "failed"
+        },
+        "results": [
+          {
+            "command": "",
+            "evidence": "Found one defect in originating-attempt evidence recovery before publication. Read-only checks passed; no files or Git state were changed.",
+            "status": "failed",
+            "test": "workflow.quality.enter:default-quality"
+          }
+        ],
+        "source_candidate_commit": "f0bcaaac7feb35efec438cbcc4bf36bfa57cd993"
+      },
+      "quality_message": "Quality failed: “workflow.quality.enter:default-quality” — Found one defect in originating-attempt evidence recovery before publication. Read-only checks passed; no files or Git state were changed.",
       "quality_skill_results": [
         {
           "artifacts": {
@@ -1493,10 +1530,10 @@
           "summary": "Reviewed the candidate and corrected a Skill receipt provenance defect. Focused regression checks pass with no unresolved findings."
         }
       ],
-      "quality_state": null,
+      "quality_state": "failed",
       "reporter": "Buddy Williams",
       "rule_state": null,
-      "updated": "2026-09-10T14:47:56Z",
+      "updated": "2026-09-10T14:52:22Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T13:43:03Z",
         "round_idx": 1,
@@ -1537,7 +1574,7 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-10T14:47:56Z",
+  "updated": "2026-09-10T14:52:22Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:37.079960889+00:00",
@@ -1576,5 +1613,5 @@
       "to": "quality"
     }
   ],
-  "workflow_revision": 45
+  "workflow_revision": 46
 }

@@ -915,11 +915,93 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "failed",
+  "results": {
+    "default-quality": {
+      "invocation_id": "f4577f5a926319479c8c06b7e3834c2cba05e45a842b0d2fdb142df218bdc506",
+      "binding_id": "default-quality",
+      "role": "quality",
+      "outcome": "failure",
+      "summary": "Found one defect in originating-attempt evidence recovery before publication. Read-only checks passed; no files or Git state were changed.",
+      "evidence": [
+        "Reviewed candidate f0bcaaac7feb35efec438cbcc4bf36bfa57cd993 against base 7b430a6a3bc0d692f03e71da68d06f3e9534dead, the finalized Round 2 plan, and affected intent contracts.",
+        "Recovery uses shared surface eligibility, exact-candidate Skill and supervised Quality evidence, bounded integration recovery, and strict approval.",
+        "The finding is established by source inspection, not a newly executed Rust regression. The existing crash regression covers a repository without a remote and misses interruption before required publication.",
+        "Final candidate identity and clean-worktree assertions exited 0. No Goal advancement, merge, push, deployment, or daemon restart occurred.",
+        "Rust regression commands below are proposed for Refine supervision and were not executed during this observational invocation."
+      ],
+      "artifacts": {
+        "findings": [
+          {
+            "description": "If attempt A crashes after advancing the local target but before recording its completed local effect, its integration_intent survives. With required publication still incomplete, recover_integrated_candidate_locked returns before processing that intent. Attempt B then records the existing local merge and successful publication under B in publication.rs:191-220 and settles Review. A remains recorded only as an unconfirmed intent, despite completing the local merge. This misses finalized plan P6 and the originating-attempt evidence contract.",
+            "id": "Q1",
+            "location": "src/application/workflow/governance/integration/resume.rs:117-124",
+            "priority": "P2",
+            "recommendation": "Reconcile prepared local effects against fresh local ancestry before returning for incomplete publication. Retain the confirmed local effect under A with pushed=false and publication_required=true, then attribute subsequent publication to its executing attempt.",
+            "required_regression": "Extend crash_after_ref_motion_recovers_the_prepared_effect_on_its_originating_attempt with a remote still at the base. Retain A's integration intent, omit its completed effect, claim B, and resume through Review. Assert A retains the completed local merge, B retains publication, and repeated recovery preserves both without reviving A.",
+            "title": "Recover the originating attempt's completed local merge before publication"
+          }
+        ],
+        "tests": [
+          {
+            "command": "node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js",
+            "evidence": "Executed: exit 0; 6 passed, 0 failed, 0 skipped.",
+            "status": "passed",
+            "test": "Browser recovery eligibility, diagnostics, and shipped JavaScript syntax"
+          },
+          {
+            "command": "set -o pipefail\ngit diff --name-only 7b430a6a3bc0d692f03e71da68d06f3e9534dead f0bcaaac7feb35efec438cbcc4bf36bfa57cd993 -- '*.rs' | xargs -r rustfmt --check --edition 2024 --config skip_children=true",
+            "evidence": "Executed: exit 0; no formatting diagnostics.",
+            "status": "passed",
+            "test": "Changed Rust file formatting"
+          },
+          {
+            "command": "git diff --check 7b430a6a3bc0d692f03e71da68d06f3e9534dead f0bcaaac7feb35efec438cbcc4bf36bfa57cd993",
+            "evidence": "Executed: exit 0; no whitespace errors.",
+            "status": "passed",
+            "test": "Candidate patch whitespace integrity"
+          },
+          {
+            "command": "cargo test --lib governance -- --test-threads=1",
+            "evidence": "Proposed for Refine supervision. Existing tests do not cover Q1's combined crash and incomplete-publication scenario.",
+            "status": "pending",
+            "test": "Existing Governance recovery, settlement, authority, and surface regressions"
+          },
+          {
+            "command": "cargo test --lib application::events:: -- --test-threads=1",
+            "evidence": "Proposed for Refine supervision; not executed here.",
+            "status": "pending",
+            "test": "Skill receipt validation and lifecycle gates"
+          },
+          {
+            "command": "cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1",
+            "evidence": "Proposed for Refine supervision; not executed here.",
+            "status": "pending",
+            "test": "Quality proof reuse, receipt replay, and explicit absent required Skills"
+          },
+          {
+            "command": "cargo test --lib candidate_refresh -- --test-threads=1",
+            "evidence": "Proposed for Refine supervision; not executed here.",
+            "status": "pending",
+            "test": "Candidate refresh and bounded target-movement recovery"
+          }
+        ]
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-quality",
+      "diagnostic": null,
+      "operation_id": "1a08bca29fe113c762a",
+      "process_id": "proc-1789051677985-1129590-394",
+      "raw_output": "{\n  \"binding_id\": \"default-quality\",\n  \"invocation_id\": \"f4577f5a926319479c8c06b7e3834c2cba05e45a842b0d2fdb142df218bdc506\",\n  \"outcome\": \"failure\",\n  \"role\": \"quality\",\n  \"summary\": \"Found one defect in originating-attempt evidence recovery before publication. Read-only checks passed; no files or Git state were changed.\",\n  \"evidence\": [\n    \"Reviewed candidate f0bcaaac7feb35efec438cbcc4bf36bfa57cd993 against base 7b430a6a3bc0d692f03e71da68d06f3e9534dead, the finalized Round 2 plan, and affected intent contracts.\",\n    \"Recovery uses shared surface eligibility, exact-candidate Skill and supervised Quality evidence, bounded integration recovery, and strict approval.\",\n    \"The finding is established by source inspection, not a newly executed Rust regression. The existing crash regression covers a repository without a remote and misses interruption before required publication.\",\n    \"Final candidate identity and clean-worktree assertions exited 0. No Goal advancement, merge, push, deployment, or daemon restart occurred.\",\n    \"Rust regression commands below are proposed for Refine supervision and were not executed during this observational invocation.\"\n  ],\n  \"artifacts\": {\n    \"findings\": [\n      {\n        \"id\": \"Q1\",\n        \"priority\": \"P2\",\n        \"title\": \"Recover the originating attempt's completed local merge before publication\",\n        \"location\": \"src/application/workflow/governance/integration/resume.rs:117-124\",\n        \"description\": \"If attempt A crashes after advancing the local target but before recording its completed local effect, its integration_intent survives. With required publication still incomplete, recover_integrated_candidate_locked returns before processing that intent. Attempt B then records the existing local merge and successful publication under B in publication.rs:191-220 and settles Review. A remains recorded only as an unconfirmed intent, despite completing the local merge. This misses finalized plan P6 and the originating-attempt evidence contract.\",\n        \"recommendation\": \"Reconcile prepared local effects against fresh local ancestry before returning for incomplete publication. Retain the confirmed local effect under A with pushed=false and publication_required=true, then attribute subsequent publication to its executing attempt.\",\n        \"required_regression\": \"Extend crash_after_ref_motion_recovers_the_prepared_effect_on_its_originating_attempt with a remote still at the base. Retain A's integration intent, omit its completed effect, claim B, and resume through Review. Assert A retains the completed local merge, B retains publication, and repeated recovery preserves both without reviving A.\"\n      }\n    ],\n    \"tests\": [\n      {\n        \"test\": \"Browser recovery eligibility, diagnostics, and shipped JavaScript syntax\",\n        \"command\": \"node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js\",\n        \"status\": \"passed\",\n        \"evidence\": \"Executed: exit 0; 6 passed, 0 failed, 0 skipped.\"\n      },\n      {\n        \"test\": \"Changed Rust file formatting\",\n        \"command\": \"set -o pipefail\\ngit diff --name-only 7b430a6a3bc0d692f03e71da68d06f3e9534dead f0bcaaac7feb35efec438cbcc4bf36bfa57cd993 -- '*.rs' | xargs -r rustfmt --check --edition 2024 --config skip_children=true\",\n        \"status\": \"passed\",\n        \"evidence\": \"Executed: exit 0; no formatting diagnostics.\"\n      },\n      {\n        \"test\": \"Candidate patch whitespace integrity\",\n        \"command\": \"git diff --check 7b430a6a3bc0d692f03e71da68d06f3e9534dead f0bcaaac7feb35efec438cbcc4bf36bfa57cd993\",\n        \"status\": \"passed\",\n        \"evidence\": \"Executed: exit 0; no whitespace errors.\"\n      },\n      {\n        \"test\": \"Existing Governance recovery, settlement, authority, and surface regressions\",\n        \"command\": \"cargo test --lib governance -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed for Refine supervision. Existing tests do not cover Q1's combined crash and incomplete-publication scenario.\"\n      },\n      {\n        \"test\": \"Skill receipt validation and lifecycle gates\",\n        \"command\": \"cargo test --lib application::events:: -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed for Refine supervision; not executed here.\"\n      },\n      {\n        \"test\": \"Quality proof reuse, receipt replay, and explicit absent required Skills\",\n        \"command\": \"cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed for Refine supervision; not executed here.\"\n      },\n      {\n        \"test\": \"Candidate refresh and bounded target-movement recovery\",\n        \"command\": \"cargo test --lib candidate_refresh -- --test-threads=1\",\n        \"status\": \"pending\",\n        \"evidence\": \"Proposed for Refine supervision; not executed here.\"\n      }\n    ]\n  }\n}\n",
+      "workflow_revision": 18
+    }
+  ],
   "created_at": "2026-09-10T14:47:57.628533745+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-10T14:52:21.907889235+00:00",
   "error": null,
   "action_applied": false
 }
