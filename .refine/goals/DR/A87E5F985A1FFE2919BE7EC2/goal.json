@@ -3,7 +3,7 @@
   "branch_name": "refine/DRA87E5F985A1FFE2919BE7EC2/round-4",
   "candidate_commit": "34660f8e680c56c09ce52c89ddf552c78b3c7d75",
   "created": "2026-09-10T08:26:05Z",
-  "event_generation": 13,
+  "event_generation": 14,
   "feature_id": null,
   "feature_order": null,
   "id": "DRA87E5F985A1FFE2919BE7EC2",
@@ -5206,9 +5206,238 @@
       "prompt": "In a managed recovery Round for Goal DRA87E5F985A1FFE2919BE7EC2, preserve candidate 59af87d23c3c14881f3969ef316146e7aa2e3273 and all prior Round artifacts. Move required_bindings and the pure receipt-validity policy from src/application/events/evidence.rs into a cohesive Model module extending the existing automation semantics. Update Application callers and relocate the corresponding policy tests. Keep invocation orchestration, configuration persistence and timestamp acquisition in Application. Preserve receipt compatibility, exact-candidate validation, required Skill checks, Q1 effect attribution, replay deduplication, lifecycle gates and strict approval. Avoid unrelated refactoring. Run the relocated Model tests and the existing governance, application::events::, quality_resume, candidate_refresh, CLI/API recovery and browser diagnostics checks; check changed Rust formatting and patch whitespace. Report actual commands and results. Update intent documentation only if its contract changes. Do not manually advance Goal state, approve, merge, push, deploy or restart the serving installation.",
       "quality_agent_report": "workflow.quality.enter:default-quality: Verified the Model policy extraction and preserved recovery behavior on the exact candidate. All requested checks passed; no defects found.",
       "quality_candidate_commit": "34660f8e680c56c09ce52c89ddf552c78b3c7d75",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
+      "quality_checked_at": "2026-09-10T15:44:54Z",
+      "quality_details": {
+        "candidate_commit": "34660f8e680c56c09ce52c89ddf552c78b3c7d75",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRA87E5F985A1FFE2919BE7EC2-round-2",
+        "diagnostics": [
+          "Event invocation 042c2558d6e30c65acecd3097ad12993c7b496dd99b33ce0cd53c92f06458c37: automation/invocations/042c2558d6e30c65acecd3097ad12993c7b496dd99b33ce0cd53c92f06458c37.json",
+          "Observed supervised process proc-1789055024315-1129590-831 exited 0. stdout: running 4 tests\ntest model::automation::gate_evidence::tests::disabled_skills_and_node_overrides_use_the_pinned_selection ... ok\ntest model::automation::gate_evidence::tests::optional_gates_require_explicit_receipts_and_never_promote_context_or_background ... ok\ntest model::automation::gate_evidence::tests::required_results_are_pinned_complete_and_candidate_bound ... ok\ntest model::automation::gate_evidence::tests::version_one_receipts_accept_legacy_state_and_additional_metadata ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 1185 filtered out; finished in 0.00s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+          "Observed supervised process proc-1789055024584-1129590-834 exited 0. stdout: flow::tests::disruption::force_stop_after_quality_proof_before_governance_reuses_the_proof ... ok\ntest application::workflow::tests::disruption::force_stop_mid_governance_with_transaction_marker_recovers_and_integrates ... ok\ntest application::workflow::tests::execution_ownership::cleanup_observes_candidate_handoff_through_governance_integration ... ok\ntest application::workflow::tests::governance::file_automation_fails_after_the_governance_recovery_budget_is_exhausted ... ok\ntest application::workflow::tests::governance::file_automation_stops_early_when_consecutive_governance_findings_are_identical ... ok\ntest application::workflow::tests::quality_base_refresh::a_later_target_move_still_refreshes_at_governance_and_retains_the_earlier_repin ... ok\ntest application::workflow::tests::worktree_resume::resume_reuses_a_durable_quality_proof_and_skips_straight_to_governance ... ok\ntest infrastructure::process::supervisor::config::tests::file_project_config_services_persist_governance_guidance_and_reporters ... ok\ntest infrastructure::process::supervisor::config::tests::governance_rejects_invalid_revision_shapes ... ok\ntest infrastructure::process::supervisor::config::tests::governance_rule_revisions_preserve_unrelated_fields_and_fence_stale_writers ... ok\ntest surfaces::cli::tests::goals::lifecycle::goal_retry_governance_from_review_uses_shared_evidence_diagnostics ... ok\ntest surfaces::web_server::tests::features::membership::web_server_governance_retry_from_review_uses_shared_exact_candidate_eligibility ... ok\ntest surfaces::web_server::tests::quality_guidance::governance::configuration_routes_report_detached_target_app ... ok\ntest surfaces::web_server::tests::quality_guidance::governance::web_server_manages_events_skills_and_reporters ... ok\ntest surfaces::web_server::tests::static_surface::work_items::static_goal_detail_uses_shared_governance_review_state_helpers ... ok\n\ntest result: ok. 86 passed; 0 failed; 0 ignored; 0 measured; 1103 filtered out; finished in 48.73s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.13s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\nPreparing worktree (detached HEAD 5ab56a8)\nPreparing worktree (detached HEAD 3d84db5)",
+          "Observed supervised process proc-1789055073636-1129590-846 exited 0. stdout: nc_merges_disjoint_edits_fences_both_editors_and_rejects_broken_references ... ok\ntest application::events::tests::default_skills_complete_a_real_workflow_with_observed_quality_and_candidate_evidence ... ok\ntest application::events::tests::disabled_node_override_masks_only_its_project_binding ... ok\ntest application::events::tests::goal_and_system_paths_resolve_arrays_and_missing_shared_parameters_keep_requiredness ... ok\ntest application::events::tests::interrupted_index_updates_recover_without_replaying_completed_work ... ok\ntest application::events::tests::manual_request_identity_and_success_action_receipts_survive_replay ... ok\ntest application::events::tests::manual_skills_select_one_skill_validate_inputs_and_pin_replay_without_a_goal ... ok\ntest application::events::tests::manual_transition_waits_for_exit_evidence_and_cancellation_can_supersede_it ... ok\ntest application::events::tests::migration_preserves_content_is_idempotent_and_stale_writes_cannot_erase_edits ... ok\ntest application::events::tests::missing_automatic_input_settles_as_visible_error_instead_of_waiting_forever ... ok\ntest application::events::tests::ordered_independent_runs_collect_failure_preserve_evidence_and_do_not_replay ... ok\ntest application::events::tests::oversized_configuration_is_rejected_before_replacing_the_readable_document ... ok\ntest application::events::tests::single_trigger_save_rejects_multiple_and_derives_the_workflow_result_contract ... ok\ntest application::events::tests::skill_event_assignments_save_atomically_and_preserve_other_skills ... ok\ntest application::events::tests::startup_occurrences_are_idempotent_and_new_boots_get_new_invocations ... ok\ntest application::events::tests::typed_parameters_resolve_explicit_then_context_then_default_and_fail_on_missing ... ok\ntest application::events::tests::v2_migration_splits_assignments_preserves_overrides_and_is_idempotent ... ok\n\ntest result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 1168 filtered out; finished in 3.45s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+          "Observed supervised process proc-1789055077388-1129590-849 exited 0. stdout: running 6 tests\ntest application::workflow::engine::behaviors::tests::quality_resume::empty_quality_and_governance_skills_pass_without_agents_and_retain_candidate_proof ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::receipt_replay::quality_receipt_replay_uses_the_original_skill_and_supervises_its_commands ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::resume_with_a_durable_quality_proof_transitions_without_any_provider_invocation ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::resume_with_a_proof_for_another_candidate_reruns_the_whole_quality_phase ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::resume_with_an_unresolvable_proof_candidate_reruns_the_whole_quality_phase ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::resume_with_persisted_correction_evidence_skips_the_agent_and_reruns_only_the_gate ... ok\n\ntest result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 1183 filtered out; finished in 6.66s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+          "Observed supervised process proc-1789055084323-1129590-861 exited 0. stdout: resh::a_target_tip_moved_during_resolution_retries_boundedly_then_resolves ... ok\ntest application::workflow::tests::candidate_refresh::an_interrupted_rebase_is_aborted_before_the_recovery_round_is_queued ... ok\ntest application::workflow::tests::candidate_refresh::an_out_of_scope_edit_is_rejected_before_it_reaches_the_replacement ... ok\ntest application::workflow::tests::candidate_refresh::an_unavailable_resolver_falls_back_immediately_without_more_attempts ... ok\ntest application::workflow::tests::candidate_refresh::authority_loss_after_rebase_restores_the_original_candidate_branch ... ok\ntest application::workflow::tests::candidate_refresh::conflicted_refresh_resolves_in_place_without_holding_the_repository_lock ... ok\ntest application::workflow::tests::candidate_refresh::integration_merge_conflict_exhaustion_fails_with_integration_retry_exhausted ... ok\ntest application::workflow::tests::candidate_refresh::integration_merge_conflict_queues_one_fenced_recovery_round_with_the_conflicted_paths ... ok\ntest application::workflow::tests::candidate_refresh::integration_recovery_uses_the_next_shared_automatic_retry_attempt ... ok\ntest application::workflow::tests::candidate_refresh::refresh_conflict_aborts_and_queues_one_fenced_recovery_round ... ok\ntest application::workflow::tests::candidate_refresh::refresh_conflict_records_explicit_exhaustion_without_a_successor_round ... ok\ntest application::workflow::tests::candidate_refresh::rejected_resolutions_exhaust_the_budget_into_todays_fallback_with_a_question ... ok\ntest application::workflow::tests::candidate_refresh::repository_lease_serializes_competing_target_refreshes ... ok\ntest application::workflow::tests::candidate_refresh::target_advancement_rebases_a_provable_delta_and_records_both_identities ... ok\ntest application::workflow::tests::candidate_refresh::workflow_conflict_resolution_defaults_on_and_honors_off ... ok\n\ntest result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 1173 filtered out; finished in 4.50s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+          "Observed supervised process proc-1789055089107-1129590-868 exited 0. stdout: running 12 tests\ntest application::work_items::tests::workflow::authored_todo_start_atomically_pins_nonempty_round ... ok\ntest application::work_items::tests::workflow::authored_todo_start_rejects_round_revision_change_before_execution ... ok\ntest application::work_items::tests::workflow::automatic_recovery_appends_past_a_claimed_recovery_round ... ok\ntest application::work_items::tests::workflow::automatic_recovery_reuses_a_round_claimed_by_the_retiring_attempt ... ok\ntest application::work_items::tests::workflow::automatic_recovery_reuses_an_unstarted_recovery_round ... ok\ntest application::work_items::tests::workflow::file_work_item_service_rejects_invalid_manual_transition ... ok\ntest application::work_items::tests::workflow::file_work_item_service_transitions_goal_via_refine_json ... ok\ntest application::work_items::tests::workflow::file_work_item_service_verifies_and_undoes_goal_workflow ... ok\ntest application::work_items::tests::workflow::integration_recovery_records_truthful_successor_and_clears_authority ... ok\ntest application::work_items::tests::workflow::integration_recovery_reuses_its_own_claimed_unworked_recovery_round ... ok\ntest application::work_items::tests::workflow::projected_status_transition_rejects_an_external_revision_change ... ok\ntest application::work_items::tests::workflow::reconciliation_recovery_clears_source_authority_and_requeues_todo ... ok\n\ntest result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 1177 filtered out; finished in 0.94s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+          "Observed supervised process proc-1789055090296-1129590-871 exited 0. stdout: running 5 tests\ntest surfaces::cli::tests::goals::lifecycle::feature_transfer_command_moves_feature_and_member_goals_between_nodes ... ok\ntest surfaces::cli::tests::goals::lifecycle::goal_approve_and_undo_use_shared_file_work_item_service ... ok\ntest surfaces::cli::tests::goals::lifecycle::goal_edit_note_delete_use_shared_file_work_item_service ... ok\ntest surfaces::cli::tests::goals::lifecycle::goal_resolve_merged_cli_parses_and_dispatches_to_daemon_route ... ok\ntest surfaces::cli::tests::goals::lifecycle::goal_retry_governance_from_review_uses_shared_evidence_diagnostics ... ok\n\ntest result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 1184 filtered out; finished in 0.41s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+          "Observed supervised process proc-1789055090962-1129590-877 exited 0. stdout: running 1 test\ntest surfaces::web_server::tests::features::membership::web_server_governance_retry_from_review_uses_shared_exact_candidate_eligibility ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1188 filtered out; finished in 0.09s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+          "Observed supervised process proc-1789055091306-1129590-880 exited 0. stdout: ✔ Governance and Quality details render structured evidence as readable JSON (3.649455ms)\n✔ a failed Goal falls back to current error evidence when legacy failure fields are empty (2.033415ms)\n✔ Failure and Quality cards render the actionable summary safely and retain full Details (1.445085ms)\n✔ Implementation Plan renders final checklist, immutable history, outcomes, and failures safely (2.014776ms)\n✔ Review recovery controls use shared eligibility and keep acceptance separate (3.213016ms)\n✔ every shipped JavaScript asset passes the Node syntax gate (2548.957937ms)\nℹ tests 6\nℹ suites 0\nℹ pass 6\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 2657.935544",
+          "Observed supervised process proc-1789055094163-1129590-883 exited 0.",
+          "Observed supervised process proc-1789055094443-1129590-886 exited 0.",
+          "Observed supervised process proc-1789055094578-1129590-889 exited 0."
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "1a08bfa2e74113c7659",
+        "provider_attempts": [],
+        "quality_proof": {
+          "checked_at": "2026-09-10T15:44:54Z",
+          "checked_candidate_commit": "34660f8e680c56c09ce52c89ddf552c78b3c7d75",
+          "evaluation_scope": "isolated_candidate",
+          "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+          "operation_id": "1a08bfa2e74113c7659",
+          "results": [
+            {
+              "command": "cargo test --lib model::automation::gate_evidence -- --test-threads=1",
+              "evidence": "Observed supervised process proc-1789055024315-1129590-831 exited 0. stdout: running 4 tests\ntest model::automation::gate_evidence::tests::disabled_skills_and_node_overrides_use_the_pinned_selection ... ok\ntest model::automation::gate_evidence::tests::optional_gates_require_explicit_receipts_and_never_promote_context_or_background ... ok\ntest model::automation::gate_evidence::tests::required_results_are_pinned_complete_and_candidate_bound ... ok\ntest model::automation::gate_evidence::tests::version_one_receipts_accept_legacy_state_and_additional_metadata ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 1185 filtered out; finished in 0.00s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+              "exit_code": 0,
+              "process_id": "proc-1789055024315-1129590-831",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Model selection, receipt validation and compatibility"
+            },
+            {
+              "command": "cargo test --lib governance -- --test-threads=1",
+              "evidence": "Observed supervised process proc-1789055024584-1129590-834 exited 0. stdout: flow::tests::disruption::force_stop_after_quality_proof_before_governance_reuses_the_proof ... ok\ntest application::workflow::tests::disruption::force_stop_mid_governance_with_transaction_marker_recovers_and_integrates ... ok\ntest application::workflow::tests::execution_ownership::cleanup_observes_candidate_handoff_through_governance_integration ... ok\ntest application::workflow::tests::governance::file_automation_fails_after_the_governance_recovery_budget_is_exhausted ... ok\ntest application::workflow::tests::governance::file_automation_stops_early_when_consecutive_governance_findings_are_identical ... ok\ntest application::workflow::tests::quality_base_refresh::a_later_target_move_still_refreshes_at_governance_and_retains_the_earlier_repin ... ok\ntest application::workflow::tests::worktree_resume::resume_reuses_a_durable_quality_proof_and_skips_straight_to_governance ... ok\ntest infrastructure::process::supervisor::config::tests::file_project_config_services_persist_governance_guidance_and_reporters ... ok\ntest infrastructure::process::supervisor::config::tests::governance_rejects_invalid_revision_shapes ... ok\ntest infrastructure::process::supervisor::config::tests::governance_rule_revisions_preserve_unrelated_fields_and_fence_stale_writers ... ok\ntest surfaces::cli::tests::goals::lifecycle::goal_retry_governance_from_review_uses_shared_evidence_diagnostics ... ok\ntest surfaces::web_server::tests::features::membership::web_server_governance_retry_from_review_uses_shared_exact_candidate_eligibility ... ok\ntest surfaces::web_server::tests::quality_guidance::governance::configuration_routes_report_detached_target_app ... ok\ntest surfaces::web_server::tests::quality_guidance::governance::web_server_manages_events_skills_and_reporters ... ok\ntest surfaces::web_server::tests::static_surface::work_items::static_goal_detail_uses_shared_governance_review_state_helpers ... ok\n\ntest result: ok. 86 passed; 0 failed; 0 ignored; 0 measured; 1103 filtered out; finished in 48.73s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.13s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\nPreparing worktree (detached HEAD 5ab56a8)\nPreparing worktree (detached HEAD 3d84db5)",
+              "exit_code": 0,
+              "process_id": "proc-1789055024584-1129590-834",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Recovery, settlement, lifecycle gates and stale-attempt rejection"
+            },
+            {
+              "command": "cargo test --lib application::events:: -- --test-threads=1",
+              "evidence": "Observed supervised process proc-1789055073636-1129590-846 exited 0. stdout: nc_merges_disjoint_edits_fences_both_editors_and_rejects_broken_references ... ok\ntest application::events::tests::default_skills_complete_a_real_workflow_with_observed_quality_and_candidate_evidence ... ok\ntest application::events::tests::disabled_node_override_masks_only_its_project_binding ... ok\ntest application::events::tests::goal_and_system_paths_resolve_arrays_and_missing_shared_parameters_keep_requiredness ... ok\ntest application::events::tests::interrupted_index_updates_recover_without_replaying_completed_work ... ok\ntest application::events::tests::manual_request_identity_and_success_action_receipts_survive_replay ... ok\ntest application::events::tests::manual_skills_select_one_skill_validate_inputs_and_pin_replay_without_a_goal ... ok\ntest application::events::tests::manual_transition_waits_for_exit_evidence_and_cancellation_can_supersede_it ... ok\ntest application::events::tests::migration_preserves_content_is_idempotent_and_stale_writes_cannot_erase_edits ... ok\ntest application::events::tests::missing_automatic_input_settles_as_visible_error_instead_of_waiting_forever ... ok\ntest application::events::tests::ordered_independent_runs_collect_failure_preserve_evidence_and_do_not_replay ... ok\ntest application::events::tests::oversized_configuration_is_rejected_before_replacing_the_readable_document ... ok\ntest application::events::tests::single_trigger_save_rejects_multiple_and_derives_the_workflow_result_contract ... ok\ntest application::events::tests::skill_event_assignments_save_atomically_and_preserve_other_skills ... ok\ntest application::events::tests::startup_occurrences_are_idempotent_and_new_boots_get_new_invocations ... ok\ntest application::events::tests::typed_parameters_resolve_explicit_then_context_then_default_and_fail_on_missing ... ok\ntest application::events::tests::v2_migration_splits_assignments_preserves_overrides_and_is_idempotent ... ok\n\ntest result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 1168 filtered out; finished in 3.45s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+              "exit_code": 0,
+              "process_id": "proc-1789055073636-1129590-846",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Application event execution and Skill evidence"
+            },
+            {
+              "command": "cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1",
+              "evidence": "Observed supervised process proc-1789055077388-1129590-849 exited 0. stdout: running 6 tests\ntest application::workflow::engine::behaviors::tests::quality_resume::empty_quality_and_governance_skills_pass_without_agents_and_retain_candidate_proof ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::receipt_replay::quality_receipt_replay_uses_the_original_skill_and_supervises_its_commands ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::resume_with_a_durable_quality_proof_transitions_without_any_provider_invocation ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::resume_with_a_proof_for_another_candidate_reruns_the_whole_quality_phase ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::resume_with_an_unresolvable_proof_candidate_reruns_the_whole_quality_phase ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::resume_with_persisted_correction_evidence_skips_the_agent_and_reruns_only_the_gate ... ok\n\ntest result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 1183 filtered out; finished in 6.66s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+              "exit_code": 0,
+              "process_id": "proc-1789055077388-1129590-849",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Pinned configuration replay and supervised Quality proof"
+            },
+            {
+              "command": "cargo test --lib candidate_refresh -- --test-threads=1",
+              "evidence": "Observed supervised process proc-1789055084323-1129590-861 exited 0. stdout: resh::a_target_tip_moved_during_resolution_retries_boundedly_then_resolves ... ok\ntest application::workflow::tests::candidate_refresh::an_interrupted_rebase_is_aborted_before_the_recovery_round_is_queued ... ok\ntest application::workflow::tests::candidate_refresh::an_out_of_scope_edit_is_rejected_before_it_reaches_the_replacement ... ok\ntest application::workflow::tests::candidate_refresh::an_unavailable_resolver_falls_back_immediately_without_more_attempts ... ok\ntest application::workflow::tests::candidate_refresh::authority_loss_after_rebase_restores_the_original_candidate_branch ... ok\ntest application::workflow::tests::candidate_refresh::conflicted_refresh_resolves_in_place_without_holding_the_repository_lock ... ok\ntest application::workflow::tests::candidate_refresh::integration_merge_conflict_exhaustion_fails_with_integration_retry_exhausted ... ok\ntest application::workflow::tests::candidate_refresh::integration_merge_conflict_queues_one_fenced_recovery_round_with_the_conflicted_paths ... ok\ntest application::workflow::tests::candidate_refresh::integration_recovery_uses_the_next_shared_automatic_retry_attempt ... ok\ntest application::workflow::tests::candidate_refresh::refresh_conflict_aborts_and_queues_one_fenced_recovery_round ... ok\ntest application::workflow::tests::candidate_refresh::refresh_conflict_records_explicit_exhaustion_without_a_successor_round ... ok\ntest application::workflow::tests::candidate_refresh::rejected_resolutions_exhaust_the_budget_into_todays_fallback_with_a_question ... ok\ntest application::workflow::tests::candidate_refresh::repository_lease_serializes_competing_target_refreshes ... ok\ntest application::workflow::tests::candidate_refresh::target_advancement_rebases_a_provable_delta_and_records_both_identities ... ok\ntest application::workflow::tests::candidate_refresh::workflow_conflict_resolution_defaults_on_and_honors_off ... ok\n\ntest result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 1173 filtered out; finished in 4.50s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+              "exit_code": 0,
+              "process_id": "proc-1789055084323-1129590-861",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Candidate refresh and bounded recovery"
+            },
+            {
+              "command": "cargo test --lib application::work_items::tests::workflow -- --test-threads=1",
+              "evidence": "Observed supervised process proc-1789055089107-1129590-868 exited 0. stdout: running 12 tests\ntest application::work_items::tests::workflow::authored_todo_start_atomically_pins_nonempty_round ... ok\ntest application::work_items::tests::workflow::authored_todo_start_rejects_round_revision_change_before_execution ... ok\ntest application::work_items::tests::workflow::automatic_recovery_appends_past_a_claimed_recovery_round ... ok\ntest application::work_items::tests::workflow::automatic_recovery_reuses_a_round_claimed_by_the_retiring_attempt ... ok\ntest application::work_items::tests::workflow::automatic_recovery_reuses_an_unstarted_recovery_round ... ok\ntest application::work_items::tests::workflow::file_work_item_service_rejects_invalid_manual_transition ... ok\ntest application::work_items::tests::workflow::file_work_item_service_transitions_goal_via_refine_json ... ok\ntest application::work_items::tests::workflow::file_work_item_service_verifies_and_undoes_goal_workflow ... ok\ntest application::work_items::tests::workflow::integration_recovery_records_truthful_successor_and_clears_authority ... ok\ntest application::work_items::tests::workflow::integration_recovery_reuses_its_own_claimed_unworked_recovery_round ... ok\ntest application::work_items::tests::workflow::projected_status_transition_rejects_an_external_revision_change ... ok\ntest application::work_items::tests::workflow::reconciliation_recovery_clears_source_authority_and_requeues_todo ... ok\n\ntest result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 1177 filtered out; finished in 0.94s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+              "exit_code": 0,
+              "process_id": "proc-1789055089107-1129590-868",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Shared workflow transitions"
+            },
+            {
+              "command": "cargo test --lib surfaces::cli::tests::goals::lifecycle -- --test-threads=1",
+              "evidence": "Observed supervised process proc-1789055090296-1129590-871 exited 0. stdout: running 5 tests\ntest surfaces::cli::tests::goals::lifecycle::feature_transfer_command_moves_feature_and_member_goals_between_nodes ... ok\ntest surfaces::cli::tests::goals::lifecycle::goal_approve_and_undo_use_shared_file_work_item_service ... ok\ntest surfaces::cli::tests::goals::lifecycle::goal_edit_note_delete_use_shared_file_work_item_service ... ok\ntest surfaces::cli::tests::goals::lifecycle::goal_resolve_merged_cli_parses_and_dispatches_to_daemon_route ... ok\ntest surfaces::cli::tests::goals::lifecycle::goal_retry_governance_from_review_uses_shared_evidence_diagnostics ... ok\n\ntest result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 1184 filtered out; finished in 0.41s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+              "exit_code": 0,
+              "process_id": "proc-1789055090296-1129590-871",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: CLI recovery and strict approval"
+            },
+            {
+              "command": "cargo test --lib web_server_governance_retry_from_review -- --test-threads=1",
+              "evidence": "Observed supervised process proc-1789055090962-1129590-877 exited 0. stdout: running 1 test\ntest surfaces::web_server::tests::features::membership::web_server_governance_retry_from_review_uses_shared_exact_candidate_eligibility ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1188 filtered out; finished in 0.09s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+              "exit_code": 0,
+              "process_id": "proc-1789055090962-1129590-877",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: API shared recovery eligibility"
+            },
+            {
+              "command": "node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js",
+              "evidence": "Observed supervised process proc-1789055091306-1129590-880 exited 0. stdout: ✔ Governance and Quality details render structured evidence as readable JSON (3.649455ms)\n✔ a failed Goal falls back to current error evidence when legacy failure fields are empty (2.033415ms)\n✔ Failure and Quality cards render the actionable summary safely and retain full Details (1.445085ms)\n✔ Implementation Plan renders final checklist, immutable history, outcomes, and failures safely (2.014776ms)\n✔ Review recovery controls use shared eligibility and keep acceptance separate (3.213016ms)\n✔ every shipped JavaScript asset passes the Node syntax gate (2548.957937ms)\nℹ tests 6\nℹ suites 0\nℹ pass 6\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 2657.935544",
+              "exit_code": 0,
+              "process_id": "proc-1789055091306-1129590-880",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Browser recovery diagnostics and JavaScript syntax"
+            },
+            {
+              "command": "set -o pipefail\nGIT_OPTIONAL_LOCKS=0 git diff --name-only b47569adb8d4c5d1d7335ba91729a3e486a38fe0 HEAD -- '*.rs' | xargs -r rustfmt --check --edition 2024 --config skip_children=true",
+              "evidence": "Observed supervised process proc-1789055094163-1129590-883 exited 0.",
+              "exit_code": 0,
+              "process_id": "proc-1789055094163-1129590-883",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Changed Rust formatting"
+            },
+            {
+              "command": "GIT_OPTIONAL_LOCKS=0 git diff --check 59af87d23c3c14881f3969ef316146e7aa2e3273 HEAD",
+              "evidence": "Observed supervised process proc-1789055094443-1129590-886 exited 0.",
+              "exit_code": 0,
+              "process_id": "proc-1789055094443-1129590-886",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Recovery Round patch integrity"
+            },
+            {
+              "command": "GIT_OPTIONAL_LOCKS=0 git diff --check b47569adb8d4c5d1d7335ba91729a3e486a38fe0 HEAD",
+              "evidence": "Observed supervised process proc-1789055094578-1129590-889 exited 0.",
+              "exit_code": 0,
+              "process_id": "proc-1789055094578-1129590-889",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Complete candidate patch integrity"
+            }
+          ],
+          "round_idx": 3,
+          "schema_version": 1,
+          "source_candidate_commit": "34660f8e680c56c09ce52c89ddf552c78b3c7d75",
+          "state": "passed"
+        },
+        "results": [
+          {
+            "command": "cargo test --lib model::automation::gate_evidence -- --test-threads=1",
+            "evidence": "Observed supervised process proc-1789055024315-1129590-831 exited 0. stdout: running 4 tests\ntest model::automation::gate_evidence::tests::disabled_skills_and_node_overrides_use_the_pinned_selection ... ok\ntest model::automation::gate_evidence::tests::optional_gates_require_explicit_receipts_and_never_promote_context_or_background ... ok\ntest model::automation::gate_evidence::tests::required_results_are_pinned_complete_and_candidate_bound ... ok\ntest model::automation::gate_evidence::tests::version_one_receipts_accept_legacy_state_and_additional_metadata ... ok\n\ntest result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 1185 filtered out; finished in 0.00s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+            "exit_code": 0,
+            "process_id": "proc-1789055024315-1129590-831",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Model selection, receipt validation and compatibility"
+          },
+          {
+            "command": "cargo test --lib governance -- --test-threads=1",
+            "evidence": "Observed supervised process proc-1789055024584-1129590-834 exited 0. stdout: flow::tests::disruption::force_stop_after_quality_proof_before_governance_reuses_the_proof ... ok\ntest application::workflow::tests::disruption::force_stop_mid_governance_with_transaction_marker_recovers_and_integrates ... ok\ntest application::workflow::tests::execution_ownership::cleanup_observes_candidate_handoff_through_governance_integration ... ok\ntest application::workflow::tests::governance::file_automation_fails_after_the_governance_recovery_budget_is_exhausted ... ok\ntest application::workflow::tests::governance::file_automation_stops_early_when_consecutive_governance_findings_are_identical ... ok\ntest application::workflow::tests::quality_base_refresh::a_later_target_move_still_refreshes_at_governance_and_retains_the_earlier_repin ... ok\ntest application::workflow::tests::worktree_resume::resume_reuses_a_durable_quality_proof_and_skips_straight_to_governance ... ok\ntest infrastructure::process::supervisor::config::tests::file_project_config_services_persist_governance_guidance_and_reporters ... ok\ntest infrastructure::process::supervisor::config::tests::governance_rejects_invalid_revision_shapes ... ok\ntest infrastructure::process::supervisor::config::tests::governance_rule_revisions_preserve_unrelated_fields_and_fence_stale_writers ... ok\ntest surfaces::cli::tests::goals::lifecycle::goal_retry_governance_from_review_uses_shared_evidence_diagnostics ... ok\ntest surfaces::web_server::tests::features::membership::web_server_governance_retry_from_review_uses_shared_exact_candidate_eligibility ... ok\ntest surfaces::web_server::tests::quality_guidance::governance::configuration_routes_report_detached_target_app ... ok\ntest surfaces::web_server::tests::quality_guidance::governance::web_server_manages_events_skills_and_reporters ... ok\ntest surfaces::web_server::tests::static_surface::work_items::static_goal_detail_uses_shared_governance_review_state_helpers ... ok\n\ntest result: ok. 86 passed; 0 failed; 0 ignored; 0 measured; 1103 filtered out; finished in 48.73s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.13s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)\nPreparing worktree (detached HEAD 5ab56a8)\nPreparing worktree (detached HEAD 3d84db5)",
+            "exit_code": 0,
+            "process_id": "proc-1789055024584-1129590-834",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Recovery, settlement, lifecycle gates and stale-attempt rejection"
+          },
+          {
+            "command": "cargo test --lib application::events:: -- --test-threads=1",
+            "evidence": "Observed supervised process proc-1789055073636-1129590-846 exited 0. stdout: nc_merges_disjoint_edits_fences_both_editors_and_rejects_broken_references ... ok\ntest application::events::tests::default_skills_complete_a_real_workflow_with_observed_quality_and_candidate_evidence ... ok\ntest application::events::tests::disabled_node_override_masks_only_its_project_binding ... ok\ntest application::events::tests::goal_and_system_paths_resolve_arrays_and_missing_shared_parameters_keep_requiredness ... ok\ntest application::events::tests::interrupted_index_updates_recover_without_replaying_completed_work ... ok\ntest application::events::tests::manual_request_identity_and_success_action_receipts_survive_replay ... ok\ntest application::events::tests::manual_skills_select_one_skill_validate_inputs_and_pin_replay_without_a_goal ... ok\ntest application::events::tests::manual_transition_waits_for_exit_evidence_and_cancellation_can_supersede_it ... ok\ntest application::events::tests::migration_preserves_content_is_idempotent_and_stale_writes_cannot_erase_edits ... ok\ntest application::events::tests::missing_automatic_input_settles_as_visible_error_instead_of_waiting_forever ... ok\ntest application::events::tests::ordered_independent_runs_collect_failure_preserve_evidence_and_do_not_replay ... ok\ntest application::events::tests::oversized_configuration_is_rejected_before_replacing_the_readable_document ... ok\ntest application::events::tests::single_trigger_save_rejects_multiple_and_derives_the_workflow_result_contract ... ok\ntest application::events::tests::skill_event_assignments_save_atomically_and_preserve_other_skills ... ok\ntest application::events::tests::startup_occurrences_are_idempotent_and_new_boots_get_new_invocations ... ok\ntest application::events::tests::typed_parameters_resolve_explicit_then_context_then_default_and_fail_on_missing ... ok\ntest application::events::tests::v2_migration_splits_assignments_preserves_overrides_and_is_idempotent ... ok\n\ntest result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 1168 filtered out; finished in 3.45s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+            "exit_code": 0,
+            "process_id": "proc-1789055073636-1129590-846",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Application event execution and Skill evidence"
+          },
+          {
+            "command": "cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1",
+            "evidence": "Observed supervised process proc-1789055077388-1129590-849 exited 0. stdout: running 6 tests\ntest application::workflow::engine::behaviors::tests::quality_resume::empty_quality_and_governance_skills_pass_without_agents_and_retain_candidate_proof ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::receipt_replay::quality_receipt_replay_uses_the_original_skill_and_supervises_its_commands ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::resume_with_a_durable_quality_proof_transitions_without_any_provider_invocation ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::resume_with_a_proof_for_another_candidate_reruns_the_whole_quality_phase ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::resume_with_an_unresolvable_proof_candidate_reruns_the_whole_quality_phase ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::resume_with_persisted_correction_evidence_skips_the_agent_and_reruns_only_the_gate ... ok\n\ntest result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 1183 filtered out; finished in 6.66s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+            "exit_code": 0,
+            "process_id": "proc-1789055077388-1129590-849",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Pinned configuration replay and supervised Quality proof"
+          },
+          {
+            "command": "cargo test --lib candidate_refresh -- --test-threads=1",
+            "evidence": "Observed supervised process proc-1789055084323-1129590-861 exited 0. stdout: resh::a_target_tip_moved_during_resolution_retries_boundedly_then_resolves ... ok\ntest application::workflow::tests::candidate_refresh::an_interrupted_rebase_is_aborted_before_the_recovery_round_is_queued ... ok\ntest application::workflow::tests::candidate_refresh::an_out_of_scope_edit_is_rejected_before_it_reaches_the_replacement ... ok\ntest application::workflow::tests::candidate_refresh::an_unavailable_resolver_falls_back_immediately_without_more_attempts ... ok\ntest application::workflow::tests::candidate_refresh::authority_loss_after_rebase_restores_the_original_candidate_branch ... ok\ntest application::workflow::tests::candidate_refresh::conflicted_refresh_resolves_in_place_without_holding_the_repository_lock ... ok\ntest application::workflow::tests::candidate_refresh::integration_merge_conflict_exhaustion_fails_with_integration_retry_exhausted ... ok\ntest application::workflow::tests::candidate_refresh::integration_merge_conflict_queues_one_fenced_recovery_round_with_the_conflicted_paths ... ok\ntest application::workflow::tests::candidate_refresh::integration_recovery_uses_the_next_shared_automatic_retry_attempt ... ok\ntest application::workflow::tests::candidate_refresh::refresh_conflict_aborts_and_queues_one_fenced_recovery_round ... ok\ntest application::workflow::tests::candidate_refresh::refresh_conflict_records_explicit_exhaustion_without_a_successor_round ... ok\ntest application::workflow::tests::candidate_refresh::rejected_resolutions_exhaust_the_budget_into_todays_fallback_with_a_question ... ok\ntest application::workflow::tests::candidate_refresh::repository_lease_serializes_competing_target_refreshes ... ok\ntest application::workflow::tests::candidate_refresh::target_advancement_rebases_a_provable_delta_and_records_both_identities ... ok\ntest application::workflow::tests::candidate_refresh::workflow_conflict_resolution_defaults_on_and_honors_off ... ok\n\ntest result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 1173 filtered out; finished in 4.50s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+            "exit_code": 0,
+            "process_id": "proc-1789055084323-1129590-861",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Candidate refresh and bounded recovery"
+          },
+          {
+            "command": "cargo test --lib application::work_items::tests::workflow -- --test-threads=1",
+            "evidence": "Observed supervised process proc-1789055089107-1129590-868 exited 0. stdout: running 12 tests\ntest application::work_items::tests::workflow::authored_todo_start_atomically_pins_nonempty_round ... ok\ntest application::work_items::tests::workflow::authored_todo_start_rejects_round_revision_change_before_execution ... ok\ntest application::work_items::tests::workflow::automatic_recovery_appends_past_a_claimed_recovery_round ... ok\ntest application::work_items::tests::workflow::automatic_recovery_reuses_a_round_claimed_by_the_retiring_attempt ... ok\ntest application::work_items::tests::workflow::automatic_recovery_reuses_an_unstarted_recovery_round ... ok\ntest application::work_items::tests::workflow::file_work_item_service_rejects_invalid_manual_transition ... ok\ntest application::work_items::tests::workflow::file_work_item_service_transitions_goal_via_refine_json ... ok\ntest application::work_items::tests::workflow::file_work_item_service_verifies_and_undoes_goal_workflow ... ok\ntest application::work_items::tests::workflow::integration_recovery_records_truthful_successor_and_clears_authority ... ok\ntest application::work_items::tests::workflow::integration_recovery_reuses_its_own_claimed_unworked_recovery_round ... ok\ntest application::work_items::tests::workflow::projected_status_transition_rejects_an_external_revision_change ... ok\ntest application::work_items::tests::workflow::reconciliation_recovery_clears_source_authority_and_requeues_todo ... ok\n\ntest result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 1177 filtered out; finished in 0.94s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+            "exit_code": 0,
+            "process_id": "proc-1789055089107-1129590-868",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Shared workflow transitions"
+          },
+          {
+            "command": "cargo test --lib surfaces::cli::tests::goals::lifecycle -- --test-threads=1",
+            "evidence": "Observed supervised process proc-1789055090296-1129590-871 exited 0. stdout: running 5 tests\ntest surfaces::cli::tests::goals::lifecycle::feature_transfer_command_moves_feature_and_member_goals_between_nodes ... ok\ntest surfaces::cli::tests::goals::lifecycle::goal_approve_and_undo_use_shared_file_work_item_service ... ok\ntest surfaces::cli::tests::goals::lifecycle::goal_edit_note_delete_use_shared_file_work_item_service ... ok\ntest surfaces::cli::tests::goals::lifecycle::goal_resolve_merged_cli_parses_and_dispatches_to_daemon_route ... ok\ntest surfaces::cli::tests::goals::lifecycle::goal_retry_governance_from_review_uses_shared_evidence_diagnostics ... ok\n\ntest result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 1184 filtered out; finished in 0.41s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+            "exit_code": 0,
+            "process_id": "proc-1789055090296-1129590-871",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: CLI recovery and strict approval"
+          },
+          {
+            "command": "cargo test --lib web_server_governance_retry_from_review -- --test-threads=1",
+            "evidence": "Observed supervised process proc-1789055090962-1129590-877 exited 0. stdout: running 1 test\ntest surfaces::web_server::tests::features::membership::web_server_governance_retry_from_review_uses_shared_exact_candidate_eligibility ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 1188 filtered out; finished in 0.09s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+            "exit_code": 0,
+            "process_id": "proc-1789055090962-1129590-877",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: API shared recovery eligibility"
+          },
+          {
+            "command": "node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js",
+            "evidence": "Observed supervised process proc-1789055091306-1129590-880 exited 0. stdout: ✔ Governance and Quality details render structured evidence as readable JSON (3.649455ms)\n✔ a failed Goal falls back to current error evidence when legacy failure fields are empty (2.033415ms)\n✔ Failure and Quality cards render the actionable summary safely and retain full Details (1.445085ms)\n✔ Implementation Plan renders final checklist, immutable history, outcomes, and failures safely (2.014776ms)\n✔ Review recovery controls use shared eligibility and keep acceptance separate (3.213016ms)\n✔ every shipped JavaScript asset passes the Node syntax gate (2548.957937ms)\nℹ tests 6\nℹ suites 0\nℹ pass 6\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 2657.935544",
+            "exit_code": 0,
+            "process_id": "proc-1789055091306-1129590-880",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Browser recovery diagnostics and JavaScript syntax"
+          },
+          {
+            "command": "set -o pipefail\nGIT_OPTIONAL_LOCKS=0 git diff --name-only b47569adb8d4c5d1d7335ba91729a3e486a38fe0 HEAD -- '*.rs' | xargs -r rustfmt --check --edition 2024 --config skip_children=true",
+            "evidence": "Observed supervised process proc-1789055094163-1129590-883 exited 0.",
+            "exit_code": 0,
+            "process_id": "proc-1789055094163-1129590-883",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Changed Rust formatting"
+          },
+          {
+            "command": "GIT_OPTIONAL_LOCKS=0 git diff --check 59af87d23c3c14881f3969ef316146e7aa2e3273 HEAD",
+            "evidence": "Observed supervised process proc-1789055094443-1129590-886 exited 0.",
+            "exit_code": 0,
+            "process_id": "proc-1789055094443-1129590-886",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Recovery Round patch integrity"
+          },
+          {
+            "command": "GIT_OPTIONAL_LOCKS=0 git diff --check b47569adb8d4c5d1d7335ba91729a3e486a38fe0 HEAD",
+            "evidence": "Observed supervised process proc-1789055094578-1129590-889 exited 0.",
+            "exit_code": 0,
+            "process_id": "proc-1789055094578-1129590-889",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Complete candidate patch integrity"
+          }
+        ],
+        "source_candidate_commit": "34660f8e680c56c09ce52c89ddf552c78b3c7d75"
+      },
+      "quality_message": "All Quality Skills passed with supervised evidence.",
       "quality_skill_results": [
         {
           "artifacts": {
@@ -5303,10 +5532,10 @@
           "summary": "Verified the Model policy extraction and preserved recovery behavior on the exact candidate. All requested checks passed; no defects found."
         }
       ],
-      "quality_state": "unclassified",
+      "quality_state": "passed",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T15:40:23Z",
+      "updated": "2026-09-10T15:44:55Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T15:24:12Z",
         "round_idx": 3,
@@ -5316,9 +5545,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "quality",
+  "status": "governance",
   "target_branch": "main",
-  "updated": "2026-09-10T15:40:23Z",
+  "updated": "2026-09-10T15:44:55Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:37.079960889+00:00",
@@ -5436,7 +5665,16 @@
       "node_id": "default",
       "round_idx": 3,
       "to": "quality"
+    },
+    {
+      "at": "2026-09-10T15:44:55.354456532+00:00",
+      "forced": false,
+      "from": "quality",
+      "generation": 14,
+      "node_id": "default",
+      "round_idx": 3,
+      "to": "governance"
     }
   ],
-  "workflow_revision": 108
+  "workflow_revision": 111
 }

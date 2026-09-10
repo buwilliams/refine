@@ -3,7 +3,7 @@
   "branch_name": "refine/DR54BF57DCE017ED8EC68A5EEB/round-3",
   "candidate_commit": "05643ffb157c6404098f5437ffe8de40c721a5b7",
   "created": "2026-09-10T08:26:04Z",
-  "event_generation": 9,
+  "event_generation": 10,
   "feature_id": null,
   "feature_order": null,
   "id": "DR54BF57DCE017ED8EC68A5EEB",
@@ -3583,9 +3583,204 @@
       "prompt": "Repair replay interruption recovery for candidate b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5 in a new managed recovery Round. Preserve prior branches, worktrees, journals, plans and evidence. Before ordinary worktree discovery or candidate ancestry rejection, inspect the trusted managed workspace and reconcile its replay journal under current attempt authority and repository coordination. Handle detached replay completion, replacement attachment before Goal persistence, and persisted replacement before acknowledgement. Preserve dirty work and unexpected ref changes; never roll back a durably persisted replacement. Cover Plan/Implement and Quality/Governance resumption. Add regressions through WorkflowEngine preparation and execution, rather than directly constructing WorkflowContext. Verify replacement checks still run against the exact candidate. Proposed checks: cargo test --lib application::workflow::tests::worktree_resume -- --test-threads=1; cargo test --lib application::workflow::tests::candidate_refresh -- --test-threads=1; cargo check --all-targets. Update only affected intent documentation.",
       "quality_agent_report": "workflow.quality.enter:default-quality: Corrected one reproduced preservation defect and contradictory intent wording. All focused checks passed on the corrected working tree.",
       "quality_candidate_commit": "05643ffb157c6404098f5437ffe8de40c721a5b7",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
+      "quality_checked_at": "2026-09-10T15:44:46Z",
+      "quality_details": {
+        "candidate_commit": "05643ffb157c6404098f5437ffe8de40c721a5b7",
+        "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR54BF57DCE017ED8EC68A5EEB-round-2",
+        "diagnostics": [
+          "Event invocation ac2c6af0ae4bef43d3832f58111ace5b3d5390cd1abf1229b3bd76a04b10e136: automation/invocations/ac2c6af0ae4bef43d3832f58111ace5b3d5390cd1abf1229b3bd76a04b10e136.json",
+          "Observed supervised process proc-1789054992326-1129590-819 exited 0.",
+          "Observed supervised process proc-1789054992462-1129590-822 exited 0.",
+          "Observed supervised process proc-1789054992591-1129590-825 exited 0.",
+          "Observed supervised process proc-1789054992870-1129590-828 exited 0. stdout: k\ntest application::workflow::tests::worktree_resume::replay_interruptions::engine_prefers_current_handoff_to_an_occupied_historical_fallback ... ok\ntest application::workflow::tests::worktree_resume::replay_interruptions::engine_repeats_recovery_after_restoration_or_handoff_reconciliation ... ok\ntest application::workflow::tests::worktree_resume::replay_interruptions::engine_resumes_all_replay_windows_in_all_four_phases ... ok\ntest application::workflow::tests::worktree_resume::replay_interruptions::engine_uses_current_round_log_when_handoff_is_unavailable ... ok\ntest application::workflow::tests::worktree_resume::replay_safety::engine_preserves_changed_refs_head_and_invalid_journals ... ok\ntest application::workflow::tests::worktree_resume::replay_safety::engine_preserves_dirty_staged_and_untracked_replay_work ... ok\ntest application::workflow::tests::worktree_resume::replay_safety::engine_preserves_interrupted_conflict_and_later_resolution_edits ... ok\ntest application::workflow::tests::worktree_resume::replay_safety::engine_preserves_replay_when_a_retained_source_ref_changes ... ok\ntest application::workflow::tests::worktree_resume::replay_safety::engine_rejects_foreign_checkout_and_mismatched_handoff ... ok\ntest application::workflow::tests::worktree_resume::replay_safety::engine_revalidates_authority_after_waiting_for_repository_coordination ... ok\ntest application::workflow::tests::worktree_resume::replay_safety::engine_treats_workspace_contention_as_retryable_preparation ... ok\ntest application::workflow::tests::worktree_resume::resume_fails_closed_when_the_round_branch_no_longer_contains_the_candidate ... ok\ntest application::workflow::tests::worktree_resume::resume_rebuilds_a_pruned_candidate_worktree_and_finishes_the_round ... ok\ntest application::workflow::tests::worktree_resume::resume_reuses_a_durable_quality_proof_and_skips_straight_to_governance ... ok\n\ntest result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 1185 filtered out; finished in 47.42s stderr: Compiling refine v4.2.0 (/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR54BF57DCE017ED8EC68A5EEB-round-2)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.58s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+          "Observed supervised process proc-1789055049055-1129590-837 exited 0. stdout: lication::governance_replays_rechecks_republishes_and_integrates_a_wrong_base_candidate ... ok\ntest application::workflow::tests::candidate_refresh::publication::governance_resumes_replacement_quality_after_interruption_before_checks ... ok\ntest application::workflow::tests::candidate_refresh::publication::interrupted_successful_push_is_recognized_after_candidate_progress_updates ... ok\ntest application::workflow::tests::candidate_refresh::publication::published_candidate_is_replaced_with_a_durable_lease_and_retry_is_idempotent ... ok\ntest application::workflow::tests::candidate_refresh::publication::server_side_race_after_advertisement_is_rejected_by_the_atomic_lease ... ok\ntest application::workflow::tests::candidate_refresh::publication::target_advancing_after_publication_forces_a_second_replay_and_new_exact_checks ... ok\ntest application::workflow::tests::candidate_refresh::publication::unexpected_remote_change_preserves_the_original_lease_and_pending_intent ... ok\ntest application::workflow::tests::candidate_refresh::refresh_conflict_aborts_and_queues_one_fenced_recovery_round ... ok\ntest application::workflow::tests::candidate_refresh::refresh_conflict_records_explicit_exhaustion_without_a_successor_round ... ok\ntest application::workflow::tests::candidate_refresh::rejected_resolutions_exhaust_the_budget_into_todays_fallback_with_a_question ... ok\ntest application::workflow::tests::candidate_refresh::resolver_scope::resolver_cannot_modify_a_nonconflicting_file_already_staged_by_the_pick ... ok\ntest application::workflow::tests::candidate_refresh::target_advancement_rebases_a_provable_delta_and_records_both_identities ... ok\ntest application::workflow::tests::candidate_refresh::workflow_conflict_resolution_defaults_on_and_honors_off ... ok\ntest application::workflow::tests::candidate_refresh::workspace_and_repository_leases_fence_competing_target_refreshes ... ok\n\ntest result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 1164 filtered out; finished in 18.57s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+          "Observed supervised process proc-1789055067876-1129590-840 exited 0. stdout: running 14 tests\ntest application::workflow::tests::round_base::a_dirty_checkout_advances_the_ref_and_leaves_the_sync_pending_for_repair ... ok\ntest application::workflow::tests::round_base::a_diverged_local_target_is_left_for_integration_to_merge ... ok\ntest application::workflow::tests::round_base::a_stale_candidate_against_an_advanced_target_queues_a_recovery_round ... ok\ntest application::workflow::tests::round_base::a_stale_candidate_whose_target_never_moved_queues_recoverable_evidence ... ok\ntest application::workflow::tests::round_base::a_stale_local_target_fast_forwards_from_its_remote_before_the_base_is_pinned ... ok\ntest application::workflow::tests::round_base::agent_lineage::invalid_planning_context_fails_before_candidate_or_worktree_mutation ... ok\ntest application::workflow::tests::round_base::agent_lineage::pre_agent_refresh_anchors_to_the_observed_target_before_plan_edits ... ok\ntest application::workflow::tests::round_base::agent_lineage::pre_agent_refresh_reconciles_the_binding_and_retains_the_original_plan ... ok\ntest application::workflow::tests::round_base::agent_lineage::resume_keeps_the_original_base_and_unfinished_implementation_files ... ok\ntest application::workflow::tests::round_base::agent_lineage::scoped_retry_replays_in_a_successor_worktree_and_preserves_the_source ... ok\ntest application::workflow::tests::round_base::an_unreachable_remote_leaves_the_round_to_start_from_the_local_ref ... ok\ntest application::workflow::tests::round_base::resumption_recreates_a_missing_round_branch_at_the_recorded_base ... ok\ntest application::workflow::tests::round_base::resumption_reuses_an_existing_round_branch_exactly_as_it_stands ... ok\ntest application::workflow::tests::round_base::round_branch_is_born_at_the_merge_target_not_at_the_shared_checkout_head ... ok\n\ntest result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 1189 filtered out; finished in 5.07s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+          "Observed supervised process proc-1789055073219-1129590-843 exited 0. stdout: running 5 tests\ntest application::workflow::engine::behaviors::tests::quality_resume::replacement_skills::optional_quality_runs_background_skills_and_attaches_context_without_spawning_it ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::replacement_skills::replacement_cannot_reuse_the_original_skill_invocation_or_exact_candidate_proof ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::replacement_skills::replacement_uses_current_skills_and_records_when_required_checks_no_longer_apply ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::replacement_skills::resumed_replacement_preserves_failed_checks_even_when_current_skills_are_disabled ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::replacement_skills::resumed_replacement_quality_runs_required_checks_once_and_reuses_its_exact_proof ... ok\n\ntest result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 1198 filtered out; finished in 5.40s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+          "Observed supervised process proc-1789055078892-1129590-852 exited 0. stdout: ests::worktrees::ensure_worktree_recreates_checkout_after_its_directory_was_removed ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_accepts_clean_branch_commit_since_base ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_bootstraps_unborn_repo_for_worktree ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_branches_worktrees_diffs_commits_pathspecs_and_pushes ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_does_not_track_read_only_git_probes ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_hard_reset_preserves_runtime_and_removes_other_noise ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_hard_resets_tracked_changes ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_lists_status_and_reverts_commits ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_rejects_invalid_names_and_reports_git_failures ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_reports_literal_paths_for_renames_and_special_names ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_reports_primary_worktree_refine_state_as_untracked ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_splits_tracked_dirt_from_untracked_files ... ok\ntest infrastructure::git::worktrees::tests::worktrees::locked_candidate_worktree_registration_survives_repo_wide_prune ... ok\ntest infrastructure::git::worktrees::tests::worktrees::quarantine_handles_renames_and_preserves_untracked_special_names ... ok\ntest infrastructure::git::worktrees::tests::worktrees::remove_worktree_unlocks_a_locked_candidate_worktree_first ... ok\n\ntest result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 1172 filtered out; finished in 1.36s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+          "Observed supervised process proc-1789055080503-1129590-855 exited 0. stdout: running 5 tests\ntest architecture_tests::planned_capability_directories_exist ... ok\ntest architecture_tests::crate_exports_only_the_semantic_roots_and_error_boundary ... ok\ntest architecture_tests::model_has_no_runtime_or_adapter_dependencies ... ok\ntest architecture_tests::non_surface_code_does_not_import_surfaces ... ok\ntest architecture_tests::retired_and_generic_root_namespaces_are_absent ... ok\n\ntest result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 1198 filtered out; finished in 0.18s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+          "Observed supervised process proc-1789055080922-1129590-858 exited 0. stderr: Checking refine v4.2.0 (/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR54BF57DCE017ED8EC68A5EEB-round-2)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.27s"
+        ],
+        "evaluation_scope": "isolated_candidate",
+        "operation_id": "1a08bfa011b113c7657",
+        "provider_attempts": [],
+        "quality_proof": {
+          "checked_at": "2026-09-10T15:44:46Z",
+          "checked_candidate_commit": "05643ffb157c6404098f5437ffe8de40c721a5b7",
+          "evaluation_scope": "isolated_candidate",
+          "goal_id": "DR54BF57DCE017ED8EC68A5EEB",
+          "operation_id": "1a08bfa011b113c7657",
+          "results": [
+            {
+              "command": "test \"$(git rev-parse HEAD)\" = 05643ffb157c6404098f5437ffe8de40c721a5b7 && test \"$(git branch --show-current)\" = refine/DR54BF57DCE017ED8EC68A5EEB/round-3 && test -z \"$(git --no-optional-locks status --porcelain=v1)\" && git merge-base --is-ancestor b47569adb8d4c5d1d7335ba91729a3e486a38fe0 05643ffb157c6404098f5437ffe8de40c721a5b7",
+              "evidence": "Observed supervised process proc-1789054992326-1129590-819 exited 0.",
+              "exit_code": 0,
+              "process_id": "proc-1789054992326-1129590-819",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Pinned candidate identity, clean checkout and base ancestry"
+            },
+            {
+              "command": "git diff --check b47569adb8d4c5d1d7335ba91729a3e486a38fe0 05643ffb157c6404098f5437ffe8de40c721a5b7",
+              "evidence": "Observed supervised process proc-1789054992462-1129590-822 exited 0.",
+              "exit_code": 0,
+              "process_id": "proc-1789054992462-1129590-822",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Pinned candidate whitespace"
+            },
+            {
+              "command": "git diff --name-only --diff-filter=ACMR -z b47569adb8d4c5d1d7335ba91729a3e486a38fe0 05643ffb157c6404098f5437ffe8de40c721a5b7 -- '*.rs' | xargs -0 rustfmt --check --edition 2024 --config skip_children=true",
+              "evidence": "Observed supervised process proc-1789054992591-1129590-825 exited 0.",
+              "exit_code": 0,
+              "process_id": "proc-1789054992591-1129590-825",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Formatting of changed Rust files"
+            },
+            {
+              "command": "cargo test --lib application::workflow::tests::worktree_resume -- --test-threads=1",
+              "evidence": "Observed supervised process proc-1789054992870-1129590-828 exited 0. stdout: k\ntest application::workflow::tests::worktree_resume::replay_interruptions::engine_prefers_current_handoff_to_an_occupied_historical_fallback ... ok\ntest application::workflow::tests::worktree_resume::replay_interruptions::engine_repeats_recovery_after_restoration_or_handoff_reconciliation ... ok\ntest application::workflow::tests::worktree_resume::replay_interruptions::engine_resumes_all_replay_windows_in_all_four_phases ... ok\ntest application::workflow::tests::worktree_resume::replay_interruptions::engine_uses_current_round_log_when_handoff_is_unavailable ... ok\ntest application::workflow::tests::worktree_resume::replay_safety::engine_preserves_changed_refs_head_and_invalid_journals ... ok\ntest application::workflow::tests::worktree_resume::replay_safety::engine_preserves_dirty_staged_and_untracked_replay_work ... ok\ntest application::workflow::tests::worktree_resume::replay_safety::engine_preserves_interrupted_conflict_and_later_resolution_edits ... ok\ntest application::workflow::tests::worktree_resume::replay_safety::engine_preserves_replay_when_a_retained_source_ref_changes ... ok\ntest application::workflow::tests::worktree_resume::replay_safety::engine_rejects_foreign_checkout_and_mismatched_handoff ... ok\ntest application::workflow::tests::worktree_resume::replay_safety::engine_revalidates_authority_after_waiting_for_repository_coordination ... ok\ntest application::workflow::tests::worktree_resume::replay_safety::engine_treats_workspace_contention_as_retryable_preparation ... ok\ntest application::workflow::tests::worktree_resume::resume_fails_closed_when_the_round_branch_no_longer_contains_the_candidate ... ok\ntest application::workflow::tests::worktree_resume::resume_rebuilds_a_pruned_candidate_worktree_and_finishes_the_round ... ok\ntest application::workflow::tests::worktree_resume::resume_reuses_a_durable_quality_proof_and_skips_straight_to_governance ... ok\n\ntest result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 1185 filtered out; finished in 47.42s stderr: Compiling refine v4.2.0 (/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR54BF57DCE017ED8EC68A5EEB-round-2)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.58s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+              "exit_code": 0,
+              "process_id": "proc-1789054992870-1129590-828",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Engine resumption, preservation and exact-candidate gates"
+            },
+            {
+              "command": "cargo test --lib application::workflow::tests::candidate_refresh -- --test-threads=1",
+              "evidence": "Observed supervised process proc-1789055049055-1129590-837 exited 0. stdout: lication::governance_replays_rechecks_republishes_and_integrates_a_wrong_base_candidate ... ok\ntest application::workflow::tests::candidate_refresh::publication::governance_resumes_replacement_quality_after_interruption_before_checks ... ok\ntest application::workflow::tests::candidate_refresh::publication::interrupted_successful_push_is_recognized_after_candidate_progress_updates ... ok\ntest application::workflow::tests::candidate_refresh::publication::published_candidate_is_replaced_with_a_durable_lease_and_retry_is_idempotent ... ok\ntest application::workflow::tests::candidate_refresh::publication::server_side_race_after_advertisement_is_rejected_by_the_atomic_lease ... ok\ntest application::workflow::tests::candidate_refresh::publication::target_advancing_after_publication_forces_a_second_replay_and_new_exact_checks ... ok\ntest application::workflow::tests::candidate_refresh::publication::unexpected_remote_change_preserves_the_original_lease_and_pending_intent ... ok\ntest application::workflow::tests::candidate_refresh::refresh_conflict_aborts_and_queues_one_fenced_recovery_round ... ok\ntest application::workflow::tests::candidate_refresh::refresh_conflict_records_explicit_exhaustion_without_a_successor_round ... ok\ntest application::workflow::tests::candidate_refresh::rejected_resolutions_exhaust_the_budget_into_todays_fallback_with_a_question ... ok\ntest application::workflow::tests::candidate_refresh::resolver_scope::resolver_cannot_modify_a_nonconflicting_file_already_staged_by_the_pick ... ok\ntest application::workflow::tests::candidate_refresh::target_advancement_rebases_a_provable_delta_and_records_both_identities ... ok\ntest application::workflow::tests::candidate_refresh::workflow_conflict_resolution_defaults_on_and_honors_off ... ok\ntest application::workflow::tests::candidate_refresh::workspace_and_repository_leases_fence_competing_target_refreshes ... ok\n\ntest result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 1164 filtered out; finished in 18.57s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+              "exit_code": 0,
+              "process_id": "proc-1789055049055-1129590-837",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Replay, conflicts, authority and publication recovery"
+            },
+            {
+              "command": "cargo test --lib application::workflow::tests::round_base -- --test-threads=1",
+              "evidence": "Observed supervised process proc-1789055067876-1129590-840 exited 0. stdout: running 14 tests\ntest application::workflow::tests::round_base::a_dirty_checkout_advances_the_ref_and_leaves_the_sync_pending_for_repair ... ok\ntest application::workflow::tests::round_base::a_diverged_local_target_is_left_for_integration_to_merge ... ok\ntest application::workflow::tests::round_base::a_stale_candidate_against_an_advanced_target_queues_a_recovery_round ... ok\ntest application::workflow::tests::round_base::a_stale_candidate_whose_target_never_moved_queues_recoverable_evidence ... ok\ntest application::workflow::tests::round_base::a_stale_local_target_fast_forwards_from_its_remote_before_the_base_is_pinned ... ok\ntest application::workflow::tests::round_base::agent_lineage::invalid_planning_context_fails_before_candidate_or_worktree_mutation ... ok\ntest application::workflow::tests::round_base::agent_lineage::pre_agent_refresh_anchors_to_the_observed_target_before_plan_edits ... ok\ntest application::workflow::tests::round_base::agent_lineage::pre_agent_refresh_reconciles_the_binding_and_retains_the_original_plan ... ok\ntest application::workflow::tests::round_base::agent_lineage::resume_keeps_the_original_base_and_unfinished_implementation_files ... ok\ntest application::workflow::tests::round_base::agent_lineage::scoped_retry_replays_in_a_successor_worktree_and_preserves_the_source ... ok\ntest application::workflow::tests::round_base::an_unreachable_remote_leaves_the_round_to_start_from_the_local_ref ... ok\ntest application::workflow::tests::round_base::resumption_recreates_a_missing_round_branch_at_the_recorded_base ... ok\ntest application::workflow::tests::round_base::resumption_reuses_an_existing_round_branch_exactly_as_it_stands ... ok\ntest application::workflow::tests::round_base::round_branch_is_born_at_the_merge_target_not_at_the_shared_checkout_head ... ok\n\ntest result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 1189 filtered out; finished in 5.07s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+              "exit_code": 0,
+              "process_id": "proc-1789055067876-1129590-840",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Round creation, lineage and retained bases"
+            },
+            {
+              "command": "cargo test --lib replacement_skills -- --test-threads=1",
+              "evidence": "Observed supervised process proc-1789055073219-1129590-843 exited 0. stdout: running 5 tests\ntest application::workflow::engine::behaviors::tests::quality_resume::replacement_skills::optional_quality_runs_background_skills_and_attaches_context_without_spawning_it ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::replacement_skills::replacement_cannot_reuse_the_original_skill_invocation_or_exact_candidate_proof ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::replacement_skills::replacement_uses_current_skills_and_records_when_required_checks_no_longer_apply ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::replacement_skills::resumed_replacement_preserves_failed_checks_even_when_current_skills_are_disabled ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::replacement_skills::resumed_replacement_quality_runs_required_checks_once_and_reuses_its_exact_proof ... ok\n\ntest result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 1198 filtered out; finished in 5.40s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+              "exit_code": 0,
+              "process_id": "proc-1789055073219-1129590-843",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Replacement Skills and candidate-bound evidence"
+            },
+            {
+              "command": "cargo test --lib infrastructure::git::worktrees -- --test-threads=1",
+              "evidence": "Observed supervised process proc-1789055078892-1129590-852 exited 0. stdout: ests::worktrees::ensure_worktree_recreates_checkout_after_its_directory_was_removed ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_accepts_clean_branch_commit_since_base ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_bootstraps_unborn_repo_for_worktree ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_branches_worktrees_diffs_commits_pathspecs_and_pushes ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_does_not_track_read_only_git_probes ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_hard_reset_preserves_runtime_and_removes_other_noise ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_hard_resets_tracked_changes ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_lists_status_and_reverts_commits ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_rejects_invalid_names_and_reports_git_failures ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_reports_literal_paths_for_renames_and_special_names ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_reports_primary_worktree_refine_state_as_untracked ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_splits_tracked_dirt_from_untracked_files ... ok\ntest infrastructure::git::worktrees::tests::worktrees::locked_candidate_worktree_registration_survives_repo_wide_prune ... ok\ntest infrastructure::git::worktrees::tests::worktrees::quarantine_handles_renames_and_preserves_untracked_special_names ... ok\ntest infrastructure::git::worktrees::tests::worktrees::remove_worktree_unlocks_a_locked_candidate_worktree_first ... ok\n\ntest result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 1172 filtered out; finished in 1.36s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+              "exit_code": 0,
+              "process_id": "proc-1789055078892-1129590-852",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Shared Git worktree behavior"
+            },
+            {
+              "command": "cargo test --lib architecture_tests",
+              "evidence": "Observed supervised process proc-1789055080503-1129590-855 exited 0. stdout: running 5 tests\ntest architecture_tests::planned_capability_directories_exist ... ok\ntest architecture_tests::crate_exports_only_the_semantic_roots_and_error_boundary ... ok\ntest architecture_tests::model_has_no_runtime_or_adapter_dependencies ... ok\ntest architecture_tests::non_surface_code_does_not_import_surfaces ... ok\ntest architecture_tests::retired_and_generic_root_namespaces_are_absent ... ok\n\ntest result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 1198 filtered out; finished in 0.18s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+              "exit_code": 0,
+              "process_id": "proc-1789055080503-1129590-855",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: Architecture boundaries"
+            },
+            {
+              "command": "cargo check --all-targets",
+              "evidence": "Observed supervised process proc-1789055080922-1129590-858 exited 0. stderr: Checking refine v4.2.0 (/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR54BF57DCE017ED8EC68A5EEB-round-2)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.27s",
+              "exit_code": 0,
+              "process_id": "proc-1789055080922-1129590-858",
+              "status": "passed",
+              "test": "workflow.quality.enter:default-quality: All-target compilation"
+            }
+          ],
+          "round_idx": 2,
+          "schema_version": 1,
+          "source_candidate_commit": "05643ffb157c6404098f5437ffe8de40c721a5b7",
+          "state": "passed"
+        },
+        "results": [
+          {
+            "command": "test \"$(git rev-parse HEAD)\" = 05643ffb157c6404098f5437ffe8de40c721a5b7 && test \"$(git branch --show-current)\" = refine/DR54BF57DCE017ED8EC68A5EEB/round-3 && test -z \"$(git --no-optional-locks status --porcelain=v1)\" && git merge-base --is-ancestor b47569adb8d4c5d1d7335ba91729a3e486a38fe0 05643ffb157c6404098f5437ffe8de40c721a5b7",
+            "evidence": "Observed supervised process proc-1789054992326-1129590-819 exited 0.",
+            "exit_code": 0,
+            "process_id": "proc-1789054992326-1129590-819",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Pinned candidate identity, clean checkout and base ancestry"
+          },
+          {
+            "command": "git diff --check b47569adb8d4c5d1d7335ba91729a3e486a38fe0 05643ffb157c6404098f5437ffe8de40c721a5b7",
+            "evidence": "Observed supervised process proc-1789054992462-1129590-822 exited 0.",
+            "exit_code": 0,
+            "process_id": "proc-1789054992462-1129590-822",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Pinned candidate whitespace"
+          },
+          {
+            "command": "git diff --name-only --diff-filter=ACMR -z b47569adb8d4c5d1d7335ba91729a3e486a38fe0 05643ffb157c6404098f5437ffe8de40c721a5b7 -- '*.rs' | xargs -0 rustfmt --check --edition 2024 --config skip_children=true",
+            "evidence": "Observed supervised process proc-1789054992591-1129590-825 exited 0.",
+            "exit_code": 0,
+            "process_id": "proc-1789054992591-1129590-825",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Formatting of changed Rust files"
+          },
+          {
+            "command": "cargo test --lib application::workflow::tests::worktree_resume -- --test-threads=1",
+            "evidence": "Observed supervised process proc-1789054992870-1129590-828 exited 0. stdout: k\ntest application::workflow::tests::worktree_resume::replay_interruptions::engine_prefers_current_handoff_to_an_occupied_historical_fallback ... ok\ntest application::workflow::tests::worktree_resume::replay_interruptions::engine_repeats_recovery_after_restoration_or_handoff_reconciliation ... ok\ntest application::workflow::tests::worktree_resume::replay_interruptions::engine_resumes_all_replay_windows_in_all_four_phases ... ok\ntest application::workflow::tests::worktree_resume::replay_interruptions::engine_uses_current_round_log_when_handoff_is_unavailable ... ok\ntest application::workflow::tests::worktree_resume::replay_safety::engine_preserves_changed_refs_head_and_invalid_journals ... ok\ntest application::workflow::tests::worktree_resume::replay_safety::engine_preserves_dirty_staged_and_untracked_replay_work ... ok\ntest application::workflow::tests::worktree_resume::replay_safety::engine_preserves_interrupted_conflict_and_later_resolution_edits ... ok\ntest application::workflow::tests::worktree_resume::replay_safety::engine_preserves_replay_when_a_retained_source_ref_changes ... ok\ntest application::workflow::tests::worktree_resume::replay_safety::engine_rejects_foreign_checkout_and_mismatched_handoff ... ok\ntest application::workflow::tests::worktree_resume::replay_safety::engine_revalidates_authority_after_waiting_for_repository_coordination ... ok\ntest application::workflow::tests::worktree_resume::replay_safety::engine_treats_workspace_contention_as_retryable_preparation ... ok\ntest application::workflow::tests::worktree_resume::resume_fails_closed_when_the_round_branch_no_longer_contains_the_candidate ... ok\ntest application::workflow::tests::worktree_resume::resume_rebuilds_a_pruned_candidate_worktree_and_finishes_the_round ... ok\ntest application::workflow::tests::worktree_resume::resume_reuses_a_durable_quality_proof_and_skips_straight_to_governance ... ok\n\ntest result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 1185 filtered out; finished in 47.42s stderr: Compiling refine v4.2.0 (/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR54BF57DCE017ED8EC68A5EEB-round-2)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.58s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+            "exit_code": 0,
+            "process_id": "proc-1789054992870-1129590-828",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Engine resumption, preservation and exact-candidate gates"
+          },
+          {
+            "command": "cargo test --lib application::workflow::tests::candidate_refresh -- --test-threads=1",
+            "evidence": "Observed supervised process proc-1789055049055-1129590-837 exited 0. stdout: lication::governance_replays_rechecks_republishes_and_integrates_a_wrong_base_candidate ... ok\ntest application::workflow::tests::candidate_refresh::publication::governance_resumes_replacement_quality_after_interruption_before_checks ... ok\ntest application::workflow::tests::candidate_refresh::publication::interrupted_successful_push_is_recognized_after_candidate_progress_updates ... ok\ntest application::workflow::tests::candidate_refresh::publication::published_candidate_is_replaced_with_a_durable_lease_and_retry_is_idempotent ... ok\ntest application::workflow::tests::candidate_refresh::publication::server_side_race_after_advertisement_is_rejected_by_the_atomic_lease ... ok\ntest application::workflow::tests::candidate_refresh::publication::target_advancing_after_publication_forces_a_second_replay_and_new_exact_checks ... ok\ntest application::workflow::tests::candidate_refresh::publication::unexpected_remote_change_preserves_the_original_lease_and_pending_intent ... ok\ntest application::workflow::tests::candidate_refresh::refresh_conflict_aborts_and_queues_one_fenced_recovery_round ... ok\ntest application::workflow::tests::candidate_refresh::refresh_conflict_records_explicit_exhaustion_without_a_successor_round ... ok\ntest application::workflow::tests::candidate_refresh::rejected_resolutions_exhaust_the_budget_into_todays_fallback_with_a_question ... ok\ntest application::workflow::tests::candidate_refresh::resolver_scope::resolver_cannot_modify_a_nonconflicting_file_already_staged_by_the_pick ... ok\ntest application::workflow::tests::candidate_refresh::target_advancement_rebases_a_provable_delta_and_records_both_identities ... ok\ntest application::workflow::tests::candidate_refresh::workflow_conflict_resolution_defaults_on_and_honors_off ... ok\ntest application::workflow::tests::candidate_refresh::workspace_and_repository_leases_fence_competing_target_refreshes ... ok\n\ntest result: ok. 39 passed; 0 failed; 0 ignored; 0 measured; 1164 filtered out; finished in 18.57s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+            "exit_code": 0,
+            "process_id": "proc-1789055049055-1129590-837",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Replay, conflicts, authority and publication recovery"
+          },
+          {
+            "command": "cargo test --lib application::workflow::tests::round_base -- --test-threads=1",
+            "evidence": "Observed supervised process proc-1789055067876-1129590-840 exited 0. stdout: running 14 tests\ntest application::workflow::tests::round_base::a_dirty_checkout_advances_the_ref_and_leaves_the_sync_pending_for_repair ... ok\ntest application::workflow::tests::round_base::a_diverged_local_target_is_left_for_integration_to_merge ... ok\ntest application::workflow::tests::round_base::a_stale_candidate_against_an_advanced_target_queues_a_recovery_round ... ok\ntest application::workflow::tests::round_base::a_stale_candidate_whose_target_never_moved_queues_recoverable_evidence ... ok\ntest application::workflow::tests::round_base::a_stale_local_target_fast_forwards_from_its_remote_before_the_base_is_pinned ... ok\ntest application::workflow::tests::round_base::agent_lineage::invalid_planning_context_fails_before_candidate_or_worktree_mutation ... ok\ntest application::workflow::tests::round_base::agent_lineage::pre_agent_refresh_anchors_to_the_observed_target_before_plan_edits ... ok\ntest application::workflow::tests::round_base::agent_lineage::pre_agent_refresh_reconciles_the_binding_and_retains_the_original_plan ... ok\ntest application::workflow::tests::round_base::agent_lineage::resume_keeps_the_original_base_and_unfinished_implementation_files ... ok\ntest application::workflow::tests::round_base::agent_lineage::scoped_retry_replays_in_a_successor_worktree_and_preserves_the_source ... ok\ntest application::workflow::tests::round_base::an_unreachable_remote_leaves_the_round_to_start_from_the_local_ref ... ok\ntest application::workflow::tests::round_base::resumption_recreates_a_missing_round_branch_at_the_recorded_base ... ok\ntest application::workflow::tests::round_base::resumption_reuses_an_existing_round_branch_exactly_as_it_stands ... ok\ntest application::workflow::tests::round_base::round_branch_is_born_at_the_merge_target_not_at_the_shared_checkout_head ... ok\n\ntest result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 1189 filtered out; finished in 5.07s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+            "exit_code": 0,
+            "process_id": "proc-1789055067876-1129590-840",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Round creation, lineage and retained bases"
+          },
+          {
+            "command": "cargo test --lib replacement_skills -- --test-threads=1",
+            "evidence": "Observed supervised process proc-1789055073219-1129590-843 exited 0. stdout: running 5 tests\ntest application::workflow::engine::behaviors::tests::quality_resume::replacement_skills::optional_quality_runs_background_skills_and_attaches_context_without_spawning_it ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::replacement_skills::replacement_cannot_reuse_the_original_skill_invocation_or_exact_candidate_proof ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::replacement_skills::replacement_uses_current_skills_and_records_when_required_checks_no_longer_apply ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::replacement_skills::resumed_replacement_preserves_failed_checks_even_when_current_skills_are_disabled ... ok\ntest application::workflow::engine::behaviors::tests::quality_resume::replacement_skills::resumed_replacement_quality_runs_required_checks_once_and_reuses_its_exact_proof ... ok\n\ntest result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 1198 filtered out; finished in 5.40s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.11s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+            "exit_code": 0,
+            "process_id": "proc-1789055073219-1129590-843",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Replacement Skills and candidate-bound evidence"
+          },
+          {
+            "command": "cargo test --lib infrastructure::git::worktrees -- --test-threads=1",
+            "evidence": "Observed supervised process proc-1789055078892-1129590-852 exited 0. stdout: ests::worktrees::ensure_worktree_recreates_checkout_after_its_directory_was_removed ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_accepts_clean_branch_commit_since_base ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_bootstraps_unborn_repo_for_worktree ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_branches_worktrees_diffs_commits_pathspecs_and_pushes ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_does_not_track_read_only_git_probes ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_hard_reset_preserves_runtime_and_removes_other_noise ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_hard_resets_tracked_changes ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_lists_status_and_reverts_commits ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_rejects_invalid_names_and_reports_git_failures ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_reports_literal_paths_for_renames_and_special_names ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_reports_primary_worktree_refine_state_as_untracked ... ok\ntest infrastructure::git::worktrees::tests::worktrees::file_git_worktree_service_splits_tracked_dirt_from_untracked_files ... ok\ntest infrastructure::git::worktrees::tests::worktrees::locked_candidate_worktree_registration_survives_repo_wide_prune ... ok\ntest infrastructure::git::worktrees::tests::worktrees::quarantine_handles_renames_and_preserves_untracked_special_names ... ok\ntest infrastructure::git::worktrees::tests::worktrees::remove_worktree_unlocks_a_locked_candidate_worktree_first ... ok\n\ntest result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 1172 filtered out; finished in 1.36s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.10s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+            "exit_code": 0,
+            "process_id": "proc-1789055078892-1129590-852",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Shared Git worktree behavior"
+          },
+          {
+            "command": "cargo test --lib architecture_tests",
+            "evidence": "Observed supervised process proc-1789055080503-1129590-855 exited 0. stdout: running 5 tests\ntest architecture_tests::planned_capability_directories_exist ... ok\ntest architecture_tests::crate_exports_only_the_semantic_roots_and_error_boundary ... ok\ntest architecture_tests::model_has_no_runtime_or_adapter_dependencies ... ok\ntest architecture_tests::non_surface_code_does_not_import_surfaces ... ok\ntest architecture_tests::retired_and_generic_root_namespaces_are_absent ... ok\n\ntest result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 1198 filtered out; finished in 0.18s stderr: Finished `test` profile [unoptimized + debuginfo] target(s) in 0.09s\n     Running unittests src/lib.rs (target/debug/deps/refine-8328488576a1416d)",
+            "exit_code": 0,
+            "process_id": "proc-1789055080503-1129590-855",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: Architecture boundaries"
+          },
+          {
+            "command": "cargo check --all-targets",
+            "evidence": "Observed supervised process proc-1789055080922-1129590-858 exited 0. stderr: Checking refine v4.2.0 (/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR54BF57DCE017ED8EC68A5EEB-round-2)\n    Finished `dev` profile [unoptimized + debuginfo] target(s) in 5.27s",
+            "exit_code": 0,
+            "process_id": "proc-1789055080922-1129590-858",
+            "status": "passed",
+            "test": "workflow.quality.enter:default-quality: All-target compilation"
+          }
+        ],
+        "source_candidate_commit": "05643ffb157c6404098f5437ffe8de40c721a5b7"
+      },
+      "quality_message": "All Quality Skills passed with supervised evidence.",
       "quality_skill_results": [
         {
           "artifacts": {
@@ -3661,10 +3856,10 @@
           "summary": "Corrected one reproduced preservation defect and contradictory intent wording. All focused checks passed on the corrected working tree."
         }
       ],
-      "quality_state": "unclassified",
+      "quality_state": "passed",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T15:40:11Z",
+      "updated": "2026-09-10T15:44:47Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T15:08:46Z",
         "round_idx": 2,
@@ -3674,9 +3869,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "quality",
+  "status": "governance",
   "target_branch": "main",
-  "updated": "2026-09-10T15:40:11Z",
+  "updated": "2026-09-10T15:44:47Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:36.990956802+00:00",
@@ -3758,7 +3953,16 @@
       "node_id": "default",
       "round_idx": 2,
       "to": "quality"
+    },
+    {
+      "at": "2026-09-10T15:44:47.015976930+00:00",
+      "forced": false,
+      "from": "quality",
+      "generation": 10,
+      "node_id": "default",
+      "round_idx": 2,
+      "to": "governance"
     }
   ],
-  "workflow_revision": 80
+  "workflow_revision": 84
 }
