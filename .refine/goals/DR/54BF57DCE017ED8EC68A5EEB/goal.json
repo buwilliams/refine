@@ -106,12 +106,63 @@
           "round_idx": 0,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-09-10T08:26:05Z",
+        "phase": "criticize",
+        "phase_started_at": "2026-09-10T08:28:59Z",
+        "proposal": {
+          "completed_at": "2026-09-10T08:28:59Z",
+          "git_after": {
+            "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-1",
+            "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Create fresh Round worktrees from one resolved declared target, read their initial HEAD for the Goal base, candidate handoff, and planning binding, and distinguish creation from resumption so reopening existing work never silently replaces its base with its candidate tip.",
+                "id": "P1"
+              },
+              {
+                "description": "Extend the existing Git capability and candidate-refresh workflow to derive the replay range from the candidate and current target merge base and replay it onto that exact target commit, handling mismatched recorded bases even when the target has not moved and preserving merge changes and already-applied work.",
+                "id": "P2"
+              },
+              {
+                "description": "Prepare lineage before Plan and Implement agents launch or resume, expose base, target, and worktree mismatches in their context, and reconcile affected planning bindings and handoff records through existing authority checks while preserving prior artifacts and unfinished work.",
+                "id": "P3"
+              },
+              {
+                "description": "Re-resolve the declared target for Quality and Governance recovery Rounds, branch from the retained candidate and replay that new branch when needed before implementation, and record its refreshed base and candidate without rewriting the source Round's evidence.",
+                "id": "P4"
+              },
+              {
+                "description": "Use the shared replay path at the Quality boundary and before integration, replace the strict recorded-base rejection and unmoved-target terminal failure with recoverable refresh routing, and retry late target movement through the existing bounded integration loop.",
+                "id": "P5"
+              },
+              {
+                "description": "Persist original and replacement base and candidate identities with the actual replay base, invalidate superseded gate projections, and rerun Quality and Governance for the replacement commit before publication while retaining the existing target lease and commit fences.",
+                "id": "P6"
+              },
+              {
+                "description": "Keep conflict resolution and abort recovery in the existing managed worktree path, preserve the original candidate on unsuccessful replay, report unresolved conflicting paths, and distinguish unsafe or unavailable history, dirty worktrees, authority loss, and Git errors from content conflicts.",
+                "id": "P7"
+              },
+              {
+                "description": "Update only the affected worktree and workflow intent pages to describe actual creation bases, early lineage repair, retry re-anchoring, automatic replay, and recoverable conflict outcomes in their established format.",
+                "id": "P8"
+              }
+            ],
+            "summary": "Make new worktree bindings reflect their actual target-based starting commit and extend the existing refresh workflow to replay stale or divergent candidates onto the current target, preserving their work instead of abandoning a Round over mismatched bookkeeping."
+          },
+          "started_at": "2026-09-10T08:26:05Z"
+        },
         "schema_version": 2,
         "started_at": "2026-09-10T08:26:05Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T08:26:05Z"
+        "updated_at": "2026-09-10T08:28:59Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -125,7 +176,7 @@
       "quality_state": "unclassified",
       "reporter": "ethan.jacobson@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T08:26:05Z",
+      "updated": "2026-09-10T08:28:59Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T08:26:04Z",
         "round_idx": 0,
@@ -137,6 +188,6 @@
   ],
   "status": "plan",
   "target_branch": "main",
-  "updated": "2026-09-10T08:26:05Z",
-  "workflow_revision": 7
+  "updated": "2026-09-10T08:28:59Z",
+  "workflow_revision": 9
 }
