@@ -3,7 +3,7 @@
   "branch_name": "refine/DR74050DA12C5442DF797B8AB6/round-2",
   "candidate_commit": null,
   "created": "2026-09-10T08:26:05Z",
-  "event_generation": 3,
+  "event_generation": 4,
   "feature_id": null,
   "feature_order": null,
   "id": "DR74050DA12C5442DF797B8AB6",
@@ -1013,6 +1013,111 @@
         }
       },
       "event_results": {
+        "22642fe7d378804adb9418a11495943e7c147d26293ad3fbc9a37d47e832751a": {
+          "candidate_commit": null,
+          "results": {
+            "default-implement": {
+              "artifacts": {
+                "implementation_evidence": {
+                  "checklist": [
+                    {
+                      "evidence": "Implemented in the pinned Round 2 worktree at f880b7767149e4de43d5bc4d4786247d1e536a8c. Round 1 was inspected read-only. Application supervision uses the shared workflow health and scheduler-observation contracts; worker replacement remains the companion Goal's responsibility.",
+                      "id": "workflow.plan.enter:default-plan:P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Independent identity receipts preserve runtime, original start and deadline, recorded cap, OS identity, group witnesses and execution correlations. Registration covers Skill subprocesses and sessions. Legacy records without sufficient deadline evidence remain visible and counted without signalling.",
+                      "id": "workflow.plan.enter:default-plan:P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added identity-fenced group termination with five-second TERM grace and ten-second KILL confirmation, surviving-descendant checks, and bounded reaping/output draining. Ownership failures retain receipts, transcripts and cleanup obligations.",
+                      "id": "workflow.plan.enter:default-plan:P3",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Existing daemon supervision reconciles both process roots every five seconds independently of admission. Tests cover pause, corrupt target state, per-record failures and contended cleanup locks. The final real group exited 11.804 seconds after its original deadline.",
+                      "id": "workflow.plan.enter:default-plan:P4",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Skill operations acquire execution leases atomically with registration and retain launch receipts before waiting. Durable first-detection evidence distinguishes released tasks, exited owners, healthy leases and capability handoffs. Recovery correlates operation and invocation records across both process roots.",
+                      "id": "workflow.plan.enter:default-plan:P5",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Application recovery settles interrupted Skills and operations within the configured recovery window, retains original errors and unresolved cleanup, and fences late results by invocation, node, Round and attempt authority. Tests cover cancellation, supersession, persistence failure and clearing cleanup after terminal failure.",
+                      "id": "workflow.plan.enter:default-plan:P6",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Admission errors retry within five seconds; per-Goal retries cap at thirty seconds. Preparation runs within owning tasks. Capacity deduplicates starting tasks, durable Event receipts and their first live group while retaining additional live cleanup groups. Fresh Plan execution began in 4.627 seconds with the original equal-priority task still active.",
+                      "id": "workflow.plan.enter:default-plan:P7",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Shared health exposes recovery causes, pending cleanup, admission errors and observation freshness through next, node responses and system status. The final fixture captured four onset/recovery activity entries and healthy final output with no pending recovery.",
+                      "id": "workflow.plan.enter:default-plan:P8",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Registered and ran daemon_lifetime_recovery using production daemon, worker and Skill execution paths. The fixture removed the primary registration and killed the Skill's supervising owner, then verified TERM/KILL, whole-group exit, failed operation, Skill execution error and fresh Plan admission. Daemon PID 2666358 and worker PID 2666387 retained identical OS incarnations.",
+                      "id": "workflow.plan.enter:default-plan:P9",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "The same-worker fixture used two slots, a held Plan task, a released operation lease and a transient admission error. Another Todo launched Plan while the held task remained active. Exited-owner recovery used a real Custom Skill; focused tests additionally cover Node-start Skill settlement.",
+                      "id": "workflow.plan.enter:default-plan:P10",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Focused tests cover simulated PID identity reuse, missing/corrupt identities, leader-only exit, TERM resistance, injected signalling/observation failures, blocked output drain, launch/cancellation fencing, superseded authority, late completion, persistence faults, cleanup capacity, pause and authenticated Toolbar exemptions.",
+                      "id": "workflow.plan.enter:default-plan:P11",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Separated identity, group termination, deadline reconciliation, operation recovery, admission, health and execution storage responsibilities. Updated eight affected intent pages. Formatting passed for all 59 changed Rust files; git diff --check and all-targets compilation passed. Required tests ran with the unchanged workflow fixture failure reported below.",
+                      "id": "workflow.plan.enter:default-plan:P12",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "cargo check --all-targets: passed without warnings.",
+                    "cargo test --lib infrastructure::process -- --test-threads=1: 99 passed.",
+                    "cargo test --lib application::events -- --test-threads=1: 22 passed.",
+                    "cargo test --lib application::workers -- --test-threads=1: 24 passed.",
+                    "cargo test --lib application::workflow -- --test-threads=1: 175 passed, 1 failed.",
+                    "Workflow failure: planning_repair::multiple_plan_skills_contribute_separate_namespaced_checklists, line 117, rejected duplicate Skill assignment: A Skill has one trigger. Clone the Skill to use it at another trigger point. The fixture and validation implementation are unchanged from the pinned base; the base was not separately executed.",
+                    "cargo test --lib application::workflow::health -- --test-threads=1: 1 passed after the final health-read changes.",
+                    "cargo test --lib application::agents::sessions -- --test-threads=1: 37 passed.",
+                    "cargo test --lib application::guidance -- --test-threads=1: 3 passed.",
+                    "cargo test --lib surfaces::web_server::tests::nodes_fleet -- --test-threads=1: 5 passed.",
+                    "cargo test --lib surfaces::cli::tests::system::daemon -- --test-threads=1: 15 passed.",
+                    "cargo test --lib surfaces::web_server::http::background_loops -- --test-threads=1: 2 passed.",
+                    "cargo test --test daemon_lifetime_recovery -- --test-threads=1 --nocapture: 2 passed, including the helper entry and combined daemon-lifetime incident fixture; 33.37 seconds.",
+                    "No tests were ignored in these runs.",
+                    "rustfmt --edition 2024 --config skip_children=true --check on all 59 changed Rust files: passed. git diff --check: passed."
+                  ]
+                }
+              },
+              "binding_id": "default-implement",
+              "evidence": [
+                "Final integration evidence: target/refine-integration/artifacts/daemon-lifetime-recovery-33065/recovery-evidence.json.",
+                "Original deadline 1789051435860; TERM 1789051437631; KILL 1789051442647; confirmed group exit 1789051447664 milliseconds.",
+                "Daemon before/after: PID 2666358, linux:6cd2da70-8e08-446f-a445-f46afceaad1a:2393567.",
+                "Worker before/after: PID 2666387, linux:6cd2da70-8e08-446f-a445-f46afceaad1a:2393568.",
+                "Final next health: healthy=true, state=ticking, two active attempts, no admission error, no pending cleanup.",
+                "Changes remain uncommitted in the pinned worktree. No Goal advancement, merge, push, source promotion or serving-installation restart was performed."
+              ],
+              "invocation_id": "22642fe7d378804adb9418a11495943e7c147d26293ad3fbc9a37d47e832751a",
+              "outcome": "failure",
+              "role": "implement",
+              "summary": "Implemented recovery and verified both incidents without restarting the daemon or worker. Required workflow verification retains one failure in an unchanged duplicate-Skill fixture."
+            }
+          },
+          "source": "workflow.implement.enter",
+          "state": "failed"
+        },
         "4357e47d8ff8a0552b076144b8d02e247b5521348c6f0379a3ce7844059f5f28": {
           "candidate_commit": null,
           "results": {
@@ -1112,9 +1217,9 @@
           "state": "succeeded"
         }
       },
-      "failure_at": "",
-      "failure_category": "",
-      "failure_message": "",
+      "failure_at": "2026-09-10T14:46:14Z",
+      "failure_category": "workflow",
+      "failure_message": "Skill workflow.implement.enter:default-implement failed: Implemented recovery and verified both incidents without restarting the daemon or worker. Required workflow verification retains one failure in an unchanged duplicate-Skill fixture.",
       "governance_candidate_commit": "",
       "governance_checked_at": "",
       "governance_details": "",
@@ -1284,7 +1389,7 @@
       "quality_state": "unclassified",
       "reporter": "Buddy Williams",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T13:49:01Z",
+      "updated": "2026-09-10T14:46:14Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T13:43:02Z",
         "round_idx": 1,
@@ -1294,9 +1399,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "failed",
   "target_branch": "main",
-  "updated": "2026-09-10T13:49:01Z",
+  "updated": "2026-09-10T14:46:14Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:36.894817765+00:00",
@@ -1324,7 +1429,16 @@
       "node_id": "default",
       "round_idx": 1,
       "to": "implement"
+    },
+    {
+      "at": "2026-09-10T14:46:14.174523732+00:00",
+      "forced": true,
+      "from": "implement",
+      "generation": 4,
+      "node_id": "default",
+      "round_idx": 1,
+      "to": "failed"
     }
   ],
-  "workflow_revision": 32
+  "workflow_revision": 34
 }
