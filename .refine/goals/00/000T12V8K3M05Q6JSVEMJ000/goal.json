@@ -3,7 +3,7 @@
   "branch_name": "refine/00000T12V8K3M05Q6JSVEMJ000/round-2",
   "candidate_commit": null,
   "created": "2026-09-10T13:01:23Z",
-  "event_generation": 8,
+  "event_generation": 9,
   "feature_id": null,
   "feature_order": null,
   "id": "00000T12V8K3M05Q6JSVEMJ000",
@@ -2038,6 +2038,78 @@
           }
         }
       },
+      "event_results": {
+        "bddb4147dfa5434dffb53720f5fd0f1a722ab48939270ed6c7451e91a3de53df": {
+          "candidate_commit": null,
+          "results": {
+            "default-plan": {
+              "artifacts": {
+                "plan": {
+                  "checklist": [
+                    {
+                      "description": "In the pinned Round 2 worktree, confirm branch refine/00000T12V8K3M05Q6JSVEMJ000/round-2, clean status, and base 7b430a6a3bc0d692f03e71da68d06f3e9534dead. Compare f880b776..b831779b with 7b430a6a..e93801fc to identify the intended clipboard delta and overlapping target changes. Preserve both retained candidates, the Round 1 branch/worktree, and all historical evidence.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Selectively reapply the intended delta to the current clipboard module: native Ctrl/Cmd+C/V and Insert shortcuts yield to browser clipboard events while suppressing xterm interpretation; Ctrl+Shift+C/V remains an explicit asynchronous fallback with repeat suppression. Preserve Copy selection, manual recovery, truthful feedback, copying after exit/disconnection, and retained renderer/history behavior. Keep paste on Terminal.paste → onData → the existing session-bound input queue, including duplicate suppression and pending-read checks for tab, focus, renderer, session, and exit changes.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Correct the nine inherited asynchronous-copy regression cases in tests/web_terminal_copy_recovery_browser.test.js and tests/web_terminal_copy_lifecycle_browser.test.js. Use Ctrl+Shift+C for scenarios that deliberately await writeText resolution/rejection, and assert that a pending attempt exists before changing lifecycle state. Preserve their recovery, focus, selection, history, restart, supersession, and stale-result assertions. Keep native-copy scenarios and Ctrl+C in the manual recovery field unchanged; retain separate trusted native-copy coverage proving successful copying without asynchronous API access or a PTY interrupt.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Recover the relevant unit/browser coverage and corrected Claude smoke helper from the retained candidate, preserving current target tests and loaders. Reuse tests/support/terminal_clipboard_runtime.js; omit the unreferenced duplicate terminal-clipboard-runtime.js. Keep additional browser/smoke helpers focused on their responsibilities. Add the selection-hint accessibility association and update only docs/intent/05-surfaces/03-browser/19-terminal.md to reconcile native clipboard authority with existing copy recovery. Keep implementation in the shared browser terminal surface, preserving Model/Application/Infrastructure contracts and existing workflow authority.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Verify the resulting candidate from the pinned worktree using an explicitly verified NODE_PATH and available Chromium: node --test --test-concurrency=1 tests/web_terminal*.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_goal_log_tail.test.js tests/web_javascript_syntax.test.js. This must include both inherited recovery/lifecycle suites. Require executed browser tests with zero skips, covering native clipboard permission states, fallback failures, mouse-capture selection, all profiles and both provider fixtures, paste framing, session isolation, terminal controls, and toolbar/palette focus. Run node --check tests/support/claude-clipboard-smoke.js and the isolated Claude smoke helper with a fresh evidence directory under an already trusted scratch parent; keep its pasted prompt unsubmitted. Record commands, tooling/provider versions, results, and actual platform coverage.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Review the complete base-to-candidate diff, run git diff --check 7b430a6a3bc0d692f03e71da68d06f3e9534dead, and report checklist evidence for Refine's candidate handoff. Require fresh supervised Quality and independent Governance bound to the final committed candidate before integration; earlier b831779b results cannot authorize it. If target refresh changes the candidate, repeat both gates for the replacement. Leave Goal transitions, merge, push, source promotion, and serving-daemon restart to their authorized workflow/operator actions.",
+                      "id": "P6"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "C1",
+                      "resolution": "Replacing current files wholesale with the original candidate would discard target additions for retained-output copying and manual recovery. P1–P2 instead reconcile the intended delta against the current base, using the failed replacement as comparison evidence."
+                    },
+                    {
+                      "criticism_id": "C2",
+                      "resolution": "Changing test gestures could conceal a product regression. P3 preserves every lifecycle assertion, explicitly proves asynchronous work started, and keeps separate native-copy assertions. Restoring asynchronous Ctrl+C handling would recreate the browser-permission dependency the Goal addresses."
+                    },
+                    {
+                      "criticism_id": "C3",
+                      "resolution": "The prior verification list omitted the two inherited suites that exposed the integration failure. P5 includes every web_terminal test file, requires browser execution, and records fresh Claude evidence; retained passes are historical evidence only."
+                    },
+                    {
+                      "criticism_id": "C4",
+                      "resolution": "A broader terminal rewrite, provider-specific path, or OSC 52 extension is unnecessary for this correction. P4 keeps clipboard ownership in the existing shared module, avoids an unused duplicate helper, and limits documentation to the affected Terminal contract."
+                    }
+                  ],
+                  "summary": "Use a scoped, regression-led recovery from base 7b430a6a: restore native browser clipboard handling while retaining current copy recovery and lifecycle behavior, then correct inherited asynchronous-copy test triggers and verify the complete combined candidate."
+                }
+              },
+              "binding_id": "default-plan",
+              "evidence": [
+                "Read-only Git inspection confirmed the pinned Round 2 branch and main both name 7b430a6a3bc0d692f03e71da68d06f3e9534dead. Final status porcelain remained empty; no files or Git state were changed.",
+                "Both retained commits resolve. Round 1 currently names e93801fca1a1991ce4389799268de315aded1ae8. Comparing its delta with the original candidate showed that current-target copy controls and recovery logic must be preserved.",
+                "The two inherited recovery/lifecycle browser test files are unchanged between the pinned base and e93801fc. Inspection identified nine test instances that use Ctrl+C while expecting asynchronous write completion or failure, consistent with the supplied Quality failure. This invocation did not rerun tests.",
+                "Reviewed candidate Design, Surface Principles, Terminal, Toolbar, Command Palette, Plan, Quality, and Governance intent. The supplied prior Claude smoke evidence reported native clipboard operation without OSC 52; that evidence was not refreshed during planning.",
+                "Repository inspection found no references to the replacement candidate's added terminal-clipboard-runtime.js; its unit suite uses the existing terminal_clipboard_runtime.js. The additional browser helper is referenced by browser tests and the Claude smoke helper."
+              ],
+              "invocation_id": "bddb4147dfa5434dffb53720f5fd0f1a722ab48939270ed6c7451e91a3de53df",
+              "outcome": "success",
+              "role": "plan",
+              "summary": "Completed observational recovery planning and corrected the result schema: criticism_resolutions entries contain only criticism_id and resolution. Verification commands are proposed, not claimed as executed. "
+            }
+          },
+          "source": "workflow.plan.enter",
+          "state": "succeeded"
+        }
+      },
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
@@ -2057,12 +2129,98 @@
           "round_idx": 1,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-09-10T14:28:44Z",
+        "final_plan": {
+          "completed_at": "2026-09-10T14:35:37Z",
+          "git_after": {
+            "branch": "refine/00000T12V8K3M05Q6JSVEMJ000/round-2",
+            "head_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T12V8K3M05Q6JSVEMJ000/round-2",
+            "head_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "In the pinned Round 2 worktree, confirm branch refine/00000T12V8K3M05Q6JSVEMJ000/round-2, clean status, and base 7b430a6a3bc0d692f03e71da68d06f3e9534dead. Compare f880b776..b831779b with 7b430a6a..e93801fc to identify the intended clipboard delta and overlapping target changes. Preserve both retained candidates, the Round 1 branch/worktree, and all historical evidence.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Selectively reapply the intended delta to the current clipboard module: native Ctrl/Cmd+C/V and Insert shortcuts yield to browser clipboard events while suppressing xterm interpretation; Ctrl+Shift+C/V remains an explicit asynchronous fallback with repeat suppression. Preserve Copy selection, manual recovery, truthful feedback, copying after exit/disconnection, and retained renderer/history behavior. Keep paste on Terminal.paste → onData → the existing session-bound input queue, including duplicate suppression and pending-read checks for tab, focus, renderer, session, and exit changes.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Correct the nine inherited asynchronous-copy regression cases in tests/web_terminal_copy_recovery_browser.test.js and tests/web_terminal_copy_lifecycle_browser.test.js. Use Ctrl+Shift+C for scenarios that deliberately await writeText resolution/rejection, and assert that a pending attempt exists before changing lifecycle state. Preserve their recovery, focus, selection, history, restart, supersession, and stale-result assertions. Keep native-copy scenarios and Ctrl+C in the manual recovery field unchanged; retain separate trusted native-copy coverage proving successful copying without asynchronous API access or a PTY interrupt.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Recover the relevant unit/browser coverage and corrected Claude smoke helper from the retained candidate, preserving current target tests and loaders. Reuse tests/support/terminal_clipboard_runtime.js; omit the unreferenced duplicate terminal-clipboard-runtime.js. Keep additional browser/smoke helpers focused on their responsibilities. Add the selection-hint accessibility association and update only docs/intent/05-surfaces/03-browser/19-terminal.md to reconcile native clipboard authority with existing copy recovery. Keep implementation in the shared browser terminal surface, preserving Model/Application/Infrastructure contracts and existing workflow authority.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Verify the resulting candidate from the pinned worktree using an explicitly verified NODE_PATH and available Chromium: node --test --test-concurrency=1 tests/web_terminal*.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_goal_log_tail.test.js tests/web_javascript_syntax.test.js. This must include both inherited recovery/lifecycle suites. Require executed browser tests with zero skips, covering native clipboard permission states, fallback failures, mouse-capture selection, all profiles and both provider fixtures, paste framing, session isolation, terminal controls, and toolbar/palette focus. Run node --check tests/support/claude-clipboard-smoke.js and the isolated Claude smoke helper with a fresh evidence directory under an already trusted scratch parent; keep its pasted prompt unsubmitted. Record commands, tooling/provider versions, results, and actual platform coverage.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Review the complete base-to-candidate diff, run git diff --check 7b430a6a3bc0d692f03e71da68d06f3e9534dead, and report checklist evidence for Refine's candidate handoff. Require fresh supervised Quality and independent Governance bound to the final committed candidate before integration; earlier b831779b results cannot authorize it. If target refresh changes the candidate, repeat both gates for the replacement. Leave Goal transitions, merge, push, source promotion, and serving-daemon restart to their authorized workflow/operator actions.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Use a scoped, regression-led recovery from base 7b430a6a: restore native browser clipboard handling while retaining current copy recovery and lifecycle behavior, then correct inherited asynchronous-copy test triggers and verify the complete combined candidate."
+          },
+          "started_at": "2026-09-10T14:28:44Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-09-10T14:35:37Z",
+        "proposal": {
+          "completed_at": "2026-09-10T14:35:37Z",
+          "git_after": {
+            "branch": "refine/00000T12V8K3M05Q6JSVEMJ000/round-2",
+            "head_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/00000T12V8K3M05Q6JSVEMJ000/round-2",
+            "head_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "In the pinned Round 2 worktree, confirm branch refine/00000T12V8K3M05Q6JSVEMJ000/round-2, clean status, and base 7b430a6a3bc0d692f03e71da68d06f3e9534dead. Compare f880b776..b831779b with 7b430a6a..e93801fc to identify the intended clipboard delta and overlapping target changes. Preserve both retained candidates, the Round 1 branch/worktree, and all historical evidence.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Selectively reapply the intended delta to the current clipboard module: native Ctrl/Cmd+C/V and Insert shortcuts yield to browser clipboard events while suppressing xterm interpretation; Ctrl+Shift+C/V remains an explicit asynchronous fallback with repeat suppression. Preserve Copy selection, manual recovery, truthful feedback, copying after exit/disconnection, and retained renderer/history behavior. Keep paste on Terminal.paste → onData → the existing session-bound input queue, including duplicate suppression and pending-read checks for tab, focus, renderer, session, and exit changes.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "Correct the nine inherited asynchronous-copy regression cases in tests/web_terminal_copy_recovery_browser.test.js and tests/web_terminal_copy_lifecycle_browser.test.js. Use Ctrl+Shift+C for scenarios that deliberately await writeText resolution/rejection, and assert that a pending attempt exists before changing lifecycle state. Preserve their recovery, focus, selection, history, restart, supersession, and stale-result assertions. Keep native-copy scenarios and Ctrl+C in the manual recovery field unchanged; retain separate trusted native-copy coverage proving successful copying without asynchronous API access or a PTY interrupt.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Recover the relevant unit/browser coverage and corrected Claude smoke helper from the retained candidate, preserving current target tests and loaders. Reuse tests/support/terminal_clipboard_runtime.js; omit the unreferenced duplicate terminal-clipboard-runtime.js. Keep additional browser/smoke helpers focused on their responsibilities. Add the selection-hint accessibility association and update only docs/intent/05-surfaces/03-browser/19-terminal.md to reconcile native clipboard authority with existing copy recovery. Keep implementation in the shared browser terminal surface, preserving Model/Application/Infrastructure contracts and existing workflow authority.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Verify the resulting candidate from the pinned worktree using an explicitly verified NODE_PATH and available Chromium: node --test --test-concurrency=1 tests/web_terminal*.test.js tests/web_supervisor_toolbar.test.js tests/web_command_palette.test.js tests/web_goal_log_tail.test.js tests/web_javascript_syntax.test.js. This must include both inherited recovery/lifecycle suites. Require executed browser tests with zero skips, covering native clipboard permission states, fallback failures, mouse-capture selection, all profiles and both provider fixtures, paste framing, session isolation, terminal controls, and toolbar/palette focus. Run node --check tests/support/claude-clipboard-smoke.js and the isolated Claude smoke helper with a fresh evidence directory under an already trusted scratch parent; keep its pasted prompt unsubmitted. Record commands, tooling/provider versions, results, and actual platform coverage.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Review the complete base-to-candidate diff, run git diff --check 7b430a6a3bc0d692f03e71da68d06f3e9534dead, and report checklist evidence for Refine's candidate handoff. Require fresh supervised Quality and independent Governance bound to the final committed candidate before integration; earlier b831779b results cannot authorize it. If target refresh changes the candidate, repeat both gates for the replacement. Leave Goal transitions, merge, push, source promotion, and serving-daemon restart to their authorized workflow/operator actions.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Use a scoped, regression-led recovery from base 7b430a6a: restore native browser clipboard handling while retaining current copy recovery and lifecycle behavior, then correct inherited asynchronous-copy test triggers and verify the complete combined candidate."
+          },
+          "started_at": "2026-09-10T14:28:44Z"
+        },
         "schema_version": 2,
         "started_at": "2026-09-10T14:28:44Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T14:28:44Z"
+        "updated_at": "2026-09-10T14:35:37Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -2076,7 +2234,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T14:28:44Z",
+      "updated": "2026-09-10T14:35:37Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T14:28:43Z",
         "round_idx": 1,
@@ -2257,9 +2415,9 @@
       }
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-09-10T14:28:44Z",
+  "updated": "2026-09-10T14:35:37Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:01:23.048199482+00:00",
@@ -2332,7 +2490,16 @@
       "node_id": "default",
       "round_idx": 1,
       "to": "plan"
+    },
+    {
+      "at": "2026-09-10T14:35:37.396687548+00:00",
+      "forced": false,
+      "from": "plan",
+      "generation": 9,
+      "node_id": "default",
+      "round_idx": 1,
+      "to": "implement"
     }
   ],
-  "workflow_revision": 42
+  "workflow_revision": 48
 }

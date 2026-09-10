@@ -1,9 +1,9 @@
 {
-  "base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+  "base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
   "branch_name": "refine/DR54BF57DCE017ED8EC68A5EEB/round-2",
-  "candidate_commit": null,
+  "candidate_commit": "6b9e73d02dfe7f3fb472cbe816686ac32fa98ba6",
   "created": "2026-09-10T08:26:04Z",
-  "event_generation": 3,
+  "event_generation": 4,
   "feature_id": null,
   "feature_order": null,
   "id": "DR54BF57DCE017ED8EC68A5EEB",
@@ -486,7 +486,7 @@
         "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
       },
       "assignee": "ethan.jacobson@insurity.com",
-      "constitution_state": "unclassified",
+      "constitution_state": null,
       "created": "2026-09-10T13:06:36Z",
       "event_configuration": {
         "events": {
@@ -1069,17 +1069,110 @@
           },
           "source": "workflow.plan.enter",
           "state": "succeeded"
+        },
+        "a7381646927a35850b75b4bb751c36908cca54e7515c33530520976a41f6dcee": {
+          "candidate_commit": null,
+          "results": {
+            "default-implement": {
+              "artifacts": {
+                "implementation_evidence": {
+                  "checklist": [
+                    {
+                      "evidence": "Added shared pre-agent validation of HEAD, branch, base, target, authority, planning context and current Skills. Agent-lineage tests pass for changed planning context, target advancement, preserved dirty work and original-base resumption.",
+                      "id": "workflow.plan.enter:default-plan:P1",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Replay ownership now uses retained creation, planning or prior-refresh observations plus Git ancestry. Tests prove unrelated developer commits are excluded and ambiguous, unavailable or merged history cannot authorize guessed replay.",
+                      "id": "workflow.plan.enter:default-plan:P2",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Added exact-target detached replay with retained source refs, a durable journal and local branch comparison-and-swap. Interruption tests pass before attachment and after replacement persistence.",
+                      "id": "workflow.plan.enter:default-plan:P3",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Wrong-base and advanced-target candidates use shared refresh. Scoped retries use successor worktrees while preserving source attempts. Existing bounded retry policy remains enforced. Tests cover unchanged targets, successor replay and target movement after publication.",
+                      "id": "workflow.plan.enter:default-plan:P4",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Authority-fenced persistence records original and replacement identities, actual replay base and superseded evidence. Active planning bindings are reconciled while original plans remain archived. Interrupted handoff acknowledgement resumes without rolling back persisted replacements.",
+                      "id": "workflow.plan.enter:default-plan:P5",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Replacement invocations include the candidate SHA, refresh current Skill configuration and invalidate stale gate projections. Three replacement-Skill tests pass, covering exact-candidate proof separation, changed configuration, background execution, context-only attachment and explicit absence of required checks.",
+                      "id": "workflow.plan.enter:default-plan:P6",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Candidate handoffs journal publication intent and retain the previously confirmed remote SHA. Publication uses an atomic exact-SHA lease. Tests pass for replacement publication, identical retries, interrupted successful pushes, unexpected remote changes and a server-side race after advertisement.",
+                      "id": "workflow.plan.enter:default-plan:P7",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Preserved managed conflict resolution and recovery. Tests distinguish content conflicts, ambiguous or unavailable history, dirty work, lost authority, Git command failures and unexpected local ref changes; these cases cannot become successful replay evidence.",
+                      "id": "workflow.plan.enter:default-plan:P8",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Separated workflow admission, lineage, implementation, checks, integration, replay and publication into responsibility-based modules. Updated only seven affected worktree, workflow and Skills intent pages. Architecture tests and scoped formatting checks pass.",
+                      "id": "workflow.plan.enter:default-plan:P9",
+                      "outcome": "completed"
+                    },
+                    {
+                      "evidence": "Workflow regression run passes 202 selected tests, including fresh declared-target creation, replay, conflicts, retries, publication races and interruption. End-to-end fixtures reach Review after replacement checks and leased republication, including a second target advance.",
+                      "id": "workflow.plan.enter:default-plan:P10",
+                      "outcome": "completed"
+                    }
+                  ],
+                  "verification": [
+                    "cargo test --lib application::workflow -- --test-threads=1 --skip multiple_plan_skills_contribute_separate_namespaced_checklists: 202 passed, 0 failed.",
+                    "Unfiltered workflow run: 199 passed, 1 failed. The unchanged multiple_plan_skills_contribute_separate_namespaced_checklists fixture violates the existing one-trigger-per-Skill validator. It was explicitly excluded from the final workflow run.",
+                    "cargo test --lib replacement_skills -- --test-threads=1: 3 passed after final evidence-wording adjustments.",
+                    "cargo test --lib application::events::tests -- --test-threads=1: 20 passed.",
+                    "cargo test --lib infrastructure::git::worktrees -- --test-threads=1: 31 passed.",
+                    "cargo test --lib architecture_tests -- --test-threads=1: 5 passed.",
+                    "cargo check --all-targets: passed.",
+                    "cargo clippy --lib --tests -- -D warnings: blocked by five existing diagnostics: two needless_pub_self, one collapsible_if, one module_inception and one unnecessary_sort_by.",
+                    "cargo clippy --lib --tests -- -D warnings -A clippy::needless_pub_self -A clippy::collapsible_if -A clippy::module_inception -A clippy::unnecessary_sort_by: passed.",
+                    "Scoped rustfmt --check on all 38 changed Rust files and git diff --check: passed."
+                  ]
+                }
+              },
+              "binding_id": "default-implement",
+              "evidence": [
+                "Implemented in the pinned Round 2 workspace; HEAD remains f880b7767149e4de43d5bc4d4786247d1e536a8c. Changes remain uncommitted for Refine.",
+                "Round 1 retains HEAD 8f6de519c62a8a373b19482d5c7842068acfb35d, its original change inventory and diff statistics. Source files and historical evidence were preserved.",
+                "Verification logs are retained under /tmp/refine-dr54-r2-*.log, including workflow-final-checked, replacement-skills-final, all-targets-final-checked and clippy-final-checked.",
+                "No real Goal state was advanced, candidate committed, branch pushed, integration performed, installation deployed or daemon restarted."
+              ],
+              "invocation_id": "a7381646927a35850b75b4bb751c36908cca54e7515c33530520976a41f6dcee",
+              "outcome": "success",
+              "role": "implement",
+              "summary": "Implemented proven-history candidate replay, recoverable interruption handling, current exact-candidate Skill checks and atomic leased republication. All ten checklist items are complete; verification passed with the explicitly reported baseline test and lint limitations."
+            }
+          },
+          "source": "workflow.implement.enter",
+          "state": "succeeded"
         }
       },
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
-      "governance_candidate_commit": "",
-      "governance_checked_at": "",
-      "governance_details": "",
-      "governance_message": "",
+      "governance_candidate_commit": null,
+      "governance_checked_at": null,
+      "governance_details": null,
+      "governance_message": null,
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [],
+        "context_version": 1,
+        "recorded_at": "2026-09-10T14:40:11Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
@@ -1090,6 +1183,7 @@
           "round_idx": 1,
           "target_branch": "main"
         },
+        "completed_at": "2026-09-10T14:40:11Z",
         "final_plan": {
           "completed_at": "2026-09-10T13:54:14Z",
           "git_after": {
@@ -1148,6 +1242,77 @@
             "summary": "workflow.plan.enter:default-plan: Recover stale candidates by replaying only proven Goal changes, retaining source evidence, rerunning current Skills, and fencing replacement publication."
           },
           "started_at": "2026-09-10T13:43:01Z"
+        },
+        "implementation": {
+          "completed_at": "2026-09-10T14:40:11Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Added shared pre-agent validation of HEAD, branch, base, target, authority, planning context and current Skills. Agent-lineage tests pass for changed planning context, target advancement, preserved dirty work and original-base resumption.",
+                "id": "workflow.plan.enter:default-plan:P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Replay ownership now uses retained creation, planning or prior-refresh observations plus Git ancestry. Tests prove unrelated developer commits are excluded and ambiguous, unavailable or merged history cannot authorize guessed replay.",
+                "id": "workflow.plan.enter:default-plan:P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Added exact-target detached replay with retained source refs, a durable journal and local branch comparison-and-swap. Interruption tests pass before attachment and after replacement persistence.",
+                "id": "workflow.plan.enter:default-plan:P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Wrong-base and advanced-target candidates use shared refresh. Scoped retries use successor worktrees while preserving source attempts. Existing bounded retry policy remains enforced. Tests cover unchanged targets, successor replay and target movement after publication.",
+                "id": "workflow.plan.enter:default-plan:P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Authority-fenced persistence records original and replacement identities, actual replay base and superseded evidence. Active planning bindings are reconciled while original plans remain archived. Interrupted handoff acknowledgement resumes without rolling back persisted replacements.",
+                "id": "workflow.plan.enter:default-plan:P5",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Replacement invocations include the candidate SHA, refresh current Skill configuration and invalidate stale gate projections. Three replacement-Skill tests pass, covering exact-candidate proof separation, changed configuration, background execution, context-only attachment and explicit absence of required checks.",
+                "id": "workflow.plan.enter:default-plan:P6",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Candidate handoffs journal publication intent and retain the previously confirmed remote SHA. Publication uses an atomic exact-SHA lease. Tests pass for replacement publication, identical retries, interrupted successful pushes, unexpected remote changes and a server-side race after advertisement.",
+                "id": "workflow.plan.enter:default-plan:P7",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Preserved managed conflict resolution and recovery. Tests distinguish content conflicts, ambiguous or unavailable history, dirty work, lost authority, Git command failures and unexpected local ref changes; these cases cannot become successful replay evidence.",
+                "id": "workflow.plan.enter:default-plan:P8",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Separated workflow admission, lineage, implementation, checks, integration, replay and publication into responsibility-based modules. Updated only seven affected worktree, workflow and Skills intent pages. Architecture tests and scoped formatting checks pass.",
+                "id": "workflow.plan.enter:default-plan:P9",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Workflow regression run passes 202 selected tests, including fresh declared-target creation, replay, conflicts, retries, publication races and interruption. End-to-end fixtures reach Review after replacement checks and leased republication, including a second target advance.",
+                "id": "workflow.plan.enter:default-plan:P10",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "cargo test --lib application::workflow -- --test-threads=1 --skip multiple_plan_skills_contribute_separate_namespaced_checklists: 202 passed, 0 failed.",
+              "Unfiltered workflow run: 199 passed, 1 failed. The unchanged multiple_plan_skills_contribute_separate_namespaced_checklists fixture violates the existing one-trigger-per-Skill validator. It was explicitly excluded from the final workflow run.",
+              "cargo test --lib replacement_skills -- --test-threads=1: 3 passed after final evidence-wording adjustments.",
+              "cargo test --lib application::events::tests -- --test-threads=1: 20 passed.",
+              "cargo test --lib infrastructure::git::worktrees -- --test-threads=1: 31 passed.",
+              "cargo test --lib architecture_tests -- --test-threads=1: 5 passed.",
+              "cargo check --all-targets: passed.",
+              "cargo clippy --lib --tests -- -D warnings: blocked by five existing diagnostics: two needless_pub_self, one collapsible_if, one module_inception and one unnecessary_sort_by.",
+              "cargo clippy --lib --tests -- -D warnings -A clippy::needless_pub_self -A clippy::collapsible_if -A clippy::module_inception -A clippy::unnecessary_sort_by: passed.",
+              "Scoped rustfmt --check on all 38 changed Rust files and git diff --check: passed."
+            ]
+          },
+          "report": "workflow.implement.enter:default-implement: Implemented proven-history candidate replay, recoverable interruption handling, current exact-candidate Skill checks and atomic leased republication. All ten checklist items are complete; verification passed with the explicitly reported baseline test and lint limitations.",
+          "started_at": "2026-09-10T13:54:14Z"
         },
         "phase": "implement",
         "phase_started_at": "2026-09-10T13:54:14Z",
@@ -1212,34 +1377,64 @@
         },
         "schema_version": 2,
         "started_at": "2026-09-10T13:43:01Z",
-        "state": "in_progress",
-        "updated_at": "2026-09-10T13:54:14Z"
+        "state": "completed",
+        "updated_at": "2026-09-10T14:40:11Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "workflow.implement.enter:default-implement: Implemented proven-history candidate replay, recoverable interruption handling, current exact-candidate Skill checks and atomic leased republication. All ten checklist items are complete; verification passed with the explicitly reported baseline test and lint limitations.",
+      "implementation_reported_at": "2026-09-10T14:40:11Z",
       "logs": [],
-      "meta_rule_state": "unclassified",
-      "product_state": "unclassified",
+      "meta_rule_state": null,
+      "product_state": null,
       "prompt": "Recover safely from an old candidate whose recorded base is wrong or whose target has advanced, using the candidate's proven Goal changes.\n\nThe original worktree-creation defect was fixed by 8f6de519: fresh and recreated Round branches use the recorded merge-target base. Current code also refreshes candidates before Quality and integration. Keep those behaviors and focus this Round on remaining lineage and retry gaps. settle_stale_candidate still fails immediately when the target equals the recorded base but the candidate does not descend from it. Round 1 retained extensive unfinished replay and publication work without a candidate or final verification.\n\nValidate actual worktree HEAD, recorded base, target and planning or Skill context before automated edits. Preserve the original base when resuming existing work. Extend the current refresh and recovery path to repair bookkeeping only when retained Round and Git evidence identify the Goal's own change range. A merge base or a conflict-free rebase alone does not prove that every commit on a divergent developer branch belongs to the Goal. Ambiguous or unavailable history must remain recoverable with clear evidence, not import unrelated work.\n\nReplay an unambiguous candidate onto one observed target tip in a managed workspace. Record original and replacement identities, retain the source attempt, and rerun the applicable current Skills and exact-candidate checks for every changed candidate. Respect required, background and context-only behavior and record when no required check Skills apply. Bound retries for target movement, preserve conflict evidence and existing supported conflict recovery, and never treat dirty work, lost authority or a Git error as a successful replay.\n\nPreserve target leases and atomic publication checks against the previously recorded remote candidate SHA. Handle an already-published identical replacement idempotently; preserve unexpected remote changes and interrupted publication evidence.\n\nVerify advanced targets, a wrong recorded base with an unchanged target, divergent branches containing unrelated commits, retries, content conflicts, remote publication races and interruption. Prove fresh Round creation still starts at the declared target and that replacement commits cannot reuse stale check evidence.\n\nThis is a recovery Round following the Skills review on 10 September 2026. Start from current main in a new managed Round worktree. Preserve Round 1, its plans, logs, branches, commits and uncommitted files; inspect and selectively reuse useful work instead of replaying the whole old attempt. Use the current Skills and docs/intent contracts, not archived Governance, Quality or Guidance configuration or the old fixed planning sequence. Refine owns workflow advancement and integration; human approval remains separate. Update only affected documentation and report focused verification with actual results.",
-      "quality_checked_at": "",
-      "quality_details": "",
-      "quality_message": "",
-      "quality_state": "unclassified",
+      "quality_candidate_commit": null,
+      "quality_checked_at": null,
+      "quality_details": null,
+      "quality_message": null,
+      "quality_state": null,
       "reporter": "Buddy Williams",
-      "rule_state": "unclassified",
-      "updated": "2026-09-10T13:54:14Z",
+      "rule_state": null,
+      "updated": "2026-09-10T14:40:12Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T13:43:00Z",
         "round_idx": 1,
         "workflow_revision": 18
       },
+      "workflow_candidate_refresh": {
+        "authorizing_status": "quality",
+        "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-2",
+        "node_id": "default",
+        "original_base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+        "original_candidate_commit": "90ad05b6fcdb1dbaaa94d2cc6efbf0fcd33c2def",
+        "previous_gate_evidence": {
+          "constitution_state": "unclassified",
+          "governance_candidate_commit": "",
+          "governance_checked_at": "",
+          "governance_details": "",
+          "governance_message": "",
+          "meta_rule_state": "unclassified",
+          "product_state": "unclassified",
+          "quality_candidate_commit": null,
+          "quality_checked_at": "",
+          "quality_details": "",
+          "quality_message": "",
+          "quality_state": "unclassified",
+          "rule_state": "unclassified"
+        },
+        "refreshed_at": "2026-09-10T14:40:12Z",
+        "replacement_base_commit": "7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+        "replacement_candidate_commit": "6b9e73d02dfe7f3fb472cbe816686ac32fa98ba6",
+        "round_idx": 1,
+        "state": "refreshed",
+        "workflow_revision": 18,
+        "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR54BF57DCE017ED8EC68A5EEB-round-2"
+      },
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-10T13:54:14Z",
+  "updated": "2026-09-10T14:40:12Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:36.990956802+00:00",
@@ -1267,7 +1462,16 @@
       "node_id": "default",
       "round_idx": 1,
       "to": "implement"
+    },
+    {
+      "at": "2026-09-10T14:40:11.799050719+00:00",
+      "forced": false,
+      "from": "implement",
+      "generation": 4,
+      "node_id": "default",
+      "round_idx": 1,
+      "to": "quality"
     }
   ],
-  "workflow_revision": 32
+  "workflow_revision": 41
 }
