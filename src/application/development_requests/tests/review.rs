@@ -249,6 +249,118 @@ fn auto_approve_invalid_settings_keep_review_observation_and_retry_evidence() {
 }
 
 #[test]
+fn auto_approve_settings_read_failures_preserve_review_until_repaired() {
+    for unreadable in [false, true] {
+        let f = ReviewFixture::new();
+        f.enable(true);
+        let path = FileSettingsService::for_node(&f.service.refine_dir, "worker").path();
+        let saved = fs::read(&path).unwrap();
+        if unreadable {
+            // A directory deterministically produces a read error even as root.
+            fs::remove_file(&path).unwrap();
+            fs::create_dir(&path).unwrap();
+        } else {
+            fs::write(&path, b"{broken registry").unwrap();
+        }
+        f.poll(0);
+        let observed = f.record();
+        assert_eq!(f.status(), GoalStatus::Review);
+        assert!(observed.review_seen_at.is_some());
+        assert_eq!(observed.attempts, 1);
+        let error = observed.last_error.as_deref().unwrap();
+        assert!(error.contains(if unreadable {
+            "failed to read node registry"
+        } else {
+            "failed to parse node registry"
+        }));
+        f.poll(0);
+        assert_eq!(f.status(), GoalStatus::Review);
+        assert_eq!(f.record().review_seen_at, observed.review_seen_at);
+        assert_eq!(f.record().attempts, 2);
+        assert_eq!(f.mail.notifications.get(), 0);
+
+        if unreadable {
+            fs::remove_dir(&path).unwrap();
+        }
+        fs::write(&path, saved).unwrap();
+        f.poll(0);
+        assert_eq!(f.status(), GoalStatus::Done);
+        assert_eq!(f.record().review_seen_at, observed.review_seen_at);
+        assert_eq!(f.record().status, DevelopmentRequestStatus::Notified);
+        assert!(f.record().last_error.is_none());
+        assert_eq!(f.mail.notifications.get(), 1);
+    }
+}
+
+#[test]
+fn resolution_retry_after_auto_approval_ignores_disabled_or_invalid_settings() {
+    struct RejectResolution;
+
+    impl MailSource for RejectResolution {
+        fn pending_email_ids(&self, _: &str) -> RefineResult<Vec<String>> {
+            panic!("local resolution retry must not query intake")
+        }
+
+        fn raw_email(&self, _: &str) -> RefineResult<Vec<u8>> {
+            panic!("local resolution retry must not fetch raw mail")
+        }
+
+        fn mark_processed(&self, _: &str) -> RefineResult<()> {
+            panic!("local resolution retry must not mark intake")
+        }
+
+        fn send_resolution(
+            &self,
+            _: &DevelopmentRequestSettings,
+            _: &DevelopmentRequestRecord,
+        ) -> RefineResult<()> {
+            Err(RefineError::Io(
+                "resolution temporarily unavailable".to_string(),
+            ))
+        }
+    }
+
+    for invalid in [false, true] {
+        let f = ReviewFixture::new();
+        f.enable(true);
+        f.service
+            .process_local_records(&RejectResolution, &settings())
+            .unwrap();
+        let pending = f.record();
+        assert_eq!(f.status(), GoalStatus::Done);
+        assert_eq!(pending.status, DevelopmentRequestStatus::Resolved);
+        assert!(pending.notified_at.is_none());
+        assert_eq!(pending.attempts, 1);
+        assert!(
+            pending
+                .last_error
+                .as_deref()
+                .unwrap()
+                .contains("resolution temporarily unavailable")
+        );
+        if invalid {
+            f.corrupt_setting();
+        } else {
+            f.enable(false);
+        }
+        f.poll(0);
+        let notified = f.record();
+        assert_eq!(f.status(), GoalStatus::Done);
+        assert_eq!(notified.status, DevelopmentRequestStatus::Notified);
+        assert!(notified.notified_at.is_some());
+        assert!(notified.last_error.is_none());
+        assert_eq!(
+            notified.notification_message_id,
+            pending.notification_message_id
+        );
+        assert_eq!(notified.review_seen_at, pending.review_seen_at);
+        f.poll(0);
+        assert_eq!(f.record(), notified);
+        assert_eq!(f.mail.notifications.get(), 1);
+    }
+}
+
+#[test]
 fn manual_approval_notifies_once_with_disabled_or_unreadable_settings() {
     for unreadable in [false, true] {
         let f = ReviewFixture::new();
