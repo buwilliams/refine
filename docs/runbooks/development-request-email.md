@@ -40,15 +40,21 @@ revision. Choose the node that owns the mailbox connection. Open
 The Skill uses the supported one-shot command:
 
 ```sh
-refine system fetch-email-goals \
-  --runtime-root /home/buddy/projects/refine/run/8082 \
-  --target-root /home/buddy/projects/refine-next
+'/home/buddy/projects/refine/bin/refine' system fetch-email-goals \
+  --runtime-root '/home/buddy/projects/refine/run/8082' \
+  --target-root '/home/buddy/projects/refine-next'
 ```
+
+Use the selected node's `system.refine_executable`, `system.runtime_root`, and
+`system.project_root` values. Pass each as a separate, safely quoted argument,
+including when a path contains spaces or apostrophes. This bounded one-shot
+command checks the target against the local connection before accessing mail.
 
 Each call fetches at most 25 remote messages. Its JSON result includes
 `fetched_count`, `batch_limit`, `goal_ids`, and per-record `errors`. Errors cause
 a nonzero exit while retaining successful imports and retry evidence. The Skill
 may fetch further batches, up to ten per invocation, and reports remaining work.
+Stop immediately on a failed command and report its retained retry evidence.
 
 For startup fetching, also install
 [Fetch Goals from Email on startup](skills/fetch-goals-from-email-on-startup.json)
