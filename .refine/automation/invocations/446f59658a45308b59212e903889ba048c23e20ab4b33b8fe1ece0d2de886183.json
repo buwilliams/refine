@@ -1048,11 +1048,139 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "failed",
+  "results": {
+    "default-quality": {
+      "invocation_id": "446f59658a45308b59212e903889ba048c23e20ab4b33b8fe1ece0d2de886183",
+      "binding_id": "default-quality",
+      "role": "quality",
+      "outcome": "failure",
+      "summary": "Quality found a blocking lifecycle regression: a fresh Goal's Backlog Exit Skill fails because its Round branch does not exist yet. Corrected cached-success workspace revalidation and retained a regression test for the remaining finding.",
+      "evidence": [
+        "Reviewed candidate f71e9c45a6211470506fb71c90f1f487aa770658 against base 7b430a6a3bc0d692f03e71da68d06f3e9534dead, the finalized plan, relevant intent, and retained Round 1 changes.",
+        "Blocking finding: src/application/events/execution/workspace.rs:30 requires branch_name for every Goal-bound Skill. Fresh Goals have no branch before Plan materialization. Through the actual lifecycle dispatcher, a configured Backlog Exit Skill becomes Error with 'Goal Skill workspace unavailable: missing Round branch', preventing the transition. The existing test in src/application/events/tests.rs:455 conceals this case by manually creating a workspace.",
+        "Recovery must provide isolated execution for lifecycle Skills before Plan without prematurely materializing queued Goal implementation worktrees. This remains unresolved; the new fresh_goal_backlog_exit_skill_remains_runnable_before_round_materialization regression is intentionally failing.",
+        "Corrected src/application/events/execution/runner.rs so cached successful invocations revalidate their original workspace before reuse. The added regression failed before correction and now passes, covering missing/replaced registrations while preserving retained results and primary-checkout bytes.",
+        "Updated the Quality intent page's stale recovery description to match separate recovery worktrees and configured Plan/Implement Skills.",
+        "Final verification totals: 219 selected tests passed and 1 failed. Clippy completed with eight warnings in code already present in the base; warning-free validation is not claimed.",
+        "Primary-checkout HEAD, status and index bytes remained unchanged. Round 1 HEAD, status, index bytes and all 36 retained modified/untracked files remained unchanged.",
+        "Three files contain uncommitted Quality changes. Goal state, integration, publication and the serving installation were not changed. Verification used local Git and deterministic provider fixtures; real provider continuation and Windows were not exercised."
+      ],
+      "artifacts": {
+        "tests": [
+          {
+            "command": "cargo test --lib application::events:: -- --test-threads=1",
+            "evidence": "Exit 101: 26 passed, 1 failed. Fresh Backlog Exit invocation became Error because the Round branch was missing. Cached-success recovery regression passed.",
+            "status": "failed",
+            "test": "Skill execution, recovery and fresh Goal lifecycle admission"
+          },
+          {
+            "command": "cargo test --lib infrastructure::git::worktrees::tests -- --test-threads=1",
+            "evidence": "Exit 0: 45 passed.",
+            "status": "passed",
+            "test": "Workspace ownership, Git redirection and primary-checkout preservation"
+          },
+          {
+            "command": "cargo test --lib quality::tests:: -- --test-threads=1",
+            "evidence": "Exit 0: 38 passed.",
+            "status": "passed",
+            "test": "Exact-candidate Quality and isolated legacy reconciliation"
+          },
+          {
+            "command": "cargo test --lib application::workflow::tests::candidate_refresh -- --test-threads=1",
+            "evidence": "Exit 0: 16 passed.",
+            "status": "passed",
+            "test": "Candidate refresh and conflict recovery"
+          },
+          {
+            "command": "cargo test --lib application::workflow::tests::quality_recovery -- --test-threads=1",
+            "evidence": "Exit 0: 1 passed.",
+            "status": "passed",
+            "test": "Recovery Round and dirty-primary preservation"
+          },
+          {
+            "command": "cargo test --lib application::workflow::tests::quality_base_refresh -- --test-threads=1",
+            "evidence": "Exit 0: 9 passed.",
+            "status": "passed",
+            "test": "Quality boundary refresh"
+          },
+          {
+            "command": "cargo test --lib round_base -- --test-threads=1",
+            "evidence": "Exit 0: 9 passed.",
+            "status": "passed",
+            "test": "Declared-base Round creation"
+          },
+          {
+            "command": "cargo test --lib worktree_resume -- --test-threads=1",
+            "evidence": "Exit 0: 3 passed.",
+            "status": "passed",
+            "test": "Worktree resumption"
+          },
+          {
+            "command": "cargo test --lib workflow::engine::behaviors::tests:: -- --test-threads=1",
+            "evidence": "Exit 0: 15 passed.",
+            "status": "passed",
+            "test": "Workflow recovery and terminal proof behavior"
+          },
+          {
+            "command": "cargo test --lib launch_environment -- --test-threads=1",
+            "evidence": "Exit 0: 5 passed.",
+            "status": "passed",
+            "test": "Inherited launch environment filtering"
+          },
+          {
+            "command": "cargo test --lib infrastructure::agents::invocation::tests -- --test-threads=1",
+            "evidence": "Exit 0: 16 passed.",
+            "status": "passed",
+            "test": "Provider invocation compatibility"
+          },
+          {
+            "command": "cargo test --lib application::persistence_sync::resolution:: -- --test-threads=1",
+            "evidence": "Exit 0: 16 passed.",
+            "status": "passed",
+            "test": "Shared conflict resolver behavior"
+          },
+          {
+            "command": "cargo test --lib infrastructure::process::subprocess:: -- --test-threads=1",
+            "evidence": "Exit 0: 20 passed.",
+            "status": "passed",
+            "test": "Process launch and supervision"
+          },
+          {
+            "command": "cargo clippy --all-targets",
+            "evidence": "Exit 0 with eight pre-existing warnings.",
+            "status": "passed",
+            "test": "Compilation and linting across targets"
+          },
+          {
+            "command": "git diff --name-only -z 7b430a6a3bc0d692f03e71da68d06f3e9534dead -- '*.rs' | xargs -0 -r rustfmt --check --edition 2024 --config skip_children=true",
+            "evidence": "Exit 0; 47 changed Rust files checked.",
+            "status": "passed",
+            "test": "Changed Rust file formatting"
+          },
+          {
+            "command": "git diff --check 7b430a6a3bc0d692f03e71da68d06f3e9534dead",
+            "evidence": "Exit 0; no whitespace errors.",
+            "status": "passed",
+            "test": "Candidate whitespace validation"
+          }
+        ]
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-quality",
+      "diagnostic": null,
+      "operation_id": null,
+      "process_id": "proc-1789050860938-1129590-349",
+      "raw_output": "{\n  \"binding_id\": \"default-quality\",\n  \"invocation_id\": \"446f59658a45308b59212e903889ba048c23e20ab4b33b8fe1ece0d2de886183\",\n  \"outcome\": \"failure\",\n  \"role\": \"quality\",\n  \"summary\": \"Quality found a blocking lifecycle regression: a fresh Goal's Backlog Exit Skill fails because its Round branch does not exist yet. Corrected cached-success workspace revalidation and retained a regression test for the remaining finding.\",\n  \"evidence\": [\n    \"Reviewed candidate f71e9c45a6211470506fb71c90f1f487aa770658 against base 7b430a6a3bc0d692f03e71da68d06f3e9534dead, the finalized plan, relevant intent, and retained Round 1 changes.\",\n    \"Blocking finding: src/application/events/execution/workspace.rs:30 requires branch_name for every Goal-bound Skill. Fresh Goals have no branch before Plan materialization. Through the actual lifecycle dispatcher, a configured Backlog Exit Skill becomes Error with 'Goal Skill workspace unavailable: missing Round branch', preventing the transition. The existing test in src/application/events/tests.rs:455 conceals this case by manually creating a workspace.\",\n    \"Recovery must provide isolated execution for lifecycle Skills before Plan without prematurely materializing queued Goal implementation worktrees. This remains unresolved; the new fresh_goal_backlog_exit_skill_remains_runnable_before_round_materialization regression is intentionally failing.\",\n    \"Corrected src/application/events/execution/runner.rs so cached successful invocations revalidate their original workspace before reuse. The added regression failed before correction and now passes, covering missing/replaced registrations while preserving retained results and primary-checkout bytes.\",\n    \"Updated the Quality intent page's stale recovery description to match separate recovery worktrees and configured Plan/Implement Skills.\",\n    \"Final verification totals: 219 selected tests passed and 1 failed. Clippy completed with eight warnings in code already present in the base; warning-free validation is not claimed.\",\n    \"Primary-checkout HEAD, status and index bytes remained unchanged. Round 1 HEAD, status, index bytes and all 36 retained modified/untracked files remained unchanged.\",\n    \"Three files contain uncommitted Quality changes. Goal state, integration, publication and the serving installation were not changed. Verification used local Git and deterministic provider fixtures; real provider continuation and Windows were not exercised.\"\n  ],\n  \"artifacts\": {\n    \"tests\": [\n      {\n        \"test\": \"Skill execution, recovery and fresh Goal lifecycle admission\",\n        \"command\": \"cargo test --lib application::events:: -- --test-threads=1\",\n        \"status\": \"failed\",\n        \"evidence\": \"Exit 101: 26 passed, 1 failed. Fresh Backlog Exit invocation became Error because the Round branch was missing. Cached-success recovery regression passed.\"\n      },\n      {\n        \"test\": \"Workspace ownership, Git redirection and primary-checkout preservation\",\n        \"command\": \"cargo test --lib infrastructure::git::worktrees::tests -- --test-threads=1\",\n        \"status\": \"passed\",\n        \"evidence\": \"Exit 0: 45 passed.\"\n      },\n      {\n        \"test\": \"Exact-candidate Quality and isolated legacy reconciliation\",\n        \"command\": \"cargo test --lib quality::tests:: -- --test-threads=1\",\n        \"status\": \"passed\",\n        \"evidence\": \"Exit 0: 38 passed.\"\n      },\n      {\n        \"test\": \"Candidate refresh and conflict recovery\",\n        \"command\": \"cargo test --lib application::workflow::tests::candidate_refresh -- --test-threads=1\",\n        \"status\": \"passed\",\n        \"evidence\": \"Exit 0: 16 passed.\"\n      },\n      {\n        \"test\": \"Recovery Round and dirty-primary preservation\",\n        \"command\": \"cargo test --lib application::workflow::tests::quality_recovery -- --test-threads=1\",\n        \"status\": \"passed\",\n        \"evidence\": \"Exit 0: 1 passed.\"\n      },\n      {\n        \"test\": \"Quality boundary refresh\",\n        \"command\": \"cargo test --lib application::workflow::tests::quality_base_refresh -- --test-threads=1\",\n        \"status\": \"passed\",\n        \"evidence\": \"Exit 0: 9 passed.\"\n      },\n      {\n        \"test\": \"Declared-base Round creation\",\n        \"command\": \"cargo test --lib round_base -- --test-threads=1\",\n        \"status\": \"passed\",\n        \"evidence\": \"Exit 0: 9 passed.\"\n      },\n      {\n        \"test\": \"Worktree resumption\",\n        \"command\": \"cargo test --lib worktree_resume -- --test-threads=1\",\n        \"status\": \"passed\",\n        \"evidence\": \"Exit 0: 3 passed.\"\n      },\n      {\n        \"test\": \"Workflow recovery and terminal proof behavior\",\n        \"command\": \"cargo test --lib workflow::engine::behaviors::tests:: -- --test-threads=1\",\n        \"status\": \"passed\",\n        \"evidence\": \"Exit 0: 15 passed.\"\n      },\n      {\n        \"test\": \"Inherited launch environment filtering\",\n        \"command\": \"cargo test --lib launch_environment -- --test-threads=1\",\n        \"status\": \"passed\",\n        \"evidence\": \"Exit 0: 5 passed.\"\n      },\n      {\n        \"test\": \"Provider invocation compatibility\",\n        \"command\": \"cargo test --lib infrastructure::agents::invocation::tests -- --test-threads=1\",\n        \"status\": \"passed\",\n        \"evidence\": \"Exit 0: 16 passed.\"\n      },\n      {\n        \"test\": \"Shared conflict resolver behavior\",\n        \"command\": \"cargo test --lib application::persistence_sync::resolution:: -- --test-threads=1\",\n        \"status\": \"passed\",\n        \"evidence\": \"Exit 0: 16 passed.\"\n      },\n      {\n        \"test\": \"Process launch and supervision\",\n        \"command\": \"cargo test --lib infrastructure::process::subprocess:: -- --test-threads=1\",\n        \"status\": \"passed\",\n        \"evidence\": \"Exit 0: 20 passed.\"\n      },\n      {\n        \"test\": \"Compilation and linting across targets\",\n        \"command\": \"cargo clippy --all-targets\",\n        \"status\": \"passed\",\n        \"evidence\": \"Exit 0 with eight pre-existing warnings.\"\n      },\n      {\n        \"test\": \"Changed Rust file formatting\",\n        \"command\": \"git diff --name-only -z 7b430a6a3bc0d692f03e71da68d06f3e9534dead -- '*.rs' | xargs -0 -r rustfmt --check --edition 2024 --config skip_children=true\",\n        \"status\": \"passed\",\n        \"evidence\": \"Exit 0; 47 changed Rust files checked.\"\n      },\n      {\n        \"test\": \"Candidate whitespace validation\",\n        \"command\": \"git diff --check 7b430a6a3bc0d692f03e71da68d06f3e9534dead\",\n        \"status\": \"passed\",\n        \"evidence\": \"Exit 0; no whitespace errors.\"\n      }\n    ]\n  }\n}\n",
+      "workflow_revision": 18
+    }
+  ],
   "created_at": "2026-09-10T14:34:20.876237333+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-10T14:48:54.889452053+00:00",
   "error": null,
   "action_applied": false
 }
