@@ -1,7 +1,7 @@
 {
-  "completed_at": "2026-09-10T15:14:14.060493743+00:00",
+  "completed_at": null,
   "config_revision": 22,
-  "created_at": "2026-09-10T15:10:18.169263135+00:00",
+  "created_at": "2026-09-10T15:14:15.329769960+00:00",
   "error": null,
   "event": {
     "id": "workflow.quality.enter",
@@ -10,8 +10,8 @@
     "source": "workflow.quality.enter"
   },
   "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
-  "id": "f65f7678896e54eb1bea0eacaae750da1e57801232102aca52c9bec8888696d7",
+  "id": "07504c434eb70160153bd6b21b21bbc081ceb258cf12160dca8b327cfde0ba4b",
   "node_id": "default",
-  "result_count": 1,
-  "state": "succeeded"
+  "result_count": 0,
+  "state": "running"
 }

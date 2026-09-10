@@ -2595,6 +2595,98 @@
           "source": "workflow.implement.enter",
           "state": "succeeded"
         },
+        "f65f7678896e54eb1bea0eacaae750da1e57801232102aca52c9bec8888696d7": {
+          "candidate_commit": "59af87d23c3c14881f3969ef316146e7aa2e3273",
+          "results": {
+            "default-quality": {
+              "artifacts": {
+                "tests": [
+                  {
+                    "command": "cargo test --lib crash_after_ref_motion_with_pending_publication_preserves_attempt_effects -- --test-threads=1",
+                    "evidence": "Exit 0; 1 passed. Verifies originating local effect, rejected publication and retry, distinct replacement publication, replay, and stale-attempt rejection.",
+                    "status": "passed",
+                    "test": "Q1 regression"
+                  },
+                  {
+                    "command": "cargo test --lib governance -- --test-threads=1",
+                    "evidence": "Exit 0; 86 passed, 0 failed, 0 ignored.",
+                    "status": "passed",
+                    "test": "Governance recovery, exact ancestry, settlement, lifecycle gates, and authority"
+                  },
+                  {
+                    "command": "cargo test --lib application::events:: -- --test-threads=1",
+                    "evidence": "Exit 0; 24 passed.",
+                    "status": "passed",
+                    "test": "Pinned Skill evidence and event execution"
+                  },
+                  {
+                    "command": "cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1",
+                    "evidence": "Exit 0; 6 passed.",
+                    "status": "passed",
+                    "test": "Configuration-preserving replay and supervised Quality proof"
+                  },
+                  {
+                    "command": "cargo test --lib candidate_refresh -- --test-threads=1",
+                    "evidence": "Exit 0; 16 passed.",
+                    "status": "passed",
+                    "test": "Candidate refresh and bounded recovery"
+                  },
+                  {
+                    "command": "cargo test --lib application::work_items::tests::workflow -- --test-threads=1",
+                    "evidence": "Exit 0; 12 passed.",
+                    "status": "passed",
+                    "test": "Shared workflow transitions"
+                  },
+                  {
+                    "command": "cargo test --lib surfaces::cli::tests::goals::lifecycle -- --test-threads=1",
+                    "evidence": "Exit 0; 5 passed.",
+                    "status": "passed",
+                    "test": "CLI recovery and strict approval"
+                  },
+                  {
+                    "command": "cargo test --lib web_server_governance_retry_from_review -- --test-threads=1",
+                    "evidence": "Exit 0; 1 passed.",
+                    "status": "passed",
+                    "test": "API Review recovery"
+                  },
+                  {
+                    "command": "node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js",
+                    "evidence": "Exit 0; 6 passed, no skips.",
+                    "status": "passed",
+                    "test": "Browser recovery diagnostics and JavaScript syntax"
+                  },
+                  {
+                    "command": "set -o pipefail\ngit diff --name-only b47569adb8d4c5d1d7335ba91729a3e486a38fe0 HEAD -- '*.rs' | xargs -r rustfmt --check --edition 2024 --config skip_children=true",
+                    "evidence": "Exit 0; all 50 changed Rust files passed.",
+                    "status": "passed",
+                    "test": "Changed Rust formatting"
+                  },
+                  {
+                    "command": "git diff --check b47569adb8d4c5d1d7335ba91729a3e486a38fe0 HEAD && git diff --check",
+                    "evidence": "Exit 0; no whitespace errors.",
+                    "status": "passed",
+                    "test": "Candidate patch integrity"
+                  }
+                ]
+              },
+              "binding_id": "default-quality",
+              "evidence": [
+                "Independently reviewed candidate 59af87d23c3c14881f3969ef316146e7aa2e3273 against the finalized plan and affected intent contracts. No unresolved findings or corrections were needed.",
+                "Confirmed Q1 retains A's proven local effect before incomplete publication, preserves its original identity and diagnostics, and keeps B's publication separately attributed without restoring stale authority.",
+                "Read the retained implementation regression-before.log: the new regression failed because A's completed effect was absent. Independently reran the corrected regression successfully.",
+                "Existing coverage verifies malformed and unproved intents, cancellation, supersession, exact commit identity, lifecycle gates, Skill configuration replay, strict approval, and deduplicated effects.",
+                "Final checkout remained clean at the pinned candidate; all 59 candidate file hashes were unchanged. Previous Round branches remain retained. No Goal state changes, merge, push, deployment, or daemon restart were performed.",
+                "Rust execution logs are retained under /tmp/refine-quality-f65f7678/. All requested checks ran without baseline failures. Full-suite and live-environment recovery were not exercised."
+              ],
+              "invocation_id": "f65f7678896e54eb1bea0eacaae750da1e57801232102aca52c9bec8888696d7",
+              "outcome": "success",
+              "role": "quality",
+              "summary": "Reviewed the exact candidate and verified the Q1 correction. All focused checks passed; no further defects found."
+            }
+          },
+          "source": "workflow.quality.enter",
+          "state": "succeeded"
+        },
         "f8ce4c2cd35101b783a100cf4bd8f1cfda15a9fd0a9660a222df925b714d2118": {
           "candidate_commit": null,
           "results": {
@@ -2866,14 +2958,102 @@
       "meta_rule_state": null,
       "product_state": null,
       "prompt": "Implement a fresh managed recovery Round for Goal DRA87E5F985A1FFE2919BE7EC2 from current main. Preserve both previous Rounds, including their branches, commits, uncommitted files, plans, logs and failure evidence. Inspect and selectively reuse Round 2 candidate f0bcaaac7feb35efec438cbcc4bf36bfa57cd993, including its Quality correction that pins Skill configuration before invocation and preserves configuration on replay. Complete the supported Review integration-settlement recovery behavior under current Skills and docs/intent contracts.\n\nFix Quality finding Q1 from invocation f4577f5a926319479c8c06b7e3834c2cba05e45a842b0d2fdb142df218bdc506. In src/application/workflow/governance/integration/resume.rs, recover_integrated_candidate_locked currently requires publication before reconciling prepared integration effects. Under the existing target lease, repository lock and authority checks, reconcile retained integration_intent records against freshly observed exact local ancestry before returning for incomplete publication. Validate the candidate and recorded integration identity against the applicable target. When attempt A completed the local merge but crashed before recording its effect, append that proven local effect to A's originating Round and workflow revision, retaining its original integration identity, pushed=false and publication_required=true. Reuse the existing integration_effects capability; historical retention must not grant A authority, replace current settlement projections, or advance replacement work. An intent whose exact integration commit is absent from the local target remains unconfirmed.\n\nLet authoritative attempt B finish required publication through the existing workflow and retain publication under B. Keep local completion distinct from publication completion; subsequent recovery must not relabel B's publication as A's. Preserve original observations and diagnostics, and make replay retain stable, deduplicated effects. Require fresh local and required published target proof before atomic settlement with Review. Preserve strict human approval, lifecycle Skill gates, candidate-bound supervised Quality proof, explicit completed no-required-Skills receipts, and rejection of missing, failed, pending or mismatched evidence. Content equality cannot transfer proof between commit identities. Retain existing bounded handling of publication rejection and concurrent target movement without force-pushing.\n\nAdd a deterministic regression beside crash_after_ref_motion_recovers_the_prepared_effect_on_its_originating_attempt. Configure a temporary remote still at the base; retain A's integration intent and completed local target movement, omit A's completed-effect record, then claim B and resume through the normal workflow to Review. Assert A retains its exact completed local effect with publication still distinguished, B retains successful publication, and stale A cannot settle or advance work. Exercise interruption or failed publication followed by retry, repeated recovery before and after settlement, and preservation of both attempts' evidence. Retain coverage for no-remote recovery, interruption after publication, cancellation, supersession and unproved intents. Demonstrate the new regression fails before the correction and passes afterward within the new managed worktree.\n\nRun the new regression and focused checks using cargo test --lib governance -- --test-threads=1, cargo test --lib application::events:: -- --test-threads=1, cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1, and cargo test --lib candidate_refresh -- --test-threads=1. Verify retained surface behavior with the existing CLI/API recovery tests and node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js. Check changed Rust formatting and patch whitespace. Report actual commands, selected test counts, results and any baseline failures or unexecuted checks. Update only documentation affected by the correction. Refine owns candidate publication, integration and workflow advancement; do not manually change Goal state, approve, merge, push, deploy or restart the serving installation.",
-      "quality_candidate_commit": null,
+      "quality_agent_report": "workflow.quality.enter:default-quality: Reviewed the exact candidate and verified the Q1 correction. All focused checks passed; no further defects found.",
+      "quality_candidate_commit": "59af87d23c3c14881f3969ef316146e7aa2e3273",
       "quality_checked_at": null,
       "quality_details": null,
       "quality_message": null,
+      "quality_skill_results": [
+        {
+          "artifacts": {
+            "tests": [
+              {
+                "command": "cargo test --lib crash_after_ref_motion_with_pending_publication_preserves_attempt_effects -- --test-threads=1",
+                "evidence": "Exit 0; 1 passed. Verifies originating local effect, rejected publication and retry, distinct replacement publication, replay, and stale-attempt rejection.",
+                "status": "passed",
+                "test": "Q1 regression"
+              },
+              {
+                "command": "cargo test --lib governance -- --test-threads=1",
+                "evidence": "Exit 0; 86 passed, 0 failed, 0 ignored.",
+                "status": "passed",
+                "test": "Governance recovery, exact ancestry, settlement, lifecycle gates, and authority"
+              },
+              {
+                "command": "cargo test --lib application::events:: -- --test-threads=1",
+                "evidence": "Exit 0; 24 passed.",
+                "status": "passed",
+                "test": "Pinned Skill evidence and event execution"
+              },
+              {
+                "command": "cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1",
+                "evidence": "Exit 0; 6 passed.",
+                "status": "passed",
+                "test": "Configuration-preserving replay and supervised Quality proof"
+              },
+              {
+                "command": "cargo test --lib candidate_refresh -- --test-threads=1",
+                "evidence": "Exit 0; 16 passed.",
+                "status": "passed",
+                "test": "Candidate refresh and bounded recovery"
+              },
+              {
+                "command": "cargo test --lib application::work_items::tests::workflow -- --test-threads=1",
+                "evidence": "Exit 0; 12 passed.",
+                "status": "passed",
+                "test": "Shared workflow transitions"
+              },
+              {
+                "command": "cargo test --lib surfaces::cli::tests::goals::lifecycle -- --test-threads=1",
+                "evidence": "Exit 0; 5 passed.",
+                "status": "passed",
+                "test": "CLI recovery and strict approval"
+              },
+              {
+                "command": "cargo test --lib web_server_governance_retry_from_review -- --test-threads=1",
+                "evidence": "Exit 0; 1 passed.",
+                "status": "passed",
+                "test": "API Review recovery"
+              },
+              {
+                "command": "node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js",
+                "evidence": "Exit 0; 6 passed, no skips.",
+                "status": "passed",
+                "test": "Browser recovery diagnostics and JavaScript syntax"
+              },
+              {
+                "command": "set -o pipefail\ngit diff --name-only b47569adb8d4c5d1d7335ba91729a3e486a38fe0 HEAD -- '*.rs' | xargs -r rustfmt --check --edition 2024 --config skip_children=true",
+                "evidence": "Exit 0; all 50 changed Rust files passed.",
+                "status": "passed",
+                "test": "Changed Rust formatting"
+              },
+              {
+                "command": "git diff --check b47569adb8d4c5d1d7335ba91729a3e486a38fe0 HEAD && git diff --check",
+                "evidence": "Exit 0; no whitespace errors.",
+                "status": "passed",
+                "test": "Candidate patch integrity"
+              }
+            ]
+          },
+          "binding_id": "workflow.quality.enter:default-quality",
+          "evidence": [
+            "Independently reviewed candidate 59af87d23c3c14881f3969ef316146e7aa2e3273 against the finalized plan and affected intent contracts. No unresolved findings or corrections were needed.",
+            "Confirmed Q1 retains A's proven local effect before incomplete publication, preserves its original identity and diagnostics, and keeps B's publication separately attributed without restoring stale authority.",
+            "Read the retained implementation regression-before.log: the new regression failed because A's completed effect was absent. Independently reran the corrected regression successfully.",
+            "Existing coverage verifies malformed and unproved intents, cancellation, supersession, exact commit identity, lifecycle gates, Skill configuration replay, strict approval, and deduplicated effects.",
+            "Final checkout remained clean at the pinned candidate; all 59 candidate file hashes were unchanged. Previous Round branches remain retained. No Goal state changes, merge, push, deployment, or daemon restart were performed.",
+            "Rust execution logs are retained under /tmp/refine-quality-f65f7678/. All requested checks ran without baseline failures. Full-suite and live-environment recovery were not exercised."
+          ],
+          "invocation_id": "f65f7678896e54eb1bea0eacaae750da1e57801232102aca52c9bec8888696d7",
+          "outcome": "success",
+          "role": "quality",
+          "summary": "Reviewed the exact candidate and verified the Q1 correction. All focused checks passed; no further defects found."
+        }
+      ],
       "quality_state": null,
       "reporter": "Refine",
       "rule_state": null,
-      "updated": "2026-09-10T15:10:18Z",
+      "updated": "2026-09-10T15:14:14Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T14:56:18Z",
         "round_idx": 2,
@@ -2914,7 +3094,7 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-10T15:10:18Z",
+  "updated": "2026-09-10T15:14:14Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:37.079960889+00:00",
@@ -2989,5 +3169,5 @@
       "to": "quality"
     }
   ],
-  "workflow_revision": 71
+  "workflow_revision": 75
 }
