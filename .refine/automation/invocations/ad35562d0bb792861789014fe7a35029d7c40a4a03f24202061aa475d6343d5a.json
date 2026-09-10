@@ -2913,11 +2913,23 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
+  "state": "error",
+  "results": {
+    "default-implement": {
+      "invocation_id": "ad35562d0bb792861789014fe7a35029d7c40a4a03f24202061aa475d6343d5a",
+      "binding_id": "default-implement",
+      "role": "implement",
+      "outcome": "error",
+      "summary": "{\"type\":\"item.completed\",\"item\":{\"id\":\"item_18\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"tail -15 /tmp/refine-outcomes-round4-bgxx84de/check-initial.log; rg -n 'mod success_actions|mod recovery_actions' src/application/events/tests.rs; df -h .; du -sh target 2>/dev/null\\\"\",\"aggregated_output\":\"    Checking url v2.5.8\\n    Checking tokio-util v0.7.19\\n    Checking tower v0.5.3\\n    Checking tokio-stream v0.1.18\\n    Checking h2 v0.4.15\\n    Checking tower-http v0.6.11\\n    Checking h",
+      "evidence": [],
+      "artifacts": {
+        "fault_kind": "execution"
+      }
+    }
+  },
   "attempts": [],
   "created_at": "2026-09-10T16:00:50.326209259+00:00",
-  "completed_at": null,
-  "error": null,
+  "completed_at": "2026-09-10T16:05:20.293530893+00:00",
+  "error": "Goal DRCBAA3A2FC4ABDDCEC2B87473 no longer authorizes implement work on node default",
   "action_applied": false
 }

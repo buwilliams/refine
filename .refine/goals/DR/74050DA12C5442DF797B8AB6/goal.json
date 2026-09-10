@@ -3,9 +3,9 @@
   "branch_name": "refine/DR74050DA12C5442DF797B8AB6/round-2",
   "candidate_commit": null,
   "created": "2026-09-10T08:26:05Z",
-  "event_generation": 4,
-  "feature_id": null,
-  "feature_order": null,
+  "event_generation": 5,
+  "feature_id": "00000T130Z0R6J0GJMARY62005",
+  "feature_order": 3,
   "id": "DR74050DA12C5442DF797B8AB6",
   "name": "Recover overdue agents and interrupted Skill runs",
   "node_id": "default",
@@ -1397,11 +1397,43 @@
       },
       "workflow_reconciliation": null,
       "workflow_recovery": null
+    },
+    {
+      "agent_context": null,
+      "assignee": "Refine",
+      "constitution_state": "unclassified",
+      "created": "2026-09-10T16:22:20Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_candidate_commit": "",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "guidance_decision": null,
+      "implementation_plan": null,
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Recover Goal DR74050DA12C5442DF797B8AB6: Recover overdue agents and interrupted Skill runs.\n\nThe user explicitly authorized restarting all six failed Goals after the Plan, Implement, Quality and Governance Skills were revised (configuration revision 26). This new Round supersedes the earlier user-directed hold; preserve its audit record and every previous attempt.\n\nOutcome: Enforce each managed agent's original recorded deadline independently of its live session handle or scheduler loop, and reconcile interrupted operations during the same daemon lifetime so unrelated eligible work can progress.\n\nRetained evidence: Round 2 failed at implementation reporting after an asserted unchanged duplicate-Skill fixture failure. It retained substantial uncommitted deadline, operation-recovery and health work at f880b7767149e4de43d5bc4d4786247d1e536a8c, with no captured candidate. Recheck that failure against the new Round's actual base; do not carry an old baseline claim forward as a current fact. Inspect /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR74050DA12C5442DF797B8AB6-round-2 read-only as a reuse source: HEAD f880b7767149e4de43d5bc4d4786247d1e536a8c, branch refine/DR74050DA12C5442DF797B8AB6/round-2, 64 tracked/untracked status entries at recovery preparation. Full prior Goal records, tracked patches and untracked-file manifests were captured at /tmp/refine-recovery-rounds-etc0wvs8/DR74050DA12C5442DF797B8AB6/. Prior plans, findings and test results are evidence, not instructions to reproduce their design or claims of a passed new candidate.\n\nApproach: Build on the preceding scheduling/ownership recovery and its shared maintain_daemon and health concepts. Preserve original deadlines, interactive timeout rules, runtime/incarnation/PID identity, bounded termination and confirmed owned-process exit. Unknown ownership must remain explicit; never kill an unrelated process or release still-owned capacity. Settle interrupted operations with their evidence and cleanup obligations, using bounded existing maintenance rather than a second scheduler. Keep Skills and managed operations on the same supervision path.\n\nVerification: Retain the same daemon and worker identities while deliberately losing session tracking or primary metadata, expiring an owned process and reconciling its operation. Prove another eligible Goal starts after safe capacity is available. Cover reused PIDs, escaped descendants, uncertain exit, termination failure, cancellation, pause, Skill agents and interrupted operations. Exercise the shared maintenance/worker/process suites and reproduce or repair the old fixture issue in its current context without weakening its behavioral assertion. Run the applicable project checks and report exact commands, selected test counts, failures, skips and candidate identity. Confirm any alleged baseline failure against this Round's pinned base.\n\nUse Refine's new managed Round workspace and the target tip selected at admission, which may include earlier Goals in this ordered recovery Feature. Reconcile the concept and existing owner before selectively carrying forward useful work. Preserve all earlier branches, worktrees, commits, uncommitted files, journals and failure evidence; do not reset or clean them. Keep changes within this Goal's behavior and update only affected intent documentation. The revised Skills govern this run. Refine owns candidate capture, workflow advancement and integration; human approval and serving-installation promotion/restart remain separate.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-09-10T16:22:20Z",
+      "workflow_attempt_authority": null,
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
     }
   ],
-  "status": "failed",
+  "status": "todo",
   "target_branch": "main",
-  "updated": "2026-09-10T14:46:14Z",
+  "updated": "2026-09-10T16:22:20Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:36.894817765+00:00",
@@ -1438,7 +1470,16 @@
       "node_id": "default",
       "round_idx": 1,
       "to": "failed"
+    },
+    {
+      "at": "2026-09-10T16:22:20.926015469+00:00",
+      "forced": false,
+      "from": "failed",
+      "generation": 5,
+      "node_id": "default",
+      "round_idx": 2,
+      "to": "todo"
     }
   ],
-  "workflow_revision": 34
+  "workflow_revision": 37
 }

@@ -3,13 +3,21 @@
   "branch_name": "refine/DR07C216F3E4EC22A57C60BE0B/round-3",
   "candidate_commit": "ab318054adf5a5418ee3ae8bec348c98232916f2",
   "created": "2026-09-10T08:26:00Z",
-  "event_generation": 7,
-  "feature_id": null,
-  "feature_order": null,
+  "event_generation": 9,
+  "feature_id": "00000T130Z0R6J0GJMARY62005",
+  "feature_order": 2,
   "id": "DR07C216F3E4EC22A57C60BE0B",
   "name": "Keep workflow scheduling alive after Goal failures",
   "node_id": "default",
-  "notes": [],
+  "notes": [
+    {
+      "author": "Native Agent (user-directed stop)",
+      "body": "Stopped at the user's explicit request on 10 September 2026 and placed in Failed to halt recovery churn while the Plan, Implement, Quality, and Governance Skills are reviewed. This is an operator-directed stop, not a new Quality or Governance verdict. Preserve all prior Rounds, candidates, branches, managed worktrees, uncommitted changes, logs, and failure evidence. Before resuming, reconcile the underlying concepts and existing owners against current main; retain useful work and address shared invariants rather than repeatedly patching individual findings. No approval, integration, or recovery restart is authorized by this note. Stop receipts are retained under the Node runtime process-stop-outcomes directory; session readbacks are in /tmp/refine-goal-stop-p441c9qe.",
+      "created": "2026-09-10T16:07:51Z",
+      "id": "00000T130KA60HJRQ9J4Y62000",
+      "updated": "2026-09-10T16:07:51Z"
+    }
+  ],
   "priority": "low",
   "reporter": "ethan.jacobson@insurity.com",
   "rounds": [
@@ -2877,18 +2885,46 @@
       "reporter": "Refine",
       "rule_state": "unclassified",
       "updated": "2026-09-10T15:38:34Z",
-      "workflow_attempt_authority": {
-        "claimed_at": "2026-09-10T15:33:55Z",
-        "round_idx": 2,
-        "workflow_revision": 48
-      },
+      "workflow_attempt_authority": null,
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    },
+    {
+      "agent_context": null,
+      "assignee": "Refine",
+      "constitution_state": "unclassified",
+      "created": "2026-09-10T16:21:25Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_candidate_commit": "",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "guidance_decision": null,
+      "implementation_plan": null,
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Recover Goal DR07C216F3E4EC22A57C60BE0B: Keep workflow scheduling alive after Goal failures.\n\nThe user explicitly authorized restarting all six failed Goals after the Plan, Implement, Quality and Governance Skills were revised (configuration revision 26). This new Round supersedes the earlier user-directed hold; preserve its audit record and every previous attempt.\n\nOutcome: A failure in one Goal must not stop unrelated eligible work from being scheduled. Detect a live workflow worker whose scheduling loop stalls, and recover safely or expose an actionable unhealthy state while keeping daemon control responsive.\n\nRetained evidence: Round 3 was stopped by the user with useful uncommitted ownership and settlement-evidence work. Earlier Quality found that an unobserved parent exit could lose descendant ownership, and settlement panics could omit originating failure evidence. The recorded ab318054 candidate is earlier retained work, not proof that the interrupted Round 3 changes passed. Inspect /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR07C216F3E4EC22A57C60BE0B-round-2 read-only as a reuse source: HEAD ab318054adf5a5418ee3ae8bec348c98232916f2, branch refine/DR07C216F3E4EC22A57C60BE0B/round-3, 28 tracked/untracked status entries at recovery preparation. Full prior Goal records, tracked patches and untracked-file manifests were captured at /tmp/refine-recovery-rounds-etc0wvs8/DR07C216F3E4EC22A57C60BE0B/. Prior plans, findings and test results are evidence, not instructions to reproduce their design or claims of a passed new candidate.\n\nApproach: Distinguish semantic Goal authority, transient worker ownership and proof that local execution has ended. Reuse one shared ownership assessment across capacity, replacement, deadlines and worktree protection; an empty scan alone is insufficient exit evidence. Reassess the retained guardian mechanism against existing host/process capabilities and supported platforms rather than preserving its design by default. Contain preparation, execution and settlement faults at the originating attempt, preserve cancellation/newer authority, and finalize explicit evidence even when settlement itself panics. Share maintenance and health mechanisms with the following overdue-agent Goal rather than introducing competing schedulers or watchdogs.\n\nVerification: Use real consumer paths to reproduce leader exit before descendant observation, including a setsid child, missing registration and unavailable identity evidence. Verify safe capacity/worktree retention and eventual release only with trustworthy exit proof. Inject preparation faults, task and settlement panics, transient persistence failures and supersession; verify another eligible Goal enters Plan after safe capacity becomes available. Verify stalled tick detection and bounded recovery without false alarms for pause or legitimate waiting. Run the applicable project checks and report exact commands, selected test counts, failures, skips and candidate identity. Confirm any alleged baseline failure against this Round's pinned base.\n\nUse Refine's new managed Round workspace and the target tip selected at admission, which may include earlier Goals in this ordered recovery Feature. Reconcile the concept and existing owner before selectively carrying forward useful work. Preserve all earlier branches, worktrees, commits, uncommitted files, journals and failure evidence; do not reset or clean them. Keep changes within this Goal's behavior and update only affected intent documentation. The revised Skills govern this run. Refine owns candidate capture, workflow advancement and integration; human approval and serving-installation promotion/restart remain separate.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-09-10T16:21:25Z",
+      "workflow_attempt_authority": null,
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "todo",
   "target_branch": "main",
-  "updated": "2026-09-10T15:38:34Z",
+  "updated": "2026-09-10T16:21:25Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:37.178169037+00:00",
@@ -2952,7 +2988,25 @@
       "node_id": "default",
       "round_idx": 2,
       "to": "implement"
+    },
+    {
+      "at": "2026-09-10T16:05:19.990326227+00:00",
+      "forced": true,
+      "from": "implement",
+      "generation": 8,
+      "node_id": "default",
+      "round_idx": 2,
+      "to": "failed"
+    },
+    {
+      "at": "2026-09-10T16:21:25.499509824+00:00",
+      "forced": false,
+      "from": "failed",
+      "generation": 9,
+      "node_id": "default",
+      "round_idx": 3,
+      "to": "todo"
     }
   ],
-  "workflow_revision": 62
+  "workflow_revision": 67
 }

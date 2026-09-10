@@ -4682,11 +4682,23 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
+  "state": "error",
+  "results": {
+    "default-implement": {
+      "invocation_id": "d16a5d8bda7a7e4a61cf23b79ef965a438c27da89aa59d4ec18869b702a59ae4",
+      "binding_id": "default-implement",
+      "role": "implement",
+      "outcome": "error",
+      "summary": "{\"type\":\"item.completed\",\"item\":{\"id\":\"item_43\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"python3 - <<'PY'\\nfrom pathlib import Path\\nimport subprocess,json,hashlib\\nout=Path('/tmp/refine-implement-d16a5d8b')\\nold=json.loads((out/'preservation-before.json').read_text());fail=[]\\nrefs=subprocess.check_output(['git','for-each-ref','--format=%(refname) %(objectname)','refs/heads/refine/DRA87E5F985A1FFE2919BE7EC2/']).decode()\\nif refs\\\"'!=old['\\\"'refs']:fail.append('retained refs changed",
+      "evidence": [],
+      "artifacts": {
+        "fault_kind": "execution"
+      }
+    }
+  },
   "attempts": [],
   "created_at": "2026-09-10T15:53:59.427032678+00:00",
-  "completed_at": null,
-  "error": null,
+  "completed_at": "2026-09-10T16:05:20.193230288+00:00",
+  "error": "Goal DRA87E5F985A1FFE2919BE7EC2 no longer authorizes implement work on node default",
   "action_applied": false
 }

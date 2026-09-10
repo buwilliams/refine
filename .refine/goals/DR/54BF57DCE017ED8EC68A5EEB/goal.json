@@ -3,9 +3,9 @@
   "branch_name": "refine/DR54BF57DCE017ED8EC68A5EEB/round-3",
   "candidate_commit": "05643ffb157c6404098f5437ffe8de40c721a5b7",
   "created": "2026-09-10T08:26:04Z",
-  "event_generation": 11,
-  "feature_id": null,
-  "feature_order": null,
+  "event_generation": 12,
+  "feature_id": "00000T130Z0R6J0GJMARY62005",
+  "feature_order": 4,
   "id": "DR54BF57DCE017ED8EC68A5EEB",
   "name": "Recover stale candidates with proven Goal history",
   "node_id": "default",
@@ -3946,11 +3946,43 @@
       },
       "workflow_reconciliation": null,
       "workflow_recovery": null
+    },
+    {
+      "agent_context": null,
+      "assignee": "Refine",
+      "constitution_state": "unclassified",
+      "created": "2026-09-10T16:22:20Z",
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_candidate_commit": "",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "guidance_decision": null,
+      "implementation_plan": null,
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Recover Goal DR54BF57DCE017ED8EC68A5EEB: Recover stale candidates with proven Goal history.\n\nThe user explicitly authorized restarting all six failed Goals after the Plan, Implement, Quality and Governance Skills were revised (configuration revision 26). This new Round supersedes the earlier user-directed hold; preserve its audit record and every previous attempt.\n\nOutcome: Recover an old or misbased candidate using only provable Goal-owned history, and make replay/publication interruption recoverable without importing unrelated commits or reusing evidence for another candidate.\n\nRetained evidence: Retained candidate 05643ffb157c6404098f5437ffe8de40c721a5b7 passed its recorded Quality checks but failed Governance again. The remaining finding is a completion-evidence gap: Git may finish a detached replay before Refine writes the replacement SHA, leaving replacement=null in the journal. Existing fixtures began after that window. Preserve both Governance findings and the stopped automatic retry history. Inspect /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR54BF57DCE017ED8EC68A5EEB-round-2 read-only as a reuse source: HEAD 05643ffb157c6404098f5437ffe8de40c721a5b7, branch refine/DR54BF57DCE017ED8EC68A5EEB/round-3, 0 tracked/untracked status entries at recovery preparation. Full prior Goal records, tracked patches and untracked-file manifests were captured at /tmp/refine-recovery-rounds-etc0wvs8/DR54BF57DCE017ED8EC68A5EEB/. Prior plans, findings and test results are evidence, not instructions to reproduce their design or claims of a passed new candidate.\n\nApproach: Model replay intent, observed Git effects and durable settlement distinctly within the existing candidate-refresh/replay capability. Identify trustworthy evidence for interruption windows before choosing edits. Reconcile recovery before ordinary hydration can reject a state the operation itself produced. Preserve unexpected refs, dirty work, lost authority and unknown lineage as explicit conflicts; a common merge base alone is not proof of Goal ownership. Retain source and replacement identities, never roll back a durably settled replacement, and preserve target leases and conditional publication. Fit current main's Skill gate/configuration concepts.\n\nVerification: Drive real WorkflowEngine preparation/execution through interruption immediately after Git completes but before the journal records the replacement, and before/after branch attachment and Goal persistence. Cover Plan, Implement, Quality and Governance resumption, wrong recorded bases, unrelated divergent commits, target movement, publication races and dirty/conflicted work. Prove changed candidates receive their own required Quality/Governance evidence before publication or integration. Reuse worktree_resume and candidate_refresh coverage rather than bypassing hydration with constructed contexts. Run the applicable project checks and report exact commands, selected test counts, failures, skips and candidate identity. Confirm any alleged baseline failure against this Round's pinned base.\n\nUse Refine's new managed Round workspace and the target tip selected at admission, which may include earlier Goals in this ordered recovery Feature. Reconcile the concept and existing owner before selectively carrying forward useful work. Preserve all earlier branches, worktrees, commits, uncommitted files, journals and failure evidence; do not reset or clean them. Keep changes within this Goal's behavior and update only affected intent documentation. The revised Skills govern this run. Refine owns candidate capture, workflow advancement and integration; human approval and serving-installation promotion/restart remain separate.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-09-10T16:22:20Z",
+      "workflow_attempt_authority": null,
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
     }
   ],
-  "status": "failed",
+  "status": "todo",
   "target_branch": "main",
-  "updated": "2026-09-10T15:48:46Z",
+  "updated": "2026-09-10T16:22:20Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:36.990956802+00:00",
@@ -4050,7 +4082,16 @@
       "node_id": "default",
       "round_idx": 2,
       "to": "failed"
+    },
+    {
+      "at": "2026-09-10T16:22:20.995600977+00:00",
+      "forced": false,
+      "from": "failed",
+      "generation": 12,
+      "node_id": "default",
+      "round_idx": 3,
+      "to": "todo"
     }
   ],
-  "workflow_revision": 87
+  "workflow_revision": 90
 }

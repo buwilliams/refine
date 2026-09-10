@@ -1,0 +1,11 @@
+{
+  "assignee": "Buddy Williams",
+  "created": "2026-09-10T16:20:38Z",
+  "description": "Recover six retained failed Goals using the revised Plan, Implement, Quality and Governance Skills. Reconcile existing concepts and shared owners against the target at each admission, selectively reuse retained work, and preserve every prior attempt and its evidence. Ordered delivery: managed worktrees and Skill gates; scheduler and ownership health; overdue agents and interrupted operations; candidate replay recovery; integration settlement; durable decisions and resolution metrics. Each Goal waits for its predecessor to reach the supported completion boundary, so overlapping changes build on integrated work. Quality, Governance and human approval retain their normal authority; this Feature does not authorize approval or serving-installation promotion.",
+  "id": "00000T130Z0R6J0GJMARY62005",
+  "name": "Workflow recovery with revised Skills",
+  "node_id": "default",
+  "reporter": "Buddy Williams",
+  "updated": "2026-09-10T16:20:38Z",
+  "workflow_revision": 1
+}

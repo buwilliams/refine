@@ -1784,11 +1784,23 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
+  "state": "error",
+  "results": {
+    "default-implement": {
+      "invocation_id": "b0638100eb2c2e089a4dc5564fafbf1c7976e3f78b096977fdadc1771c6bef84",
+      "binding_id": "default-implement",
+      "role": "implement",
+      "outcome": "error",
+      "summary": "{\"type\":\"item.completed\",\"item\":{\"id\":\"item_71\",\"type\":\"command_execution\",\"command\":\"/bin/bash -lc \\\"python3 - <<'PY'\\np='src/infrastructure/process/subprocess/owned_groups/assessment.rs';s=open(p).read().replace('        let observed = self.observe_owned_group(group)?;','''        let observed = match self.observe_owned_group(group) {\\n            Ok(observed) => observed,\\n            Err(error) => return Ok(OwnershipAssessment::Unverified { reason: error.to_string() }),\\n        };''');open(",
+      "evidence": [],
+      "artifacts": {
+        "fault_kind": "execution"
+      }
+    }
+  },
   "attempts": [],
   "created_at": "2026-09-10T15:38:34.657916345+00:00",
-  "completed_at": null,
-  "error": null,
+  "completed_at": "2026-09-10T16:05:20.100605512+00:00",
+  "error": "Goal DR07C216F3E4EC22A57C60BE0B no longer authorizes implement work on node default",
   "action_applied": false
 }

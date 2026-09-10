@@ -1,8 +1,8 @@
 {
-  "completed_at": null,
+  "completed_at": "2026-09-10T16:05:20.293530893+00:00",
   "config_revision": 22,
   "created_at": "2026-09-10T16:00:50.326209259+00:00",
-  "error": null,
+  "error": "Goal DRCBAA3A2FC4ABDDCEC2B87473 no longer authorizes implement work on node default",
   "event": {
     "id": "workflow.implement.enter",
     "kind": "system",
@@ -12,6 +12,6 @@
   "goal_id": "DRCBAA3A2FC4ABDDCEC2B87473",
   "id": "ad35562d0bb792861789014fe7a35029d7c40a4a03f24202061aa475d6343d5a",
   "node_id": "default",
-  "result_count": 0,
-  "state": "running"
+  "result_count": 1,
+  "state": "error"
 }
