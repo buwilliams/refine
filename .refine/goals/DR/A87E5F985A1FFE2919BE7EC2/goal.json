@@ -3,7 +3,7 @@
   "branch_name": "refine/DRA87E5F985A1FFE2919BE7EC2/round-3",
   "candidate_commit": "f0bcaaac7feb35efec438cbcc4bf36bfa57cd993",
   "created": "2026-09-10T08:26:05Z",
-  "event_generation": 6,
+  "event_generation": 7,
   "feature_id": null,
   "feature_order": null,
   "id": "DRA87E5F985A1FFE2919BE7EC2",
@@ -2518,6 +2518,87 @@
           }
         }
       },
+      "event_results": {
+        "f8ce4c2cd35101b783a100cf4bd8f1cfda15a9fd0a9660a222df925b714d2118": {
+          "candidate_commit": null,
+          "results": {
+            "default-plan": {
+              "artifacts": {
+                "plan": {
+                  "checklist": [
+                    {
+                      "description": "Continue in the invocation-pinned Round 3 branch and retained candidate worktree. Preserve both previous Rounds and the existing Skill configuration pinning/replay correction; limit implementation to Q1 and its verification.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Add crash_after_ref_motion_with_pending_publication_preserves_attempt_effects beside the existing crash regression in governance/tests/skill_gates.rs. Retain A’s exact integration intent and completed local merge with a temporary remote still at base, omit A’s completed effect, claim B, and demonstrate the attribution assertion fails before changing production code.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "In integration/resume.rs, reconcile prepared local effects before the incomplete-publication return under existing lease, repository-lock and authority checks. Validate the candidate, target branch, remote, originating Round/revision, successful merge and exact candidate-to-integration-to-local ancestry; leave malformed, mismatched or unproved intents unconfirmed.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Use the existing integration_effects capability to retain A’s proven local effect without publishing a settlement projection. Preserve its integration identity, timestamp, diagnostics, pushed=false and recorded publication requirement. Deduplicate replay by originating attempt, exact integration identity and completion phase, retaining original records and never attributing B’s later publication to A.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Let B complete publication through the existing workflow, retaining B’s publication evidence. Exercise deterministic publication rejection followed by retry, interruption after publication, repeated recovery before settlement and idempotent requests afterward; assert both attempts’ evidence survives and stale A cannot settle, publish or advance replacement work. Preserve fresh target proof, atomic Review settlement, lifecycle gates, strict approval and bounded target-movement recovery.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Extend negative coverage to an integration commit absent from the local target despite candidate ancestry, mismatched identities and content equality without commit identity. Retain existing no-remote, cancellation, supersession, Skill receipt replay, missing/failed/pending evidence and explicit completed no-required-Skills coverage. Keep changes cohesive within the existing recovery and evidence responsibilities.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Clarify local-effect retention versus publication attribution in the affected merge/review and Governance intent pages. Run the new regression and specified focused Rust, CLI/API and JavaScript checks, changed-file Rust formatting and patch whitespace checks; report actual commands, selected counts, results, skips and unexecuted checks against the implementation candidate.",
+                      "id": "P7"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "C1",
+                      "resolution": "The recovery request mentions a fresh worktree from main, but the invocation explicitly pins scoped recovery to the retained workspace. Live inspection confirms that directory now holds the Round 3 branch at f0bcaaac7feb35efec438cbcc4bf36bfa57cd993. Use that binding; branch creation, rebasing and workflow advancement remain Refine-owned."
+                    },
+                    {
+                      "criticism_id": "C2",
+                      "resolution": "Moving the early return alone leaves publication-dependent intent validation and effect.pushed=configured, which could relabel B’s publication as A’s. Separate local-effect reconciliation from publication completeness and never infer the publishing attempt from remote ancestry."
+                    },
+                    {
+                      "criticism_id": "C3",
+                      "resolution": "The existing completed-effect retention method derives publication_required from pushed, so using it unchanged for an unpublished required push would lose that requirement. Use the existing local-integration retention method for required publication and preserve the original no-remote semantics."
+                    },
+                    {
+                      "criticism_id": "C4",
+                      "resolution": "A success-only regression would miss replay attribution and duplicate records. Verify rejection/retry and the post-publication, pre-settlement window, preserving original timestamps and distinguishing local completion from publication when deduplicating. Reuse existing workflow and evidence capabilities rather than adding another recovery state machine or weakening approval."
+                    }
+                  ],
+                  "summary": "Correct Q1 on the retained candidate so recovery preserves the originating attempt’s completed local integration before publication, while the authoritative replacement publishes and settles Review with distinct, replay-safe evidence."
+                }
+              },
+              "binding_id": "default-plan",
+              "evidence": [
+                "Observed workspace: /home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRA87E5F985A1FFE2919BE7EC2-round-2. Branch: refine/DRA87E5F985A1FFE2919BE7EC2/round-3. HEAD: f0bcaaac7feb35efec438cbcc4bf36bfa57cd993. Working tree was clean before and after inspection.",
+                "git for-each-ref confirmed retained Round 1 at 8f6de519c62a8a373b19482d5c7842068acfb35d and Round 2 at f0bcaaac7feb35efec438cbcc4bf36bfa57cd993. git merge-base HEAD main returned the pinned base 7b430a6a3bc0d692f03e71da68d06f3e9534dead.",
+                "Confirmed Q1 in src/application/workflow/governance/integration/resume.rs:117-165: incomplete publication returns before intent reconciliation; the reconciliation also requires published ancestry and sets pushed from remote configuration. publication.rs:191-220 records subsequent local/publication effects under the active attempt.",
+                "Inspected integration_effects.rs:28-59 and its append/deduplication logic: local retention preserves publication_required without updating the current projection. Existing full-record equality makes preserving original effect metadata relevant to replay stability.",
+                "Inspected the existing no-remote crash regression, temporary-remote fixture, publication-failure regression, settlement/authority tests and CLI/API recovery tests. Reviewed applicable Design, Skills, Planning, merge/review, Governance, Review and surface intent contracts. Verified the retained Quality commit includes configuration pinning before invocation and replay validation.",
+                "Proposed red/green command: cargo test --lib crash_after_ref_motion_with_pending_publication_preserves_attempt_effects -- --test-threads=1. Run after adding the regression but before the production correction, then after correction; record the selected count and actual failing/passing assertions.",
+                "Proposed focused commands: cargo test --lib governance -- --test-threads=1; cargo test --lib application::events:: -- --test-threads=1; cargo test --lib application::workflow::engine::behaviors::tests::quality_resume -- --test-threads=1; cargo test --lib candidate_refresh -- --test-threads=1; cargo test --lib application::work_items::tests::workflow -- --test-threads=1.",
+                "Proposed surface commands: cargo test --lib surfaces::cli::tests::goals::lifecycle -- --test-threads=1; cargo test --lib web_server_governance_retry_from_review_uses_shared_exact_candidate_eligibility -- --test-threads=1; node --test tests/web_goal_detail_diagnostics.test.js tests/web_javascript_syntax.test.js.",
+                "Proposed formatting: rustfmt --check --edition 2024 --config skip_children=true with every Rust file changed by this correction explicitly listed. Check both the correction diff and final candidate diff for whitespace.",
+                "Executed git diff --check and git diff --check 7b430a6a3bc0d692f03e71da68d06f3e9534dead HEAD: both exited 0. Rust/JavaScript tests and formatting were not executed in this observational planning invocation; no test counts or baseline test results are claimed. No files, Goal state or refs were intentionally changed; no merge, push, deployment or restart was performed."
+              ],
+              "invocation_id": "f8ce4c2cd35101b783a100cf4bd8f1cfda15a9fd0a9660a222df925b714d2118",
+              "outcome": "success",
+              "role": "plan",
+              "summary": "Completed a read-only, regression-first implementation plan for Q1 against the pinned retained candidate, resolving workspace identity, publication attribution, replay and authority boundaries."
+            }
+          },
+          "source": "workflow.plan.enter",
+          "state": "succeeded"
+        }
+      },
       "failure_at": "",
       "failure_category": "",
       "failure_message": "",
@@ -2537,12 +2618,106 @@
           "round_idx": 2,
           "target_branch": "main"
         },
-        "phase": "plan",
-        "phase_started_at": "2026-09-10T14:56:19Z",
+        "final_plan": {
+          "completed_at": "2026-09-10T15:00:31Z",
+          "git_after": {
+            "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-3",
+            "head_commit": "f0bcaaac7feb35efec438cbcc4bf36bfa57cd993",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-3",
+            "head_commit": "f0bcaaac7feb35efec438cbcc4bf36bfa57cd993",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Continue in the invocation-pinned Round 3 branch and retained candidate worktree. Preserve both previous Rounds and the existing Skill configuration pinning/replay correction; limit implementation to Q1 and its verification.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Add crash_after_ref_motion_with_pending_publication_preserves_attempt_effects beside the existing crash regression in governance/tests/skill_gates.rs. Retain A’s exact integration intent and completed local merge with a temporary remote still at base, omit A’s completed effect, claim B, and demonstrate the attribution assertion fails before changing production code.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "In integration/resume.rs, reconcile prepared local effects before the incomplete-publication return under existing lease, repository-lock and authority checks. Validate the candidate, target branch, remote, originating Round/revision, successful merge and exact candidate-to-integration-to-local ancestry; leave malformed, mismatched or unproved intents unconfirmed.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Use the existing integration_effects capability to retain A’s proven local effect without publishing a settlement projection. Preserve its integration identity, timestamp, diagnostics, pushed=false and recorded publication requirement. Deduplicate replay by originating attempt, exact integration identity and completion phase, retaining original records and never attributing B’s later publication to A.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Let B complete publication through the existing workflow, retaining B’s publication evidence. Exercise deterministic publication rejection followed by retry, interruption after publication, repeated recovery before settlement and idempotent requests afterward; assert both attempts’ evidence survives and stale A cannot settle, publish or advance replacement work. Preserve fresh target proof, atomic Review settlement, lifecycle gates, strict approval and bounded target-movement recovery.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Extend negative coverage to an integration commit absent from the local target despite candidate ancestry, mismatched identities and content equality without commit identity. Retain existing no-remote, cancellation, supersession, Skill receipt replay, missing/failed/pending evidence and explicit completed no-required-Skills coverage. Keep changes cohesive within the existing recovery and evidence responsibilities.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Clarify local-effect retention versus publication attribution in the affected merge/review and Governance intent pages. Run the new regression and specified focused Rust, CLI/API and JavaScript checks, changed-file Rust formatting and patch whitespace checks; report actual commands, selected counts, results, skips and unexecuted checks against the implementation candidate.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Correct Q1 on the retained candidate so recovery preserves the originating attempt’s completed local integration before publication, while the authoritative replacement publishes and settles Review with distinct, replay-safe evidence."
+          },
+          "started_at": "2026-09-10T14:56:19Z"
+        },
+        "phase": "implement",
+        "phase_started_at": "2026-09-10T15:00:31Z",
+        "proposal": {
+          "completed_at": "2026-09-10T15:00:31Z",
+          "git_after": {
+            "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-3",
+            "head_commit": "f0bcaaac7feb35efec438cbcc4bf36bfa57cd993",
+            "status_porcelain": []
+          },
+          "git_before": {
+            "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-3",
+            "head_commit": "f0bcaaac7feb35efec438cbcc4bf36bfa57cd993",
+            "status_porcelain": []
+          },
+          "result": {
+            "checklist": [
+              {
+                "description": "Continue in the invocation-pinned Round 3 branch and retained candidate worktree. Preserve both previous Rounds and the existing Skill configuration pinning/replay correction; limit implementation to Q1 and its verification.",
+                "id": "workflow.plan.enter:default-plan:P1"
+              },
+              {
+                "description": "Add crash_after_ref_motion_with_pending_publication_preserves_attempt_effects beside the existing crash regression in governance/tests/skill_gates.rs. Retain A’s exact integration intent and completed local merge with a temporary remote still at base, omit A’s completed effect, claim B, and demonstrate the attribution assertion fails before changing production code.",
+                "id": "workflow.plan.enter:default-plan:P2"
+              },
+              {
+                "description": "In integration/resume.rs, reconcile prepared local effects before the incomplete-publication return under existing lease, repository-lock and authority checks. Validate the candidate, target branch, remote, originating Round/revision, successful merge and exact candidate-to-integration-to-local ancestry; leave malformed, mismatched or unproved intents unconfirmed.",
+                "id": "workflow.plan.enter:default-plan:P3"
+              },
+              {
+                "description": "Use the existing integration_effects capability to retain A’s proven local effect without publishing a settlement projection. Preserve its integration identity, timestamp, diagnostics, pushed=false and recorded publication requirement. Deduplicate replay by originating attempt, exact integration identity and completion phase, retaining original records and never attributing B’s later publication to A.",
+                "id": "workflow.plan.enter:default-plan:P4"
+              },
+              {
+                "description": "Let B complete publication through the existing workflow, retaining B’s publication evidence. Exercise deterministic publication rejection followed by retry, interruption after publication, repeated recovery before settlement and idempotent requests afterward; assert both attempts’ evidence survives and stale A cannot settle, publish or advance replacement work. Preserve fresh target proof, atomic Review settlement, lifecycle gates, strict approval and bounded target-movement recovery.",
+                "id": "workflow.plan.enter:default-plan:P5"
+              },
+              {
+                "description": "Extend negative coverage to an integration commit absent from the local target despite candidate ancestry, mismatched identities and content equality without commit identity. Retain existing no-remote, cancellation, supersession, Skill receipt replay, missing/failed/pending evidence and explicit completed no-required-Skills coverage. Keep changes cohesive within the existing recovery and evidence responsibilities.",
+                "id": "workflow.plan.enter:default-plan:P6"
+              },
+              {
+                "description": "Clarify local-effect retention versus publication attribution in the affected merge/review and Governance intent pages. Run the new regression and specified focused Rust, CLI/API and JavaScript checks, changed-file Rust formatting and patch whitespace checks; report actual commands, selected counts, results, skips and unexecuted checks against the implementation candidate.",
+                "id": "workflow.plan.enter:default-plan:P7"
+              }
+            ],
+            "summary": "workflow.plan.enter:default-plan: Correct Q1 on the retained candidate so recovery preserves the originating attempt’s completed local integration before publication, while the authoritative replacement publishes and settles Review with distinct, replay-safe evidence."
+          },
+          "started_at": "2026-09-10T14:56:19Z"
+        },
         "schema_version": 2,
         "started_at": "2026-09-10T14:56:19Z",
         "state": "in_progress",
-        "updated_at": "2026-09-10T14:56:19Z"
+        "updated_at": "2026-09-10T15:00:31Z"
       },
       "implementation_report": null,
       "implementation_reported_at": null,
@@ -2556,7 +2731,7 @@
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T14:56:19Z",
+      "updated": "2026-09-10T15:00:31Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T14:56:18Z",
         "round_idx": 2,
@@ -2566,9 +2741,9 @@
       "workflow_recovery": null
     }
   ],
-  "status": "plan",
+  "status": "implement",
   "target_branch": "main",
-  "updated": "2026-09-10T14:56:19Z",
+  "updated": "2026-09-10T15:00:31Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:37.079960889+00:00",
@@ -2623,7 +2798,16 @@
       "node_id": "default",
       "round_idx": 2,
       "to": "plan"
+    },
+    {
+      "at": "2026-09-10T15:00:31.561950961+00:00",
+      "forced": false,
+      "from": "plan",
+      "generation": 7,
+      "node_id": "default",
+      "round_idx": 2,
+      "to": "implement"
     }
   ],
-  "workflow_revision": 56
+  "workflow_revision": 62
 }
