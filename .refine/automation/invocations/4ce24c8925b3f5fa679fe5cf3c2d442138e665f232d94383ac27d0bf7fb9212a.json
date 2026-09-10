@@ -508,11 +508,60 @@
       "parameters": {}
     }
   ],
-  "state": "running",
-  "results": {},
-  "attempts": [],
+  "state": "succeeded",
+  "results": {
+    "default-quality": {
+      "invocation_id": "4ce24c8925b3f5fa679fe5cf3c2d442138e665f232d94383ac27d0bf7fb9212a",
+      "binding_id": "default-quality",
+      "role": "quality",
+      "outcome": "success",
+      "summary": "Observational review passed: 137 focused checks passed without skips; formatting and whitespace checks passed. No unresolved findings.",
+      "evidence": [
+        "Independently reviewed candidate 9a6c56c9c089cb0a78d83f23db7fff17f89c3a69 against the finalized plan and Terminal, Toolbar and Command Palette intent. No findings requiring recovery.",
+        "Confirmed all four extracted keyboard helpers match the pinned baseline byte-for-byte and production scripts load in the required order.",
+        "The shared adapter preserves Alt+Up/Down modifiers while retaining renderer identity and focus checks. The committed queue correction revalidates session identity and exit both at flush and immediately before deferred delivery.",
+        "Inspected input callers and backend forwarding. Keyboard policy remains in the browser adapter; shortcut meaning remains owned by the attached application.",
+        "The listed commands are suitable for supervised replay against the pinned candidate. Full web, Rust test and release-build results supplied by the previous invocation were not independently rerun here.",
+        "Browser coverage uses Chromium with Linux, Windows and macOS platform settings and intercepted input requests. Native Codex behavior and physical Windows/macOS environments were not tested.",
+        "Final HEAD remained 9a6c56c9c089cb0a78d83f23db7fff17f89c3a69 with clean Git status. No source edits, Git mutations, Goal changes, merge, push, deployment or daemon restart."
+      ],
+      "artifacts": {
+        "tests": [
+          {
+            "command": "NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal*.test.js tests/web_supervisor_toolbar.test.js tests/web_goal_log_tail.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js",
+            "evidence": "Exit 0: 137 passed, 0 failed, 0 skipped. Real Chromium/xterm verified exact Alt-arrow bytes, lifecycle fencing, neighboring shortcuts, clipboard behavior and palette precedence.",
+            "status": "passed",
+            "test": "Shared terminal keyboard behavior and affected surface regressions"
+          },
+          {
+            "command": "cargo fmt --all -- --check",
+            "evidence": "Exit 0.",
+            "status": "passed",
+            "test": "Rust formatting"
+          },
+          {
+            "command": "git diff --check && git diff 0b6cc819de716b1b118f40c4465d114290117699 9a6c56c9c089cb0a78d83f23db7fff17f89c3a69 --check",
+            "evidence": "Exit 0.",
+            "status": "passed",
+            "test": "Worktree and complete candidate whitespace"
+          }
+        ]
+      }
+    }
+  },
+  "attempts": [
+    {
+      "attempt": 0,
+      "binding_id": "default-quality",
+      "diagnostic": null,
+      "operation_id": "1a08c3d09fb113c7675",
+      "process_id": "proc-1789059206427-1129590-1199",
+      "raw_output": "{\n  \"artifacts\": {\n    \"tests\": [\n      {\n        \"command\": \"NODE_PATH=/tmp/refine-clipboard-round1-fqes06ao/node_modules node --test tests/web_terminal*.test.js tests/web_supervisor_toolbar.test.js tests/web_goal_log_tail.test.js tests/web_command_palette.test.js tests/web_javascript_syntax.test.js\",\n        \"evidence\": \"Exit 0: 137 passed, 0 failed, 0 skipped. Real Chromium/xterm verified exact Alt-arrow bytes, lifecycle fencing, neighboring shortcuts, clipboard behavior and palette precedence.\",\n        \"status\": \"passed\",\n        \"test\": \"Shared terminal keyboard behavior and affected surface regressions\"\n      },\n      {\n        \"command\": \"cargo fmt --all -- --check\",\n        \"evidence\": \"Exit 0.\",\n        \"status\": \"passed\",\n        \"test\": \"Rust formatting\"\n      },\n      {\n        \"command\": \"git diff --check && git diff 0b6cc819de716b1b118f40c4465d114290117699 9a6c56c9c089cb0a78d83f23db7fff17f89c3a69 --check\",\n        \"evidence\": \"Exit 0.\",\n        \"status\": \"passed\",\n        \"test\": \"Worktree and complete candidate whitespace\"\n      }\n    ]\n  },\n  \"binding_id\": \"default-quality\",\n  \"evidence\": [\n    \"Independently reviewed candidate 9a6c56c9c089cb0a78d83f23db7fff17f89c3a69 against the finalized plan and Terminal, Toolbar and Command Palette intent. No findings requiring recovery.\",\n    \"Confirmed all four extracted keyboard helpers match the pinned baseline byte-for-byte and production scripts load in the required order.\",\n    \"The shared adapter preserves Alt+Up/Down modifiers while retaining renderer identity and focus checks. The committed queue correction revalidates session identity and exit both at flush and immediately before deferred delivery.\",\n    \"Inspected input callers and backend forwarding. Keyboard policy remains in the browser adapter; shortcut meaning remains owned by the attached application.\",\n    \"The listed commands are suitable for supervised replay against the pinned candidate. Full web, Rust test and release-build results supplied by the previous invocation were not independently rerun here.\",\n    \"Browser coverage uses Chromium with Linux, Windows and macOS platform settings and intercepted input requests. Native Codex behavior and physical Windows/macOS environments were not tested.\",\n    \"Final HEAD remained 9a6c56c9c089cb0a78d83f23db7fff17f89c3a69 with clean Git status. No source edits, Git mutations, Goal changes, merge, push, deployment or daemon restart.\"\n  ],\n  \"invocation_id\": \"4ce24c8925b3f5fa679fe5cf3c2d442138e665f232d94383ac27d0bf7fb9212a\",\n  \"outcome\": \"success\",\n  \"role\": \"quality\",\n  \"summary\": \"Observational review passed: 137 focused checks passed without skips; formatting and whitespace checks passed. No unresolved findings.\"\n}\n",
+      "workflow_revision": 2
+    }
+  ],
   "created_at": "2026-09-10T16:53:26.063491119+00:00",
-  "completed_at": null,
+  "completed_at": "2026-09-10T16:56:16.344050890+00:00",
   "error": null,
   "action_applied": false
 }
