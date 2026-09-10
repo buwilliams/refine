@@ -1,0 +1,486 @@
+{
+  "schema_version": 2,
+  "revision": 22,
+  "skills": {
+    "default-governance": {
+      "id": "default-governance",
+      "name": "Governance",
+      "prompt": "## Governance review\n\nReview the exact candidate against the project's stated intent and attached Skills. Read the accepted plans, implementation and Quality evidence and actual diff. Report actual violations with evidence, not hypothetical risks or preferences. Do not edit files, merge, push or change Goal state. A finding must include an actionable recovery request.\n\n## Product intent\n\nRefine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.\n\n## Project rules\n\n- Keep domain concepts, invariants, and pure policy in `src/model`; shared behavior and orchestration in `src/application`; Git, process, host, storage, provider, and telemetry mechanisms in `src/infrastructure`; and adapters for people and machines in `src/surfaces`. Keep `error.rs` as a neutral shared boundary. Model remains independent of the other areas, and code outside Surfaces does not depend on surface adapters.\n- Maintain a consistent architecture by extending the existing semantic responsibilities and dependency boundaries described in `docs/intent/01-design.md`. Do not invent new architectural concepts.\n- Preserve Rust-based flat-file persistence, file indexes, and in-memory caching. Keep CLI and API work under 50 ms, excluding time spent waiting on LLMs or outside tools.\n- Maintain affected documentation, especially `docs/intent/*`, and preserve its established format. Apply the scope limits in the intent guidance below.\n- Keep Refine agent-first by using installed coding-agent CLIs. Do not duplicate or reimplement coding-agent functionality.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
+      "role": "task",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "provenance": "refine-default-v1"
+    },
+    "default-implement": {
+      "id": "default-implement",
+      "name": "Implement",
+      "prompt": "## Implement\n\nImplement the current Goal Round using every accepted plan and attached Skill. Inspect existing code, make the complete change, run appropriate verification, and report evidence for each checklist item. Preserve unrelated changes and historical evidence. Refine owns candidate commits, workflow advancement, Quality, Governance and integration.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
+      "role": "implement",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "provenance": "refine-default-v1"
+    },
+    "default-plan": {
+      "id": "default-plan",
+      "name": "Plan",
+      "prompt": "## Plan\n\nProduce a complete, concise implementation plan for the current Goal Round. Inspect the repository and applicable context, resolve assumptions, consider alternatives and critique your proposed solution before finalizing it. Choose the planning method appropriate to the work. For a scoped finding recovery Round, focus the plan on the requested correction against the retained candidate. Do not change repository files. Return an actionable plan with stable checklist IDs and meaningful verification.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
+      "role": "plan",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "provenance": "refine-default-v1"
+    },
+    "default-quality": {
+      "id": "default-quality",
+      "name": "Quality",
+      "prompt": "## Quality review\n\nIndependently review the finalized plans and candidate implementation. Select or add meaningful tests, correct defects when needed, and run the relevant checks. Report actual commands, results and findings. Refine verifies the exact candidate and supervises evaluation commands.\n\n## Required behavior\n\nPreserve the relevant Goal and docs/intent product behavior. Keep Model, Application, Infrastructure, and Surfaces coherent; shared capabilities authoritative; local state and evidence inspectable and recoverable; and affected surfaces semantically consistent.\n\n## Review and verification\n\nJudge the candidate against the Goal and only the relevant docs/intent pages. Use the smallest deterministic checks that cover the affected behavior, adding or adjusting behavior-focused tests only when evidence is missing. Scale integration and failure-path checks to actual risk. Report exact commands, results, and remaining uncertainty. Do not require unrelated tests, documentation, refactors, or cleanup; documentation is relevant only when product intent or an architectural contract changes.\n\n## Acceptance checks\n\n- The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
+      "role": "quality",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "provenance": "refine-default-v1"
+    },
+    "fetch-goals-from-email": {
+      "id": "fetch-goals-from-email",
+      "name": "Fetch Goals from Email",
+      "prompt": "Fetch new email requests into the selected project's Backlog. This Skill authorizes creation of ordinary Goals from the configured mailbox. Use system.refine_executable to run `system fetch-email-goals --runtime-root <system.runtime_root> --target-root <system.project_root>`, passing each value as a separate, safely quoted argument. This one-shot capability owns secret access, the target-bound sender allowlist, MIME extraction, remote acknowledgement, deterministic Goal IDs, and durable retry records. Do not read or print the mail token, author duplicate Goals yourself, rewrite email source, or modify the request ledger. Inspect the JSON result and report the imported or recovered Goal IDs and any errors. A batch is limited to 25 remote messages; if fetched_count equals batch_limit, fetch another batch, up to ten batches per invocation, then report whether more mail may remain. Stop on a failed command and report the retained retry evidence. Fetching does not approve Goals, change Review decisions, or send email replies. Follow docs/runbooks/development-request-email.md for connection errors.",
+      "role": "task",
+      "enabled": true,
+      "scope": {
+        "node_id": "default"
+      },
+      "parameters": [],
+      "provenance": null
+    },
+    "fetch-goals-from-email-on-startup": {
+      "id": "fetch-goals-from-email-on-startup",
+      "name": "Fetch Goals from Email on startup",
+      "prompt": "Queue the Custom Skill `fetch-goals-from-email` once for this startup occurrence. Run system.refine_executable with arguments `skills trigger fetch-goals-from-email --request-id startup-email-<invocation_id>`, copying invocation_id exactly from this invocation's completion contract. Set REFINE_DAEMON_PORT to the daemon_port parameter for that command. Use safely quoted arguments. Report the queued invocation ID, then complete this startup Skill immediately. Do not wait for the child Skill: releasing this agent slot lets it run even when concurrency is limited to one. Reuse the same request ID if the command needs a retry; do not create a polling loop or fetch email directly. If the target Skill is missing or disabled, report that error without changing its configuration.",
+      "role": "task",
+      "enabled": true,
+      "scope": {
+        "node_id": "default"
+      },
+      "parameters": [
+        {
+          "name": "daemon_port",
+          "description": "",
+          "kind": "number",
+          "required": true,
+          "default": 8082,
+          "choices": []
+        }
+      ],
+      "provenance": null
+    },
+    "release": {
+      "id": "release",
+      "name": "Release",
+      "prompt": "Carry out the release request in the request parameter for the selected project. Use system.project_root as the release repository, system.runtime_root for durable operation state, and system.refine_executable for Refine commands. Read docs/runbooks/semantic-release.md in the project before acting. Use the existing system release-plan, release-prepare, and release-publish capabilities; do not reimplement version selection, candidate integration, tagging, or publication. Always pass the explicit --repo-root and --runtime-root values. Preview the requested semantic increment and report the proposed version and relevant changes. Preparation creates a normal reviewable Goal; retain its operation ID and inspect real Goal and operation evidence. Use the daemon API for asynchronous preparation when useful. Publishing requires the user's explicit publication authorization and an approved preparation; pass --confirm only when that authorization is present. Preserve review and exact-candidate checks. Reuse existing operation IDs for retries and report actual remote tag, release URL, and deployment evidence. Never infer publication success merely from a successful command or local tag.",
+      "role": "task",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [
+        {
+          "name": "request",
+          "description": "",
+          "kind": "text",
+          "required": true,
+          "default": null,
+          "choices": []
+        }
+      ],
+      "provenance": null
+    }
+  },
+  "events": {
+    "custom": {
+      "id": "custom",
+      "name": "Custom",
+      "kind": "custom",
+      "source": null,
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [
+        {
+          "id": "trigger-38405586-05d4-4db4-a7b8-e5efa58b45c9",
+          "skill_id": "release",
+          "enabled": true,
+          "mode": "blocking",
+          "order": 0,
+          "scope": {
+            "node_id": null
+          },
+          "overrides": null,
+          "inputs": {}
+        },
+        {
+          "id": "trigger-2748a40c-20f1-4533-851a-d3d752e56013",
+          "skill_id": "fetch-goals-from-email",
+          "enabled": true,
+          "mode": "blocking",
+          "order": 0,
+          "scope": {
+            "node_id": "default"
+          },
+          "overrides": null,
+          "inputs": {}
+        }
+      ],
+      "on_success": null
+    },
+    "node.startup.ready": {
+      "id": "node.startup.ready",
+      "name": "Node Startup Ready",
+      "kind": "system",
+      "source": "node.startup.ready",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [
+        {
+          "id": "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f",
+          "skill_id": "fetch-goals-from-email-on-startup",
+          "enabled": true,
+          "mode": "background",
+          "order": 0,
+          "scope": {
+            "node_id": "default"
+          },
+          "overrides": null,
+          "inputs": {}
+        }
+      ],
+      "on_success": null
+    },
+    "workflow.backlog.enter": {
+      "id": "workflow.backlog.enter",
+      "name": "Workflow Backlog Enter",
+      "kind": "system",
+      "source": "workflow.backlog.enter",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
+    "workflow.backlog.exit": {
+      "id": "workflow.backlog.exit",
+      "name": "Workflow Backlog Exit",
+      "kind": "system",
+      "source": "workflow.backlog.exit",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
+    "workflow.cancelled.enter": {
+      "id": "workflow.cancelled.enter",
+      "name": "Workflow Cancelled Enter",
+      "kind": "system",
+      "source": "workflow.cancelled.enter",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
+    "workflow.cancelled.exit": {
+      "id": "workflow.cancelled.exit",
+      "name": "Workflow Cancelled Exit",
+      "kind": "system",
+      "source": "workflow.cancelled.exit",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
+    "workflow.done.enter": {
+      "id": "workflow.done.enter",
+      "name": "Workflow Done Enter",
+      "kind": "system",
+      "source": "workflow.done.enter",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
+    "workflow.done.exit": {
+      "id": "workflow.done.exit",
+      "name": "Workflow Done Exit",
+      "kind": "system",
+      "source": "workflow.done.exit",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
+    "workflow.failed.enter": {
+      "id": "workflow.failed.enter",
+      "name": "Workflow Failed Enter",
+      "kind": "system",
+      "source": "workflow.failed.enter",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
+    "workflow.failed.exit": {
+      "id": "workflow.failed.exit",
+      "name": "Workflow Failed Exit",
+      "kind": "system",
+      "source": "workflow.failed.exit",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
+    "workflow.governance.enter": {
+      "id": "workflow.governance.enter",
+      "name": "Workflow Governance Enter",
+      "kind": "system",
+      "source": "workflow.governance.enter",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [
+        {
+          "id": "default-governance",
+          "skill_id": "default-governance",
+          "enabled": true,
+          "mode": "blocking",
+          "order": 0,
+          "scope": {
+            "node_id": null
+          },
+          "overrides": null,
+          "inputs": {}
+        }
+      ],
+      "on_success": null
+    },
+    "workflow.governance.exit": {
+      "id": "workflow.governance.exit",
+      "name": "Workflow Governance Exit",
+      "kind": "system",
+      "source": "workflow.governance.exit",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
+    "workflow.implement.enter": {
+      "id": "workflow.implement.enter",
+      "name": "Workflow Implement Enter",
+      "kind": "system",
+      "source": "workflow.implement.enter",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [
+        {
+          "id": "default-implement",
+          "skill_id": "default-implement",
+          "enabled": true,
+          "mode": "blocking",
+          "order": 0,
+          "scope": {
+            "node_id": null
+          },
+          "overrides": null,
+          "inputs": {}
+        }
+      ],
+      "on_success": null
+    },
+    "workflow.implement.exit": {
+      "id": "workflow.implement.exit",
+      "name": "Workflow Implement Exit",
+      "kind": "system",
+      "source": "workflow.implement.exit",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
+    "workflow.plan.enter": {
+      "id": "workflow.plan.enter",
+      "name": "Workflow Plan Enter",
+      "kind": "system",
+      "source": "workflow.plan.enter",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [
+        {
+          "id": "default-plan",
+          "skill_id": "default-plan",
+          "enabled": true,
+          "mode": "blocking",
+          "order": 0,
+          "scope": {
+            "node_id": null
+          },
+          "overrides": null,
+          "inputs": {}
+        }
+      ],
+      "on_success": null
+    },
+    "workflow.plan.exit": {
+      "id": "workflow.plan.exit",
+      "name": "Workflow Plan Exit",
+      "kind": "system",
+      "source": "workflow.plan.exit",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
+    "workflow.quality.enter": {
+      "id": "workflow.quality.enter",
+      "name": "Workflow Quality Enter",
+      "kind": "system",
+      "source": "workflow.quality.enter",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [
+        {
+          "id": "default-quality",
+          "skill_id": "default-quality",
+          "enabled": true,
+          "mode": "blocking",
+          "order": 0,
+          "scope": {
+            "node_id": null
+          },
+          "overrides": null,
+          "inputs": {}
+        }
+      ],
+      "on_success": null
+    },
+    "workflow.quality.exit": {
+      "id": "workflow.quality.exit",
+      "name": "Workflow Quality Exit",
+      "kind": "system",
+      "source": "workflow.quality.exit",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
+    "workflow.review.enter": {
+      "id": "workflow.review.enter",
+      "name": "Workflow Review Enter",
+      "kind": "system",
+      "source": "workflow.review.enter",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
+    "workflow.review.exit": {
+      "id": "workflow.review.exit",
+      "name": "Workflow Review Exit",
+      "kind": "system",
+      "source": "workflow.review.exit",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
+    "workflow.todo.enter": {
+      "id": "workflow.todo.enter",
+      "name": "Workflow Todo Enter",
+      "kind": "system",
+      "source": "workflow.todo.enter",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    },
+    "workflow.todo.exit": {
+      "id": "workflow.todo.exit",
+      "name": "Workflow Todo Exit",
+      "kind": "system",
+      "source": "workflow.todo.exit",
+      "enabled": true,
+      "scope": {
+        "node_id": null
+      },
+      "parameters": [],
+      "bindings": [],
+      "on_success": null
+    }
+  }
+}

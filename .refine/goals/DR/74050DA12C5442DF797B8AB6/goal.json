@@ -1,12 +1,13 @@
 {
-  "base_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
-  "branch_name": "refine/DR74050DA12C5442DF797B8AB6/round-1",
+  "base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+  "branch_name": "refine/DR74050DA12C5442DF797B8AB6/round-2",
   "candidate_commit": null,
   "created": "2026-09-10T08:26:05Z",
+  "event_generation": 2,
   "feature_id": null,
   "feature_order": null,
   "id": "DR74050DA12C5442DF797B8AB6",
-  "name": "Workflow scheduler wedges permanently when an agent leaks past its hard cap — new Todo goals never get classified/admitted, with no self-heal and no surfaced signal",
+  "name": "Recover overdue agents and interrupted Skill runs",
   "node_id": "default",
   "notes": [],
   "priority": "low",
@@ -296,17 +297,791 @@
       "reporter": "ethan.jacobson@insurity.com",
       "rule_state": "unclassified",
       "updated": "2026-09-10T08:36:18Z",
+      "workflow_attempt_authority": null,
+      "workflow_reconciliation": null,
+      "workflow_recovery": null
+    },
+    {
+      "agent_context": {
+        "assembled_at": "2026-09-10T13:43:03Z",
+        "current_round": {
+          "assignee": "ethan.jacobson@insurity.com",
+          "prompt": "Recover from an overdue owned agent or interrupted operation without leaving unrelated eligible Goals stuck in Todo.\n\nThe reported August incident remains useful evidence, but its unclassified Governance fields and missing guidance_decision are no longer admission criteria. Follow current scheduling eligibility and the Skill invocation, process and operation records. Round 1 retained unfinished deadline, operation-recovery and health changes with no candidate; its last log records an unsuccessful agent exit and superseded attempt. Current scheduler_error handling can still suspend admission for a whole pass while an active task remains.\n\nEnforce each managed agent's recorded hard cap independently of its in-memory session handle or workflow admission loop, including current Skill processes. Recover ownership from durable runtime and process-group identity, verify it before signalling, and use bounded termination with confirmed group exit. A reused PID or unknown ownership must produce a visible problem, not an unrelated process kill. Preserve existing interactive timeout rules and do not reset an original deadline during recovery.\n\nReconcile interrupted operations during the daemon lifetime within a defined bound. Mark unrecoverable operations failed with retained evidence and cleanup obligations. Keep still-live owned processes counted against capacity; one unresolved operation must not become a permanent global block on otherwise eligible work. Retry transient admission errors with bounded delay and preserve pause, ownership, ordering and resource limits.\n\nExpose overdue processes, unresolved operations and stalled admission through shared node health, refine next and bounded activity entries, with cause and a supported remedy. Share supervision and health reporting with Goal DR07C216F3E4EC22A57C60BE0B, which covers scheduler-loop failure and heartbeat detection; do not add a second scheduler or watchdog.\n\nVerify a deliberately orphaned owned process is terminated after its recorded cap, its operation settles, and another Todo Goal starts Plan within a documented bound after safe capacity is available. Exercise interrupted operations, PID reuse, termination failure, cancellation, pause and Skill processes. The recovery test must retain the same daemon and worker identities to prove no restart was required.\n\nThis is a recovery Round following the Skills review on 10 September 2026. Start from current main in a new managed Round worktree. Preserve Round 1, its plans, logs, branches, commits and uncommitted files; inspect and selectively reuse useful work instead of replaying the whole old attempt. Use the current Skills and docs/intent contracts, not archived Governance, Quality or Guidance configuration or the old fixed planning sequence. Refine owns workflow advancement and integration; human approval remains separate. Update only affected documentation and report focused verification with actual results.",
+          "reporter": "Buddy Williams",
+          "round": 2
+        },
+        "goal": {
+          "assignee": "ethan.jacobson@insurity.com",
+          "id": "DR74050DA12C5442DF797B8AB6",
+          "name": "Recover overdue agents and interrupted Skill runs",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "ethan.jacobson@insurity.com"
+        },
+        "governance": {
+          "configured": false,
+          "constitution": "",
+          "product": "",
+          "rules": []
+        },
+        "guidance_candidates": [],
+        "previous_rounds": [
+          {
+            "assignee": "ethan.jacobson@insurity.com",
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                "context_digest": "c8db11834ca4cea7ad1dd66a3ec743824e63d9516d4c3b4e8300869dec5ea78f",
+                "context_version": 1,
+                "goal_id": "DR74050DA12C5442DF797B8AB6",
+                "implementation_branch": "refine/DR74050DA12C5442DF797B8AB6/round-1",
+                "round_idx": 0,
+                "target_branch": "main"
+              },
+              "criticism": {
+                "completed_at": "2026-09-10T08:32:47Z",
+                "git_after": {
+                  "branch": "refine/DR74050DA12C5442DF797B8AB6/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR74050DA12C5442DF797B8AB6/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "findings": [
+                    {
+                      "checklist_item_ids": [
+                        "P3",
+                        "P4",
+                        "P5",
+                        "P6",
+                        "P9"
+                      ],
+                      "description": "No checklist item delivers the requested incident reproductions or diagnostic demonstration; the existing session hard-cap test retains its poller, and workflow disruption tests recreate the engine, so they cannot establish recovery from this daemon-lifetime wedge.",
+                      "id": "C1",
+                      "material": true,
+                      "recommendation": "Add deterministic regressions proving that a leaked agent without session tracking is killed and its operation reconciled, and that an interrupted operation plus a transient scheduler error while another worker remains active cannot prevent a fresh Todo from reaching Plan and classification within the bound; retain the same daemon and runner, and capture a stalled or degraded diagnostic with remediation."
+                    }
+                  ],
+                  "summary": "The plan addresses the observed failure mechanisms but omits the required proof of recovery without restarting the daemon."
+                },
+                "started_at": "2026-09-10T08:30:02Z"
+              },
+              "final_plan": {
+                "completed_at": "2026-09-10T08:35:16Z",
+                "git_after": {
+                  "branch": "refine/DR74050DA12C5442DF797B8AB6/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR74050DA12C5442DF797B8AB6/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Share canonical workflow-agent ownership and admission observations across the existing process, workflow, and diagnostic capabilities so Goal sessions remain recognizable when their kind metadata becomes interactive_session, keeping deadline reconciliation and workflow health in cohesive modules.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Extend existing node-local process identity evidence with the original start time, absolute hard-cap deadline, verified process-group identity, owning runtime, and available Goal, Round, and operation correlation so losing a session handle or primary process record does not erase the evidence needed to enforce the cap.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Run deadline reconciliation every five seconds through existing daemon supervision independently of workflow execution and pause state, inspecting owned process and identity records in both runtime process locations and enforcing the original hard cap without extending it for activity, attachment, or recovery.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Extend identity-fenced termination to recoverable orphan registrations with bounded TERM-to-KILL escalation, confirmed exit of the owned process group, and bounded session shutdown and output draining, retaining transcripts and ownership evidence and raising an actionable failure when identity, permissions, or exit cannot be established safely.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Reconcile proven abandoned operations during the daemon lifetime as well as startup, retry incomplete recovery for at most sixty seconds before recording terminal failure with retained cleanup obligations, preserve capability-owned restart handoffs, and settle only the matching Goal attempt after confirmed exit so live cleanup hazards remain visible and counted for capacity without becoming a node-wide admission barrier.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Replace the scheduler error latch that lasts for an entire pass with retries whose delay is capped at thirty seconds, move blocking per-Goal preparation out of shared admission, and retain transient starting and running capacity until settlement so unrelated eligible Todo Goals enter Plan and begin normal classification within one minute of local blockers clearing while pause, ownership, authoring, ordering, priority, and capacity gates remain authoritative.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Publish a small runtime-local workflow health projection containing runner identity, admission-loop heartbeat, last successful evaluation and admission, eligible work, observed capacity, pending recovery, and causal errors so readers can distinguish real inactivity, stale observation, legitimate waiting, and unresolved degradation without scanning the host on each request.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Have existing daemon supervision check workflow health every five seconds and raise a stalled-node alarm after sixty seconds of continuously admittable work without admission or a stale admission heartbeat, using the scheduler's eligibility rules and allowing ordinary admission to resume after safe reconciliation without launching a competing scheduler.",
+                      "id": "P8"
+                    },
+                    {
+                      "description": "Prioritize stalled and degraded conditions with their known cause, affected work, elapsed time, and supported remediation in refine next and expose the same runtime-local diagnostics through node show and node health, recording bounded onset, change, and recovery activity and clearing only resolved recovery flags while preserving historical evidence and unrelated failures.",
+                      "id": "P9"
+                    },
+                    {
+                      "description": "Implement a deterministic leaked-agent incident reproducer using controlled time and a real owned process group that loses session tracking and primary process metadata, then captures deadline-driven group termination and correlated operation reconciliation through production supervision while retaining the same daemon and runner identities.",
+                      "id": "P10"
+                    },
+                    {
+                      "description": "Implement a deterministic admission incident reproducer that holds an unrelated equal-priority worker active under a two-slot cap, introduces an interrupted operation and a transient scheduler error, and captures a fresh eligible Todo entering Plan and beginning classification within sixty seconds of the transient error clearing together with actionable stalled or degraded output and recovery activity while retaining the same daemon and runner identities.",
+                      "id": "P11"
+                    },
+                    {
+                      "description": "Update only the affected process, workflow, agent timeout, CLI, and activity intent pages in their existing format to describe independent deadline enforcement, bounded recovery and admission, and the stalled-node diagnostic contract.",
+                      "id": "P12"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "C1",
+                      "resolution": "P10 and P11 make the requested incident reproducers explicit implementation deliverables: deterministic regressions must require confirmed exit of an overdue owned process group after session tracking and primary process metadata are lost, reconciliation of its correlated operation, and fresh Todo admission to Plan with recorded classification progress within sixty seconds after a transient scheduler error clears despite an interrupted operation and another worker held active; they must also capture stalled or degraded diagnostics with a supported remediation hint and recovery activity, asserting unchanged daemon and runner identities throughout so session polling or engine reconstruction cannot satisfy the recovery claim."
+                    }
+                  ],
+                  "summary": "Make workflow automation recover from leaked agents and interrupted operations without restarting the daemon by enforcing original agent deadlines independently of session tracking, retrying scheduler failures without stopping unrelated admission, and surfacing stalled or degraded nodes with actionable diagnostics, with deterministic incident reproducers that retain the same daemon and runner throughout."
+                },
+                "started_at": "2026-09-10T08:32:47Z"
+              },
+              "governance_precheck": {
+                "attempt": 1,
+                "checked_at": "2026-09-10T08:36:18Z",
+                "message": "Executing the finalized plan as written does not necessarily violate any supplied governance rule or enabled guidance.",
+                "status": "passed"
+              },
+              "phase": "implement",
+              "phase_started_at": "2026-09-10T08:36:18Z",
+              "proposal": {
+                "completed_at": "2026-09-10T08:30:02Z",
+                "git_after": {
+                  "branch": "refine/DR74050DA12C5442DF797B8AB6/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR74050DA12C5442DF797B8AB6/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Share canonical workflow-agent ownership and admission observations across the existing process, workflow, and diagnostic capabilities so Goal sessions remain recognizable when their kind metadata becomes interactive_session, keeping deadline reconciliation and workflow health in cohesive modules.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Extend existing node-local process identity evidence with the original start time, absolute hard-cap deadline, verified process-group identity, owning runtime, and available Goal, Round, and operation correlation so losing a session handle or primary process record does not erase the information needed to enforce the cap.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Run deadline reconciliation every five seconds through existing daemon supervision independently of workflow execution and pause state, inspecting owned process and identity records in both runtime process locations and enforcing the original hard cap without extending it for activity, attachment, or recovery.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Extend identity-fenced termination to recoverable orphan registrations with bounded TERM-to-KILL escalation, confirmation that the owned process group has exited, and bounded session shutdown and output draining, retaining transcripts and ownership evidence and raising an actionable failure when identity, permissions, or exit cannot be established safely.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Reconcile proven abandoned operations during the daemon lifetime as well as startup, retry incomplete recovery for at most sixty seconds before recording terminal failure with retained cleanup obligations, preserve capability-owned restart handoffs, and settle only the matching Goal attempt after confirmed exit so live cleanup hazards remain visible without becoming a node-wide admission barrier.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Replace the pass-long scheduler error latch with bounded retries capped at thirty seconds, move blocking per-Goal preparation out of shared admission, and retain transient starting and running capacity until settlement so unrelated eligible Todo Goals enter Plan and begin normal classification within one minute of local blockers clearing while pause, ownership, authoring, ordering, priority, and capacity gates remain authoritative.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Publish a small runtime-local workflow health projection containing runner identity, admission-loop heartbeat, last successful evaluation and admission, eligible work, observed capacity, pending recovery, and causal errors so readers can distinguish real inactivity, stale observation, legitimate waiting, and unresolved degradation without scanning the host on each request.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Have existing daemon supervision check workflow health every five seconds and raise a stalled-node alarm after sixty seconds of continuously admittable work without admission or a stale admission heartbeat, using the scheduler's eligibility rules and allowing ordinary admission to resume after safe reconciliation without launching a competing scheduler.",
+                      "id": "P8"
+                    },
+                    {
+                      "description": "Prioritize stalled and degraded conditions with their known cause, affected work, elapsed time, and supported remediation in refine next and expose the same runtime-local diagnostics through node show and node health, recording bounded onset, change, and recovery activity and clearing only resolved recovery flags while preserving historical evidence and unrelated failures.",
+                      "id": "P9"
+                    },
+                    {
+                      "description": "Update only the affected process, workflow, agent timeout, CLI, and activity intent pages in their existing format to describe independent deadline enforcement, bounded recovery and admission, and the stalled-node diagnostic contract.",
+                      "id": "P10"
+                    }
+                  ],
+                  "summary": "Make workflow automation recover from leaked agents and interrupted operations without a manual daemon restart by enforcing agent deadlines independently of session polling, removing the scheduler error latch that can stop unrelated admission, and reporting stalled or degraded nodes with actionable recovery details."
+                },
+                "started_at": "2026-09-10T08:26:07Z"
+              },
+              "schema_version": 2,
+              "started_at": "2026-09-10T08:26:07Z",
+              "state": "in_progress",
+              "updated_at": "2026-09-10T08:36:18Z"
+            },
+            "prompt": "From: Ethan Jacobson <ethan.jacobson@insurity.com>\nSubject: Workflow scheduler wedges permanently when an agent leaks past its hard cap — new Todo goals never get classified/admitted, with no self-heal and no surfaced signal\n\nBody:\n## Objective\r\n\r\nMake the workflow runner resilient to a leaked/orphaned agent process. Today, a single agent that outlives its `agent_hard_cap_seconds` without being reaped leaves the node's scheduler silently stuck: newly created Todo goals are never classified and never admitted to `plan`, indefinitely, until a human manually restarts the daemon. Fix the reaper, the interrupted-operation recovery, and the observability so this self-heals (or at minimum fails loud).\r\n\r\n## Observed behavior (real incident — evidence)\r\n\r\n- Node `bo2lnxnevo02-ethan`, daemon port 8082, up continuously since 2026-08-24 16:20 (no restart).\r\n- Goal `00000T0ESJ4FD36A43G309R000` created 2026-08-25T23:12:16Z. ~3h later it is still `status: todo` with:\r\n  - round classification states **all `unclassified`** (`constitution_state`, `product_state`, `meta_rule_state`, `rule_state`, `quality_state`),\r\n  - `guidance_decision: null`, `implementation_plan: null`, `workflow_attempt_authority: null`,\r\n  - **zero** entries in its activity log (never touched by automation).\r\n- It is the **only** open goal on the node, yet `daemon-status.json` shows `worker_state: idle`, `workflow_paused: false`, `active_operations: []`. So the runner is idle-but-not-admitting an eligible goal with a free slot (`parallel_run_cap: 2`).\r\n- `daemon-status.json` reports `degraded_integrations: [\"process-recovery-reconciled\", \"operation-recovery-interrupted\"]`.\r\n- A **leaked agent** is the cause: PID `322837`, `claude --dangerously-skip-permissions ...`, started 2026-08-25 09:47, still alive after **12h20m** against `agent_hard_cap_seconds = 7200` (2h) — ~10h past its kill deadline. Refine has lost track of it: `refine next` reports `running_workflow_processes: 0` while the OS process is very much alive (338 MB RSS).\r\n- Since the goal was created, the workflow runner (PID 1949880) spawned **zero** goal-processing/classification processes — only git-sync / worktree-cleanup / source-update-check maintenance.\r\n\r\n## Root-cause hypotheses (verify, don't assume)\r\n\r\n1. The hard-cap reaper only enforces the cap on agents the supervisor still tracks; an agent whose supervising operation was interrupted (daemon lost the handle) is never killed, so it runs unbounded.\r\n2. `operation-recovery-interrupted` leaves the integration permanently `degraded`; the scheduler treats an unreconciled interrupted operation as a barrier and refuses to claim `workflow_attempt_authority` for *unrelated* goals.\r\n3. The degraded/wedged state is not surfaced anywhere a user looks (`refine next` suggested only \"review/converge\", never \"your node is degraded / this todo goal is stuck\") — so it silently persists until a manual restart.\r\n\r\n## Desired behavior / acceptance criteria\r\n\r\n1. **Reaper enforces the hard cap unconditionally.** Any agent process exceeding `agent_hard_cap_seconds` is terminated regardless of whether the supervisor still tracks it (reconcile by process-identity/pgid, not just in-memory handle). Add a repro: leak an agent past the cap and assert it is killed and its operation reconciled.\r\n2. **Interrupted-operation recovery self-heals or fails loud.** After a daemon-lifetime interruption, `operation-recovery-interrupted` must either reconcile automatically within a bounded window or transition the affected operation to a terminal failed state — it must not sit `degraded` forever.\r\n3. **An unreconciled/interrupted operation must not block unrelated goals.** A newly created Todo goal on an idle node (workflow not paused, slot free) must get classified and admitted (`todo -> plan`) within N minutes without any manual daemon restart. Add a regression test covering exactly this: interrupted op present + fresh todo goal => goal still advances.\r\n4. **Surface the wedge.** When `worker_state: idle` while eligible Todo goals exist on the active node with a free slot and `workflow_paused: false`, emit a diagnostic (in `refine next`, `node show`/health, and the activity log) stating the node is stalled, why, and the remediation — rather than silently doing nothing. Same for non-empty `degraded_integrations`.\r\n5. **Watchdog.** Consider a periodic self-check that detects \"idle runner + admittable work + no admission for > threshold\" and either forces admission or raises a health alarm.\r\n\r\n## Verification / evidence to include in the candidate\r\n\r\n- Repro test for the leaked-agent-past-hard-cap kill.\r\n- Repro test for \"interrupted operation does not block a fresh todo goal from being classified + admitted.\"\r\n- Demonstration that `refine next` (or node health) now reports the stalled/degraded condition with a remediation hint.\r\n- Confirmation the fix needs no manual `refine system` restart to recover.\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nEthan Jacobson\r\nEthan.Jacobson@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
+            "reporter": "ethan.jacobson@insurity.com",
+            "round": 1
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "assignee": "ethan.jacobson@insurity.com",
+      "constitution_state": "unclassified",
+      "created": "2026-09-10T13:06:36Z",
+      "event_configuration": {
+        "events": {
+          "custom": {
+            "bindings": [
+              {
+                "enabled": true,
+                "id": "trigger-38405586-05d4-4db4-a7b8-e5efa58b45c9",
+                "inputs": {},
+                "mode": "blocking",
+                "order": 0,
+                "overrides": null,
+                "scope": {
+                  "node_id": null
+                },
+                "skill_id": "release"
+              },
+              {
+                "enabled": true,
+                "id": "trigger-2748a40c-20f1-4533-851a-d3d752e56013",
+                "inputs": {},
+                "mode": "blocking",
+                "order": 0,
+                "overrides": null,
+                "scope": {
+                  "node_id": "default"
+                },
+                "skill_id": "fetch-goals-from-email"
+              }
+            ],
+            "enabled": true,
+            "id": "custom",
+            "kind": "custom",
+            "name": "Custom",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": null
+          },
+          "node.startup.ready": {
+            "bindings": [
+              {
+                "enabled": true,
+                "id": "trigger-2124c51c-8d1f-44b7-8a07-7a989a68227f",
+                "inputs": {},
+                "mode": "background",
+                "order": 0,
+                "overrides": null,
+                "scope": {
+                  "node_id": "default"
+                },
+                "skill_id": "fetch-goals-from-email-on-startup"
+              }
+            ],
+            "enabled": true,
+            "id": "node.startup.ready",
+            "kind": "system",
+            "name": "Node Startup Ready",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "node.startup.ready"
+          },
+          "workflow.backlog.enter": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.backlog.enter",
+            "kind": "system",
+            "name": "Workflow Backlog Enter",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.backlog.enter"
+          },
+          "workflow.backlog.exit": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.backlog.exit",
+            "kind": "system",
+            "name": "Workflow Backlog Exit",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.backlog.exit"
+          },
+          "workflow.cancelled.enter": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.cancelled.enter",
+            "kind": "system",
+            "name": "Workflow Cancelled Enter",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.cancelled.enter"
+          },
+          "workflow.cancelled.exit": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.cancelled.exit",
+            "kind": "system",
+            "name": "Workflow Cancelled Exit",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.cancelled.exit"
+          },
+          "workflow.done.enter": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.done.enter",
+            "kind": "system",
+            "name": "Workflow Done Enter",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.done.enter"
+          },
+          "workflow.done.exit": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.done.exit",
+            "kind": "system",
+            "name": "Workflow Done Exit",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.done.exit"
+          },
+          "workflow.failed.enter": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.failed.enter",
+            "kind": "system",
+            "name": "Workflow Failed Enter",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.failed.enter"
+          },
+          "workflow.failed.exit": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.failed.exit",
+            "kind": "system",
+            "name": "Workflow Failed Exit",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.failed.exit"
+          },
+          "workflow.governance.enter": {
+            "bindings": [
+              {
+                "enabled": true,
+                "id": "default-governance",
+                "inputs": {},
+                "mode": "blocking",
+                "order": 0,
+                "overrides": null,
+                "scope": {
+                  "node_id": null
+                },
+                "skill_id": "default-governance"
+              }
+            ],
+            "enabled": true,
+            "id": "workflow.governance.enter",
+            "kind": "system",
+            "name": "Workflow Governance Enter",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.governance.enter"
+          },
+          "workflow.governance.exit": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.governance.exit",
+            "kind": "system",
+            "name": "Workflow Governance Exit",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.governance.exit"
+          },
+          "workflow.implement.enter": {
+            "bindings": [
+              {
+                "enabled": true,
+                "id": "default-implement",
+                "inputs": {},
+                "mode": "blocking",
+                "order": 0,
+                "overrides": null,
+                "scope": {
+                  "node_id": null
+                },
+                "skill_id": "default-implement"
+              }
+            ],
+            "enabled": true,
+            "id": "workflow.implement.enter",
+            "kind": "system",
+            "name": "Workflow Implement Enter",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.implement.enter"
+          },
+          "workflow.implement.exit": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.implement.exit",
+            "kind": "system",
+            "name": "Workflow Implement Exit",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.implement.exit"
+          },
+          "workflow.plan.enter": {
+            "bindings": [
+              {
+                "enabled": true,
+                "id": "default-plan",
+                "inputs": {},
+                "mode": "blocking",
+                "order": 0,
+                "overrides": null,
+                "scope": {
+                  "node_id": null
+                },
+                "skill_id": "default-plan"
+              }
+            ],
+            "enabled": true,
+            "id": "workflow.plan.enter",
+            "kind": "system",
+            "name": "Workflow Plan Enter",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.plan.enter"
+          },
+          "workflow.plan.exit": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.plan.exit",
+            "kind": "system",
+            "name": "Workflow Plan Exit",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.plan.exit"
+          },
+          "workflow.quality.enter": {
+            "bindings": [
+              {
+                "enabled": true,
+                "id": "default-quality",
+                "inputs": {},
+                "mode": "blocking",
+                "order": 0,
+                "overrides": null,
+                "scope": {
+                  "node_id": null
+                },
+                "skill_id": "default-quality"
+              }
+            ],
+            "enabled": true,
+            "id": "workflow.quality.enter",
+            "kind": "system",
+            "name": "Workflow Quality Enter",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.quality.enter"
+          },
+          "workflow.quality.exit": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.quality.exit",
+            "kind": "system",
+            "name": "Workflow Quality Exit",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.quality.exit"
+          },
+          "workflow.review.enter": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.review.enter",
+            "kind": "system",
+            "name": "Workflow Review Enter",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.review.enter"
+          },
+          "workflow.review.exit": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.review.exit",
+            "kind": "system",
+            "name": "Workflow Review Exit",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.review.exit"
+          },
+          "workflow.todo.enter": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.todo.enter",
+            "kind": "system",
+            "name": "Workflow Todo Enter",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.todo.enter"
+          },
+          "workflow.todo.exit": {
+            "bindings": [],
+            "enabled": true,
+            "id": "workflow.todo.exit",
+            "kind": "system",
+            "name": "Workflow Todo Exit",
+            "on_success": null,
+            "parameters": [],
+            "scope": {
+              "node_id": null
+            },
+            "source": "workflow.todo.exit"
+          }
+        },
+        "revision": 22,
+        "schema_version": 2,
+        "skills": {
+          "default-governance": {
+            "enabled": true,
+            "id": "default-governance",
+            "name": "Governance",
+            "parameters": [],
+            "prompt": "## Governance review\n\nReview the exact candidate against the project's stated intent and attached Skills. Read the accepted plans, implementation and Quality evidence and actual diff. Report actual violations with evidence, not hypothetical risks or preferences. Do not edit files, merge, push or change Goal state. A finding must include an actionable recovery request.\n\n## Product intent\n\nRefine is a local-first, agent-first operating layer for software delivery. It moves user-defined Goals through a workflow to ensure parallel implementation across Nodes, quality, and governance.\n\n## Project rules\n\n- Keep domain concepts, invariants, and pure policy in `src/model`; shared behavior and orchestration in `src/application`; Git, process, host, storage, provider, and telemetry mechanisms in `src/infrastructure`; and adapters for people and machines in `src/surfaces`. Keep `error.rs` as a neutral shared boundary. Model remains independent of the other areas, and code outside Surfaces does not depend on surface adapters.\n- Maintain a consistent architecture by extending the existing semantic responsibilities and dependency boundaries described in `docs/intent/01-design.md`. Do not invent new architectural concepts.\n- Preserve Rust-based flat-file persistence, file indexes, and in-memory caching. Keep CLI and API work under 50 ms, excluding time spent waiting on LLMs or outside tools.\n- Maintain affected documentation, especially `docs/intent/*`, and preserve its established format. Apply the scope limits in the intent guidance below.\n- Keep Refine agent-first by using installed coding-agent CLIs. Do not duplicate or reimplement coding-agent functionality.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
+            "provenance": "refine-default-v1",
+            "role": "task",
+            "scope": {
+              "node_id": null
+            }
+          },
+          "default-implement": {
+            "enabled": true,
+            "id": "default-implement",
+            "name": "Implement",
+            "parameters": [],
+            "prompt": "## Implement\n\nImplement the current Goal Round using every accepted plan and attached Skill. Inspect existing code, make the complete change, run appropriate verification, and report evidence for each checklist item. Preserve unrelated changes and historical evidence. Refine owns candidate commits, workflow advancement, Quality, Governance and integration.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
+            "provenance": "refine-default-v1",
+            "role": "implement",
+            "scope": {
+              "node_id": null
+            }
+          },
+          "default-plan": {
+            "enabled": true,
+            "id": "default-plan",
+            "name": "Plan",
+            "parameters": [],
+            "prompt": "## Plan\n\nProduce a complete, concise implementation plan for the current Goal Round. Inspect the repository and applicable context, resolve assumptions, consider alternatives and critique your proposed solution before finalizing it. Choose the planning method appropriate to the work. For a scoped finding recovery Round, focus the plan on the requested correction against the retained candidate. Do not change repository files. Return an actionable plan with stable checklist IDs and meaningful verification.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
+            "provenance": "refine-default-v1",
+            "role": "plan",
+            "scope": {
+              "node_id": null
+            }
+          },
+          "default-quality": {
+            "enabled": true,
+            "id": "default-quality",
+            "name": "Quality",
+            "parameters": [],
+            "prompt": "## Quality review\n\nIndependently review the finalized plans and candidate implementation. Select or add meaningful tests, correct defects when needed, and run the relevant checks. Report actual commands, results and findings. Refine verifies the exact candidate and supervises evaluation commands.\n\n## Required behavior\n\nPreserve the relevant Goal and docs/intent product behavior. Keep Model, Application, Infrastructure, and Surfaces coherent; shared capabilities authoritative; local state and evidence inspectable and recoverable; and affected surfaces semantically consistent.\n\n## Review and verification\n\nJudge the candidate against the Goal and only the relevant docs/intent pages. Use the smallest deterministic checks that cover the affected behavior, adding or adjusting behavior-focused tests only when evidence is missing. Scale integration and failure-path checks to actual risk. Report exact commands, results, and remaining uncertainty. Do not require unrelated tests, documentation, refactors, or cleanup; documentation is relevant only when product intent or an architectural contract changes.\n\n## Acceptance checks\n\n- The candidate satisfies the Goal and relevant docs/intent contracts, preserves the existing architecture and consistent behavior across affected surfaces, and passes focused deterministic regression checks.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
+            "provenance": "refine-default-v1",
+            "role": "quality",
+            "scope": {
+              "node_id": null
+            }
+          },
+          "fetch-goals-from-email": {
+            "enabled": true,
+            "id": "fetch-goals-from-email",
+            "name": "Fetch Goals from Email",
+            "parameters": [],
+            "prompt": "Fetch new email requests into the selected project's Backlog. This Skill authorizes creation of ordinary Goals from the configured mailbox. Use system.refine_executable to run `system fetch-email-goals --runtime-root <system.runtime_root> --target-root <system.project_root>`, passing each value as a separate, safely quoted argument. This one-shot capability owns secret access, the target-bound sender allowlist, MIME extraction, remote acknowledgement, deterministic Goal IDs, and durable retry records. Do not read or print the mail token, author duplicate Goals yourself, rewrite email source, or modify the request ledger. Inspect the JSON result and report the imported or recovered Goal IDs and any errors. A batch is limited to 25 remote messages; if fetched_count equals batch_limit, fetch another batch, up to ten batches per invocation, then report whether more mail may remain. Stop on a failed command and report the retained retry evidence. Fetching does not approve Goals, change Review decisions, or send email replies. Follow docs/runbooks/development-request-email.md for connection errors.",
+            "provenance": null,
+            "role": "task",
+            "scope": {
+              "node_id": "default"
+            }
+          },
+          "fetch-goals-from-email-on-startup": {
+            "enabled": true,
+            "id": "fetch-goals-from-email-on-startup",
+            "name": "Fetch Goals from Email on startup",
+            "parameters": [
+              {
+                "choices": [],
+                "default": 8082,
+                "description": "",
+                "kind": "number",
+                "name": "daemon_port",
+                "required": true
+              }
+            ],
+            "prompt": "Queue the Custom Skill `fetch-goals-from-email` once for this startup occurrence. Run system.refine_executable with arguments `skills trigger fetch-goals-from-email --request-id startup-email-<invocation_id>`, copying invocation_id exactly from this invocation's completion contract. Set REFINE_DAEMON_PORT to the daemon_port parameter for that command. Use safely quoted arguments. Report the queued invocation ID, then complete this startup Skill immediately. Do not wait for the child Skill: releasing this agent slot lets it run even when concurrency is limited to one. Reuse the same request ID if the command needs a retry; do not create a polling loop or fetch email directly. If the target Skill is missing or disabled, report that error without changing its configuration.",
+            "provenance": null,
+            "role": "task",
+            "scope": {
+              "node_id": "default"
+            }
+          },
+          "release": {
+            "enabled": true,
+            "id": "release",
+            "name": "Release",
+            "parameters": [
+              {
+                "choices": [],
+                "default": null,
+                "description": "",
+                "kind": "text",
+                "name": "request",
+                "required": true
+              }
+            ],
+            "prompt": "Carry out the release request in the request parameter for the selected project. Use system.project_root as the release repository, system.runtime_root for durable operation state, and system.refine_executable for Refine commands. Read docs/runbooks/semantic-release.md in the project before acting. Use the existing system release-plan, release-prepare, and release-publish capabilities; do not reimplement version selection, candidate integration, tagging, or publication. Always pass the explicit --repo-root and --runtime-root values. Preview the requested semantic increment and report the proposed version and relevant changes. Preparation creates a normal reviewable Goal; retain its operation ID and inspect real Goal and operation evidence. Use the daemon API for asynchronous preparation when useful. Publishing requires the user's explicit publication authorization and an approved preparation; pass --confirm only when that authorization is present. Preserve review and exact-candidate checks. Reuse existing operation IDs for retries and report actual remote tag, release URL, and deployment evidence. Never infer publication success merely from a successful command or local tag.",
+            "provenance": null,
+            "role": "task",
+            "scope": {
+              "node_id": null
+            }
+          }
+        }
+      },
+      "failure_at": "",
+      "failure_category": "",
+      "failure_message": "",
+      "governance_candidate_commit": "",
+      "governance_checked_at": "",
+      "governance_details": "",
+      "governance_message": "",
+      "governance_rule_actions": [],
+      "guidance_decision": null,
+      "implementation_plan": {
+        "binding": {
+          "base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+          "context_digest": "6f914e6880411eca3ed0d982cbcc9e8c52bc1f2a84abc46d4e984f703562f3b9",
+          "context_version": 1,
+          "goal_id": "DR74050DA12C5442DF797B8AB6",
+          "implementation_branch": "refine/DR74050DA12C5442DF797B8AB6/round-2",
+          "round_idx": 1,
+          "target_branch": "main"
+        },
+        "phase": "plan",
+        "phase_started_at": "2026-09-10T13:43:03Z",
+        "schema_version": 2,
+        "started_at": "2026-09-10T13:43:03Z",
+        "state": "in_progress",
+        "updated_at": "2026-09-10T13:43:03Z"
+      },
+      "implementation_report": null,
+      "implementation_reported_at": null,
+      "logs": [],
+      "meta_rule_state": "unclassified",
+      "product_state": "unclassified",
+      "prompt": "Recover from an overdue owned agent or interrupted operation without leaving unrelated eligible Goals stuck in Todo.\n\nThe reported August incident remains useful evidence, but its unclassified Governance fields and missing guidance_decision are no longer admission criteria. Follow current scheduling eligibility and the Skill invocation, process and operation records. Round 1 retained unfinished deadline, operation-recovery and health changes with no candidate; its last log records an unsuccessful agent exit and superseded attempt. Current scheduler_error handling can still suspend admission for a whole pass while an active task remains.\n\nEnforce each managed agent's recorded hard cap independently of its in-memory session handle or workflow admission loop, including current Skill processes. Recover ownership from durable runtime and process-group identity, verify it before signalling, and use bounded termination with confirmed group exit. A reused PID or unknown ownership must produce a visible problem, not an unrelated process kill. Preserve existing interactive timeout rules and do not reset an original deadline during recovery.\n\nReconcile interrupted operations during the daemon lifetime within a defined bound. Mark unrecoverable operations failed with retained evidence and cleanup obligations. Keep still-live owned processes counted against capacity; one unresolved operation must not become a permanent global block on otherwise eligible work. Retry transient admission errors with bounded delay and preserve pause, ownership, ordering and resource limits.\n\nExpose overdue processes, unresolved operations and stalled admission through shared node health, refine next and bounded activity entries, with cause and a supported remedy. Share supervision and health reporting with Goal DR07C216F3E4EC22A57C60BE0B, which covers scheduler-loop failure and heartbeat detection; do not add a second scheduler or watchdog.\n\nVerify a deliberately orphaned owned process is terminated after its recorded cap, its operation settles, and another Todo Goal starts Plan within a documented bound after safe capacity is available. Exercise interrupted operations, PID reuse, termination failure, cancellation, pause and Skill processes. The recovery test must retain the same daemon and worker identities to prove no restart was required.\n\nThis is a recovery Round following the Skills review on 10 September 2026. Start from current main in a new managed Round worktree. Preserve Round 1, its plans, logs, branches, commits and uncommitted files; inspect and selectively reuse useful work instead of replaying the whole old attempt. Use the current Skills and docs/intent contracts, not archived Governance, Quality or Guidance configuration or the old fixed planning sequence. Refine owns workflow advancement and integration; human approval remains separate. Update only affected documentation and report focused verification with actual results.",
+      "quality_checked_at": "",
+      "quality_details": "",
+      "quality_message": "",
+      "quality_state": "unclassified",
+      "reporter": "Buddy Williams",
+      "rule_state": "unclassified",
+      "updated": "2026-09-10T13:43:03Z",
       "workflow_attempt_authority": {
-        "claimed_at": "2026-09-10T08:26:06Z",
-        "round_idx": 0,
-        "workflow_revision": 2
+        "claimed_at": "2026-09-10T13:43:02Z",
+        "round_idx": 1,
+        "workflow_revision": 18
       },
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "plan",
   "target_branch": "main",
-  "updated": "2026-09-10T08:36:18Z",
-  "workflow_revision": 15
+  "updated": "2026-09-10T13:43:03Z",
+  "workflow_events": [
+    {
+      "at": "2026-09-10T13:06:36.894817765+00:00",
+      "forced": false,
+      "from": "failed",
+      "generation": 1,
+      "node_id": "default",
+      "round_idx": 1,
+      "to": "todo"
+    },
+    {
+      "at": "2026-09-10T13:43:03.252065229+00:00",
+      "forced": false,
+      "from": "todo",
+      "generation": 2,
+      "node_id": "default",
+      "round_idx": 1,
+      "to": "plan"
+    }
+  ],
+  "workflow_revision": 26
 }

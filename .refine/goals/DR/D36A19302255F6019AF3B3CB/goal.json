@@ -3,12 +3,21 @@
   "branch_name": "refine/DRD36A19302255F6019AF3B3CB/round-1",
   "candidate_commit": "a4564655b91445b79b0a8d7d789d8b0b37aa5164",
   "created": "2026-09-10T08:26:08Z",
+  "event_generation": 1,
   "feature_id": null,
   "feature_order": null,
   "id": "DRD36A19302255F6019AF3B3CB",
   "name": "Allow editing name",
   "node_id": "default",
-  "notes": [],
+  "notes": [
+    {
+      "author": "Codex, at Buddy Williams' request",
+      "body": "Reviewed on 10 September 2026 after the Skills changes. This request is already covered by the current Goal modal: More Goal actions > Rename opens the existing name editor and saves through the shared Goal metadata API. Verified on main f880b776 in Chromium with an intercepted test API: the current name was prefilled, Save submitted only the trimmed replacement name, and the modal title refreshed without browser errors. No live Goal was renamed by that check.\n\nCancelling this redundant request. Round 1's extra editor beside the title is not needed to provide the requested rename capability. Its candidate a4564655b91445b79b0a8d7d789d8b0b37aa5164 is not integrated; preserve that commit, its two subsequent modified files, the failed attempt and all logs. Cancellation does not mark the candidate approved or completed.",
+      "created": "2026-09-10T13:06:37Z",
+      "id": "00000T12VDCJA17MSCD3EMJ001",
+      "updated": "2026-09-10T13:06:37Z"
+    }
+  ],
   "priority": "low",
   "reporter": "ethan.jacobson@insurity.com",
   "rounds": [
@@ -293,17 +302,24 @@
       "reporter": "ethan.jacobson@insurity.com",
       "rule_state": "unclassified",
       "updated": "2026-09-10T08:47:17Z",
-      "workflow_attempt_authority": {
-        "claimed_at": "2026-09-10T08:26:10Z",
-        "round_idx": 0,
-        "workflow_revision": 2
-      },
+      "workflow_attempt_authority": null,
       "workflow_reconciliation": null,
       "workflow_recovery": null
     }
   ],
-  "status": "quality",
+  "status": "cancelled",
   "target_branch": "main",
-  "updated": "2026-09-10T08:47:17Z",
-  "workflow_revision": 20
+  "updated": "2026-09-10T13:06:37Z",
+  "workflow_events": [
+    {
+      "at": "2026-09-10T13:06:37.377896475+00:00",
+      "forced": true,
+      "from": "failed",
+      "generation": 1,
+      "node_id": "default",
+      "round_idx": 0,
+      "to": "cancelled"
+    }
+  ],
+  "workflow_revision": 23
 }

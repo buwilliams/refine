@@ -1,0 +1,708 @@
+{
+  "id": "b20a5bd07cc26ca841043a8ace0eebf134ac9927db09d5b67e84a34c23b65520",
+  "event": {
+    "id": "workflow.plan.enter",
+    "name": "Workflow Plan Enter",
+    "kind": "system",
+    "source": "workflow.plan.enter",
+    "enabled": true,
+    "scope": {
+      "node_id": null
+    },
+    "parameters": [],
+    "bindings": [
+      {
+        "id": "default-plan",
+        "skill_id": "default-plan",
+        "enabled": true,
+        "mode": "blocking",
+        "order": 0,
+        "scope": {
+          "node_id": null
+        },
+        "overrides": null,
+        "inputs": {}
+      }
+    ],
+    "on_success": null
+  },
+  "config_revision": 22,
+  "context": {
+    "node_id": "default",
+    "target_root": "/home/buddy/projects/refine-next",
+    "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR07C216F3E4EC22A57C60BE0B-round-2",
+    "provider": "codex",
+    "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+    "round_idx": 1,
+    "workflow_revision": 18,
+    "candidate_commit": null,
+    "data": {
+      "context": {
+        "assembled_at": "2026-09-10T13:43:00Z",
+        "current_round": {
+          "assignee": "ethan.jacobson@insurity.com",
+          "prompt": "Keep a per-Goal error from stopping workflow scheduling, and detect a live worker whose scheduling loop has stopped making progress.\n\nThe August field report is a hypothesis to reproduce, not proof that a specific stale-candidate error kills today's worker. Current execution already catches some task panics, but preparation runs in the scheduling path and scheduler_error suppresses admission until the pass ends. There is no scheduler-tick health evidence in the current runner. Round 1 retained unfinished failure-containment and watchdog changes without a candidate; its final log reports an unsuccessful agent exit and superseded attempt.\n\nContain preparation, Skill execution, result handling and failure-settlement errors at the owning Goal boundary. Ensure ended attempts release their local active entry and unrelated eligible work continues. Distinguish an authoritative failure, a superseded attempt and failure to persist evidence; retry transient persistence failures within a bound while rechecking authority. Never overwrite a newer Round or cancellation to make an old failure appear settled. Keep blocking Git, lock or settlement work from freezing the admission control path, without releasing capacity while owned work is still alive.\n\nPublish runtime-local health tied to the actual worker incarnation and target, with ticks emitted by the scheduling loop itself. Use independent existing daemon supervision to detect stale ticks. Recover with bounded restart backoff only after safely stopping the old worker and its owned work, or report unhealthy with a concrete remedy if this cannot be proved. Keep daemon reachability and shutdown control available.\n\nUse one shared health assessment in system status and refine next, distinguishing a stall from pause, missing required Plan/Implement Skills, scope or ordering blocks, long-running tasks and unavailable evidence. Keep worktree cleanup and deadline enforcement independently responsive. Share the latter and operation-recovery changes with Goal DR74050DA12C5442DF797B8AB6 instead of adding competing supervision.\n\nVerify a superseded integration failure, preparation and settlement faults, and a task panic cannot stop the next eligible Goal entering Plan after capacity is available. Inject a non-ticking worker and verify detection plus safe recovery or unhealthy reporting. Test pause and legitimate waiting without false alarms, and confirm cleanup and deadline checks remain responsive without deleting retained work.\n\nThis is a recovery Round following the Skills review on 10 September 2026. Start from current main in a new managed Round worktree. Preserve Round 1, its plans, logs, branches, commits and uncommitted files; inspect and selectively reuse useful work instead of replaying the whole old attempt. Use the current Skills and docs/intent contracts, not archived Governance, Quality or Guidance configuration or the old fixed planning sequence. Refine owns workflow advancement and integration; human approval remains separate. Update only affected documentation and report focused verification with actual results.",
+          "reporter": "Buddy Williams",
+          "round": 2
+        },
+        "goal": {
+          "assignee": "ethan.jacobson@insurity.com",
+          "id": "DR07C216F3E4EC22A57C60BE0B",
+          "name": "Keep workflow scheduling alive after Goal failures",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "ethan.jacobson@insurity.com"
+        },
+        "governance": {
+          "configured": false,
+          "constitution": "",
+          "product": "",
+          "rules": []
+        },
+        "guidance_candidates": [],
+        "previous_rounds": [
+          {
+            "assignee": "ethan.jacobson@insurity.com",
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                "context_digest": "d0192175d51d1535da94ed99aa2c0dc323a94aa787f7697f4d3f5d148b560871",
+                "context_version": 1,
+                "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+                "implementation_branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-1",
+                "round_idx": 0,
+                "target_branch": "main"
+              },
+              "criticism": {
+                "completed_at": "2026-09-10T08:31:49Z",
+                "git_after": {
+                  "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "summary": "The plan addresses failure isolation, worker liveness, stalled admission, and independent maintenance while preserving authority and recovery safety."
+                },
+                "started_at": "2026-09-10T08:29:48Z"
+              },
+              "final_plan": {
+                "completed_at": "2026-09-10T08:34:23Z",
+                "git_after": {
+                  "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Extend the existing per-Goal execution boundary to contain preparation, behavior, result-construction, and settlement failures or panics, ensuring each ended attempt delivers a completion outcome and releases its local active entry so unrelated eligible Goals continue.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Make settlement distinguish an authoritative failed or existing recovery outcome, a superseded attempt, and an unpersisted failure, preserving originating Round and revision evidence, retrying transient persistence failures within a bound with authority rechecked each time, and surfacing exhausted writes without overwriting newer Goal decisions or broadening automatic recovery policy.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Move potentially blocking Goal preparation and settlement out of the scheduling control path, bound or defer affected lock and Git waits, and account for in-flight preparation and live executions until they end so the next eligible Todo Goal can enter Plan within one poll interval after capacity becomes available.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Publish atomic runtime-local health tied to the exact worker incarnation and active target, with tick sequence advanced by the scheduler itself, last tick, last completed scheduling pass, active attempts, and failure context, using explicit startup and silence bounds that preserve liveness reporting during long-running Goals, pause, disabled automation, and app detachment.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Extend daemon-side runner supervision to detect missing or stale scheduler ticks independently of workflow execution and recover with bounded restart backoff only after confirming the old worker and its owned executions have stopped, retaining artifacts and reporting unhealthy whenever identity, termination, or replacement readiness cannot be established.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Expose one freshly evaluated workflow health assessment through shared system and process diagnostics so stalled scheduling makes daemon_healthy false while daemon reachability, shutdown control, and recovery supervision remain available.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Schedule agent hard-cap and idle enforcement independently through existing process supervision using recorded limits and activity evidence, preserving human-input and Toolbar timeout rules and containing individual inspection or termination failures.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Keep the existing worktree-cleanup worker independent of admission and worker-recovery waits, make its periodic supervision resilient to transient errors and bounded repository contention, and preserve pause behavior, cleanup eligibility, and retained evidence.",
+                      "id": "P8"
+                    },
+                    {
+                      "description": "Extend the shared next-action service to surface locally eligible Todo Goals waiting beyond a defined admission threshold with free capacity and no active attempts, using shared scheduling eligibility and live process observations including interactive Goal sessions, and report the waiting count, last tick or unavailable evidence, and supported remediation while distinguishing policy blocks and unknown runtime evidence from all-quiet.",
+                      "id": "P9"
+                    },
+                    {
+                      "description": "Keep failure containment, worker health, and maintenance changes within their existing shared responsibility boundaries and update only affected intent pages to describe settlement authority, liveness recovery, independent maintenance, and stalled-admission reporting.",
+                      "id": "P10"
+                    }
+                  ],
+                  "summary": "Strengthen Goal failure isolation and attempt-fenced settlement, detect and safely recover stalled workflow scheduling, expose delayed Todo admission through shared diagnostics, and keep agent timeout enforcement and worktree cleanup independently responsive so a live daemon cannot silently stop advancing work."
+                },
+                "started_at": "2026-09-10T08:31:49Z"
+              },
+              "governance_precheck": {
+                "attempt": 1,
+                "checked_at": "2026-09-10T08:35:20Z",
+                "message": "Executing the finalized plan does not necessarily violate any supplied governance rule or enabled guidance.",
+                "status": "passed"
+              },
+              "phase": "implement",
+              "phase_started_at": "2026-09-10T08:35:20Z",
+              "proposal": {
+                "completed_at": "2026-09-10T08:29:48Z",
+                "git_after": {
+                  "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Strengthen the existing execution boundary around each Goal's preparation, behavior execution, result construction, panic handling, and failure settlement so every finished attempt delivers a terminal outcome and releases its local active entry even when settlement itself fails, while unrelated eligible Goals continue through the scheduler.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Represent failure settlement explicitly as an authoritative failed or existing recovery outcome, a superseded attempt, or an unpersisted failure, retaining originating Round and revision evidence, surfacing persistence failures with bounded retries, and preserving newer Goal decisions and fail-closed integration conflicts.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Keep potentially blocking Goal preparation and settlement off the scheduling control path and make affected lock acquisition and Git waits bounded or deferrable, preserving capacity until execution actually ends and admitting the next eligible Todo Goal within one poll interval after a failed attempt releases its slot.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Publish atomic runtime-local workflow health bound to the worker's process identity and active target, including actual scheduler tick sequence, last tick, last successful scheduling pass, active attempts, and failure context, with explicit startup and silence bounds that distinguish long-running work, pause, disabled automation, and an unattached app from a stalled loop.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Extend daemon-side worker supervision to detect stale or missing ticks independently of workflow execution and recover with bounded restart backoff only after confirming the old worker and its owned executions have stopped, retaining artifacts and reporting unhealthy when identity, termination, or replacement readiness cannot be established.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Expose the same freshly evaluated worker health through shared system and process diagnostics so a stalled worker makes daemon_healthy false even when HTTP responds, while separating shutdown control and lifecycle reachability from worker degradation so the API and recovery supervision remain available.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Make agent hard-cap and idle enforcement independently scheduled through existing process supervision using recorded limits and activity evidence, preserving human-input and Toolbar timeout rules, and isolate that enforcement and existing worktree-cleanup supervision from admission and worker-recovery waits while retaining cleanup eligibility and evidence protections.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Extend the shared next-action service to report locally eligible Todo Goals waiting beyond a defined threshold with free capacity and no active attempts, using scheduler eligibility and process observations that include interactive Goal sessions, and provide the last tick, waiting count, and a supported remediation command while distinguishing policy blocks and unknown runtime evidence from all-quiet.",
+                      "id": "P8"
+                    },
+                    {
+                      "description": "Keep execution containment, liveness diagnostics, and maintenance enforcement in cohesive modules within their existing responsibility boundaries, and update the affected workflow overview, consistency contract, process intent, and CLI intent pages to explain failure isolation, worker recovery, independent maintenance, and stalled-admission reporting.",
+                      "id": "P9"
+                    }
+                  ],
+                  "summary": "Keep integration failures confined to their Goal attempts, detect and recover stalled workflow workers, expose delayed Todo admission, and keep agent timeout enforcement and worktree cleanup responsive so an alive daemon cannot silently stop advancing work."
+                },
+                "started_at": "2026-09-10T08:26:01Z"
+              },
+              "schema_version": 2,
+              "started_at": "2026-09-10T08:26:01Z",
+              "state": "in_progress",
+              "updated_at": "2026-09-10T08:35:20Z"
+            },
+            "prompt": "From: Ethan Jacobson <ethan.jacobson@insurity.com>\nSubject: Refine daemon bug\n\nBody:\n## Summary\r\n  The workflow runner-worker loop stops making progress after it fails to durably settle a\r\n  stale-candidate integration, yet its OS process stays alive. Once wedged, the daemon admits\r\n  no new work (Todo Goals never reach Plan), stops reaping agents past their hard cap, and\r\n  stops cleaning worktrees �X indefinitely, until a manual daemon restart. Nothing detects or\r\n  surfaces the dead loop: `refine next` reports \"all-quiet\" and `system status` reports\r\n  daemon_healthy=true with running_workflow_processes=0.\r\n\r\n  ## Field evidence (Refine 4.2.0, node bo2lnxnevo02-ethan, daemon port 8082)\r\n  - Last log entry of ANY kind: 2026-08-18T21:50:00Z (category=workflow):\r\n    \"Goal failure was not durably settled (attempt superseded); original error:\r\n     Candidate 11818bcf�K is stale: recorded base 2a4dccff�K is not <current>\".\r\n    Preceding lines show repeated \"Candidate �K is stale\" / \"! [rejected] �K non-fast-forward\"\r\n    while integrating round branches during concurrent activity on merge_target_branch\r\n    `insurity-claims`.\r\n  - ~44h later: zero subsequent log lines. No \"Workflow status changed\" since 08-18T21:48.\r\n  - A Goal created + started today sits in `todo` and is never admitted to `plan`.\r\n  - system status: daemon_healthy=true, running_workflow_processes=0,\r\n    parallel_run_cap=2 (capacity free). refine next: suggestion \"all-quiet\".\r\n  - State-sync is healthy (sync_recovered 2026-08-18T13:48; `sync --preview` fast-forwards;\r\n    origin push of refine/state succeeded today) �X so sync is NOT the blocker.\r\n  - Collateral from the stalled loop: 3 agent sessions alive 21�V27h, far past\r\n    agent_hard_cap_seconds=7200 and agent_idle_timeout_seconds=900, unreaped; 7 orphaned\r\n    worktrees under .git/refine-worktrees not cleaned. This indicates the SAME loop that\r\n    admits work also owns reaping/cleanup, and all of it stopped together.\r\n  - Restarting the daemon respawns the worker and immediately resumes admission, reaping,\r\n    and cleanup.\r\n\r\n  ## Root-cause hypothesis (confirm in code)\r\n  The \"Goal failure was not durably settled (attempt superseded)\" path �X reached when a\r\n  candidate's recorded base is stale and the failure record is superseded by a concurrent\r\n  attempt �X is not handled as a recoverable per-Goal outcome. Instead of logging the failure\r\n  and continuing the loop to the next Goal, the worker's main loop exits or deadlocks (e.g.\r\n  an error propagates out of the loop body, an await never completes, or a lock/worktree is\r\n  left held). The supervisor keeps the process alive (so `system status` looks healthy) but\r\n  the loop no longer ticks.\r\n\r\n  Start in the workflow runner-worker entrypoint (`refine system runner-worker --kind\r\n  workflow`) and the engine loop under src/application/workflow/engine/execution/. Find where\r\n  \"Goal failure was not durably settled (attempt superseded)\" and the stale-candidate error\r\n  (\"Candidate �K is stale: recorded base �K\") are produced, and trace what happens to the loop\r\n  after that error �X specifically whether the error escapes the per-Goal iteration boundary.\r\n\r\n  ## Required behavior\r\n  1. A per-Goal failure �X including \"attempt superseded\" / stale-candidate / non-fast-forward\r\n     push rejection �X must be caught at the per-Goal boundary, recorded durably (Goal ->\r\n     failed or a recovery Round), and the worker loop MUST continue to the next Goal. No\r\n     single-Goal integration failure may terminate or wedge the loop.\r\n  2. Liveness detection: the worker must emit a periodic heartbeat/tick, and the daemon must\r\n     detect a stalled loop (alive process, no progress/heartbeat within a bound) and either\r\n     auto-restart the worker or mark itself unhealthy. system status must report a wedged\r\n     worker as NOT healthy.\r\n  3. Observability: when a Todo Goal has been waiting past a threshold with free capacity and\r\n     no active runs, `refine next` must surface it (e.g. \"workflow worker not advancing:\r\n     last tick <ts>, N Goals stuck in todo\") with a remediation command, instead of\r\n     \"all-quiet\".\r\n  4. Decouple or make independently resilient the periodic duties driven by this loop\r\n     (admission, agent hard-cap/idle reaping, worktree cleanup) so one wedged concern does\r\n     not silently stop the others.\r\n\r\n  ## Reproduction\r\n  1. Start a Goal whose implementation round races the merge_target_branch so its candidate\r\n     goes stale on integration (recorded base no longer current), and arrange a concurrent\r\n     attempt so the failure is \"superseded\" and cannot be durably settled.\r\n  2. Observe the worker log the \"attempt superseded\" line and then stop ticking.\r\n  3. Create + start another Goal; it stays in `todo` and is never admitted; refine next says\r\n     \"all-quiet\"; running_workflow_processes stays 0; agents past hard cap go unreaped.\r\n  4. Restart the daemon �� admission/reaping/cleanup resume. Confirms the loop, not the data,\r\n     was the blocker.\r\n\r\n  ## Acceptance criteria\r\n  - A stale-candidate / superseded-attempt integration failure records the Goal outcome and\r\n    the worker continues to the next Goal WITHOUT wedging; a follow-up Todo Goal is admitted\r\n    to Plan within one poll interval.\r\n  - A wedged/stalled worker loop is detected (heartbeat/tick watchdog) and auto-recovered or\r\n    reported unhealthy in system status �X no manual restart required.\r\n  - refine next surfaces a stuck-Todo-with-idle-worker condition instead of \"all-quiet\".\r\n  - Reaper and worktree-cleanup keep running independent of an admission-path failure.\r\n  - Regression tests (style of src/application/workflow/tests/ and\r\n    src/infrastructure/process/supervisor/lifecycle/tests.rs): inject a superseded/stale\r\n    candidate failure and assert the loop survives and the next Goal is admitted; assert the\r\n    watchdog flags a non-ticking worker.\r\n\r\n  ## Constraints\r\n  - Preserve fail-closed safety for genuine content conflicts and never auto-merge contested\r\n    Goal records; this fix is about loop survival, liveness detection, and surfacing �X not\r\n    about weakening conflict handling.\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nEthan Jacobson\r\nEthan.Jacobson@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
+            "reporter": "ethan.jacobson@insurity.com",
+            "round": 1
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "event": {},
+      "goal": {
+        "assignee": "ethan.jacobson@insurity.com",
+        "base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+        "branch_name": "refine/DR07C216F3E4EC22A57C60BE0B/round-2",
+        "candidate_commit": null,
+        "created": "2026-09-10T08:26:00Z",
+        "event_generation": 2,
+        "feature_id": null,
+        "feature_order": null,
+        "id": "DR07C216F3E4EC22A57C60BE0B",
+        "name": "Keep workflow scheduling alive after Goal failures",
+        "node_display_name": "Default",
+        "node_id": "default",
+        "notes": [],
+        "priority": "low",
+        "reporter": "ethan.jacobson@insurity.com",
+        "round_count": 2,
+        "rounds": [
+          {
+            "assignee": "ethan.jacobson@insurity.com",
+            "constitution_state": "unclassified",
+            "created": "2026-09-10T08:26:00Z",
+            "failure_at": "",
+            "failure_category": "",
+            "failure_message": "",
+            "governance_candidate_commit": "",
+            "governance_checked_at": "",
+            "governance_details": "",
+            "governance_message": "",
+            "governance_rule_actions": [],
+            "guidance_decision": null,
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                "context_digest": "d0192175d51d1535da94ed99aa2c0dc323a94aa787f7697f4d3f5d148b560871",
+                "context_version": 1,
+                "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+                "implementation_branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-1",
+                "round_idx": 0,
+                "target_branch": "main"
+              },
+              "criticism": {
+                "completed_at": "2026-09-10T08:31:49Z",
+                "git_after": {
+                  "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "summary": "The plan addresses failure isolation, worker liveness, stalled admission, and independent maintenance while preserving authority and recovery safety."
+                },
+                "started_at": "2026-09-10T08:29:48Z"
+              },
+              "final_plan": {
+                "completed_at": "2026-09-10T08:34:23Z",
+                "git_after": {
+                  "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Extend the existing per-Goal execution boundary to contain preparation, behavior, result-construction, and settlement failures or panics, ensuring each ended attempt delivers a completion outcome and releases its local active entry so unrelated eligible Goals continue.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Make settlement distinguish an authoritative failed or existing recovery outcome, a superseded attempt, and an unpersisted failure, preserving originating Round and revision evidence, retrying transient persistence failures within a bound with authority rechecked each time, and surfacing exhausted writes without overwriting newer Goal decisions or broadening automatic recovery policy.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Move potentially blocking Goal preparation and settlement out of the scheduling control path, bound or defer affected lock and Git waits, and account for in-flight preparation and live executions until they end so the next eligible Todo Goal can enter Plan within one poll interval after capacity becomes available.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Publish atomic runtime-local health tied to the exact worker incarnation and active target, with tick sequence advanced by the scheduler itself, last tick, last completed scheduling pass, active attempts, and failure context, using explicit startup and silence bounds that preserve liveness reporting during long-running Goals, pause, disabled automation, and app detachment.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Extend daemon-side runner supervision to detect missing or stale scheduler ticks independently of workflow execution and recover with bounded restart backoff only after confirming the old worker and its owned executions have stopped, retaining artifacts and reporting unhealthy whenever identity, termination, or replacement readiness cannot be established.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Expose one freshly evaluated workflow health assessment through shared system and process diagnostics so stalled scheduling makes daemon_healthy false while daemon reachability, shutdown control, and recovery supervision remain available.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Schedule agent hard-cap and idle enforcement independently through existing process supervision using recorded limits and activity evidence, preserving human-input and Toolbar timeout rules and containing individual inspection or termination failures.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Keep the existing worktree-cleanup worker independent of admission and worker-recovery waits, make its periodic supervision resilient to transient errors and bounded repository contention, and preserve pause behavior, cleanup eligibility, and retained evidence.",
+                      "id": "P8"
+                    },
+                    {
+                      "description": "Extend the shared next-action service to surface locally eligible Todo Goals waiting beyond a defined admission threshold with free capacity and no active attempts, using shared scheduling eligibility and live process observations including interactive Goal sessions, and report the waiting count, last tick or unavailable evidence, and supported remediation while distinguishing policy blocks and unknown runtime evidence from all-quiet.",
+                      "id": "P9"
+                    },
+                    {
+                      "description": "Keep failure containment, worker health, and maintenance changes within their existing shared responsibility boundaries and update only affected intent pages to describe settlement authority, liveness recovery, independent maintenance, and stalled-admission reporting.",
+                      "id": "P10"
+                    }
+                  ],
+                  "summary": "Strengthen Goal failure isolation and attempt-fenced settlement, detect and safely recover stalled workflow scheduling, expose delayed Todo admission through shared diagnostics, and keep agent timeout enforcement and worktree cleanup independently responsive so a live daemon cannot silently stop advancing work."
+                },
+                "started_at": "2026-09-10T08:31:49Z"
+              },
+              "governance_precheck": {
+                "attempt": 1,
+                "checked_at": "2026-09-10T08:35:20Z",
+                "message": "Executing the finalized plan does not necessarily violate any supplied governance rule or enabled guidance.",
+                "status": "passed"
+              },
+              "phase": "implement",
+              "phase_started_at": "2026-09-10T08:35:20Z",
+              "proposal": {
+                "completed_at": "2026-09-10T08:29:48Z",
+                "git_after": {
+                  "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Strengthen the existing execution boundary around each Goal's preparation, behavior execution, result construction, panic handling, and failure settlement so every finished attempt delivers a terminal outcome and releases its local active entry even when settlement itself fails, while unrelated eligible Goals continue through the scheduler.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Represent failure settlement explicitly as an authoritative failed or existing recovery outcome, a superseded attempt, or an unpersisted failure, retaining originating Round and revision evidence, surfacing persistence failures with bounded retries, and preserving newer Goal decisions and fail-closed integration conflicts.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Keep potentially blocking Goal preparation and settlement off the scheduling control path and make affected lock acquisition and Git waits bounded or deferrable, preserving capacity until execution actually ends and admitting the next eligible Todo Goal within one poll interval after a failed attempt releases its slot.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Publish atomic runtime-local workflow health bound to the worker's process identity and active target, including actual scheduler tick sequence, last tick, last successful scheduling pass, active attempts, and failure context, with explicit startup and silence bounds that distinguish long-running work, pause, disabled automation, and an unattached app from a stalled loop.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Extend daemon-side worker supervision to detect stale or missing ticks independently of workflow execution and recover with bounded restart backoff only after confirming the old worker and its owned executions have stopped, retaining artifacts and reporting unhealthy when identity, termination, or replacement readiness cannot be established.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Expose the same freshly evaluated worker health through shared system and process diagnostics so a stalled worker makes daemon_healthy false even when HTTP responds, while separating shutdown control and lifecycle reachability from worker degradation so the API and recovery supervision remain available.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Make agent hard-cap and idle enforcement independently scheduled through existing process supervision using recorded limits and activity evidence, preserving human-input and Toolbar timeout rules, and isolate that enforcement and existing worktree-cleanup supervision from admission and worker-recovery waits while retaining cleanup eligibility and evidence protections.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Extend the shared next-action service to report locally eligible Todo Goals waiting beyond a defined threshold with free capacity and no active attempts, using scheduler eligibility and process observations that include interactive Goal sessions, and provide the last tick, waiting count, and a supported remediation command while distinguishing policy blocks and unknown runtime evidence from all-quiet.",
+                      "id": "P8"
+                    },
+                    {
+                      "description": "Keep execution containment, liveness diagnostics, and maintenance enforcement in cohesive modules within their existing responsibility boundaries, and update the affected workflow overview, consistency contract, process intent, and CLI intent pages to explain failure isolation, worker recovery, independent maintenance, and stalled-admission reporting.",
+                      "id": "P9"
+                    }
+                  ],
+                  "summary": "Keep integration failures confined to their Goal attempts, detect and recover stalled workflow workers, expose delayed Todo admission, and keep agent timeout enforcement and worktree cleanup responsive so an alive daemon cannot silently stop advancing work."
+                },
+                "started_at": "2026-09-10T08:26:01Z"
+              },
+              "schema_version": 2,
+              "started_at": "2026-09-10T08:26:01Z",
+              "state": "in_progress",
+              "updated_at": "2026-09-10T08:35:20Z"
+            },
+            "implementation_report": null,
+            "implementation_reported_at": null,
+            "logs": [
+              {
+                "actor": "refine",
+                "category": "state",
+                "datetime": "2026-09-10T08:26:01Z",
+                "details": {
+                  "node_id": "default"
+                },
+                "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+                "message": "Workflow status changed: todo -> plan",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "git",
+                "datetime": "2026-09-10T08:26:01Z",
+                "details": {
+                  "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-1",
+                  "node_id": "default",
+                  "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR07C216F3E4EC22A57C60BE0B-round-1"
+                },
+                "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+                "message": "Created implementation worktree for refine/DR07C216F3E4EC22A57C60BE0B/round-1",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "governance",
+                "datetime": "2026-09-10T08:35:20Z",
+                "details": {
+                  "attempt": 1,
+                  "node_id": "default",
+                  "phase": "plan",
+                  "status": "passed"
+                },
+                "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+                "message": "Plan governance pre-check passed",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "state",
+                "datetime": "2026-09-10T08:35:20Z",
+                "details": {
+                  "node_id": "default"
+                },
+                "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+                "message": "Workflow status changed: plan -> implement",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "agent",
+                "datetime": "2026-09-10T08:54:44Z",
+                "details": {
+                  "error": "Goal Agent exited unsuccessfully: 1; additionally failed to persist implementation planning failure evidence: Goal DR07C216F3E4EC22A57C60BE0B no longer authorizes implementation planning on node default round 1",
+                  "node_id": "default"
+                },
+                "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+                "message": "Workflow failed: Goal Agent exited unsuccessfully: 1; additionally failed to persist implementation planning failure evidence: Goal DR07C216F3E4EC22A57C60BE0B no longer authorizes implementation planning on node default round 1",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "workflow",
+                "datetime": "2026-09-10T08:54:44Z",
+                "details": {
+                  "failure_stage": "workflow"
+                },
+                "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+                "message": "Goal failure was not durably settled (attempt superseded); original error: Goal Agent exited unsuccessfully: 1; additionally failed to persist implementation planning failure evidence: Goal DR07C216F3E4EC22A57C60BE0B no longer authorizes implementation planning on node default round 1",
+                "round_idx": 0,
+                "severity": "warning"
+              }
+            ],
+            "meta_rule_state": "unclassified",
+            "product_state": "unclassified",
+            "prompt": "From: Ethan Jacobson <ethan.jacobson@insurity.com>\nSubject: Refine daemon bug\n\nBody:\n## Summary\r\n  The workflow runner-worker loop stops making progress after it fails to durably settle a\r\n  stale-candidate integration, yet its OS process stays alive. Once wedged, the daemon admits\r\n  no new work (Todo Goals never reach Plan), stops reaping agents past their hard cap, and\r\n  stops cleaning worktrees �X indefinitely, until a manual daemon restart. Nothing detects or\r\n  surfaces the dead loop: `refine next` reports \"all-quiet\" and `system status` reports\r\n  daemon_healthy=true with running_workflow_processes=0.\r\n\r\n  ## Field evidence (Refine 4.2.0, node bo2lnxnevo02-ethan, daemon port 8082)\r\n  - Last log entry of ANY kind: 2026-08-18T21:50:00Z (category=workflow):\r\n    \"Goal failure was not durably settled (attempt superseded); original error:\r\n     Candidate 11818bcf�K is stale: recorded base 2a4dccff�K is not <current>\".\r\n    Preceding lines show repeated \"Candidate �K is stale\" / \"! [rejected] �K non-fast-forward\"\r\n    while integrating round branches during concurrent activity on merge_target_branch\r\n    `insurity-claims`.\r\n  - ~44h later: zero subsequent log lines. No \"Workflow status changed\" since 08-18T21:48.\r\n  - A Goal created + started today sits in `todo` and is never admitted to `plan`.\r\n  - system status: daemon_healthy=true, running_workflow_processes=0,\r\n    parallel_run_cap=2 (capacity free). refine next: suggestion \"all-quiet\".\r\n  - State-sync is healthy (sync_recovered 2026-08-18T13:48; `sync --preview` fast-forwards;\r\n    origin push of refine/state succeeded today) �X so sync is NOT the blocker.\r\n  - Collateral from the stalled loop: 3 agent sessions alive 21�V27h, far past\r\n    agent_hard_cap_seconds=7200 and agent_idle_timeout_seconds=900, unreaped; 7 orphaned\r\n    worktrees under .git/refine-worktrees not cleaned. This indicates the SAME loop that\r\n    admits work also owns reaping/cleanup, and all of it stopped together.\r\n  - Restarting the daemon respawns the worker and immediately resumes admission, reaping,\r\n    and cleanup.\r\n\r\n  ## Root-cause hypothesis (confirm in code)\r\n  The \"Goal failure was not durably settled (attempt superseded)\" path �X reached when a\r\n  candidate's recorded base is stale and the failure record is superseded by a concurrent\r\n  attempt �X is not handled as a recoverable per-Goal outcome. Instead of logging the failure\r\n  and continuing the loop to the next Goal, the worker's main loop exits or deadlocks (e.g.\r\n  an error propagates out of the loop body, an await never completes, or a lock/worktree is\r\n  left held). The supervisor keeps the process alive (so `system status` looks healthy) but\r\n  the loop no longer ticks.\r\n\r\n  Start in the workflow runner-worker entrypoint (`refine system runner-worker --kind\r\n  workflow`) and the engine loop under src/application/workflow/engine/execution/. Find where\r\n  \"Goal failure was not durably settled (attempt superseded)\" and the stale-candidate error\r\n  (\"Candidate �K is stale: recorded base �K\") are produced, and trace what happens to the loop\r\n  after that error �X specifically whether the error escapes the per-Goal iteration boundary.\r\n\r\n  ## Required behavior\r\n  1. A per-Goal failure �X including \"attempt superseded\" / stale-candidate / non-fast-forward\r\n     push rejection �X must be caught at the per-Goal boundary, recorded durably (Goal ->\r\n     failed or a recovery Round), and the worker loop MUST continue to the next Goal. No\r\n     single-Goal integration failure may terminate or wedge the loop.\r\n  2. Liveness detection: the worker must emit a periodic heartbeat/tick, and the daemon must\r\n     detect a stalled loop (alive process, no progress/heartbeat within a bound) and either\r\n     auto-restart the worker or mark itself unhealthy. system status must report a wedged\r\n     worker as NOT healthy.\r\n  3. Observability: when a Todo Goal has been waiting past a threshold with free capacity and\r\n     no active runs, `refine next` must surface it (e.g. \"workflow worker not advancing:\r\n     last tick <ts>, N Goals stuck in todo\") with a remediation command, instead of\r\n     \"all-quiet\".\r\n  4. Decouple or make independently resilient the periodic duties driven by this loop\r\n     (admission, agent hard-cap/idle reaping, worktree cleanup) so one wedged concern does\r\n     not silently stop the others.\r\n\r\n  ## Reproduction\r\n  1. Start a Goal whose implementation round races the merge_target_branch so its candidate\r\n     goes stale on integration (recorded base no longer current), and arrange a concurrent\r\n     attempt so the failure is \"superseded\" and cannot be durably settled.\r\n  2. Observe the worker log the \"attempt superseded\" line and then stop ticking.\r\n  3. Create + start another Goal; it stays in `todo` and is never admitted; refine next says\r\n     \"all-quiet\"; running_workflow_processes stays 0; agents past hard cap go unreaped.\r\n  4. Restart the daemon �� admission/reaping/cleanup resume. Confirms the loop, not the data,\r\n     was the blocker.\r\n\r\n  ## Acceptance criteria\r\n  - A stale-candidate / superseded-attempt integration failure records the Goal outcome and\r\n    the worker continues to the next Goal WITHOUT wedging; a follow-up Todo Goal is admitted\r\n    to Plan within one poll interval.\r\n  - A wedged/stalled worker loop is detected (heartbeat/tick watchdog) and auto-recovered or\r\n    reported unhealthy in system status �X no manual restart required.\r\n  - refine next surfaces a stuck-Todo-with-idle-worker condition instead of \"all-quiet\".\r\n  - Reaper and worktree-cleanup keep running independent of an admission-path failure.\r\n  - Regression tests (style of src/application/workflow/tests/ and\r\n    src/infrastructure/process/supervisor/lifecycle/tests.rs): inject a superseded/stale\r\n    candidate failure and assert the loop survives and the next Goal is admitted; assert the\r\n    watchdog flags a non-ticking worker.\r\n\r\n  ## Constraints\r\n  - Preserve fail-closed safety for genuine content conflicts and never auto-merge contested\r\n    Goal records; this fix is about loop survival, liveness detection, and surfacing �X not\r\n    about weakening conflict handling.\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nEthan Jacobson\r\nEthan.Jacobson@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
+            "quality_checked_at": "",
+            "quality_details": "",
+            "quality_message": "",
+            "quality_state": "unclassified",
+            "reporter": "ethan.jacobson@insurity.com",
+            "rule_state": "unclassified",
+            "updated": "2026-09-10T08:35:20Z",
+            "workflow_attempt_authority": null,
+            "workflow_reconciliation": null,
+            "workflow_recovery": null
+          },
+          {
+            "assignee": "ethan.jacobson@insurity.com",
+            "constitution_state": "unclassified",
+            "created": "2026-09-10T13:06:37Z",
+            "failure_at": "",
+            "failure_category": "",
+            "failure_message": "",
+            "governance_candidate_commit": "",
+            "governance_checked_at": "",
+            "governance_details": "",
+            "governance_message": "",
+            "governance_rule_actions": [],
+            "guidance_decision": null,
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                "context_digest": "8d5894d622f18774a33f60ea849b1931e88482f40f1b50ec521ec9fb908bc6ec",
+                "context_version": 1,
+                "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+                "implementation_branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-2",
+                "round_idx": 1,
+                "target_branch": "main"
+              },
+              "phase": "plan",
+              "phase_started_at": "2026-09-10T13:43:00Z",
+              "schema_version": 2,
+              "started_at": "2026-09-10T13:43:00Z",
+              "state": "in_progress",
+              "updated_at": "2026-09-10T13:43:00Z"
+            },
+            "implementation_report": null,
+            "implementation_reported_at": null,
+            "latest_log": {
+              "actor": "refine",
+              "category": "git",
+              "datetime": "2026-09-10T13:43:00Z",
+              "details": {
+                "base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-2",
+                "branch_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                "node_id": "default",
+                "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR07C216F3E4EC22A57C60BE0B-round-2"
+              },
+              "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+              "message": "Created implementation worktree for refine/DR07C216F3E4EC22A57C60BE0B/round-2",
+              "round_idx": 1,
+              "severity": "info"
+            },
+            "latest_state_log": {
+              "actor": "refine",
+              "category": "state",
+              "datetime": "2026-09-10T13:43:00Z",
+              "details": {
+                "node_id": "default"
+              },
+              "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+              "message": "Workflow status changed: todo -> plan",
+              "round_idx": 1,
+              "severity": "info"
+            },
+            "latest_workflow_log": {
+              "actor": "refine",
+              "category": "state",
+              "datetime": "2026-09-10T13:43:00Z",
+              "details": {
+                "node_id": "default"
+              },
+              "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+              "message": "Workflow status changed: todo -> plan",
+              "round_idx": 1,
+              "severity": "info"
+            },
+            "logs": [
+              {
+                "actor": "refine",
+                "category": "git",
+                "datetime": "2026-09-10T13:43:00Z",
+                "details": {
+                  "node_id": "default",
+                  "remote": "origin",
+                  "target_branch": "main",
+                  "target_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c"
+                },
+                "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+                "message": "Local main already carried the fetched tip",
+                "round_idx": 1,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "state",
+                "datetime": "2026-09-10T13:43:00Z",
+                "details": {
+                  "node_id": "default"
+                },
+                "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+                "message": "Workflow status changed: todo -> plan",
+                "round_idx": 1,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "git",
+                "datetime": "2026-09-10T13:43:00Z",
+                "details": {
+                  "base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "branch": "refine/DR07C216F3E4EC22A57C60BE0B/round-2",
+                  "branch_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "node_id": "default",
+                  "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR07C216F3E4EC22A57C60BE0B-round-2"
+                },
+                "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+                "message": "Created implementation worktree for refine/DR07C216F3E4EC22A57C60BE0B/round-2",
+                "round_idx": 1,
+                "severity": "info"
+              }
+            ],
+            "meta_rule_state": "unclassified",
+            "product_state": "unclassified",
+            "prompt": "Keep a per-Goal error from stopping workflow scheduling, and detect a live worker whose scheduling loop has stopped making progress.\n\nThe August field report is a hypothesis to reproduce, not proof that a specific stale-candidate error kills today's worker. Current execution already catches some task panics, but preparation runs in the scheduling path and scheduler_error suppresses admission until the pass ends. There is no scheduler-tick health evidence in the current runner. Round 1 retained unfinished failure-containment and watchdog changes without a candidate; its final log reports an unsuccessful agent exit and superseded attempt.\n\nContain preparation, Skill execution, result handling and failure-settlement errors at the owning Goal boundary. Ensure ended attempts release their local active entry and unrelated eligible work continues. Distinguish an authoritative failure, a superseded attempt and failure to persist evidence; retry transient persistence failures within a bound while rechecking authority. Never overwrite a newer Round or cancellation to make an old failure appear settled. Keep blocking Git, lock or settlement work from freezing the admission control path, without releasing capacity while owned work is still alive.\n\nPublish runtime-local health tied to the actual worker incarnation and target, with ticks emitted by the scheduling loop itself. Use independent existing daemon supervision to detect stale ticks. Recover with bounded restart backoff only after safely stopping the old worker and its owned work, or report unhealthy with a concrete remedy if this cannot be proved. Keep daemon reachability and shutdown control available.\n\nUse one shared health assessment in system status and refine next, distinguishing a stall from pause, missing required Plan/Implement Skills, scope or ordering blocks, long-running tasks and unavailable evidence. Keep worktree cleanup and deadline enforcement independently responsive. Share the latter and operation-recovery changes with Goal DR74050DA12C5442DF797B8AB6 instead of adding competing supervision.\n\nVerify a superseded integration failure, preparation and settlement faults, and a task panic cannot stop the next eligible Goal entering Plan after capacity is available. Inject a non-ticking worker and verify detection plus safe recovery or unhealthy reporting. Test pause and legitimate waiting without false alarms, and confirm cleanup and deadline checks remain responsive without deleting retained work.\n\nThis is a recovery Round following the Skills review on 10 September 2026. Start from current main in a new managed Round worktree. Preserve Round 1, its plans, logs, branches, commits and uncommitted files; inspect and selectively reuse useful work instead of replaying the whole old attempt. Use the current Skills and docs/intent contracts, not archived Governance, Quality or Guidance configuration or the old fixed planning sequence. Refine owns workflow advancement and integration; human approval remains separate. Update only affected documentation and report focused verification with actual results.",
+            "quality_checked_at": "",
+            "quality_details": "",
+            "quality_message": "",
+            "quality_state": "unclassified",
+            "reporter": "Buddy Williams",
+            "rule_state": "unclassified",
+            "updated": "2026-09-10T13:43:00Z",
+            "workflow_attempt_authority": {
+              "claimed_at": "2026-09-10T13:42:58Z",
+              "round_idx": 1,
+              "workflow_revision": 18
+            },
+            "workflow_reconciliation": null,
+            "workflow_recovery": null
+          }
+        ],
+        "status": "plan",
+        "target_branch": "main",
+        "updated": "2026-09-10T13:43:00Z",
+        "workflow_revision": 26
+      },
+      "system": {
+        "candidate_commit": null,
+        "node_id": "default",
+        "project_root": "/home/buddy/projects/refine-next",
+        "workflow_step": "plan",
+        "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR07C216F3E4EC22A57C60BE0B-round-2"
+      }
+    },
+    "metadata": {
+      "behavior": "EventSkill",
+      "event_operation_id": "1a08b8eb6ae113c762",
+      "goal_id": "DR07C216F3E4EC22A57C60BE0B",
+      "kind": "workflow",
+      "node_id": "default",
+      "provider": "codex",
+      "round_idx": 1,
+      "target_app_id": "/home/buddy/projects/refine-next",
+      "workflow_revision": 18,
+      "workflow_state": "plan"
+    }
+  },
+  "bindings": [
+    {
+      "binding": {
+        "id": "default-plan",
+        "skill_id": "default-plan",
+        "enabled": true,
+        "mode": "blocking",
+        "order": 0,
+        "scope": {
+          "node_id": null
+        },
+        "overrides": null,
+        "inputs": {}
+      },
+      "skill": {
+        "id": "default-plan",
+        "name": "Plan",
+        "prompt": "## Plan\n\nProduce a complete, concise implementation plan for the current Goal Round. Inspect the repository and applicable context, resolve assumptions, consider alternatives and critique your proposed solution before finalizing it. Choose the planning method appropriate to the work. For a scoped finding recovery Round, focus the plan on the requested correction against the retained candidate. Do not change repository files. Return an actionable plan with stable checklist IDs and meaningful verification.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
+        "role": "plan",
+        "enabled": true,
+        "scope": {
+          "node_id": null
+        },
+        "parameters": [],
+        "provenance": "refine-default-v1"
+      },
+      "parameters": {}
+    }
+  ],
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-10T13:43:01.021248612+00:00",
+  "completed_at": null,
+  "error": null,
+  "action_applied": false
+}

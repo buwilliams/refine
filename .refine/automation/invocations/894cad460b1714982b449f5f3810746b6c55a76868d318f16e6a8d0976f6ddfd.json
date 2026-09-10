@@ -1,0 +1,736 @@
+{
+  "id": "894cad460b1714982b449f5f3810746b6c55a76868d318f16e6a8d0976f6ddfd",
+  "event": {
+    "id": "workflow.plan.enter",
+    "name": "Workflow Plan Enter",
+    "kind": "system",
+    "source": "workflow.plan.enter",
+    "enabled": true,
+    "scope": {
+      "node_id": null
+    },
+    "parameters": [],
+    "bindings": [
+      {
+        "id": "default-plan",
+        "skill_id": "default-plan",
+        "enabled": true,
+        "mode": "blocking",
+        "order": 0,
+        "scope": {
+          "node_id": null
+        },
+        "overrides": null,
+        "inputs": {}
+      }
+    ],
+    "on_success": null
+  },
+  "config_revision": 22,
+  "context": {
+    "node_id": "default",
+    "target_root": "/home/buddy/projects/refine-next",
+    "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR54BF57DCE017ED8EC68A5EEB-round-2",
+    "provider": "codex",
+    "goal_id": "DR54BF57DCE017ED8EC68A5EEB",
+    "round_idx": 1,
+    "workflow_revision": 18,
+    "candidate_commit": null,
+    "data": {
+      "context": {
+        "assembled_at": "2026-09-10T13:43:01Z",
+        "current_round": {
+          "assignee": "ethan.jacobson@insurity.com",
+          "prompt": "Recover safely from an old candidate whose recorded base is wrong or whose target has advanced, using the candidate's proven Goal changes.\n\nThe original worktree-creation defect was fixed by 8f6de519: fresh and recreated Round branches use the recorded merge-target base. Current code also refreshes candidates before Quality and integration. Keep those behaviors and focus this Round on remaining lineage and retry gaps. settle_stale_candidate still fails immediately when the target equals the recorded base but the candidate does not descend from it. Round 1 retained extensive unfinished replay and publication work without a candidate or final verification.\n\nValidate actual worktree HEAD, recorded base, target and planning or Skill context before automated edits. Preserve the original base when resuming existing work. Extend the current refresh and recovery path to repair bookkeeping only when retained Round and Git evidence identify the Goal's own change range. A merge base or a conflict-free rebase alone does not prove that every commit on a divergent developer branch belongs to the Goal. Ambiguous or unavailable history must remain recoverable with clear evidence, not import unrelated work.\n\nReplay an unambiguous candidate onto one observed target tip in a managed workspace. Record original and replacement identities, retain the source attempt, and rerun the applicable current Skills and exact-candidate checks for every changed candidate. Respect required, background and context-only behavior and record when no required check Skills apply. Bound retries for target movement, preserve conflict evidence and existing supported conflict recovery, and never treat dirty work, lost authority or a Git error as a successful replay.\n\nPreserve target leases and atomic publication checks against the previously recorded remote candidate SHA. Handle an already-published identical replacement idempotently; preserve unexpected remote changes and interrupted publication evidence.\n\nVerify advanced targets, a wrong recorded base with an unchanged target, divergent branches containing unrelated commits, retries, content conflicts, remote publication races and interruption. Prove fresh Round creation still starts at the declared target and that replacement commits cannot reuse stale check evidence.\n\nThis is a recovery Round following the Skills review on 10 September 2026. Start from current main in a new managed Round worktree. Preserve Round 1, its plans, logs, branches, commits and uncommitted files; inspect and selectively reuse useful work instead of replaying the whole old attempt. Use the current Skills and docs/intent contracts, not archived Governance, Quality or Guidance configuration or the old fixed planning sequence. Refine owns workflow advancement and integration; human approval remains separate. Update only affected documentation and report focused verification with actual results.",
+          "reporter": "Buddy Williams",
+          "round": 2
+        },
+        "goal": {
+          "assignee": "ethan.jacobson@insurity.com",
+          "id": "DR54BF57DCE017ED8EC68A5EEB",
+          "name": "Recover stale candidates with proven Goal history",
+          "node_id": "default",
+          "priority": "low",
+          "reporter": "ethan.jacobson@insurity.com"
+        },
+        "governance": {
+          "configured": false,
+          "constitution": "",
+          "product": "",
+          "rules": []
+        },
+        "guidance_candidates": [],
+        "previous_rounds": [
+          {
+            "assignee": "ethan.jacobson@insurity.com",
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                "context_digest": "92e55ba227cfee5088656b5487e22b9bbe9d09875d81821f90ec426b19bea51e",
+                "context_version": 1,
+                "goal_id": "DR54BF57DCE017ED8EC68A5EEB",
+                "implementation_branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-1",
+                "round_idx": 0,
+                "target_branch": "main"
+              },
+              "criticism": {
+                "completed_at": "2026-09-10T08:31:29Z",
+                "git_after": {
+                  "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "findings": [
+                    {
+                      "checklist_item_ids": [
+                        "P5",
+                        "P6"
+                      ],
+                      "description": "Governance publishes the candidate before integration using an ordinary push (engine/behaviors/mod.rs and git/worktrees/service_adapter.rs); if the target then advances, replay rewrites the already-published branch and the next push fails as non-fast-forward despite a clean replay, which P5-P6 do not address.",
+                      "id": "C1",
+                      "material": true,
+                      "recommendation": "Add replacement publication fenced by the exact previously published remote candidate SHA, preserving concurrent remote changes, so a late-target retry can publish and integrate the replacement after its gates pass."
+                    }
+                  ],
+                  "summary": "The plan needs safe republication of already-published candidates after replay."
+                },
+                "started_at": "2026-09-10T08:28:59Z"
+              },
+              "final_plan": {
+                "completed_at": "2026-09-10T08:33:19Z",
+                "git_after": {
+                  "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Create fresh Round worktrees from one resolved declared target, read their initial HEAD for the Goal base, candidate handoff, and planning binding, and distinguish creation from resumption so reopening existing work preserves its original base.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Extend the existing Git capability and candidate-refresh workflow to derive the replay range from the candidate and current target merge base and replay it onto that exact target commit, handling mismatched recorded bases even when the target has not moved and preserving merge changes and already-applied work.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Prepare lineage before Plan and Implement agents launch or resume, expose base, target, and worktree mismatches in their context, and reconcile affected planning bindings and handoff records through existing authority checks while preserving prior artifacts and unfinished work.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Re-resolve the declared target for Quality and Governance recovery Rounds, branch from the retained candidate and replay that new branch when needed before implementation, and record its refreshed base and candidate without rewriting the source Round's evidence.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Use the shared replay path at the Quality boundary and before integration, replace the strict recorded-base rejection and unmoved-target terminal failure with recoverable refresh routing, and retry late target movement through the existing bounded integration loop.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Persist original and replacement base and candidate identities with the actual replay base, invalidate superseded gate projections, and rerun Quality and Governance for each replacement before publication while retaining the existing target lease and commit fences.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Extend existing durable handoff evidence to record publication intent before pushing and retain the publication remote, candidate branch, last confirmed published candidate SHA, and pending replacement identity across refreshes and interrupted attempts.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Republish the exact passing replacement through the shared Git capability with an atomic comparison against the candidate branch's recorded previously published remote SHA, recognize an already-published identical replacement on retry, and preserve and report any other remote change without adopting it as a new expected SHA or force-updating the target.",
+                      "id": "P8"
+                    },
+                    {
+                      "description": "Keep conflict resolution and abort recovery in the existing managed worktree path, preserve the original candidate on unsuccessful replay, report unresolved conflicting paths, and distinguish unsafe or unavailable history, dirty worktrees, authority loss, publication races, and Git errors from content conflicts.",
+                      "id": "P9"
+                    },
+                    {
+                      "description": "Update only the affected worktree and workflow intent pages to describe actual creation bases, early lineage repair, retry re-anchoring, automatic replay, fenced replacement publication, and recoverable conflict outcomes in their established format.",
+                      "id": "P10"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "C1",
+                      "resolution": "P7-P8 retain publication authority across replay and restart and replace ordinary republication with an atomic update fenced by the exact previously published remote candidate SHA; P5-P6 route late target movement through replacement Quality and Governance before this update, while retries recognize an identical published replacement and preserve all other remote changes."
+                    }
+                  ],
+                  "summary": "Make worktree bindings reflect their actual target-based starting commit and extend the existing refresh workflow to replay stale or divergent candidates onto the current target, rerun their gates, and safely republish replacements against the exact previously published candidate so clean work can integrate despite target movement without overwriting concurrent remote changes."
+                },
+                "started_at": "2026-09-10T08:31:29Z"
+              },
+              "governance_precheck": {
+                "attempt": 1,
+                "checked_at": "2026-09-10T08:34:05Z",
+                "message": "No step in the finalized plan necessarily violates the supplied constitution, governance rules, or enabled guidance.",
+                "status": "passed"
+              },
+              "phase": "implement",
+              "phase_started_at": "2026-09-10T08:34:05Z",
+              "proposal": {
+                "completed_at": "2026-09-10T08:28:59Z",
+                "git_after": {
+                  "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Create fresh Round worktrees from one resolved declared target, read their initial HEAD for the Goal base, candidate handoff, and planning binding, and distinguish creation from resumption so reopening existing work never silently replaces its base with its candidate tip.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Extend the existing Git capability and candidate-refresh workflow to derive the replay range from the candidate and current target merge base and replay it onto that exact target commit, handling mismatched recorded bases even when the target has not moved and preserving merge changes and already-applied work.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Prepare lineage before Plan and Implement agents launch or resume, expose base, target, and worktree mismatches in their context, and reconcile affected planning bindings and handoff records through existing authority checks while preserving prior artifacts and unfinished work.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Re-resolve the declared target for Quality and Governance recovery Rounds, branch from the retained candidate and replay that new branch when needed before implementation, and record its refreshed base and candidate without rewriting the source Round's evidence.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Use the shared replay path at the Quality boundary and before integration, replace the strict recorded-base rejection and unmoved-target terminal failure with recoverable refresh routing, and retry late target movement through the existing bounded integration loop.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Persist original and replacement base and candidate identities with the actual replay base, invalidate superseded gate projections, and rerun Quality and Governance for the replacement commit before publication while retaining the existing target lease and commit fences.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Keep conflict resolution and abort recovery in the existing managed worktree path, preserve the original candidate on unsuccessful replay, report unresolved conflicting paths, and distinguish unsafe or unavailable history, dirty worktrees, authority loss, and Git errors from content conflicts.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Update only the affected worktree and workflow intent pages to describe actual creation bases, early lineage repair, retry re-anchoring, automatic replay, and recoverable conflict outcomes in their established format.",
+                      "id": "P8"
+                    }
+                  ],
+                  "summary": "Make new worktree bindings reflect their actual target-based starting commit and extend the existing refresh workflow to replay stale or divergent candidates onto the current target, preserving their work instead of abandoning a Round over mismatched bookkeeping."
+                },
+                "started_at": "2026-09-10T08:26:05Z"
+              },
+              "schema_version": 2,
+              "started_at": "2026-09-10T08:26:05Z",
+              "state": "in_progress",
+              "updated_at": "2026-09-10T08:34:05Z"
+            },
+            "prompt": "From: Ethan Jacobson <ethan.jacobson@insurity.com>\nSubject: Integration must auto-rebase stale candidates instead of hard-failing on a base/target mismatch\n\nBody:\nWhen a candidate's recorded base_commit is not an ancestor of the candidate, Refine's integration gate hard-fails with Candidate … is stale: recorded base … is not its ancestor and abandons the round — even when the candidate is content-correct and replays onto the current target with no conflicts. This wasted a full round on run 8082 (goal 00000T082ZTBZ3N3EDG591G002): the binding recorded base=a8d44a23 on target_branch=insurity-claims, but the worktree was cut from develop (eacc5984), which had diverged from insurity-claims. The candidate diff was a Claims-only, test-file-only change that rebases cleanly onto either branch.\r\n\r\nFixes required (any one of 1–2 prevents it; 3 makes it self-healing):\r\n1. Single source of truth for the base. Record binding.base_commit as git rev-parse HEAD of the worktree at the moment it is created, not from a separate snapshot of the target branch taken at goal-creation time. This makes the ancestor invariant true by construction.\r\n2. Cut the worktree from the declared target. If target_branch=insurity-claims, create the worktree from insurity-claims (or its recorded base) — not from whatever the main repo happens to have checked out (develop). Today these two disagree; they must be reconciled to one branch.\r\n3. Auto-rebase / replay on staleness instead of failing. When the recorded base isn't an ancestor of the candidate (or the target tip advanced since the worktree was cut), the integration step should replay the candidate's own commits onto the current target tip before failing:\r\n   - base = git merge-base <candidate> <target-tip>\r\n   - git rebase --onto <target-tip> <base> <candidate> (equivalently cherry-pick base..candidate)\r\n   - Proceed with the rebased commit if it applies cleanly; only fail integration on a genuine, unresolvable content conflict — never on a bookkeeping divergence.\r\n4. Replace the strict ancestor gate with a merge-base-driven replay. The strict recorded_base ∈ ancestors(candidate) check is the trigger for the false failure; a merge-base + replay is robust to either side advancing.\r\n5. Re-anchor on automatic retries. A quality/governance retry must re-resolve the current target tip and rebase the prior candidate onto it (or branch from the prior candidate), so a retry can't inherit an already-stale base.\r\n6. Detect the divergence early and loudly. Validate the base↔target invariant at plan/implement start — while the agent context is live and can rebase in-context — instead of only at the terminal integration gate where the sole outcome is failure.\r\n\r\nAcceptance: A candidate built on a target tip that has since advanced (or was cut from a divergent-but-clean branch) integrates successfully via auto-rebase; integration fails only on a real merge conflict, with the conflicting paths reported.\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nEthan Jacobson\r\nEthan.Jacobson@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
+            "reporter": "ethan.jacobson@insurity.com",
+            "round": 1
+          }
+        ],
+        "version": 1,
+        "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+      },
+      "event": {},
+      "goal": {
+        "assignee": "ethan.jacobson@insurity.com",
+        "base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+        "branch_name": "refine/DR54BF57DCE017ED8EC68A5EEB/round-2",
+        "candidate_commit": null,
+        "created": "2026-09-10T08:26:04Z",
+        "event_generation": 2,
+        "feature_id": null,
+        "feature_order": null,
+        "id": "DR54BF57DCE017ED8EC68A5EEB",
+        "name": "Recover stale candidates with proven Goal history",
+        "node_display_name": "Default",
+        "node_id": "default",
+        "notes": [],
+        "priority": "low",
+        "reporter": "ethan.jacobson@insurity.com",
+        "round_count": 2,
+        "rounds": [
+          {
+            "assignee": "ethan.jacobson@insurity.com",
+            "constitution_state": "unclassified",
+            "created": "2026-09-10T08:26:04Z",
+            "failure_at": "",
+            "failure_category": "",
+            "failure_message": "",
+            "governance_candidate_commit": "",
+            "governance_checked_at": "",
+            "governance_details": "",
+            "governance_message": "",
+            "governance_rule_actions": [],
+            "guidance_decision": null,
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                "context_digest": "92e55ba227cfee5088656b5487e22b9bbe9d09875d81821f90ec426b19bea51e",
+                "context_version": 1,
+                "goal_id": "DR54BF57DCE017ED8EC68A5EEB",
+                "implementation_branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-1",
+                "round_idx": 0,
+                "target_branch": "main"
+              },
+              "criticism": {
+                "completed_at": "2026-09-10T08:31:29Z",
+                "git_after": {
+                  "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "findings": [
+                    {
+                      "checklist_item_ids": [
+                        "P5",
+                        "P6"
+                      ],
+                      "description": "Governance publishes the candidate before integration using an ordinary push (engine/behaviors/mod.rs and git/worktrees/service_adapter.rs); if the target then advances, replay rewrites the already-published branch and the next push fails as non-fast-forward despite a clean replay, which P5-P6 do not address.",
+                      "id": "C1",
+                      "material": true,
+                      "recommendation": "Add replacement publication fenced by the exact previously published remote candidate SHA, preserving concurrent remote changes, so a late-target retry can publish and integrate the replacement after its gates pass."
+                    }
+                  ],
+                  "summary": "The plan needs safe republication of already-published candidates after replay."
+                },
+                "started_at": "2026-09-10T08:28:59Z"
+              },
+              "final_plan": {
+                "completed_at": "2026-09-10T08:33:19Z",
+                "git_after": {
+                  "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Create fresh Round worktrees from one resolved declared target, read their initial HEAD for the Goal base, candidate handoff, and planning binding, and distinguish creation from resumption so reopening existing work preserves its original base.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Extend the existing Git capability and candidate-refresh workflow to derive the replay range from the candidate and current target merge base and replay it onto that exact target commit, handling mismatched recorded bases even when the target has not moved and preserving merge changes and already-applied work.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Prepare lineage before Plan and Implement agents launch or resume, expose base, target, and worktree mismatches in their context, and reconcile affected planning bindings and handoff records through existing authority checks while preserving prior artifacts and unfinished work.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Re-resolve the declared target for Quality and Governance recovery Rounds, branch from the retained candidate and replay that new branch when needed before implementation, and record its refreshed base and candidate without rewriting the source Round's evidence.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Use the shared replay path at the Quality boundary and before integration, replace the strict recorded-base rejection and unmoved-target terminal failure with recoverable refresh routing, and retry late target movement through the existing bounded integration loop.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Persist original and replacement base and candidate identities with the actual replay base, invalidate superseded gate projections, and rerun Quality and Governance for each replacement before publication while retaining the existing target lease and commit fences.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Extend existing durable handoff evidence to record publication intent before pushing and retain the publication remote, candidate branch, last confirmed published candidate SHA, and pending replacement identity across refreshes and interrupted attempts.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Republish the exact passing replacement through the shared Git capability with an atomic comparison against the candidate branch's recorded previously published remote SHA, recognize an already-published identical replacement on retry, and preserve and report any other remote change without adopting it as a new expected SHA or force-updating the target.",
+                      "id": "P8"
+                    },
+                    {
+                      "description": "Keep conflict resolution and abort recovery in the existing managed worktree path, preserve the original candidate on unsuccessful replay, report unresolved conflicting paths, and distinguish unsafe or unavailable history, dirty worktrees, authority loss, publication races, and Git errors from content conflicts.",
+                      "id": "P9"
+                    },
+                    {
+                      "description": "Update only the affected worktree and workflow intent pages to describe actual creation bases, early lineage repair, retry re-anchoring, automatic replay, fenced replacement publication, and recoverable conflict outcomes in their established format.",
+                      "id": "P10"
+                    }
+                  ],
+                  "criticism_resolutions": [
+                    {
+                      "criticism_id": "C1",
+                      "resolution": "P7-P8 retain publication authority across replay and restart and replace ordinary republication with an atomic update fenced by the exact previously published remote candidate SHA; P5-P6 route late target movement through replacement Quality and Governance before this update, while retries recognize an identical published replacement and preserve all other remote changes."
+                    }
+                  ],
+                  "summary": "Make worktree bindings reflect their actual target-based starting commit and extend the existing refresh workflow to replay stale or divergent candidates onto the current target, rerun their gates, and safely republish replacements against the exact previously published candidate so clean work can integrate despite target movement without overwriting concurrent remote changes."
+                },
+                "started_at": "2026-09-10T08:31:29Z"
+              },
+              "governance_precheck": {
+                "attempt": 1,
+                "checked_at": "2026-09-10T08:34:05Z",
+                "message": "No step in the finalized plan necessarily violates the supplied constitution, governance rules, or enabled guidance.",
+                "status": "passed"
+              },
+              "phase": "implement",
+              "phase_started_at": "2026-09-10T08:34:05Z",
+              "proposal": {
+                "completed_at": "2026-09-10T08:28:59Z",
+                "git_after": {
+                  "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Create fresh Round worktrees from one resolved declared target, read their initial HEAD for the Goal base, candidate handoff, and planning binding, and distinguish creation from resumption so reopening existing work never silently replaces its base with its candidate tip.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "Extend the existing Git capability and candidate-refresh workflow to derive the replay range from the candidate and current target merge base and replay it onto that exact target commit, handling mismatched recorded bases even when the target has not moved and preserving merge changes and already-applied work.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "Prepare lineage before Plan and Implement agents launch or resume, expose base, target, and worktree mismatches in their context, and reconcile affected planning bindings and handoff records through existing authority checks while preserving prior artifacts and unfinished work.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Re-resolve the declared target for Quality and Governance recovery Rounds, branch from the retained candidate and replay that new branch when needed before implementation, and record its refreshed base and candidate without rewriting the source Round's evidence.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Use the shared replay path at the Quality boundary and before integration, replace the strict recorded-base rejection and unmoved-target terminal failure with recoverable refresh routing, and retry late target movement through the existing bounded integration loop.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Persist original and replacement base and candidate identities with the actual replay base, invalidate superseded gate projections, and rerun Quality and Governance for the replacement commit before publication while retaining the existing target lease and commit fences.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Keep conflict resolution and abort recovery in the existing managed worktree path, preserve the original candidate on unsuccessful replay, report unresolved conflicting paths, and distinguish unsafe or unavailable history, dirty worktrees, authority loss, and Git errors from content conflicts.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Update only the affected worktree and workflow intent pages to describe actual creation bases, early lineage repair, retry re-anchoring, automatic replay, and recoverable conflict outcomes in their established format.",
+                      "id": "P8"
+                    }
+                  ],
+                  "summary": "Make new worktree bindings reflect their actual target-based starting commit and extend the existing refresh workflow to replay stale or divergent candidates onto the current target, preserving their work instead of abandoning a Round over mismatched bookkeeping."
+                },
+                "started_at": "2026-09-10T08:26:05Z"
+              },
+              "schema_version": 2,
+              "started_at": "2026-09-10T08:26:05Z",
+              "state": "in_progress",
+              "updated_at": "2026-09-10T08:34:05Z"
+            },
+            "implementation_report": null,
+            "implementation_reported_at": null,
+            "logs": [
+              {
+                "actor": "refine",
+                "category": "state",
+                "datetime": "2026-09-10T08:26:04Z",
+                "details": {
+                  "node_id": "default"
+                },
+                "goal_id": "DR54BF57DCE017ED8EC68A5EEB",
+                "message": "Workflow status changed: todo -> plan",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "git",
+                "datetime": "2026-09-10T08:26:04Z",
+                "details": {
+                  "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-1",
+                  "node_id": "default",
+                  "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR54BF57DCE017ED8EC68A5EEB-round-1"
+                },
+                "goal_id": "DR54BF57DCE017ED8EC68A5EEB",
+                "message": "Created implementation worktree for refine/DR54BF57DCE017ED8EC68A5EEB/round-1",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "governance",
+                "datetime": "2026-09-10T08:34:05Z",
+                "details": {
+                  "attempt": 1,
+                  "node_id": "default",
+                  "phase": "plan",
+                  "status": "passed"
+                },
+                "goal_id": "DR54BF57DCE017ED8EC68A5EEB",
+                "message": "Plan governance pre-check passed",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "state",
+                "datetime": "2026-09-10T08:34:05Z",
+                "details": {
+                  "node_id": "default"
+                },
+                "goal_id": "DR54BF57DCE017ED8EC68A5EEB",
+                "message": "Workflow status changed: plan -> implement",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "agent",
+                "datetime": "2026-09-10T08:54:46Z",
+                "details": {
+                  "error": "Goal Agent exited unsuccessfully: 1; additionally failed to persist implementation planning failure evidence: Goal DR54BF57DCE017ED8EC68A5EEB no longer authorizes implementation planning on node default round 1",
+                  "node_id": "default"
+                },
+                "goal_id": "DR54BF57DCE017ED8EC68A5EEB",
+                "message": "Workflow failed: Goal Agent exited unsuccessfully: 1; additionally failed to persist implementation planning failure evidence: Goal DR54BF57DCE017ED8EC68A5EEB no longer authorizes implementation planning on node default round 1",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "workflow",
+                "datetime": "2026-09-10T08:54:46Z",
+                "details": {
+                  "failure_stage": "workflow"
+                },
+                "goal_id": "DR54BF57DCE017ED8EC68A5EEB",
+                "message": "Goal failure was not durably settled (attempt superseded); original error: Goal Agent exited unsuccessfully: 1; additionally failed to persist implementation planning failure evidence: Goal DR54BF57DCE017ED8EC68A5EEB no longer authorizes implementation planning on node default round 1",
+                "round_idx": 0,
+                "severity": "warning"
+              }
+            ],
+            "meta_rule_state": "unclassified",
+            "product_state": "unclassified",
+            "prompt": "From: Ethan Jacobson <ethan.jacobson@insurity.com>\nSubject: Integration must auto-rebase stale candidates instead of hard-failing on a base/target mismatch\n\nBody:\nWhen a candidate's recorded base_commit is not an ancestor of the candidate, Refine's integration gate hard-fails with Candidate … is stale: recorded base … is not its ancestor and abandons the round — even when the candidate is content-correct and replays onto the current target with no conflicts. This wasted a full round on run 8082 (goal 00000T082ZTBZ3N3EDG591G002): the binding recorded base=a8d44a23 on target_branch=insurity-claims, but the worktree was cut from develop (eacc5984), which had diverged from insurity-claims. The candidate diff was a Claims-only, test-file-only change that rebases cleanly onto either branch.\r\n\r\nFixes required (any one of 1–2 prevents it; 3 makes it self-healing):\r\n1. Single source of truth for the base. Record binding.base_commit as git rev-parse HEAD of the worktree at the moment it is created, not from a separate snapshot of the target branch taken at goal-creation time. This makes the ancestor invariant true by construction.\r\n2. Cut the worktree from the declared target. If target_branch=insurity-claims, create the worktree from insurity-claims (or its recorded base) — not from whatever the main repo happens to have checked out (develop). Today these two disagree; they must be reconciled to one branch.\r\n3. Auto-rebase / replay on staleness instead of failing. When the recorded base isn't an ancestor of the candidate (or the target tip advanced since the worktree was cut), the integration step should replay the candidate's own commits onto the current target tip before failing:\r\n   - base = git merge-base <candidate> <target-tip>\r\n   - git rebase --onto <target-tip> <base> <candidate> (equivalently cherry-pick base..candidate)\r\n   - Proceed with the rebased commit if it applies cleanly; only fail integration on a genuine, unresolvable content conflict — never on a bookkeeping divergence.\r\n4. Replace the strict ancestor gate with a merge-base-driven replay. The strict recorded_base ∈ ancestors(candidate) check is the trigger for the false failure; a merge-base + replay is robust to either side advancing.\r\n5. Re-anchor on automatic retries. A quality/governance retry must re-resolve the current target tip and rebase the prior candidate onto it (or branch from the prior candidate), so a retry can't inherit an already-stale base.\r\n6. Detect the divergence early and loudly. Validate the base↔target invariant at plan/implement start — while the agent context is live and can rebase in-context — instead of only at the terminal integration gate where the sole outcome is failure.\r\n\r\nAcceptance: A candidate built on a target tip that has since advanced (or was cut from a divergent-but-clean branch) integrates successfully via auto-rebase; integration fails only on a real merge conflict, with the conflicting paths reported.\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nEthan Jacobson\r\nEthan.Jacobson@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
+            "quality_checked_at": "",
+            "quality_details": "",
+            "quality_message": "",
+            "quality_state": "unclassified",
+            "reporter": "ethan.jacobson@insurity.com",
+            "rule_state": "unclassified",
+            "updated": "2026-09-10T08:34:05Z",
+            "workflow_attempt_authority": null,
+            "workflow_reconciliation": null,
+            "workflow_recovery": null
+          },
+          {
+            "assignee": "ethan.jacobson@insurity.com",
+            "constitution_state": "unclassified",
+            "created": "2026-09-10T13:06:36Z",
+            "failure_at": "",
+            "failure_category": "",
+            "failure_message": "",
+            "governance_candidate_commit": "",
+            "governance_checked_at": "",
+            "governance_details": "",
+            "governance_message": "",
+            "governance_rule_actions": [],
+            "guidance_decision": null,
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                "context_digest": "82445db0c3923b3ca2aefba20dca4fbb72117bfa8603631dd0d3a267041ee04e",
+                "context_version": 1,
+                "goal_id": "DR54BF57DCE017ED8EC68A5EEB",
+                "implementation_branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-2",
+                "round_idx": 1,
+                "target_branch": "main"
+              },
+              "phase": "plan",
+              "phase_started_at": "2026-09-10T13:43:01Z",
+              "schema_version": 2,
+              "started_at": "2026-09-10T13:43:01Z",
+              "state": "in_progress",
+              "updated_at": "2026-09-10T13:43:01Z"
+            },
+            "implementation_report": null,
+            "implementation_reported_at": null,
+            "latest_log": {
+              "actor": "refine",
+              "category": "git",
+              "datetime": "2026-09-10T13:43:01Z",
+              "details": {
+                "base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-2",
+                "branch_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                "node_id": "default",
+                "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR54BF57DCE017ED8EC68A5EEB-round-2"
+              },
+              "goal_id": "DR54BF57DCE017ED8EC68A5EEB",
+              "message": "Created implementation worktree for refine/DR54BF57DCE017ED8EC68A5EEB/round-2",
+              "round_idx": 1,
+              "severity": "info"
+            },
+            "latest_state_log": {
+              "actor": "refine",
+              "category": "state",
+              "datetime": "2026-09-10T13:43:01Z",
+              "details": {
+                "node_id": "default"
+              },
+              "goal_id": "DR54BF57DCE017ED8EC68A5EEB",
+              "message": "Workflow status changed: todo -> plan",
+              "round_idx": 1,
+              "severity": "info"
+            },
+            "latest_workflow_log": {
+              "actor": "refine",
+              "category": "state",
+              "datetime": "2026-09-10T13:43:01Z",
+              "details": {
+                "node_id": "default"
+              },
+              "goal_id": "DR54BF57DCE017ED8EC68A5EEB",
+              "message": "Workflow status changed: todo -> plan",
+              "round_idx": 1,
+              "severity": "info"
+            },
+            "logs": [
+              {
+                "actor": "refine",
+                "category": "git",
+                "datetime": "2026-09-10T13:43:01Z",
+                "details": {
+                  "node_id": "default",
+                  "remote": "origin",
+                  "target_branch": "main",
+                  "target_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c"
+                },
+                "goal_id": "DR54BF57DCE017ED8EC68A5EEB",
+                "message": "Local main already carried the fetched tip",
+                "round_idx": 1,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "state",
+                "datetime": "2026-09-10T13:43:01Z",
+                "details": {
+                  "node_id": "default"
+                },
+                "goal_id": "DR54BF57DCE017ED8EC68A5EEB",
+                "message": "Workflow status changed: todo -> plan",
+                "round_idx": 1,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "git",
+                "datetime": "2026-09-10T13:43:01Z",
+                "details": {
+                  "base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "branch": "refine/DR54BF57DCE017ED8EC68A5EEB/round-2",
+                  "branch_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "node_id": "default",
+                  "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR54BF57DCE017ED8EC68A5EEB-round-2"
+                },
+                "goal_id": "DR54BF57DCE017ED8EC68A5EEB",
+                "message": "Created implementation worktree for refine/DR54BF57DCE017ED8EC68A5EEB/round-2",
+                "round_idx": 1,
+                "severity": "info"
+              }
+            ],
+            "meta_rule_state": "unclassified",
+            "product_state": "unclassified",
+            "prompt": "Recover safely from an old candidate whose recorded base is wrong or whose target has advanced, using the candidate's proven Goal changes.\n\nThe original worktree-creation defect was fixed by 8f6de519: fresh and recreated Round branches use the recorded merge-target base. Current code also refreshes candidates before Quality and integration. Keep those behaviors and focus this Round on remaining lineage and retry gaps. settle_stale_candidate still fails immediately when the target equals the recorded base but the candidate does not descend from it. Round 1 retained extensive unfinished replay and publication work without a candidate or final verification.\n\nValidate actual worktree HEAD, recorded base, target and planning or Skill context before automated edits. Preserve the original base when resuming existing work. Extend the current refresh and recovery path to repair bookkeeping only when retained Round and Git evidence identify the Goal's own change range. A merge base or a conflict-free rebase alone does not prove that every commit on a divergent developer branch belongs to the Goal. Ambiguous or unavailable history must remain recoverable with clear evidence, not import unrelated work.\n\nReplay an unambiguous candidate onto one observed target tip in a managed workspace. Record original and replacement identities, retain the source attempt, and rerun the applicable current Skills and exact-candidate checks for every changed candidate. Respect required, background and context-only behavior and record when no required check Skills apply. Bound retries for target movement, preserve conflict evidence and existing supported conflict recovery, and never treat dirty work, lost authority or a Git error as a successful replay.\n\nPreserve target leases and atomic publication checks against the previously recorded remote candidate SHA. Handle an already-published identical replacement idempotently; preserve unexpected remote changes and interrupted publication evidence.\n\nVerify advanced targets, a wrong recorded base with an unchanged target, divergent branches containing unrelated commits, retries, content conflicts, remote publication races and interruption. Prove fresh Round creation still starts at the declared target and that replacement commits cannot reuse stale check evidence.\n\nThis is a recovery Round following the Skills review on 10 September 2026. Start from current main in a new managed Round worktree. Preserve Round 1, its plans, logs, branches, commits and uncommitted files; inspect and selectively reuse useful work instead of replaying the whole old attempt. Use the current Skills and docs/intent contracts, not archived Governance, Quality or Guidance configuration or the old fixed planning sequence. Refine owns workflow advancement and integration; human approval remains separate. Update only affected documentation and report focused verification with actual results.",
+            "quality_checked_at": "",
+            "quality_details": "",
+            "quality_message": "",
+            "quality_state": "unclassified",
+            "reporter": "Buddy Williams",
+            "rule_state": "unclassified",
+            "updated": "2026-09-10T13:43:01Z",
+            "workflow_attempt_authority": {
+              "claimed_at": "2026-09-10T13:43:00Z",
+              "round_idx": 1,
+              "workflow_revision": 18
+            },
+            "workflow_reconciliation": null,
+            "workflow_recovery": null
+          }
+        ],
+        "status": "plan",
+        "target_branch": "main",
+        "updated": "2026-09-10T13:43:01Z",
+        "workflow_revision": 26
+      },
+      "system": {
+        "candidate_commit": null,
+        "node_id": "default",
+        "project_root": "/home/buddy/projects/refine-next",
+        "workflow_step": "plan",
+        "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DR54BF57DCE017ED8EC68A5EEB-round-2"
+      }
+    },
+    "metadata": {
+      "behavior": "EventSkill",
+      "event_operation_id": "1a08b8eba37113c764",
+      "goal_id": "DR54BF57DCE017ED8EC68A5EEB",
+      "kind": "workflow",
+      "node_id": "default",
+      "provider": "codex",
+      "round_idx": 1,
+      "target_app_id": "/home/buddy/projects/refine-next",
+      "workflow_revision": 18,
+      "workflow_state": "plan"
+    }
+  },
+  "bindings": [
+    {
+      "binding": {
+        "id": "default-plan",
+        "skill_id": "default-plan",
+        "enabled": true,
+        "mode": "blocking",
+        "order": 0,
+        "scope": {
+          "node_id": null
+        },
+        "overrides": null,
+        "inputs": {}
+      },
+      "skill": {
+        "id": "default-plan",
+        "name": "Plan",
+        "prompt": "## Plan\n\nProduce a complete, concise implementation plan for the current Goal Round. Inspect the repository and applicable context, resolve assumptions, consider alternatives and critique your proposed solution before finalizing it. Choose the planning method appropriate to the work. For a scoped finding recovery Round, focus the plan on the requested correction against the retained candidate. Do not change repository files. Return an actionable plan with stable checklist IDs and meaningful verification.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
+        "role": "plan",
+        "enabled": true,
+        "scope": {
+          "node_id": null
+        },
+        "parameters": [],
+        "provenance": "refine-default-v1"
+      },
+      "parameters": {}
+    }
+  ],
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-10T13:43:01.926797117+00:00",
+  "completed_at": null,
+  "error": null,
+  "action_applied": false
+}
