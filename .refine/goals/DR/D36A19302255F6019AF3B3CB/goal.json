@@ -1,7 +1,7 @@
 {
   "base_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
   "branch_name": "refine/DRD36A19302255F6019AF3B3CB/round-1",
-  "candidate_commit": null,
+  "candidate_commit": "a4564655b91445b79b0a8d7d789d8b0b37aa5164",
   "created": "2026-09-10T08:26:08Z",
   "feature_id": null,
   "feature_order": null,
@@ -95,7 +95,28 @@
       "governance_details": "",
       "governance_message": "",
       "governance_rule_actions": [],
-      "guidance_decision": null,
+      "guidance_decision": {
+        "applied": [
+          {
+            "enabled": true,
+            "id": "guidance-1",
+            "instructions": "Use the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Foundation, Capabilities, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.",
+            "name": "Intent and architecture",
+            "rule": "Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract."
+          },
+          {
+            "enabled": true,
+            "id": "guidance-2",
+            "instructions": "Keep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.",
+            "name": "Cohesive code files",
+            "rule": "Apply whenever an agent adds or changes code files in any language."
+          }
+        ],
+        "code_files_changed": true,
+        "context_version": 1,
+        "recorded_at": "2026-09-10T08:47:17Z",
+        "skipped": []
+      },
       "implementation_plan": {
         "binding": {
           "base_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
@@ -106,6 +127,7 @@
           "round_idx": 0,
           "target_branch": "main"
         },
+        "completed_at": "2026-09-10T08:47:16Z",
         "criticism": {
           "completed_at": "2026-09-10T08:29:58Z",
           "git_after": {
@@ -168,6 +190,50 @@
           "message": "Executing the finalized plan as written does not necessarily violate any supplied rule or enabled guidance.",
           "status": "passed"
         },
+        "implementation": {
+          "completed_at": "2026-09-10T08:47:16Z",
+          "execution": {
+            "checklist": [
+              {
+                "evidence": "Added accessible Edit name beside the Goal title; both it and the existing Rename action use the focused 150-line goal-name-editor.js module, loaded by index.html. Extracted the existing Chromium app harness into tests/support/browser_app.js without changing existing test bodies.",
+                "id": "P1",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Editor prefills the current name, supports Save and Enter, trims surrounding whitespace, visibly validates blanks, and avoids unchanged-name PATCH requests. Cancel and Escape dismiss only the editor; normal dismissal restores focus to Edit name. Chromium interaction tests pass.",
+                "id": "P2",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Sends only {name} through the existing Goal PATCH endpoint using captured Goal identity, node generation, URL and editor instance. Refreshes reject stale requests and old modal instances. Rust API regression verifies name trimming, blank rejection, preservation of other fields with the expected workflow revision increment, and unchanged durable records after rejection in Plan, Implement, Quality and Governance. Production Rust metadata behavior is unchanged.",
+                "id": "P3",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Uses existing DOM morph preservation to retain the exact editor subtree, draft, caret and focus across same-Goal redraws. Prevents duplicate submissions, retains retryable failures, and retries failed post-save GETs without another PATCH. Success refreshes authoritative detail while preserving notes, Round drafts, expanded sections and underlying route. Chromium checks cover cancellation during save, navigation, node changes, out-of-order GETs, background failures and mobile layout.",
+                "id": "P4",
+                "outcome": "completed"
+              },
+              {
+                "evidence": "Updated docs/intent/05-surfaces/03-browser/08-goal.md in its existing bullet format to document both entry points, editor interactions, draft preservation and shared metadata restrictions. Kept production changes within the existing browser surface and shared capability boundary.",
+                "id": "P5",
+                "outcome": "completed"
+              }
+            ],
+            "verification": [
+              "NODE_PATH=/home/buddy/.npm/_npx/e41f203b7505f1fb/node_modules node --test tests/*.test.js -> 251 tests: 246 passed, 5 failed, 0 skipped; all 14 Goal-name tests passed. Exit 1 solely for confirmed baseline failures. Log: /tmp/refine-goal-name-browser-verified.log.",
+              "From /tmp/refine-goal-name-baseline.XpujRR, archived from pinned commit 8f6de519c62a8a373b19482d5c7842068acfb35d: NODE_PATH=/home/buddy/.npm/_npx/e41f203b7505f1fb/node_modules node --test --test-name-pattern='Controls Node selector switches by ID|Agent terminal renders transported ANSI|every Node, Project, and legacy Settings tab|Refine dev source refreshes morph|runtime banner distinguishes trusted source' tests/web_screen_render.test.js -> the same 5 failures, 0 skipped, exit 1. Failures: hidden Node selector, ANSI terminal output, missing performance screen marker, obsolete source-update copy, missing renderRuntimeUpgradeBanner. Log: /tmp/refine-goal-name-baseline-tests.log.",
+              "cargo test --lib goal_name_patch_preserves_other_fields_and_shared_metadata_restrictions -- --test-threads=1 -> 1 passed, 0 failed, exit 0. Log: /tmp/refine-goal-name-rust-contract.log.",
+              "cargo test --lib web_server_edits_notes_and_deletes_goal -- --test-threads=1 -> 1 passed, 0 failed, exit 0. Log: /tmp/refine-goal-name-rust-api.log.",
+              "cargo test --lib surfaces::web_server::tests::static_surface::work_items -- --test-threads=1 -> 5 passed, 0 failed, exit 0. Log: /tmp/refine-goal-name-rust-surface.log.",
+              "node --check src/surfaces/web/static/js/features/goal-name-editor.js; node --check src/surfaces/web/static/js/features/goals-detail.js; node --check tests/support/browser_app.js; node --check tests/web_goal_name_editor.test.js; node --check tests/web_screen_render.test.js -> all five syntax checks exited 0.",
+              "rustfmt --edition 2024 --check --config skip_children=true src/surfaces/web_server/tests/goals/mod.rs src/surfaces/web_server/tests/goals/name.rs -> exit 0.",
+              "git diff --cached --check -> exit 0 before commit. git status --short -> empty; git diff HEAD --exit-code -> exit 0 after commit. git rev-parse HEAD -> a4564655b91445b79b0a8d7d789d8b0b37aa5164."
+            ]
+          },
+          "report": "Implemented discoverable Goal name editing in local commit a4564655b91445b79b0a8d7d789d8b0b37aa5164. All P1-P5 items completed. All 14 Goal-name Chromium checks and 7 focused Rust checks passed. Full browser suite: 246 passed, 5 failures reproduced on pinned baseline 8f6de519, 0 skipped. Worktree clean; no merge or push.",
+          "started_at": "2026-09-10T08:32:08Z"
+        },
         "phase": "implement",
         "phase_started_at": "2026-09-10T08:32:08Z",
         "proposal": {
@@ -211,11 +277,11 @@
         },
         "schema_version": 2,
         "started_at": "2026-09-10T08:26:11Z",
-        "state": "in_progress",
-        "updated_at": "2026-09-10T08:32:08Z"
+        "state": "completed",
+        "updated_at": "2026-09-10T08:47:16Z"
       },
-      "implementation_report": null,
-      "implementation_reported_at": null,
+      "implementation_report": "Implemented discoverable Goal name editing in local commit a4564655b91445b79b0a8d7d789d8b0b37aa5164. All P1-P5 items completed. All 14 Goal-name Chromium checks and 7 focused Rust checks passed. Full browser suite: 246 passed, 5 failures reproduced on pinned baseline 8f6de519, 0 skipped. Worktree clean; no merge or push.",
+      "implementation_reported_at": "2026-09-10T08:47:16Z",
       "logs": [],
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
@@ -226,7 +292,7 @@
       "quality_state": "unclassified",
       "reporter": "ethan.jacobson@insurity.com",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T08:32:08Z",
+      "updated": "2026-09-10T08:47:17Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T08:26:10Z",
         "round_idx": 0,
@@ -236,8 +302,8 @@
       "workflow_recovery": null
     }
   ],
-  "status": "implement",
+  "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-10T08:32:08Z",
-  "workflow_revision": 15
+  "updated": "2026-09-10T08:47:17Z",
+  "workflow_revision": 20
 }
