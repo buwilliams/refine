@@ -137,6 +137,27 @@ impl FileProcessSupervisor {
             .into_iter()
             .map(|p| (p.id.clone(), p))
             .collect::<BTreeMap<_, _>>();
+        // Workload-terminal registrations can still own an uncertain scope,
+        // including when its group record was lost. Active list() omits them.
+        if let Ok(entries) = fs::read_dir(self.processes_dir()) {
+            for entry in entries {
+                let path = entry.map_err(|e| RefineError::Io(e.to_string()))?.path();
+                if path.extension().and_then(|s| s.to_str()) != Some("json") {
+                    continue;
+                }
+                let Ok(bytes) = fs::read(&path) else {
+                    continue;
+                };
+                let Ok(process) = serde_json::from_slice::<ManagedProcess>(&bytes) else {
+                    continue;
+                };
+                if Self::requires_group_ownership(&process)
+                    && self.group_pending(&process).unwrap_or(true)
+                {
+                    processes.entry(process.id.clone()).or_insert(process);
+                }
+            }
+        }
         for group in self.owned_groups()? {
             if self.runtime_root.canonicalize().ok().as_ref() != Some(&group.runtime_root) {
                 return Err(RefineError::Conflict("owned group runtime changed".into()));

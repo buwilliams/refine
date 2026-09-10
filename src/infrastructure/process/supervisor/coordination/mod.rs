@@ -32,7 +32,10 @@ pub(crate) fn lock_exclusive_before(
     timeout: Duration,
 ) -> RefineResult<()> {
     let timeout = LOCK_TIMEOUT.with(|value| value.get()).unwrap_or(timeout);
-    let deadline = Instant::now() + timeout;
+    let deadline = LOCK_DEADLINE
+        .with(|value| value.get())
+        .map(|d| d.min(Instant::now() + timeout))
+        .unwrap_or_else(|| Instant::now() + timeout);
     loop {
         match file.try_lock_exclusive() {
             Ok(()) => return Ok(()),
@@ -51,7 +54,10 @@ pub(crate) fn lock_exclusive_before(
                 timeout.as_secs()
             )));
         }
-        std::thread::sleep(COORDINATION_ACQUIRE_POLL_INTERVAL);
+        std::thread::sleep(
+            COORDINATION_ACQUIRE_POLL_INTERVAL
+                .min(deadline.saturating_duration_since(Instant::now())),
+        );
     }
 }
 
@@ -65,6 +71,24 @@ pub fn with_lock_timeout<T>(timeout: Duration, operation: impl FnOnce() -> T) ->
         }
     }
     let _reset = Reset(LOCK_TIMEOUT.with(|value| value.replace(Some(timeout))));
+    operation()
+}
+
+thread_local! { static LOCK_DEADLINE: std::cell::Cell<Option<Instant>> = const { std::cell::Cell::new(None) }; }
+
+/// Nested coordination cannot extend an owning operation's monotonic budget.
+pub(crate) fn with_lock_deadline<T>(deadline: Instant, operation: impl FnOnce() -> T) -> T {
+    struct Reset(Option<Instant>);
+    impl Drop for Reset {
+        fn drop(&mut self) {
+            LOCK_DEADLINE.with(|v| v.set(self.0));
+        }
+    }
+    let _reset = Reset(LOCK_DEADLINE.with(|v| {
+        let old = v.get();
+        v.set(Some(old.map_or(deadline, |d| d.min(deadline))));
+        old
+    }));
     operation()
 }
 

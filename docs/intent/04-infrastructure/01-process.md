@@ -116,6 +116,10 @@ Application's `workers::maintenance::maintain_daemon` is the shared daemon-maint
 
 Cleanup supervision runs independently of admission and workflow restart waits. Transient pause-state or repository inspection failures are retried; repository contention is deferred with bounded lock waits. Existing pause boundaries, retention delays, live-use checks, dirty-worktree protection and exact local/remote ref-retirement fences remain authoritative.
 
+PTY completion and failure keep the guardian available while the shared supervisor terminates and reaps descendants. Termination uses one monotonic two-second coordination and proof budget; output capture uses interruptible reads and a bounded final drain. Guardian handle reaping is deferred through process supervision, so an uncertain descendant cannot block session return. A gated launch abort uses the same kernel scope-exit receipt after reaping its unstarted workload.
+
+Artifact retirement belongs to the process supervisor. Seven-day log retention rechecks ownership, registration, handoff and age under bounded coordination before deleting stdout, stderr or stdin artifacts. Missing primary registration is insufficient: live, unverified, missing, corrupt or unreadable ownership preserves evidence. Cleanup and handoff lock inodes remain stable across retirement so existing waiters and new consumers cannot acquire different locks for the same process. Persistent supervisor lock files are excluded from the application Git inventory by a runtime-local ignore marker without replacing an existing ignore policy. Workload-terminal registrations with missing group records still retain capacity.
+
 ## Future Direction
 
 Process Infrastructure should gain better resource observation, isolation, health checks, remote-node visibility, and provenance without turning node-local runtime facts into synchronized locks. Scaling should preserve the cheap-restart model: durable semantic work, transient workers, and clear Application authority over Goals.

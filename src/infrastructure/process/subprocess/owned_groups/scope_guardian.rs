@@ -84,6 +84,9 @@ fn run(mode: &str, socket: Option<&str>) -> RefineResult<()> {
         .map_err(io_error)?;
     let request: Request = receive(&mut connection)?;
     if mode == "workload" {
+        unsafe {
+            libc::signal(libc::SIGHUP, libc::SIG_DFL);
+        }
         let mut gate = [0];
         connection.read_exact(&mut gate).map_err(io_error)?;
         if gate != *b"S" {
@@ -131,6 +134,10 @@ fn run(mode: &str, socket: Option<&str>) -> RefineResult<()> {
             "invalid ownership helper mode".into(),
         ));
     }
+    // PTY master closure must not destroy the guardian before its ECHILD proof.
+    unsafe {
+        libc::signal(libc::SIGHUP, libc::SIG_IGN);
+    }
     if unsafe { libc::prctl(libc::PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) } != 0 {
         return Err(io_error(std::io::Error::last_os_error()));
     }
@@ -152,19 +159,13 @@ fn run(mode: &str, socket: Option<&str>) -> RefineResult<()> {
         .map_err(io_error)?;
     send(&mut connection, &child.id())?;
     let mut gate = [0];
-    if let Err(error) = connection.read_exact(&mut gate) {
+    if connection.read_exact(&mut gate).is_ok() && gate == *b"S" {
+        parent.write_all(&gate).map_err(io_error)?;
+    } else {
+        // A gated abort still produces kernel scope-exit proof through the
+        // common reaping path. No workload side effects were authorized.
         let _ = child.kill();
-        let _ = child.wait();
-        return Err(io_error(error));
     }
-    if gate != *b"S" {
-        let _ = child.kill();
-        let _ = child.wait();
-        return Err(RefineError::Conflict(
-            "registration handshake rejected".into(),
-        ));
-    }
-    parent.write_all(&gate).map_err(io_error)?;
     drop(parent);
     drop(connection);
     // The guardian must not hold the workload's output or input streams open.
@@ -220,6 +221,17 @@ fn run(mode: &str, socket: Option<&str>) -> RefineResult<()> {
         if error.raw_os_error() == Some(libc::ECHILD)
             && let Some(status) = leader_status
         {
+            #[cfg(test)]
+            if let Some(gate) = request
+                .workload
+                .metadata
+                .get("test_scope_exit_gate")
+                .and_then(Value::as_str)
+            {
+                while !Path::new(gate).exists() {
+                    std::thread::sleep(Duration::from_millis(5));
+                }
+            }
             proof
                 .write_all(b"exited\n")
                 .and_then(|()| proof.sync_all())

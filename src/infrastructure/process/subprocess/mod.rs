@@ -339,8 +339,10 @@ use test_hooks::*;
 pub use workflow_registration::managed_pid_is_alive;
 use workflow_registration::*;
 
+mod artifact_retirement;
 mod execution;
 mod output;
+mod registration_identity;
 mod registry;
 mod supervision;
 mod termination;

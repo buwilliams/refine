@@ -7,6 +7,17 @@ impl FileProcessSupervisor {
         timeout: Duration,
     ) -> RefineResult<OwnedGroup> {
         let deadline = Instant::now() + timeout;
+        crate::infrastructure::process::supervisor::coordination::with_lock_deadline(
+            deadline,
+            || self.stop_owned_group_before(expected, deadline),
+        )
+    }
+    fn stop_owned_group_before(
+        &self,
+        expected: &OwnedGroup,
+        deadline: Instant,
+    ) -> RefineResult<OwnedGroup> {
+        let timeout = deadline.saturating_duration_since(Instant::now());
         // Worker and Agent groups can overlap through ancestry. Serialize tree stops across
         // both registries so one failed stop cannot resume another stop's frozen witnesses.
         let runtime = if self.runtime_root.file_name().and_then(|s| s.to_str()) == Some("agents") {

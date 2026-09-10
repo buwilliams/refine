@@ -181,39 +181,11 @@ fn remove_files_older_than(dir: &Path, retention: Duration) {
     }
 }
 
-/// Output logs and stdin captures whose process registration is gone are
-/// orphans: the exit path archives history but leaves them behind, so any
-/// process that ended on its own left its full output on disk forever.
+/// Retention is a shared ownership decision, including absent primary records.
 fn sweep_orphan_process_logs(processes_dir: &Path, retention: Duration) {
-    let cutoff = std::time::SystemTime::now()
-        .checked_sub(retention)
-        .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
-    let Ok(entries) = std::fs::read_dir(processes_dir) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
-            continue;
-        };
-        let Some(process_id) = name
-            .strip_suffix(".stdout.log")
-            .or_else(|| name.strip_suffix(".stderr.log"))
-            .or_else(|| name.strip_suffix(".stdin.txt"))
-        else {
-            continue;
-        };
-        if processes_dir.join(format!("{process_id}.json")).exists() {
-            continue;
-        }
-        let is_old = entry
-            .metadata()
-            .ok()
-            .and_then(|metadata| metadata.modified().ok())
-            .is_some_and(|modified| modified < cutoff);
-        if is_old {
-            let _ = std::fs::remove_file(path);
-        }
+    if let Some(runtime) = processes_dir.parent() {
+        crate::infrastructure::process::subprocess::FileProcessSupervisor::new(runtime)
+            .retire_aged_process_logs(retention);
     }
 }
 
@@ -327,3 +299,7 @@ mod workflow_shutdown_tests {
         std::fs::remove_dir_all(root).unwrap();
     }
 }
+
+#[cfg(all(test, target_os = "linux"))]
+#[path = "background_loops_retention_tests.rs"]
+mod retention_tests;

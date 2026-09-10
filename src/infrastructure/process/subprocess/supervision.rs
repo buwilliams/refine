@@ -1,6 +1,19 @@
 use super::*;
 
 impl FileProcessSupervisor {
+    /// Reuse the launching supervisor's child-handle reaping lane. Reaping a
+    /// guardian never supplies workload status or authorizes artifact retirement.
+    pub(crate) fn reap_pty_handle<T: Send + 'static>(
+        &self,
+        mut child: Box<dyn portable_pty::Child + Send + Sync>,
+        retained: T,
+    ) {
+        std::thread::spawn(move || {
+            let _retained = retained;
+            let _ = child.wait();
+        });
+    }
+
     fn wait_for_reaper_idle(&self, process_id: &str) -> RefineResult<()> {
         let deadline = Instant::now() + Duration::from_secs(1);
         loop {

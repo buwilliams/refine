@@ -193,6 +193,9 @@ impl ScopeLaunch {
         *details = value.to_string();
         Ok(pid)
     }
+    pub(crate) fn scope(&self) -> &LaunchScope {
+        &self.scope
+    }
     pub(crate) fn release(&mut self) -> RefineResult<()> {
         self.connection.write_all(b"S").map_err(io_error)
     }

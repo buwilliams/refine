@@ -296,3 +296,6 @@ mod scheduling;
 
 mod settlement_evidence;
 use settlement_evidence::{assert_origin, originating_evidence};
+
+#[cfg(target_os = "linux")]
+mod pty;

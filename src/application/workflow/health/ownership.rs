@@ -11,7 +11,15 @@ pub(super) fn assess(root: &Path) -> RefineResult<Option<WorkflowHealth>> {
                 return Ok(Some(unverified(root, &group.process, &reason)));
             }
         }
-        for process in owner.list()? {
+        for process in owner.capacity_processes()? {
+            if let Some(reason) = process
+                .details
+                .as_deref()
+                .and_then(|s| serde_json::from_str::<serde_json::Value>(s).ok())
+                .and_then(|v| v["scope_settlement_error"].as_str().map(str::to_owned))
+            {
+                return Ok(Some(unverified(root, &process, &reason)));
+            }
             if FileProcessSupervisor::requires_group_ownership(&process)
                 && !groups.iter().any(|g| g.process.id == process.id)
             {

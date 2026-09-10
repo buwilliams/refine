@@ -19,7 +19,7 @@ use crate::infrastructure::agents::invocation::{
 };
 use crate::infrastructure::process::subprocess::{
     FileProcessSupervisor, ManagedProcess, ManagedProcessSpec, ProcessOwner, ProcessResourceLimits,
-    ProcessSupervisor, signal_os_process,
+    ProcessSupervisor,
 };
 use crate::model::goal::ImplementationExecutionEvidence;
 
@@ -141,11 +141,15 @@ enum AgentSessionState {
 }
 
 mod codec;
+mod output_capture;
+mod pty_lifecycle;
 mod session_runtime;
 mod signal_recovery;
 
 #[cfg(test)]
-use session_runtime::{pump_pty_output, run_goal_agent_session, transcript_capture_failure};
+use output_capture::{pump_pty_output, transcript_capture_failure};
+#[cfg(test)]
+use session_runtime::run_goal_agent_session;
 pub use session_runtime::{run_goal_agent, run_goal_agent_with_settlement};
 
 use codec::*;
@@ -393,3 +397,6 @@ mod attachment_tests;
 mod recovery_tests;
 #[cfg(test)]
 mod tests;
+
+#[cfg(all(test, target_os = "linux"))]
+pub(crate) mod ownership_tests;
