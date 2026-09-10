@@ -1,7 +1,7 @@
 {
   "base_commit": "b47569adb8d4c5d1d7335ba91729a3e486a38fe0",
   "branch_name": "refine/DR54BF57DCE017ED8EC68A5EEB/round-3",
-  "candidate_commit": "9d1ea52e4c373b6046db9c99c53cec99eddd93e4",
+  "candidate_commit": "05643ffb157c6404098f5437ffe8de40c721a5b7",
   "created": "2026-09-10T08:26:04Z",
   "event_generation": 9,
   "feature_id": null,
@@ -3224,6 +3224,86 @@
           "source": "workflow.plan.enter",
           "state": "succeeded"
         },
+        "f064303547ad825e70aab4ff68a57bbeb87880de6640f5ad8ad5357f13629841": {
+          "candidate_commit": "9d1ea52e4c373b6046db9c99c53cec99eddd93e4",
+          "results": {
+            "default-quality": {
+              "artifacts": {
+                "tests": [
+                  {
+                    "command": "cargo test --lib application::workflow::tests::worktree_resume -- --test-threads=1",
+                    "evidence": "18 passed; exit 0.",
+                    "status": "passed",
+                    "test": "Engine resumption, interruption preservation and exact-candidate gates"
+                  },
+                  {
+                    "command": "cargo test --lib application::workflow::tests::candidate_refresh -- --test-threads=1",
+                    "evidence": "39 passed; exit 0.",
+                    "status": "passed",
+                    "test": "Replay, conflicts, authority and publication recovery"
+                  },
+                  {
+                    "command": "cargo test --lib application::workflow::tests::round_base -- --test-threads=1",
+                    "evidence": "14 passed; exit 0.",
+                    "status": "passed",
+                    "test": "Round creation, lineage and retained bases"
+                  },
+                  {
+                    "command": "cargo test --lib replacement_skills -- --test-threads=1",
+                    "evidence": "5 passed; exit 0.",
+                    "status": "passed",
+                    "test": "Replacement Skill checks and candidate-bound evidence"
+                  },
+                  {
+                    "command": "cargo test --lib infrastructure::git::worktrees -- --test-threads=1",
+                    "evidence": "31 passed; exit 0.",
+                    "status": "passed",
+                    "test": "Shared Git worktree behavior"
+                  },
+                  {
+                    "command": "cargo test --lib architecture_tests",
+                    "evidence": "5 passed; exit 0.",
+                    "status": "passed",
+                    "test": "Architecture boundaries"
+                  },
+                  {
+                    "command": "cargo check --all-targets",
+                    "evidence": "Exit 0.",
+                    "status": "passed",
+                    "test": "All-target compilation"
+                  },
+                  {
+                    "command": "git diff --name-only --diff-filter=ACMR -z b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5 -- '*.rs' | xargs -0 rustfmt --check --edition 2024 --config skip_children=true",
+                    "evidence": "All 14 changed Rust files passed; exit 0.",
+                    "status": "passed",
+                    "test": "Changed-file formatting"
+                  },
+                  {
+                    "command": "git diff --check b47569adb8d4c5d1d7335ba91729a3e486a38fe0",
+                    "evidence": "Exit 0.",
+                    "status": "passed",
+                    "test": "Candidate and correction whitespace"
+                  }
+                ]
+              },
+              "binding_id": "default-quality",
+              "evidence": [
+                "Reviewed clean pinned candidate 9d1ea52e4c373b6046db9c99c53cec99eddd93e4 against the finalized plan and affected intent contracts.",
+                "Reproduced a preservation defect with cargo test --lib engine_preserves_replay_when_a_retained_source_ref_changes -- --test-threads=1: recovery moved HEAD before rejecting a changed retained-source ref. Moved source-ref validation before restoration. The regression then passed across detached, attached and persisted replacements.",
+                "Corrected the affected worktree intent passage that contradicted preservation of interrupted conflicts and later user edits.",
+                "Corrections remain uncommitted in three files for Refine to capture and verify. HEAD remains the pinned candidate; the prior Round 2 branch remains at b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5.",
+                "Verification used deterministic local Git and provider fixtures. The full workflow suite, live daemon crashes and disk-failure injection were not exercised. Command logs are retained in /tmp/refine-quality-DR54BF57DCE017ED8EC68A5EEB-round3.",
+                "No project Goal-state mutation, merge, push, deployment or daemon restart was performed."
+              ],
+              "invocation_id": "f064303547ad825e70aab4ff68a57bbeb87880de6640f5ad8ad5357f13629841",
+              "outcome": "success",
+              "role": "quality",
+              "summary": "Corrected one reproduced preservation defect and contradictory intent wording. All focused checks passed on the corrected working tree."
+            }
+          },
+          "source": "workflow.quality.enter",
+          "state": "succeeded"
+        },
         "f5daf05213a866b54b6943aa5814f98a8c2130254725e4d1d9119ba76df31844": {
           "candidate_commit": null,
           "results": {
@@ -3501,13 +3581,90 @@
       "meta_rule_state": "unclassified",
       "product_state": "unclassified",
       "prompt": "Repair replay interruption recovery for candidate b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5 in a new managed recovery Round. Preserve prior branches, worktrees, journals, plans and evidence. Before ordinary worktree discovery or candidate ancestry rejection, inspect the trusted managed workspace and reconcile its replay journal under current attempt authority and repository coordination. Handle detached replay completion, replacement attachment before Goal persistence, and persisted replacement before acknowledgement. Preserve dirty work and unexpected ref changes; never roll back a durably persisted replacement. Cover Plan/Implement and Quality/Governance resumption. Add regressions through WorkflowEngine preparation and execution, rather than directly constructing WorkflowContext. Verify replacement checks still run against the exact candidate. Proposed checks: cargo test --lib application::workflow::tests::worktree_resume -- --test-threads=1; cargo test --lib application::workflow::tests::candidate_refresh -- --test-threads=1; cargo check --all-targets. Update only affected intent documentation.",
+      "quality_agent_report": "workflow.quality.enter:default-quality: Corrected one reproduced preservation defect and contradictory intent wording. All focused checks passed on the corrected working tree.",
+      "quality_candidate_commit": "05643ffb157c6404098f5437ffe8de40c721a5b7",
       "quality_checked_at": "",
       "quality_details": "",
       "quality_message": "",
+      "quality_skill_results": [
+        {
+          "artifacts": {
+            "tests": [
+              {
+                "command": "cargo test --lib application::workflow::tests::worktree_resume -- --test-threads=1",
+                "evidence": "18 passed; exit 0.",
+                "status": "passed",
+                "test": "Engine resumption, interruption preservation and exact-candidate gates"
+              },
+              {
+                "command": "cargo test --lib application::workflow::tests::candidate_refresh -- --test-threads=1",
+                "evidence": "39 passed; exit 0.",
+                "status": "passed",
+                "test": "Replay, conflicts, authority and publication recovery"
+              },
+              {
+                "command": "cargo test --lib application::workflow::tests::round_base -- --test-threads=1",
+                "evidence": "14 passed; exit 0.",
+                "status": "passed",
+                "test": "Round creation, lineage and retained bases"
+              },
+              {
+                "command": "cargo test --lib replacement_skills -- --test-threads=1",
+                "evidence": "5 passed; exit 0.",
+                "status": "passed",
+                "test": "Replacement Skill checks and candidate-bound evidence"
+              },
+              {
+                "command": "cargo test --lib infrastructure::git::worktrees -- --test-threads=1",
+                "evidence": "31 passed; exit 0.",
+                "status": "passed",
+                "test": "Shared Git worktree behavior"
+              },
+              {
+                "command": "cargo test --lib architecture_tests",
+                "evidence": "5 passed; exit 0.",
+                "status": "passed",
+                "test": "Architecture boundaries"
+              },
+              {
+                "command": "cargo check --all-targets",
+                "evidence": "Exit 0.",
+                "status": "passed",
+                "test": "All-target compilation"
+              },
+              {
+                "command": "git diff --name-only --diff-filter=ACMR -z b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5 -- '*.rs' | xargs -0 rustfmt --check --edition 2024 --config skip_children=true",
+                "evidence": "All 14 changed Rust files passed; exit 0.",
+                "status": "passed",
+                "test": "Changed-file formatting"
+              },
+              {
+                "command": "git diff --check b47569adb8d4c5d1d7335ba91729a3e486a38fe0",
+                "evidence": "Exit 0.",
+                "status": "passed",
+                "test": "Candidate and correction whitespace"
+              }
+            ]
+          },
+          "binding_id": "workflow.quality.enter:default-quality",
+          "evidence": [
+            "Reviewed clean pinned candidate 9d1ea52e4c373b6046db9c99c53cec99eddd93e4 against the finalized plan and affected intent contracts.",
+            "Reproduced a preservation defect with cargo test --lib engine_preserves_replay_when_a_retained_source_ref_changes -- --test-threads=1: recovery moved HEAD before rejecting a changed retained-source ref. Moved source-ref validation before restoration. The regression then passed across detached, attached and persisted replacements.",
+            "Corrected the affected worktree intent passage that contradicted preservation of interrupted conflicts and later user edits.",
+            "Corrections remain uncommitted in three files for Refine to capture and verify. HEAD remains the pinned candidate; the prior Round 2 branch remains at b1426cf5fb8dcc6a66a62d56fe8620c8ba513fb5.",
+            "Verification used deterministic local Git and provider fixtures. The full workflow suite, live daemon crashes and disk-failure injection were not exercised. Command logs are retained in /tmp/refine-quality-DR54BF57DCE017ED8EC68A5EEB-round3.",
+            "No project Goal-state mutation, merge, push, deployment or daemon restart was performed."
+          ],
+          "invocation_id": "f064303547ad825e70aab4ff68a57bbeb87880de6640f5ad8ad5357f13629841",
+          "outcome": "success",
+          "role": "quality",
+          "summary": "Corrected one reproduced preservation defect and contradictory intent wording. All focused checks passed on the corrected working tree."
+        }
+      ],
       "quality_state": "unclassified",
       "reporter": "Refine",
       "rule_state": "unclassified",
-      "updated": "2026-09-10T15:34:07Z",
+      "updated": "2026-09-10T15:40:11Z",
       "workflow_attempt_authority": {
         "claimed_at": "2026-09-10T15:08:46Z",
         "round_idx": 2,
@@ -3519,7 +3676,7 @@
   ],
   "status": "quality",
   "target_branch": "main",
-  "updated": "2026-09-10T15:34:07Z",
+  "updated": "2026-09-10T15:40:11Z",
   "workflow_events": [
     {
       "at": "2026-09-10T13:06:36.990956802+00:00",
@@ -3603,5 +3760,5 @@
       "to": "quality"
     }
   ],
-  "workflow_revision": 76
+  "workflow_revision": 80
 }
