@@ -1,0 +1,849 @@
+{
+  "id": "5e2fa2729b06741dc0cc78a2af1b79563832549b72a4fd7998ad94e8f7a17cb4",
+  "event": {
+    "id": "workflow.implement.enter",
+    "name": "Workflow Implement Enter",
+    "kind": "system",
+    "source": "workflow.implement.enter",
+    "enabled": true,
+    "scope": {
+      "node_id": null
+    },
+    "parameters": [],
+    "bindings": [
+      {
+        "id": "default-implement",
+        "skill_id": "default-implement",
+        "enabled": true,
+        "mode": "blocking",
+        "order": 0,
+        "scope": {
+          "node_id": null
+        },
+        "overrides": null,
+        "inputs": {}
+      }
+    ],
+    "on_success": null
+  },
+  "config_revision": 22,
+  "context": {
+    "node_id": "default",
+    "target_root": "/home/buddy/projects/refine-next",
+    "cwd": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRA87E5F985A1FFE2919BE7EC2-round-2",
+    "provider": "codex",
+    "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+    "round_idx": 1,
+    "workflow_revision": 18,
+    "candidate_commit": null,
+    "data": {
+      "context": {
+        "agent_context": {
+          "assembled_at": "2026-09-10T13:43:04Z",
+          "current_round": {
+            "assignee": "ethan.jacobson@insurity.com",
+            "prompt": "Provide a supported recovery path for a Goal stranded in Review when integration effects or publication occurred but successful settlement was interrupted.\n\nThis is still relevant after Skills: current approval requires settled integration, and RetryGovernance remains unavailable from Review. The four old Governance sub-states in the original report are historical evidence, not sufficient current authority. Round 1 retained unfinished retry and settlement changes without a candidate or verified completion; preserve them and its superseded-attempt failure.\n\nExtend the existing recovery capability so an eligible Review Goal can recheck or complete settlement through the normal workflow and return to Review for human acceptance. Keep approval strict. Resolve required Skill results and supervised candidate proof from the applicable pinned configuration, including an explicitly recorded case where no required Quality or Governance Skills apply. Never infer a pass from background/context Skills, obsolete configuration flags, a missing result or matching file content.\n\nUnder the existing target lease and Goal authority checks, compare the exact candidate with the current local and required published target. Recover settlement only from proof tied to that candidate and its actual integration. Content-equal commits with different identities need normal refresh or reconciliation and new checks when the candidate changes. Handle non-fast-forward publication and concurrent target movement through bounded existing recovery.\n\nRecord completed Git effects on the originating attempt even when it was cancelled or superseded, without advancing replacement work or reviving stale authority. Make settlement and entry to Review consistent and retries idempotent. CLI, API and browser guidance should expose the same allowed recovery and explain missing evidence clearly.\n\nVerify interrupted settlement before and after publication, an already-integrated exact candidate, content equality without identity, required Skills enabled or absent, failed and missing results, duplicate recovery, cancellation and supersession. Recovery must not approve the Goal, force-push a contested ref or rewrite historical results.\n\nThis is a recovery Round following the Skills review on 10 September 2026. Start from current main in a new managed Round worktree. Preserve Round 1, its plans, logs, branches, commits and uncommitted files; inspect and selectively reuse useful work instead of replaying the whole old attempt. Use the current Skills and docs/intent contracts, not archived Governance, Quality or Guidance configuration or the old fixed planning sequence. Refine owns workflow advancement and integration; human approval remains separate. Update only affected documentation and report focused verification with actual results.",
+            "reporter": "Buddy Williams",
+            "round": 2
+          },
+          "goal": {
+            "assignee": "ethan.jacobson@insurity.com",
+            "id": "DRA87E5F985A1FFE2919BE7EC2",
+            "name": "Recover missing integration settlement for Goals in Review",
+            "node_id": "default",
+            "priority": "low",
+            "reporter": "ethan.jacobson@insurity.com"
+          },
+          "governance": {
+            "configured": false,
+            "constitution": "",
+            "product": "",
+            "rules": []
+          },
+          "guidance_candidates": [],
+          "previous_rounds": [
+            {
+              "assignee": "ethan.jacobson@insurity.com",
+              "implementation_plan": {
+                "binding": {
+                  "base_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "context_digest": "0b10c257e34f5871e645d958450969501dcb07d420b58b9cfc55010dba8a628e",
+                  "context_version": 1,
+                  "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+                  "implementation_branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-1",
+                  "round_idx": 0,
+                  "target_branch": "main"
+                },
+                "criticism": {
+                  "completed_at": "2026-09-10T08:31:52Z",
+                  "git_after": {
+                    "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-1",
+                    "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                    "status_porcelain": []
+                  },
+                  "git_before": {
+                    "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-1",
+                    "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                    "status_porcelain": []
+                  },
+                  "result": {
+                    "summary": "The plan covers guarded Review recovery, exact-candidate proof, publication failures, and atomic fenced settlement."
+                  },
+                  "started_at": "2026-09-10T08:29:38Z"
+                },
+                "final_plan": {
+                  "completed_at": "2026-09-10T08:33:20Z",
+                  "git_after": {
+                    "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-1",
+                    "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                    "status_porcelain": []
+                  },
+                  "git_before": {
+                    "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-1",
+                    "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                    "status_porcelain": []
+                  },
+                  "result": {
+                    "checklist": [
+                      {
+                        "description": "Allow the shared Governance retry operation from Review only when the current Round has passed Quality and Governance evidence bound to its recorded candidate but lacks successful integration settlement, atomically retaining the recovery reason and prior diagnostics while retiring stale attempt authority and returning the Goal to Governance for a fresh scheduler claim.",
+                        "id": "P1"
+                      },
+                      {
+                        "description": "At Governance resume, acquire the existing integrated-target lease and inspect the recorded candidate and freshly observed local and required published targets before workspace preparation, candidate refresh, or Round-branch publication, reconstructing missing integration evidence only when normalized passed Quality proof and candidate-bound Governance evidence authorize that exact integrated ancestor.",
+                        "id": "P2"
+                      },
+                      {
+                        "description": "When integration or required publication remains incomplete, resume the existing workflow from the recorded candidate identity under the target lease, requiring ordinary integration or candidate refresh with replacement Quality and Governance for content-equal commits with different identities.",
+                        "id": "P3"
+                      },
+                      {
+                        "description": "Route an authoritative attempt's non-fast-forward Round-branch publication failure through the existing bounded integration recovery, retaining candidate identities, local and remote tips, conflicting refs, and failure diagnostics while preventing superseded attempts from changing replacement work.",
+                        "id": "P4"
+                      },
+                      {
+                        "description": "Centralize successful integration settlement within the existing workflow and work-item capabilities, rechecking Round, node, attempt, candidate, and gate authority under the Goal lock before atomically recording success with Review and requiring that evidence at every automated Review entry.",
+                        "id": "P5"
+                      },
+                      {
+                        "description": "Make interrupted and repeated settlement recoverable from retained evidence and fresh Git observations, recording completed Git effects on their originating Round after cancellation or supersession without restoring stale authority or advancing the replacement Round.",
+                        "id": "P6"
+                      },
+                      {
+                        "description": "Keep CLI and API Governance retry handlers on the shared eligibility path and make missing-settlement approval errors identify that path when eligible while preserving approval as acceptance of durably settled integration.",
+                        "id": "P7"
+                      },
+                      {
+                        "description": "Update the affected Governance, Review, merge-and-review, and CLI intent pages in their established format to explain recovery eligibility, exact-candidate integration and publication requirements, and retained failure boundaries.",
+                        "id": "P8"
+                      }
+                    ],
+                    "summary": "Add a guarded Governance retry for Goals stranded in Review so Refine can recover or finish integration of the exact approved candidate, durably settle success before returning to Review, and preserve prior evidence when an attempt is interrupted or superseded."
+                  },
+                  "started_at": "2026-09-10T08:31:52Z"
+                },
+                "governance_precheck": {
+                  "attempt": 1,
+                  "checked_at": "2026-09-10T08:34:06Z",
+                  "message": "Executing the finalized plan as written does not necessarily violate any supplied rule or enabled guidance.",
+                  "status": "passed"
+                },
+                "phase": "implement",
+                "phase_started_at": "2026-09-10T08:34:07Z",
+                "proposal": {
+                  "completed_at": "2026-09-10T08:29:38Z",
+                  "git_after": {
+                    "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-1",
+                    "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                    "status_porcelain": []
+                  },
+                  "git_before": {
+                    "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-1",
+                    "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                    "status_porcelain": []
+                  },
+                  "result": {
+                    "checklist": [
+                      {
+                        "description": "Allow the existing Governance retry operation from Review only when the current Round has passed Quality and Governance evidence bound to its recorded candidate but lacks integration settlement, atomically preserving the recovery reason and prior diagnostics while retiring stale attempt authority so the scheduler can claim a fresh attempt.",
+                        "id": "P1"
+                      },
+                      {
+                        "description": "At Governance resume, inspect the durable candidate and freshly observed local and required published targets before workspace preparation, candidate refresh, or Round-branch publication, reconstructing missing integration evidence only when normalized passed Quality proof and candidate-bound Governance evidence authorize that exact integrated ancestor.",
+                        "id": "P2"
+                      },
+                      {
+                        "description": "When the exact candidate is not fully integrated and published, resume the existing integration workflow from its recorded identity, treating content-equal commits with different identities as requiring ordinary integration or candidate refresh with replacement Quality and Governance rather than transferring the old verdict to another commit.",
+                        "id": "P3"
+                      },
+                      {
+                        "description": "Route an authoritative retry's non-fast-forward Round-branch publication failure through the existing bounded integration recovery with retained candidate identities, local and remote tips, and failure diagnostics, preserving conflicting refs and leaving replacement work untouched when the attempt is superseded.",
+                        "id": "P4"
+                      },
+                      {
+                        "description": "Concentrate integration settlement in a focused module within the existing workflow and work-item capabilities that rechecks Round, node, attempt, candidate, and gate authority under the Goal lock, atomically records successful integration with Review, guards other automated Review entry paths against missing evidence, and makes interrupted or repeated settlement recoverable while retaining completed Git effects on their originating Round after cancellation or supersession.",
+                        "id": "P5"
+                      },
+                      {
+                        "description": "Route the existing CLI and API Governance retry handlers through the shared recovery eligibility check and make missing-settlement approval errors identify the supported retry path while keeping approval limited to accepting the durably settled integration.",
+                        "id": "P6"
+                      },
+                      {
+                        "description": "Update the affected Governance, Review, merge-and-review, and CLI intent pages in their established format to describe the recovery entry condition, exact-candidate and publication requirements, and retained failure boundaries.",
+                        "id": "P7"
+                      }
+                    ],
+                    "summary": "Add a guarded Governance retry for Goals stranded in Review so Refine can recover or complete exact-candidate integration, durably record its success, and return the Goal to an approvable Review state while preserving prior evidence and fencing superseded attempts."
+                  },
+                  "started_at": "2026-09-10T08:26:08Z"
+                },
+                "schema_version": 2,
+                "started_at": "2026-09-10T08:26:08Z",
+                "state": "in_progress",
+                "updated_at": "2026-09-10T08:34:07Z"
+              },
+              "prompt": "From: Ethan Jacobson <ethan.jacobson@insurity.com>\nSubject: Goal wedged in Review �X approve blocked by missing Governance settlement after a superseded integration push\n\nBody:\n**Summary:** A Goal that passed Quality and Governance (both bound to the current candidate commit) reached `review` after its governance-**integration** push failed non-fast-forward and the workflow attempt was superseded. The durable \"Governance succeeded\" settlement was never written, so `approve` refuses with *\"reached review without successful Governance evidence\"* �X and no CLI transition can repair it from Review.\r\n\r\n## Repro\r\n1. Goal passes Quality + Governance evaluation on candidate commit X.\r\n2. Governance-integration push to the round branch is rejected (non-fast-forward); attempt is superseded.\r\n3. Goal still lands in `review`, but with no settled governance record.\r\n\r\n## Observed\r\nGoal stuck in `review`. All four gate sub-states (`constitution/rule/product/meta_rule`) = `passed`, `governance_candidate_commit` == `goal.candidate_commit`, yet every lever refuses:\r\n- `approve` �� \"reached review without successful Governance evidence\"\r\n- `retry --stage governance` �� \"not allowed for Review\"\r\n- `resolve-merged` �� \"can only resolve an already-merged candidate from quality\"\r\n- `undo` �� refuses, points to \"submit a new round\"\r\n\r\nNo forward path exists. The fix was actually integrated (present on the target branch under a content-equal commit), but the Goal cannot be marked Done.\r\n\r\n## Expected\r\nEither (a) `approve` should accept a Goal whose gates passed and whose candidate is integrated, or (b) a recovery op (e.g. `resolve-merged` or `retry --stage governance`) should be permitted from Review to re-settle governance.\r\n\r\n## Example\r\n- Goal `00000SZW7P0CKH8X2VDT7CG000`, candidate `f5128caef`.\r\n- Integration push failed 2026-08-26T17:04:52Z (non-fast-forward), superseded 17:04:53Z.\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nEthan Jacobson\r\nEthan.Jacobson@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
+              "reporter": "ethan.jacobson@insurity.com",
+              "round": 1
+            }
+          ],
+          "version": 1,
+          "workflow_summary": "Refine gives this Goal Agent an isolated worktree and a finalized implementation plan. Implement the current Round and report evidence; a separate agent will review and correct the candidate in Quality, then an independent Governance gate will verify policy and integrate the exact passing commit before human Review. Do not directly advance Goal state, approve, merge, or push."
+        },
+        "plans": {
+          "checklist": [
+            {
+              "description": "Selectively adapt retained Round 1 recovery code into cohesive modules while preserving all original Round artifacts.",
+              "id": "workflow.plan.enter:default-plan:P1"
+            },
+            {
+              "description": "Centralize candidate-bound validation of required Skill results, supervised Quality proof, and explicit no-required-Skills evidence.",
+              "id": "workflow.plan.enter:default-plan:P2"
+            },
+            {
+              "description": "Add guarded, idempotent Governance retry admission for Review Goals with incomplete integration settlement.",
+              "id": "workflow.plan.enter:default-plan:P3"
+            },
+            {
+              "description": "Inspect exact candidate integration and publication under the existing target lease before preparing or refreshing the candidate workspace.",
+              "id": "workflow.plan.enter:default-plan:P4"
+            },
+            {
+              "description": "Route contested publication and concurrent target movement through existing bounded integration recovery.",
+              "id": "workflow.plan.enter:default-plan:P5"
+            },
+            {
+              "description": "Retain completed Git effects against their originating attempt across interruption, cancellation, and supersession.",
+              "id": "workflow.plan.enter:default-plan:P6"
+            },
+            {
+              "description": "Atomically settle verified integration with entry to Review, preserving lifecycle Skill gates and stale-attempt rejection.",
+              "id": "workflow.plan.enter:default-plan:P7"
+            },
+            {
+              "description": "Expose shared recovery eligibility and evidence diagnostics through CLI, API, and browser while keeping approval strict.",
+              "id": "workflow.plan.enter:default-plan:P8"
+            },
+            {
+              "description": "Update affected recovery, settlement, Review, and surface intent documentation.",
+              "id": "workflow.plan.enter:default-plan:P9"
+            },
+            {
+              "description": "Add focused regression coverage and report actual verification results against the managed Round candidate.",
+              "id": "workflow.plan.enter:default-plan:P10"
+            }
+          ],
+          "summary": "workflow.plan.enter:default-plan: Extend Governance retry to recover interrupted exact-candidate integration settlement, using pinned Skill evidence and attempt-fenced writes before returning to Review for human acceptance."
+        }
+      },
+      "event": {},
+      "goal": {
+        "assignee": "ethan.jacobson@insurity.com",
+        "base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+        "branch_name": "refine/DRA87E5F985A1FFE2919BE7EC2/round-2",
+        "candidate_commit": null,
+        "created": "2026-09-10T08:26:05Z",
+        "event_generation": 3,
+        "feature_id": null,
+        "feature_order": null,
+        "id": "DRA87E5F985A1FFE2919BE7EC2",
+        "name": "Recover missing integration settlement for Goals in Review",
+        "node_display_name": "Default",
+        "node_id": "default",
+        "notes": [],
+        "priority": "low",
+        "reporter": "ethan.jacobson@insurity.com",
+        "round_count": 2,
+        "rounds": [
+          {
+            "assignee": "ethan.jacobson@insurity.com",
+            "constitution_state": "unclassified",
+            "created": "2026-09-10T08:26:05Z",
+            "failure_at": "",
+            "failure_category": "",
+            "failure_message": "",
+            "governance_candidate_commit": "",
+            "governance_checked_at": "",
+            "governance_details": "",
+            "governance_message": "",
+            "governance_rule_actions": [],
+            "guidance_decision": null,
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                "context_digest": "0b10c257e34f5871e645d958450969501dcb07d420b58b9cfc55010dba8a628e",
+                "context_version": 1,
+                "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+                "implementation_branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-1",
+                "round_idx": 0,
+                "target_branch": "main"
+              },
+              "criticism": {
+                "completed_at": "2026-09-10T08:31:52Z",
+                "git_after": {
+                  "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "summary": "The plan covers guarded Review recovery, exact-candidate proof, publication failures, and atomic fenced settlement."
+                },
+                "started_at": "2026-09-10T08:29:38Z"
+              },
+              "final_plan": {
+                "completed_at": "2026-09-10T08:33:20Z",
+                "git_after": {
+                  "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Allow the shared Governance retry operation from Review only when the current Round has passed Quality and Governance evidence bound to its recorded candidate but lacks successful integration settlement, atomically retaining the recovery reason and prior diagnostics while retiring stale attempt authority and returning the Goal to Governance for a fresh scheduler claim.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "At Governance resume, acquire the existing integrated-target lease and inspect the recorded candidate and freshly observed local and required published targets before workspace preparation, candidate refresh, or Round-branch publication, reconstructing missing integration evidence only when normalized passed Quality proof and candidate-bound Governance evidence authorize that exact integrated ancestor.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "When integration or required publication remains incomplete, resume the existing workflow from the recorded candidate identity under the target lease, requiring ordinary integration or candidate refresh with replacement Quality and Governance for content-equal commits with different identities.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Route an authoritative attempt's non-fast-forward Round-branch publication failure through the existing bounded integration recovery, retaining candidate identities, local and remote tips, conflicting refs, and failure diagnostics while preventing superseded attempts from changing replacement work.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Centralize successful integration settlement within the existing workflow and work-item capabilities, rechecking Round, node, attempt, candidate, and gate authority under the Goal lock before atomically recording success with Review and requiring that evidence at every automated Review entry.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Make interrupted and repeated settlement recoverable from retained evidence and fresh Git observations, recording completed Git effects on their originating Round after cancellation or supersession without restoring stale authority or advancing the replacement Round.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Keep CLI and API Governance retry handlers on the shared eligibility path and make missing-settlement approval errors identify that path when eligible while preserving approval as acceptance of durably settled integration.",
+                      "id": "P7"
+                    },
+                    {
+                      "description": "Update the affected Governance, Review, merge-and-review, and CLI intent pages in their established format to explain recovery eligibility, exact-candidate integration and publication requirements, and retained failure boundaries.",
+                      "id": "P8"
+                    }
+                  ],
+                  "summary": "Add a guarded Governance retry for Goals stranded in Review so Refine can recover or finish integration of the exact approved candidate, durably settle success before returning to Review, and preserve prior evidence when an attempt is interrupted or superseded."
+                },
+                "started_at": "2026-09-10T08:31:52Z"
+              },
+              "governance_precheck": {
+                "attempt": 1,
+                "checked_at": "2026-09-10T08:34:06Z",
+                "message": "Executing the finalized plan as written does not necessarily violate any supplied rule or enabled guidance.",
+                "status": "passed"
+              },
+              "phase": "implement",
+              "phase_started_at": "2026-09-10T08:34:07Z",
+              "proposal": {
+                "completed_at": "2026-09-10T08:29:38Z",
+                "git_after": {
+                  "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-1",
+                  "head_commit": "8f6de519c62a8a373b19482d5c7842068acfb35d",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Allow the existing Governance retry operation from Review only when the current Round has passed Quality and Governance evidence bound to its recorded candidate but lacks integration settlement, atomically preserving the recovery reason and prior diagnostics while retiring stale attempt authority so the scheduler can claim a fresh attempt.",
+                      "id": "P1"
+                    },
+                    {
+                      "description": "At Governance resume, inspect the durable candidate and freshly observed local and required published targets before workspace preparation, candidate refresh, or Round-branch publication, reconstructing missing integration evidence only when normalized passed Quality proof and candidate-bound Governance evidence authorize that exact integrated ancestor.",
+                      "id": "P2"
+                    },
+                    {
+                      "description": "When the exact candidate is not fully integrated and published, resume the existing integration workflow from its recorded identity, treating content-equal commits with different identities as requiring ordinary integration or candidate refresh with replacement Quality and Governance rather than transferring the old verdict to another commit.",
+                      "id": "P3"
+                    },
+                    {
+                      "description": "Route an authoritative retry's non-fast-forward Round-branch publication failure through the existing bounded integration recovery with retained candidate identities, local and remote tips, and failure diagnostics, preserving conflicting refs and leaving replacement work untouched when the attempt is superseded.",
+                      "id": "P4"
+                    },
+                    {
+                      "description": "Concentrate integration settlement in a focused module within the existing workflow and work-item capabilities that rechecks Round, node, attempt, candidate, and gate authority under the Goal lock, atomically records successful integration with Review, guards other automated Review entry paths against missing evidence, and makes interrupted or repeated settlement recoverable while retaining completed Git effects on their originating Round after cancellation or supersession.",
+                      "id": "P5"
+                    },
+                    {
+                      "description": "Route the existing CLI and API Governance retry handlers through the shared recovery eligibility check and make missing-settlement approval errors identify the supported retry path while keeping approval limited to accepting the durably settled integration.",
+                      "id": "P6"
+                    },
+                    {
+                      "description": "Update the affected Governance, Review, merge-and-review, and CLI intent pages in their established format to describe the recovery entry condition, exact-candidate and publication requirements, and retained failure boundaries.",
+                      "id": "P7"
+                    }
+                  ],
+                  "summary": "Add a guarded Governance retry for Goals stranded in Review so Refine can recover or complete exact-candidate integration, durably record its success, and return the Goal to an approvable Review state while preserving prior evidence and fencing superseded attempts."
+                },
+                "started_at": "2026-09-10T08:26:08Z"
+              },
+              "schema_version": 2,
+              "started_at": "2026-09-10T08:26:08Z",
+              "state": "in_progress",
+              "updated_at": "2026-09-10T08:34:07Z"
+            },
+            "implementation_report": null,
+            "implementation_reported_at": null,
+            "logs": [
+              {
+                "actor": "refine",
+                "category": "state",
+                "datetime": "2026-09-10T08:26:07Z",
+                "details": {
+                  "node_id": "default"
+                },
+                "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+                "message": "Workflow status changed: todo -> plan",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "git",
+                "datetime": "2026-09-10T08:26:08Z",
+                "details": {
+                  "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-1",
+                  "node_id": "default",
+                  "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRA87E5F985A1FFE2919BE7EC2-round-1"
+                },
+                "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+                "message": "Created implementation worktree for refine/DRA87E5F985A1FFE2919BE7EC2/round-1",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "governance",
+                "datetime": "2026-09-10T08:34:06Z",
+                "details": {
+                  "attempt": 1,
+                  "node_id": "default",
+                  "phase": "plan",
+                  "status": "passed"
+                },
+                "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+                "message": "Plan governance pre-check passed",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "state",
+                "datetime": "2026-09-10T08:34:07Z",
+                "details": {
+                  "node_id": "default"
+                },
+                "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+                "message": "Workflow status changed: plan -> implement",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "agent",
+                "datetime": "2026-09-10T08:54:46Z",
+                "details": {
+                  "error": "Goal Agent exited unsuccessfully: 1; additionally failed to persist implementation planning failure evidence: Goal DRA87E5F985A1FFE2919BE7EC2 no longer authorizes implementation planning on node default round 1",
+                  "node_id": "default"
+                },
+                "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+                "message": "Workflow failed: Goal Agent exited unsuccessfully: 1; additionally failed to persist implementation planning failure evidence: Goal DRA87E5F985A1FFE2919BE7EC2 no longer authorizes implementation planning on node default round 1",
+                "round_idx": 0,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "workflow",
+                "datetime": "2026-09-10T08:54:46Z",
+                "details": {
+                  "failure_stage": "workflow"
+                },
+                "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+                "message": "Goal failure was not durably settled (attempt superseded); original error: Goal Agent exited unsuccessfully: 1; additionally failed to persist implementation planning failure evidence: Goal DRA87E5F985A1FFE2919BE7EC2 no longer authorizes implementation planning on node default round 1",
+                "round_idx": 0,
+                "severity": "warning"
+              }
+            ],
+            "meta_rule_state": "unclassified",
+            "product_state": "unclassified",
+            "prompt": "From: Ethan Jacobson <ethan.jacobson@insurity.com>\nSubject: Goal wedged in Review �X approve blocked by missing Governance settlement after a superseded integration push\n\nBody:\n**Summary:** A Goal that passed Quality and Governance (both bound to the current candidate commit) reached `review` after its governance-**integration** push failed non-fast-forward and the workflow attempt was superseded. The durable \"Governance succeeded\" settlement was never written, so `approve` refuses with *\"reached review without successful Governance evidence\"* �X and no CLI transition can repair it from Review.\r\n\r\n## Repro\r\n1. Goal passes Quality + Governance evaluation on candidate commit X.\r\n2. Governance-integration push to the round branch is rejected (non-fast-forward); attempt is superseded.\r\n3. Goal still lands in `review`, but with no settled governance record.\r\n\r\n## Observed\r\nGoal stuck in `review`. All four gate sub-states (`constitution/rule/product/meta_rule`) = `passed`, `governance_candidate_commit` == `goal.candidate_commit`, yet every lever refuses:\r\n- `approve` �� \"reached review without successful Governance evidence\"\r\n- `retry --stage governance` �� \"not allowed for Review\"\r\n- `resolve-merged` �� \"can only resolve an already-merged candidate from quality\"\r\n- `undo` �� refuses, points to \"submit a new round\"\r\n\r\nNo forward path exists. The fix was actually integrated (present on the target branch under a content-equal commit), but the Goal cannot be marked Done.\r\n\r\n## Expected\r\nEither (a) `approve` should accept a Goal whose gates passed and whose candidate is integrated, or (b) a recovery op (e.g. `resolve-merged` or `retry --stage governance`) should be permitted from Review to re-settle governance.\r\n\r\n## Example\r\n- Goal `00000SZW7P0CKH8X2VDT7CG000`, candidate `f5128caef`.\r\n- Integration push failed 2026-08-26T17:04:52Z (non-fast-forward), superseded 17:04:53Z.\r\n\r\n\r\n[cid:insurity-small2_2f81c33c-d951-4e5c-a467-1113541ca22c.jpg]\r\nEthan Jacobson\r\nEthan.Jacobson@insurity.com\r\n\r\n[cid:excellence2026signature(17b0688e-5473-4b74-96eb-a73f633f2c2f)_48407359-d77b-4967-95cd-277a32b50ebc.png]<https://insurity.com/excellence?utm_source=Email-Signature&utm_medium=Email&utm_campaign=Event-Excellence-2026>\r\n\r\n_____________________________________________________________________________________________________\r\n\r\nThe information contained in this e-mail message is intended only for the personal and confidential use of the intended recipient(s). This message may be an attorney-client communication and/or work product and as such is privileged and confidential. If the reader of this message is not the intended recipient or an agent responsible for delivering it to the intended recipient, you are hereby notified that you have received this document in error and that any review, dissemination, distribution, or copying of this message is strictly prohibited. If you have received this communication in error, please notify us immediately by e-mail, and delete the original message.\r\n_____________________________________________________________________________________________________\r\n~~~Insurity~~~",
+            "quality_checked_at": "",
+            "quality_details": "",
+            "quality_message": "",
+            "quality_state": "unclassified",
+            "reporter": "ethan.jacobson@insurity.com",
+            "rule_state": "unclassified",
+            "updated": "2026-09-10T08:34:07Z",
+            "workflow_attempt_authority": null,
+            "workflow_reconciliation": null,
+            "workflow_recovery": null
+          },
+          {
+            "assignee": "ethan.jacobson@insurity.com",
+            "constitution_state": "unclassified",
+            "created": "2026-09-10T13:06:37Z",
+            "failure_at": "",
+            "failure_category": "",
+            "failure_message": "",
+            "governance_candidate_commit": "",
+            "governance_checked_at": "",
+            "governance_details": "",
+            "governance_message": "",
+            "governance_rule_actions": [],
+            "guidance_decision": null,
+            "implementation_plan": {
+              "binding": {
+                "base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                "context_digest": "b5e3831c569283fff6b7c1e9be0e826fab391bac4d88ddbf28de9f9bbc44afc4",
+                "context_version": 1,
+                "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+                "implementation_branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-2",
+                "round_idx": 1,
+                "target_branch": "main"
+              },
+              "final_plan": {
+                "completed_at": "2026-09-10T13:54:44Z",
+                "git_after": {
+                  "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-2",
+                  "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-2",
+                  "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Selectively adapt retained Round 1 recovery code into cohesive modules while preserving all original Round artifacts.",
+                      "id": "workflow.plan.enter:default-plan:P1"
+                    },
+                    {
+                      "description": "Centralize candidate-bound validation of required Skill results, supervised Quality proof, and explicit no-required-Skills evidence.",
+                      "id": "workflow.plan.enter:default-plan:P2"
+                    },
+                    {
+                      "description": "Add guarded, idempotent Governance retry admission for Review Goals with incomplete integration settlement.",
+                      "id": "workflow.plan.enter:default-plan:P3"
+                    },
+                    {
+                      "description": "Inspect exact candidate integration and publication under the existing target lease before preparing or refreshing the candidate workspace.",
+                      "id": "workflow.plan.enter:default-plan:P4"
+                    },
+                    {
+                      "description": "Route contested publication and concurrent target movement through existing bounded integration recovery.",
+                      "id": "workflow.plan.enter:default-plan:P5"
+                    },
+                    {
+                      "description": "Retain completed Git effects against their originating attempt across interruption, cancellation, and supersession.",
+                      "id": "workflow.plan.enter:default-plan:P6"
+                    },
+                    {
+                      "description": "Atomically settle verified integration with entry to Review, preserving lifecycle Skill gates and stale-attempt rejection.",
+                      "id": "workflow.plan.enter:default-plan:P7"
+                    },
+                    {
+                      "description": "Expose shared recovery eligibility and evidence diagnostics through CLI, API, and browser while keeping approval strict.",
+                      "id": "workflow.plan.enter:default-plan:P8"
+                    },
+                    {
+                      "description": "Update affected recovery, settlement, Review, and surface intent documentation.",
+                      "id": "workflow.plan.enter:default-plan:P9"
+                    },
+                    {
+                      "description": "Add focused regression coverage and report actual verification results against the managed Round candidate.",
+                      "id": "workflow.plan.enter:default-plan:P10"
+                    }
+                  ],
+                  "summary": "workflow.plan.enter:default-plan: Extend Governance retry to recover interrupted exact-candidate integration settlement, using pinned Skill evidence and attempt-fenced writes before returning to Review for human acceptance."
+                },
+                "started_at": "2026-09-10T13:43:04Z"
+              },
+              "phase": "implement",
+              "phase_started_at": "2026-09-10T13:54:44Z",
+              "proposal": {
+                "completed_at": "2026-09-10T13:54:44Z",
+                "git_after": {
+                  "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-2",
+                  "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "status_porcelain": []
+                },
+                "git_before": {
+                  "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-2",
+                  "head_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "status_porcelain": []
+                },
+                "result": {
+                  "checklist": [
+                    {
+                      "description": "Selectively adapt retained Round 1 recovery code into cohesive modules while preserving all original Round artifacts.",
+                      "id": "workflow.plan.enter:default-plan:P1"
+                    },
+                    {
+                      "description": "Centralize candidate-bound validation of required Skill results, supervised Quality proof, and explicit no-required-Skills evidence.",
+                      "id": "workflow.plan.enter:default-plan:P2"
+                    },
+                    {
+                      "description": "Add guarded, idempotent Governance retry admission for Review Goals with incomplete integration settlement.",
+                      "id": "workflow.plan.enter:default-plan:P3"
+                    },
+                    {
+                      "description": "Inspect exact candidate integration and publication under the existing target lease before preparing or refreshing the candidate workspace.",
+                      "id": "workflow.plan.enter:default-plan:P4"
+                    },
+                    {
+                      "description": "Route contested publication and concurrent target movement through existing bounded integration recovery.",
+                      "id": "workflow.plan.enter:default-plan:P5"
+                    },
+                    {
+                      "description": "Retain completed Git effects against their originating attempt across interruption, cancellation, and supersession.",
+                      "id": "workflow.plan.enter:default-plan:P6"
+                    },
+                    {
+                      "description": "Atomically settle verified integration with entry to Review, preserving lifecycle Skill gates and stale-attempt rejection.",
+                      "id": "workflow.plan.enter:default-plan:P7"
+                    },
+                    {
+                      "description": "Expose shared recovery eligibility and evidence diagnostics through CLI, API, and browser while keeping approval strict.",
+                      "id": "workflow.plan.enter:default-plan:P8"
+                    },
+                    {
+                      "description": "Update affected recovery, settlement, Review, and surface intent documentation.",
+                      "id": "workflow.plan.enter:default-plan:P9"
+                    },
+                    {
+                      "description": "Add focused regression coverage and report actual verification results against the managed Round candidate.",
+                      "id": "workflow.plan.enter:default-plan:P10"
+                    }
+                  ],
+                  "summary": "workflow.plan.enter:default-plan: Extend Governance retry to recover interrupted exact-candidate integration settlement, using pinned Skill evidence and attempt-fenced writes before returning to Review for human acceptance."
+                },
+                "started_at": "2026-09-10T13:43:04Z"
+              },
+              "schema_version": 2,
+              "started_at": "2026-09-10T13:43:04Z",
+              "state": "in_progress",
+              "updated_at": "2026-09-10T13:54:44Z"
+            },
+            "implementation_report": null,
+            "implementation_reported_at": null,
+            "latest_log": {
+              "actor": "refine",
+              "category": "state",
+              "datetime": "2026-09-10T13:54:44Z",
+              "details": {
+                "node_id": "default"
+              },
+              "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+              "message": "Workflow status changed: plan -> implement",
+              "round_idx": 1,
+              "severity": "info"
+            },
+            "latest_state_log": {
+              "actor": "refine",
+              "category": "state",
+              "datetime": "2026-09-10T13:54:44Z",
+              "details": {
+                "node_id": "default"
+              },
+              "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+              "message": "Workflow status changed: plan -> implement",
+              "round_idx": 1,
+              "severity": "info"
+            },
+            "latest_workflow_log": {
+              "actor": "refine",
+              "category": "state",
+              "datetime": "2026-09-10T13:54:44Z",
+              "details": {
+                "node_id": "default"
+              },
+              "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+              "message": "Workflow status changed: plan -> implement",
+              "round_idx": 1,
+              "severity": "info"
+            },
+            "logs": [
+              {
+                "actor": "refine",
+                "category": "git",
+                "datetime": "2026-09-10T13:43:03Z",
+                "details": {
+                  "node_id": "default",
+                  "remote": "origin",
+                  "target_branch": "main",
+                  "target_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c"
+                },
+                "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+                "message": "Local main already carried the fetched tip",
+                "round_idx": 1,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "state",
+                "datetime": "2026-09-10T13:43:04Z",
+                "details": {
+                  "node_id": "default"
+                },
+                "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+                "message": "Workflow status changed: todo -> plan",
+                "round_idx": 1,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "git",
+                "datetime": "2026-09-10T13:43:04Z",
+                "details": {
+                  "base_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "branch": "refine/DRA87E5F985A1FFE2919BE7EC2/round-2",
+                  "branch_commit": "f880b7767149e4de43d5bc4d4786247d1e536a8c",
+                  "node_id": "default",
+                  "worktree": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRA87E5F985A1FFE2919BE7EC2-round-2"
+                },
+                "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+                "message": "Created implementation worktree for refine/DRA87E5F985A1FFE2919BE7EC2/round-2",
+                "round_idx": 1,
+                "severity": "info"
+              },
+              {
+                "actor": "refine",
+                "category": "state",
+                "datetime": "2026-09-10T13:54:44Z",
+                "details": {
+                  "node_id": "default"
+                },
+                "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+                "message": "Workflow status changed: plan -> implement",
+                "round_idx": 1,
+                "severity": "info"
+              }
+            ],
+            "meta_rule_state": "unclassified",
+            "product_state": "unclassified",
+            "prompt": "Provide a supported recovery path for a Goal stranded in Review when integration effects or publication occurred but successful settlement was interrupted.\n\nThis is still relevant after Skills: current approval requires settled integration, and RetryGovernance remains unavailable from Review. The four old Governance sub-states in the original report are historical evidence, not sufficient current authority. Round 1 retained unfinished retry and settlement changes without a candidate or verified completion; preserve them and its superseded-attempt failure.\n\nExtend the existing recovery capability so an eligible Review Goal can recheck or complete settlement through the normal workflow and return to Review for human acceptance. Keep approval strict. Resolve required Skill results and supervised candidate proof from the applicable pinned configuration, including an explicitly recorded case where no required Quality or Governance Skills apply. Never infer a pass from background/context Skills, obsolete configuration flags, a missing result or matching file content.\n\nUnder the existing target lease and Goal authority checks, compare the exact candidate with the current local and required published target. Recover settlement only from proof tied to that candidate and its actual integration. Content-equal commits with different identities need normal refresh or reconciliation and new checks when the candidate changes. Handle non-fast-forward publication and concurrent target movement through bounded existing recovery.\n\nRecord completed Git effects on the originating attempt even when it was cancelled or superseded, without advancing replacement work or reviving stale authority. Make settlement and entry to Review consistent and retries idempotent. CLI, API and browser guidance should expose the same allowed recovery and explain missing evidence clearly.\n\nVerify interrupted settlement before and after publication, an already-integrated exact candidate, content equality without identity, required Skills enabled or absent, failed and missing results, duplicate recovery, cancellation and supersession. Recovery must not approve the Goal, force-push a contested ref or rewrite historical results.\n\nThis is a recovery Round following the Skills review on 10 September 2026. Start from current main in a new managed Round worktree. Preserve Round 1, its plans, logs, branches, commits and uncommitted files; inspect and selectively reuse useful work instead of replaying the whole old attempt. Use the current Skills and docs/intent contracts, not archived Governance, Quality or Guidance configuration or the old fixed planning sequence. Refine owns workflow advancement and integration; human approval remains separate. Update only affected documentation and report focused verification with actual results.",
+            "quality_checked_at": "",
+            "quality_details": "",
+            "quality_message": "",
+            "quality_state": "unclassified",
+            "reporter": "Buddy Williams",
+            "rule_state": "unclassified",
+            "updated": "2026-09-10T13:54:44Z",
+            "workflow_attempt_authority": {
+              "claimed_at": "2026-09-10T13:43:03Z",
+              "round_idx": 1,
+              "workflow_revision": 18
+            },
+            "workflow_reconciliation": null,
+            "workflow_recovery": null
+          }
+        ],
+        "status": "implement",
+        "target_branch": "main",
+        "updated": "2026-09-10T13:54:44Z",
+        "workflow_revision": 32
+      },
+      "system": {
+        "candidate_commit": null,
+        "node_id": "default",
+        "project_root": "/home/buddy/projects/refine-next",
+        "workflow_step": "implement",
+        "workspace": "/home/buddy/projects/refine-next/.git/refine-worktrees/refine-DRA87E5F985A1FFE2919BE7EC2-round-2"
+      }
+    },
+    "metadata": {
+      "behavior": "EventSkill",
+      "event_operation_id": "1a08b997339113c7618",
+      "goal_id": "DRA87E5F985A1FFE2919BE7EC2",
+      "kind": "workflow",
+      "node_id": "default",
+      "provider": "codex",
+      "round_idx": 1,
+      "target_app_id": "/home/buddy/projects/refine-next",
+      "workflow_revision": 18,
+      "workflow_state": "implement"
+    }
+  },
+  "bindings": [
+    {
+      "binding": {
+        "id": "default-implement",
+        "skill_id": "default-implement",
+        "enabled": true,
+        "mode": "blocking",
+        "order": 0,
+        "scope": {
+          "node_id": null
+        },
+        "overrides": null,
+        "inputs": {}
+      },
+      "skill": {
+        "id": "default-implement",
+        "name": "Implement",
+        "prompt": "## Implement\n\nImplement the current Goal Round using every accepted plan and attached Skill. Inspect existing code, make the complete change, run appropriate verification, and report evidence for each checklist item. Preserve unrelated changes and historical evidence. Refine owns candidate commits, workflow advancement, Quality, Governance and integration.\n\n## Intent and architecture\n\nApplicability: Apply when a Goal changes Refine product behavior, architecture, shared capabilities, durable state, workflow, or a surface contract.\n\nUse the Goal and the relevant files under docs/intent/ as the durable product context. Preserve the Model, Application, Infrastructure, and Surfaces boundaries; shared capability ownership; thin and semantically consistent surfaces; local inspectable state; and recoverable Git and process behavior. Update only the affected docs/intent pages when the change alters documented product intent or an architectural contract. Do not require unrelated documentation, cleanup, or broader work.\n\nFor this project on the current Default node, /home/buddy/projects/refine-next is the target development checkout and /home/buddy/projects/refine is the serving Refine installation. Use the invocation's pinned workspace (the managed Goal Round worktree when supplied) for code changes and verification, and read the relevant intent from that candidate. Verify paths from the current invocation and runtime before operating on another node. Source promotion and restarting the serving installation are separate operator actions; an ordinary implementation or Quality run should not deploy its candidate or restart the daemon that is supervising it.\n\n## Cohesive code files\n\nApplicability: Apply whenever an agent adds or changes code files in any language.\n\nKeep each code file focused on one cohesive responsibility. Treat roughly 500 lines as a prompt to review structure, not as a blind hard cap. When a file grows because it mixes responsibilities or unrelated method families, split it into clearly named modules or files and move methods, helpers, types, and tests with the responsibility they serve. Prefer real module boundaries and stable public APIs over arbitrary chunks or include-only shards. Preserve behavior during structural refactors, and document any justified exception for generated or intrinsically cohesive files.\n",
+        "role": "implement",
+        "enabled": true,
+        "scope": {
+          "node_id": null
+        },
+        "parameters": [],
+        "provenance": "refine-default-v1"
+      },
+      "parameters": {}
+    }
+  ],
+  "state": "running",
+  "results": {},
+  "attempts": [],
+  "created_at": "2026-09-10T13:54:44.650239709+00:00",
+  "completed_at": null,
+  "error": null,
+  "action_applied": false
+}
