@@ -1,88 +1,6 @@
 use super::*;
 
 #[test]
-fn governance_review_prose_with_code_braces_reads_the_verdict_not_the_first_brace() {
-    // Shape of the review that was misread: a code reference containing
-    // braces, the phrase "rule violation" used while *clearing* a rule, and
-    // the real verdict last.
-    let output = "## Rule 3\n\
-             The `error: () => { setDiaryError(true) }` handler in \
-             `onClaimNumberChange` is unchanged, so this is not a rule violation. \
-             Compliant.\n\n\
-             {\"status\":\"passed\",\"message\":\"Round 1 is a clean, well-scoped diary-editor bug fix.\"}";
-
-    let evaluation = parse_governance_provider_output(output, 3);
-
-    assert!(!evaluation.failed);
-    assert_eq!(
-        evaluation.message.as_deref(),
-        Some("Round 1 is a clean, well-scoped diary-editor bug fix.")
-    );
-    assert_eq!(evaluation.details["failed_actions"], json!([]));
-    assert_eq!(evaluation.details["verdict"]["status"], "passed");
-}
-
-#[test]
-fn governance_verdict_survives_an_unclosed_brace_in_the_review_prose() {
-    let output = "Reviewed `if (claim.diary) {` in the editor.\n\
-             {\"status\":\"passed\",\"message\":\"All rules compliant.\"}";
-
-    let evaluation = parse_governance_provider_output(output, 2);
-
-    assert!(!evaluation.failed);
-    assert_eq!(evaluation.details["verdict"]["status"], "passed");
-}
-
-#[test]
-fn governance_review_without_a_verdict_fails_closed_as_a_parse_error() {
-    let output = "The change looks fine to me. No rules were broken.";
-
-    let evaluation = parse_governance_provider_output(output, 2);
-
-    // Unreadable verdicts must be obviously a parsing problem, never a
-    // silent pass and never a fabricated rule violation.
-    assert!(evaluation.failed);
-    assert_eq!(
-        evaluation.message.as_deref(),
-        Some(GOVERNANCE_VERDICT_UNPARSABLE)
-    );
-    assert_eq!(evaluation.details["verdict_parse_error"], true);
-    assert_eq!(
-        evaluation.details["failed_actions"][0]["action"],
-        "verdict_parse_error"
-    );
-    // The review body is kept for triage, but is not itself the failure.
-    assert_eq!(evaluation.details["raw_output"], output);
-    assert_ne!(evaluation.details["failed_actions"][0]["message"], output);
-}
-
-#[test]
-fn governance_failing_verdict_records_the_parsed_violations() {
-    let output = "Rule 1 is violated.\n\
-             {\"status\":\"failed\",\"message\":\"app.py contains a smoke marker\",\
-             \"violations\":[{\"rule_id\":\"rule-1\",\"message\":\"smoke marker appended\"}],\
-             \"recovery_analysis\":\"Remove the marker.\",\
-             \"recovery_round_prompt\":\"Remove the marker and rerun focused tests.\"}";
-
-    let evaluation = parse_governance_provider_output(output, 1);
-
-    assert!(evaluation.failed);
-    assert_eq!(
-        evaluation.message.as_deref(),
-        Some("app.py contains a smoke marker")
-    );
-    assert_eq!(evaluation.details["failed_actions"][0]["rule_id"], "rule-1");
-    assert_eq!(
-        evaluation.recovery_analysis.as_deref(),
-        Some("Remove the marker.")
-    );
-    assert_eq!(
-        evaluation.recovery_round_prompt.as_deref(),
-        Some("Remove the marker and rerun focused tests.")
-    );
-}
-
-#[test]
 fn file_automation_fails_after_the_governance_recovery_budget_is_exhausted() {
     let temp_root = unique_temp_dir("automation-governance");
     let target_root = temp_root.clone();
@@ -140,7 +58,10 @@ fn file_automation_fails_after_the_governance_recovery_budget_is_exhausted() {
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let previous_smoke_ai = std::env::var_os("REFINE_SMOKE_AI_PATH");
     unsafe {
-        std::env::set_var("REFINE_SMOKE_AI_PATH", smoke_ai.to_str().unwrap());
+        std::env::set_var(
+            "REFINE_SMOKE_AI_PATH",
+            crate::application::events::test_support::adapt_fixture(&smoke_ai),
+        );
     }
     let work_items = FileWorkItemService::new(&refine_dir);
     work_items
@@ -184,7 +105,10 @@ fn file_automation_fails_after_the_governance_recovery_budget_is_exhausted() {
             .contains("Do not append smoke markers.")
     );
     assert_eq!(latest["governance_details"]["phase"], "post_implementation");
-    assert_eq!(latest["governance_rule_actions"][0]["rule_id"], "rule-6");
+    assert_eq!(
+        latest["governance_rule_actions"][0]["rule_id"],
+        "workflow.governance.enter:default-governance:rule-6"
+    );
     assert_eq!(goal["rounds"][5]["automatic_retry"]["attempt"], 5);
     assert_eq!(goal["rounds"][5]["automatic_retry"]["kind"], "governance");
     unsafe {
@@ -251,7 +175,10 @@ fn file_automation_stops_early_when_consecutive_governance_findings_are_identica
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let previous_smoke_ai = std::env::var_os("REFINE_SMOKE_AI_PATH");
     unsafe {
-        std::env::set_var("REFINE_SMOKE_AI_PATH", smoke_ai.to_str().unwrap());
+        std::env::set_var(
+            "REFINE_SMOKE_AI_PATH",
+            crate::application::events::test_support::adapt_fixture(&smoke_ai),
+        );
     }
     let work_items = FileWorkItemService::new(&refine_dir);
     work_items

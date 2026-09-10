@@ -42,6 +42,7 @@ mod provider_output;
 mod runner;
 mod settings;
 mod settlement;
+mod skill_checks;
 mod summary;
 mod wire;
 

@@ -1,14 +1,28 @@
 use super::*;
 use crate::application::workflow::engine::context::WorkflowContext;
 use crate::model::goal::ProposedImplementationPlan;
+use serde_json::Value;
+
+fn native_script(body: &str) -> String {
+    format!(
+        r#"#!/usr/bin/env python3
+import json,sys,pathlib
+prompt=' '.join(sys.argv[1:])
+result=json.JSONDecoder().raw_decode(prompt.split('Refine completion contract (supplied by the system):\n',1)[1])[0]
+{body}
+print(json.dumps(result))
+"#
+    )
+}
 
 #[cfg(unix)]
-fn run_governed_planning_with_script(
+fn run_planning(
     prefix: &str,
     script_body: &str,
-) -> (RefineResult<ProposedImplementationPlan>, serde_json::Value) {
+    multiple: bool,
+    retry: bool,
+) -> (RefineResult<ProposedImplementationPlan>, Value) {
     use std::os::unix::fs::PermissionsExt;
-
     let temp_root = unique_temp_dir(prefix);
     let target_root = temp_root.join("repo");
     let runtime_root = temp_root.join("run/8080");
@@ -30,13 +44,7 @@ fn run_governed_planning_with_script(
     let branch = "refine/GOAL1/round-1";
     git(&target_root, &["checkout", "-b", branch]).unwrap();
 
-    fs::write(
-        &smoke_ai,
-        format!(
-            "#!/bin/sh\n{script_body}\nprintf '%s\\n' \"$payload\" > \"$REFINE_AGENT_SIGNAL_PATH\"\nsleep 10\n"
-        ),
-    )
-    .unwrap();
+    fs::write(&smoke_ai, native_script(script_body)).unwrap();
     let mut permissions = fs::metadata(&smoke_ai).unwrap().permissions();
     permissions.set_mode(0o755);
     fs::set_permissions(&smoke_ai, permissions).unwrap();
@@ -45,10 +53,9 @@ fn run_governed_planning_with_script(
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let previous_provider = std::env::var_os("REFINE_SMOKE_AI_PATH");
-    let previous_planning = std::env::var_os("REFINE_SMOKE_AI_GOVERNED_PLANNING");
+
     unsafe {
         std::env::set_var("REFINE_SMOKE_AI_PATH", &smoke_ai);
-        std::env::set_var("REFINE_SMOKE_AI_GOVERNED_PLANNING", "1");
     }
 
     let refine_dir = test_refine_dir(&target_root);
@@ -92,21 +99,85 @@ fn run_governed_planning_with_script(
         Default::default(),
         work_items.clone(),
     );
+    let events =
+        crate::application::events::FileEventService::with_runtime_root(&refine_dir, &runtime_root);
+    if multiple {
+        let config = events.config().unwrap();
+        let mut event = config.events["workflow.plan.enter"].clone();
+        let mut binding = event.bindings[0].clone();
+        binding.id = "independent-plan".into();
+        binding.order = 1;
+        event.bindings.push(binding);
+        events
+            .save(
+                "events",
+                &event.id,
+                json!({"revision":config.revision, "item":event}),
+            )
+            .unwrap();
+    }
     let goal = work_items.show_goal_detail("GOAL1").unwrap();
-    let result =
+    let mut result =
         run_governed_implementation_planning(&context, &goal, &agent_context, &target_root, branch);
-    let detail = work_items.show_goal_detail("GOAL1").unwrap();
 
+    if retry {
+        let error = result.unwrap_err();
+        assert_eq!(
+            work_items.show_goal_detail("GOAL1").unwrap()["rounds"][0]["implementation_plan"]["state"],
+            "failed"
+        );
+        let workflow = WorkflowEngine::with_target_root(&runtime_root, &target_root);
+        assert_eq!(
+            workflow.settle_goal_failure("GOAL1", authority, "plan", &error),
+            Some(true)
+        );
+        work_items
+            .transition_goal_status("GOAL1", GoalStatus::Todo)
+            .unwrap();
+        work_items
+            .advance_automated_goal_status("GOAL1", GoalStatus::Plan)
+            .unwrap();
+        fs::write(&smoke_ai, native_script("")).unwrap();
+        let (round_idx, revision, request) = work_items.authored_goal_commitment("GOAL1").unwrap();
+        let authority = work_items
+            .claim_workflow_attempt("GOAL1", GoalStatus::Plan, round_idx, revision, &request)
+            .unwrap();
+        let context = WorkflowContext::new(
+            &runtime_root,
+            &target_root,
+            "GOAL1".into(),
+            "default".into(),
+            "smoke-ai".into(),
+            round_idx,
+            authority,
+            Default::default(),
+            work_items.clone(),
+        );
+        let goal = work_items.show_goal_detail("GOAL1").unwrap();
+        result = run_governed_implementation_planning(
+            &context,
+            &goal,
+            &agent_context,
+            &target_root,
+            branch,
+        );
+    }
+    let mut detail = work_items.show_goal_detail("GOAL1").unwrap();
+    let history = events.invocations(0, 100).unwrap();
+    detail["invocations"] = json!(
+        history["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|i| events.invocation(i["id"].as_str().unwrap()).unwrap())
+            .collect::<Vec<_>>()
+    );
+    detail["file"] = json!(fs::read_to_string(target_root.join("app.txt")).unwrap());
     unsafe {
         if let Some(previous) = previous_provider {
             std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
         } else {
             std::env::remove_var("REFINE_SMOKE_AI_PATH");
-        }
-        if let Some(previous) = previous_planning {
-            std::env::set_var("REFINE_SMOKE_AI_GOVERNED_PLANNING", previous);
-        } else {
-            std::env::remove_var("REFINE_SMOKE_AI_GOVERNED_PLANNING");
         }
     }
     fs::remove_dir_all(temp_root).unwrap();
@@ -115,347 +186,117 @@ fn run_governed_planning_with_script(
 
 #[cfg(unix)]
 #[test]
-fn governed_planning_repairs_invalid_proposal_and_retains_the_attempt() {
-    let (result, detail) = run_governed_planning_with_script(
-        "governed-planning-repair",
-        r#"case "$*" in
-  *"Structured Output Repair 1/2"*)
-    payload='{"state":"completed","message":"repaired","guidance_applied":[],"planning_result":{"summary":"Repair the workflow output contract.","checklist":[{"id":"P1","description":"Implement the bounded repair behavior."}]}}'
-    ;;
-  *"Current Workflow Phase: Criticize"*)
-    payload='{"state":"completed","message":"criticized","guidance_applied":[],"planning_result":{"summary":"No material omissions.","findings":[]}}'
-    ;;
-  *"Current Workflow Phase: Revise"*)
-    payload='{"state":"completed","message":"revised","guidance_applied":[],"planning_result":{"summary":"Repair the workflow output contract.","checklist":[{"id":"P1","description":"Implement the bounded repair behavior."}],"criticism_resolutions":[]}}'
-    ;;
-  *)
-    payload='{"state":"completed","message":"invalid proposal","guidance_applied":[],"planning_result":{"summary":"Missing the checklist."}}'
-    ;;
-esac"#,
+fn plan_skill_repairs_invalid_artifact_and_retains_diagnostics() {
+    let (result, detail) = run_planning(
+        "event-plan-repair",
+        "if 'previous response' not in prompt: result['artifacts']['plan']={'summary':'Missing checklist'}",
+        false,
+        false,
     );
-    let plan = result.unwrap();
-    assert_eq!(plan.checklist[0].id, "P1");
-
-    let attempts = detail["rounds"][0]["implementation_plan"]["invalid_output_attempts"]
-        .as_array()
-        .unwrap();
-    assert_eq!(attempts.len(), 1);
-    assert_eq!(attempts[0]["phase"], "plan");
-    assert_eq!(attempts[0]["attempt"], 1);
+    assert_eq!(
+        result.unwrap().checklist[0].id,
+        "workflow.plan.enter:default-plan:P1"
+    );
+    let attempts = detail["invocations"][0]["attempts"].as_array().unwrap();
+    assert_eq!(attempts.len(), 2);
     assert!(
-        attempts[0]["diagnostics"]
+        attempts[0]["diagnostic"]
             .as_str()
             .unwrap()
-            .contains("structured implementation plan JSON")
+            .contains("checklist")
     );
-    assert_eq!(
-        attempts[0]["raw_output"],
-        r#"{"summary":"Missing the checklist."}"#
+    assert!(
+        attempts[0]["raw_output"]
+            .as_str()
+            .unwrap()
+            .contains("Missing checklist")
     );
+    assert!(attempts[1]["diagnostic"].is_null());
 }
 
 #[cfg(unix)]
 #[test]
-fn governed_planning_fails_fast_when_the_agent_never_signals_completion() {
-    // A clean exit with no completion signal used to fall back to decoding the
-    // terminal transcript as plan JSON — a guaranteed contract failure with a
-    // misleading diagnostic that burned every repair attempt (two full agent
-    // runs) reproducing the same shape.
-    let (result, detail) =
-        run_governed_planning_with_script("governed-planning-no-signal", "exit 0");
-
-    let message = result.unwrap_err().to_string();
+fn plan_skill_exhausts_bounded_repairs_without_accepting_an_invalid_plan() {
+    let (result, detail) = run_planning(
+        "event-plan-exhausted",
+        "result['artifacts']['plan']={'summary':'Missing checklist'}",
+        false,
+        false,
+    );
     assert!(
-        message.contains("exited without a structured completion signal"),
-        "expected the no-signal infrastructure fault to be named, got: {message}"
-    );
-
-    let plan = &detail["rounds"][0]["implementation_plan"];
-    assert_eq!(plan["failure"]["category"], "provider");
-    let attempts = &plan["invalid_output_attempts"];
-    assert!(
-        attempts.as_array().is_none_or(Vec::is_empty),
-        "no repair attempts may be spent on a session that never signalled: {attempts:?}"
-    );
-}
-
-#[cfg(unix)]
-#[test]
-fn governed_revision_accepts_aliased_resolution_ids_without_a_repair_round() {
-    let (result, detail) = run_governed_planning_with_script(
-        "governed-revision-alias",
-        r#"case "$*" in
-  *"Current Workflow Phase: Criticize"*)
-    payload='{"state":"completed","message":"criticized","guidance_applied":[],"planning_result":{"summary":"One material omission.","findings":[{"id":"C1","material":true,"checklist_item_ids":["P1"],"description":"Missing failure-path coverage.","recommendation":"Cover the failure path."}]}}'
-    ;;
-  *"Current Workflow Phase: Revise"*)
-    payload='{"state":"completed","message":"revised","guidance_applied":[],"planning_result":{"summary":"Cover the failure path.","checklist":[{"id":"P1","description":"Implement the behavior and its failure path."}],"criticism_resolutions":[{"id":"C1","resolution":"Extended P1 to cover the failure path."}]}}'
-    ;;
-  *)
-    payload='{"state":"completed","message":"planned","guidance_applied":[],"planning_result":{"summary":"Implement the behavior.","checklist":[{"id":"P1","description":"Implement the behavior."}]}}'
-    ;;
-esac"#,
-    );
-    // The production transcript shape from goal DRE2A015047036C9717F9959E7: the
-    // revise agent resolves finding C1 under the key `id`, not `criticism_id`.
-    let plan = result.unwrap();
-    assert_eq!(plan.criticism_resolutions.len(), 1);
-    assert_eq!(plan.criticism_resolutions[0].criticism_id, "C1");
-    assert_eq!(
-        plan.criticism_resolutions[0].resolution,
-        "Extended P1 to cover the failure path."
-    );
-
-    let attempts = &detail["rounds"][0]["implementation_plan"]["invalid_output_attempts"];
-    assert!(
-        attempts.as_array().is_none_or(Vec::is_empty),
-        "attempts: {attempts:?}"
-    );
-}
-
-/// The disruption doctrine: durable Goal state is the complete truth, so a
-/// Goal re-queued after a planning failure re-enters this step and does the
-/// work over. A Failed persisted plan must not be a terminal contract
-/// violation that instantly re-fails the re-queued Goal.
-#[cfg(unix)]
-#[test]
-fn a_requeued_goal_re_enters_planning_past_its_failed_plan() {
-    use std::os::unix::fs::PermissionsExt;
-
-    let temp_root = unique_temp_dir("requeued-planning-reentry");
-    let target_root = temp_root.join("repo");
-    let runtime_root = temp_root.join("run/8080");
-    let smoke_ai = temp_root.join("smoke-ai");
-    fs::create_dir_all(&target_root).unwrap();
-    git(&target_root, &["init", "-b", "main"]).unwrap();
-    git(
-        &target_root,
-        &["config", "user.email", "refine-test@example.invalid"],
-    )
-    .unwrap();
-    git(&target_root, &["config", "user.name", "Refine Test"]).unwrap();
-    fs::write(target_root.join("app.txt"), "base\n").unwrap();
-    git(&target_root, &["add", "app.txt"]).unwrap();
-    git(&target_root, &["commit", "-m", "base"]).unwrap();
-    let base = git_output(&target_root, &["rev-parse", "HEAD"])
-        .trim()
-        .to_string();
-    let branch = "refine/GOAL1/round-1";
-    git(&target_root, &["checkout", "-b", branch]).unwrap();
-
-    // First attempt: the agent exits without signalling completion, so
-    // planning records a provider failure on the round's plan.
-    fs::write(&smoke_ai, "#!/bin/sh\nexit 0\n").unwrap();
-    let mut permissions = fs::metadata(&smoke_ai).unwrap().permissions();
-    permissions.set_mode(0o755);
-    fs::set_permissions(&smoke_ai, permissions).unwrap();
-
-    let _guard = smoke_ai_env_lock()
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    let previous_provider = std::env::var_os("REFINE_SMOKE_AI_PATH");
-    let previous_planning = std::env::var_os("REFINE_SMOKE_AI_GOVERNED_PLANNING");
-    unsafe {
-        std::env::set_var("REFINE_SMOKE_AI_PATH", &smoke_ai);
-        std::env::set_var("REFINE_SMOKE_AI_GOVERNED_PLANNING", "1");
-    }
-
-    let refine_dir = test_refine_dir(&target_root);
-    let work_items = FileWorkItemService::new(&refine_dir);
-    work_items
-        .create_goal_summary("Planning re-entry", Some("GOAL1"))
-        .unwrap();
-    work_items
-        .append_goal_round_summary("GOAL1", "Reporter", "Implement bounded repair")
-        .unwrap();
-    work_items
-        .transition_goal_status("GOAL1", GoalStatus::Todo)
-        .unwrap();
-    work_items
-        .advance_automated_goal_status("GOAL1", GoalStatus::Plan)
-        .unwrap();
-    work_items
-        .update_goal_git_refs("GOAL1", branch, "main", &base, None)
-        .unwrap();
-    let agent_context = json!({
-        "version": 1,
-        "goal": {"id": "GOAL1", "name": "Planning re-entry", "node_id": "default"},
-        "previous_rounds": [],
-        "current_round": {"round": 1, "prompt": "Implement bounded repair"}
-    });
-    work_items
-        .update_goal_round_evaluation_summary("GOAL1", 0, &json!({"agent_context": agent_context}))
-        .unwrap();
-    let (round_idx, revision, request) = work_items.authored_goal_commitment("GOAL1").unwrap();
-    let authority = work_items
-        .claim_workflow_attempt("GOAL1", GoalStatus::Plan, round_idx, revision, &request)
-        .unwrap();
-    let context = WorkflowContext::new(
-        &runtime_root,
-        &target_root,
-        "GOAL1".to_string(),
-        "default".to_string(),
-        "smoke-ai".to_string(),
-        round_idx,
-        authority,
-        Default::default(),
-        work_items.clone(),
-    );
-    let goal = work_items.show_goal_detail("GOAL1").unwrap();
-    let error =
-        run_governed_implementation_planning(&context, &goal, &agent_context, &target_root, branch)
-            .unwrap_err();
-    let detail = work_items.show_goal_detail("GOAL1").unwrap();
-    assert_eq!(
-        detail["rounds"][0]["implementation_plan"]["state"],
-        "failed"
-    );
-
-    // The planning behavior settles the failure through the real path,
-    // failing the Goal and recording the failure on its round.
-    let workflow = WorkflowEngine::with_target_root(&runtime_root, &target_root);
-    assert_eq!(
-        workflow.settle_goal_failure("GOAL1", authority, "plan", &error),
-        Some(true)
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("after two repairs")
     );
     assert_eq!(
-        work_items.show_goal_summary("GOAL1").unwrap().goal.status,
-        GoalStatus::Failed
-    );
-
-    // Manual re-queue: the operator moves the Failed Goal back to Todo.
-    work_items
-        .transition_goal_status("GOAL1", GoalStatus::Todo)
-        .unwrap();
-    let detail = work_items.show_goal_detail("GOAL1").unwrap();
-    assert_eq!(detail["rounds"][0]["failure_category"], "");
-    assert_eq!(detail["rounds"][0]["failure_message"], "");
-
-    // Second attempt: a well-formed planning trio.
-    fs::write(
-        &smoke_ai,
-        concat!(
-            "#!/bin/sh\n",
-            r#"case "$*" in
-  *"Current Workflow Phase: Criticize"*)
-    payload='{"state":"completed","message":"criticized","guidance_applied":[],"planning_result":{"summary":"No material omissions.","findings":[]}}'
-    ;;
-  *"Current Workflow Phase: Revise"*)
-    payload='{"state":"completed","message":"revised","guidance_applied":[],"planning_result":{"summary":"Implement the behavior.","checklist":[{"id":"P1","description":"Implement the behavior."}],"criticism_resolutions":[]}}'
-    ;;
-  *)
-    payload='{"state":"completed","message":"planned","guidance_applied":[],"planning_result":{"summary":"Implement the behavior.","checklist":[{"id":"P1","description":"Implement the behavior."}]}}'
-    ;;
-esac"#,
-            "\nprintf '%s\\n' \"$payload\" > \"$REFINE_AGENT_SIGNAL_PATH\"\nsleep 10\n"
-        ),
-    )
-    .unwrap();
-
-    work_items
-        .advance_automated_goal_status("GOAL1", GoalStatus::Plan)
-        .unwrap();
-    let (round_idx, revision, request) = work_items.authored_goal_commitment("GOAL1").unwrap();
-    let authority = work_items
-        .claim_workflow_attempt("GOAL1", GoalStatus::Plan, round_idx, revision, &request)
-        .unwrap();
-    let context = WorkflowContext::new(
-        &runtime_root,
-        &target_root,
-        "GOAL1".to_string(),
-        "default".to_string(),
-        "smoke-ai".to_string(),
-        round_idx,
-        authority,
-        Default::default(),
-        work_items.clone(),
-    );
-    let goal = work_items.show_goal_detail("GOAL1").unwrap();
-    let result =
-        run_governed_implementation_planning(&context, &goal, &agent_context, &target_root, branch);
-    let detail = work_items.show_goal_detail("GOAL1").unwrap();
-
-    unsafe {
-        if let Some(previous) = previous_provider {
-            std::env::set_var("REFINE_SMOKE_AI_PATH", previous);
-        } else {
-            std::env::remove_var("REFINE_SMOKE_AI_PATH");
-        }
-        if let Some(previous) = previous_planning {
-            std::env::set_var("REFINE_SMOKE_AI_GOVERNED_PLANNING", previous);
-        } else {
-            std::env::remove_var("REFINE_SMOKE_AI_GOVERNED_PLANNING");
-        }
-    }
-
-    // The re-queued Goal re-plans instead of instantly re-failing: the failed
-    // prior plan is replaced wholesale by the fresh attempt.
-    let plan = result.unwrap();
-    assert_eq!(plan.checklist[0].id, "P1");
-    let persisted = &detail["rounds"][0]["implementation_plan"];
-    assert_ne!(persisted["state"], "failed");
-    assert!(persisted["failure"].is_null(), "{:#}", persisted["failure"]);
-    assert!(!persisted["final_plan"].is_null());
-    assert!(
-        persisted["invalid_output_attempts"]
+        detail["invocations"][0]["attempts"]
             .as_array()
-            .is_none_or(Vec::is_empty),
-        "the replaced plan must not inherit the failed attempt's repair ledger"
+            .unwrap()
+            .len(),
+        3
     );
-
-    fs::remove_dir_all(temp_root).unwrap();
+    assert_eq!(
+        detail["rounds"][0]["implementation_plan"]["failure"]["category"],
+        "invalid_output"
+    );
 }
 
 #[cfg(unix)]
 #[test]
-fn governed_planning_repair_diagnostics_name_ambiguity_and_schema_paths() {
-    let (result, detail) = run_governed_planning_with_script(
-        "governed-planning-diagnostics",
-        r#"case "$*" in
-  *"Current Workflow Phase: Plan"*"Structured Output Repair 1/2"*)
-    payload='{"state":"completed","message":"repaired plan","guidance_applied":[],"planning_result":{"summary":"Implement the behavior.","checklist":[{"id":"P1","description":"Implement the behavior."}]}}'
-    ;;
-  *"Current Workflow Phase: Revise"*"Structured Output Repair 1/2"*)
-    payload='{"state":"completed","message":"repaired revision","guidance_applied":[],"planning_result":{"summary":"Cover the failure path.","checklist":[{"id":"P1","description":"Implement the behavior and its failure path."}],"criticism_resolutions":[{"criticism_id":"C1","resolution":"Extended P1 to cover the failure path."}]}}'
-    ;;
-  *"Current Workflow Phase: Criticize"*)
-    payload='{"state":"completed","message":"criticized","guidance_applied":[],"planning_result":{"summary":"One material omission.","findings":[{"id":"C1","material":true,"checklist_item_ids":["P1"],"description":"Missing failure-path coverage.","recommendation":"Cover the failure path."}]}}'
-    ;;
-  *"Current Workflow Phase: Revise"*)
-    payload='{"state":"completed","message":"revised","guidance_applied":[],"planning_result":{"summary":"Cover the failure path.","checklist":[{"id":"P1","description":"Implement the behavior and its failure path."}],"criticism_resolutions":[{"criticism_id":"C1"}]}}'
-    ;;
-  *)
-    payload='{"state":"completed","message":"planned","guidance_applied":[],"planning_result":"planned as {\"summary\":\"one\"} or {\"summary\":\"two\"}"}'
-    ;;
-esac"#,
-    );
+fn multiple_plan_skills_contribute_separate_namespaced_checklists() {
+    let (result, detail) = run_planning("event-multiple-plans", "", true, false);
     let plan = result.unwrap();
-    assert_eq!(plan.criticism_resolutions[0].criticism_id, "C1");
-
-    let attempts = detail["rounds"][0]["implementation_plan"]["invalid_output_attempts"]
-        .as_array()
-        .unwrap();
-    assert_eq!(attempts.len(), 2, "attempts: {attempts:?}");
-
-    // Plan attempt 1 stringified prose instead of the required object; the
-    // transport fault must be named explicitly.
-    assert_eq!(attempts[0]["phase"], "plan");
-    let stringified = attempts[0]["diagnostics"].as_str().unwrap();
-    assert!(
-        stringified.contains("invalid recursively stringified JSON"),
-        "diagnostics: {stringified}"
+    assert_eq!(plan.checklist.len(), 2);
+    assert_ne!(plan.checklist[0].id, plan.checklist[1].id);
+    assert_eq!(
+        detail["invocations"][0]["results"]
+            .as_object()
+            .unwrap()
+            .len(),
+        2
     );
+    assert!(detail["rounds"][0]["implementation_plan"]["criticism"].is_null());
+}
 
-    // Revise attempt 1 dropped the resolution field; the repair prompt must
-    // carry the exact schema path instead of a generic sentence.
-    assert_eq!(attempts[1]["phase"], "revise");
-    let schema_path = attempts[1]["diagnostics"].as_str().unwrap();
-    assert!(
-        schema_path.contains("criticism_resolutions[0]"),
-        "diagnostics: {schema_path}"
+#[cfg(unix)]
+#[test]
+fn a_requeued_goal_re_enters_planning_and_retains_prior_event_failure() {
+    let (result, detail) = run_planning(
+        "event-requeue-plan",
+        "result['artifacts']['plan']={}",
+        false,
+        true,
+    );
+    assert_eq!(result.unwrap().checklist.len(), 1);
+    let history = detail["invocations"].as_array().unwrap();
+    assert_eq!(history.len(), 2);
+    assert!(history.iter().any(|i| i["state"] == "error"));
+    assert!(history.iter().any(|i| i["state"] == "succeeded"));
+    assert!(detail["rounds"][0]["implementation_plan"]["failure"].is_null());
+}
+
+#[cfg(unix)]
+#[test]
+fn plan_skill_cannot_mutate_the_checkout_and_retains_its_response() {
+    let (result, detail) = run_planning(
+        "event-plan-mutation",
+        "pathlib.Path('app.txt').write_text('unauthorized change')",
+        false,
+        false,
     );
     assert!(
-        schema_path.contains("missing field `resolution`"),
-        "diagnostics: {schema_path}"
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("changed the checkout")
+    );
+    assert_eq!(detail["file"], "unauthorized change");
+    assert_eq!(
+        detail["invocations"][0]["attempts"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
     );
 }

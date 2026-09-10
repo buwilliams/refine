@@ -6,6 +6,7 @@ refine coordinates your agent fleet for software delivery. It is not another age
 
 - **Empower your team** - extend product feedback and app edits to your whole team. Keep planning, features, Goals, chat, and human verification in one workflow so work moves without losing context.
 - **Agent Fleet** - orchestrate your agent fleet across decentralized repositories, branches, processes, and your fleet of nodes. Cheap feedback loops keep agent work moving while git keeps everyone in sync.
+- **Events and Skills** - connect workflow activity and custom actions to reusable agent instructions, with scoped configuration, parameters, and durable execution evidence. [Configure Events and Skills](docs/runbooks/configure-events-and-skills.md).
 - **Governance** - keep agent work aligned with your product intent, local rules, and requirements. Review stays grounded before changes merge.
 - **Personal AI** - install refine and manage your fleet with your favorite agent.
 

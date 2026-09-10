@@ -36,7 +36,7 @@ impl FileOperationRegistry {
         for process in supervisor
             .list()?
             .iter()
-            .filter(|process| process_operation_id(process).as_deref() == Some(operation_id))
+            .filter(|process| process_belongs_to_operation(process, operation_id))
         {
             supervisor.request_termination(&process.id, "terminate")?;
         }
@@ -194,7 +194,7 @@ impl FileOperationRegistry {
         for process in supervisor
             .list()?
             .into_iter()
-            .filter(|process| process_operation_id(process).as_deref() == Some(operation_id))
+            .filter(|process| process_belongs_to_operation(process, operation_id))
         {
             if FileProcessSupervisor::process_is_alive(&process)? {
                 live.push(json!({"id": process.id, "pid": process.pid}));

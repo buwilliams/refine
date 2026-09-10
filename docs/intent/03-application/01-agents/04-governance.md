@@ -27,14 +27,14 @@ Governance also applies to Refine's own agent design. Internal prompts remain re
 
 Current implementation details that matter to intent:
 
-- governance lives near settings, guidance, reporters, and quality configuration;
+- Governance instructions live in Skills, triggered by Events at Workflow Governance Enter;
 - agents and workflow should be able to reuse governance context;
 - governance concerns should be visible when they affect work;
 - governance should preserve human-editable project intent rather than hiding policy inside code;
 - governance verdicts should cite actual rule violations rather than preferences or hypothetical risks.
-- product, constitution, and automatic-Round-limit patches are independent of the rule collection and preserve omitted fields;
-- every rule has a stable id and the collection has a `rules_revision`; browser, CLI, and compatibility list writers submit the revision they observed, receive the authoritative normalized readback, and refresh rather than replay stale rules after a conflict;
-- generated rules are adopted through the same revision-fenced persistence path as manually edited rules, so generation cannot overwrite a concurrent rule change.
+- the default Governance Skill preserves existing product, constitution, and rule text; edits use the shared Events/Skills revision fence;
+- the shared automatic recovery Round limit belongs in Runtime Config;
+- every blocking Governance Skill must pass for the collective gate to pass; invalid provider output remains an execution fault rather than a fabricated violation;
 - post-Quality integration takes the repository workflow lease before final target revalidation and retains it through any provable candidate refresh, replacement Quality and Governance, publication, integration, and evidence settlement. Governance always judges the exact candidate that the lease will integrate; a replacement commit invalidates and reruns the prior gates. The verdict itself runs between repository-lock holds under a no-output stall budget, and integration re-proves the exact target tip it will merge onto.
 
 ## Future Direction

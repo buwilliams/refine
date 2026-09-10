@@ -191,6 +191,15 @@ impl FileProcessControlService {
         let goal = work_items.cancel_goal_summary(goal_id)?;
         let mut stopped = Vec::new();
         let mut failures = Vec::new();
+        if let Some(refine_dir) = &self.refine_dir {
+            let events = crate::application::events::FileEventService::with_runtime_root(
+                refine_dir,
+                &self.runtime_root,
+            );
+            if let Err(error) = events.cancel_goal_invocations(goal_id) {
+                failures.push(json!({"event_cancellation": error.to_string()}));
+            }
+        }
         for (supervisor, process) in self.managed_processes_for_goal(goal_id)? {
             match self
                 .terminate_with_escalation(&supervisor, &process, "terminate")

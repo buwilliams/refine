@@ -27,6 +27,24 @@ pub fn merge_state_file(
     local_bytes: &[u8],
     remote_bytes: &[u8],
 ) -> Option<Vec<u8>> {
+    if relative == Path::new("automation/config.json") {
+        let mut base: serde_json::Value = serde_json::from_slice(base_bytes).ok()?;
+        let mut local: serde_json::Value = serde_json::from_slice(local_bytes).ok()?;
+        let mut remote: serde_json::Value = serde_json::from_slice(remote_bytes).ok()?;
+        let revision = local["revision"]
+            .as_u64()?
+            .max(remote["revision"].as_u64()?)
+            .checked_add(1)?;
+        for value in [&mut base, &mut local, &mut remote] {
+            value.as_object_mut()?.remove("revision");
+        }
+        let mut merged = merge_json_value(&base, &local, &remote, None, GoalDepth::Deep)?;
+        merged["revision"] = revision.into();
+        let config: crate::model::automation::AutomationConfig =
+            serde_json::from_value(merged.clone()).ok()?;
+        config.validate().ok()?;
+        return encode_json(&merged);
+    }
     if relative == Path::new("nodes.json") {
         return merge_node_registry(base_bytes, local_bytes, remote_bytes);
     }

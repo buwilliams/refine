@@ -277,6 +277,17 @@ impl WorkflowEngine {
         );
         let policy = self.policy().map_err(unclaimed)?;
         let summary = work_items.show_goal_summary(goal_id).map_err(unclaimed)?;
+        if work_items
+            .show_goal_detail(goal_id)
+            .map_err(unclaimed)?
+            .get("pending_event_transition")
+            .is_some_and(|p| p["state"] == "pending")
+        {
+            return Err(unclaimed(RefineError::Conflict(format!(
+                "{} {goal_id}",
+                crate::application::events::transitions::PENDING
+            ))));
+        }
         let node_id = summary
             .goal
             .node_id
@@ -370,6 +381,11 @@ impl WorkflowEngine {
     ) -> RefineResult<WorkflowStepResult> {
         let start_status = ctx.start_status.clone();
         if let Err(error) = self.advance_behaviors(&mut ctx, start_status) {
+            if matches!(&error, RefineError::Degraded(message) if message.starts_with("workspace is in use"))
+                || is_stale_authority(&error)
+            {
+                return Err(error);
+            }
             let _ =
                 self.settle_goal_failure(&ctx.goal_id, ctx.attempt_authority, "workflow", &error);
             return Err(error);
@@ -447,6 +463,22 @@ impl WorkflowEngine {
                     current.as_str()
                 )));
             };
+            let _target_workspace = if integrated_target_lane.is_some() {
+                Some(
+                    crate::infrastructure::storage::workspace::WorkspaceLease::acquire(
+                        ctx.target_root,
+                    )?,
+                )
+            } else {
+                None
+            };
+            let workspace = ctx
+                .worktree_path
+                .as_deref()
+                .map(std::path::Path::new)
+                .unwrap_or(ctx.target_root);
+            let _workspace =
+                crate::infrastructure::storage::workspace::WorkspaceLease::acquire(workspace)?;
             match behavior.advance(ctx) {
                 Ok(WorkflowAdvanceOutcome::Transition { to, .. }) => current = to,
                 Ok(WorkflowAdvanceOutcome::Completed { .. }) => {
@@ -528,6 +560,7 @@ fn outcome_reason(outcome: WorkflowAdvanceOutcome) -> String {
 
 fn is_stale_authority(error: &RefineError) -> bool {
     matches!(error, RefineError::Conflict(message) if message.contains("owned by node")
+        || message.starts_with(crate::application::events::transitions::PENDING)
         || message.contains("no longer eligible")
         || message.contains("changed from expected")
         || message.contains("changed before workflow attempt claim")

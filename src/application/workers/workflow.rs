@@ -51,6 +51,20 @@ pub(super) fn run_workflow_worker(
                 }
                 recovered_root = Some(root);
             }
+            if let Ok(refine_dir) = prepare_refine_dir(&target_root) {
+                let events = crate::application::events::FileEventService::with_runtime_root(
+                    &refine_dir,
+                    runtime_root,
+                );
+                if let Err(error) = events.dispatch_goal_events(&target_root) {
+                    eprintln!("refine Goal Events: {error}");
+                }
+                if let Err(error) = events.dispatch_pending(&target_root) {
+                    if !error.to_string().contains("paused") {
+                        eprintln!("refine Events: {error}");
+                    }
+                }
+            }
             match workflow.evaluate_workflow() {
                 Ok(result) if result.changed_projection() => {
                     let _ = refresh_projection(runtime_root, &target_root);

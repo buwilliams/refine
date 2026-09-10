@@ -2,22 +2,23 @@
 
 ## Key Ideas
 
-- **Pinned Context**: planning uses the product, constitution, rules, guidance, prior Rounds, current Round, and repository state captured for this attempt.
-- **Independent Critique**: proposal, critique, and finalization are distinct agent phases.
+- **Pinned Context**: planning uses the Goal, current Round, repository state, parameters, and attached Skills selected for the occurrence.
+- **Skill-Owned Method**: the default Plan Skill chooses how to investigate and challenge its solution before finalizing it.
+- **Independent Results**: multiple Plan Skills contribute separate checklists with stable namespaced item IDs.
 - **No Repository Mutation**: Plan produces durable execution evidence before implementation begins.
 
 ## Purpose
 
-Plan turns an actionable Round into a governed implementation strategy. It makes assumptions and risks inspectable before an implementation agent changes files.
+Plan turns an actionable Round into an inspectable implementation strategy. It makes assumptions and verification visible before an implementation agent changes files.
 
 ## Expected Role
 
-After Todo admission, Workflow pins the exact Goal, Round, workflow revision, Git base, and project context. Fresh managed agents propose a plan, critique it independently, and finalize a concise checklist. Each artifact is persisted before the next phase begins. Planning agents must leave the repository unchanged. When proposal, criticism, or revision output cannot be parsed or validated, Workflow durably records the raw attempt and diagnostic, then makes at most two diagnostic repair invocations while retaining the last valid phase artifact.
+After Todo admission, Workflow pins the Goal, Round, attempt authority, and Git base. `workflow.plan.enter` launches its applicable Skills. Refine supplies each Plan Skill's result contract and collects every accepted plan; no fixed proposal, criticism, revision, or advisory Governance agent sequence is imposed.
 
-On providers whose CLI accepts a caller-chosen interactive session identifier, the plan phase pins a provider-native session; revision and the later implementation launch resume it so accumulated repository context carries forward, while criticism always runs fresh to preserve its independent judgment. A lost provider session degrades to a fresh launch rather than failing the Round.
+A Plan Skill must leave the repository unchanged and return an actionable checklist. Invalid responses receive at most two diagnostic repairs with raw attempts and process receipts retained. A blocked or invalid Plan result cannot advance Implement. Infrastructure, authority, and contract failures remain distinct from a Governance finding.
 
-When governance is configured, an advisory plan-stage governance pre-check judges the finalized plan before any implementation spend. Violations are folded back into the criticize-and-revise contract as material findings for one additional revision; a plan that still fails settles the Round as a planning failure, and an unreadable pre-check verdict is recorded as inconclusive while the Round proceeds. The post-implementation Governance gate stays authoritative.
+The finalized plan remains in the existing Round evidence model, allowing historical proposal, criticism, and revision artifacts to remain readable. Implement consumes the collected checklist and reports actual change and verification evidence for each item. A finding recovery Round invokes the Plan Skill with the reviewed recovery request and retained candidate, then continues through the full Quality and Governance gates.
 
-A Quality- or Governance-finding recovery Round skips the proposal, criticism, and revision phases entirely: the drafted recovery request is already a reviewed delta against a candidate both gates have judged, so Workflow synthesizes and persists its final plan deterministically and the Round spends its agent budget on the fix. Every later gate still runs unchanged.
+## Future Direction
 
-A completed final plan advances the same Round to Implement. Provider, repair-exhausted output-contract, authority, or persistence failures preserve their distinct evidence and move the Goal to Failed; they do not create automatic Governance recovery Rounds.
+Let projects improve planning through their Skills and Event composition while maintaining concise, reviewable outcomes and durable evidence.

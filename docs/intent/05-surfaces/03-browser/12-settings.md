@@ -10,25 +10,26 @@
 
 ## Purpose
 
-Settings exist to configure Refine's relationship to the project, node, target app, agents, runtime, quality, governance, guidance, reporters, processes, and performance.
+Settings exist to configure Refine's relationship to the project, node, target app, agents, runtime, Events, Skills, reporters, processes, and performance.
 
 They should help users make Refine work correctly in their environment without requiring deep knowledge of the internal implementation.
 
 ## Expected Role
 
-Settings should be split by product domain. Project concerns belong with project surfaces. Node and runtime concerns belong with node surfaces. Quality belongs with quality. Governance belongs with governance. This keeps configuration understandable and prevents generic settings sprawl.
+Settings consolidates the former Node and Governance navigation entries under `/#/settings/<tab>`. Events and Skills have their own tabs in the node configuration surface. Governance and Quality remain workflow steps; their instructions are configured as Skills. Retired configuration routes redirect to Settings without retaining competing editors.
 
 Current implementation details that matter to intent:
 
 - settings render through shared `renderSettingsSurface` flows;
 - settings data loads are scoped by active surface and tab;
 - detached mode short-circuits app-scoped calls and keeps app management actionable;
-- target-app settings, quality settings, runtime settings, reporters, governance, guidance, processes, and performance are separate concerns;
+- target-app settings, runtime settings, reporters, Events, Skills, processes, and performance are separate concerns;
 - Node Runtime Config presents a blank parallel-run cap as `Automatic`. Automatic admission applies the node's resource-budget percentage to both detected logical CPU cores and currently available memory; the default is 70 percent, leaving 30 percent for shared-host work. Entering a positive parallel-run cap is an explicit absolute node-level override. Unset node, provider, and target-app limits inherit the resulting global limit;
 - node runtime settings include a validated state-sync stale threshold. Its default is longer than the normal remote-fetch cadence so routine scheduling jitter does not degrade health;
 - Node Runtime Config includes Auto-approve for email-request Goals processed by that node. The validated `auto_approve` boolean defaults to `false` on new and existing installations, leaving Goals in Review for manual acceptance or a follow-up Round. The shared settings API, CLI, runtime copy action, and existing edit/autosave flow use the same setting. Changes apply on the next approval attempt, including requests already waiting in Review, without restarting the worker. When enabled, the local email `auto_approve_after_seconds` delay runs from the first observed Review time, recorded even while disabled. Invalid or unreadable settings prevent automatic acceptance; manual acceptance and notifications after Done remain available;
 - the Nodes view keeps fleet bootstrap health separate from state-sync health: the active node uses this daemon's evidence and other nodes remain unknown without direct evidence;
-- Guidance editing uses stable item ids and an observed collection revision. Governance rule autosave and generated-rule adoption retain rule ids and the observed rules revision. Both surfaces consume authoritative write responses and refresh visible state after a `409` instead of retrying stale content;
+- Events and Skills share a configuration revision. Editors retain drafts and refresh the underlying state after a conflict. Node switches fence submissions and preserve or explicitly discard unsaved drafts;
+- custom Event launch forms collect typed parameters and defaults, and execution history exposes findings, errors, process evidence, and cancellation;
 - Guide icons and guidance surfaces are expected to help explain fields.
 
 Settings should avoid overfetching and avoid hiding invalid states. If Refine is detached, paused, misconfigured, or missing a target app command, the settings surface should make that clear.

@@ -17,18 +17,18 @@ The point is not to prevent all mistakes. The point is to make the system prove 
 
 ## Expected Role
 
-Quality should sit between implementation and trust. Every committed Goal candidate receives a Quality evaluation. Quality uses its own project-wide plain-text tests, separate from Governance rules and target-app lifecycle commands.
+Quality should sit between implementation and trust. Every committed Goal candidate receives a Quality evaluation. Quality instructions and expected outcomes are authored in Skills bound to `workflow.quality.enter`. The default Quality Skill is seeded from existing instructions and tests. Target-app lifecycle commands retain their separate operational purpose.
 
 Current implementation details that matter to intent:
 
-- each configured plain-text test should receive exactly one pass or fail result;
+- all blocking Quality Skills contribute independent results; every accepted check command receives an observed pass or fail result;
 - the Quality agent should choose one non-interactive command for each test whose final status is `0` if and only if that test passes; expected-empty predicates must invert or compare tools such as `grep` so a successful no-match cannot surface as exit `1`, and a pass without a correlated observed execution should fail;
 - the provider and test commands should be correlated with one durable operation ID, and process registration should share the cancellation barrier so no work can launch after cancellation wins;
 - manual and workflow evaluation of the same Goal candidate should share one exclusive operation owner and identical Goal-round evidence;
 - manual evaluation should validate active Node ownership and reserve the same Node, provider, target-app, and global agent capacity used by workflow;
 - each operation should retain its originating target-app and Refine-state identity so restart recovery cannot write evidence into a subsequently selected app;
 - evaluation should persist an exact identity commitment and revalidate it before and after supervised checks: `isolated_candidate` requires the current Goal Round, candidate branch, registered worktree path, clean checkout, and candidate HEAD. A sibling Goal advancing a shared target does not change that isolated evaluation identity. Passed evidence includes a versioned proof bound to Goal ID, zero-based Round, evaluation scope, operation ID, checked candidate, source candidate, state, timestamp, and recorded results;
-- an unreadable Quality response receives at most two diagnostic repair invocations. Every invalid raw response, diagnostic, and provider process receipt remains in durable operation evidence; successful Round details also retain the complete accepted and repaired attempt sequence. Repair exhaustion links the Round to that operation as an output-contract fault, provider launch failure remains a provider fault, and neither is converted into a failed implementation finding;
+- an unreadable Quality response receives at most two diagnostic repair invocations. Every invalid raw response, diagnostic, and provider process receipt remains in the durable Event invocation; Quality diagnostics link to that evidence. Repair exhaustion links the Round to that operation as an output-contract fault, provider launch failure remains a provider fault, and neither is converted into a failed implementation finding;
 - already-merged reconciliation accepts retained exact-candidate proof or normalizes legacy fields only when they reconstruct the complete identity above. Otherwise it creates a clean managed checkout at the exact candidate and runs isolated Quality again; ancestry or a shared-target descendant never supplies Quality approval;
 - the first valid failed isolated evaluation from that already-merged regeneration is terminal and fail-closed. Refine durably retains its exact candidate and source identity, operation, timestamp, results, diagnostics, and provider attempts, and restart settlement reuses that artifact without launching another evaluation or allowing a later result to replace it;
 - implementation worktree creation should register a node-local candidate handoff under the repository maintenance lock. That cleanup-visible owner remains active without a gap through implementation, Quality, and Governance, and cleanup cannot reclaim the current candidate checkout until Governance successfully integrates it. A newer recovery Round may supersede the retained handoff only after its successor checkout has acquired ownership;
@@ -41,11 +41,11 @@ Current implementation details that matter to intent:
 - a valid failed verdict should trigger a separate read-only investigation that records an evidence-based cause, drafts a complete next-Round request, and returns the Goal to Todo; Quality and Governance share the configured five-Round automatic recovery budget, after which a remaining finding moves the Goal to Failed;
 - provider, parsing, harness, candidate-identity, authority, and infrastructure failures should fail visibly without creating or consuming an automatic recovery Round;
 - quality settings should be shared project context, not hidden UI state;
-- an empty Quality test list should be an explicit successful no-op, not a reason to skip durable Quality evidence.
+- Quality success requires nonempty supervised evidence; missing blocking Quality Skills or check commands are configuration or contract errors.
 
-`quality/settings.json` is the authoritative test policy. Goal workflow Quality always evaluates the isolated candidate before Governance. Legacy timing values remain readable for migration and reconciliation but are not emitted as current configuration. Before migration is marked complete, Refine inspects every Node and deduplicates all enabled legacy target-app test commands; a failed migration remains retryable. Imported commands remain enforced as supervised Quality tests until a user saves a replacement test set.
+`automation/config.json` holds the authoritative Event and Skill definitions. Goal Quality evaluates the isolated candidate before Governance. Migration archives existing Quality instructions and test policy, including deduplicated enabled legacy commands from every node. Previously enforced commands remain supervised until the imported default Quality Skill is deliberately edited or replaced. Legacy files remain migration evidence and do not regain configuration authority.
 
-The browser, API, and `refine config quality` surface all use the same partial settings service. Business requirements and instructions support multiline text, tests remain plain-text outcomes, omitted fields remain unchanged, unknown fields and invalid shapes are rejected, and every successful mutation returns the saved normalized policy.
+Browser Settings, API Skills, and `refine skills` use the same revision-fenced definition service. Instructions are multiline plain text. Invalid definitions and stale revisions fail without erasing the current configuration.
 
 Quality should be strict enough to reveal risk and flexible enough to fit different projects. Refine should not assume every app has the same test command, build step, or verification style.
 

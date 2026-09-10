@@ -14,8 +14,6 @@ const routes = {
   logs: renderLogs,
   changes: renderChanges,
   settings: renderSettings,
-  node: renderNodeSettings,
-  project: renderProjectSettings,
 };
 
 function parseHash() {
@@ -41,18 +39,12 @@ function parseHash() {
   if (parts[0] === "chat") return { route: "chat_redirect" };
   if (parts[0] === "logs") return { route: "logs" };
   if (parts[0] === "changes") return { route: "changes" };
-  if (parts[0] === "system" || parts[0] === "settings") {
-    return { route: "node", tab: parts[1] || "processes" };
-  }
-  if (parts[0] === "node") {
-    return { route: "node", tab: parts[1] || null };
-  }
-  if (parts[0] === "governance") {
-    return { route: "project", tab: parts[1] || "governance" };
-  }
-  if (parts[0] === "project") {
-    if (parts[1] === "application") return { route: "node", tab: "application" };
-    return { route: "project", tab: parts[1] || null };
+  if (["system", "settings", "node", "governance", "project"].includes(parts[0])) {
+    const retired = ["governance", "quality", "guidance"];
+    let tab = parts[1] || (["governance", "project"].includes(parts[0]) ? "skills" : "processes");
+    if (retired.includes(tab)) tab = "skills";
+    if (parts[0] !== "settings" || tab !== parts[1]) history.replaceState(null, "", `#/settings/${tab}`);
+    return { route: "settings", tab };
   }
   return { route: "dashboard" };
 }

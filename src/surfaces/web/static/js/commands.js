@@ -623,7 +623,7 @@ registerCommand({
 
 async function ensureTargetAppSettingsPane() {
   if (state.currentRoute !== "node") {
-    location.hash = "#/node/target-app";
+    location.hash = "#/settings/target-app";
   }
   for (let i = 0; i < 40; i += 1) {
     if (

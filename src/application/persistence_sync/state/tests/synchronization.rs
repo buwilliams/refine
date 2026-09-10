@@ -704,3 +704,59 @@ fn sync_requires_legacy_state_to_be_removed_from_application_branch() {
         .contains("review")
     );
 }
+
+#[test]
+fn events_defaults_adopt_remote_configuration_and_disjoint_edits_sync_between_nodes() {
+    use crate::application::events::FileEventService;
+    let fixture = SyncFixture::new("event-config-sync");
+    let a = FileEventService::new(refine_dir_for_target_root(&fixture.a).unwrap());
+    let b = FileEventService::new(refine_dir_for_target_root(&fixture.b).unwrap());
+    let initial = a.config().unwrap();
+    b.config().unwrap();
+    assert_eq!(
+        fs::read(a.refine_dir.join("automation/config.json")).unwrap(),
+        crate::application::events::migration::pristine_config_bytes()
+    );
+    let mut plan = initial.skills["default-plan"].clone();
+    plan.prompt = "Project planning instructions".into();
+    a.save(
+        "skills",
+        &plan.id,
+        serde_json::json!({"revision":initial.revision,"item":plan}),
+    )
+    .unwrap();
+    fixture.service(&fixture.a).sync().unwrap();
+    fixture.service(&fixture.b).sync().unwrap();
+    let base = b.config().unwrap();
+    assert_eq!(
+        base.skills["default-plan"].prompt,
+        "Project planning instructions"
+    );
+    let mut left = base.skills["default-plan"].clone();
+    left.prompt = "Revised planning".into();
+    let mut right = base.skills["default-quality"].clone();
+    right.prompt = "Check observable requirements".into();
+    a.save(
+        "skills",
+        &left.id,
+        serde_json::json!({"revision":base.revision,"item":left}),
+    )
+    .unwrap();
+    b.save(
+        "skills",
+        &right.id,
+        serde_json::json!({"revision":base.revision,"item":right}),
+    )
+    .unwrap();
+    fixture.service(&fixture.a).sync().unwrap();
+    fixture.service(&fixture.b).sync().unwrap();
+    fixture.service(&fixture.a).sync().unwrap();
+    let merged = a.config().unwrap();
+    assert_eq!(merged.as_ref(), b.config().unwrap().as_ref());
+    assert_eq!(merged.skills["default-plan"].prompt, "Revised planning");
+    assert_eq!(
+        merged.skills["default-quality"].prompt,
+        "Check observable requirements"
+    );
+    assert!(merged.revision > base.revision + 1);
+}

@@ -3,7 +3,7 @@ use serde_json::{Value, json};
 use crate::application::chat::{ChatAttachment, ChatService, StandaloneQualityRequest};
 use crate::application::system::target_apps::{FileTargetAppService, TargetAppSnapshot};
 use crate::application::workflow::phases::quality::{
-    FileQualityService, QualityOperationRunner, QualityService, QualitySettingsPatch,
+    FileQualityService, QualityOperationRunner, QualityService,
 };
 use crate::error::{RefineError, RefineResult};
 use crate::infrastructure::process::subprocess::FileProcessSupervisor;
@@ -112,41 +112,6 @@ impl InProcessWebServer {
                 || !get("target_app_health_url").trim().is_empty(),
             "message": snapshot.message
         })
-    }
-
-    pub(super) fn handle_quality_get(&self) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "load quality settings");
-        match FileQualityService::new(refine_dir).load_settings() {
-            Ok(settings) => ApiResponse::json(200, json!(settings)),
-            Err(error) => error_response(error),
-        }
-    }
-
-    pub(super) fn handle_quality_save(&self, request: ApiRequest) -> ApiResponse {
-        let refine_dir = require_refine_dir!(self, "save quality settings");
-        let patch = match serde_json::from_value::<QualitySettingsPatch>(
-            request.body.unwrap_or_else(|| json!({})),
-        ) {
-            Ok(patch) => patch,
-            Err(error) => {
-                return ApiResponse::json(
-                    400,
-                    json!({
-                        "error": {
-                            "code": "invalid_input",
-                            "message": format!("invalid quality settings body: {error}")
-                        }
-                    }),
-                );
-            }
-        };
-        match FileQualityService::new(&refine_dir).save_settings(patch) {
-            Ok(settings) => {
-                append_quality_activity(&refine_dir, "Quality settings updated".to_string());
-                ApiResponse::json(200, json!(settings))
-            }
-            Err(error) => error_response(error),
-        }
     }
 
     pub(super) fn handle_quality_checks(&self, request: ApiRequest) -> ApiResponse {

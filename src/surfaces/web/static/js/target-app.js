@@ -104,7 +104,7 @@ function applyAgentStatusSnapshot(snap) {
       ? "paused"
       : "running";
   indicator.dataset.state = status;
-  indicator.href = "#/node/processes";
+  indicator.href = "#/settings/processes";
   indicator.removeAttribute("target");
   indicator.removeAttribute("rel");
   const label = `Agents (${agentCount})`;
@@ -144,7 +144,7 @@ function applyTargetAppSnapshot(snap) {
   const checkOk = "last_check_ok" in snap ? snap.last_check_ok : snap.last_health_ok;
   const appUrl = (snap.app_url || "").trim();
   const opensApp = appState === "running" && appUrl;
-  indicator.href = opensApp ? appUrl : "#/node/processes";
+  indicator.href = opensApp ? appUrl : "#/settings/processes";
   if (opensApp) {
     indicator.target = "_blank";
     indicator.rel = "noopener noreferrer";

@@ -67,6 +67,7 @@ function hydrateNodeSelector(project, registry) {
 
 function nodeContextDirtySurfaces() {
   const dirty = [];
+  if (typeof automationEditor !== "undefined" && automationEditor?.dataset.nodeContextDirty === "true") dirty.push({label: "Events or Skills", root: automationEditor});
   const newGoal = document.querySelector("[data-testid='new-goal-modal']");
   const newGoalPrompt = newGoal?.querySelector("[data-testid='new-goal-prompt']");
   const newGoalPriority = newGoal?.querySelector("[data-testid='new-goal-priority']");
@@ -110,6 +111,7 @@ async function confirmLocalNodeContextDiscard() {
 }
 
 async function discardLocalNodeContextSurfaces() {
+  if (typeof automationEditor !== "undefined") automationEditor?._close();
   if (typeof _discardNewGoalForNodeSwitch === "function") _discardNewGoalForNodeSwitch();
   if (typeof _discardImportForNodeSwitch === "function") await _discardImportForNodeSwitch();
   if (typeof _targetAppDraftDirty !== "undefined") _targetAppDraftDirty = false;
@@ -127,7 +129,7 @@ function preserveExternalDirtySurfaces(dirty) {
     warning.dataset.testid = "node-context-stale-warning";
     warning.textContent = `${label} belongs to the previous Node. Discard and reopen it before submitting.`;
     panel.prepend(warning);
-    root.querySelectorAll("input, select, textarea, button:not(.modal-close)").forEach((control) => {
+    root.querySelectorAll("input, select, textarea, button:not(.modal-close):not([data-close])").forEach((control) => {
       control.disabled = true;
     });
   }
@@ -135,6 +137,7 @@ function preserveExternalDirtySurfaces(dirty) {
 
 function closeCleanNodeContextModals() {
   const dirtyRoots = new Set(nodeContextDirtySurfaces().map((item) => item.root).filter(Boolean));
+  if (typeof automationEditor !== "undefined" && automationEditor && !dirtyRoots.has(automationEditor)) automationEditor._close();
   if (typeof _newGoalModalOpen !== "undefined" && _newGoalModalOpen
       && !dirtyRoots.has(document.querySelector("[data-testid='new-goal-modal']")?.closest(".modal-backdrop"))) {
     if (typeof _discardNewGoalForNodeSwitch === "function") _discardNewGoalForNodeSwitch();
@@ -188,6 +191,7 @@ async function applyAuthoritativeNodeContext(project, registry, {
   };
   if (changed) {
     nodeContextGeneration += 1;
+    if (typeof refreshCustomEvents === "function") refreshCustomEvents();
     invalidateScreenDataCache();
     if (external) preserveExternalDirtySurfaces(preservedDirty);
     else if (!surfacesPrepared) await discardLocalNodeContextSurfaces();

@@ -11,7 +11,7 @@ pub(super) fn dispatch_command(command: Commands) -> RefineResult<()> {
             Ok(())
         }
         Commands::Next { target_root: None } => {
-            let next = daemon_json("GET", "/guidance/next", None)?;
+            let next = daemon_json("GET", "/next", None)?;
             print_json(&next);
             Ok(())
         }

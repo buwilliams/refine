@@ -44,6 +44,16 @@ pub(super) fn write_json_atomically(path: &std::path::Path, value: &Value) -> Re
         }
 
         let mut next = value.clone();
+        let event_pending = if is_goal_record(path) {
+            crate::application::events::transitions::prepare_write(
+                &record_root,
+                path,
+                current.as_ref(),
+                &mut next,
+            )?
+        } else {
+            false
+        };
         let object = next.as_object_mut().ok_or_else(|| {
             RefineError::Serialization(format!(
                 "workflow record {} is not a JSON object",
@@ -73,6 +83,15 @@ pub(super) fn write_json_atomically(path: &std::path::Path, value: &Value) -> Re
                     path.display()
                 );
             }
+        }
+        if event_pending {
+            return Err(RefineError::Conflict(format!(
+                "{} {}",
+                crate::application::events::transitions::PENDING,
+                next["pending_event_transition"]["id"]
+                    .as_str()
+                    .unwrap_or("transition")
+            )));
         }
         Ok(())
     })

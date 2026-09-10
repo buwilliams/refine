@@ -1183,7 +1183,7 @@ async function applyProjectAttachResult(result, options = {}) {
   updateActiveNodeLabel();
   state.dashboard = null;
   state.currentGoal = null;
-  state.underlayHash = "#/node/application";
+  state.underlayHash = "#/settings/application";
   if (typeof goalsExcludedIds !== "undefined") goalsExcludedIds.clear();
   if (options.toast !== false) showProjectAttachToast(result);
   resetChatForProjectSwitch();
@@ -1191,8 +1191,8 @@ async function applyProjectAttachResult(result, options = {}) {
   if (typeof reconcileNodeContext === "function") await reconcileNodeContext();
   else await refreshNodeScopedState();
   await refreshTargetAppToggle();
-  if (location.hash !== "#/node/application") {
-    location.hash = "#/node/application";
+  if (location.hash !== "#/settings/application") {
+    location.hash = "#/settings/application";
   } else if (["settings", "node", "project"].includes(state.currentRoute || "")) {
     await refreshSettings();
   } else {
@@ -1972,6 +1972,7 @@ function initSSE() {
     }
   });
   sseSource.addEventListener("api_mutation", (event) => {
+    if (/event-definitions|skills/.test(event.data) && typeof refreshCustomEvents === "function") refreshCustomEvents();
     if (typeof handleNodeContextMutationEvent === "function") {
       handleNodeContextMutationEvent(event);
     }

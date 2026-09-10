@@ -17,7 +17,17 @@ use super::*;
 
 pub(in crate::surfaces::web_server) fn normalize_api_path(path: &str) -> String {
     let path = path.split('?').next().unwrap_or(path);
-    let mut normalized = if let Some(rest) = path.strip_prefix("/api/goals") {
+    let mut normalized = if [
+        "/api/event-definitions",
+        "/api/skills",
+        "/api/event-invocations",
+        "/api/next",
+    ]
+    .iter()
+    .any(|prefix| path == *prefix || path.starts_with(&format!("{prefix}/")))
+    {
+        path.strip_prefix("/api").unwrap().to_string()
+    } else if let Some(rest) = path.strip_prefix("/api/goals") {
         format!("/work/goals{rest}")
     } else if let Some(rest) = path.strip_prefix("/api/features") {
         format!("/work/features{rest}")

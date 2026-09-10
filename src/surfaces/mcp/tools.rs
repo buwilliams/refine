@@ -34,6 +34,7 @@ enum ToolBinding {
     /// Escape hatch: method, path, and body are taken from the arguments so an
     /// agent can reach any daemon route, including writes.
     Passthrough,
+    EventTrigger,
 }
 
 /// A capability the MCP surface exposes to clients.
@@ -117,6 +118,23 @@ impl McpTool {
                     body: Some(Value::Object(body)),
                 })
             }
+            ToolBinding::EventTrigger => {
+                let id = arguments
+                    .get("event_id")
+                    .and_then(Value::as_str)
+                    .filter(|id| crate::model::automation::valid_id(id))
+                    .ok_or_else(|| "a valid event_id is required".to_string())?;
+                let mut body = arguments
+                    .as_object()
+                    .cloned()
+                    .ok_or_else(|| "arguments must be an object".to_string())?;
+                body.remove("event_id");
+                Ok(RequestParts {
+                    method: "POST".into(),
+                    path: format!("/event-definitions/{id}/trigger"),
+                    body: Some(Value::Object(body)),
+                })
+            }
             ToolBinding::Passthrough => {
                 let path = arguments
                     .get("path")
@@ -148,6 +166,42 @@ impl McpTool {
 /// `refine_request` escape hatch covers everything else, including writes.
 pub fn tool_catalog() -> Vec<McpTool> {
     vec![
+        McpTool {
+            name: "refine_list_events",
+            description: "Discover Events and ordered Skill bindings, including custom Events available for manual launch.",
+            input_schema: empty_schema,
+            binding: ToolBinding::Api {
+                method: "GET",
+                path: "/event-definitions",
+                path_params: &[],
+            },
+        },
+        McpTool {
+            name: "refine_list_skills",
+            description: "Read reusable Skill instructions, roles, parameters and configuration revisions.",
+            input_schema: empty_schema,
+            binding: ToolBinding::Api {
+                method: "GET",
+                path: "/skills",
+                path_params: &[],
+            },
+        },
+        McpTool {
+            name: "refine_event_catalog",
+            description: "List all workflow Enter/Exit and lifecycle Event sources.",
+            input_schema: empty_schema,
+            binding: ToolBinding::Api {
+                method: "GET",
+                path: "/event-definitions/catalog",
+                path_params: &[],
+            },
+        },
+        McpTool {
+            name: "refine_trigger_event",
+            description: "Launch a custom Event on the active node. Supply required parameters discovered from its definition and Skills. Reuse request_id to retry transport without duplicating work.",
+            input_schema: || json!({"type":"object","properties":{"event_id":{"type":"string"},"goal_id":{"type":"string"},"node_id":{"type":"string"},"request_id":{"type":"string"},"parameters":{"type":"object"}},"required":["event_id"],"additionalProperties":false}),
+            binding: ToolBinding::EventTrigger,
+        },
         McpTool {
             name: "refine_system_status",
             description: "Read the local Refine daemon status: health, worker state, active operations, and target app state.",
@@ -246,7 +300,7 @@ pub fn tool_catalog() -> Vec<McpTool> {
             input_schema: empty_schema,
             binding: ToolBinding::Api {
                 method: "GET",
-                path: "/guidance/next",
+                path: "/next",
                 path_params: &[],
             },
         },

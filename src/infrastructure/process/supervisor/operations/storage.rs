@@ -109,17 +109,26 @@ impl FileOperationRegistry {
     }
 
     pub fn active_launch_guard(&self, operation_id: &str) -> RefineResult<OperationLaunchGuard> {
+        self.active_launch_guards(&[operation_id])
+    }
+
+    /// Parent capability and Event cancellation share a single launch window.
+    pub fn active_launch_guards(
+        &self,
+        operation_ids: &[&str],
+    ) -> RefineResult<OperationLaunchGuard> {
         let lock = self.mutation_lock()?;
-        let operation = self.status(operation_id)?;
-        if !matches!(
-            operation.state,
-            OperationState::Pending | OperationState::Running
-        ) {
-            FileExt::unlock(&lock).ok();
-            return Err(RefineError::Conflict(format!(
-                "Operation {operation_id} is {}; no later supervised process may start",
-                operation.state.as_api_status()
-            )));
+        for operation_id in operation_ids {
+            let operation = self.status(operation_id)?;
+            if !matches!(
+                operation.state,
+                OperationState::Pending | OperationState::Running
+            ) {
+                return Err(RefineError::Conflict(format!(
+                    "Operation {operation_id} is {}; no later supervised process may start",
+                    operation.state.as_api_status()
+                )));
+            }
         }
         Ok(OperationLaunchGuard { _lock: lock })
     }
@@ -181,9 +190,7 @@ impl FileOperationRegistry {
             if capability_reconciles_restart {
                 let associated = processes
                     .iter()
-                    .filter(|process| {
-                        process_operation_id(process).as_deref() == Some(operation.id.as_str())
-                    })
+                    .filter(|process| process_belongs_to_operation(process, &operation.id))
                     .collect::<Vec<_>>();
                 let capability_attempt = operation
                     .external_attempt
@@ -224,9 +231,7 @@ impl FileOperationRegistry {
             };
             let associated = processes
                 .iter()
-                .filter(|process| {
-                    process_operation_id(process).as_deref() == Some(operation.id.as_str())
-                })
+                .filter(|process| process_belongs_to_operation(process, &operation.id))
                 .cloned()
                 .collect::<Vec<_>>();
             match self.terminate_recovery_processes(&supervisor, &operation, &associated) {

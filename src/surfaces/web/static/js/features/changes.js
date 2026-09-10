@@ -192,7 +192,7 @@ function drawChanges(data, f) {
     renderInto(root, `
       <p class="muted" data-testid="changes-branch-unresolved">
         No integration branch resolved. Set <code>merge_target_branch</code>
-        in <a href="#/node/target-app">Node → Target App Config</a>, or check that the host
+        in <a href="#/settings/target-app">Node → Target App Config</a>, or check that the host
         repo has a branch checked out.
       </p>`);
     return;

@@ -8,6 +8,7 @@ use crate::model::workflow::GoalStatus;
 
 mod agents;
 mod config;
+mod events;
 mod features;
 mod fleet;
 mod goals;
@@ -20,10 +21,8 @@ mod todos;
 mod workflow;
 
 pub use agents::{AgentAction, CliAgentProfile};
-pub use config::{
-    ConfigAction, ConfigDomain, ConfigGovernanceAction, ConfigGuidanceAction, ConfigPayload,
-    ConfigQualityAction, ConfigSettingsAction,
-};
+pub use config::{ConfigAction, ConfigDomain, ConfigPayload, ConfigSettingsAction};
+pub use events::{DefinitionAction, EventAction};
 pub use features::FeatureAction;
 pub use fleet::FleetAction;
 pub use goals::GoalAction;
@@ -46,7 +45,17 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Commands {
-    /// Inspect and configure Settings, Quality, Governance, and Guidance for the active app.
+    /// Configure Event bindings and trigger custom Events.
+    Events {
+        #[command(subcommand)]
+        action: EventAction,
+    },
+    /// Manage reusable Skill instructions, parameters and workflow result roles.
+    Skills {
+        #[command(subcommand)]
+        action: DefinitionAction,
+    },
+    /// Inspect Settings, Events, and Skills for the active app.
     /// Project selection, workflow control, nodes, fleet, Reporters, Todos, and agent authentication remain in their named command groups.
     Config {
         #[command(subcommand)]

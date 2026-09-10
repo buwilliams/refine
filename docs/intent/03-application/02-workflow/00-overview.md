@@ -24,7 +24,7 @@ The lifecycle is:
 - plan: independent agents propose, critique, and finalize an implementation plan from pinned project and Goal context;
 - implement: a fresh agent changes the isolated candidate using the finalized plan;
 - quality: a fresh agent reviews the plan and implementation, writes or selects appropriate tests, corrects the candidate, and proves the checks pass;
-- governance: an independent review verifies product, constitution, rules, and guidance before exact candidate integration;
+- governance: an independent review verifies project intent and applicable Skills before exact candidate integration;
 - review: evidence and judgment accept or decline the integrated result;
 - done: the intended outcome is complete;
 - failed: the attempt stopped with inspectable evidence;

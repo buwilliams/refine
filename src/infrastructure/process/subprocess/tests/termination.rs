@@ -76,3 +76,38 @@ fn requested_termination_keeps_registry_truth_until_process_exit() {
 
     fs::remove_dir_all(temp_root).unwrap();
 }
+
+#[cfg(unix)]
+#[test]
+fn managed_completion_timeout_bounds_a_process_that_keeps_producing_output() {
+    let root = unique_temp_dir("event-completion-timeout");
+    let supervisor = FileProcessSupervisor::new(&root);
+    let started = Instant::now();
+    let result = supervisor.run_to_completion(ManagedProcessSpec {
+        owner: ProcessOwner::Agent,
+        command: "sh".into(),
+        args: shell_args("while true; do printf progress; sleep 0.05; done"),
+        cwd: None,
+        env: vec![],
+        stdin: None,
+        limits: None,
+        authorization_command: None,
+        sensitive: false,
+        metadata: Map::from_iter([("completion_timeout_seconds".into(), json!(1))]),
+    });
+    assert!(
+        result
+            .unwrap_err()
+            .to_string()
+            .contains("completion timeout")
+    );
+    assert!(started.elapsed() < Duration::from_secs(5));
+    assert!(
+        supervisor
+            .list()
+            .unwrap()
+            .iter()
+            .all(|p| !FileProcessSupervisor::process_is_alive(p).unwrap())
+    );
+    fs::remove_dir_all(root).unwrap();
+}

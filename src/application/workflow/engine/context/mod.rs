@@ -110,6 +110,7 @@ impl<'a> WorkflowContext<'a> {
     }
 
     pub fn request_transition(&mut self, from: GoalStatus, to: GoalStatus) -> RefineResult<()> {
+        crate::application::events::workflow::exit(self, from.clone(), to.clone())?;
         let current = self.work_items.show_goal_summary(&self.goal_id)?;
         let current_node = current.goal.node_id.as_deref().unwrap_or("default");
         if current_node != self.node_id {

@@ -53,6 +53,7 @@ impl ObservedExecution {
                 "redirection unexpected",
                 "unexpected token",
                 "unexpected end of file",
+                "unexpected eof",
                 "bad substitution",
             ]
             .iter()
@@ -82,11 +83,12 @@ pub(crate) fn is_quality_harness_fault(error: &RefineError) -> bool {
 }
 
 pub(crate) fn is_quality_output_contract_fault(error: &RefineError) -> bool {
-    matches!(
-        error,
-        RefineError::StructuredOutput(inner)
-            if inner.label() == QualityEvaluationWire::LABEL
-    )
+    matches!(error, RefineError::Serialization(message) if message.starts_with("Skill output contract failed"))
+        || matches!(
+            error,
+            RefineError::StructuredOutput(inner)
+                if inner.label() == QualityEvaluationWire::LABEL
+        )
 }
 
 pub(crate) fn record_quality_provider_attempt(

@@ -4,6 +4,38 @@ use serde_json::json;
 use crate::application::agent_io::prompts::{PromptTemplate, render};
 
 impl FileWorkItemService {
+    pub(crate) fn settle_event_transition(
+        &self,
+        goal_id: &str,
+        transition_id: &str,
+        failed: bool,
+    ) -> RefineResult<()> {
+        let current = self.show_goal_summary(goal_id)?;
+        let (_lock, path, mut value) = self.read_goal_value_unchecked(&current)?;
+        let pending = value
+            .get("pending_event_transition")
+            .cloned()
+            .ok_or_else(|| RefineError::Conflict("Event transition was superseded".into()))?;
+        if pending["id"].as_str() != Some(transition_id) || pending["state"] != "pending" {
+            return Err(RefineError::Conflict(
+                "Event transition was superseded".into(),
+            ));
+        }
+        let stale = pending["revision"] != value["workflow_revision"];
+        if failed || stale {
+            value["pending_event_transition"]["state"] =
+                json!(if stale { "superseded" } else { "failed" });
+            write_json_atomically(&path, &value)?;
+            return Ok(());
+        }
+        let to = pending["to"]
+            .as_str()
+            .ok_or_else(|| RefineError::InvalidInput("missing Event destination".into()))?;
+        crate::application::events::transitions::approve_exit(&self.refine_dir, &value, to)?;
+        let mut requested = pending["requested"].clone();
+        requested["workflow_revision"] = value["workflow_revision"].clone();
+        write_json_atomically(&path, &requested)
+    }
     pub fn retry_goal_quality_summary(&self, goal_id: &str) -> RefineResult<GoalSummaryProjection> {
         let current = self.show_goal_summary(goal_id)?;
         validate_goal_operation(&current.goal.status, &GoalOperation::RetryQuality)?;

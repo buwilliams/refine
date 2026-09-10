@@ -1,11 +1,8 @@
 pub mod contract;
 
-use std::time::Duration;
-
 use serde_json::{Value, json};
 
 use crate::application::agent_io::prompts::{PromptEngine, PromptTemplate};
-use crate::application::agents::sessions::{GoalAgentLaunch, run_goal_agent_with_settlement};
 use crate::application::persistence_sync::resolution::ConflictResolver;
 use crate::application::work_items::AlreadyMergedSettlement;
 use crate::application::workflow::engine::behaviors::contract::{
@@ -28,12 +25,10 @@ use crate::application::workflow::recovery::candidate_handoff::{
 use crate::application::workflow::{
     CandidateRefreshOutcome, GovernanceEvaluation, QualityRecoveryInvestigation,
     agent_idle_timeout, agent_worktree_cwd, complete_implementation_planning,
-    fail_implementation_phase, governed_implementation_prompt, implementation_branch_name,
-    implementation_resume_session, json_object, now_timestamp, parse_governance_provider_output,
-    parse_quality_recovery_provider_output, post_implementation_governance_prompt,
+    implementation_branch_name, json_object, now_timestamp, parse_quality_recovery_provider_output,
     quality_recovery_prompt, refresh_candidate_for_target_advancement,
     refresh_candidate_with_resolver, round_agent_context, run_governed_implementation_planning,
-    selected_agent_context, setting_string, setting_usize, workflow_conflict_resolver,
+    selected_agent_context, setting_string, workflow_conflict_resolver,
 };
 use crate::error::{MergeConflictStage, RefineError, RefineResult};
 use crate::infrastructure::agents::invocation::{
@@ -42,9 +37,6 @@ use crate::infrastructure::agents::invocation::{
 use crate::infrastructure::git::with_repository_git_lock;
 use crate::infrastructure::git::worktrees::{
     FileGitWorktreeService, GitWorktreeService, MergeResult,
-};
-use crate::infrastructure::process::supervisor::config::{
-    FileGovernanceService, FileGuidanceService,
 };
 use crate::infrastructure::process::supervisor::operations::{
     FileOperationRegistry, OperationRegistry, OperationState,
@@ -678,7 +670,7 @@ impl WorkflowBehavior for WorkflowPlan {
         Ok(WorkflowAdvanceOutcome::Transition {
             from: GoalStatus::Plan,
             to: GoalStatus::Implement,
-            reason: "Plan was proposed, criticized, and finalized".to_string(),
+            reason: "Plan Skills produced validated implementation plans".to_string(),
         })
     }
 }
@@ -710,106 +702,60 @@ impl WorkflowBehavior for WorkflowImplementation {
             Ok(plan) => plan,
             Err(error) => return fail(ctx, "implement", error),
         };
-        let prompt = match governed_implementation_prompt(&ctx.goal_id, &agent_context, &final_plan)
-        {
-            Ok(prompt) => prompt,
-            Err(error) => return fail(ctx, "implementation_planning", error),
-        };
-        let mut process_metadata =
-            ctx.workflow_process_metadata("implement", "WorkflowImplementation");
-        process_metadata.insert("implementation_phase".to_string(), json!("implement"));
-        process_metadata.insert(
-            "operation_id".to_string(),
-            json!(uuid::Uuid::new_v4().to_string()),
-        );
-        process_metadata.insert(
-            "worktree".to_string(),
-            json!({"path": worktree_path, "branch": branch}),
-        );
         let implementation_started_at = now_timestamp();
-        let resume_session = implementation_resume_session(ctx);
-        let observation_before_launch = resume_session
-            .as_ref()
-            .map(|_| {
-                FileGitWorktreeService::with_runtime_root(&agent_cwd, ctx.runtime_root)
-                    .implementation_planning_observation()
-            })
-            .transpose()
-            .ok()
-            .flatten();
-        let launch_with_session = |provider_session| GoalAgentLaunch {
-            provider_session,
-            runtime_root: ctx.runtime_root.to_path_buf(),
-            cwd: agent_cwd.clone(),
-            provider: ctx.provider.clone(),
-            prompt: prompt.clone(),
-            metadata: process_metadata.clone(),
-            completion_timeout: Some(Duration::from_secs(setting_usize(
-                &ctx.settings,
-                "agent_hard_cap_seconds",
-                7200,
-            ) as u64)),
-            idle_timeout: crate::application::workflow::agent_idle_timeout(&ctx.settings),
+        let results = crate::application::events::workflow::run(
+            ctx,
+            GoalStatus::Implement,
+            "enter",
+            &agent_cwd,
+            json!({"agent_context": agent_context, "plans": final_plan}),
+            "implement",
+        )?;
+        crate::application::events::workflow::require_success(&results)?;
+        let provider_output = results
+            .iter()
+            .map(|r| format!("{}: {}", r.binding_id, r.summary))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let mut evidence = crate::model::goal::ImplementationExecutionEvidence {
+            checklist: Vec::new(),
+            verification: Vec::new(),
         };
-        let on_attention = |attention: crate::application::agents::sessions::GoalAgentAttention| {
-            let _ = ctx.log(
-                "agent",
-                "Goal Agent is waiting for user input",
-                Some(json_object(json!({
-                    "provider": ctx.provider,
-                    "message": attention.message,
-                    "branch": branch,
-                    "worktree": worktree_path
-                }))),
-            );
-        };
-        let launch_result = run_goal_agent_with_settlement(
-            launch_with_session(resume_session.clone()),
-            on_attention,
-            |_| Ok(()),
-        );
-        let launch_result = match launch_result {
-            // A resumed plan-phase session can be gone by now — pruned by the
-            // provider or from an earlier daemon lifetime. Retry fresh only
-            // when the worktree is provably untouched, so a genuine mid-work
-            // agent failure still fails the Round exactly as before.
-            Err(resume_error)
-                if resume_session.is_some()
-                    && observation_before_launch.is_some()
-                    && FileGitWorktreeService::with_runtime_root(&agent_cwd, ctx.runtime_root)
-                        .implementation_planning_observation()
-                        .ok()
-                        == observation_before_launch =>
-            {
-                let _ = ctx.log(
-                    "agent",
-                    "Goal Agent could not resume the plan-phase provider session; retrying fresh",
-                    Some(json_object(json!({
-                        "provider": ctx.provider,
-                        "resume_error": resume_error.to_string(),
-                        "branch": branch
-                    }))),
-                );
-                run_goal_agent_with_settlement(launch_with_session(None), on_attention, |_| Ok(()))
+        for result in results.iter().filter(|r| r.role == "implement") {
+            let value = result
+                .artifacts
+                .get("implementation_evidence")
+                .cloned()
+                .ok_or_else(|| {
+                    RefineError::InvalidInput("Implement Skill omitted checklist evidence".into())
+                })?;
+            let next: crate::model::goal::ImplementationExecutionEvidence =
+                serde_json::from_value(value)
+                    .map_err(|e| RefineError::InvalidInput(e.to_string()))?;
+            for item in next.checklist {
+                if let Some(existing) = evidence.checklist.iter_mut().find(|e| e.id == item.id) {
+                    existing
+                        .evidence
+                        .push_str(&format!("\n{}: {}", result.binding_id, item.evidence));
+                    if !matches!(
+                        item.outcome,
+                        crate::model::goal::ImplementationChecklistOutcome::Completed
+                            | crate::model::goal::ImplementationChecklistOutcome::NoChangeNeeded
+                    ) {
+                        existing.outcome = item.outcome;
+                    }
+                } else {
+                    evidence.checklist.push(item);
+                }
             }
-            other => other,
-        };
-        let agent_result = match launch_result {
-            Ok(result) => result,
-            Err(error) => {
-                let failure = fail_implementation_phase(ctx, "provider", &error);
-                return fail(ctx, "agent", failure);
-            }
-        };
-        let provider_output = agent_result.output;
-        if let Err(error) = complete_implementation_planning(
+            evidence.verification.extend(next.verification);
+        }
+        complete_implementation_planning(
             ctx,
             implementation_started_at,
             provider_output.clone(),
-            agent_result.implementation_evidence.clone(),
-        ) {
-            return fail(ctx, "implementation_planning", error);
-        }
+            Some(evidence),
+        )?;
         if let Err(error) = ctx
             .work_items
             .update_latest_goal_round_implementation_report(&ctx.goal_id, &provider_output)
@@ -878,11 +824,7 @@ impl WorkflowBehavior for WorkflowImplementation {
             Err(error) => return fail(ctx, "guidance", error),
         };
         let code_changed = changed_paths.iter().any(|path| is_code_path(path));
-        let guidance_decision = match guidance_decision(
-            &agent_context,
-            agent_result.guidance_applied.as_deref(),
-            code_changed,
-        ) {
+        let guidance_decision = match guidance_decision(&agent_context, None, code_changed) {
             Ok(decision) => decision,
             Err(error) => return fail(ctx, "guidance", error),
         };
@@ -1569,6 +1511,12 @@ impl WorkflowBehavior for WorkflowGovernance {
                         .map(GovernanceIntegrationStep::Outcome);
                 }
 
+                crate::application::events::workflow::exit(
+                    ctx,
+                    GoalStatus::Governance,
+                    GoalStatus::Review,
+                )?;
+
                 with_repository_git_lock(&target_root, || {
                     ctx.revalidate_authority(GoalStatus::Governance)?;
                     let detail = ctx.work_items.show_goal_detail(&ctx.goal_id)?;
@@ -1993,56 +1941,29 @@ fn run_quality_correction_agent(ctx: &mut WorkflowContext<'_>) -> RefineResult<(
         .get("implementation_report")
         .and_then(Value::as_str)
         .unwrap_or("No implementation report was recorded.");
-    let context_json = serde_json::to_string_pretty(&agent_context).map_err(|error| {
-        RefineError::Serialization(format!("failed to encode Quality context: {error}"))
-    })?;
-    let plan_json = serde_json::to_string_pretty(&plan).map_err(|error| {
-        RefineError::Serialization(format!("failed to encode finalized plan: {error}"))
-    })?;
-    let prompt = PromptEngine::render(
-        PromptTemplate::GoalWorkflowQualityAgent,
-        &[
-            ("context_json", &context_json),
-            ("plan_json", &plan_json),
-            ("implementation_report", implementation_report),
-        ],
-    )
-    .map_err(|error| RefineError::Serialization(format!("invalid Quality prompt: {error}")))?;
+
     let agent_cwd = agent_worktree_cwd(
         &worktree_path,
         setting_string(&ctx.settings, "agent_subpath", "").as_str(),
     )?;
-    let report = if cfg!(test) && ctx.provider == "smoke-ai" {
-        "Smoke AI Quality fixture reviewed the candidate and retained existing tests.".to_string()
-    } else {
-        let result = run_goal_agent_with_settlement(
-            GoalAgentLaunch {
-                provider_session: None,
-                runtime_root: ctx.runtime_root.to_path_buf(),
-                cwd: agent_cwd,
-                provider: ctx.provider.clone(),
-                prompt,
-                metadata: ctx.workflow_process_metadata("quality", "WorkflowQualityAgent"),
-                completion_timeout: Some(Duration::from_secs(setting_usize(
-                    &ctx.settings,
-                    "agent_hard_cap_seconds",
-                    7200,
-                ) as u64)),
-                idle_timeout: crate::application::workflow::agent_idle_timeout(&ctx.settings),
-            },
-            |attention| {
-                let _ = ctx.log(
-                    "quality",
-                    "Quality Agent is waiting for user input",
-                    Some(json_object(json!({"message": attention.message}))),
-                );
-            },
-            |_| Ok(()),
-        )?;
-        let output = result.output;
-        ctx.revalidate_authority(GoalStatus::Quality)?;
-        output
-    };
+    let results = crate::application::events::workflow::run(
+        ctx,
+        GoalStatus::Quality,
+        "enter",
+        &agent_cwd,
+        json!({"agent_context": agent_context, "plans": plan, "implementation_report": implementation_report}),
+        &format!("correct-{}", ctx.commit.as_deref().unwrap_or("")),
+    )?;
+    let report = results
+        .iter()
+        .map(|r| format!("{}: {}", r.binding_id, r.summary))
+        .collect::<Vec<_>>()
+        .join("\n");
+    ctx.work_items.update_goal_round_evaluation_summary(
+        &ctx.goal_id,
+        ctx.round_idx,
+        &json!({"quality_skill_results": results}),
+    )?;
     let target_branch = setting_string(&ctx.settings, "merge_target_branch", "main");
     let worktree_git = FileGitWorktreeService::with_runtime_root(&worktree_path, ctx.runtime_root);
     ctx.revalidate_authority(GoalStatus::Quality)?;
@@ -2109,9 +2030,7 @@ fn ensure_goal_agent_context(ctx: &WorkflowContext<'_>, goal: &Value) -> RefineR
         return Ok(context.clone());
     }
 
-    let governance = FileGovernanceService::new(ctx.refine_dir()).load()?;
-    let guidance = FileGuidanceService::new(ctx.refine_dir()).list()?;
-    let context = goal_agent_context(&governance, &guidance, goal, ctx.round_idx)?;
+    let context = goal_agent_context(&json!({}), &json!({"guidance": []}), goal, ctx.round_idx)?;
     ctx.work_items.update_latest_goal_round_evaluation_summary(
         &ctx.goal_id,
         &json!({"agent_context": context}),
@@ -2360,91 +2279,54 @@ fn evaluate_workflow_governance(
     provider_cwd: &std::path::Path,
     agent_context: &Value,
 ) -> RefineResult<GovernanceEvaluation> {
-    let governance = agent_context.get("governance").cloned().ok_or_else(|| {
-        RefineError::Serialization(format!(
-            "Goal {} round {} has no pinned governance context",
-            ctx.goal_id,
-            ctx.round_idx + 1
-        ))
-    })?;
-    let rules = governance
-        .get("rules")
-        .and_then(|value| value.as_array())
-        .cloned()
-        .unwrap_or_default();
-    let guidance = agent_context
-        .get("guidance_candidates")
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default();
-    let product_or_constitution_configured = governance
-        .get("product")
-        .and_then(Value::as_str)
-        .is_some_and(|value| !value.trim().is_empty())
-        || governance
-            .get("constitution")
-            .and_then(Value::as_str)
-            .is_some_and(|value| !value.trim().is_empty());
-    if rules.is_empty() && guidance.is_empty() && !product_or_constitution_configured {
-        return Ok(GovernanceEvaluation {
-            failed: false,
-            message: None,
-            recovery_analysis: None,
-            recovery_round_prompt: None,
-            details: json_object(json!({
-                "phase": "post_implementation",
-                "configured": false,
-                "governance_configured": governance.get("configured").and_then(Value::as_bool).unwrap_or(false),
-                "rules_checked": 0,
-                "guidance_checked": 0,
-                "failed_actions": []
-            })),
-        });
-    }
-    let prompt = post_implementation_governance_prompt(
-        &governance,
-        &rules,
-        &guidance,
-        worktree_path,
+    let results = crate::application::events::workflow::run(
+        ctx,
+        GoalStatus::Governance,
+        "enter",
         provider_cwd,
-        &ctx.goal_id,
-        ctx.round_idx,
-    );
-    let provider = HostAgentProviderService::with_runtime_root(ctx.runtime_root.join("agents"));
-    let output = provider.invoke(ProviderInvocation {
-        provider: ctx.provider.clone(),
-        prompt,
-        session_id: None,
-        cwd: Some(provider_cwd.display().to_string()),
-        stall_timeout_seconds: agent_idle_timeout(&ctx.settings).map(|timeout| timeout.as_secs()),
-        process_metadata: ctx.workflow_process_metadata("governance", "WorkflowGovernance"),
-    })?;
-    let mut evaluation = parse_governance_provider_output(&output, rules.len());
-    evaluation
-        .details
-        .insert("provider".to_string(), Value::String(ctx.provider.clone()));
-    evaluation
-        .details
-        .insert("guidance_checked".to_string(), json!(guidance.len()));
-    evaluation.details.insert(
-        "worktree".to_string(),
-        Value::String(worktree_path.to_string()),
-    );
-    evaluation.details.insert(
-        "cwd".to_string(),
-        Value::String(provider_cwd.display().to_string()),
-    );
-    evaluation.details.insert(
-        "governance_configured".to_string(),
-        governance
-            .get("configured")
-            .and_then(Value::as_bool)
-            .unwrap_or(false)
-            .into(),
-    );
+        agent_context.clone(),
+        ctx.commit.as_deref().unwrap_or(""),
+    )?;
+    let failures: Vec<_> = results.iter().filter(|r| r.outcome != "success").collect();
+    let actions = failures.iter().flat_map(|result| result.artifacts.get("violations").and_then(Value::as_array).into_iter().flatten().map(move |violation| json!({"rule_id": format!("{}:{}", result.binding_id, violation.get("rule_id").and_then(Value::as_str).unwrap_or("finding")), "state":"failed", "message":violation.get("message"), "evidence":violation.get("evidence")}))).collect::<Vec<_>>();
+    let analysis = failures
+        .iter()
+        .map(|r| {
+            r.artifacts
+                .get("recovery_analysis")
+                .and_then(Value::as_str)
+                .unwrap_or(&r.summary)
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    let recovery = failures
+        .iter()
+        .filter_map(|r| {
+            r.artifacts
+                .get("recovery_round_prompt")
+                .and_then(Value::as_str)
+        })
+        .collect::<Vec<_>>()
+        .join("\n\n");
+    if !failures.is_empty() && recovery.trim().is_empty() {
+        return Err(RefineError::InvalidInput(
+            "Governance findings require an actionable recovery request".into(),
+        ));
+    }
     Ok(GovernanceEvaluation {
-        details: evaluation.details,
-        ..evaluation
+        failed: !failures.is_empty(),
+        message: (!failures.is_empty()).then(|| {
+            failures
+                .iter()
+                .map(|r| r.summary.as_str())
+                .collect::<Vec<_>>()
+                .join("; ")
+        }),
+        recovery_analysis: (!failures.is_empty()).then_some(analysis),
+        recovery_round_prompt: (!failures.is_empty()).then_some(recovery),
+        details: json_object(
+            json!({"phase": "post_implementation", "configured": true, "skill_results": results, "failed_actions": actions, "worktree": worktree_path, "candidate_commit": ctx.commit}),
+        ),
     })
 }
 
@@ -2684,10 +2566,14 @@ fn current_automatic_retry_attempt(ctx: &WorkflowContext<'_>) -> RefineResult<u3
 }
 
 fn max_automatic_round_retries(ctx: &WorkflowContext<'_>) -> RefineResult<u32> {
-    Ok(FileGovernanceService::new(ctx.refine_dir())
-        .load()?
+    Ok(ctx
+        .settings
         .get("max_automatic_round_retries")
-        .and_then(Value::as_u64)
+        .and_then(|value| {
+            value
+                .as_u64()
+                .or_else(|| value.as_str().and_then(|s| s.parse().ok()))
+        })
         .and_then(|value| u32::try_from(value).ok())
         .unwrap_or(5))
 }

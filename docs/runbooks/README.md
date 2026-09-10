@@ -18,6 +18,10 @@ source code:
 
 Runbooks:
 
+- [Configure Events and Skills](configure-events-and-skills.md) — bind reusable
+  agent instructions to workflow activity and custom actions, with scoped settings,
+  parameters, migration, and execution evidence.
+
 - [Install Refine](install.md) — install or update Refine, configure an agent
   provider, start the daemon, and verify the result.
 - [Operate development-request email intake](development-request-email.md) —

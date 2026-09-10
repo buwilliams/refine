@@ -5,6 +5,14 @@ use crate::error::RefineError;
 use super::super::*;
 
 pub(in crate::surfaces::web_server) fn error_response(error: RefineError) -> ApiResponse {
+    if let RefineError::Conflict(message) = &error
+        && message.starts_with(crate::application::events::transitions::PENDING)
+    {
+        return ApiResponse::json(
+            202,
+            json!({"pending": true, "message": message, "transition_id": message.trim_start_matches(crate::application::events::transitions::PENDING).trim()}),
+        );
+    }
     let (status, code) = match &error {
         RefineError::InvalidInput(_) => (400, "invalid_input"),
         RefineError::NotFound(_) => (404, "not_found"),

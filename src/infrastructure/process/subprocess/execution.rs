@@ -173,12 +173,21 @@ impl FileProcessSupervisor {
         // Output is the process demonstrating it is still working, so it resets
         // the budget. Without this a command that hangs holds every lock it took
         // for as long as the daemon lives.
+        let started = Instant::now();
+        let hard_cap = spec
+            .metadata
+            .get("completion_timeout_seconds")
+            .and_then(Value::as_u64)
+            .filter(|seconds| *seconds > 0)
+            .map(Duration::from_secs);
+        let mut hard_capped = false;
         let mut last_progress = Instant::now();
         let mut stalled = false;
         while reader_done < 2 || status.is_none() {
-            if let Some(stall_timeout) = stall_timeout
-                && status.is_none()
-                && last_progress.elapsed() >= stall_timeout
+            hard_capped = hard_cap.is_some_and(|limit| started.elapsed() >= limit);
+            if status.is_none()
+                && (hard_capped
+                    || stall_timeout.is_some_and(|limit| last_progress.elapsed() >= limit))
             {
                 // Signal the whole group where the process leads one. Killing
                 // only the direct child leaves its descendants holding the
@@ -271,6 +280,12 @@ impl FileProcessSupervisor {
         };
         process.exit_code = status.code();
         self.remove_process_artifacts(&process)?;
+        if hard_capped {
+            return Err(RefineError::Degraded(format!(
+                "managed process {} exceeded its completion timeout",
+                process.id
+            )));
+        }
         if stalled {
             // Degraded rather than a failure of the command itself: nothing is
             // known about whether the work would have succeeded, only that it
@@ -312,16 +327,16 @@ impl FileProcessSupervisor {
         &self,
         spec: &ManagedProcessSpec,
     ) -> RefineResult<Option<OperationLaunchGuard>> {
-        let Some(operation_id) = spec
-            .metadata
-            .get("operation_id")
-            .and_then(Value::as_str)
-            .filter(|value| !value.trim().is_empty())
-        else {
+        let ids = ["operation_id", "event_operation_id"]
+            .iter()
+            .filter_map(|key| spec.metadata.get(*key).and_then(Value::as_str))
+            .filter(|id| !id.is_empty())
+            .collect::<Vec<_>>();
+        if ids.is_empty() {
             return Ok(None);
-        };
+        }
         FileOperationRegistry::new(&self.runtime_root)
-            .active_launch_guard(operation_id)
+            .active_launch_guards(&ids)
             .map(Some)
     }
 }

@@ -258,7 +258,10 @@ fn daemon_agent_automation_loop_executes_todo_goals_without_manual_request() {
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let previous_smoke_ai = std::env::var_os("REFINE_SMOKE_AI_PATH");
     unsafe {
-        std::env::set_var("REFINE_SMOKE_AI_PATH", smoke_ai.to_str().unwrap());
+        std::env::set_var(
+            "REFINE_SMOKE_AI_PATH",
+            crate::application::events::test_support::adapt_fixture(&smoke_ai),
+        );
     }
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
@@ -267,7 +270,7 @@ fn daemon_agent_automation_loop_executes_todo_goals_without_manual_request() {
         .update(&json!({
             "agent_cli": "smoke-ai",
             "target_app_build_command": "printf build-ok",
-            "allowed_commands": "printf"
+            "allowed_commands": "printf,git"
         }))
         .unwrap();
 

@@ -113,6 +113,19 @@ fn workflow_admits_current_round_integration_from_todo_and_stops_resuming() {
     // checkout may be on another branch without invalidating exact target ancestry.
     git(&target_root, &["checkout", "refine/GOAL1/round-1"]).unwrap();
 
+    let provider = temp_root.join("proof-provider");
+    fs::write(&provider, "#!/bin/sh\nprintf '%s' fixture\n").unwrap();
+    {
+        use std::os::unix::fs::PermissionsExt;
+        fs::set_permissions(&provider, fs::Permissions::from_mode(0o755)).unwrap();
+    }
+    let _guard = smoke_ai_env_lock()
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
+    let _provider = SmokeAiGuard::set(&provider);
+    FileSettingsService::new(&refine_dir)
+        .update(&json!({"agent_cli":"smoke-ai"}))
+        .unwrap();
     let workflow = WorkflowEngine::with_target_root(&runtime_root, &target_root);
     let first = workflow.execute_work().unwrap();
     assert_eq!(first.len(), 1);

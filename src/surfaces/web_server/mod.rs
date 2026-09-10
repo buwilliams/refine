@@ -75,6 +75,18 @@ pub const API_GROUPS: &[ApiRouteGroup] = &[
         capability: "server-sent events for app, process, operation, chat updates",
     },
     ApiRouteGroup {
+        prefix: "/event-definitions",
+        capability: "system catalog, scoped Event bindings, custom Event invocation",
+    },
+    ApiRouteGroup {
+        prefix: "/skills",
+        capability: "scoped reusable Skill instructions and result roles",
+    },
+    ApiRouteGroup {
+        prefix: "/event-invocations",
+        capability: "Event results, evidence and cancellation",
+    },
+    ApiRouteGroup {
         prefix: "/quality",
         capability: "checks and screenshots",
     },
@@ -87,12 +99,8 @@ pub const API_GROUPS: &[ApiRouteGroup] = &[
         capability: "project and runtime settings",
     },
     ApiRouteGroup {
-        prefix: "/governance",
-        capability: "governance rules and generated project rules",
-    },
-    ApiRouteGroup {
-        prefix: "/guidance",
-        capability: "operator guidance documents",
+        prefix: "/next",
+        capability: "recommended project and fleet operations",
     },
     ApiRouteGroup {
         prefix: "/reporters",

@@ -9,6 +9,7 @@ pub(super) const RUNTIME_SETTINGS: &[&str] = &[
     "agent_idle_timeout_seconds",
     "agent_hard_cap_seconds",
     "agent_limit_pause_seconds",
+    "max_automatic_round_retries",
     "worker_memory_limit_mb",
     "ui_memory_limit_mb",
     "worker_cpu_priority",

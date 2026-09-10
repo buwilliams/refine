@@ -355,7 +355,12 @@ pub(crate) struct SmokeAiOverride(Option<OsString>);
 impl SmokeAiOverride {
     pub(crate) fn new(path: &Path) -> Self {
         let previous = std::env::var_os("REFINE_SMOKE_AI_PATH");
-        unsafe { std::env::set_var("REFINE_SMOKE_AI_PATH", path) };
+        unsafe {
+            std::env::set_var(
+                "REFINE_SMOKE_AI_PATH",
+                crate::application::events::test_support::adapt_fixture(path),
+            )
+        };
         Self(previous)
     }
 }

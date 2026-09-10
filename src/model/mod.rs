@@ -2,6 +2,7 @@
 //!
 //! Model code has no runtime, filesystem, process, or surface dependencies.
 
+pub mod automation;
 pub mod feature;
 pub mod fleet;
 pub mod goal;

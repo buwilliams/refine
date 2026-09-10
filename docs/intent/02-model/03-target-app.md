@@ -49,7 +49,7 @@ The current implementation details that matter to intent are:
   being published as durable `refine/state` project history;
 - Git provides history, isolation, rollback, and merge discipline;
 - Application services and daemon routes should coordinate state mutation so Surfaces do not compete for authority.
-- the active checkout-owned daemon is the normal configuration mutation authority for browser and CLI. Guidance and Governance collection revisions make stale writers explicit while stable item ids preserve unrelated entries; no surface writes `.git/refine-live-state` directly or creates a parallel configuration model.
+- the active checkout-owned daemon is the normal configuration mutation authority for browser and CLI. Events and Skills configuration revisions make stale writers explicit while stable item ids preserve unrelated entries; no surface writes `.git/refine-live-state` directly or creates a parallel configuration model.
 - state synchronization has no separate baseline artifact: the Git merge base
   of the local and remote `refine/state` heads is the reconciliation baseline,
   shared and durable by construction. Every sync pass snapshots live state

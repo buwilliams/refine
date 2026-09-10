@@ -10,8 +10,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
 
 const UNRESOLVABLE_CANDIDATE: &str = "0123456789abcdef0123456789abcdef01234567";
-const SMOKE_AI_CORRECTION_FIXTURE_REPORT: &str =
-    "Smoke AI Quality fixture reviewed the candidate and retained existing tests.";
+const SMOKE_AI_CORRECTION_FIXTURE_REPORT: &str = "workflow.quality.enter:default-quality: Smoke AI Quality fixture reviewed the candidate and retained existing tests.";
 
 #[test]
 fn resume_with_a_durable_quality_proof_transitions_without_any_provider_invocation() {

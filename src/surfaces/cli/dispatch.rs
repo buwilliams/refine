@@ -1,6 +1,7 @@
 mod agents;
 mod config;
 mod config_input;
+mod events;
 #[cfg(test)]
 pub(crate) use config::dispatch_config;
 mod daemon_transport;
@@ -186,6 +187,8 @@ pub fn dispatch(cli: Cli) -> RefineResult<()> {
     };
 
     match cli.command {
+        Commands::Events { action } => events::events(action),
+        Commands::Skills { action } => events::definitions("skills", action),
         command @ Commands::Config { .. } => config::dispatch_command(command),
         command @ Commands::Website { .. } => website::dispatch_command(command),
         command @ Commands::System { .. } => system::dispatch_command(command),
@@ -581,28 +584,12 @@ fn direct_work_item_service(target_root: &Path) -> RefineResult<FileWorkItemServ
 
 pub(super) fn explicit_target_root_path(command: &Commands) -> Option<&PathBuf> {
     match command {
+        Commands::Events { .. } | Commands::Skills { .. } => None,
         Commands::Config { action } => match action {
             ConfigAction::Show { target_root, .. } => target_root.as_ref(),
             ConfigAction::Settings { action } => match action {
                 ConfigSettingsAction::Show { target_root }
                 | ConfigSettingsAction::Set { target_root, .. } => target_root.as_ref(),
-            },
-            ConfigAction::Quality { action } => match action {
-                ConfigQualityAction::Show { target_root }
-                | ConfigQualityAction::Set { target_root, .. } => target_root.as_ref(),
-            },
-            ConfigAction::Governance { action } => match action {
-                ConfigGovernanceAction::Show { target_root }
-                | ConfigGovernanceAction::Set { target_root, .. }
-                | ConfigGovernanceAction::GenerateRules { target_root, .. } => target_root.as_ref(),
-            },
-            ConfigAction::Guidance { action } => match action {
-                ConfigGuidanceAction::List { target_root }
-                | ConfigGuidanceAction::Add { target_root, .. }
-                | ConfigGuidanceAction::Edit { target_root, .. }
-                | ConfigGuidanceAction::Enable { target_root, .. }
-                | ConfigGuidanceAction::Disable { target_root, .. }
-                | ConfigGuidanceAction::Remove { target_root, .. } => target_root.as_ref(),
             },
         },
         Commands::Project { action } => match action {

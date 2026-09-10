@@ -132,6 +132,10 @@ function renderNodeRuntimeConfigSections(s, activeNodeLabel, cli) {
         control: `<input type="text" id="s-pattern" data-testid="runtime-branch-name-pattern" value="${htmlEscape(s.branch_name_pattern || "refine/{goal_id}")}">`,
       })}
       ${renderSettingsEditableField({
+        id: "s-round-retries", label: "Automatic recovery Round limit", valueLabel: s.max_automatic_round_retries ?? 5,
+        control: `<input type="number" id="s-round-retries" min="0" max="100" value="${htmlEscape(s.max_automatic_round_retries ?? 5)}">`,
+      })}
+      ${renderSettingsEditableField({
         id: "s-idle",
         label: "Agent idle timeout (seconds)",
         guideItemId: "runtime-agent-idle-timeout",
@@ -443,6 +447,7 @@ async function autosaveSettingsRuntime(options = {}) {
     parallel_run_cap: $("#s-cap").value,
     automatic_agent_resource_budget_percent: $("#s-automatic-resource-budget-percent").value,
     branch_name_pattern: $("#s-pattern").value,
+    max_automatic_round_retries: $("#s-round-retries").value,
     agent_idle_timeout_seconds: $("#s-idle").value,
     agent_hard_cap_seconds: $("#s-hard").value,
     worker_memory_limit_mb: $("#s-worker-memory").value,
@@ -473,7 +478,7 @@ function bindNodeRuntimeConfigControls() {
   const root = document.querySelector('[data-tab-pane="runtime"]');
   const autosaveRuntime = bindSettingsAutosave(
     root,
-    "#s-cap, #s-automatic-resource-budget-percent, #s-pattern, #s-idle, #s-hard, #s-worker-memory, #s-ui-memory, #s-worker-cpu-priority, #s-resource-isolation, #s-agent-limit-pause, #s-chat-idle, #s-backlog-promote, #s-auto-approve, #s-worktree-cleanup-delay, #s-state-sync-debounce, #s-project-update-pulse, #s-state-sync-stale-threshold, #s-state-sync-auto-recovery, #s-state-sync-agent-resolution, #s-workflow-conflict-resolution, #s-file-browser-ignore",
+    "#s-cap, #s-automatic-resource-budget-percent, #s-pattern, #s-round-retries, #s-idle, #s-hard, #s-worker-memory, #s-ui-memory, #s-worker-cpu-priority, #s-resource-isolation, #s-agent-limit-pause, #s-chat-idle, #s-backlog-promote, #s-auto-approve, #s-worktree-cleanup-delay, #s-state-sync-debounce, #s-project-update-pulse, #s-state-sync-stale-threshold, #s-state-sync-auto-recovery, #s-state-sync-agent-resolution, #s-workflow-conflict-resolution, #s-file-browser-ignore",
     autosaveSettingsRuntime,
     { event: "settings-editable-commit" },
   );

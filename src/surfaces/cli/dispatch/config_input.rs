@@ -1,17 +1,5 @@
 use super::*;
 
-pub(super) fn decode_optional_config_input(
-    payload: ConfigPayload,
-    flags: serde_json::Map<String, Value>,
-    label: &str,
-) -> RefineResult<Value> {
-    if !flags.is_empty() || payload.json.is_some() || payload.file.is_some() || payload.stdin {
-        decode_config_input(payload, flags, label)
-    } else {
-        Ok(json!({}))
-    }
-}
-
 pub(super) fn decode_config_input(
     payload: ConfigPayload,
     flags: serde_json::Map<String, Value>,
@@ -64,35 +52,6 @@ fn decode_config_input_with_reader(
         )));
     }
     Ok(value)
-}
-
-pub(super) fn validate_governance_generation(body: &Value) -> RefineResult<()> {
-    let object = body.as_object().ok_or_else(|| {
-        RefineError::InvalidInput("Governance generation must be a JSON object".to_string())
-    })?;
-    for (key, value) in object {
-        if !matches!(key.as_str(), "product" | "constitution" | "provider") {
-            return Err(RefineError::InvalidInput(format!(
-                "unknown Governance generation field: {key}"
-            )));
-        }
-        if !value.is_string() {
-            return Err(RefineError::InvalidInput(format!(
-                "Governance generation {key} must be a string"
-            )));
-        }
-    }
-    Ok(())
-}
-
-pub(super) fn insert_optional(
-    values: &mut serde_json::Map<String, Value>,
-    key: &str,
-    value: Option<String>,
-) {
-    if let Some(value) = value {
-        values.insert(key.to_string(), Value::String(value));
-    }
 }
 
 fn parse_object(text: &str, source: &str) -> RefineResult<Value> {

@@ -84,16 +84,15 @@ pub(super) fn terminal_recovery_state_is_authoritative(
     ) && current != next
 }
 
-pub(super) fn process_operation_id(process: &ManagedProcess) -> Option<String> {
+pub(super) fn process_belongs_to_operation(process: &ManagedProcess, operation_id: &str) -> bool {
     process
         .details
         .as_deref()
         .and_then(|details| serde_json::from_str::<Value>(details).ok())
-        .and_then(|details| {
-            details
-                .get("operation_id")
-                .and_then(Value::as_str)
-                .map(str::to_string)
+        .is_some_and(|details| {
+            ["operation_id", "event_operation_id"]
+                .iter()
+                .any(|key| details.get(*key).and_then(Value::as_str) == Some(operation_id))
         })
 }
 

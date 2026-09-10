@@ -310,7 +310,8 @@ function drawGoalDetail(goal) {
   // Outside implementation it opens a separate diagnostic session whose stop
   // lifecycle cannot requeue, cancel, or otherwise mutate the Goal.
   const canOpenAgent = !!goal.id;
-  const openAgentTitle = ["plan", "implement", "quality"].includes(goal.status)
+  const eventAgents = !!goal.rounds?.at(-1)?.event_configuration && ["plan", "implement", "quality", "governance"].includes(goal.status);
+  const openAgentTitle = eventAgents ? "Inspect this Goal's Event agents, results, and process evidence" : ["plan", "implement", "quality"].includes(goal.status)
     ? "Attach to the running Goal Agent"
     : "Open a diagnostic Agent with this Goal's recorded context";
 
@@ -348,7 +349,7 @@ function drawGoalDetail(goal) {
         <div class="goal-action-group">
           <button class="goal-action-primary" id="btn-open-agent" data-testid="goal-open-agent"
                   ${canOpenAgent ? "" : "disabled"}
-                  title="${htmlEscape(openAgentTitle)}">Open Agent</button>
+                  title="${htmlEscape(openAgentTitle)}">${eventAgents ? "Event agents" : "Open Agent"}</button>
           <details class="nav-menu goal-action-menu" id="goal-action-menu"${actionMenuOpen ? " open" : ""}>
             <summary class="btn goal-action-more" aria-label="More Goal actions" data-testid="goal-action-menu-toggle"></summary>
             <div class="nav-menu-panel goal-action-panel">
@@ -451,7 +452,10 @@ function bindGoalDetailControls() {
   const liveWorkflow = () => _goalDetailView.workflow || {};
 
   bindOnce($("#btn-open-agent"), "click", () => {
-    openAgentDock({ goalId: liveGoal().id, goalStatus: liveGoal().status });
+    const goal = liveGoal();
+    if (goal.rounds?.at(-1)?.event_configuration && ["plan", "implement", "quality", "governance"].includes(goal.status)) {
+      openEventHistory(null, 0, goal.id).catch(showActionError);
+    } else { openAgentDock({ goalId: goal.id, goalStatus: goal.status }); }
   });
   bindOnce($("#btn-watch-logs"), "click", () => {
     closeGoalActionMenu();

@@ -2,6 +2,9 @@ use super::*;
 
 impl QualityService for FileQualityService {
     fn run_checks(&self, request: QualityCheckRequest) -> RefineResult<QualityCheckResult> {
+        if self.refine_dir.join("automation/config.json").exists() {
+            return self.run_skill_checks(request);
+        }
         let candidate_root = PathBuf::from(&request.cwd);
         verify_candidate(&candidate_root, &request.candidate_commit, "before")?;
         let settings = self.load_settings()?;

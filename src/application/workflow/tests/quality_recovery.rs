@@ -54,7 +54,10 @@ fn file_automation_fails_after_the_shared_quality_recovery_budget_is_exhausted()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let previous_smoke_ai = std::env::var_os("REFINE_SMOKE_AI_PATH");
     unsafe {
-        std::env::set_var("REFINE_SMOKE_AI_PATH", smoke_ai.to_str().unwrap());
+        std::env::set_var(
+            "REFINE_SMOKE_AI_PATH",
+            crate::application::events::test_support::adapt_fixture(&smoke_ai),
+        );
     }
     let work_items = FileWorkItemService::new(&refine_dir);
     work_items
@@ -101,7 +104,7 @@ fn file_automation_fails_after_the_shared_quality_recovery_budget_is_exhausted()
             .unwrap_or("")
             .contains("health check")
     );
-    // Recovery Rounds are scoped: planning is synthesized (no criticize pass),
+    // Recovery Rounds are scoped: the Plan Skill focuses on the finding,
     // and the Round continues on the retained candidate branch lineage.
     let recovery_plan = &goal["rounds"][1]["implementation_plan"];
     assert_eq!(recovery_plan["state"], "completed");
@@ -109,13 +112,13 @@ fn file_automation_fails_after_the_shared_quality_recovery_budget_is_exhausted()
         recovery_plan["final_plan"]["result"]["summary"]
             .as_str()
             .unwrap_or("")
-            .starts_with("Scoped quality recovery"),
+            .starts_with("workflow.plan.enter:default-plan:"),
         "{recovery_plan}"
     );
     assert!(recovery_plan["criticism"].is_null());
     assert_eq!(
         recovery_plan["final_plan"]["result"]["checklist"][0]["id"],
-        "R1"
+        "workflow.plan.enter:default-plan:P1"
     );
     assert!(
         goal["branch_name"]

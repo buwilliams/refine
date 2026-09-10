@@ -81,32 +81,20 @@ fn static_main_nav_exposes_refine_source_update_affordance() {
 }
 
 #[test]
-fn static_project_settings_explain_governance_and_quality_effects() {
-    let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
-    let governance =
-        fs::read_to_string(static_root.join("js/features/settings_governance.js")).unwrap();
-    let quality = fs::read_to_string(static_root.join("js/features/settings_quality.js")).unwrap();
-
-    assert!(governance.contains(r#"data-testid="governance-explanation""#));
-    assert!(governance.contains("A rule finding can draft a fresh recovery Round"));
-    assert!(governance.contains("do not start a check now"));
-    assert!(governance.contains("rules_revision:"));
-    assert!(governance.contains("saved.rules || []"));
-    assert!(governance.contains("e.status === 409"));
-    assert!(governance.contains("refreshSettingsTab(\"governance\""));
-
-    let guidance =
-        fs::read_to_string(static_root.join("js/features/settings_guidance.js")).unwrap();
-    assert!(guidance.contains("/api/guidance/${encodeURIComponent(current.id)}"));
-    assert!(guidance.contains("{ ...item, revision }"));
-    assert!(guidance.contains("e.status === 409"));
-    assert!(guidance.contains("refreshSettingsTab(refreshTab, { force: true })"));
-    assert!(!guidance.contains("api(\"PUT\", \"/api/guidance\""));
-
-    assert!(quality.contains(r#"data-testid="quality-explanation""#));
-    assert!(quality.contains("Passing checks advance the Goal to Governance"));
-    assert!(quality.contains("preserve the candidate"));
-    assert!(quality.contains("do not start a run now"));
+fn static_settings_replace_retired_editors_with_events_and_skills() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
+    let index = fs::read_to_string(root.join("index.html")).unwrap();
+    let settings = fs::read_to_string(root.join("js/features/settings.js")).unwrap();
+    assert!(index.contains("settings_events.js"));
+    assert!(settings.contains("slug: \"events\""));
+    assert!(settings.contains("slug: \"skills\""));
+    for retired in [
+        "settings_governance.js",
+        "settings_guidance.js",
+        "settings_quality.js",
+    ] {
+        assert!(!index.contains(retired));
+    }
 }
 
 #[test]
@@ -118,21 +106,10 @@ fn static_releases_surface_separates_prepare_from_confirmed_publish() {
         fs::read_to_string(static_root.join("js/features/settings_releases.js")).unwrap();
 
     assert!(index.contains("settings_releases.js"));
-    let node_tabs = settings
-        .split("  node: {")
-        .nth(1)
-        .and_then(|node| node.split("  project: {").next())
-        .expect("Node settings surface");
-    assert!(node_tabs.contains(r#"{ slug: "runtime", label: "Runtime Config" }"#));
-    assert!(node_tabs.contains(r#"{ slug: "releases", label: "Refine (dev)" }"#));
+    let node_tabs = settings.split("const SETTINGS_SURFACES =").nth(1).unwrap();
     assert!(
-        node_tabs.find(r#"slug: "runtime""#).unwrap()
-            < node_tabs.find(r#"slug: "releases""#).unwrap()
-    );
-    assert!(
-        node_tabs
-            .trim_end()
-            .ends_with("{ slug: \"releases\", label: \"Refine (dev)\" },\n    ],\n  },")
+        node_tabs.find("slug: \"runtime\"").unwrap()
+            < node_tabs.find("slug: \"releases\"").unwrap()
     );
     assert!(releases.contains(r#"data-testid="release-bump""#));
     assert!(releases.contains(r#"data-testid="release-preview""#));

@@ -13,7 +13,6 @@ use crate::application::projects::registry::registry_apps_array;
 use crate::application::system::installation::InstallTarget;
 use crate::error::RefineResult;
 use crate::infrastructure::agents::invocation::{AgentProviderService, HostAgentProviderService};
-use crate::infrastructure::observability::activity::{ActivityService, FileActivityService};
 use crate::infrastructure::observability::metrics::{FileMetricsService, PerformanceQuery};
 use crate::infrastructure::process::subprocess::ManagedProcess;
 use crate::infrastructure::process::supervisor::operations::OperationHandle;
@@ -183,12 +182,6 @@ pub(in crate::surfaces::web_server) fn first_non_empty(first: &str, second: &str
     } else {
         first.to_string()
     }
-}
-
-pub(in crate::surfaces::web_server) fn append_quality_activity(refine_dir: &Path, message: String) {
-    let service = FileActivityService::new(refine_dir);
-    let entry = service.new_entry(message, "info", "quality", None, Some("refine".to_string()));
-    let _ = service.append(entry);
 }
 
 pub(in crate::surfaces::web_server) fn operation_response(

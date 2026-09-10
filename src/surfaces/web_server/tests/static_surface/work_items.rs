@@ -1,14 +1,15 @@
 use super::*;
 
 #[test]
-fn static_goal_detail_opens_the_workflow_agent_instead_of_goal_chat() {
+fn static_goal_detail_exposes_event_agents_and_retains_interactive_diagnostics() {
     let static_root = Path::new(env!("CARGO_MANIFEST_DIR")).join("src/surfaces/web/static");
     let goal_detail = fs::read_to_string(static_root.join("js/features/goals-detail.js")).unwrap();
     let toolbar = fs::read_to_string(static_root.join("js/features/toolbar.js")).unwrap();
 
     assert!(goal_detail.contains(r#"data-testid="goal-open-agent""#));
     assert!(goal_detail.contains("Open Agent"));
-    assert!(goal_detail.contains("openAgentDock({ goalId: liveGoal().id"));
+    assert!(goal_detail.contains("openAgentDock({ goalId: goal.id"));
+    assert!(goal_detail.contains("openEventHistory(null, 0, goal.id)"));
     assert!(toolbar.contains("function openAgentDock"));
     assert!(!goal_detail.contains("goal-open-chat"));
     assert!(!toolbar.contains("openChatDock"));

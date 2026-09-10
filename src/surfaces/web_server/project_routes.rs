@@ -1,17 +1,16 @@
 mod dashboard;
+mod events;
 mod nodes_fleet;
 mod projects;
-mod settings_governance;
+mod settings;
 mod target_app;
 mod todos;
 use crate::infrastructure::process::supervisor::config::{
-    ConfigService, FileGovernanceService, FileGuidanceService, FileReporterService,
-    FileSettingsService,
+    ConfigService, FileReporterService, FileSettingsService,
 };
 use std::collections::BTreeMap;
 use std::thread;
 
-use chrono::Utc;
 use serde_json::{Value, json};
 
 use crate::application::agent_io::prompts::{PromptTemplate, render};
@@ -139,26 +138,6 @@ fn dashboard_active_node(
     service.active_identity()
 }
 
-/// The canonical generated-rules shape shown to the agent. The parser also
-/// accepts `items`, bare arrays, `{rule}` objects, bare strings, and plain
-/// text lines.
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
-struct GeneratedGovernanceRulesContract {
-    rules: Vec<String>,
-}
-
-impl crate::application::agent_io::structured_output::Contract
-    for GeneratedGovernanceRulesContract
-{
-    const LABEL: &'static str = "generated Governance rules JSON";
-
-    fn example() -> Self {
-        GeneratedGovernanceRulesContract {
-            rules: vec!["one concise rule".to_string()],
-        }
-    }
-}
-
 /// The canonical target-app config shape shown to the agent. The parser also
 /// accepts legacy command spellings and string-typed timeouts.
 #[derive(Debug, serde::Deserialize, serde::Serialize)]
@@ -208,19 +187,6 @@ impl crate::application::agent_io::structured_output::Contract for TargetAppConf
             notes: "".to_string(),
         }
     }
-}
-
-fn governance_generation_prompt(product: &str, constitution: &str) -> String {
-    let rules_contract =
-        <GeneratedGovernanceRulesContract as crate::application::agent_io::structured_output::Contract>::contract_json();
-    render(
-        PromptTemplate::GovernanceGeneration,
-        &[
-            ("product", product),
-            ("constitution", constitution),
-            ("rules_contract", &rules_contract),
-        ],
-    )
 }
 
 fn target_app_generation_prompt(target_root: &std::path::Path) -> String {
@@ -362,65 +328,6 @@ fn target_app_generated_settings(config: &TargetAppGeneratedConfig) -> Value {
     })
 }
 
-fn generated_governance_rule(text: &str, index: usize) -> Value {
-    let timestamp = Utc::now().to_rfc3339();
-    json!({
-        "id": format!("generated-rule-{}-{index}", Utc::now().timestamp_millis()),
-        "text": text.chars().take(500).collect::<String>(),
-        "created": timestamp,
-        "updated": timestamp,
-        "source": "generated"
-    })
-}
-
-fn parse_generated_governance_rules(output: &str) -> Vec<Value> {
-    for value in crate::application::agent_io::structured_output::json_candidates(
-        output,
-        &crate::application::agent_io::structured_output::DecodeOptions::new(
-            <GeneratedGovernanceRulesContract as crate::application::agent_io::structured_output::Contract>::LABEL,
-        ),
-    ) {
-        let rules = value
-            .get("rules")
-            .or_else(|| value.get("items"))
-            .unwrap_or(&value);
-        if let Some(items) = rules.as_array() {
-            let parsed = items
-                .iter()
-                .enumerate()
-                .filter_map(|(index, item)| {
-                    let text = item
-                        .get("text")
-                        .or_else(|| item.get("rule"))
-                        .and_then(Value::as_str)
-                        .or_else(|| item.as_str())?
-                        .trim();
-                    (!text.is_empty()).then(|| generated_governance_rule(text, index + 1))
-                })
-                .collect::<Vec<_>>();
-            if !parsed.is_empty() {
-                return parsed;
-            }
-        }
-    }
-
-    output
-        .lines()
-        .map(|line| {
-            line.trim()
-                .trim_start_matches(|ch: char| {
-                    ch == '-' || ch == '*' || ch.is_ascii_digit() || ch == '.'
-                })
-                .trim()
-        })
-        .filter(|line| !line.is_empty())
-        .enumerate()
-        .map(|(index, line)| generated_governance_rule(line, index + 1))
-        .collect()
-}
-
-impl InProcessWebServer {}
-
 fn body_string<'a>(body: &'a Value, key: &str) -> &'a str {
     body.get(key).and_then(Value::as_str).unwrap_or("")
 }
@@ -428,18 +335,6 @@ fn body_string<'a>(body: &'a Value, key: &str) -> &'a str {
 fn todo_list_id_from_path(path: &str) -> Option<&str> {
     path.strip_prefix("/todos/lists/")
         .filter(|id| !id.is_empty() && !id.contains('/'))
-}
-
-fn guidance_id_from_path(path: &str) -> Option<&str> {
-    path.strip_prefix("/guidance/")
-        .filter(|id| !id.is_empty() && !id.contains('/'))
-}
-
-fn guidance_id_required() -> ApiResponse {
-    ApiResponse::json(
-        404,
-        json!({"error": {"code": "not_found", "message": "Guidance route requires a valid entry id"}}),
-    )
 }
 
 fn todo_item_collection_list_id(path: &str) -> Option<&str> {

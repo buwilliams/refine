@@ -27,7 +27,19 @@ pub(crate) fn is_bootstrap_state_path(path: &std::path::Path) -> bool {
 }
 
 pub(crate) fn bootstrap_only_state(state: &DurableStateMap) -> bool {
-    state.keys().all(|path| is_bootstrap_state_path(path))
+    static PRISTINE_EVENTS: OnceLock<u64> = OnceLock::new();
+    let pristine = PRISTINE_EVENTS.get_or_init(|| {
+        state_content_fingerprint(&crate::application::events::migration::pristine_config_bytes())
+    });
+    let defaults_only = state.get(std::path::Path::new("automation/config.json")) == Some(pristine);
+    state.keys().all(|path| {
+        is_bootstrap_state_path(path)
+            || (defaults_only
+                && matches!(
+                    path.to_string_lossy().replace('\\', "/").as_str(),
+                    "automation/config.json" | "automation/migration-v1.json"
+                ))
+    })
 }
 
 /// Identity of a file as it was when its contents were last hashed.

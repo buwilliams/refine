@@ -49,6 +49,15 @@ impl InProcessWebServer {
         let raw_path = request.path.clone();
         request.path = normalize_api_path(&request.path);
 
+        if ["/event-definitions", "/skills", "/event-invocations"]
+            .iter()
+            .any(|prefix| {
+                request.path == *prefix || request.path.starts_with(&format!("{prefix}/"))
+            })
+        {
+            return self.handle_event_capability(request, &raw_path);
+        }
+
         if request.path == mcp::MCP_ROUTE {
             return self.handle_mcp(&request);
         }
@@ -541,40 +550,8 @@ impl InProcessWebServer {
             return self.handle_upgrade_status();
         }
 
-        if request.method == "GET" && request.path == "/governance" {
-            return self.handle_governance_get();
-        }
-
-        if request.method == "PATCH" && request.path == "/governance" {
-            return self.handle_governance_save(request);
-        }
-
-        if request.method == "POST" && request.path == "/governance/generate-rules" {
-            return self.handle_governance_generate_rules(request);
-        }
-
-        if request.method == "GET" && request.path == "/guidance/next" {
+        if request.method == "GET" && request.path == "/next" {
             return self.handle_guidance_next();
-        }
-
-        if request.method == "GET" && request.path == "/guidance" {
-            return self.handle_guidance_list();
-        }
-
-        if request.method == "PUT" && request.path == "/guidance" {
-            return self.handle_guidance_update(request);
-        }
-
-        if request.method == "POST" && request.path == "/guidance" {
-            return self.handle_guidance_add(request);
-        }
-
-        if request.method == "PATCH" && request.path.starts_with("/guidance/") {
-            return self.handle_guidance_edit(request);
-        }
-
-        if request.method == "DELETE" && request.path.starts_with("/guidance/") {
-            return self.handle_guidance_remove(request);
         }
 
         if request.method == "GET" && request.path == "/reporters" {
@@ -635,14 +612,6 @@ impl InProcessWebServer {
 
         if request.method == "DELETE" && request.path.starts_with("/todos/lists/") {
             return self.handle_todo_list_delete(request);
-        }
-
-        if request.method == "GET" && request.path == "/quality" {
-            return self.handle_quality_get();
-        }
-
-        if request.method == "PATCH" && request.path == "/quality" {
-            return self.handle_quality_save(request);
         }
 
         if request.method == "POST" && request.path == "/quality/checks" {

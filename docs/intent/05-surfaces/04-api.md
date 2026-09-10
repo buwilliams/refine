@@ -16,7 +16,7 @@ The API should be treated as local Application transport. It is important, but i
 
 ## Expected Role
 
-The API should expose groups that match Refine's Application design. Current route groups include system, apps, project, sync, target app, work, workflow, activity, import, dashboard, agents, operations, runner workers, processes, events, quality, chat, settings, governance, guidance, reporters, Reporter-scoped todos, nodes, fleet, changes, cache, performance, files, terminal, diagnostics, and upgrade.
+The API should expose groups that match Refine's Application design. Current route groups include system, apps, project, sync, target app, work, workflow, activity, import, dashboard, agents, operations, runner workers, processes, events, event definitions, Skills, event invocations, quality evidence, chat, settings, next actions, reporters, Reporter-scoped todos, nodes, fleet, changes, cache, performance, files, terminal, diagnostics, and upgrade.
 
 The daemon stores the checkout identity resolved at bootstrap and passes that
 request-scoped authority through system, install, update, source, process, and
@@ -56,7 +56,7 @@ State-sync health also carries the latest monotonic attempt id and source, the
 latest failed reconciliation identity, and the stable id and location of its
 complete conflict report.
 
-Settings, Quality, Governance, and Guidance routes are the shared configuration contract for browser and CLI. Ordinary Settings and Quality writes remain validated partial patches. Governance scalar patches preserve rules, while every rule replacement carries the observed `rules_revision`; Guidance entries have stable ids, item routes mutate one entry under the repository coordination lock, and both item and compatibility whole-list writes carry the observed `revision`. Stale revisions return `409` without overwriting unrelated state, missing ids return `404`, and successful writes return the normalized authoritative collection.
+Ordinary Settings use validated partial patches. `/event-definitions` and `/skills` expose the shared configuration document with stable item IDs and an observed revision required for every mutation. `/event-definitions/catalog` indexes system sources; custom trigger requests validate typed parameters and may carry a reusable request ID. `/event-invocations` exposes paginated evidence, status, and cancellation. Conflicting revisions return `409`, missing IDs return `404`, and cross-reference validation prevents deleting a bound Skill. `/events` retains its streaming meaning. Retired Governance, Guidance, and Quality configuration routes are removed; Quality evidence and check operations remain. API contract version 4 advertises these changes.
 
 Browser mutations must present an `Origin` or `Referer` whose authority matches
 the request `Host`. CLI and other non-browser clients may omit those headers.

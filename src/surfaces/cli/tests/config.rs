@@ -7,11 +7,10 @@ mod auto_approve;
 static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
 
 #[test]
-fn config_complete_command_tree_and_payload_forms_parse() {
+fn events_skills_and_runtime_command_trees_parse_and_retired_editors_are_rejected() {
     for args in [
         vec!["refine", "config", "show"],
-        vec!["refine", "config", "show", "quality"],
-        vec!["refine", "config", "settings", "show"],
+        vec!["refine", "config", "show", "skills"],
         vec![
             "refine",
             "config",
@@ -20,73 +19,48 @@ fn config_complete_command_tree_and_payload_forms_parse() {
             "--set",
             "agent_cli=codex",
         ],
+        vec!["refine", "events", "catalog"],
+        vec!["refine", "events", "list", "--node-id", "default"],
         vec![
             "refine",
-            "config",
-            "settings",
-            "set",
+            "events",
+            "trigger",
+            "deploy",
+            "--param",
+            "version=1",
+            "--request-id",
+            "request-1",
+        ],
+        vec![
+            "refine",
+            "events",
+            "bind",
+            "deploy",
+            "--revision",
+            "3",
             "--json",
-            r#"{"agent_cli":"codex"}"#,
+            "{}",
         ],
-        vec!["refine", "config", "quality", "show"],
+        vec!["refine", "events", "runs"],
+        vec!["refine", "events", "cancel", "invocation-1"],
         vec![
             "refine",
-            "config",
-            "quality",
-            "set",
-            "--test",
-            "Dashboard loads",
-        ],
-        vec![
-            "refine",
-            "config",
-            "quality",
-            "set",
+            "skills",
+            "save",
+            "check",
+            "--revision",
+            "4",
             "--file",
-            "quality.json",
+            "skill.json",
         ],
-        vec!["refine", "config", "governance", "show"],
-        vec![
-            "refine",
-            "config",
-            "governance",
-            "set",
-            "--rule",
-            "No regressions",
-        ],
-        vec!["refine", "config", "governance", "generate-rules"],
-        vec!["refine", "config", "governance", "set", "--stdin"],
-        vec!["refine", "config", "guidance", "list"],
-        vec![
-            "refine",
-            "config",
-            "guidance",
-            "add",
-            "--json",
-            r#"{"name":"A","rule":"B","instructions":"C"}"#,
-        ],
-        vec![
-            "refine",
-            "config",
-            "guidance",
-            "edit",
-            "guidance-1",
-            "--name",
-            "New",
-        ],
-        vec!["refine", "config", "guidance", "enable", "guidance-1"],
-        vec!["refine", "config", "guidance", "disable", "guidance-1"],
-        vec!["refine", "config", "guidance", "remove", "guidance-1"],
+        vec!["refine", "skills", "enable", "check"],
+        vec!["refine", "skills", "remove", "check", "--revision", "5"],
     ] {
         Cli::try_parse_from(&args).unwrap_or_else(|error| panic!("failed {args:?}: {error}"));
     }
-    assert!(
-        Cli::try_parse_from([
-            "refine", "config", "quality", "set", "--json", "{}", "--file", "q.json"
-        ])
-        .is_ok(),
-        "the shared decoder owns structured overlapping-source errors"
-    );
+    for retired in ["quality", "governance", "guidance"] {
+        assert!(Cli::try_parse_from(["refine", "config", retired, "show"]).is_err());
+    }
 }
 
 #[test]
@@ -120,58 +94,47 @@ fn config_help_documents_scope_boundary_and_catalogs_every_family() {
         .iter()
         .map(|command| command["name"].as_str().unwrap())
         .collect::<Vec<_>>();
-    assert_eq!(
-        names,
-        ["show", "settings", "quality", "governance", "guidance"]
-    );
+    assert_eq!(names, ["show", "settings"]);
 }
 
 #[test]
 fn config_target_root_adapter_uses_shared_services_and_returns_saved_readback() {
-    let temp_root = unique_temp_dir("cli-config-target-root");
-    let target = temp_root.join("app");
-    fs::create_dir_all(&target).unwrap();
-
+    let root = unique_temp_dir("cli-config-target-root");
+    std::fs::create_dir_all(&root).unwrap();
     let saved = dispatch_config(
         Cli::try_parse_from([
             "refine",
             "config",
-            "quality",
+            "settings",
             "set",
-            "--business-requirements",
-            "Dashboard works",
-            "--test",
-            "Dashboard loads",
+            "--set",
+            "agent_cli=codex",
             "--target-root",
-            target.to_str().unwrap(),
+            root.to_str().unwrap(),
         ])
         .unwrap()
         .command
         .into_config(),
     )
     .unwrap();
-    assert_eq!(saved["business_requirements"], "Dashboard works");
-    assert_eq!(saved["tests"], json!(["Dashboard loads"]));
-
+    assert_eq!(saved["settings"]["agent_cli"], "codex");
     let all = dispatch_config(
         Cli::try_parse_from([
             "refine",
             "config",
             "show",
             "--target-root",
-            target.to_str().unwrap(),
+            root.to_str().unwrap(),
         ])
         .unwrap()
         .command
         .into_config(),
     )
     .unwrap();
-    assert_eq!(all["quality"]["business_requirements"], "Dashboard works");
-    assert!(all["settings"].is_object());
-    assert_eq!(all["governance"]["rules_revision"], 0);
-    assert_eq!(all["guidance"]["revision"], 0);
-
-    fs::remove_dir_all(temp_root).unwrap();
+    assert_eq!(all["skills"]["items"].as_array().unwrap().len(), 4);
+    assert_eq!(all["events"]["items"].as_array().unwrap().len(), 21);
+    assert!(all.get("governance").is_none());
+    fs::remove_dir_all(root).unwrap();
 }
 
 trait IntoConfigAction {
@@ -189,121 +152,51 @@ impl IntoConfigAction for Commands {
 
 #[test]
 fn config_rejects_unknown_malformed_and_overlapping_input_before_state_changes() {
-    let temp_root = unique_temp_dir("cli-config-invalid");
-    let target = temp_root.join("app");
-    fs::create_dir_all(&target).unwrap();
-    let target = target.to_str().unwrap();
-
-    let malformed = Cli::try_parse_from([
-        "refine",
-        "config",
-        "quality",
-        "set",
-        "--json",
+    let root = unique_temp_dir("cli-config-invalid");
+    fs::create_dir_all(&root).unwrap();
+    for payload in [
         "{",
-        "--target-root",
-        target,
-    ])
-    .unwrap()
-    .command
-    .into_config();
-    assert!(matches!(
-        dispatch_config(malformed),
-        Err(RefineError::InvalidInput(_))
-    ));
-
-    let unknown = Cli::try_parse_from([
+        r#"{"unknown_setting":true}"#,
+        r#"{"max_automatic_round_retries":-1}"#,
+    ] {
+        let action = Cli::try_parse_from([
+            "refine",
+            "config",
+            "settings",
+            "set",
+            "--json",
+            payload,
+            "--target-root",
+            root.to_str().unwrap(),
+        ])
+        .unwrap()
+        .command
+        .into_config();
+        assert!(matches!(
+            dispatch_config(action),
+            Err(RefineError::InvalidInput(_))
+        ));
+    }
+    let action = Cli::try_parse_from([
         "refine",
         "config",
         "settings",
         "set",
-        "--set",
-        "unknown_setting=true",
-        "--target-root",
-        target,
-    ])
-    .unwrap()
-    .command
-    .into_config();
-    assert!(matches!(
-        dispatch_config(unknown),
-        Err(RefineError::InvalidInput(_))
-    ));
-
-    let overlap = Cli::try_parse_from([
-        "refine",
-        "config",
-        "quality",
-        "set",
-        "--instructions",
-        "One",
         "--json",
         "{}",
+        "--set",
+        "agent_cli=codex",
         "--target-root",
-        target,
+        root.to_str().unwrap(),
     ])
     .unwrap()
     .command
     .into_config();
     assert!(matches!(
-        dispatch_config(overlap),
+        dispatch_config(action),
         Err(RefineError::InvalidInput(_))
     ));
-
-    let invalid_quality = Cli::try_parse_from([
-        "refine",
-        "config",
-        "quality",
-        "set",
-        "--json",
-        r#"{"tests":"not-a-list"}"#,
-        "--target-root",
-        target,
-    ])
-    .unwrap()
-    .command
-    .into_config();
-    assert!(matches!(
-        dispatch_config(invalid_quality),
-        Err(RefineError::InvalidInput(_))
-    ));
-
-    let invalid_governance = Cli::try_parse_from([
-        "refine",
-        "config",
-        "governance",
-        "set",
-        "--json",
-        r#"{"max_automatic_round_retries":-1}"#,
-        "--target-root",
-        target,
-    ])
-    .unwrap()
-    .command
-    .into_config();
-    assert!(matches!(
-        dispatch_config(invalid_governance),
-        Err(RefineError::InvalidInput(_))
-    ));
-
-    let missing_guidance = Cli::try_parse_from([
-        "refine",
-        "config",
-        "guidance",
-        "remove",
-        "missing",
-        "--target-root",
-        target,
-    ])
-    .unwrap()
-    .command
-    .into_config();
-    assert!(matches!(
-        dispatch_config(missing_guidance),
-        Err(RefineError::NotFound(_))
-    ));
-
-    fs::remove_dir_all(temp_root).unwrap();
+    fs::remove_dir_all(root).unwrap();
 }
 
 #[test]

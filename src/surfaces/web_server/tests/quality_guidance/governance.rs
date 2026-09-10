@@ -3,12 +3,7 @@ use super::*;
 #[test]
 fn configuration_routes_report_detached_target_app() {
     let server = server_with_projection();
-    for path in [
-        "/api/settings",
-        "/api/quality",
-        "/api/governance",
-        "/api/guidance",
-    ] {
+    for path in ["/api/settings", "/api/event-definitions", "/api/skills"] {
         let response = server.handle(ApiRequest {
             method: "GET".to_string(),
             path: path.to_string(),
@@ -20,101 +15,56 @@ fn configuration_routes_report_detached_target_app() {
 }
 
 #[test]
-fn web_server_manages_governance_guidance_and_reporters() {
+fn web_server_manages_events_skills_and_reporters() {
     let temp_root = unique_temp_dir("http-project-config");
     let refine_dir = temp_root.join(".refine");
     let mut server = server_with_projection();
     server.target_root = Some(refine_dir.parent().unwrap().to_path_buf());
 
-    let governance = server.handle(ApiRequest {
-        method: "PATCH".to_string(),
-        path: "/api/governance".to_string(),
-        body: Some(json!({
-            "product": "Refine",
-            "constitution": "Be useful",
-            "rules": [{"text": "No regressions"}]
-        })),
-    });
-    assert_eq!(governance.status, 200);
-    assert_eq!(governance.body["configured"], true);
-    assert_eq!(governance.body["rules"].as_array().unwrap().len(), 1);
-
-    let generated = server.handle(ApiRequest {
-        method: "POST".to_string(),
-        path: "/api/governance/generate-rules".to_string(),
-        body: Some(json!({"product": "Refine", "constitution": "Be useful"})),
-    });
-    assert_eq!(generated.status, 200);
-    assert_eq!(generated.body["ok"], true);
-    assert!(generated.body["rules"].as_array().unwrap().len() >= 2);
-
-    let guidance = server.handle(ApiRequest {
-        method: "PUT".to_string(),
-        path: "/api/guidance".to_string(),
-        body: Some(json!({"guidance": [{
-            "name": "Accessibility",
-            "rule": "When UI changes",
-            "instructions": "Check keyboard behavior",
-            "enabled": true
-        }]})),
-    });
-    assert_eq!(guidance.status, 200);
-    assert_eq!(guidance.body["guidance"].as_array().unwrap().len(), 1);
-    assert_eq!(guidance.body["revision"], 1);
-    let guidance_id = guidance.body["guidance"][0]["id"].as_str().unwrap();
-    let added = server.handle(ApiRequest {
-        method: "POST".to_string(),
-        path: "/api/guidance".to_string(),
-        body: Some(json!({
-            "revision": 1,
-            "name": "Cohesion",
-            "rule": "When code changes",
-            "instructions": "Keep files focused"
-        })),
-    });
-    assert_eq!(added.status, 200);
-    assert_eq!(added.body["revision"], 2);
-    assert_eq!(added.body["guidance"].as_array().unwrap().len(), 2);
-    let stale = server.handle(ApiRequest {
-        method: "PATCH".to_string(),
-        path: format!("/api/guidance/{guidance_id}"),
-        body: Some(json!({"revision": 1, "enabled": false})),
-    });
-    assert_eq!(stale.status, 409);
-    let stale_list = server.handle(ApiRequest {
-        method: "PUT".to_string(),
-        path: "/api/guidance".to_string(),
-        body: Some(json!({
-            "revision": 1,
-            "guidance": [{
-                "id": guidance_id,
-                "name": "Accessibility",
-                "rule": "When UI changes",
-                "instructions": "Overwrite concurrently added entry",
-                "enabled": true
-            }]
-        })),
-    });
-    assert_eq!(stale_list.status, 409);
-    let after_stale = server.handle(ApiRequest {
-        method: "GET".to_string(),
-        path: "/api/guidance".to_string(),
+    let catalog = server.handle(ApiRequest {
+        method: "GET".into(),
+        path: "/api/event-definitions/catalog".into(),
         body: None,
     });
-    assert_eq!(after_stale.body["guidance"].as_array().unwrap().len(), 2);
-    let missing = server.handle(ApiRequest {
-        method: "DELETE".to_string(),
-        path: "/api/guidance/missing".to_string(),
-        body: Some(json!({"revision": 2})),
+    assert_eq!(catalog.status, 200);
+    assert_eq!(catalog.body["sources"].as_array().unwrap().len(), 21);
+    let skills = server.handle(ApiRequest {
+        method: "GET".into(),
+        path: "/api/skills".into(),
+        body: None,
     });
-    assert_eq!(missing.status, 404);
-
-    let stale_governance = server.handle(ApiRequest {
-        method: "PATCH".to_string(),
-        path: "/api/governance".to_string(),
-        body: Some(json!({"rules": [{"text": "Stale"}], "rules_revision": 0})),
+    assert_eq!(skills.status, 200);
+    let revision = skills.body["revision"].clone();
+    let saved = server.handle(ApiRequest { method: "PUT".into(), path: "/api/skills/accessibility".into(), body: Some(json!({"revision": revision,"item":{"name":"Accessibility", "prompt":"Check keyboard behavior", "role":"task"}})) });
+    assert_eq!(saved.status, 200);
+    let stale = server.handle(ApiRequest {
+        method: "PUT".into(),
+        path: "/api/skills/accessibility".into(),
+        body: Some(
+            json!({"revision":revision,"item":{"name":"Stale", "prompt":"Stale", "role":"task"}}),
+        ),
     });
-    assert_eq!(stale_governance.status, 409);
+    assert_eq!(stale.status, 409);
+    let event = server.handle(ApiRequest { method:"PUT".into(), path:"/api/event-definitions/check-ui".into(), body:Some(json!({"revision":saved.body["revision"],"item":{"name":"Check UI", "kind":"custom", "bindings":[{"id":"check", "skill_id":"accessibility"}]}})) });
+    assert_eq!(event.status, 200);
+    let referenced = server.handle(ApiRequest {
+        method: "DELETE".into(),
+        path: "/api/skills/accessibility".into(),
+        body: Some(json!({"revision":event.body["revision"]})),
+    });
+    assert_eq!(referenced.status, 409);
+    for retired in ["/api/quality", "/api/governance", "/api/guidance"] {
+        assert_eq!(
+            server
+                .handle(ApiRequest {
+                    method: "GET".into(),
+                    path: retired.into(),
+                    body: None
+                })
+                .status,
+            404
+        );
+    }
 
     let reporter_one = server.handle(ApiRequest {
         method: "POST".to_string(),
@@ -153,8 +103,7 @@ fn web_server_manages_governance_guidance_and_reporters() {
     });
     assert_eq!(listed.status, 200);
     assert_eq!(listed.body["reporters"].as_array().unwrap().len(), 1);
-    assert!(refine_dir.join("governance.json").exists());
-    assert!(refine_dir.join("guidance.json").exists());
+    assert!(refine_dir.join("automation/config.json").exists());
     assert!(refine_dir.join("reporters.json").exists());
 
     remove_temp_dir(&temp_root);

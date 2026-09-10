@@ -3,7 +3,7 @@
 ## Key Ideas
 
 - **Agents Turn Intent Into Work**: agents read context, use tools, make changes, and leave evidence.
-- **Guided Autonomy**: agents should have enough guidance, governance, and target-app context to act well without redefining product semantics.
+- **Guided Autonomy**: agents should have enough Skills, Event parameters, and target-app context to act well without redefining product semantics.
 - **Operations With Accountability**: agents should use powerful Application behavior and Infrastructure mechanisms while leaving recoverable traces.
 - **Evidence Before Trust**: quality checks, logs, diffs, review, and activity should explain why work is ready.
 - **Reviewable Handoff**: agent work should move through review, merge, and Git worktree boundaries without losing context.
@@ -16,7 +16,7 @@ Agents exist because Refine is designed for software work that is increasingly p
 
 This Application area folds together the concerns that make agent work useful instead of merely powerful:
 
-- guidance gives agents product context and local operating instructions;
+- Skills give agents product context and reusable instructions; Events choose when they run;
 - governance shapes risk, judgment, and review pressure;
 - operations let agents act on the target app, files, Git, commands, imports, diagnostics, and work items without creating a generic Tools layer;
 - quality checks produce evidence before confidence;
@@ -32,7 +32,7 @@ The child documents in this section describe the Application behavior agents nee
 
 The Agents Application should sit between Refine's intent and the outside world. It should help agents:
 
-- read target-app context, guidance, governance, settings, and existing work;
+- read target-app context, Skills, Event definitions, settings, and existing work;
 - explore ideas and shape selected plans into reviewable Features and Goals;
 - select tools appropriate to the work;
 - create or refine Goals and Features from imports, chats, plans, and source material;
@@ -61,14 +61,13 @@ Current implementation details that matter to intent:
   Runtime-free detect, configure, authentication, and diagnostics remain
   stateless; invoke, resume, interactive, and managed launches fail closed
   instead of inventing HOME, XDG, platform support, or CWD state.
-- every internal agent prompt is a Markdown template under `src/application/agent_io/prompts/<feature>/`, loaded through the shared prompt engine rather than embedded in consumer code;
+- internal feature prompts use the shared prompt engine; Event Skill instructions are authored configuration with a Refine-supplied completion contract;
 - agents should prefer installed local CLIs and host tools where possible;
 - chat and standalone sessions are agent behavior, not browser-only behavior;
 - import extraction and draft review should use shared work item persistence;
 - quality, governance, logs, activity, and System notices should be reusable agent evidence;
 - worktrees isolate agent output and preserve merge handoff.
-- a workflow-owned Goal Agent runs in one native CLI terminal per active Goal;
-  supported surfaces attach to that process instead of launching another agent.
+- workflow-owned Event agents use the shared managed invocation capability; invocation history exposes results and process evidence without launching duplicate work.
 
 The Agents Application should remain powerful. Refine's safety posture is mitigation greater than prevention: use Git, logs, Governance, Quality, review, process visibility, and durable state to make powerful actions recoverable and accountable.
 
@@ -78,7 +77,7 @@ This posture is intentionally ambitious. Refine should not teach agents to accep
 
 ## Future Direction
 
-Future agents should become the main actors in Refine. They may decompose Features, import plans, implement Goals, run quality checks, review other agents, resolve conflicts, prepare merges, update guidance, and coordinate across nodes.
+Future agents should become the main actors in Refine. They may decompose Features, import plans, implement Goals, run quality checks, review other agents, resolve conflicts, prepare merges, update Skills, and coordinate across nodes.
 
 As agents improve, the Application should become less transcript-bound and more evidence-aware. Agents should produce structured plans, source links, tests, risk summaries, dependency graphs, review notes, merge summaries, and recovery proposals.
 

@@ -12,7 +12,7 @@
     - Agent Operations
       - [Overview](03-application/01-agents/01-agent-operations/00-overview.md)
       - [Import](03-application/01-agents/01-agent-operations/01-import.md)
-    - [Guidance](03-application/01-agents/02-guidance.md)
+    - [Skills](03-application/01-agents/02-skills.md)
     - [Quality](03-application/01-agents/03-quality.md)
     - [Governance](03-application/01-agents/04-governance.md)
     - [Merge, Review, And Git Worktrees](03-application/01-agents/05-merge-review-git-worktrees.md)
@@ -34,6 +34,7 @@
     - [Cancelled](03-application/02-workflow/10-cancelled.md)
     - [Shared Workflow Consistency Contract](03-application/02-workflow/11-consistency-contract.md)
   - [Execution Ownership](03-application/03-execution-ownership.md)
+  - [Events](03-application/05-events.md)
   - [Persistence Sync](03-application/04-persistence-sync.md)
 - Infrastructure
   - [Process](04-infrastructure/01-process.md)

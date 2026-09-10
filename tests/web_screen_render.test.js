@@ -140,8 +140,9 @@ function apiFixture(pathname) {
   }
   if (pathname.startsWith("/api/diagnostics")) return {};
   if (pathname.startsWith("/api/quality")) return {};
-  if (pathname.startsWith("/api/governance")) return {};
-  if (pathname.startsWith("/api/guidance")) return { guidance: [] };
+  if (pathname === "/api/event-definitions/catalog") return {sources: ["workflow.quality.enter"], roles: ["task", "plan", "implement", "quality", "governance"]};
+  if (pathname === "/api/event-definitions" || pathname === "/api/skills") return {revision:1, items:[]};
+  if (pathname === "/api/event-invocations") return {items:[], offset:0, total:0};
   if (pathname.startsWith("/api/processes")) return {};
   if (pathname.startsWith("/api/performance")) {
     return { events: [], summary: {}, backend: { store: "jsonl" } };
@@ -1400,13 +1401,12 @@ test("every Node, Project, and legacy Settings tab renders and refreshes", { ski
       ["#/node/application", '[data-testid="project-app-select"]'],
       ["#/node/reporters", '[data-testid="reporters-table"]'],
       ["#/node/processes", '[data-testid="settings-pane-processes"].active'],
-      ["#/node/performance", '[data-testid="performance-refresh"]'],
       ["#/node/target-app", '[data-testid="target-app-copy-node"]'],
       ["#/node/runtime", '[data-testid="runtime-recheck-auth"]'],
-      ["#/node/releases", '[data-testid="source-promotion-section"]'],
-      ["#/project/governance", '[data-testid="governance-explanation"]'],
-      ["#/project/quality", '[data-testid="quality-explanation"]'],
-      ["#/project/guidance", '[data-testid="guidance-list"]'],
+      ["#/node/releases", '[data-testid="release-bump"]'],
+      ["#/project/governance", '[data-testid="settings-skills"]'],
+      ["#/settings/events", '[data-testid="settings-events"]'],
+      ["#/settings/skills", '[data-testid="settings-skills"]'],
       ["#/settings", '[data-testid="settings-pane-processes"].active'],
     ]) {
       await assertScreenRenders(app, { route, marker });
@@ -1733,4 +1733,70 @@ test("changed settings refresh preserves focus, dirty controls, scroll, and one 
   } finally {
     await app.close();
   }
+});
+
+test("Events and Skills editors save revisions and custom Events launch typed defaults from Controls", {skip: SKIP}, async () => {
+  let revision = 7;
+  const skills = [];
+  const event = {id:"check",name:"Check release",kind:"custom",enabled:true,scope:{node_id:null},parameters:[{name:"count",kind:"number",required:true,default:3},{name:"strict",kind:"boolean",default:true}],bindings:[],on_success:null};
+  const invocation = {id:"test-invocation",event,state:"pending",results:{},attempts:[]};
+  const launches = [];
+  const app = await openApp({fixture: (pathname, request) => {
+    if (pathname === "/api/skills") return {revision,items:skills};
+    if (pathname.startsWith("/api/skills/") && request.method() === "PUT") {
+      const body = request.postDataJSON(); assert.equal(body.revision, revision);
+      skills.push({...body.item,id:pathname.split("/").at(-1)}); return {revision:++revision,item:skills.at(-1)};
+    }
+    if (pathname === "/api/event-definitions") return {revision,items:[event]};
+    if (pathname === "/api/event-definitions/check") return {revision,item:event};
+    if (pathname.endsWith("/check/inputs")) return {revision,parameters:event.parameters};
+    if (pathname.endsWith("/check/trigger")) { launches.push(request.postDataJSON()); return invocation; }
+    if (pathname === "/api/event-invocations/test-invocation") return invocation;
+    if (pathname === "/api/event-invocations/test-invocation/cancel") { invocation.state="cancelled"; return invocation; }
+    return apiFixture(pathname);
+  }});
+  try {
+    await app.page.goto(`${app.origin}/#/settings/skills`);
+    await app.page.locator("[data-automation-new]").click();
+    const modal = app.page.locator('[data-testid="automation-modal"]');
+    await modal.locator('[data-name]').first().fill("Release review");
+    await modal.locator('[data-prompt]').fill("Inspect the release and report evidence.");
+    await modal.locator('[data-save]').click();
+    await app.page.waitForFunction(() => !document.querySelector('[data-testid="automation-modal"]'));
+    assert.equal(skills[0].prompt, "Inspect the release and report evidence.");
+    await app.page.locator('#nav-context-menu > summary').click();
+    await app.page.locator('[data-custom-event="check"]').click();
+    await modal.locator('[data-parameter-index="0"]').waitFor();
+    assert.equal(await modal.locator('[data-parameter-index="0"]').inputValue(), "3");
+    assert.equal(await modal.locator('[data-parameter-index="1"]').inputValue(), "true");
+    await modal.locator('[data-save]').click();
+    await app.page.waitForFunction(() => document.querySelector('[data-testid="automation-modal"]')?.textContent.includes('pending'));
+    assert.deepEqual(launches[0].parameters,{count:3,strict:true});
+    assert.equal(launches[0].node_id, "node-a");
+    assert.ok(launches[0].request_id);
+    await modal.locator('[data-delete]').click();
+    await app.page.waitForFunction(() => document.querySelector('[data-testid="automation-modal"]')?.textContent.includes('cancelled'));
+    await app.page.keyboard.press("Escape");
+    assert.equal(await modal.count(),0);
+    assert.deepEqual(app.pageErrors, []);
+    assert.equal(await app.page.evaluate(() => commandRegistry.has("event.custom.check")),true);
+  } finally { await app.close(); }
+});
+
+test("Goal Event agents open scoped invocation evidence during workflow execution", {skip: SKIP}, async () => {
+  const goal = {...GOAL,status:"implement",rounds:[{...GOAL.rounds[0],event_configuration:{revision:1}}]};
+  let historyGoal = null;
+  const app = await openApp({fixture: (pathname, request) => {
+    if (pathname === "/api/goals/GOAL1") return {goal};
+    if (pathname === "/api/event-invocations") { historyGoal = new URL(request.url()).searchParams.get("goal_id"); return {items:[],offset:0,total:0}; }
+    return apiFixture(pathname);
+  }});
+  try {
+    await app.page.goto(`${app.origin}/#/goals/GOAL1`);
+    await app.page.locator('[data-testid="goal-open-agent"]').click();
+    await app.page.locator('[data-testid="automation-modal"]').waitFor();
+    assert.equal(historyGoal,"GOAL1");
+    assert.match(await app.page.locator('[data-testid="automation-modal"]').textContent(),/Event agents · GOAL1/);
+    assert.deepEqual(app.pageErrors,[]);
+  } finally { await app.close(); }
 });

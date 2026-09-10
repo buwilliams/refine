@@ -5,6 +5,7 @@ pub mod agents;
 pub mod chat;
 pub mod development_requests;
 pub mod diagnostics;
+pub mod events;
 pub mod exports;
 pub mod fleet;
 pub mod guidance;

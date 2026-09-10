@@ -97,11 +97,12 @@ impl FileGovernanceIntegrationService {
         if snapshot.quality_proof.is_none() && snapshot.non_quality_gate_failure.is_none() {
             work_items.prepare_already_merged_quality_regeneration(goal_id, &snapshot)?;
             let settings = FileQualityService::new(&self.refine_dir).load_settings()?;
-            let provider = if settings.configured {
-                resolve_agent_provider(&self.runtime_root, None)?
-            } else {
-                "not-required".to_string()
-            };
+            let provider =
+                if self.refine_dir.join("automation/config.json").exists() || settings.configured {
+                    resolve_agent_provider(&self.runtime_root, None)?
+                } else {
+                    "not-required".to_string()
+                };
             let runner =
                 QualityOperationRunner::new(&self.refine_dir, &self.runtime_root, &target_root);
             let mut metadata = workflow_subprocess_metadata(

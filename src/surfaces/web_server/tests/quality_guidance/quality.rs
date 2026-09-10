@@ -119,7 +119,7 @@ fn daemon_startup_recovers_quality_cancellation_for_original_app_after_switch() 
 }
 
 #[test]
-fn web_server_manages_quality_settings_and_checks() {
+fn web_server_manages_quality_skill_and_checks() {
     let temp_root = unique_temp_dir("http-quality");
     let app_root = temp_root.join("app");
     let runtime_root = temp_root.join("run/8080");
@@ -160,7 +160,12 @@ fn web_server_manages_quality_settings_and_checks() {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let previous_smoke_ai = std::env::var_os("REFINE_SMOKE_AI_PATH");
-    unsafe { std::env::set_var("REFINE_SMOKE_AI_PATH", &smoke_ai) };
+    unsafe {
+        std::env::set_var(
+            "REFINE_SMOKE_AI_PATH",
+            crate::application::events::test_support::adapt_fixture(&smoke_ai),
+        )
+    };
     let mut server = server_with_projection();
     server.target_root = Some(app_root.clone());
     server.runtime_root = Some(runtime_root.clone());
@@ -184,43 +189,19 @@ fn web_server_manages_quality_settings_and_checks() {
     );
 
     let initial = server.handle(ApiRequest {
-        method: "GET".to_string(),
-        path: "/api/quality".to_string(),
+        method: "GET".into(),
+        path: "/api/skills/default-quality".into(),
         body: None,
     });
     assert_eq!(initial.status, 200);
-    assert_eq!(initial.body["enabled"], "1");
-    assert!(initial.body.get("timing").is_none());
-    assert_eq!(initial.body["tests"], json!([]));
-
+    let mut skill = initial.body["item"].clone();
+    skill["prompt"] = json!("Dashboard must render. Run focused checks for a signed-in user.");
     let saved = server.handle(ApiRequest {
-        method: "PATCH".to_string(),
-        path: "/api/quality".to_string(),
-        body: Some(json!({
-            "enabled": "1",
-            "timing": "post_build",
-            "business_requirements": "Dashboard must render",
-            "instructions": "Run focused checks",
-            "tests": ["Dashboard loads for a signed-in user."]
-        })),
+        method: "PUT".into(),
+        path: "/api/skills/default-quality".into(),
+        body: Some(json!({"revision":initial.body["revision"],"item":skill})),
     });
     assert_eq!(saved.status, 200);
-    assert_eq!(saved.body["enabled"], "1");
-    assert!(saved.body.get("timing").is_none());
-    assert_eq!(saved.body["configured"], true);
-
-    let legacy_timing = server.handle(ApiRequest {
-        method: "PATCH".to_string(),
-        path: "/api/settings".to_string(),
-        body: Some(json!({"quality_timing": "pre_merge"})),
-    });
-    assert_eq!(legacy_timing.status, 400);
-    let effective_quality = server.handle(ApiRequest {
-        method: "GET".to_string(),
-        path: "/api/quality".to_string(),
-        body: None,
-    });
-    assert!(effective_quality.body.get("timing").is_none());
     let dashboard = server.handle(ApiRequest {
         method: "GET".to_string(),
         path: "/api/dashboard".to_string(),
@@ -271,7 +252,7 @@ fn web_server_manages_quality_settings_and_checks() {
     assert_eq!(operation.result["owner_id"], "GOAL1");
     assert_eq!(
         operation.result["results"][0]["test"],
-        "Dashboard loads for a signed-in user."
+        "workflow.quality.enter:default-quality: Dashboard loads for a signed-in user."
     );
     assert!(operation.result["results"][0]["process_id"].is_string());
     let detail = work_items.show_goal_detail("GOAL1").unwrap();
@@ -322,8 +303,7 @@ fn web_server_manages_quality_settings_and_checks() {
         path: "/api/quality".to_string(),
         body: None,
     });
-    assert_eq!(listed.status, 200);
-    assert!(listed.body.get("regressions").is_none());
+    assert_eq!(listed.status, 404);
 
     unsafe {
         if let Some(previous) = previous_smoke_ai {

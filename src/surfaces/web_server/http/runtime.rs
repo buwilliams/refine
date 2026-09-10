@@ -50,6 +50,22 @@ impl LocalHttpDaemon {
     pub fn warm_caches_in_background(&self) {
         let daemon = self.clone();
         thread::spawn(move || {
+            if let (Ok(Some(refine_dir)), Some(runtime), Some(target)) = (
+                daemon.server.current_refine_dir(),
+                daemon.server.runtime_root.as_ref(),
+                daemon.server.target_root(),
+            ) {
+                let events = crate::application::events::FileEventService::with_runtime_root(
+                    &refine_dir,
+                    runtime,
+                );
+                // This readiness path runs in the daemon, rather than a replaceable worker.
+                static STARTUP_ID: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+                let startup = STARTUP_ID.get_or_init(|| uuid::Uuid::new_v4().to_string());
+                if let Err(error) = events.startup_ready(&target, startup) {
+                    eprintln!("refine startup Events: {error}");
+                }
+            }
             let _ = daemon.server.warm_current_projection_cache();
             let _ = daemon.server.warm_diagnostics_cache();
             let _ = daemon.warm_static_cache();
